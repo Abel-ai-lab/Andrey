@@ -28,8 +28,10 @@ completes the result by Meek's rules.
 
 Candidates are compared by the strength of their dependence on the target: the absolute partial
 correlation for a test that reports one (``statistic_pvalue``), else the p-value. Strengths that
-agree to ``KEY_DP`` decimals go to the candidate with the lower rank, from
-:func:`~andrey.core.ties.tie_ranks`, so the sets do not depend on the column order.
+agree go to the candidate with the lower rank, from :func:`~andrey.core.ties.tie_ranks`, so the
+sets do not depend on the column order. A partial correlation is compared to ``KEY_DP`` decimals.
+A p-value is compared to ``KEY_DP`` decimals in MMPC and to ``KEY_DP`` significant digits in every
+grow step of IAMB and Inter-IAMB (:func:`markov_blanket`).
 """
 
 from __future__ import annotations
@@ -74,8 +76,16 @@ def _tests_every_set(test: CITest) -> bool:
     return isinstance(test, TestwiseDeletion)
 
 
-def _dependence(test: CITest) -> _Dependence:
-    """The p-value and strength key of a query, read from ``statistic_pvalue`` where it exists."""
+def _pvalue_key(p: float, significant: bool) -> float:
+    """A p-value's strength key: ``p`` to ``KEY_DP`` significant digits when ``significant``, so
+    p-values far below ``10**-KEY_DP``, common for strong dependence on many rows, keep the order of
+    their sizes, else to ``KEY_DP`` decimals."""
+    return float(f"{p:.{KEY_DP}g}") if significant else round(p, KEY_DP)
+
+
+def _dependence(test: CITest, *, significant: bool = False) -> _Dependence:
+    """The p-value and strength key of a query, read from ``statistic_pvalue`` where it exists; a
+    p-value key is :func:`_pvalue_key`'s."""
     statistic_pvalue = getattr(test, "statistic_pvalue", None)
     if statistic_pvalue is not None:
 
@@ -87,13 +97,13 @@ def _dependence(test: CITest) -> _Dependence:
 
     def by_pvalue(target: int, x: int, cond: Sequence[int]) -> tuple[float, float]:
         p = test(target, x, cond)
-        return p, round(p, KEY_DP)
+        return p, _pvalue_key(p, significant)
 
     return by_pvalue
 
 
 def _dependences(
-    test: CITest,
+    test: CITest, *, significant: bool = False
 ) -> Callable[[int, Sequence[int], Sequence[int]], list[tuple[float, float]]]:
     """:func:`_dependence` of every candidate in ``xs`` against one conditioning set.
 
@@ -106,10 +116,10 @@ def _dependences(
         def by_scan(
             target: int, xs: Sequence[int], cond: Sequence[int]
         ) -> list[tuple[float, float]]:
-            return [(p, round(p, KEY_DP)) for p in scan(target, xs, cond).tolist()]
+            return [(p, _pvalue_key(p, significant)) for p in scan(target, xs, cond).tolist()]
 
         return by_scan
-    dependence = _dependence(test)
+    dependence = _dependence(test, significant=significant)
 
     def one_by_one(
         target: int, xs: Sequence[int], cond: Sequence[int]
@@ -143,7 +153,8 @@ def markov_blanket(
     """Estimate ``target``'s Markov blanket with IAMB, or with Inter-IAMB when ``interleaved``.
 
     Grow: add the candidate most dependent on ``target`` given the current blanket, among those
-    whose p-value is at or below ``alpha``, until none is. Shrink: visit the members in the order
+    whose p-value is at or below ``alpha``, until none is; a p-value strength is compared to
+    ``KEY_DP`` significant digits. Shrink: visit the members in the order
     they joined and drop each one the test finds independent of ``target`` (a p-value above
     ``alpha``) given the other current members. IAMB grows to the end and then shrinks once;
     Inter-IAMB shrinks after every addition and stops when no candidate qualifies or the blanket
@@ -161,7 +172,7 @@ def markov_blanket(
     ``target`` is set in it, in place, to the conditioning set of the last such test: the blanket
     of the grow step that left it out, or the other members when the shrink dropped it.
     """
-    dependences = _dependences(test)
+    dependences = _dependences(test, significant=True)
     required = _required(constraints, target, ranks)
     blanket: list[int] = list(required)
     seen: set[frozenset[int]] = set()

@@ -8,6 +8,16 @@ and, when a change breaks the API, Breaking, and from 0.11.0 it closes with New 
 someone contributes for the first time, sections Keep a Changelog does not define; each change
 names its pull request.
 
+## [Unreleased]
+
+### Changed
+
+- `iamb` and `inter_iamb` order the candidates of each grow step by their p-values to nine
+  significant digits, where they compared p-values rounded to nine decimals, which tied every
+  p-value below 5e-10 and left the choice to a rank computed from the data. On categorical data
+  their blankets can change for some targets, and so can the graphs of `rsmax2` with
+  `restrict="iamb"` or `"inter_iamb"`; results on continuous data do not change. ([#969])
+
 ## [0.18.0] - 2026-11-19
 
 ### Highlights
@@ -2675,3 +2685,4 @@ First alpha release.
 [#1090]: https://github.com/Abel-ai-lab/Andrey/pull/1090
 [#1099]: https://github.com/Abel-ai-lab/Andrey/pull/1099
 [card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
+[#969]: https://github.com/Abel-ai-lab/Andrey/pull/969
