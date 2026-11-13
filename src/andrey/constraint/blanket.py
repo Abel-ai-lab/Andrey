@@ -629,12 +629,18 @@ def blanket_cpdag(
 
 
 def _ranked_test(
-    X: np.ndarray, indep_test: str, categorical: np.ndarray | None, seed: int | None
+    X: np.ndarray,
+    indep_test: str,
+    categorical: np.ndarray | None,
+    seed: int | None,
+    degrees_of_freedom: str,
 ) -> tuple[CITest, list[int]]:
-    """The ``indep_test`` test, seeded by ``seed``, over ``X`` and each column's
-    :func:`~andrey.core.ties.tie_ranks`, the columns the test reads as categories ranked as
-    categories (:func:`~andrey.core.ties.tie_mask`)."""
-    test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
+    """The ``indep_test`` test, seeded by ``seed``, with ``degrees_of_freedom``, over ``X`` and
+    each column's :func:`~andrey.core.ties.tie_ranks`, the columns the test reads as categories
+    ranked as categories (:func:`~andrey.core.ties.tie_mask`)."""
+    test = make_indep_test(
+        indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
+    )
     return test, tie_ranks(X, tie_mask(indep_test, categorical, X.shape[1])).tolist()
 
 
@@ -873,6 +879,7 @@ def local_search(
     *,
     alpha: float,
     indep_test: str,
+    degrees_of_freedom: str = "mean",
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -881,11 +888,12 @@ def local_search(
     """A :class:`LocalSearch` over the ``indep_test`` test of ``X``.
 
     ``categorical`` marks the categorical columns for a mixed-data test; ``seed`` fixes the draws
-    of a stochastic test (``None`` uses ``ANDREY_SEED``); ``alpha``, ``max_depth``, and
+    of a stochastic test (``None`` uses ``ANDREY_SEED``); ``degrees_of_freedom`` reaches a
+    categorical test (:class:`~andrey.core.ci.ChiSquare`); ``alpha``, ``max_depth``, and
     ``constraints`` are as :class:`LocalSearch` takes them. A column the test reads as categories
     (:func:`~andrey.core.ties.tie_mask`) has as many levels as distinct observed values.
     """
-    test, ranks = _ranked_test(X, indep_test, categorical, seed)
+    test, ranks = _ranked_test(X, indep_test, categorical, seed, degrees_of_freedom)
     mask = tie_mask(indep_test, categorical, X.shape[1])
     levels = None
     if mask.any():
@@ -910,6 +918,7 @@ def local_structure(
     *,
     alpha: float,
     indep_test: str,
+    degrees_of_freedom: str = "mean",
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -931,6 +940,7 @@ def local_structure(
         X,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
@@ -947,6 +957,7 @@ def local_set(
     *,
     alpha: float,
     indep_test: str,
+    degrees_of_freedom: str = "mean",
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -961,6 +972,7 @@ def local_set(
         X,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,

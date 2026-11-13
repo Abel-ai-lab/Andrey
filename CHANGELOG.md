@@ -10,6 +10,15 @@ names its pull request.
 
 ## [Unreleased]
 
+### Added
+
+- `degrees_of_freedom`, an argument of every method that takes the categorical tests, `"chisq"` and
+  `"gsq"`, and of `ChiSquare`: `"mean"`, the default and the rule so far, is the mean of the
+  statistic when `y` is shuffled within each configuration of the conditioning set; `"nonempty"` is
+  `(r_x - 1) * (r_y - 1)` per configuration over the values present, each table's empty rows and
+  columns struck (Spirtes, Glymour, and Scheines 1993). The two differ only on sparse tables.
+  Passing it with another test raises `ValueError`. ([#981])
+
 ### Changed
 
 - `iamb` and `inter_iamb` order the candidates of each grow step by their p-values to nine
@@ -2686,3 +2695,4 @@ First alpha release.
 [#1099]: https://github.com/Abel-ai-lab/Andrey/pull/1099
 [card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
 [#969]: https://github.com/Abel-ai-lab/Andrey/pull/969
+[#981]: https://github.com/Abel-ai-lab/Andrey/pull/981

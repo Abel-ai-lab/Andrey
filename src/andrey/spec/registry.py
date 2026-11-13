@@ -72,6 +72,7 @@ _POOLED_INDEP_TEST = concept_param(
     doc=_PARTIAL_CORRELATION + ". normal_scores is not offered: ranked over the rows of every "
     "environment, a column's normal scores mix their distributions. " + _OTHER_TESTS,
 )
+_DEGREES_OF_FREEDOM = concept_param("degrees_of_freedom")
 _CATEGORICAL = concept_param("categorical")
 _COLLIDER_RULE = concept_param("collider_rule")
 _POSSIBLE_DSEP = ParamSpec(
@@ -206,6 +207,7 @@ _add(
         params=(
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
             _CATEGORICAL,
@@ -257,6 +259,7 @@ _add(
         params=(
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _COLLIDER_RULE,
             _CATEGORICAL,
             _POSSIBLE_DSEP,
@@ -301,6 +304,7 @@ _add(
             _EBIC_GAMMA_STANDARD,
             _EQUIVALENT_SAMPLE_SIZE,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _ALPHA,
             _COLLIDER_RULE,
             _CATEGORICAL,
@@ -376,6 +380,7 @@ _add(
         params=(
             _ALPHA,
             _POOLED_INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
             _CATEGORICAL,
@@ -442,6 +447,7 @@ _add(
         params=(
             _ALPHA,
             _POOLED_INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _COLLIDER_RULE,
             _CATEGORICAL,
             _POSSIBLE_DSEP,
@@ -611,7 +617,15 @@ for _name, _summary, _key, _structure, _kind, _refs in (
             status="supported",
             column_order="relabels",
             tie_break=True,
-            params=(_TARGET, _structure, _ALPHA, _INDEP_TEST, _CATEGORICAL, _TEST_SEED),
+            params=(
+                _TARGET,
+                _structure,
+                _ALPHA,
+                _INDEP_TEST,
+                _DEGREES_OF_FREEDOM,
+                _CATEGORICAL,
+                _TEST_SEED,
+            ),
             references=_refs,
         )
     )
@@ -1344,6 +1358,7 @@ _add(
         params=(
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
@@ -1393,6 +1408,7 @@ _add(
             ),
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
@@ -1588,6 +1604,7 @@ for _name, _summary, _own, _refs in (
                 _EQUIVALENT_SAMPLE_SIZE,
                 *_own,
                 _INDEP_TEST,
+                _DEGREES_OF_FREEDOM,
                 _ALPHA,
                 _COLLIDER_RULE,
                 _CATEGORICAL,
@@ -1667,6 +1684,7 @@ _add(
                 nullable=True,
             ),
             _POOLED_INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             concept_param("invariance_test"),
             concept_param(
                 "n_starts",
@@ -1759,6 +1777,7 @@ _add(
                 nullable=True,
             ),
             _POOLED_INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             concept_param("invariance_test"),
             concept_param(
                 "n_starts",
@@ -2371,6 +2390,7 @@ _add(
                 "adjusted p-value is at most alpha.",
             ),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
             _TEST_SEED,
             concept_param(
@@ -2438,6 +2458,7 @@ _add(
                 "middle. The default majority does not depend on the order of the variables.",
             ),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
             _TEST_SEED,
             concept_param(
@@ -2610,6 +2631,7 @@ _add(
                 "to the next as conditions.",
             ),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
             _TEST_SEED,
             concept_param(

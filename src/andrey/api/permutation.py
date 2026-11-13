@@ -877,6 +877,7 @@ def igsp(
     alpha: float | None = None,
     invariance_alpha: float | None = None,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     invariance_test: str | None = None,
     n_starts: int = 10,
     seed: int | None = None,
@@ -942,6 +943,13 @@ def igsp(
         their distributions. ``None`` picks from the declared column types: ``"gsq"`` when every
         column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``.
         ``metadata["indep_test"]`` names the test the fit used.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     invariance_test : {"gaussian", "indicator"} or None, default=None
         The invariance test, which asks whether a variable's distribution given a set of others is
         the same in a setting as in the observational rows. ``"gaussian"`` compares the linear
@@ -1185,6 +1193,7 @@ def igsp(
             alpha=level,
             invariance_alpha=level if invariance_alpha is None else invariance_alpha,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             invariance_test=invariance_test,
             categorical=mask,
             n_starts=n_starts,
@@ -1210,6 +1219,7 @@ def ut_igsp(
     alpha: float | None = None,
     invariance_alpha: float | None = None,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     invariance_test: str | None = None,
     n_starts: int = 10,
     seed: int | None = None,
@@ -1280,6 +1290,13 @@ def ut_igsp(
         their distributions. ``None`` picks from the declared column types: ``"gsq"`` when every
         column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``.
         ``metadata["indep_test"]`` names the test the fit used.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     invariance_test : {"gaussian", "indicator"} or None, default=None
         The invariance test, which asks whether a variable's distribution given a set of others is
         the same in a setting as in the observational rows. ``"gaussian"`` compares the linear
@@ -1540,6 +1557,7 @@ def ut_igsp(
             alpha=level,
             invariance_alpha=level if invariance_alpha is None else invariance_alpha,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             invariance_test=invariance_test,
             categorical=mask,
             n_starts=n_starts,
@@ -1569,6 +1587,7 @@ def boss_fci(
     ebic_gamma: float = 0.0,
     equivalent_sample_size: float = 1.0,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     alpha: float = 0.05,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
@@ -1646,6 +1665,13 @@ def boss_fci(
         declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
         type, never by its values. ``metadata["indep_test"]`` names the test the fit used: the one
         picked from the declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
@@ -1877,6 +1903,7 @@ def boss_fci(
         env,
         score_func=score_func,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         collider_rule=collider_rule,
         edge_removal=edge_removal,
@@ -1904,6 +1931,7 @@ def grasp_fci(
     equivalent_sample_size: float = 1.0,
     grasp_depth: int = 3,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     alpha: float = 0.05,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
@@ -1985,6 +2013,13 @@ def grasp_fci(
         declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
         type, never by its values. ``metadata["indep_test"]`` names the test the fit used: the one
         picked from the declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
@@ -2207,6 +2242,7 @@ def grasp_fci(
         env,
         score_func=score_func,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         collider_rule=collider_rule,
         edge_removal=edge_removal,

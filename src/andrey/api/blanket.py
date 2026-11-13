@@ -43,6 +43,7 @@ def fit_blanket(
     structure: str,
     alpha: float,
     indep_test: str | None,
+    degrees_of_freedom: str,
     categorical: Sequence[str | int] | None,
     seed: int | None,
     max_depth: int | None,
@@ -61,6 +62,7 @@ def fit_blanket(
     settings = {
         "alpha": alpha,
         "indep_test": indep_test,
+        "degrees_of_freedom": degrees_of_freedom,
         "categorical": mask,
         "seed": seed,
         "max_depth": max_depth,
@@ -90,6 +92,7 @@ def iamb(
     structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -131,6 +134,13 @@ def iamb(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -345,6 +355,7 @@ def iamb(
         structure=structure,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
@@ -360,6 +371,7 @@ def inter_iamb(
     structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -400,6 +412,13 @@ def inter_iamb(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -610,6 +629,7 @@ def inter_iamb(
         structure=structure,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
@@ -625,6 +645,7 @@ def mmpc(
     structure: str = "skeleton",
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -665,6 +686,13 @@ def mmpc(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -879,6 +907,7 @@ def mmpc(
         structure=structure,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
