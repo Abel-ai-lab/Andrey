@@ -161,9 +161,9 @@ reports only p-values is ordered by its p-value, smallest first.
 `"mean"`, the default, is the mean of the statistic when `y` is shuffled within each configuration
 of the conditioning set, and `"nonempty"` is `(r_x - 1) * (r_y - 1)` per configuration over the
 values of `x` and `y` present in it, the table's empty rows and columns struck (Spirtes, Glymour and
-Scheines 1993). The two differ only on sparse tables. `pcmb` defaults to `"nonempty"`, the test its
-paper runs. Only `"chisq"` and `"gsq"` read it, so passing `degrees_of_freedom` with another test
-raises a `ValueError`.
+Scheines 1993). The two differ only on sparse tables. `pcmb` and `mmmb` default to `"nonempty"`, the
+test their papers run. Only `"chisq"` and `"gsq"` read it, so passing `degrees_of_freedom` with
+another test raises a `ValueError`.
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
@@ -200,8 +200,8 @@ errors, and `forbidden_paths` is experimental in `iamb`, `inter_iamb`, and `mmpc
 found at 50 variables often has no consistent extension: a claim there acts only on an edge, the
 fits we measured dropped about 96% of the forbidden paths on such a graph, and with forbidden paths
 alone the CPDAG was 0.65 to 1.95 edges farther from the class the claims define. Both are
-experimental in `gs`, `fast_iamb`, `hiton_pc`, and `pcmb`, which that measurement did not cover,
-and in an experimental method, such as `hiton_mb` or `mmmb`. An experimental part warns with
+experimental in `gs`, `fast_iamb`, `hiton_pc`, `hiton_mb`, and `pcmb`, which that measurement
+did not cover, and in an experimental method, such as `mmmb`. An experimental part warns with
 {py:class}`~andrey.ExperimentalWarning`, and its meaning may change without deprecation. A
 CPDAG method reads the claims on the graph it found, so where that graph is wrong, a true claim can
 direct an edge the wrong way, and a required path cannot restore an edge the search left out. A path
@@ -459,10 +459,12 @@ variable.
    fast_iamb
    mmpc
    hiton_pc
+   hiton_mb
    pcmb
    cmb
    ldecc
    local_optimal_adjustment
+   mmb_by_mmb
    icp
    ges
    gies
@@ -546,6 +548,13 @@ others changes once the target is conditioned on, then visits the undecided neig
 directs the target's edges from what their blankets show. No reference implementation exists, so
 the [0.18.0](benchmarks/0.18.0.md#cmb) release card compares it with global PC read at the target,
 on its paper's Alarm setting.
+
+MMB-by-MMB (Xie et al. 2024), {py:func}`~andrey.mmb_by_mmb`, learns the edges at one variable and
+their marks when unmeasured common causes may exist, without the whole graph: it learns the
+target's Markov blanket, then a neighbor's, one blanket at a time, until the FCI rules decide the
+marks at the target, and returns the edges the target has in the PAG. The authors' code is its
+reference: the [0.18.0](benchmarks/0.18.0.md#mmb-by-mmb) release card compares them on its paper's
+four networks with hidden variables.
 
 LDECC, local discovery using eager collider checks (Gupta et al. 2023), {py:func}`~andrey.ldecc`,
 answers for one `treatment` and `outcome`: it learns the treatment's Markov blanket with `blanket`,
@@ -759,10 +768,8 @@ in a process.
    :nosignatures:
 
    dagma
-   hiton_mb
    mmmb
    mb_by_mb
-   mmb_by_mmb
    y_structures
    ldp
    ld3

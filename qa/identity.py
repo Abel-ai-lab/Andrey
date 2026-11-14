@@ -18,8 +18,9 @@ queries a CI test or a local score also records two deterministic counts (:class
 compare names every row where one changed and fails on any change, a fall as well as a rise, unless
 ``--allow-fewer-queries`` accepts a fall.
 
-``--shuffle K`` refits each draw but ICP's, IGSP's, FCI-JCI's, and J-PCMCI+'s (:class:`Fit`) on
-``K`` seeded column orders and maps each answer back to the original columns before hashing it;
+``--shuffle K`` refits each draw but ICP's, IGSP's, FCI-JCI's, J-PCMCI+'s, CMB's, and
+MMB-by-MMB's (:class:`Fit`) on ``K`` seeded column orders and maps each answer back to the
+original columns before hashing it;
 ``--workers N`` refits the methods that run worker processes or threads (:data:`WORKER_METHODS`) on
 ``N`` workers, with every GES pass, every skeleton pass of conditioning size two or more, and every
 possible-d-sep search sent to the pool. Both report each refit whose answer differs from the first
@@ -77,10 +78,11 @@ class Fit:
 
     ``blocks`` is the number of side-by-side copies of the variables in the data: GIES's samples
     and intervention indicators, MultiGroupDirectLiNGAM's groups; a column order moves each copy
-    the same way. ``shuffled`` is ``False`` for ICP, IGSP, FCI-JCI, J-PCMCI+, CMB, LDECC, and LOAD,
-    whose draws a column order does not apply to: each row's environment is a column of the draw,
-    the target of ICP and CMB is the last variable, LDECC's treatment and outcome and LOAD's two
-    variables are the last and the first, and J-PCMCI+'s contexts follow the system variables.
+    the same way. ``shuffled`` is ``False`` for ICP, IGSP, FCI-JCI, J-PCMCI+, CMB, MMB-by-MMB,
+    LDECC, and LOAD, whose draws a column order does not apply to: each row's environment is a
+    column of the draw, the target of ICP, CMB, and MMB-by-MMB is the last variable, LDECC's
+    treatment and outcome and LOAD's two variables are the last and the first, and J-PCMCI+'s
+    contexts follow the system variables.
     ``alpha`` is the significance level of a CI-test method.
     """
 
@@ -196,6 +198,7 @@ FITS: dict[str, Fit] = {
     "MMPC": Fit(functools.partial(andrey.mmpc, alpha=ALPHA), alpha=ALPHA),
     "HITONPC": Fit(functools.partial(andrey.hiton_pc, alpha=ALPHA), alpha=ALPHA),
     "PCMB": Fit(functools.partial(andrey.pcmb, alpha=ALPHA), alpha=ALPHA),
+    "HITONMB": Fit(functools.partial(andrey.hiton_mb, alpha=ALPHA), alpha=ALPHA),
     "CMB": Fit(_last_column("cmb"), shuffled=False, alpha=ALPHA),
     "LDECC": Fit(_ldecc, shuffled=False, alpha=ALPHA),
     "LocalOptimalAdjustment": Fit(_local_optimal_adjustment, shuffled=False, alpha=ALPHA),
@@ -214,6 +217,7 @@ FITS: dict[str, Fit] = {
     "GRaSP": Fit(functools.partial(andrey.grasp, seed=0)),
     "BOSS-FCI": Fit(functools.partial(andrey.boss_fci, seed=0, alpha=ALPHA), alpha=ALPHA),
     "GRaSP-FCI": Fit(functools.partial(andrey.grasp_fci, seed=0, alpha=ALPHA), alpha=ALPHA),
+    "MMB-by-MMB": Fit(_last_column("mmb_by_mmb"), shuffled=False, alpha=ALPHA),
     "DirectLiNGAM": Fit(andrey.direct_lingam),
     "ICA-LiNGAM": Fit(functools.partial(andrey.ica_lingam, seed=0)),
     "MultiGroupDirectLiNGAM": Fit(
@@ -315,6 +319,7 @@ LARGER: dict[str, str] = {
             "MMPC",
             "HITONPC",
             "PCMB",
+            "HITONMB",
             "CMB",
             "LDECC",
             "LocalOptimalAdjustment",
@@ -325,7 +330,7 @@ LARGER: dict[str, str] = {
         ),
         "linear_gauss_er_d100",
     ),
-    **dict.fromkeys(("FCI", "GFCI", "BOSS-FCI", "GRaSP-FCI"), "latent_gauss_er_d100"),
+    **dict.fromkeys(("FCI", "GFCI", "BOSS-FCI", "GRaSP-FCI", "MMB-by-MMB"), "latent_gauss_er_d100"),
     **dict.fromkeys(("DirectLiNGAM", "ICA-LiNGAM"), "lingam_sf_d70"),
     **dict.fromkeys(("RCD", "BottomUpParceLiNGAM"), "latent_lingam_er_d17"),
     "ExactSearch": "linear_gauss_er_d16",
