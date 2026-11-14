@@ -581,7 +581,7 @@ def test_the_pc_arm_reads_the_optimal_set_where_the_class_identifies_the_effect(
     (record,), tests = L.unpack_effects(
         arm.fit(data, {**arm.params(), "treatment": 0, "outcome": 1})
     )
-    assert tests is None or tests > 0
+    assert tests > 0  # the tests PC ran, counted around the call
     assert record["identifiable"] is True and record["adjustment_sets"] == [[2]]
     assert record["set_kind"] == "optimal" and record["nonzero"] is True
 
