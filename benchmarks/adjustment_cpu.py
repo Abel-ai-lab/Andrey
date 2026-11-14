@@ -460,6 +460,14 @@ def asked_error(fit: dict) -> dict | None:
     return (fit["scores"]["error"] or {}).get(error_key(fit["treatment"], fit["outcome"]))
 
 
+def asked_sets(fit: dict) -> list[dict]:
+    """The scored sets (``scores["sets"]``) of a fit's record for the treatment and the outcome it
+    asked. A method that does not know the order also returns sets for the reverse direction; they
+    do not answer the question."""
+    asked = [fit["treatment"], fit["outcome"]]
+    return [s for s in fit["scores"]["sets"] if s["pair"] == asked]
+
+
 def gave_an_answer(fit: dict) -> bool:
     """Whether a fit's record for the pair asked gives sets or says the effect is zero, rather
     than abstain."""
@@ -474,7 +482,8 @@ def summarize(records: list[dict]) -> list[dict[str, Any]]:
     is zero (:func:`gave_an_answer`); ``adj`` counts the adjustment answers (``correct``,
     ``wrong``, ``incomplete``) of the pairs whose effect is not zero; ``valid`` is the share of
     returned sets that satisfy the adjustment criterion and ``f1`` the mean F1 of a returned set
-    against the optimal set (total effects, no hidden variables), over every record the fit gave.
+    against the optimal set (total effects, no hidden variables), over the sets of the record for
+    the pair asked (:func:`asked_sets`).
     ``error`` is the mean effect error of the record for the pair asked (:func:`asked_error`) over
     the fits that have one, and ``empty`` the unadjusted regression's on the same fits; ``paired``
     is their paired comparison (:func:`andrey_bench.pairing.compare`, ``better`` when the
@@ -492,7 +501,7 @@ def summarize(records: list[dict]) -> list[dict[str, Any]]:
         for name in dict.fromkeys(r["solution"] for r in records if r["cell"] == cell):
             mine = [r for r in records if r["cell"] == cell and r["solution"] == name]
             ok = [r for r in mine if r["status"] == "ok"]
-            sets = [s for r in ok for s in r["scores"]["sets"]]
+            sets = [s for r in ok for s in asked_sets(r)]
             errors = {}
             for r in ok:
                 if estimate := asked_error(r):
