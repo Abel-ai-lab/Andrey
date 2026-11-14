@@ -629,8 +629,9 @@ def resolve_conflicts(
     its rank is ``pvalues`` of the pair ``(a, c)``, the most clearly separated pair first, as
     :func:`~andrey.constraint.pc.orient_colliders` ranks them, and a collider whose pair has no
     p-value ranks last. Each end of a bidirected edge takes the highest rank of the colliders that
-    ask for its arrowhead; the end ranked lower gets a tail, as if its collider were skipped. An
-    edge whose ends tie to ``KEY_DP`` decimals stays bidirected.
+    ask for its arrowhead; the end ranked lower gets a tail. Only the disputed edge changes: the
+    other edge of the collider ranked lower keeps its arrowhead. An edge whose ends tie to
+    ``KEY_DP`` decimals stays bidirected.
     """
     marks = network.marks
     both = np.argwhere(np.triu((marks == ARROW) & (marks.T == ARROW))).tolist()
