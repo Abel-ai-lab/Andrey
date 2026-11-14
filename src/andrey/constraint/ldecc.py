@@ -6,11 +6,23 @@
 (:func:`uc_children`, line 3). It then runs PC's tests over the pairs of the other variables
 (Fig. 12) and reads each independence ``a _||_ b | S`` as it is found (lines 6-22): two neighbors
 separated without ``x`` are parents, as are the neighbors in ``S``; two neighbors separated by a set
-holding ``x`` form a non-collider at ``x``, and a neighbor that makes them dependent again is a
-child; otherwise, when ``a`` and ``b`` turn dependent given ``S`` and ``x``, ``x`` is a collider or
-a descendant of one between them, and the minimal neighbor separators of ``a`` and ``b``
-(:func:`minimal_separator`) are parents (:func:`ecc_parents`, Prop. 4). A neighbor joined to a
-parent by a non-collider is a child. The tests stop once every neighbor is directed.
+holding ``x`` form a non-collider at ``x``, and an undirected neighbor that makes them dependent
+again is a child; otherwise, when ``a`` and ``b`` turn dependent given ``S`` and ``x``, ``x`` is a
+collider or a descendant of one between them, and the minimal neighbor separators of ``a`` and
+``b`` (:func:`minimal_separator`) are parents (:func:`ecc_parents`, Prop. 4). A neighbor joined to
+a parent by a non-collider is a child. The tests stop once every neighbor is directed.
+
+Four steps follow the authors' implementation of [1]_ where its text reads them more broadly.
+Fig. 4's UCChildren tests a neighbor against a spouse given the one set that separated the spouse
+from ``x``; :func:`uc_children` tests it given every subset of the neighbors that separates them,
+and marks a child only when all agree. Lines 10-14 test every neighbor outside ``S`` as a child;
+here only the neighbors still undirected are tested. ECCParents with one neighbor marks it and the
+other's minimal neighbor separator; here only when that separator holds the neighbor and one more
+variable, the parent at which the collider lies (:func:`ecc_parents`). Lines 24-28 keep a parent
+set that holds no non-collider pair; here the pairs are checked among the undirected neighbors
+added to the parents. With exact tests they gave the text's answers on every graph tested; with
+finite samples they mark fewer parents as children, the error that most often separates a fit
+from the treatment's true parents.
 
 The neighbors are the blanket members that no subset of the rest of the blanket separates from
 ``x`` ([2]_ Lemma A.2): each member is tested against the subsets of ``MB(x)`` without it, never

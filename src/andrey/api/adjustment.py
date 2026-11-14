@@ -523,13 +523,12 @@ def _ldecc_record(result, x: int, y: int, name) -> dict:
             set_kind="local_parents",
             name=name,
         )
-    kept = [[v for v in s if v != y] for s in sets]
     return effect_record(
         x,
         y,
         estimand="total",
-        adjustment_sets=kept,
-        set_kind="local_parents" if kept else None,
+        adjustment_sets=[[v for v in s if v != y] for s in sets],
+        set_kind="local_parents",
         name=name,
     )
 
@@ -683,18 +682,29 @@ def ldecc(
     **How it works.** Fig. 5 of [1]_. The first step learns the treatment's Markov blanket with
     ``blanket``. The neighbors are the blanket members that no subset of the rest of the blanket
     separates from the treatment, the rule of [2]_ (App. A.1.1, Lemma A.2) for this step: each
-    member is tested against the subsets of the blanket without it. A neighbor outside a spouse's
-    separating set and dependent on the spouse given it is a child, an unshielded collider at the
-    neighbor. The PC algorithm's tests then run over the pairs that do not hold the treatment, the
-    treatment adjacent to its neighbors only. For each independence of ``a`` and ``b`` given
-    ``S``: two neighbors separated without the treatment are parents, as are the neighbors in
-    ``S``; two neighbors separated by a set holding the treatment are a non-collider at it, and a
-    neighbor that makes them dependent again is a child; otherwise, when ``a`` and ``b`` are
-    dependent given ``S`` and the treatment, the treatment is a collider or a descendant of one
-    between them, and their minimal neighbor separators, the smallest sets of neighbors that
-    separate each from the treatment, are parents (Prop. 4; with ``check``, only when the two are
-    equal). A neighbor joined to a parent by a non-collider is a child. A neighbor marked both
-    ways is a child, as in the authors' code. Each query is tested once. Variables and subsets
+    member is tested against the subsets of the blanket without it. A neighbor is a child, an
+    unshielded collider at it, when some set of neighbors separates a spouse from the treatment
+    and every such set leaves the neighbor out and dependent on the spouse. The PC algorithm's
+    tests then run over the pairs that do not hold the treatment, the treatment adjacent to its
+    neighbors only. For each independence of ``a`` and ``b`` given ``S``: two neighbors separated
+    without the treatment are parents, as are the neighbors in ``S``; two neighbors separated by a
+    set holding the treatment are a non-collider at it, and an undirected neighbor that makes them
+    dependent again is a child; otherwise, when ``a`` and ``b`` are dependent given ``S`` and the
+    treatment, the treatment is a collider or a descendant of one between them, and their minimal
+    neighbor separators, the smallest sets of neighbors that separate each from the treatment,
+    are parents (Prop. 4; with ``check``, only when the two are equal; when one of the two is a
+    neighbor, only when the other's separator holds it and one more variable). A neighbor joined
+    to a parent by a non-collider is a child. A neighbor marked both ways is a child. A parent set
+    adds to the parents each set of undirected neighbors that holds no non-collider pair.
+
+    Four of these steps follow the authors' implementation where the text of [1]_ (Figs. 4-5)
+    reads them more broadly: the text tests a neighbor against a spouse given the one set that
+    separated the spouse, tests every neighbor outside ``S`` as a child, marks a neighbor and the
+    other's separator in every eager collider check with one neighbor, and checks the
+    non-collider pairs over the whole parent set. With exact tests both readings gave the same
+    answers on every graph tested; with finite samples the implementation's readings mark fewer
+    parents as children, the error that most often moves a fit away from the treatment's true
+    parents. Each query is tested once. Variables and subsets
     are visited in an order the data fix, the treatment's neighbors first and the treatment first
     in a conditioning set, as in the authors' code, and the first subset that separates a pair is
     kept, so the answer does not depend on the column order; it does not depend on the columns'

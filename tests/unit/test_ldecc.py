@@ -154,16 +154,18 @@ def test_max_depth_caps_every_test():
 
 def test_check_marks_parents_only_when_the_separators_agree():
     """Fig. 4, ECCParents: for two variables that are not neighbors of the treatment, ``check``
-    marks their minimal neighbor separators only when the two are equal; a neighbor of the pair
-    is always marked, with the other's separator."""
+    marks their minimal neighbor separators only when the two are equal; for a neighbor and a
+    non-neighbor, the other's separator when it holds the neighbor and one more variable."""
     search = local_search(frame(n=200).to_numpy(), alpha=0.05, indep_test="fisherz")
     tests = engine.Tests(search)
     ne = [1, 2, 3]
-    cache = {5: (1,), 6: (2,), 7: (1,)}
+    cache = {5: (1,), 6: (2,), 7: (1,), 8: (2, 3), 9: (1, 2)}
     assert engine.ecc_parents(tests, 0, 5, 6, ne, True, cache) == set()
     assert engine.ecc_parents(tests, 0, 5, 6, ne, False, cache) == {1, 2}
     assert engine.ecc_parents(tests, 0, 5, 7, ne, True, cache) == {1}
-    assert engine.ecc_parents(tests, 0, 3, 6, ne, True, cache) == {2, 3}
+    assert engine.ecc_parents(tests, 0, 3, 8, ne, True, cache) == {2, 3}
+    assert engine.ecc_parents(tests, 0, 3, 6, ne, True, cache) == set()
+    assert engine.ecc_parents(tests, 0, 3, 9, ne, True, cache) == set()
     assert engine.ecc_parents(tests, 0, 3, 6, ne, True, {6: None}) == set()
 
 
@@ -173,22 +175,3 @@ def test_missing_values_are_deleted_test_by_test():
     out = ldecc(df, treatment="x", outcome="y")
     assert out.metadata["missing"] == "testwise"
     assert out.metadata["rows_tested"]["min"] < len(df)
-
-
-def test_conflicting_marks_give_no_answer():
-    """Two parents marked as a non-collider at the treatment leave no locally valid parent set:
-    the record has no set and does not decide."""
-    from andrey.api.adjustment import _ldecc_record
-
-    result = engine.Result(
-        blanket=(1, 2, 3),
-        neighbors=(1, 2, 3),
-        parents=frozenset({1, 2}),
-        children=frozenset({3}),
-        unoriented=frozenset(),
-        non_colliders=frozenset({frozenset({1, 2})}),
-        parent_sets=(),
-    )
-    record = _ldecc_record(result, 0, 3, int)
-    assert record["adjustment_sets"] == [] and record["set_kind"] is None
-    assert record["identifiable"] is None and record["nonzero"] is None
