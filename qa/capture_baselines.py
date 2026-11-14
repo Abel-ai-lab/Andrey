@@ -169,6 +169,7 @@ ALGORITHMS = {
     "PCMB": (_facade("pcmb"), "gauss_5v"),
     "HITONMB": (_facade("hiton_mb"), "gauss_5v"),
     "MMMB": (_facade("mmmb"), "gauss_5v"),
+    "YStructures": (_facade("y_structures"), "gauss_7v"),
     "CMB": (_run_target("cmb"), "gauss_5v"),
     "LDECC": (_run_ldecc, "gauss_7v"),
     "LocalOptimalAdjustment": (_run_local_optimal_adjustment, "gauss_7v"),

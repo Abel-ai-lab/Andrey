@@ -28,12 +28,14 @@ summary's ``parity_rule`` sets how its rows are judged:
   and recall from (1, 1)), ``"set_f1_loss"`` (1 minus the mean over the targets of the set's F1, so
   that fewer is better as for the others), ``"edge_distance"`` and ``"edge_f1_loss"`` (the same two
   over the edges a method answers at a target, an edge right only with both endpoint marks right),
-  and for an answer about one treatment and outcome, ``"effect_error"`` (the mean absolute error, on
-  a fresh sample, of the effects estimated with the answer's adjustment sets), ``"family_error"`` (1
-  when the answer's parent sets are not the family the true CPDAG allows, else 0), ``"recall_loss"``
-  (1 when the treatment's true parents are not among them), or ``"hausdorff_mse"`` (the squared
-  Hausdorff distance of the estimated effects from the effects the family gives in the population,
-  in standard deviations). A row's means are
+  ``"claim_error"`` (claims of ancestral pairs: the mean over the datasets of the false claims plus
+  the true pairs not claimed), ``"claim_ap_loss"`` (1 minus the mean over the datasets of the
+  average precision of the claims' scores), and for an answer about one treatment and outcome,
+  ``"effect_error"`` (the mean absolute error, on a fresh sample, of the effects estimated with the
+  answer's adjustment sets), ``"family_error"`` (1 when the answer's parent sets are not the family
+  the true CPDAG allows, else 0), ``"recall_loss"`` (1 when the treatment's true parents are not
+  among them), or ``"hausdorff_mse"`` (the squared Hausdorff distance of the estimated effects from
+  the effects the family gives in the population, in standard deviations). A row's means are
   ``andrey_<metric>_mean`` and ``comparator_<metric>_mean``, or the ``*_shd_mean`` fields, which
   then hold that error's means. A method with a gated metric beside SHD has one entry per metric,
   and a row's key names the ``metric``.
@@ -126,6 +128,8 @@ METRICS: dict[str, str] = {
     "hausdorff_mse": "effect-set Hausdorff MSE",
     "edge_distance": "edge distance",
     "edge_f1_loss": "edge F1 loss",
+    "claim_error": "claim errors",
+    "claim_ap_loss": "claim AP loss",
 }
 #: The causes an allowlist entry may name.
 CAUSES: frozenset[str] = frozenset(
