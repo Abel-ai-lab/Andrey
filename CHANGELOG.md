@@ -27,6 +27,12 @@ names its pull request.
   their blankets can change for some targets, and so can the graphs of `rsmax2` with
   `restrict="iamb"` or `"inter_iamb"`; results on continuous data do not change. ([#969])
 
+### Fixed
+
+- The backward phase of `mmpc` keeps the best separating set of each size it tests, not a record
+  of every set, so its memory no longer grows with the number of sets. Answers are unchanged.
+  ([#1019])
+
 ## [0.18.0] - 2026-11-19
 
 ### Highlights
@@ -2696,3 +2702,4 @@ First alpha release.
 [card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
 [#969]: https://github.com/Abel-ai-lab/Andrey/pull/969
 [#981]: https://github.com/Abel-ai-lab/Andrey/pull/981
+[#1019]: https://github.com/Abel-ai-lab/Andrey/pull/1019

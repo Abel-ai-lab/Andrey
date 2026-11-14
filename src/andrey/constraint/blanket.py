@@ -423,15 +423,46 @@ def parents_children(
         rest = sorted(z for z in members if z != x)
         top = len(rest) if max_depth is None else min(len(rest), max_depth)
         for size in range(1, top + 1):
-            trace: list[dict] | None = None if sepsets is None else []
-            if scan_conditioning_sets(test, target, x, rest, size, alpha, set(), before, trace):
+            found = _separating(test, target, x, rest, size, alpha, before, ranks)
+            if found is not None:
                 members.remove(x)
-                if sepsets is not None and trace is not None:
-                    found = [t for t in trace if t["removed"]]
-                    p = np.array([[t["p"] for t in found]])
-                    [sepsets[x]] = _largest_sets(p, [t["S"] for t in found], ranks)
+                if sepsets is not None:
+                    sepsets[x] = found
                 break
     return members
+
+
+def _separating(
+    test: CITest,
+    target: int,
+    x: int,
+    among: list[int],
+    size: int,
+    alpha: float,
+    skip_within: set[int],
+    ranks: Sequence[int],
+) -> tuple[int, ...] | None:
+    """The set of ``size`` members of ``among`` that separates ``x`` from ``target`` (a p-value
+    above ``alpha``) with the largest p-value, ties as :func:`_largest_sets` breaks them, or
+    ``None`` when no set does.
+
+    Every such set is tested, those lying inside ``skip_within`` excepted
+    (:func:`~andrey.constraint._skeleton.scan_conditioning_sets`). Only the best separating set so
+    far is kept, so the memory does not grow with the number of sets.
+    """
+    best: list[tuple[tuple[int, ...], float]] = []
+
+    def visit(chunk: list[tuple[int, ...]], pvalues: Sequence[float]) -> None:
+        p = np.asarray(pvalues, dtype=np.float64)
+        hits = [(chunk[j], float(p[j])) for j in np.flatnonzero(p > alpha).tolist()]
+        if hits:
+            found = best + hits
+            sets = [s for s, _ in found]
+            [pick] = _largest_sets(np.array([[q for _, q in found]]), sets, ranks)
+            best[:] = [found[sets.index(pick)]]
+
+    scan_conditioning_sets(test, target, x, among, size, alpha, set(), skip_within, visit=visit)
+    return best[0][0] if best else None
 
 
 def mmpc_sets(
