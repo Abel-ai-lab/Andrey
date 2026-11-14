@@ -481,7 +481,7 @@ def learn_local(
     size = 0
     while cap is None or size <= cap:
         neighbors = {v: {u for p in adjacent if v in p for u in p if u != v} for v in nodes}
-        removed: list[tuple[Pair, tuple[int, ...]]] = []
+        removed: list[tuple[Pair, tuple[int, ...], float]] = []
         tested = False
         for pair in sorted(adjacent - fixed):
             hits: list[tuple[tuple[int, ...], float]] = []
