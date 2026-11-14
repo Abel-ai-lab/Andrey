@@ -192,6 +192,36 @@ def test_mb_by_mb_stops_when_no_variable_is_left_to_learn():
     assert result.network.mark(0, 2) == TAIL and result.network.mark(2, 0) == TAIL
 
 
+class _OneFalseIndependence(DSepOracle):
+    """d-separation in ``dag``, except that the pair ``pair`` tests independent given ``given``."""
+
+    def __init__(self, dag: nx.DiGraph, pair: tuple[int, int], given: tuple[int, ...]) -> None:
+        super().__init__(dag)
+        self.pair, self.given = frozenset(pair), frozenset(given)
+
+    def __call__(self, x: int, y: int, condition_set=()) -> float:
+        if {int(x), int(y)} == self.pair and {int(z) for z in condition_set} == self.given:
+            return 1.0
+        return super().__call__(x, y, condition_set)
+
+
+def test_mb_by_mb_puts_no_edge_between_a_pair_a_test_separated():
+    # 0 -> 1 -> 2 with 0 and 1 testing independent given {2}: 1's blanket learner leaves 0 out
+    # with that set, while 0's own step keeps 0 - 1. MB-by-MB keeps every independence found and
+    # puts no edge between such a pair; without the rule the edge stays.
+    dag = _dag([(0, 1), (1, 2)], 3)
+
+    def run(rules: Rules):
+        search = LocalSearch(_OneFalseIndependence(dag, (0, 1), (2,)), [0, 1, 2], 0.05)
+        return sequential(search, 0, "iamb", rules)
+
+    result = run(MB_BY_MB)
+    assert result.cache.blankets[1] == [2] and result.cache.sepsets[0, 1] == (2,)
+    assert not result.network.star(0, 3).any()
+    kept = run(replace(MB_BY_MB, drop_separated=False))
+    assert kept.network.mark(0, 1) == TAIL and kept.network.mark(1, 0) == TAIL
+
+
 def test_an_orientation_several_steps_away_reaches_the_target():
     # p -> q <- r, q -> s -> t -> T: only the collider at q, three blankets away, orients t -> T.
     t_, t, s, q, p, r = range(6)
