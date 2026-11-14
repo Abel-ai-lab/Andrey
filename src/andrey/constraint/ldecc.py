@@ -149,20 +149,34 @@ def neighbors(
     return adjacent, sepsets
 
 
-def uc_children(
-    tests: Tests,
-    mb: Sequence[int],
-    ne: Sequence[int],
-    sepsets: dict[int, tuple[int, ...]],
-) -> set[int]:
-    """Fig. 4's UCChildren: a neighbor ``c`` outside a spouse ``d``'s separating set from the
-    treatment, and dependent on ``d`` given that set, is a child (``x -> c <- d``)."""
+def uc_children(tests: Tests, x: int, mb: Sequence[int], ne: Sequence[int]) -> set[int]:
+    """Fig. 4's UCChildren as the authors' code reads it: a neighbor ``c`` is a child
+    (``x -> c <- d``) when, for some spouse ``d``, a subset of the neighbors ``ne`` separates ``d``
+    from ``x``, and every such subset leaves ``c`` out and leaves ``c`` dependent on ``d``.
+
+    The subsets run from size 0 to ``|ne|`` in rank order; a spouse that no subset separates
+    marks no child.
+    """
+    pool = tests.by_rank(ne)
+    spouses = tests.by_rank(set(mb) - set(ne))
+    sizes = [size for size in range(len(pool) + 1) if tests.allowed(size)]
     children: set[int] = set()
-    for d in tests.by_rank(set(mb) - set(ne)):
-        cond = sepsets[d]
-        for c in tests.by_rank(set(ne) - set(cond)):
-            if not tests.independent(c, d, cond):
+    for c in pool:
+        for d in spouses:
+            separators = (
+                cond
+                for size in sizes
+                for cond in combinations(pool, size)
+                if tests.independent(x, d, cond)
+            )
+            marked = False
+            for cond in separators:
+                marked = c not in cond and not tests.independent(c, d, cond)
+                if not marked:
+                    break
+            if marked:
                 children.add(c)
+                break
     return children
 
 
@@ -202,24 +216,23 @@ def ecc_parents(
 ) -> set[int]:
     """Fig. 4's ECCParents: the parents an eager collider check between ``a`` and ``b`` marks.
 
-    With ``check`` and neither of them a neighbor, the minimal neighbor separators of both, when
-    they are equal; otherwise each one that is a neighbor and the minimal neighbor separator of
-    each other one. When a separator is not found, none (as the authors' code).
+    With one of them a neighbor, the other's minimal neighbor separator, when it holds that
+    neighbor and at least one more variable, as the authors' code reads the check: the collider it
+    finds is ``nbr -> v <- other`` at a parent ``v`` of ``x``. With neither a neighbor, the minimal
+    neighbor separators of both; with ``check``, only when they are equal. When a separator is not
+    found, none (as the authors' code).
     """
-    if check and a not in ne and b not in ne:
-        sep_a = minimal_separator(tests, x, a, ne, cache)
-        sep_b = minimal_separator(tests, x, b, ne, cache)
-        return set(sep_a) if sep_a is not None and sep_a == sep_b else set()
-    parents: set[int] = set()
-    for v in (a, b):
-        if v in ne:
-            parents.add(v)
-            continue
-        found = minimal_separator(tests, x, v, ne, cache)
-        if found is None:
+    if (a in ne) != (b in ne):
+        nbr, other = (a, b) if a in ne else (b, a)
+        found = minimal_separator(tests, x, other, ne, cache)
+        if found is None or len(found) < 2 or nbr not in found:
             return set()
-        parents |= set(found)
-    return parents
+        return set(found)
+    sep_a = minimal_separator(tests, x, a, ne, cache)
+    sep_b = minimal_separator(tests, x, b, ne, cache)
+    if sep_a is None or sep_b is None or (check and sep_a != sep_b):
+        return set()
+    return set(sep_a) | set(sep_b)
 
 
 def ldecc(
@@ -238,9 +251,9 @@ def ldecc(
     tests = Tests(search)
     _, mb, _ = search.local(blanket, x)
     mb = [int(v) for v in (mb or [])]
-    ne, sepsets = (adjacency or neighbors)(tests, x, mb)
+    ne, _ = (adjacency or neighbors)(tests, x, mb)
     ne_set = set(ne)
-    children = uc_children(tests, mb, ne, sepsets)
+    children = uc_children(tests, x, mb, ne)
     parents: set[int] = set()
     marked: set[frozenset[int]] = set()
     cache: dict[int, tuple[int, ...] | None] = {}
@@ -255,7 +268,7 @@ def ldecc(
             parents.update((a, b), held & ne_set)
         elif a in ne_set and b in ne_set:
             marked.add(frozenset((a, b)))
-            for v in tests.by_rank(ne_set - held - {a, b} - children):
+            for v in tests.by_rank(unoriented() - held - {a, b}):
                 wider = (*cond, v)
                 if tests.allowed(len(wider)) and not tests.independent(a, b, wider):
                     children.add(v)
@@ -312,9 +325,8 @@ def ldecc(
     sets = []
     for k in range(len(open_) + 1):
         for extra in combinations(tests.by_rank(open_), k):
-            members = parents | set(extra)
-            if not any(pair <= members for pair in marked):
-                sets.append(tuple(sorted(members)))
+            if not any(pair <= set(extra) for pair in marked):
+                sets.append(tuple(sorted(parents | set(extra))))
     return Result(
         blanket=tuple(tests.by_rank(mb)),
         neighbors=tuple(ne),
