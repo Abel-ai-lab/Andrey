@@ -633,9 +633,8 @@ def ldecc(
         at the treatment, the outcome left out of a set that holds it. With one set,
         ``identifiable`` is ``True``; with several, ``None``. When the outcome is a parent of the
         treatment, the effect is zero in every graph the answer allows and no set is valid:
-        ``nonzero`` and ``identifiable`` are ``False`` and ``adjustment_sets`` is ``[]``. When the
-        marks conflict, so that no parent set is locally valid, ``adjustment_sets`` is ``[]`` and
-        ``identifiable`` ``None``: the method gives no answer. ``nonzero`` is ``None`` otherwise.
+        ``nonzero`` and ``identifiable`` are ``False`` and ``adjustment_sets`` is ``[]``.
+        ``nonzero`` is ``None`` otherwise.
         ``metadata["algorithm"]`` is ``"ldecc"``. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
         ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the number
@@ -958,8 +957,11 @@ def local_optimal_adjustment(
     [4]_. The variable whose rank, computed from the data, comes first is searched first, ties
     between candidates go by rank as for :func:`~andrey.mb_by_mb`, and the neighbors of Step 2 go in
     rank order, so the answer does not depend on the column order unless two columns are identical.
-    An edge that two v-structures direct both ways, which exact tests never give, is left
-    undirected, so each end reads the other as an undirected neighbor.
+    An edge that two v-structures direct both ways, which exact tests never give and [1]_ leaves
+    open, takes the direction of the v-structure whose pair the tests separated most clearly (the
+    largest p-value), the order in which :func:`~andrey.pc` orients its colliders, and Meek's rules
+    run again; when the two tie, the edge is left undirected, so each end reads the other as an
+    undirected neighbor. :func:`~andrey.mb_by_mb` leaves such an edge undirected.
 
     **Zero effects.** A zero effect between two adjacent variables, the treatment a child of the
     outcome, is not identifiable here: the edge into the treatment is a back-door path that no set
