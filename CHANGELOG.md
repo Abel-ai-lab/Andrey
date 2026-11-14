@@ -220,7 +220,7 @@ names its pull request.
   treatment, and the answer is one record in `metadata["effects"]`. Against its authors' code on the
   graphs of its paper's generator and on the MAGIC-NIAB network at 8,000 to 32,000 rows, it tied on
   accuracy, recall, and effect error in all 8 settings, on 20 datasets and again on 20 fresh ones.
-  ([#991], [#PRNUM])
+  ([#991], [#1029])
 - `andrey.local_optimal_adjustment`, LOAD (Schubert, Claassen and Magliacane 2026), supported:
   for two `variables` given in any order, finds whether one causes the other and the optimal
   adjustment set for the total effect when it is identifiable, else the locally valid parent sets
@@ -231,7 +231,7 @@ names its pull request.
   two variables, and `metadata["blankets_learned"]` the variables whose blanket it learned. Against
   its authors' code on its paper's random graphs with 100 to 1,000 variables and on pairs of the
   MAGIC-NIAB network at 10,000 rows, its sets and effects tied in every setting, on 20 datasets or
-  again on 20 fresh ones. ([#1003], [#1011], [#PRNUM])
+  again on 20 fresh ones. ([#1003], [#1011], [#1029])
 
 ### Changed
 
@@ -258,12 +258,12 @@ names its pull request.
   when the other's minimal separator holds that neighbor and one more variable; and a parent set
   checks the non-collider pairs among the undirected neighbors it adds. On the 25-node graphs of
   Gupta et al. at 8,000 to 32,000 rows, the share of fits whose parent sets equal the true CPDAG's
-  rises from 0.16-0.25 to 0.38-0.42, and the answers under exact tests do not change. ([#PRNUM])
+  rises from 0.16-0.25 to 0.38-0.42, and the answers under exact tests do not change. ([#1029])
 - `local_optimal_adjustment` directs an edge that two v-structures direct both ways as the
   v-structure whose pair the tests separated most clearly asks, as `pc` orders its colliders, where
   it left the edge undirected; the answer then reads the pair's relation from it. Under exact tests
   no edge is disputed and the answers do not change; `mb_by_mb` and `mmb_by_mmb` do not change.
-  ([#PRNUM])
+  ([#1029])
 ### Fixed
 
 - The treatment-outcome benchmark lane scores the effect error of the pair asked. For a method that
@@ -289,7 +289,7 @@ names its pull request.
   of size 9 of 28 variables now peaks at about 115 MB instead of 3.5 GB. Answers and `n_tests` are
   unchanged. ([#1019])
 - The treatment-outcome benchmark lane computes `valid` and F1 from the sets of the pair asked; a
-  method that answers both directions no longer counts the sets of the reverse one. ([#PRNUM])
+  method that answers both directions no longer counts the sets of the reverse one. ([#1029])
 
 ## [0.17.1] - 2026-11-12
 
@@ -2836,6 +2836,7 @@ First alpha release.
 [#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
 [#1022]: https://github.com/Abel-ai-lab/Andrey/pull/1022
 [#1026]: https://github.com/Abel-ai-lab/Andrey/pull/1026
+[#1029]: https://github.com/Abel-ai-lab/Andrey/pull/1029
 [#1019]: https://github.com/Abel-ai-lab/Andrey/pull/1019
 [#1025]: https://github.com/Abel-ai-lab/Andrey/pull/1025
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
