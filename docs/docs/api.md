@@ -161,9 +161,9 @@ reports only p-values is ordered by its p-value, smallest first.
 `"mean"`, the default, is the mean of the statistic when `y` is shuffled within each configuration
 of the conditioning set, and `"nonempty"` is `(r_x - 1) * (r_y - 1)` per configuration over the
 values of `x` and `y` present in it, the table's empty rows and columns struck (Spirtes, Glymour and
-Scheines 1993). The two differ only on sparse tables. `pcmb` defaults to `"nonempty"`, the test its
-paper runs. Only `"chisq"` and `"gsq"` read it, so passing `degrees_of_freedom` with another test
-raises a `ValueError`.
+Scheines 1993). The two differ only on sparse tables. `pcmb` and `mmmb` default to `"nonempty"`, the
+test their papers run. Only `"chisq"` and `"gsq"` read it, so passing `degrees_of_freedom` with
+another test raises a `ValueError`.
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
@@ -200,8 +200,8 @@ errors, and `forbidden_paths` is experimental in `iamb`, `inter_iamb`, and `mmpc
 found at 50 variables often has no consistent extension: a claim there acts only on an edge, the
 fits we measured dropped about 96% of the forbidden paths on such a graph, and with forbidden paths
 alone the CPDAG was 0.65 to 1.95 edges farther from the class the claims define. Both are
-experimental in `gs`, `fast_iamb`, `hiton_pc`, and `pcmb`, which that measurement did not cover,
-and in an experimental method, such as `hiton_mb` or `mmmb`. An experimental part warns with
+experimental in `gs`, `fast_iamb`, `hiton_pc`, `hiton_mb`, and `pcmb`, which that measurement
+did not cover, and in an experimental method, such as `mmmb`. An experimental part warns with
 {py:class}`~andrey.ExperimentalWarning`, and its meaning may change without deprecation. A
 CPDAG method reads the claims on the graph it found, so where that graph is wrong, a true claim can
 direct an edge the wrong way, and a required path cannot restore an edge the search left out. A path
@@ -459,9 +459,12 @@ variable.
    fast_iamb
    mmpc
    hiton_pc
+   hiton_mb
    pcmb
    mb_by_mb
+   y_structures
    cmb
+   mmb_by_mmb
    icp
    ges
    gies
@@ -554,6 +557,13 @@ others changes once the target is conditioned on, then visits the undecided neig
 directs the target's edges from what their blankets show. No reference implementation exists, so
 the [0.18.0](benchmarks/0.18.0.md#cmb) release card compares it with global PC read at the target,
 on its paper's Alarm setting.
+
+MMB-by-MMB (Xie et al. 2024), {py:func}`~andrey.mmb_by_mmb`, learns the edges at one variable and
+their marks when unmeasured common causes may exist, without the whole graph: it learns the
+target's Markov blanket, then a neighbor's, one blanket at a time, until the FCI rules decide the
+marks at the target, and returns the edges the target has in the PAG. The authors' code is its
+reference: the [0.18.0](benchmarks/0.18.0.md#mmb-by-mmb) release card compares them on its paper's
+four networks with hidden variables.
 
 CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
 smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
@@ -733,6 +743,15 @@ links in `metadata["context_links"]` and the dummies' links in `metadata["index_
 `metadata["time_index_edges"]`. The [0.15.0](benchmarks/0.15.0.md#j-pcmci) release card
 measures it against tigramite, the package of its authors.
 
+Y-structures (Mani et al. 2006; Mooij and Cremers 2015) claim that one variable is a causal
+ancestor of another from a pattern of four variables, and the claims hold when the rows were
+selected by a mechanism the variables affect, with hidden common causes allowed (Versteeg et al.
+2022). `y_structures` returns a graph with no edges: each claim is a record in
+`metadata["effects"]` with its score and the patterns behind it, and `variables` limits the claims
+to pairs of the columns it names. `extended=True` tests the extended Y-structure, which finds more
+patterns. The [0.18.0](benchmarks/0.18.0.md#y-structures) release card measures both against the
+authors' code.
+
 ### Experimental methods
 
 A new method ships as experimental: it passes recovery tests but is not supported, because it has
@@ -748,10 +767,7 @@ in a process.
    :nosignatures:
 
    dagma
-   hiton_mb
    mmmb
-   mmb_by_mmb
-   y_structures
    ldp
    ld3
    ldecc
@@ -768,14 +784,6 @@ the empty graph at its default settings, which is why it is experimental. The
 [0.17.0](benchmarks/0.17.0.md#dagma) release card has the numbers. `robust=True` follows the first
 fit with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
-
-Y-structures (Mani et al. 2006; Mooij and Cremers 2015) claim that one variable is a causal
-ancestor of another from a pattern of four variables, and the claims hold when the rows were
-selected by a mechanism the variables affect, with hidden common causes allowed (Versteeg et al.
-2022). `y_structures` returns a graph with no edges: each claim is a record in
-`metadata["effects"]` with its score and the patterns behind it, and `variables` limits the claims
-to pairs of the columns it names. `extended=True` tests the extended Y-structure, which finds more
-patterns. It is experimental until its comparison with the authors' code is published.
 
 Local ISA-LiNG (Dai et al. 2024) answers for one `target` in a linear model with non-Gaussian noise
 whose graph may hold cycles: from the target and its Markov blanket alone, it returns the weighted

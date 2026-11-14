@@ -42,20 +42,25 @@ names its pull request.
   graphs, its sets were better in 13 of 20 settings and worse in none, with fewer errors than the
   empty set in every setting. ([#950], [#993])
 - `andrey.hiton_mb`, the semi-interleaved HITON-MB Markov blanket learner (Aliferis et al. 2010),
-  experimental, with the arguments and metadata of `iamb`, `max_depth=3` by default, and the
+  with the arguments and metadata of `iamb`, `max_depth=3` by default, and the
   target's parents and children in `metadata["parents_and_children"]`. It runs `hiton_pc` for the
   target and for each of its parents and children, then admits each child's other parent when a
   test finds it dependent on the target given the set that separated the two and the common child.
   On categorical data a spouse test, too, runs only with at least five rows per cell of its table.
-  ([#957])
+  It is supported: against the authors' HITON-MB on child, insurance, alarm, hailfinder, and pigs
+  at its paper's sizes, its sets were closer to the true ones in 11 of 13 settings and further in
+  2, at 5,000 rows on hailfinder and insurance, where its symmetry check drops members the authors'
+  code keeps. On hailfinder at 200 and 500 rows its sets have more errors than the empty set.
+  ([#957], [#1025])
 - `andrey.mmmb`, the MMMB Markov blanket learner (Tsamardinos, Aliferis, and Statnikov 2003) in its
   authors' corrected form, experimental, with the arguments and metadata of `iamb` and the target's
   parents and children in `metadata["parents_and_children"]`. It runs `mmpc`, with its symmetry
   check (Tsamardinos, Brown, and Aliferis 2006), for the target and for each of its parents and
   children, then admits a variable as a spouse when a test finds it dependent on the target given
   the set that separated the two and a parent or child of the target whose own set holds the
-  variable (Aliferis et al. 2010). The set-learner benchmark lane runs it beside the authors' MMMB.
-  ([#965])
+  variable (Aliferis et al. 2010). Its G-square test counts the degrees of freedom of Spirtes et
+  al. by default (`degrees_of_freedom="nonempty"`), as its paper's tests do. The set-learner
+  benchmark lane runs it beside the authors' MMMB. ([#965], [#1025])
 - `andrey.pcmb`, the PCMB Markov blanket learner (Peña, Nilsson, Björkegren, and Tegnér 2007),
   supported, with the arguments and metadata of `iamb`, `alpha=0.01` by default, the paper's
   level, and the target's parents and children in `metadata["parents_and_children"]`. Its own
@@ -75,12 +80,17 @@ names its pull request.
   columns struck (Spirtes, Glymour, and Scheines 1993). The two differ only on sparse tables.
   Passing it with another test raises `ValueError`. ([#981])
 - `andrey.y_structures`, Y-structures under selection bias (Versteeg, Zhang, and Mooij 2022),
-  experimental: claims that one variable is a causal ancestor of another from a pattern of four
+  supported: claims that one variable is a causal ancestor of another from a pattern of four
   variables, sound when the rows were selected by a mechanism the variables affect, with hidden
   common causes allowed. Each claim is a record in `metadata["effects"]` with the paper's score and
   its patterns, and the graph has no edges; `extended=True` tests the extended Y-structure, and
   `variables` limits the claims to pairs of the named columns. The benchmark lane of Y-structures
-  runs it beside the authors' code. ([#959])
+  runs it beside the authors' code. On the datasets of the authors' simulation script, with and
+  without selection, both forms make the same claims as the authors' code on every dataset, so
+  they tie it on precision and average precision in all 12 settings, and the precision of their
+  claims is above the share of ancestral pairs in each. Under selection the tests' errors make many
+  claims wrong at 10,000 rows: on the random graphs with 16 variables, 35 of 65 claims were true,
+  and 133 of 475 with `extended=True`. ([#959], [#1016], [#1026])
 - The set-learner benchmark lane runs the authors' Causal Explorer beside `hiton_pc` and `hiton_mb`:
   its HITON-PC and HITON-MB, and MMMB for `mmmb`, called through MATLAB in batch with
   the same data, test, significance level, and largest conditioning set. `start_causal_explorer.sh`
@@ -100,7 +110,7 @@ names its pull request.
   fit and made fewer errors than the empty answer everywhere and than bnlearn's `pc.stable` on
   Alarm and Hailfinder; Andrey's PC, at many times the tests, made fewer errors in some settings.
   The 0.18.0 release card has the numbers and the trade-off. ([#956], [#PRNUM])
-- `andrey.mmb_by_mmb`, MMB-by-MMB (Xie et al. 2024), experimental: the direct causes and direct
+- `andrey.mmb_by_mmb`, MMB-by-MMB (Xie et al. 2024), supported: the direct causes and direct
   effects of one target when unmeasured common causes may exist, the edges the target has in the PAG
   with their marks, learned one Markov blanket at a time outward from the target until its marks are
   decided or the paper's stop rules end the search. `metadata` lists the target's `parents`,
@@ -115,8 +125,15 @@ names its pull request.
   beyond the paper, the method follows it, with two safeguards that make the answer correct where
   the paper's steps as written can be wrong: a v-structure joins the answer only when the variables
   off the step confirm it from their own blankets, and the stop rules are read only once more
-  blankets have been learned than the target has neighbors. The benchmark lane of MMB-by-MMB runs it
-  beside the authors' code. ([#966], [#980], [#994])
+  blankets have been learned than the target has neighbors. A pair at a step is tested against the
+  subsets of the smaller of the two ends' blankets, which decides it as the step's own blanket
+  does (Theorem 1 of the paper at either end, the limit Grow-Shrink and MBCS* put on the search),
+  so a variable with a wide blanket costs the tests of its neighbors' blankets instead of every
+  subset of its own. The benchmark lane of MMB-by-MMB runs it beside the authors' code. It is
+  supported: on the paper's four networks with hidden nodes, at 1,000 and 5,000 rows and the paper's
+  targets, its edges and marks were better than those of the authors' code in five of eight
+  settings and no worse in the rest, and it made fewer errors than the empty answer in all eight;
+  the 0.18.0 release card has the numbers. ([#966], [#980], [#994], [#1022], [#1024])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
@@ -134,6 +151,11 @@ names its pull request.
   FCI on published networks as linear-Gaussian models with hidden nodes, and `y_structures_cpu.py`
   runs the authors' Y-structure code on models with a selection node. Each has its simulation, its
   scores, and the contract that the adapter of an Andrey method fills. ([#912])
+- The Y-structures benchmark lane draws the selection variables of a random graph by a rule,
+  `--rule`: `authors`, the default, as the authors' simulation script draws them, the first among
+  the colliders and their descendants and the others among all other nodes; `text`, the harder
+  setting, as the paper's text describes them, among the leaves of the colliders' descendants.
+  `y_structures_summary.py` judges Andrey's claims against the authors' code per setting. ([#1026])
 - Scores for the answers of local methods, which may leave a question open.
   `andrey.metrics.target_oracle` and `effect_oracle` give the answer a method's definition gives on
   the true graph: a target's Markov blanket, its parents and children, or its edges in the true
@@ -2799,8 +2821,13 @@ First alpha release.
 [#1009]: https://github.com/Abel-ai-lab/Andrey/pull/1009
 [#1011]: https://github.com/Abel-ai-lab/Andrey/pull/1011
 [#1020]: https://github.com/Abel-ai-lab/Andrey/pull/1020
+[#1024]: https://github.com/Abel-ai-lab/Andrey/pull/1024
+[#1016]: https://github.com/Abel-ai-lab/Andrey/pull/1016
 [#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
+[#1022]: https://github.com/Abel-ai-lab/Andrey/pull/1022
+[#1026]: https://github.com/Abel-ai-lab/Andrey/pull/1026
 [#1019]: https://github.com/Abel-ai-lab/Andrey/pull/1019
+[#1025]: https://github.com/Abel-ai-lab/Andrey/pull/1025
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988

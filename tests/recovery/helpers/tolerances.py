@@ -40,7 +40,15 @@ SPEC: dict[str, dict] = {
     "HITONPC": GRAPH_ONLY,
     "PCMB": GRAPH_ONLY,
     "MBbyMB": GRAPH_ONLY,
+    "HITONMB": GRAPH_ONLY,
+    "MMMB": GRAPH_ONLY,
+    # Y-structures: the claimed pairs in their listed order, and the scores within rounding.
+    "YStructures": {
+        "structural": ["graph", "claims"],
+        "numeric": {"scores": {"atol": 1e-6, "rtol": 1e-6}},
+    },
     "CMB": GRAPH_ONLY,
+    "MMBbyMMB": GRAPH_ONLY,
     "MMHC": GRAPH_SCORE,
     "RSMAX2": GRAPH_SCORE,
     "ExactSearch": GRAPH_ONLY,

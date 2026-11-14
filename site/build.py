@@ -562,6 +562,8 @@ NOT_SHOWN = {("nonlinear", "anm_er"), ("boss-grasp", "diabetes")}
 # leaves them to the card too. PCMB, CMB, and MB-by-MB have no reference implementation: their
 # rows sit beside their papers' published results, CMB's and MB-by-MB's also beside global PC read
 # at the target, with no comparator, on their release card.
+# MMB-by-MMB's rows are four networks with hidden variables read at its paper's targets, which
+# its release card reports.
 NOT_SHOWN_LANES = {
     "igsp.alpha_1e-2_starts_5",
     "igsp.alpha_1e-2_starts_10",
@@ -583,6 +585,7 @@ NOT_SHOWN_LANES = {
     "pcmb.paper",
     "cmb.paper",
     "mb_by_mb.paper",
+    "mmb-by-mmb",
 }
 # Packages the homepage omits, each reported on its release card beside the default comparison: a
 # reference patched to follow its paper where the package does not; pcalg under the JCI

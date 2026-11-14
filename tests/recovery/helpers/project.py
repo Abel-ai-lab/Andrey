@@ -28,7 +28,10 @@ _GRAPH = (
             "HITONPC",
             "PCMB",
             "MBbyMB",
+            "HITONMB",
+            "MMMB",
             "CMB",
+            "MMBbyMMB",
             "ExactSearch",
             "BOSS",
             "BOSSFCI",
@@ -73,6 +76,11 @@ _WEIGHTED_LAGS = frozenset({"DYNOTEARS", "Granger"})
 _WEIGHTED_DAG = frozenset({"NOTEARS"})
 # VARMA-LiNGAM: candidate = the causal order and both coefficient stacks in the native B layout.
 _VARMA = frozenset({"VARMALiNGAM", "VARMALiNGAMPruned"})
+
+
+# Y-structures: candidate = the edgeless graph, the claimed ``[treatment, outcome]`` pairs by
+# descending score, and their scores.
+_CLAIMS = frozenset({"YStructures"})
 
 
 def found_dag(out: Any) -> GraphStructure:
@@ -126,6 +134,13 @@ def project_output(out: Any, algorithm: str) -> dict:
         return {"graph": out.structure.to_numpy(), "latent_pairs": pairs}
     if algorithm in _ORDERED_DAG:
         return {"graph": out.structure.to_numpy(), "causal_order": np.asarray(out.ordering)}
+    if algorithm in _CLAIMS:
+        claims = out.metadata["effects"]
+        return {
+            "graph": out.structure.to_numpy(),
+            "claims": [[c["treatment"], c["outcome"]] for c in claims],
+            "scores": [c["score"] for c in claims],
+        }
     if algorithm in _INVARIANT:
         return {
             "graph": out.structure.to_numpy(),
