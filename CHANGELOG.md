@@ -8,6 +8,22 @@ and, when a change breaks the API, Breaking, and from 0.11.0 it closes with New 
 someone contributes for the first time, sections Keep a Changelog does not define; each change
 names its pull request.
 
+## [Unreleased]
+
+### Fixed
+
+- `"fisherz"` and `"normal_scores"` compute the upper tail of their p-value directly, and so do
+  the Fisher-aggregated HSIC test of `bottom_up_parce_lingam` and the Anderson-Darling p-value of
+  one value in `markov_check`. The subtraction `1 - cdf` they used was `0` below about `2e-16` and
+  off by up to a few percent near `1e-14`, so every strong dependence tied. A p-value above `1e-16`
+  is the same to rounding, and a strong dependence now keeps a positive p-value down to about
+  `1e-308`. On the recorded-output and recovery inputs, 60 of the 66 methods return the same output
+  bit for bit. The graph of `pcmb` changes in one fit, from a tie among p-values below `2e-16`;
+  the p-values and statistics in the metadata of `pcmci`, `pcmciplus`, `lpcmci`, and `jpcmciplus`
+  change; and the claim scores of `y_structures` are finite where they were infinite, with the same
+  claims. The uniformity statistic and p-value of `markov_check` change when a test's p-value was
+  `0`, and the stored outputs of its example notebook are refreshed. ([#1017])
+
 ## [0.17.1] - 2026-11-12
 
 ### Highlights
@@ -2554,3 +2570,4 @@ First alpha release.
 [nd-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/notears-dagma.md
 [ages-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/ages.md
 [#920]: https://github.com/Abel-ai-lab/andrey/pull/920
+[#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
