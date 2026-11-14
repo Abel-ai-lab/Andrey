@@ -235,16 +235,15 @@ def mb_by_mb(
     45 x 45 chessboard) it made fewer errors at the target than the empty answer, with a small
     fraction of the tests of one :func:`~andrey.pc` fit; that fit made fewer errors in a few cells,
     among them Alarm at 5,000 rows with alpha 0.05 and Hailfinder at 500 rows with alpha 0.05, and
-    on the chessboard. The
-    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#mb-by-mb>`_ has the
-    numbers. Each local structure tests every pair of a blanket against every subset of the rest, up
-    to ``local_max_depth`` members, so a blanket of ``m`` variables takes up to about
-    ``m**2 * 2**m`` tests without the cap. Under the default ``local_max_depth=5``, a pair that
-    only a larger set separates keeps its edge. The default blanket learner never drops a variable
-    it added, so a large sample, in which more variables test dependent, gives larger blankets, and
-    each test of the blanket learner conditions on the whole set so far. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    on the chessboard. The `0.18.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#mb-by-mb>`_ has the numbers. Each local
+    structure tests every pair of a blanket against every subset of the rest, up to
+    ``local_max_depth`` members, so a blanket of ``m`` variables takes up to about ``m**2 * 2**m``
+    tests without the cap. Under the default ``local_max_depth=5``, a pair that only a larger set
+    separates keeps its edge. The default blanket learner never drops a variable it added, so a
+    large sample, in which more variables test dependent, gives larger blankets, and each test of
+    the blanket learner conditions on the whole set so far. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
