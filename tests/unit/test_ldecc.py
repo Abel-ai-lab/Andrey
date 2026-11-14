@@ -184,6 +184,17 @@ def test_uc_children_needs_every_neighbor_separator_of_the_spouse_to_agree():
     assert engine.uc_children(tests, 0, [1, 2, 3], [1, 2]) == {2}
 
 
+def test_two_neighbors_are_parents_only_when_the_treatment_makes_them_dependent():
+    """Fig. 5 as the authors' code reads it: the neighbors ``2`` and ``3`` are separated
+    without the treatment ``0``; they are parents only when they test dependent given that set and
+    ``0``, as a collider at ``0`` makes them."""
+    collider = Scripted(4, {(2, 3, ())}, blanket=[1, 2, 3])
+    assert engine.ldecc(collider, 0).parents == {2, 3}
+    neither = Scripted(4, {(2, 3, ()), (2, 3, (0,))}, blanket=[1, 2, 3])
+    result = engine.ldecc(neither, 0)
+    assert result.parents == frozenset() and result.unoriented == {1, 2, 3}
+
+
 def test_a_non_collider_tests_only_the_undirected_neighbors_as_children():
     """``3`` and ``4`` are separated without the treatment ``0``, so they are parents; ``1`` and
     ``2`` are separated by ``{0}``, a non-collider. The parents, though they make ``1`` and ``2``
