@@ -152,6 +152,50 @@ def test_max_depth_caps_every_test():
         assert max(len(s) for _, _, s in search.counts.queries) <= depth
 
 
+class Scripted:
+    """A search whose test answers from a table: ``independent`` holds the queries
+    ``(a, b, cond)``, ``a < b`` and ``cond`` sorted, that test independent."""
+
+    alpha = 0.05
+    max_depth = None
+
+    def __init__(self, d: int, independent: set, blanket: list[int] | None = None) -> None:
+        self.d = d
+        self.ranks = list(range(d))
+        self.independent = independent
+        self.blanket = blanket
+
+    def local(self, learner, x):
+        return None, self.blanket, {}
+
+    def scan(self, a, bs, cond=()):
+        keys = [(min(a, b), max(a, b), tuple(sorted(cond))) for b in bs]
+        return None, np.array([1.0 if k in self.independent else 0.0 for k in keys])
+
+
+def test_uc_children_needs_every_neighbor_separator_of_the_spouse_to_agree():
+    """Fig. 4's UCChildren as the authors' code reads it: the spouse ``3`` is separated from the
+    treatment ``0`` by ``{1}`` and by ``{2}``; ``2`` is in the second, so it is not a child,
+    although it lies outside the first and depends on ``3`` given it."""
+    both = {(0, 3, (1,)), (0, 3, (2,))}
+    tests = engine.Tests(Scripted(4, both))
+    assert engine.uc_children(tests, 0, [1, 2, 3], [1, 2]) == set()
+    tests = engine.Tests(Scripted(4, {(0, 3, (1,))}))
+    assert engine.uc_children(tests, 0, [1, 2, 3], [1, 2]) == {2}
+
+
+def test_a_non_collider_tests_only_the_undirected_neighbors_as_children():
+    """``3`` and ``4`` are separated without the treatment ``0``, so they are parents; ``1`` and
+    ``2`` are separated by ``{0}``, a non-collider. The parents, though they make ``1`` and ``2``
+    dependent again, are not tested as children, and a parent set may add either of ``1`` and
+    ``2``, never both."""
+    search = Scripted(5, {(3, 4, ()), (1, 2, (0,))}, blanket=[1, 2, 3, 4])
+    result = engine.ldecc(search, 0)
+    assert result.parents == {3, 4} and result.children == frozenset()
+    assert result.non_colliders == {frozenset({1, 2})}
+    assert result.parent_sets == ((3, 4), (1, 3, 4), (2, 3, 4))
+
+
 def test_check_marks_parents_only_when_the_separators_agree():
     """Fig. 4, ECCParents: for two variables that are not neighbors of the treatment, ``check``
     marks their minimal neighbor separators only when the two are equal; for a neighbor and a
