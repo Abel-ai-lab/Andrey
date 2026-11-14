@@ -460,6 +460,7 @@ variable.
    mmpc
    hiton_pc
    pcmb
+   mb_by_mb
    cmb
    icp
    ges
@@ -536,6 +537,15 @@ or a moral graph, as `iamb` does. On categorical data it counts degrees of freed
 Glymour, and Scheines (1993) do (`degrees_of_freedom="nonempty"`). No reference implementation
 exists, so the [0.18.0](benchmarks/0.18.0.md#pcmb) release card sets its results on two published
 networks beside those of its paper.
+
+MB-by-MB (Wang et al. 2014), {py:func}`~andrey.mb_by_mb`, answers for one `target`: it learns the
+target's Markov blanket and the local structure over it, then a neighbor's, one blanket at a time,
+until no further blanket can direct an edge at the target, and returns the edges the target has in
+the CPDAG with their directions. `metadata["parents"]`, `metadata["children"]`, and
+`metadata["undirected"]` list the columns joined to the target, and `metadata["blankets_learned"]`
+the variables whose blanket it learned, in order. No reference implementation exists, so the
+[0.18.0](benchmarks/0.18.0.md#mb-by-mb) release card compares its accuracy and its tests per target
+with global PC read at the target, on its paper's Alarm, Hailfinder, and chessboard settings.
 
 CMB, causal Markov blanket (Gao and Ji 2015), {py:func}`~andrey.cmb`, learns the edges at one
 variable and their directions without the whole graph: from the target's Markov blanket, learned
@@ -740,7 +750,6 @@ in a process.
    dagma
    hiton_mb
    mmmb
-   mb_by_mb
    mmb_by_mmb
    y_structures
    ldp
@@ -759,13 +768,6 @@ the empty graph at its default settings, which is why it is experimental. The
 [0.17.0](benchmarks/0.17.0.md#dagma) release card has the numbers. `robust=True` follows the first
 fit with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
-
-MB-by-MB (Wang et al. 2014) answers for one `target`: it learns the target's Markov blanket and the
-local structure over it, then a neighbor's, one blanket at a time, until no further blanket can
-direct an edge at the target, and returns the edges the target has in the CPDAG with their
-directions. `metadata["parents"]`, `metadata["children"]`, and `metadata["undirected"]` list the
-columns joined to the target, and `metadata["blankets_learned"]` the variables whose blanket it
-learned, in order. No reference implementation exists to compare it with.
 
 Y-structures (Mani et al. 2006; Mooij and Cremers 2015) claim that one variable is a causal
 ancestor of another from a pattern of four variables, and the claims hold when the rows were

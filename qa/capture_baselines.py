@@ -139,6 +139,7 @@ ALGORITHMS = {
     "MMPC": (_facade("mmpc", structure="cpdag"), "gauss_5v"),
     "HITONPC": (_facade("hiton_pc", structure="cpdag"), "gauss_5v"),
     "PCMB": (_facade("pcmb"), "gauss_5v"),
+    "MBbyMB": (_run_target("mb_by_mb"), "gauss_5v"),
     "CMB": (_run_target("cmb"), "gauss_5v"),
     "MMHC": (_facade("mmhc"), "gauss_5v"),
     "RSMAX2": (_facade("rsmax2", restrict="pc", maximize="tabu"), "gauss_5v"),

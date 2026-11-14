@@ -86,14 +86,20 @@ names its pull request.
   the same data, test, significance level, and largest conditioning set. `start_causal_explorer.sh`
   fetches the public repository at a pinned commit; the arm is left out where MATLAB or the toolbox
   is absent. ([#957])
-- `andrey.mb_by_mb`, MB-by-MB (Wang et al. 2014), experimental: the direct causes and direct
+- `andrey.mb_by_mb`, MB-by-MB (Wang et al. 2014): the direct causes and direct
   effects of one target, the edges the target has in the CPDAG with their directions, learned one
   Markov blanket at a time outward from the target until no further blanket can direct one of
   them. `metadata` lists the target's `parents`, `children`, and `undirected` neighbors, the
   `blankets_learned`, and `n_tests`. Its blanket learner is IAMB's grow phase without the shrink,
   as in the paper's runs (`blanket="iamb_forward"`, a new choice of the engine's learners).
   `local_max_depth=5`, the cap of those runs, caps the local structures' tests alone; `max_depth`
-  caps every test, as in the other learners, and sets no cap by default. ([#956])
+  caps every test, as in the other learners, and sets no cap by default. As in the paper, every
+  independence a test of the search finds is kept, a blanket learner's included, and such a pair
+  holds no edge. It is supported: at its paper's settings (Alarm and Hailfinder at 500 to 5,000
+  rows, a 45 x 45 chessboard), each answer took a small fraction of the tests of one global PC
+  fit and made fewer errors than the empty answer everywhere and than bnlearn's `pc.stable` on
+  Alarm and Hailfinder; Andrey's PC, at many times the tests, made fewer errors in some settings.
+  The 0.18.0 release card has the numbers and the trade-off. ([#956], [#PRNUM])
 - `andrey.mmb_by_mmb`, MMB-by-MMB (Xie et al. 2024), experimental: the direct causes and direct
   effects of one target when unmeasured common causes may exist, the edges the target has in the PAG
   with their marks, learned one Markov blanket at a time outward from the target until its marks are
@@ -248,6 +254,10 @@ names its pull request.
   and a fit with a 36-member blanket ran out of memory at 64 GB; one call over the 6.9 million sets
   of size 9 of 28 variables now peaks at about 115 MB instead of 3.5 GB. Answers and `n_tests` are
   unchanged. ([#1019])
+- `mb_by_mb` puts no edge between a pair that a test of its search separated, a blanket learner's
+  test included, as the paper's search does. Such a pair could keep an edge, and a v-structure that
+  named it could direct a neighbor's other edge. On samples of the paper's networks the answers
+  change, mostly on Hailfinder, where the errors at the target fall in most settings. ([#PRNUM])
 
 ## [0.17.1] - 2026-11-12
 

@@ -178,9 +178,6 @@ def mb_by_mb(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -208,7 +205,9 @@ def mb_by_mb(
     done earlier, or every member of the blanket is done, the local structure is read from what is
     already learned instead [1]_. Only the edges at ``x`` and the v-structures that contain ``x``
     join the growing graph: the rest of the local structure may come from variables outside the
-    blanket [1]_.
+    blanket [1]_. Every independence a test of the search found is kept, a blanket learner's
+    included, and a pair it separates holds no edge [1]_: after each step, such an edge leaves the
+    growing graph, and a v-structure that named it no longer directs its other edge.
     Meek's rules [2]_ then direct the edges that follow, reading a missing edge as an absence only
     where a test separated the pair, and a triple as a non-collider only where the separating set
     holds its middle [1]_. Last, every waitlist variable that each path to the target in the
@@ -232,10 +231,13 @@ def mb_by_mb(
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
     other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet, and no reference implementation exists to compare with.
-    Tested with exact d-separation on every target of 11 random graphs of up to 30 variables and of
-    a 5 x 5 chessboard, and on simulated linear-Gaussian data with 20 variables and categorical data
-    with 10. Each local structure tests every pair of a blanket against every subset of the rest, up
+    **Limitations.** At its paper's settings (Alarm and Hailfinder samples at 500 to 5,000 rows, a
+    45 x 45 chessboard) it made fewer errors at the target than the empty answer, with a small
+    fraction of the tests of one :func:`~andrey.pc` fit; that fit made fewer errors in a few cells,
+    among them Alarm at 5,000 rows with alpha 0.05 and Hailfinder at 500 rows with alpha 0.05, and
+    on the chessboard. The
+    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#mb-by-mb>`_ has the
+    numbers. Each local structure tests every pair of a blanket against every subset of the rest, up
     to ``local_max_depth`` members, so a blanket of ``m`` variables takes up to about
     ``m**2 * 2**m`` tests without the cap. Under the default ``local_max_depth=5``, a pair that
     only a larger set separates keeps its edge. The default blanket learner never drops a variable

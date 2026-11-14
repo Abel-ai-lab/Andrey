@@ -811,8 +811,9 @@ CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss", "sachs")
 SMALL_DATA = (*(f"linear_gauss_er_d{d}" for d, _ in SMALL_SIZES), "asia_gauss", "sachs")
 CALM_DATA = (SMALL_DATA[0], "asia_gauss")
 PAG_DATA = (*_sizes("latent_gauss_er"), "asia_gauss", "sachs")
-#: CMB answers one variable, the last column. Sachs has one draw, and at its last column, jnk, CMB
-#: finds at most one of the two edges, as PC does: its SHD there equals the empty answer's.
+#: MB-by-MB and CMB answer one variable, the last column. Sachs has one draw, and at its last
+#: column, jnk, they find at most one of the two edges, as PC does: the SHD there equals the empty
+#: answer's.
 TARGET_CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss")
 LINGAM_DATA = (*_sizes("lingam_sf"), "asia_lingam", "sachs")
 CONFOUNDED_DATA = _sizes("latent_lingam_er")
@@ -928,7 +929,7 @@ def ut_igsp_targets(x: np.ndarray) -> list[list[int]]:
 
 #: Public defaults, except MMPC, HITON-PC, and RSMAX2: MMPC and HITON-PC return a skeleton by
 #: default, so the gate fits their CPDAG, and RSMAX2's default restrict phase is MMHC's, so the gate
-#: fits its IAMB restrict phase. CMB answers one variable, the last column. A fixed seed
+#: fits its IAMB restrict phase. MB-by-MB and CMB answer one variable, the last column. A fixed seed
 #: pins the search orders of BOSS, GRaSP, BOSS-FCI, and GRaSP-FCI, FastICA's start, and CALM's
 #: optimizer. CD-NOD and MultiGroupDirectLiNGAM run through their benchmark adapters, which call the
 #: public functions with the published settings: the domain index of four equal blocks of rows, and
@@ -955,6 +956,9 @@ SUPPORTED: dict[str, Method] = {
     "MMPC": Method(lambda x: andrey.mmpc(x, structure="cpdag"), "cpdag", CPDAG_DATA),
     "HITONPC": Method(lambda x: andrey.hiton_pc(x, structure="cpdag"), "cpdag", CPDAG_DATA),
     "PCMB": Method(lambda x: andrey.pcmb(x), "cpdag", CPDAG_DATA),
+    "MB-by-MB": Method(
+        lambda x: andrey.mb_by_mb(x, target=x.shape[1] - 1), "target_cpdag", TARGET_CPDAG_DATA
+    ),
     "CMB": Method(
         lambda x: andrey.cmb(x, target=x.shape[1] - 1), "target_cpdag", TARGET_CPDAG_DATA
     ),
