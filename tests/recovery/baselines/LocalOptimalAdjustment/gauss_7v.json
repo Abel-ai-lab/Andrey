@@ -1,0 +1,114 @@
+{
+  "algorithm": "LocalOptimalAdjustment",
+  "case": "gauss_7v",
+  "input": {
+    "case": "gauss_7v",
+    "column_order": [
+      5,
+      0,
+      2,
+      4,
+      6,
+      3,
+      1
+    ],
+    "seed": 20261011,
+    "sha256": "a342b357120011d784e8d0aedea48fed4cee74daf2cb6424a62ec5a6e61c3948",
+    "shape": [
+      2000,
+      7
+    ]
+  },
+  "output": {
+    "effects": [
+      {
+        "adjustment_sets": [
+          [
+            6
+          ]
+        ],
+        "estimand": "total",
+        "identifiable": true,
+        "nonzero": true,
+        "outcome": 5,
+        "set_kind": "optimal",
+        "treatment": 1
+      },
+      {
+        "adjustment_sets": [],
+        "estimand": "total",
+        "identifiable": true,
+        "nonzero": false,
+        "outcome": 1,
+        "set_kind": null,
+        "treatment": 5
+      }
+    ],
+    "graph": [
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        2,
+        0,
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        2,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        2,
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "schema_version": 3
+}

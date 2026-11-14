@@ -194,22 +194,26 @@ names its pull request.
   Alarm network at 1,000 rows, its paper's setting, it made fewer errors at the target than global
   PC read there and than the empty answer, on 20 datasets and again on 20 fresh ones; the 0.18.0
   release card has the numbers. ([#995], [#1020])
-- `andrey.ldecc`, LDECC (Gupta et al. 2023), experimental: the edges at one `treatment`, with their
+- `andrey.ldecc`, LDECC (Gupta et al. 2023), supported: the edges at one `treatment`, with their
   directions, and the locally valid parent sets for its effect on one `outcome`, from its Markov
   blanket (`blanket`, `"iamb"` by default) and the tests of the PC algorithm read as they come, with
   eager collider checks that direct the treatment's parents. The step that finds the neighbors
   tests each blanket member against subsets of the blanket. The graph is a CPDAG of the edges at the
-  treatment, and the answer is one record in `metadata["effects"]`. The treatment-outcome benchmark
-  lane runs it beside the authors' code. ([#991])
-- `andrey.local_optimal_adjustment`, LOAD (Schubert, Claassen and Magliacane 2026), experimental:
+  treatment, and the answer is one record in `metadata["effects"]`. Against its authors' code on the
+  graphs of its paper's generator and on the MAGIC-NIAB network at 8,000 to 32,000 rows, it tied on
+  accuracy, recall, and effect error in all 8 settings, on 20 datasets and again on 20 fresh ones.
+  ([#991], [#PRNUM])
+- `andrey.local_optimal_adjustment`, LOAD (Schubert, Claassen and Magliacane 2026), supported:
   for two `variables` given in any order, finds whether one causes the other and the optimal
   adjustment set for the total effect when it is identifiable, else the locally valid parent sets
   of the treatment, from local structures learned one Markov blanket at a time, as MB-by-MB learns
   them but each by the skeleton step of PC over the blanket, so the tests are exponential in the
   degrees of the skeleton and not in the size of the blanket. It learns only the blankets the
   answer needs. `metadata["effects"]` holds one record per direction, the graph the edges at the
-  two variables, and `metadata["blankets_learned"]` the variables whose blanket it learned.
-  ([#1003], [#1011])
+  two variables, and `metadata["blankets_learned"]` the variables whose blanket it learned. Against
+  its authors' code on its paper's random graphs with 100 to 1,000 variables and on pairs of the
+  MAGIC-NIAB network at 10,000 rows, its sets and effects tied in every setting, on 20 datasets or
+  again on 20 fresh ones. ([#1003], [#1011], [#PRNUM])
 
 ### Changed
 
@@ -228,6 +232,20 @@ names its pull request.
   five published networks at 500 to 10,000 rows, recall is higher in 18 of 42 comparisons and
   pooled F1 is never lower. ([#969])
 
+- `ldecc` reads five steps as its authors' implementation does: two neighbors separated without the
+  treatment are parents only when they test dependent given that set and the treatment; a neighbor
+  is a child of an unshielded collider only when every set of neighbors that separates the spouse
+  from the treatment leaves it out and dependent on the spouse; a non-collider tests only the
+  undirected neighbors as children; an eager collider check with one neighbor marks parents only
+  when the other's minimal separator holds that neighbor and one more variable; and a parent set
+  checks the non-collider pairs among the undirected neighbors it adds. On the 25-node graphs of
+  Gupta et al. at 8,000 to 32,000 rows, the share of fits whose parent sets equal the true CPDAG's
+  rises from 0.16-0.25 to 0.38-0.42, and the answers under exact tests do not change. ([#PRNUM])
+- `local_optimal_adjustment` directs an edge that two v-structures direct both ways as the
+  v-structure whose pair the tests separated most clearly asks, as `pc` orders its colliders, where
+  it left the edge undirected; the answer then reads the pair's relation from it. Under exact tests
+  no edge is disputed and the answers do not change; `mb_by_mb` and `mmb_by_mmb` do not change.
+  ([#PRNUM])
 ### Fixed
 
 - The treatment-outcome benchmark lane scores the effect error of the pair asked. For a method that
@@ -252,6 +270,8 @@ names its pull request.
   and a fit with a 36-member blanket ran out of memory at 64 GB; one call over the 6.9 million sets
   of size 9 of 28 variables now peaks at about 115 MB instead of 3.5 GB. Answers and `n_tests` are
   unchanged. ([#1019])
+- The treatment-outcome benchmark lane computes `valid` and F1 from the sets of the pair asked; a
+  method that answers both directions no longer counts the sets of the reverse one. ([#PRNUM])
 
 ## [0.17.1] - 2026-11-12
 

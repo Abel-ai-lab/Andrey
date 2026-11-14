@@ -658,9 +658,6 @@ def ldecc(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -719,16 +716,20 @@ def ldecc(
     ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
     ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Tested with exact d-separation on the graphs of [1]_
-    and [2]_ and on random graphs, and on simulated linear-Gaussian data. In some graphs the
-    eager collider checks leave a parent of the treatment undirected that the CPDAG directs [2]_
-    (App. A.2): the answer then lists more parent sets than the CPDAG allows, the treatment's
-    true parents among them. When some neighbor stays undirected, the PC algorithm's tests run
-    over every pair, as many as learning the whole skeleton, and the sets number up to two to the
-    power of the undirected neighbors. On the 25-node graphs of [1]_ (App. C.1) with 8,000 to
-    32,000 rows, a fit ran a median of 310 to 350 tests, in under a second. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    **Limitations.** Measured against its authors' code on the graphs of the generator of [1]_
+    (App. C.1) and on the MAGIC-NIAB network at 8,000 to 32,000 rows, with Fisher's z test at the
+    level of their notebooks: its parent sets and effect estimates were as near the truth as the
+    code's in every setting, on 20 datasets and again on 20 fresh ones. Like the code's, its answers
+    scored below the better of abstaining and adjusting for nothing in every setting. The
+    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#ldecc>`_ has the
+    numbers. In some graphs the eager collider checks leave a parent of the treatment undirected
+    that the CPDAG directs [2]_ (App. A.2): the answer then lists more parent sets than the CPDAG
+    allows, the treatment's true parents among them. When some neighbor stays undirected, the PC
+    algorithm's tests run over every pair, as many as learning the whole skeleton, and the sets
+    number up to two to the power of the undirected neighbors. A fit ran a median of 500 to 570
+    tests, in under a tenth of a second, on the 25-node graphs, and 72,000 to 166,000 tests, in 4 to
+    11 seconds, on MAGIC-NIAB (44 nodes). The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -917,9 +918,6 @@ def local_optimal_adjustment(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -979,13 +977,19 @@ def local_optimal_adjustment(
     ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
     ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Tested with exact d-separation on random graphs of up to
-    20 variables, against the relation, the identifiability, and the optimal set of the true
-    graph, and on simulated linear-Gaussian data. Each local structure tests a pair against the
-    subsets of the neighbors of its ends with no cap, so a variable with many neighbors costs many
-    tests, and the parent sets of a treatment grow with the subsets of its undirected neighbors.
-    The numbers are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    **Limitations.** Measured against its authors' code on the random graphs of [1]_ with 100 to
+    1,000 variables and on pairs drawn from the MAGIC-NIAB network at 10,000 rows, with Fisher's z
+    test at alpha 0.01: its sets and effect estimates were as near the truth as the code's in every
+    setting, on 20 datasets or again on 20 fresh ones, and its sets nearer the optimal set than the
+    empty set. Like the code's, its answers scored below adjusting for nothing in every setting. An
+    edge that two v-structures direct both ways is directed as the more clearly separated one asks,
+    and on 11 of those 200 datasets that answered no effect where the truth has one. The
+    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#load>`_ has the
+    numbers. Each local structure tests a pair against the subsets of the neighbors of its ends with
+    no cap, so a variable with many neighbors costs many tests, and the parent sets of a treatment
+    grow with the subsets of its undirected neighbors. A fit ran a median of 1,300 to 14,000 tests,
+    in under 3 seconds, on those graphs. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------

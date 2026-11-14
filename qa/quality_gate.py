@@ -811,8 +811,9 @@ CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss", "sachs")
 SMALL_DATA = (*(f"linear_gauss_er_d{d}" for d, _ in SMALL_SIZES), "asia_gauss", "sachs")
 CALM_DATA = (SMALL_DATA[0], "asia_gauss")
 PAG_DATA = (*_sizes("latent_gauss_er"), "asia_gauss", "sachs")
-#: CMB answers one variable, the last column. Sachs has one draw, and at its last column, jnk, CMB
-#: finds at most one of the two edges, as PC does: its SHD there equals the empty answer's.
+#: CMB, LDECC, and LOAD are scored at one variable, the last column. Sachs has one draw, and at its
+#: last column, jnk, each finds at most one of the two edges, as PC does: none scores below the
+#: empty answer there.
 TARGET_CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss")
 LINGAM_DATA = (*_sizes("lingam_sf"), "asia_lingam", "sachs")
 CONFOUNDED_DATA = _sizes("latent_lingam_er")
@@ -928,11 +929,13 @@ def ut_igsp_targets(x: np.ndarray) -> list[list[int]]:
 
 #: Public defaults, except MMPC, HITON-PC, and RSMAX2: MMPC and HITON-PC return a skeleton by
 #: default, so the gate fits their CPDAG, and RSMAX2's default restrict phase is MMHC's, so the gate
-#: fits its IAMB restrict phase. CMB answers one variable, the last column. A fixed seed
-#: pins the search orders of BOSS, GRaSP, BOSS-FCI, and GRaSP-FCI, FastICA's start, and CALM's
-#: optimizer. CD-NOD and MultiGroupDirectLiNGAM run through their benchmark adapters, which call the
-#: public functions with the published settings: the domain index of four equal blocks of rows, and
-#: three groups of columns.
+#: fits its IAMB restrict phase. CMB answers one variable, the last column; LDECC takes it as the
+#: treatment and the first column as the outcome, LOAD takes the two as its variables, and each is
+#: scored by its edges at the last column. A fixed seed pins the search orders of BOSS, GRaSP,
+#: BOSS-FCI, and GRaSP-FCI, FastICA's start, and CALM's optimizer. CD-NOD and
+#: MultiGroupDirectLiNGAM run through their benchmark adapters, which call the public functions with
+#: the published settings: the domain index of four equal blocks of rows, and three groups of
+#: columns.
 SUPPORTED: dict[str, Method] = {
     "PC": Method(lambda x: andrey.pc(x), "cpdag", CPDAG_DATA),
     "FCI": Method(lambda x: andrey.fci(x), "pag", PAG_DATA),
@@ -957,6 +960,16 @@ SUPPORTED: dict[str, Method] = {
     "PCMB": Method(lambda x: andrey.pcmb(x), "cpdag", CPDAG_DATA),
     "CMB": Method(
         lambda x: andrey.cmb(x, target=x.shape[1] - 1), "target_cpdag", TARGET_CPDAG_DATA
+    ),
+    "LDECC": Method(
+        lambda x: andrey.ldecc(x, treatment=x.shape[1] - 1, outcome=0),
+        "target_cpdag",
+        TARGET_CPDAG_DATA,
+    ),
+    "LocalOptimalAdjustment": Method(
+        lambda x: andrey.local_optimal_adjustment(x, variables=[x.shape[1] - 1, 0]),
+        "target_cpdag",
+        TARGET_CPDAG_DATA,
     ),
     "MMHC": Method(lambda x: andrey.mmhc(x), "cpdag", CPDAG_DATA),
     "RSMAX2": Method(lambda x: andrey.rsmax2(x, restrict="iamb"), "cpdag", CPDAG_DATA),
