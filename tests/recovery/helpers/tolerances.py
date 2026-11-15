@@ -51,6 +51,7 @@ SPEC: dict[str, dict] = {
     "CMB": GRAPH_ONLY,
     "LDECC": GRAPH_EFFECTS,
     "LocalOptimalAdjustment": GRAPH_EFFECTS,
+    "LocPCCDE": GRAPH_EFFECTS,
     "MMBbyMMB": GRAPH_ONLY,
     "MMHC": GRAPH_SCORE,
     "RSMAX2": GRAPH_SCORE,

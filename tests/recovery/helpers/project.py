@@ -70,7 +70,7 @@ _PCMCI = frozenset({"PCMCI", "PCMCIplus", "LPCMCI"})
 # at the target.
 _INVARIANT = frozenset({"ICP"})
 # Treatment-outcome methods: candidate = the graph and the ``effects`` records.
-_EFFECTS = frozenset({"LDECC", "LocalOptimalAdjustment"})
+_EFFECTS = frozenset({"LDECC", "LocalOptimalAdjustment", "LocPCCDE"})
 # Weighted temporal fits: candidate = the per-lag graphs and their weights.
 _WEIGHTED_LAGS = frozenset({"DYNOTEARS", "Granger"})
 # Weighted DAGs: candidate = the DAG and its weights, ``weighted_adjacency[i, j]`` for ``i -> j``.

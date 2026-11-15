@@ -1188,7 +1188,7 @@ _add(
             "metadata['visited'], and metadata['double_bar'] describe the search",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         params=(
