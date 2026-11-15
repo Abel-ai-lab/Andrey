@@ -330,7 +330,9 @@ KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
   from `cmu-phil/example-causal-datasets` (CC0-1.0) at a pinned commit once, checks its SHA-256,
   and caches it, so the first run needs network access. CMB leaves it out: at its last column,
   jnk, it finds at most one of the two edges, as PC does, so its SHD there equals the empty
-  answer's.
+  answer's. Local ISA-LiNG leaves it out too: at jnk its local structure makes 4 errors against
+  the empty answer's 2; at its paper's Sachs targets it matches the authors' code on the 0.18.0
+  release card.
 
 SHD follows the published summaries: PC, with any test, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC,
 HITON-PC, HITON-MB, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, BOSS, and GRaSP

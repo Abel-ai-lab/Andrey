@@ -833,8 +833,8 @@ TARGET_CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss")
 #: equals the empty answer's.
 TARGET_PAG_DATA = (*_sizes("latent_gauss_er"), "asia_gauss")
 LINGAM_DATA = (*_sizes("lingam_sf"), "asia_lingam", "sachs")
-#: Local ISA-LiNG answers one variable, the last column.
-LOCAL_LINGAM_DATA = LINGAM_DATA
+#: Local ISA-LiNG answers one variable, the last column; Sachs is left out (qa/README.md).
+LOCAL_LINGAM_DATA = (*_sizes("lingam_sf"), "asia_lingam")
 CONFOUNDED_DATA = _sizes("latent_lingam_er")
 INTERVENTION_DATA = tuple(f"interventional_gauss_er_d{d}" for d, _ in INTERVENTION_SIZES)
 NOISE_INTERVENTION_DATA = tuple(NOISE_INTERVENTION_CELLS)
