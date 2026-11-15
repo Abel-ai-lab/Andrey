@@ -452,9 +452,9 @@ def _separating(
     """
     best: list[tuple[tuple[int, ...], float]] = []
 
-    def visit(chunk: list[tuple[int, ...]], pvalues: Sequence[float]) -> None:
+    def visit(chunk: np.ndarray, pvalues: Sequence[float]) -> None:
         p = np.asarray(pvalues, dtype=np.float64)
-        hits = [(chunk[j], float(p[j])) for j in np.flatnonzero(p > alpha).tolist()]
+        hits = [(tuple(chunk[j].tolist()), float(p[j])) for j in np.flatnonzero(p > alpha).tolist()]
         if hits:
             found = best + hits
             sets = [s for s, _ in found]

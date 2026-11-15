@@ -26,6 +26,10 @@ names its pull request.
   p-value below 5e-10 and left the choice to a rank computed from the data. On categorical data
   their blankets can change for some targets, and so can the graphs of `rsmax2` with
   `restrict="iamb"` or `"inter_iamb"`; results on continuous data do not change. ([#969])
+- The skeleton scans of `pc` and `fci` and the conditioning-set scans of the blanket learners
+  build each chunk of conditioning sets as the rows of an int array from cached combination
+  tables, where they built tuples and converted each chunk back. Every output,
+  `metadata["n_tests"]` included, is the same bit for bit. ([#1036], [#1042])
 
 ### Fixed
 
@@ -2703,3 +2707,5 @@ First alpha release.
 [#969]: https://github.com/Abel-ai-lab/Andrey/pull/969
 [#981]: https://github.com/Abel-ai-lab/Andrey/pull/981
 [#1019]: https://github.com/Abel-ai-lab/Andrey/pull/1019
+[#1036]: https://github.com/Abel-ai-lab/Andrey/pull/1036
+[#1042]: https://github.com/Abel-ai-lab/Andrey/pull/1042
