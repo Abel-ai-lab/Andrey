@@ -690,13 +690,17 @@ def local_isa_ling(
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Its claim is graphs with cycles, where it tied the authors' code on the
-    paper's simulations. On DAGs, global :func:`~andrey.direct_lingam` read at the target was more
-    accurate and faster from 300 rows up; the `0.18.0 release card
+    paper's simulations. Data without cycles are outside the claim, small samples among them. On
+    the paper's 50-variable DAGs, global :func:`~andrey.direct_lingam` read at the target was both
+    more accurate and faster from 300 rows up, and at 100 and 300 rows local ISA-LiNG made more
+    errors than the authors' code with the true blanket; the `0.18.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#local-isa-ling>`_ has the numbers. The
     blanket step keeps every column whose standardized Lasso coefficient exceeds 0.01, often many
     more than the true blanket, and the time grows with them. Algorithm 1 tries every assignment of
     the demixing matrix's rows to the local variables that its zero pattern allows, a number that
-    grows quickly with the blanket when the matrix is dense.
+    grows quickly with the blanket when the matrix is dense. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------

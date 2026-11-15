@@ -208,9 +208,10 @@ names its pull request.
   takes the column with the fewest nonzero entries, as its authors' code does, so it always gives
   one model. The benchmark lane of local ISA-LiNG runs it beside the authors' code on the paper's
   simulations. It is supported for graphs with cycles, where it tied the authors' code with its
-  own blanket and with the true one and made fewer errors than the empty answer; on DAGs global
-  DirectLiNGAM read at the target is more accurate and faster from 300 rows up. The 0.18.0 release
-  card has the numbers. ([#986])
+  own blanket and with the true one and made fewer errors than the empty answer. Data without
+  cycles, small samples among them, are outside its claim: on DAGs global DirectLiNGAM read at the
+  target is more accurate and faster from 300 rows up. The 0.18.0 release card has the numbers.
+  ([#986])
 - `andrey.cmb`, CMB (Gao and Ji 2015), supported: the direct causes and direct effects of one
   target, without learning the whole graph. It learns the target's parents and children and Markov
   blanket with a topology-based learner (`blanket="hiton_mb"`, the paper's, or `mmmb`, `pcmb`),

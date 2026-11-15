@@ -129,6 +129,9 @@ one answer (the global fits on the graphs with cycles were timed in one process)
 | DAG, degree 5 | 2,000 | 15.00 / 37.0 s (dominated) | 1.30 / 10.6 s | 3.60 / 2.2 s | 24.75 |
 | Cycles | 2,000 | 0.60 / 28.6 s | 4.40 / 4.6 s | 7.25 / 0.7 s | 4.80 |
 
+On the DAGs from 300 rows up, global DirectLiNGAM was more accurate and faster than local ISA-LiNG
+in every cell. The DAG cells, small samples among them, are outside the claim.
+
 On Sachs, at PIP2, PIP3, and Akt, Andrey and the authors' code each made 2, 2, and 1 errors with
 either blanket, against the empty answer's 2, 3, and 2.
 

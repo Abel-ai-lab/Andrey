@@ -779,8 +779,9 @@ whose graph may hold cycles: from the target and its Markov blanket alone, it re
 edges into the target and into each of its children as a `digraph`. A cycle through the target or
 a child leaves several models the data cannot tell apart; `metadata["equivalent_models"]` lists
 them, stable ones first, and the graph holds the first. `acyclic=True` reads the edges more cheaply
-when neither the target nor a child lies on a cycle. Its use is graphs with cycles: on data
-without cycles, `direct_lingam` read at the target is more accurate and faster from 300 rows up.
+when neither the target nor a child lies on a cycle. Its use is graphs with cycles: data without
+cycles, small samples among them, are outside its claim, and `direct_lingam` read at the target is
+more accurate and faster from 300 rows up.
 The [0.18.0](benchmarks/0.18.0.md#local-isa-ling) release card measures it against the authors'
 code on its paper's simulations.
 
