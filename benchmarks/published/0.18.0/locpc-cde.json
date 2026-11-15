@@ -11,8 +11,8 @@
  "parity_rule": "paired bootstrap",
  "verdict_rule": "per cell (20 datasets, seeds 0-19, one treatment-outcome pair each): per dataset D = Andrey's error minus the authors' code's on the same data; worse when the 95% percentile-bootstrap interval of the mean D lies wholly above 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly below, a tie otherwise. A cell worse on seeds 0-19 on a measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree. The floor, per dataset: the verdict error minus the constant 'not identifiable' answer's (1 on identifiable pairs, 0 on the others), the set's missing plus extra members minus the empty set's, and the effect error minus the unadjusted regression's; it applies where the authors' code's interval lies wholly below 0, and a row then passes when Andrey's does too",
  "error_metric": "verdict_error: 1 when the answer's identifiable is not the truth's (the true CPDAG directs every edge at the outcome, or not), an undecided or missing answer included, so that 1 minus its mean is the paper's identifiable proportion; parents_error (identifiable pairs): 1 unless the answer is identifiable with the outcome's true parents other than the treatment as its set; effect_error (linear-Gaussian identifiable pairs): the absolute error, in standard deviations, of the direct effect estimated by least squares of the outcome on the treatment and the set on a fresh sample, paired over the datasets where both arms gave a set",
- "fit_protocol": "each fit in a fresh process on one core with one BLAS thread, no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored. Fisher's z on linear-Gaussian data and the G-square test on binary data at alpha 0.05, the paper's, on both arms; the authors' code with PYTHONHASHSEED=0, since its graph depends on the string hash seed",
- "seeds_note": "every cell holds 20 datasets, seeds 0-19; a cell worse on a measure also holds 20 fresh datasets, seeds 20-39",
+ "fit_protocol": "each fit in a fresh process on one core with one BLAS thread, no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; the authors' code's fits that passed it (three, with 200 binary variables) were rerun with a cap of 3,600 s, and eight of its fits that failed to start were rerun. Fisher's z on linear-Gaussian data and the G-square test on binary data at alpha 0.05, the paper's, on both arms; the authors' code with PYTHONHASHSEED=0, since its graph depends on the string hash seed",
+ "seeds_note": "every cell holds 20 datasets, seeds 0-19; no cell was worse on a measure, and the cells with 200 variables, whose verdict or set floor failed on seeds 0-19, also hold 20 fresh datasets, seeds 20-39 (replication)",
  "cells_note": "locpc-<identifiable|nonidentifiable>@5000,v=<d>[,family=binary]: the paper's Erdos-Renyi DAGs with edge probability 2 / (d - 1) and a pair X -> Y whose controlled direct effect is identifiable, or not, in the true CPDAG; linear Gaussian, or the paper's logistic binary model; 5,000 rows; the columns in an order drawn from the seed",
  "bootstrap": {
   "resamples": 10000,
@@ -5651,12 +5651,12 @@
       "s_median": 0.8317
      },
      "locpc_cde.authors": {
-      "fits": 19,
-      "verdict_error": 0.0526,
-      "parents_error": 0.3684,
+      "fits": 20,
+      "verdict_error": 0.05,
+      "parents_error": 0.4,
       "effect_error": null,
-      "tests_median": 1313.0,
-      "s_median": 18.1616
+      "tests_median": 1380.0,
+      "s_median": 18.1959
      },
      "andrey.pc.adjustment": {
       "fits": 20,
@@ -5677,7 +5677,7 @@
     },
     "metrics": {
      "verdict_error": {
-      "paired": 19,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -5697,20 +5697,20 @@
         ]
        },
        "reference_minus_empty": {
-        "paired": 19,
-        "mean": -0.9474,
+        "paired": 20,
+        "mean": -0.95,
         "bootstrap_95": [
          -1.0,
-         -0.8421
+         -0.85
         ]
        }
       }
      },
      "parents_error": {
-      "paired": 19,
-      "mean_D": -0.0526,
+      "paired": 20,
+      "mean_D": -0.05,
       "bootstrap_95": [
-       -0.1579,
+       -0.15,
        0.0
       ],
       "above_zero": false,
@@ -5726,11 +5726,11 @@
         ]
        },
        "reference_minus_empty": {
-        "paired": 19,
-        "mean": -0.4211,
+        "paired": 20,
+        "mean": -0.35,
         "bootstrap_95": [
-         -0.9474,
-         0.1579
+         -0.85,
+         0.25
         ]
        }
       }
@@ -5753,12 +5753,12 @@
       "s_median": 2.2296
      },
      "locpc_cde.authors": {
-      "fits": 19,
-      "verdict_error": 0.6316,
-      "parents_error": 0.9474,
+      "fits": 20,
+      "verdict_error": 0.65,
+      "parents_error": 0.95,
       "effect_error": null,
-      "tests_median": 5395.0,
-      "s_median": 74.7255
+      "tests_median": 5434.5,
+      "s_median": 80.5484
      },
      "andrey.pc.adjustment": {
       "fits": 20,
@@ -5779,11 +5779,11 @@
     },
     "metrics": {
      "verdict_error": {
-      "paired": 19,
-      "mean_D": -0.1053,
+      "paired": 20,
+      "mean_D": -0.1,
       "bootstrap_95": [
-       -0.3158,
-       0.1053
+       -0.3,
+       0.1
       ],
       "above_zero": false,
       "verdict": "tie",
@@ -5798,11 +5798,11 @@
         ]
        },
        "reference_minus_empty": {
-        "paired": 19,
-        "mean": 0.6316,
+        "paired": 20,
+        "mean": 0.65,
         "bootstrap_95": [
-         0.4211,
-         0.8421
+         0.45,
+         0.85
         ]
        }
       }
@@ -6070,16 +6070,16 @@
      "s_median": 1.0115
     },
     "locpc_cde.authors": {
-     "pairs": 18,
-     "mean": -0.1389,
+     "pairs": 20,
+     "mean": -0.15,
      "bootstrap_95": [
-      -0.2778,
-      0.0
+      -0.275,
+      -0.025
      ],
-     "pass": false,
-     "verdict_error_mean": 0.3421,
-     "tests_median": 1932.0,
-     "s_median": 27.0354
+     "pass": true,
+     "verdict_error_mean": 0.35,
+     "tests_median": 2181.0,
+     "s_median": 30.242
     },
     "andrey.pc.adjustment": {
      "pairs": 20,

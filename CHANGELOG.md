@@ -18,8 +18,9 @@ names its pull request.
   answer is one record in `metadata["effects"]` with the paper's reason; the graph is the local
   essential graph it learned. Against its authors' code on the paper's random graphs with 10 to 200
   variables, linear-Gaussian and binary, at 5,000 rows, it was worse in no setting and better in 4
-  of 32. On pairs whose effect the CPDAG does not identify it says "identifiable" about as often as
-  the code does, so the constant answer "not identifiable" scores better there. ([#1000], [#PRNUM])
+  of 32. On pairs whose effect the CPDAG does not identify its verdict is wrong or undecided about as
+  often as the code's, so the constant answer "not identifiable" scores better there. ([#1000],
+  [#PRNUM])
 - `andrey.gs`, the Grow-Shrink Markov blanket learner (Margaritis and Thrun 2000): the blanket of
   one target, or every variable's blanket joined into the CPDAG, skeleton, or moral graph, with the
   arguments and metadata of `iamb`. It visits the other variables in one order, the most dependent
