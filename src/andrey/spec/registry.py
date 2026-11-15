@@ -770,7 +770,7 @@ _add(
             "the search learned, in order",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         params=(
