@@ -576,8 +576,11 @@ Each test and score reads the columns as one kind of data:
 | Categorical | `chisq`, `gsq` (the default when every column is categorical) | `bdeu` (the default when every column is categorical), `discrete_bic` |
 | Mixed | `degen_gauss`, `cond_gauss` (the default when some columns are categorical) | `cond_gauss` (the default when some columns are categorical), `degen_gauss` |
 
-{{ indep_test_names }} take the tests; {{ score_func_names }} take every score, except
-`normal_scores` in `gies`, which scores each variable on the rows without an intervention on it.
+{{ indep_test_names }} take the tests, except `normal_scores` in `cdnod`, `fci_jci`, `igsp`,
+`ut_igsp`, and `jpcmciplus`, whose tests read several environments at once; {{ score_func_names }}
+take every score, except `normal_scores` in `gies`, which scores each variable on the rows without
+an intervention on it. The ranks of `normal_scores` model one distribution, so neither option takes
+an `env`.
 `gfci`, `boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take a score and a test that read the same
 kind of data, such as `andrey.gfci(data, score_func="bdeu", indep_test="chisq")`; with
 `score_func="normal_scores"` and `indep_test="normal_scores"`, both read each column's normal

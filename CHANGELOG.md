@@ -23,6 +23,14 @@ names its pull request.
   change; and the claim scores of `y_structures` are finite where they were infinite, with the same
   claims. The uniformity statistic and p-value of `markov_check` change when a test's p-value was
   `0`, and the stored outputs of its example notebook are refreshed. ([#1017])
+- `indep_test="normal_scores"` takes data from one environment. It ranks each column over every
+  row its test reads, so over several environments a column mixed their distributions: on two
+  simulated environments a true independence given the environment index was rejected in up to 95%
+  of runs at level 0.05, and the invariance tests of `igsp` and `ut_igsp` reported a change where
+  none occurred in up to all runs. `cdnod`, `fci_jci`, `igsp`, `ut_igsp`, and `jpcmciplus` no longer
+  offer it; `gfci`, `boss_fci`, and `grasp_fci` raise a `ValueError` for it with an `env`, as for
+  `score_func="normal_scores"`; and the error for a choice a method does not offer says why.
+  ([#1037])
 
 ## [0.17.1] - 2026-11-12
 
@@ -2571,3 +2579,4 @@ First alpha release.
 [ages-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/ages.md
 [#920]: https://github.com/Abel-ai-lab/andrey/pull/920
 [#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
+[#1037]: https://github.com/Abel-ai-lab/Andrey/pull/1037

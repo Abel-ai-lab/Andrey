@@ -768,7 +768,12 @@ class NormalScores(FisherZ):
     **Limitations.** Ranks measure monotone dependence: a relation that is not monotone, such as
     ``y = x**2`` for a symmetric ``x``, has zero rank correlation, and the test finds nothing where
     ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` do. Conditioning removes only the monotone
-    part of a dependence. The p-value is the Fisher-Z one, which holds asymptotically.
+    part of a dependence. The p-value is the Fisher-Z one, which holds asymptotically. The model
+    is one distribution: ranked over the rows of several environments that change a variable, a
+    column mixes their distributions, and its scores are no longer Gaussian; ranked within each
+    environment, every column is centered and scaled in each, so none depends on the environment.
+    The methods whose tests always read several environments do not offer the test, and the others
+    refuse it with an ``env``, as they refuse the rank-based score.
     """
 
     def __init__(self, data: np.ndarray) -> None:
@@ -1756,6 +1761,9 @@ SHIPPED_INDEP_TESTS: tuple[str, ...] = (
     *NONLINEAR_INDEP_TESTS,
 )
 DISCRETE_INDEP_TESTS: tuple[str, ...] = ("chisq", "gsq")
+#: The rank-based tests, which rank each column over every row they read; a method whose tests
+#: always read several environments does not offer them, as the ranks would mix the environments.
+RANK_INDEP_TESTS: tuple[str, ...] = ("normal_scores",)
 MIXED_INDEP_TESTS: tuple[str, ...] = ("degen_gauss", "cond_gauss")
 #: The shipped tests of continuous data: the partial-correlation and the nonlinear tests.
 CONTINUOUS_INDEP_TESTS: tuple[str, ...] = tuple(
