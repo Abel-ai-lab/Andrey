@@ -75,8 +75,9 @@ _EFFECTS = frozenset({"LDECC", "LocalOptimalAdjustment", "LocPCCDE"})
 # Weighted temporal fits: candidate = the per-lag graphs and their weights.
 _WEIGHTED_LAGS = frozenset({"DYNOTEARS", "Granger"})
 # Weighted graphs: candidate = the graph and its weights, ``weighted_adjacency[i, j]`` for
-# ``i -> j``: NOTEARS's DAG, and local ISA-LiNG's digraph of the edges at its target.
-_WEIGHTED_GRAPH = frozenset({"NOTEARS", "LocalISALiNG"})
+# ``i -> j``: the DAGs of NOTEARS and DAGMA, and local ISA-LiNG's digraph of the edges at its
+# target.
+_WEIGHTED_GRAPH = frozenset({"NOTEARS", "DAGMA", "LocalISALiNG"})
 # VARMA-LiNGAM: candidate = the causal order and both coefficient stacks in the native B layout.
 _VARMA = frozenset({"VARMALiNGAM", "VARMALiNGAMPruned"})
 

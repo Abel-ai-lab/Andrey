@@ -429,9 +429,11 @@ def dagma(
         When a column holds at most 10 distinct whole numbers and so may hold category codes, which
         the fit reads as numbers. Each message warns once per process.
 
-    Notes ----- **When to use.** DAGMA suits i.i.d. continuous observational data from a linear
-    structural equation model, in which each variable is a weighted sum of its causes plus noise,
-    with no unmeasured common causes [1]_, when the columns' units are meaningful (see Limitations).
+    Notes
+    -----
+    **When to use.** DAGMA suits i.i.d. continuous observational data from a linear structural
+    equation model, in which each variable is a weighted sum of its causes plus noise, with no
+    unmeasured common causes [1]_, when the columns' units are meaningful (see Limitations).
     ``robust=True`` follows the default fit with the Gaussian-likelihood path of [2]_. Its ``l1``
     penalty favors sparse graphs, and its acyclicity function takes a log-determinant of the full
     weight matrix, so it suits a moderate number of variables; it returns a DAG with the coefficient
