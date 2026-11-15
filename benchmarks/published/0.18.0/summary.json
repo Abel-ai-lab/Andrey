@@ -2,13 +2,13 @@
  "release": "0.18.0",
  "parity_rule": "paired bootstrap",
  "generated": "2026-11-14",
- "theme": "PCMB against the published results of its paper on samples of the Alarm and Pigs networks, every node a target; GS, Fast-IAMB, and HITON-PC against bnlearn on the papers' networks and on linear-Gaussian graphs, every node a target; CMB against global PC read at the target on its paper's Alarm setting, every node a target; HITON-MB against Causal Explorer on its paper's networks, every node a target; MMB-by-MMB against the authors' code on the paper's networks with hidden nodes; Y-structures and extended Y-structures against the authors' code on the datasets of the authors' simulation script, with and without selection; LDECC and LOAD against their authors' code on the models their papers plant; MB-by-MB against global PC read at the target on its paper's Alarm, Hailfinder, and chessboard settings, accuracy beside the tests per answer; Local ISA-LiNG against the authors' code in its paper's simulations",
- "build": "PCMB: Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with pcmb and its bounded subset listing as merged; the test's degrees of freedom of Spirtes et al. ran as a patch that returned the same sets and test counts as the merged default degrees_of_freedom='nonempty' on the 126 fits compared, every Alarm dataset and 6 Pigs datasets) | GS, Fast-IAMB, and HITON-PC: Andrey pre-release builds of the 0.18.0 release branch: 12 November 2026 for fast_iamb and hiton_pc as merged, 13 November 2026 for gs, whose shrink starts again from the first member after each removal | CMB: Andrey pre-release build of 13 November 2026 (the 0.18.0 release branch as merged with LOAD's skeleton step); the release branch of 14 November 2026, with exact upper-tail p-values, gave the same answers and test counts at every target of the 3 datasets rerun | HITON-MB: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with hiton_mb and mmmb as merged, mmmb's default degrees_of_freedom='nonempty') | MMB-by-MMB: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with mmb_by_mmb as merged and the lane's paper targets); the judged fits ran just before the merge of its smaller-blanket search's last commits, and the merged build gave the same marks and test counts at all 1,040 fits | Y-structures: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with the dependence check on claimed pairs and exact upper-tail p-values as merged) | LDECC and LOAD: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with ldecc reading its authors' code's five steps and local_optimal_adjustment's conflict rule, as merged in this change) | MB-by-MB: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with MB-by-MB's independence rule) | Local ISA-LiNG: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with local_isa_ling's rule for a demixing matrix without a sink column; the fits on the graphs with cycles ran on the build before that rule, which leaves their path unchanged)",
- "verdict_rule": "PCMB: no reference implementation exists, so each row sets Andrey's mean beside the paper's mean and standard deviation (Table 6), and the release card judges no row better or worse. The floor: per dataset, the mean over the targets of the errors minus the empty set's; a row passes when the 95% percentile-bootstrap interval of the mean difference lies wholly below 0 over at least 10 datasets, and the per-dataset differences are in the row | GS, Fast-IAMB, and HITON-PC: per cell (network or Gaussian graph, rows; 20 datasets, every node a target): per dataset, the mean over the targets with a nonempty true set of the distance of the set's precision and recall from (1, 1) (an empty answer counts precision 1, distance 1) and of the set's F1; D = Andrey's minus bnlearn's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 was not rerun | CMB: no reference implementation exists, so each row sets Andrey's means beside the paper's (Table 1) and judges CMB against two global PCs read at the target, Andrey's pc with the same test and level and bnlearn 5.2.1 pc.stable with mi-adf: the mean over paired datasets of CMB's total minus the other's with its 95% percentile-bootstrap interval, better or worse when the interval lies wholly on that side of 0 over at least 10 datasets, on seeds 0-19, and a cell worse there counts only when it is worse again on seeds 20-39. The floor: per dataset, the total minus the empty answer's; a row passes when its interval lies wholly below 0 | HITON-MB: per cell (network, rows; 20 datasets): per dataset, the mean over the targets both answered with a nonempty true set of the distance of the set's precision and recall from (1, 1) (an empty answer counts precision 1, distance 1) and of the set's F1; D = Andrey's minus Causal Explorer's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 was not rerun. A target where the toolbox stopped without an answer is left out of both sides | MMB-by-MMB: per cell (network, rows; 20 datasets, the paper's named targets): per dataset, the mean over the targets with a true edge of the distance of the precision and recall of the edges at the target from (1, 1) and of their F1, an edge right only with both marks right (an answer with no edge counts precision 1, distance 1, F1 0); D = Andrey's minus the authors' code's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree | Y-structures: per cell (setting, with or without selection, form; 20 datasets of 10,000 rows from the authors' simulation script): per dataset, claim_error and claim_ap_loss; D = Andrey's minus the authors' code's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly above 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly below, a tie otherwise. A cell worse on seeds 0-19 on either measure is rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 is not rerun. The floor: claim_error minus the empty answer's, applied where the authors' code's interval lies wholly below 0, passed when Andrey's interval lies wholly below 0; every row also gives the precision floor, passed when the pooled precision exceeds the pooled base rate with its 95% interval above 0 | LDECC and LOAD: per cell (20 datasets, seeds 0-19, one treatment-outcome pair each): per dataset D = Andrey's error minus the authors' code's on the same data; worse when the 95% percentile-bootstrap interval of the mean D lies wholly above 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly below, a tie otherwise. A cell worse on seeds 0-19 on a measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree. The floor: per dataset, the error minus the empty adjustment set's (for LOAD's set, the set's missing plus extra members against the empty set's); it applies where the authors' code's interval lies wholly below 0, and a row then passes when Andrey's does too | MB-by-MB: no reference implementation exists, so each row sets Andrey's means beside the paper's (Tables 1-3) and judges MB-by-MB against two global PCs read at the target, Andrey's pc and bnlearn 5.2.1 pc.stable with mi-adf, both with the same test and level and at most 5 conditioning variables, the paper's cap, and against Andrey's CMB at the same level where it ran: the mean over paired datasets of MB-by-MB's shd minus the other's with its 95% percentile-bootstrap interval, better or worse when the interval lies wholly on that side of 0 over at least 10 datasets, on the first seeds, and a cell worse there counts only when it is worse again on the fresh seeds. A comparison dominates a cell when it is more accurate and takes fewer tests per answer; the tests over every target are context. The floor: per dataset, the shd minus the empty answer's; a row passes when its interval lies wholly below 0 | Local ISA-LiNG: per cell (graph, rows, blanket; 20 datasets, one target each): D = Andrey's minus the authors' code's SHD of the local graph and Euclidean weight distance per dataset, on the datasets both finished; worse when the 95% percentile-bootstrap interval of the mean D lies wholly above 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly below, a tie otherwise. A cell worse on seeds 0-19 was rerun on seeds 20-39 and is worse only when the fresh seeds agree",
- "fit_protocol": "PCMB: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 14,400 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at alpha 0.01 with no limit on the conditioning set; columns that hold one value are left out of the fit and answer the empty set, scored against the full network | GS, Fast-IAMB, and HITON-PC: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored | CMB: each fit in a fresh process on one core with one BLAS thread, CMB once per target and each PC once per dataset, read at every target; no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at alpha 0.02 with no limit on the conditioning set, CMB with HITON-MB, its default blanket learner | HITON-MB: each fit in a fresh process on one core with one BLAS thread, every target of a dataset in one fit, no warm-up, a cap of 1,800 s per fit (3,600 s on Pigs), past which a fit is a timeout and never scored | MMB-by-MMB: each fit in a fresh process on one core with one BLAS thread, one target per fit, no warm-up, a cap of 1,800 s per fit (3,600 s on WIN95PTS at 5,000 rows, the largest cell), past which a fit is a timeout and never scored; no fit failed or timed out | Y-structures: each fit in a fresh process on one core with one BLAS thread, one untimed warm-up fit before the timed one, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. Fisher's z tests at alpha 0.01, the level of the authors' script | LDECC and LOAD: each fit in a fresh process on one core with one BLAS thread, no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. Fisher's z at the authors' levels: LDECC 0.01 x 32,000 / rows (its notebooks), LOAD 0.01; both arms uncapped in tests (LDECC's paper capped its runs at 7,000 tests) | MB-by-MB: each run fits a range of one cell's datasets in one process, one core and one BLAS thread, a cell's datasets in one run or in several over seed ranges (CMB at Hailfinder's 500 and 1,000 rows ran in several runs per cell); MB-by-MB and CMB once per target and each PC once per dataset, read at every target; no warm-up, a cap of 1,800 s per fit, 3,600 s on the chessboard, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at the cell's level, MB-by-MB with its defaults, IAMB's forward phase for the blankets and at most 5 conditioning variables in the local structures; CMB with HITON-MB, its default | Local ISA-LiNG: each fit in a fresh process on one core with one BLAS thread, one target per fit, no warm-up, a cap of 1,800 s per fit (3,600 s on the degree-5 cell and at 10,000 rows), past which a fit is a timeout and never scored; the authors' Algorithm 1 is not run past 10 local variables, a dataset then left out and counted in the coverage",
- "error_metric": "PCMB: distance: the mean over a dataset's targets with a nonempty answer of the distance of the set's precision and recall from (1, 1), the reading of the comparison with the paper: an empty answer has no precision or distance and counts in the recall as 0; distance_one counts an empty answer as distance 1; precision is the mean over the targets with an answer and recall the mean over all targets. The floor uses the set's errors, missing plus extra members, against the empty set's, the true set's size; every value is a mean over the row's datasets, and andrey_s is the median wall time of a fit for every target | GS, Fast-IAMB, and HITON-PC: set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size | CMB: total: per target, the edges at the target missing or extra against the true CPDAG plus those whose direction differs from it, an edge the CPDAG directs and the answer leaves undirected included (reversed); a dataset's value is the mean over its targets. lenient leaves out the undirected ones. The floor uses the total against the empty answer's, the target's degree | HITON-MB: set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size | MMB-by-MMB: edge_distance: the mean over the targets of the distance of the precision and recall of the edges at the target from (1, 1), an edge right only with both endpoint marks right; edge_f1_loss: 1 minus the mean over the targets of their F1. The floor uses the local endpoint SHD at the target (extra, missing, and mismarked edges) against the empty answer's, the target's true degree | Y-structures: claim_error: per dataset, the claimed ancestral pairs that are false plus the true ancestral pairs not claimed, among the system variables; claim_ap_loss: 1 minus the average precision of the ranking by the claims' scores, the pairs not claimed last. The floor uses claim_error against the empty answer's, the number of true pairs, so their difference is the false claims minus the true ones. precision_floor is the precision of the pooled claims minus the pooled base rate, the precision of claiming every pair | LDECC and LOAD: LDECC: family_error, 1 when the parent sets returned are not the family of the treatment's parent sets the true CPDAG allows; recall_loss, 1 when the treatment's true parents are not among them; hausdorff_mse, the squared Hausdorff distance of the effects estimated with the sets from the population effects of the family, in standard deviations; effect_error, the mean absolute error of the estimated effects on a fresh sample. LOAD: set_f1_loss, 1 minus the F1 of the returned set against the optimal adjustment set for the pair asked (no set counts F1 0); effect_error as for LDECC | MB-by-MB: shd: per target, the edges at the target against the true DAG, an edge the answer leaves undirected (undirected), a true edge it misses (miss), an edge the DAG lacks (extra), and a directed edge whose direction differs (reverse), shd their sum; a dataset's value is the mean over its targets. The floor uses the shd against the empty answer's, the target's degree. Cost per answer, what answering one target costs: MB-by-MB's and CMB's tests at that target, a global PC's whole fit; cost over every target: their sum over the targets, the one fit | Local ISA-LiNG: shd: the paper's SHD of the local graph, the edges into and out of the target and into each of its children in each graph, counted as the authors' code counts it (adjacencies one side has and the other lacks, plus edges whose reverse is true); weight_distance: the Euclidean norm of the difference of the two local weight matrices. The floor is each against the empty answer's (the true local edges' count and norm)",
- "complete_definition": "PCMB: true when every row has at least 10 datasets (the paper's number) | GS, Fast-IAMB, and HITON-PC: true when every row has at least 10 paired datasets (both fitted) | CMB: true when every row has at least 10 paired datasets | HITON-MB: true when every row has at least 10 paired datasets (both fitted) | MMB-by-MMB: true when every row has at least 10 paired datasets (both fitted) | Y-structures: true when every row has at least 10 paired datasets (both fitted) | LDECC and LOAD: true when every row has at least 10 paired datasets (both fitted) | MB-by-MB: true when every cell of the paper has a row with at least 10 datasets paired with Andrey's PC on its first seeds | Local ISA-LiNG: true when every row has at least 10 paired datasets (both fitted)",
- "seeds_note": "PCMB: Alarm rows hold 20 datasets, seeds 0-19, the first 10 the paper's number and 10 fresh; Pigs rows hold 10 datasets, seeds 0-9 | GS, Fast-IAMB, and HITON-PC: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | CMB: every cell holds 20 datasets, seeds 0-19, and 20 fresh datasets, seeds 20-39 | HITON-MB: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | MMB-by-MMB: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | Y-structures: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | LDECC and LOAD: every cell holds 20 datasets, seeds 0-19, and 20 fresh datasets, seeds 20-39 | MB-by-MB: Alarm and Hailfinder cells hold 20 datasets, seeds 0-19, and 20 fresh datasets, seeds 20-39; chessboard cells hold 10 datasets, seeds 0-9, and 10 fresh datasets, seeds 10-19, with fresh PC fits at 500 and 1,000 rows | Local ISA-LiNG: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39",
+ "theme": "PCMB against the published results of its paper on samples of the Alarm and Pigs networks, every node a target; GS, Fast-IAMB, and HITON-PC against bnlearn on the papers' networks and on linear-Gaussian graphs, every node a target; CMB against global PC read at the target on its paper's Alarm setting, every node a target; HITON-MB against Causal Explorer on its paper's networks, every node a target; MMB-by-MMB against the authors' code on the paper's networks with hidden nodes; Y-structures and extended Y-structures against the authors' code on the datasets of the authors' simulation script, with and without selection; LDECC and LOAD against their authors' code on the models their papers plant; MB-by-MB against global PC read at the target on its paper's Alarm, Hailfinder, and chessboard settings, accuracy beside the tests per answer; LocPC-CDE against its authors' code on the paper's random DAGs; Local ISA-LiNG against the authors' code in its paper's simulations",
+ "build": "PCMB: Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with pcmb and its bounded subset listing as merged; the test's degrees of freedom of Spirtes et al. ran as a patch that returned the same sets and test counts as the merged default degrees_of_freedom='nonempty' on the 126 fits compared, every Alarm dataset and 6 Pigs datasets) | GS, Fast-IAMB, and HITON-PC: Andrey pre-release builds of the 0.18.0 release branch: 12 November 2026 for fast_iamb and hiton_pc as merged, 13 November 2026 for gs, whose shrink starts again from the first member after each removal | CMB: Andrey pre-release build of 13 November 2026 (the 0.18.0 release branch as merged with LOAD's skeleton step); the release branch of 14 November 2026, with exact upper-tail p-values, gave the same answers and test counts at every target of the 3 datasets rerun | HITON-MB: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with hiton_mb and mmmb as merged, mmmb's default degrees_of_freedom='nonempty') | MMB-by-MMB: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with mmb_by_mmb as merged and the lane's paper targets); the judged fits ran just before the merge of its smaller-blanket search's last commits, and the merged build gave the same marks and test counts at all 1,040 fits | Y-structures: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with the dependence check on claimed pairs and exact upper-tail p-values as merged) | LDECC and LOAD: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with ldecc reading its authors' code's five steps and local_optimal_adjustment's conflict rule, as merged in this change) | MB-by-MB: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with MB-by-MB's independence rule) | LocPC-CDE: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with the pair lane's PC arm counting its tests, as merged in this change) | Local ISA-LiNG: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with local_isa_ling's rule for a demixing matrix without a sink column; the fits on the graphs with cycles ran on the build before that rule, which leaves their path unchanged)",
+ "verdict_rule": "PCMB: no reference implementation exists, so each row sets Andrey's mean beside the paper's mean and standard deviation (Table 6), and the release card judges no row better or worse. The floor: per dataset, the mean over the targets of the errors minus the empty set's; a row passes when the 95% percentile-bootstrap interval of the mean difference lies wholly below 0 over at least 10 datasets, and the per-dataset differences are in the row | GS, Fast-IAMB, and HITON-PC: per cell (network or Gaussian graph, rows; 20 datasets, every node a target): per dataset, the mean over the targets with a nonempty true set of the distance of the set's precision and recall from (1, 1) (an empty answer counts precision 1, distance 1) and of the set's F1; D = Andrey's minus bnlearn's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 was not rerun | CMB: no reference implementation exists, so each row sets Andrey's means beside the paper's (Table 1) and judges CMB against two global PCs read at the target, Andrey's pc with the same test and level and bnlearn 5.2.1 pc.stable with mi-adf: the mean over paired datasets of CMB's total minus the other's with its 95% percentile-bootstrap interval, better or worse when the interval lies wholly on that side of 0 over at least 10 datasets, on seeds 0-19, and a cell worse there counts only when it is worse again on seeds 20-39. The floor: per dataset, the total minus the empty answer's; a row passes when its interval lies wholly below 0 | HITON-MB: per cell (network, rows; 20 datasets): per dataset, the mean over the targets both answered with a nonempty true set of the distance of the set's precision and recall from (1, 1) (an empty answer counts precision 1, distance 1) and of the set's F1; D = Andrey's minus Causal Explorer's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 was not rerun. A target where the toolbox stopped without an answer is left out of both sides | MMB-by-MMB: per cell (network, rows; 20 datasets, the paper's named targets): per dataset, the mean over the targets with a true edge of the distance of the precision and recall of the edges at the target from (1, 1) and of their F1, an edge right only with both marks right (an answer with no edge counts precision 1, distance 1, F1 0); D = Andrey's minus the authors' code's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree | Y-structures: per cell (setting, with or without selection, form; 20 datasets of 10,000 rows from the authors' simulation script): per dataset, claim_error and claim_ap_loss; D = Andrey's minus the authors' code's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly above 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly below, a tie otherwise. A cell worse on seeds 0-19 on either measure is rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 is not rerun. The floor: claim_error minus the empty answer's, applied where the authors' code's interval lies wholly below 0, passed when Andrey's interval lies wholly below 0; every row also gives the precision floor, passed when the pooled precision exceeds the pooled base rate with its 95% interval above 0 | LDECC and LOAD: per cell (20 datasets, seeds 0-19, one treatment-outcome pair each): per dataset D = Andrey's error minus the authors' code's on the same data; worse when the 95% percentile-bootstrap interval of the mean D lies wholly above 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly below, a tie otherwise. A cell worse on seeds 0-19 on a measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree. The floor: per dataset, the error minus the empty adjustment set's (for LOAD's set, the set's missing plus extra members against the empty set's); it applies where the authors' code's interval lies wholly below 0, and a row then passes when Andrey's does too | MB-by-MB: no reference implementation exists, so each row sets Andrey's means beside the paper's (Tables 1-3) and judges MB-by-MB against two global PCs read at the target, Andrey's pc and bnlearn 5.2.1 pc.stable with mi-adf, both with the same test and level and at most 5 conditioning variables, the paper's cap, and against Andrey's CMB at the same level where it ran: the mean over paired datasets of MB-by-MB's shd minus the other's with its 95% percentile-bootstrap interval, better or worse when the interval lies wholly on that side of 0 over at least 10 datasets, on the first seeds, and a cell worse there counts only when it is worse again on the fresh seeds. A comparison dominates a cell when it is more accurate and takes fewer tests per answer; the tests over every target are context. The floor: per dataset, the shd minus the empty answer's; a row passes when its interval lies wholly below 0 | LocPC-CDE: per cell (20 datasets, seeds 0-19, one treatment-outcome pair each): per dataset D = Andrey's error minus the authors' code's on the same data; worse when the 95% percentile-bootstrap interval of the mean D lies wholly above 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly below, a tie otherwise. A cell worse on seeds 0-19 on a measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree. The floor, per dataset: the verdict error minus the constant 'not identifiable' answer's (1 on identifiable pairs, 0 on the others), the set's missing plus extra members minus the empty set's, and the effect error minus the unadjusted regression's; it applies where the authors' code's interval lies wholly below 0, and a row then passes when Andrey's does too | Local ISA-LiNG: per cell (graph, rows, blanket; 20 datasets, one target each): D = Andrey's minus the authors' code's SHD of the local graph and Euclidean weight distance per dataset, on the datasets both finished; worse when the 95% percentile-bootstrap interval of the mean D lies wholly above 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly below, a tie otherwise. A cell worse on seeds 0-19 was rerun on seeds 20-39 and is worse only when the fresh seeds agree",
+ "fit_protocol": "PCMB: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 14,400 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at alpha 0.01 with no limit on the conditioning set; columns that hold one value are left out of the fit and answer the empty set, scored against the full network | GS, Fast-IAMB, and HITON-PC: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored | CMB: each fit in a fresh process on one core with one BLAS thread, CMB once per target and each PC once per dataset, read at every target; no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at alpha 0.02 with no limit on the conditioning set, CMB with HITON-MB, its default blanket learner | HITON-MB: each fit in a fresh process on one core with one BLAS thread, every target of a dataset in one fit, no warm-up, a cap of 1,800 s per fit (3,600 s on Pigs), past which a fit is a timeout and never scored | MMB-by-MMB: each fit in a fresh process on one core with one BLAS thread, one target per fit, no warm-up, a cap of 1,800 s per fit (3,600 s on WIN95PTS at 5,000 rows, the largest cell), past which a fit is a timeout and never scored; no fit failed or timed out | Y-structures: each fit in a fresh process on one core with one BLAS thread, one untimed warm-up fit before the timed one, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. Fisher's z tests at alpha 0.01, the level of the authors' script | LDECC and LOAD: each fit in a fresh process on one core with one BLAS thread, no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. Fisher's z at the authors' levels: LDECC 0.01 x 32,000 / rows (its notebooks), LOAD 0.01; both arms uncapped in tests (LDECC's paper capped its runs at 7,000 tests) | MB-by-MB: each run fits a range of one cell's datasets in one process, one core and one BLAS thread, a cell's datasets in one run or in several over seed ranges (CMB at Hailfinder's 500 and 1,000 rows ran in several runs per cell); MB-by-MB and CMB once per target and each PC once per dataset, read at every target; no warm-up, a cap of 1,800 s per fit, 3,600 s on the chessboard, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at the cell's level, MB-by-MB with its defaults, IAMB's forward phase for the blankets and at most 5 conditioning variables in the local structures; CMB with HITON-MB, its default | LocPC-CDE: each fit in a fresh process on one core with one BLAS thread, no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; the authors' code's fits that passed it (three, with 200 binary variables) were rerun with a cap of 3,600 s, and eight of its fits that failed to start were rerun. Fisher's z on linear-Gaussian data and the G-square test on binary data at alpha 0.05, the paper's, on both arms; the authors' code with PYTHONHASHSEED=0, since its graph depends on the string hash seed | Local ISA-LiNG: each fit in a fresh process on one core with one BLAS thread, one target per fit, no warm-up, a cap of 1,800 s per fit (3,600 s on the degree-5 cell and at 10,000 rows), past which a fit is a timeout and never scored; the authors' Algorithm 1 is not run past 10 local variables, a dataset then left out and counted in the coverage",
+ "error_metric": "PCMB: distance: the mean over a dataset's targets with a nonempty answer of the distance of the set's precision and recall from (1, 1), the reading of the comparison with the paper: an empty answer has no precision or distance and counts in the recall as 0; distance_one counts an empty answer as distance 1; precision is the mean over the targets with an answer and recall the mean over all targets. The floor uses the set's errors, missing plus extra members, against the empty set's, the true set's size; every value is a mean over the row's datasets, and andrey_s is the median wall time of a fit for every target | GS, Fast-IAMB, and HITON-PC: set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size | CMB: total: per target, the edges at the target missing or extra against the true CPDAG plus those whose direction differs from it, an edge the CPDAG directs and the answer leaves undirected included (reversed); a dataset's value is the mean over its targets. lenient leaves out the undirected ones. The floor uses the total against the empty answer's, the target's degree | HITON-MB: set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size | MMB-by-MMB: edge_distance: the mean over the targets of the distance of the precision and recall of the edges at the target from (1, 1), an edge right only with both endpoint marks right; edge_f1_loss: 1 minus the mean over the targets of their F1. The floor uses the local endpoint SHD at the target (extra, missing, and mismarked edges) against the empty answer's, the target's true degree | Y-structures: claim_error: per dataset, the claimed ancestral pairs that are false plus the true ancestral pairs not claimed, among the system variables; claim_ap_loss: 1 minus the average precision of the ranking by the claims' scores, the pairs not claimed last. The floor uses claim_error against the empty answer's, the number of true pairs, so their difference is the false claims minus the true ones. precision_floor is the precision of the pooled claims minus the pooled base rate, the precision of claiming every pair | LDECC and LOAD: LDECC: family_error, 1 when the parent sets returned are not the family of the treatment's parent sets the true CPDAG allows; recall_loss, 1 when the treatment's true parents are not among them; hausdorff_mse, the squared Hausdorff distance of the effects estimated with the sets from the population effects of the family, in standard deviations; effect_error, the mean absolute error of the estimated effects on a fresh sample. LOAD: set_f1_loss, 1 minus the F1 of the returned set against the optimal adjustment set for the pair asked (no set counts F1 0); effect_error as for LDECC | MB-by-MB: shd: per target, the edges at the target against the true DAG, an edge the answer leaves undirected (undirected), a true edge it misses (miss), an edge the DAG lacks (extra), and a directed edge whose direction differs (reverse), shd their sum; a dataset's value is the mean over its targets. The floor uses the shd against the empty answer's, the target's degree. Cost per answer, what answering one target costs: MB-by-MB's and CMB's tests at that target, a global PC's whole fit; cost over every target: their sum over the targets, the one fit | LocPC-CDE: verdict_error: 1 when the answer's identifiable is not the truth's (the true CPDAG directs every edge at the outcome, or not), an undecided or missing answer included, so that 1 minus its mean is the paper's identifiable proportion; parents_error (identifiable pairs): 1 unless the answer is identifiable with the outcome's true parents other than the treatment as its set; effect_error (linear-Gaussian identifiable pairs): the absolute error, in standard deviations, of the direct effect estimated by least squares of the outcome on the treatment and the set on a fresh sample, paired over the datasets where both arms gave a set | Local ISA-LiNG: shd: the paper's SHD of the local graph, the edges into and out of the target and into each of its children in each graph, counted as the authors' code counts it (adjacencies one side has and the other lacks, plus edges whose reverse is true); weight_distance: the Euclidean norm of the difference of the two local weight matrices. The floor is each against the empty answer's (the true local edges' count and norm)",
+ "complete_definition": "PCMB: true when every row has at least 10 datasets (the paper's number) | GS, Fast-IAMB, and HITON-PC: true when every row has at least 10 paired datasets (both fitted) | CMB: true when every row has at least 10 paired datasets | HITON-MB: true when every row has at least 10 paired datasets (both fitted) | MMB-by-MMB: true when every row has at least 10 paired datasets (both fitted) | Y-structures: true when every row has at least 10 paired datasets (both fitted) | LDECC and LOAD: true when every row has at least 10 paired datasets (both fitted) | MB-by-MB: true when every cell of the paper has a row with at least 10 datasets paired with Andrey's PC on its first seeds | LocPC-CDE: true when every row has at least 10 paired datasets (both fitted) | Local ISA-LiNG: true when every row has at least 10 paired datasets (both fitted)",
+ "seeds_note": "PCMB: Alarm rows hold 20 datasets, seeds 0-19, the first 10 the paper's number and 10 fresh; Pigs rows hold 10 datasets, seeds 0-9 | GS, Fast-IAMB, and HITON-PC: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | CMB: every cell holds 20 datasets, seeds 0-19, and 20 fresh datasets, seeds 20-39 | HITON-MB: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | MMB-by-MMB: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | Y-structures: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | LDECC and LOAD: every cell holds 20 datasets, seeds 0-19, and 20 fresh datasets, seeds 20-39 | MB-by-MB: Alarm and Hailfinder cells hold 20 datasets, seeds 0-19, and 20 fresh datasets, seeds 20-39; chessboard cells hold 10 datasets, seeds 0-9, and 10 fresh datasets, seeds 10-19, with fresh PC fits at 500 and 1,000 rows | LocPC-CDE: every cell holds 20 datasets, seeds 0-19; no cell was worse on a measure, and the cells with 200 variables, whose verdict or set floor failed on seeds 0-19, also hold 20 fresh datasets, seeds 20-39 (replication) | Local ISA-LiNG: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39",
  "regimes": {
   "network_tables": "net:<network>:<rows>: forward samples of the network's own tables, the columns in an order drawn from the seed: Alarm (37 variables), Hailfinder (56), Pigs (441), or the 45 x 45 chessboard (2,025), whose tables are drawn from the seed; PCMB leaves columns that hold one value out of the fit",
   "discrete": "net:<network>:<rows>: forward samples of the bnlearn repository network, columns that hold one value left out of every fit, each answering the empty set at its target, every set scored against the whole network",
@@ -17,6 +17,10 @@
   "selection": "setting:<fixed|small|large>: linear-Gaussian models of the authors' simulation script, 10,000 rows kept when the sum of the selection variables lies in [2, 2.5], the system columns in an order drawn from the seed and the context last",
   "unselected": "the same models with 10,000 rows drawn without selection",
   "planted_effects": "ldecc@<rows>: LDECC's generator (its Appendix C.1: 20 covariates, the treatment, 3 mediators, and the outcome, 25 variables); magic-niab@<rows>: the fitted MAGIC-NIAB network (44 variables), treatment G266 and outcome HT, or a pair drawn from the seed (pair=random); random-graph@10000,degree=2,nodes=<d>: LOAD's random graphs with an identifiable pair; the columns in an order drawn from the seed",
+  "identifiable_cde_gaussian": "locpc-identifiable@5000,v=<d>: the paper's linear-Gaussian DAGs with a pair whose controlled direct effect the true CPDAG identifies",
+  "identifiable_cde_binary": "locpc-identifiable@5000,family=binary,v=<d>: the same with the paper's logistic binary model",
+  "nonidentifiable_cde_gaussian": "locpc-nonidentifiable@5000,v=<d>: the paper's linear-Gaussian DAGs with a pair whose controlled direct effect the true CPDAG does not identify",
+  "nonidentifiable_cde_binary": "locpc-nonidentifiable@5000,family=binary,v=<d>: the same with the paper's logistic binary model",
   "local_ling_estimated_blanket": "the paper's linear non-Gaussian models: weights uniform on [-0.9, -0.5] and [0.5, 0.9], noise U(-c, c)^5 with c uniform on [0.75, 1.25]; 50-node graphs with at most 4 neighbors per node and disjoint stable cycles, a target on a cycle; Erdos-Renyi DAGs with expected degree 3 and 5, a target whose true blanket size is closest to 14 and 20; columns shuffled; estimated blanket",
   "local_ling_true_blanket": "the paper's linear non-Gaussian models: weights uniform on [-0.9, -0.5] and [0.5, 0.9], noise U(-c, c)^5 with c uniform on [0.75, 1.25]; 50-node graphs with at most 4 neighbors per node and disjoint stable cycles, a target on a cycle; Erdos-Renyi DAGs with expected degree 3 and 5, a target whose true blanket size is closest to 14 and 20; columns shuffled; true blanket"
  },
@@ -53,11 +57,14 @@
    "bnlearn": "5.2.1",
    "R": "4.6.1"
   },
+  "LocPC-CDE": {
+   "LocPC-CDE authors' code": "pyCIPHOD 37a62c9 (Loranchet and Assaad)"
+  },
   "Local ISA-LiNG": {
    "Local-LiNG-Discovery (authors' code)": "d7351d5"
   }
  },
- "hardware": "PCMB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; fits ran on shared nodes, so the times are indicative | GS, Fast-IAMB, and HITON-PC: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes, except GS: its Andrey fits ran after bnlearn's, in separate runs on shared nodes of the same CPU model, so GS's times are indicative | CMB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; CMB, Andrey's PC, and bnlearn ran in the same run, one fit after the other, on shared nodes, so the times are indicative | HITON-MB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; the toolbox's fits and Andrey's ran in separate runs on shared nodes of the same CPU model, so the times are indicative | MMB-by-MMB: AMD EPYC 7713 64-Core Processor for most fits, and AMD EPYC 9534, AMD EPYC 9555, and Intel Xeon nodes for the rest, 1 core per fit, 1 BLAS thread; the authors' code, FCI, and RFCI ran in one run and Andrey's fits in another, each on shared nodes, so the times are indicative | Y-structures: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and the authors' code ran in the same run, one fit after the other, on shared nodes, so the times are indicative | LDECC and LOAD: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey, the authors' code, and Andrey's PC ran in separate jobs of one campaign on shared nodes, so the times are indicative | MB-by-MB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; MB-by-MB, CMB, and the two PCs ran in separate runs on shared nodes, so the times are indicative | Local ISA-LiNG: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey's fits on the DAGs and Sachs ran in a later run than the authors' code, each on shared nodes, so the times are indicative",
+ "hardware": "PCMB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; fits ran on shared nodes, so the times are indicative | GS, Fast-IAMB, and HITON-PC: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes, except GS: its Andrey fits ran after bnlearn's, in separate runs on shared nodes of the same CPU model, so GS's times are indicative | CMB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; CMB, Andrey's PC, and bnlearn ran in the same run, one fit after the other, on shared nodes, so the times are indicative | HITON-MB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; the toolbox's fits and Andrey's ran in separate runs on shared nodes of the same CPU model, so the times are indicative | MMB-by-MMB: AMD EPYC 7713 64-Core Processor for most fits, and AMD EPYC 9534, AMD EPYC 9555, and Intel Xeon nodes for the rest, 1 core per fit, 1 BLAS thread; the authors' code, FCI, and RFCI ran in one run and Andrey's fits in another, each on shared nodes, so the times are indicative | Y-structures: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and the authors' code ran in the same run, one fit after the other, on shared nodes, so the times are indicative | LDECC and LOAD: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey, the authors' code, and Andrey's PC ran in separate jobs of one campaign on shared nodes, so the times are indicative | MB-by-MB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; MB-by-MB, CMB, and the two PCs ran in separate runs on shared nodes, so the times are indicative | LocPC-CDE: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; every arm of a dataset ran in one job on shared nodes, so the times are indicative | Local ISA-LiNG: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey's fits on the DAGs and Sachs ran in a later run than the authors' code, each on shared nodes, so the times are indicative",
  "complete": true,
  "pending_fits": 0,
  "incomplete": [],
@@ -15098,6 +15105,2703 @@
       "dominated_all_targets_by": []
      },
      "andrey_s": 198.276
+    }
+   ]
+  },
+  {
+   "method": "LocPC-CDE",
+   "family": "local",
+   "solution": "andrey.locpc_cde",
+   "setting": "alpha=0.05 (the default, the paper's level), indep_test='fisherz' on linear-Gaussian data and 'gsq' on binary data, degrees_of_freedom='mean' (the default)",
+   "comparator": "the authors' code of LocPC-CDE, pyCIPHOD commit 37a62c9",
+   "comparator_solution": "locpc_cde.authors",
+   "comparator_setting": "LocPC_CDE(treatment, outcome, sparsity=0.05, ci_test=...).run(frame), the repository's class for the method, with its Fisher's z test or its G-square test on binary data, PYTHONHASHSEED=0; the record read from its final graph with Andrey's reasons",
+   "lane": "locpc-cde",
+   "output": "whether the controlled direct effect is identifiable, and the outcome's parents as its adjustment set",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; every arm of a dataset ran in one job on shared nodes, so the times are indicative",
+   "cores": 1,
+   "build": "Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with the pair lane's PC arm counting its tests, as merged in this change)",
+   "regime": "identifiable_cde_binary",
+   "claim": "in",
+   "metric": "verdict_error",
+   "error_metric": "verdict_error: 1 when the answer's identifiable is not the truth's (the true CPDAG directs every edge at the outcome, or not), an undecided or missing answer included, so that 1 minus its mean is the paper's identifiable proportion; parents_error (identifiable pairs): 1 unless the answer is identifiable with the outcome's true parents other than the treatment as its set; effect_error (linear-Gaussian identifiable pairs): the absolute error, in standard deviations, of the direct effect estimated by least squares of the outcome on the treatment and the set on a fresh sample, paired over the datasets where both arms gave a set",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.1,
+     "comparator_verdict_error_mean": 0.05,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      0.0,
+      0.15
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -1.0,
+        -0.75
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      }
+     },
+     "andrey_s": 0.0565,
+     "comparator_s": 1.479,
+     "andrey_tests": 85.5,
+     "comparator_tests": 105.5,
+     "result": "tie"
+    },
+    {
+     "d": 20,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.15,
+     "comparator_verdict_error_mean": 0.1,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      0.0,
+      0.15
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.85,
+       "bootstrap_95": [
+        -1.0,
+        -0.7
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -1.0,
+        -0.75
+       ]
+      }
+     },
+     "andrey_s": 0.1101,
+     "comparator_s": 3.6351,
+     "andrey_tests": 203.0,
+     "comparator_tests": 246.0,
+     "result": "tie"
+    },
+    {
+     "d": 30,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.1,
+     "comparator_verdict_error_mean": 0.1,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -1.0,
+        -0.75
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -1.0,
+        -0.75
+       ]
+      }
+     },
+     "andrey_s": 0.0959,
+     "comparator_s": 2.8763,
+     "andrey_tests": 207.5,
+     "comparator_tests": 252.5,
+     "result": "tie"
+    },
+    {
+     "d": 40,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.15,
+     "comparator_verdict_error_mean": 0.15,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.85,
+       "bootstrap_95": [
+        -1.0,
+        -0.7
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.85,
+       "bootstrap_95": [
+        -1.0,
+        -0.7
+       ]
+      }
+     },
+     "andrey_s": 0.1464,
+     "comparator_s": 3.5116,
+     "andrey_tests": 266.5,
+     "comparator_tests": 278.0,
+     "result": "tie"
+    },
+    {
+     "d": 50,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.05,
+     "comparator_verdict_error_mean": 0.05,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      }
+     },
+     "andrey_s": 0.1712,
+     "comparator_s": 3.896,
+     "andrey_tests": 378.5,
+     "comparator_tests": 386.0,
+     "result": "tie"
+    },
+    {
+     "d": 100,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.0,
+     "comparator_verdict_error_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "andrey_s": 0.2955,
+     "comparator_s": 7.562,
+     "andrey_tests": 573.0,
+     "comparator_tests": 683.5,
+     "result": "tie"
+    },
+    {
+     "d": 150,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.0,
+     "comparator_verdict_error_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "andrey_s": 0.5078,
+     "comparator_s": 12.3915,
+     "andrey_tests": 1082.0,
+     "comparator_tests": 1168.0,
+     "result": "tie"
+    },
+    {
+     "d": 200,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.05,
+     "comparator_verdict_error_mean": 0.05,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      }
+     },
+     "andrey_s": 0.8241,
+     "comparator_s": 19.9364,
+     "andrey_tests": 1790.5,
+     "comparator_tests": 1625.0,
+     "result": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LocPC-CDE",
+   "family": "local",
+   "solution": "andrey.locpc_cde",
+   "setting": "alpha=0.05 (the default, the paper's level), indep_test='fisherz' on linear-Gaussian data and 'gsq' on binary data, degrees_of_freedom='mean' (the default)",
+   "comparator": "the authors' code of LocPC-CDE, pyCIPHOD commit 37a62c9",
+   "comparator_solution": "locpc_cde.authors",
+   "comparator_setting": "LocPC_CDE(treatment, outcome, sparsity=0.05, ci_test=...).run(frame), the repository's class for the method, with its Fisher's z test or its G-square test on binary data, PYTHONHASHSEED=0; the record read from its final graph with Andrey's reasons",
+   "lane": "locpc-cde",
+   "output": "whether the controlled direct effect is identifiable, and the outcome's parents as its adjustment set",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; every arm of a dataset ran in one job on shared nodes, so the times are indicative",
+   "cores": 1,
+   "build": "Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with the pair lane's PC arm counting its tests, as merged in this change)",
+   "regime": "identifiable_cde_binary",
+   "claim": "in",
+   "metric": "parents_error",
+   "error_metric": "verdict_error: 1 when the answer's identifiable is not the truth's (the true CPDAG directs every edge at the outcome, or not), an undecided or missing answer included, so that 1 minus its mean is the paper's identifiable proportion; parents_error (identifiable pairs): 1 unless the answer is identifiable with the outcome's true parents other than the treatment as its set; effect_error (linear-Gaussian identifiable pairs): the absolute error, in standard deviations, of the direct effect estimated by least squares of the outcome on the treatment and the set on a fresh sample, paired over the datasets where both arms gave a set",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_parents_error_mean": 0.15,
+     "comparator_parents_error_mean": 0.2,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.4,
+       "bootstrap_95": [
+        -1.9,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.35,
+       "bootstrap_95": [
+        -1.85,
+        -0.95
+       ]
+      }
+     },
+     "andrey_s": 0.0565,
+     "comparator_s": 1.479,
+     "andrey_tests": 85.5,
+     "comparator_tests": 105.5,
+     "result": "tie"
+    },
+    {
+     "d": 20,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_parents_error_mean": 0.3,
+     "comparator_parents_error_mean": 0.35,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -1.35,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -1.35,
+        -0.5
+       ]
+      }
+     },
+     "andrey_s": 0.1101,
+     "comparator_s": 3.6351,
+     "andrey_tests": 203.0,
+     "comparator_tests": 246.0,
+     "result": "tie"
+    },
+    {
+     "d": 30,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_parents_error_mean": 0.4,
+     "comparator_parents_error_mean": 0.35,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      0.0,
+      0.15
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.4,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.45,
+        -0.55
+       ]
+      }
+     },
+     "andrey_s": 0.0959,
+     "comparator_s": 2.8763,
+     "andrey_tests": 207.5,
+     "comparator_tests": 252.5,
+     "result": "tie"
+    },
+    {
+     "d": 40,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_parents_error_mean": 0.3,
+     "comparator_parents_error_mean": 0.35,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.85,
+       "bootstrap_95": [
+        -1.2,
+        -0.55
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.8,
+       "bootstrap_95": [
+        -1.15,
+        -0.5
+       ]
+      }
+     },
+     "andrey_s": 0.1464,
+     "comparator_s": 3.5116,
+     "andrey_tests": 266.5,
+     "comparator_tests": 278.0,
+     "result": "tie"
+    },
+    {
+     "d": 50,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_parents_error_mean": 0.25,
+     "comparator_parents_error_mean": 0.25,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.15,
+       "bootstrap_95": [
+        -1.55,
+        -0.75
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.15,
+       "bootstrap_95": [
+        -1.55,
+        -0.75
+       ]
+      }
+     },
+     "andrey_s": 0.1712,
+     "comparator_s": 3.896,
+     "andrey_tests": 378.5,
+     "comparator_tests": 386.0,
+     "result": "tie"
+    },
+    {
+     "d": 100,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_parents_error_mean": 0.1,
+     "comparator_parents_error_mean": 0.15,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.1,
+       "bootstrap_95": [
+        -1.4,
+        -0.8
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.05,
+       "bootstrap_95": [
+        -1.4,
+        -0.75
+       ]
+      }
+     },
+     "andrey_s": 0.2955,
+     "comparator_s": 7.562,
+     "andrey_tests": 573.0,
+     "comparator_tests": 683.5,
+     "result": "tie"
+    },
+    {
+     "d": 150,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_parents_error_mean": 0.25,
+     "comparator_parents_error_mean": 0.45,
+     "mean_D": -0.2,
+     "bootstrap_95": [
+      -0.4,
+      -0.05
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.4,
+       "bootstrap_95": [
+        -1.8,
+        -1.05
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.15,
+       "bootstrap_95": [
+        -1.65,
+        -0.65
+       ]
+      }
+     },
+     "andrey_s": 0.5078,
+     "comparator_s": 12.3915,
+     "andrey_tests": 1082.0,
+     "comparator_tests": 1168.0,
+     "result": "better"
+    },
+    {
+     "d": 200,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_parents_error_mean": 0.4,
+     "comparator_parents_error_mean": 0.45,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.2,
+      0.1
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.6,
+       "bootstrap_95": [
+        -1.2,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.4,
+       "bootstrap_95": [
+        -1.05,
+        0.3
+       ]
+      }
+     },
+     "andrey_s": 0.8241,
+     "comparator_s": 19.9364,
+     "andrey_tests": 1790.5,
+     "comparator_tests": 1625.0,
+     "result": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LocPC-CDE",
+   "family": "local",
+   "solution": "andrey.locpc_cde",
+   "setting": "alpha=0.05 (the default, the paper's level), indep_test='fisherz' on linear-Gaussian data and 'gsq' on binary data, degrees_of_freedom='mean' (the default)",
+   "comparator": "the authors' code of LocPC-CDE, pyCIPHOD commit 37a62c9",
+   "comparator_solution": "locpc_cde.authors",
+   "comparator_setting": "LocPC_CDE(treatment, outcome, sparsity=0.05, ci_test=...).run(frame), the repository's class for the method, with its Fisher's z test or its G-square test on binary data, PYTHONHASHSEED=0; the record read from its final graph with Andrey's reasons",
+   "lane": "locpc-cde",
+   "output": "whether the controlled direct effect is identifiable, and the outcome's parents as its adjustment set",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; every arm of a dataset ran in one job on shared nodes, so the times are indicative",
+   "cores": 1,
+   "build": "Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with the pair lane's PC arm counting its tests, as merged in this change)",
+   "regime": "nonidentifiable_cde_binary",
+   "claim": "in",
+   "metric": "verdict_error",
+   "error_metric": "verdict_error: 1 when the answer's identifiable is not the truth's (the true CPDAG directs every edge at the outcome, or not), an undecided or missing answer included, so that 1 minus its mean is the paper's identifiable proportion; parents_error (identifiable pairs): 1 unless the answer is identifiable with the outcome's true parents other than the treatment as its set; effect_error (linear-Gaussian identifiable pairs): the absolute error, in standard deviations, of the direct effect estimated by least squares of the outcome on the treatment and the set on a fresh sample, paired over the datasets where both arms gave a set",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.25,
+     "comparator_verdict_error_mean": 0.35,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.25,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.25,
+       "bootstrap_95": [
+        0.1,
+        0.45
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.35,
+       "bootstrap_95": [
+        0.15,
+        0.55
+       ]
+      }
+     },
+     "andrey_s": 0.0526,
+     "comparator_s": 1.1024,
+     "andrey_tests": 104.5,
+     "comparator_tests": 102.0,
+     "result": "tie"
+    },
+    {
+     "d": 20,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.25,
+     "comparator_verdict_error_mean": 0.3,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.2,
+      0.1
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.25,
+       "bootstrap_95": [
+        0.1,
+        0.45
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.3,
+       "bootstrap_95": [
+        0.1,
+        0.5
+       ]
+      }
+     },
+     "andrey_s": 0.1848,
+     "comparator_s": 2.9411,
+     "andrey_tests": 348.0,
+     "comparator_tests": 208.0,
+     "result": "tie"
+    },
+    {
+     "d": 30,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.45,
+     "comparator_verdict_error_mean": 0.5,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.45,
+       "bootstrap_95": [
+        0.25,
+        0.65
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.5,
+       "bootstrap_95": [
+        0.3,
+        0.7
+       ]
+      }
+     },
+     "andrey_s": 0.2657,
+     "comparator_s": 6.2399,
+     "andrey_tests": 640.0,
+     "comparator_tests": 466.5,
+     "result": "tie"
+    },
+    {
+     "d": 40,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.35,
+     "comparator_verdict_error_mean": 0.55,
+     "mean_D": -0.2,
+     "bootstrap_95": [
+      -0.4,
+      -0.05
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.35,
+       "bootstrap_95": [
+        0.15,
+        0.55
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.55,
+       "bootstrap_95": [
+        0.35,
+        0.75
+       ]
+      }
+     },
+     "andrey_s": 0.3963,
+     "comparator_s": 4.0971,
+     "andrey_tests": 1027.0,
+     "comparator_tests": 375.5,
+     "result": "better"
+    },
+    {
+     "d": 50,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.55,
+     "comparator_verdict_error_mean": 0.55,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.3,
+      0.25
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.55,
+       "bootstrap_95": [
+        0.35,
+        0.75
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.55,
+       "bootstrap_95": [
+        0.35,
+        0.75
+       ]
+      }
+     },
+     "andrey_s": 0.5645,
+     "comparator_s": 11.2017,
+     "andrey_tests": 1098.0,
+     "comparator_tests": 941.5,
+     "result": "tie"
+    },
+    {
+     "d": 100,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.6,
+     "comparator_verdict_error_mean": 0.65,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.2,
+      0.1
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.6,
+       "bootstrap_95": [
+        0.4,
+        0.8
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.65,
+       "bootstrap_95": [
+        0.45,
+        0.85
+       ]
+      }
+     },
+     "andrey_s": 0.5064,
+     "comparator_s": 18.2072,
+     "andrey_tests": 907.5,
+     "comparator_tests": 1301.5,
+     "result": "tie"
+    },
+    {
+     "d": 150,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.7,
+     "comparator_verdict_error_mean": 0.7,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.7,
+       "bootstrap_95": [
+        0.5,
+        0.9
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.7,
+       "bootstrap_95": [
+        0.5,
+        0.9
+       ]
+      }
+     },
+     "andrey_s": 0.9056,
+     "comparator_s": 14.8679,
+     "andrey_tests": 1830.0,
+     "comparator_tests": 1257.0,
+     "result": "tie"
+    },
+    {
+     "d": 200,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.45,
+     "comparator_verdict_error_mean": 0.65,
+     "mean_D": -0.2,
+     "bootstrap_95": [
+      -0.4,
+      -0.05
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.45,
+       "bootstrap_95": [
+        0.25,
+        0.65
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.65,
+       "bootstrap_95": [
+        0.45,
+        0.85
+       ]
+      }
+     },
+     "andrey_s": 6.8711,
+     "comparator_s": 25.8592,
+     "andrey_tests": 17264.5,
+     "comparator_tests": 1953.5,
+     "result": "better"
+    }
+   ]
+  },
+  {
+   "method": "LocPC-CDE",
+   "family": "local",
+   "solution": "andrey.locpc_cde",
+   "setting": "alpha=0.05 (the default, the paper's level), indep_test='fisherz' on linear-Gaussian data and 'gsq' on binary data, degrees_of_freedom='mean' (the default)",
+   "comparator": "the authors' code of LocPC-CDE, pyCIPHOD commit 37a62c9",
+   "comparator_solution": "locpc_cde.authors",
+   "comparator_setting": "LocPC_CDE(treatment, outcome, sparsity=0.05, ci_test=...).run(frame), the repository's class for the method, with its Fisher's z test or its G-square test on binary data, PYTHONHASHSEED=0; the record read from its final graph with Andrey's reasons",
+   "lane": "locpc-cde",
+   "output": "whether the controlled direct effect is identifiable, and the outcome's parents as its adjustment set",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; every arm of a dataset ran in one job on shared nodes, so the times are indicative",
+   "cores": 1,
+   "build": "Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with the pair lane's PC arm counting its tests, as merged in this change)",
+   "regime": "identifiable_cde_gaussian",
+   "claim": "in",
+   "metric": "verdict_error",
+   "error_metric": "verdict_error: 1 when the answer's identifiable is not the truth's (the true CPDAG directs every edge at the outcome, or not), an undecided or missing answer included, so that 1 minus its mean is the paper's identifiable proportion; parents_error (identifiable pairs): 1 unless the answer is identifiable with the outcome's true parents other than the treatment as its set; effect_error (linear-Gaussian identifiable pairs): the absolute error, in standard deviations, of the direct effect estimated by least squares of the outcome on the treatment and the set on a fresh sample, paired over the datasets where both arms gave a set",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.0,
+     "comparator_verdict_error_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "andrey_s": 0.0106,
+     "comparator_s": 0.101,
+     "andrey_tests": 99.0,
+     "comparator_tests": 115.5,
+     "result": "tie"
+    },
+    {
+     "d": 20,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.05,
+     "comparator_verdict_error_mean": 0.05,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      }
+     },
+     "andrey_s": 0.0141,
+     "comparator_s": 0.1739,
+     "andrey_tests": 221.5,
+     "comparator_tests": 296.0,
+     "result": "tie"
+    },
+    {
+     "d": 30,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.0,
+     "comparator_verdict_error_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "andrey_s": 0.0227,
+     "comparator_s": 0.3183,
+     "andrey_tests": 330.0,
+     "comparator_tests": 493.0,
+     "result": "tie"
+    },
+    {
+     "d": 40,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.05,
+     "comparator_verdict_error_mean": 0.05,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      }
+     },
+     "andrey_s": 0.0263,
+     "comparator_s": 0.3518,
+     "andrey_tests": 383.0,
+     "comparator_tests": 438.5,
+     "result": "tie"
+    },
+    {
+     "d": 50,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.05,
+     "comparator_verdict_error_mean": 0.05,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      }
+     },
+     "andrey_s": 0.0285,
+     "comparator_s": 0.8271,
+     "andrey_tests": 525.5,
+     "comparator_tests": 1502.0,
+     "result": "tie"
+    },
+    {
+     "d": 100,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.0,
+     "comparator_verdict_error_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "andrey_s": 0.0533,
+     "comparator_s": 0.7484,
+     "andrey_tests": 931.0,
+     "comparator_tests": 963.0,
+     "result": "tie"
+    },
+    {
+     "d": 150,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.0,
+     "comparator_verdict_error_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "andrey_s": 0.0873,
+     "comparator_s": 1.2583,
+     "andrey_tests": 1791.0,
+     "comparator_tests": 1978.5,
+     "result": "tie"
+    },
+    {
+     "d": 200,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.0,
+     "comparator_verdict_error_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "andrey_s": 0.135,
+     "comparator_s": 1.9128,
+     "andrey_tests": 2744.5,
+     "comparator_tests": 2974.0,
+     "result": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LocPC-CDE",
+   "family": "local",
+   "solution": "andrey.locpc_cde",
+   "setting": "alpha=0.05 (the default, the paper's level), indep_test='fisherz' on linear-Gaussian data and 'gsq' on binary data, degrees_of_freedom='mean' (the default)",
+   "comparator": "the authors' code of LocPC-CDE, pyCIPHOD commit 37a62c9",
+   "comparator_solution": "locpc_cde.authors",
+   "comparator_setting": "LocPC_CDE(treatment, outcome, sparsity=0.05, ci_test=...).run(frame), the repository's class for the method, with its Fisher's z test or its G-square test on binary data, PYTHONHASHSEED=0; the record read from its final graph with Andrey's reasons",
+   "lane": "locpc-cde",
+   "output": "whether the controlled direct effect is identifiable, and the outcome's parents as its adjustment set",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; every arm of a dataset ran in one job on shared nodes, so the times are indicative",
+   "cores": 1,
+   "build": "Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with the pair lane's PC arm counting its tests, as merged in this change)",
+   "regime": "identifiable_cde_gaussian",
+   "claim": "in",
+   "metric": "parents_error",
+   "error_metric": "verdict_error: 1 when the answer's identifiable is not the truth's (the true CPDAG directs every edge at the outcome, or not), an undecided or missing answer included, so that 1 minus its mean is the paper's identifiable proportion; parents_error (identifiable pairs): 1 unless the answer is identifiable with the outcome's true parents other than the treatment as its set; effect_error (linear-Gaussian identifiable pairs): the absolute error, in standard deviations, of the direct effect estimated by least squares of the outcome on the treatment and the set on a fresh sample, paired over the datasets where both arms gave a set",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_parents_error_mean": 0.1,
+     "comparator_parents_error_mean": 0.25,
+     "mean_D": -0.15,
+     "bootstrap_95": [
+      -0.3,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.5,
+       "bootstrap_95": [
+        -1.95,
+        -1.15
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.35,
+       "bootstrap_95": [
+        -1.7,
+        -1.05
+       ]
+      }
+     },
+     "andrey_s": 0.0106,
+     "comparator_s": 0.101,
+     "andrey_tests": 99.0,
+     "comparator_tests": 115.5,
+     "result": "tie"
+    },
+    {
+     "d": 20,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_parents_error_mean": 0.2,
+     "comparator_parents_error_mean": 0.25,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -1.4,
+        -0.35
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.8,
+       "bootstrap_95": [
+        -1.3,
+        -0.25
+       ]
+      }
+     },
+     "andrey_s": 0.0141,
+     "comparator_s": 0.1739,
+     "andrey_tests": 221.5,
+     "comparator_tests": 296.0,
+     "result": "tie"
+    },
+    {
+     "d": 30,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_parents_error_mean": 0.15,
+     "comparator_parents_error_mean": 0.15,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.15,
+      0.15
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.2,
+       "bootstrap_95": [
+        -1.6,
+        -0.7
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.15,
+       "bootstrap_95": [
+        -1.65,
+        -0.6
+       ]
+      }
+     },
+     "andrey_s": 0.0227,
+     "comparator_s": 0.3183,
+     "andrey_tests": 330.0,
+     "comparator_tests": 493.0,
+     "result": "tie"
+    },
+    {
+     "d": 40,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_parents_error_mean": 0.25,
+     "comparator_parents_error_mean": 0.3,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.05,
+       "bootstrap_95": [
+        -1.55,
+        -0.55
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.5,
+        -0.4
+       ]
+      }
+     },
+     "andrey_s": 0.0263,
+     "comparator_s": 0.3518,
+     "andrey_tests": 383.0,
+     "comparator_tests": 438.5,
+     "result": "tie"
+    },
+    {
+     "d": 50,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_parents_error_mean": 0.3,
+     "comparator_parents_error_mean": 0.4,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.25,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.45,
+        -0.4
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.75,
+       "bootstrap_95": [
+        -1.3,
+        -0.2
+       ]
+      }
+     },
+     "andrey_s": 0.0285,
+     "comparator_s": 0.8271,
+     "andrey_tests": 525.5,
+     "comparator_tests": 1502.0,
+     "result": "tie"
+    },
+    {
+     "d": 100,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_parents_error_mean": 0.35,
+     "comparator_parents_error_mean": 0.35,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.7,
+       "bootstrap_95": [
+        -1.2,
+        -0.15
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.65,
+       "bootstrap_95": [
+        -1.15,
+        -0.1
+       ]
+      }
+     },
+     "andrey_s": 0.0533,
+     "comparator_s": 0.7484,
+     "andrey_tests": 931.0,
+     "comparator_tests": 963.0,
+     "result": "tie"
+    },
+    {
+     "d": 150,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_parents_error_mean": 0.3,
+     "comparator_parents_error_mean": 0.3,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.05,
+       "bootstrap_95": [
+        -1.55,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.05,
+       "bootstrap_95": [
+        -1.55,
+        -0.5
+       ]
+      }
+     },
+     "andrey_s": 0.0873,
+     "comparator_s": 1.2583,
+     "andrey_tests": 1791.0,
+     "comparator_tests": 1978.5,
+     "result": "tie"
+    },
+    {
+     "d": 200,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_parents_error_mean": 0.45,
+     "comparator_parents_error_mean": 0.55,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.25,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.7,
+       "bootstrap_95": [
+        -1.55,
+        0.05
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.55,
+       "bootstrap_95": [
+        -1.4,
+        0.25
+       ]
+      }
+     },
+     "andrey_s": 0.135,
+     "comparator_s": 1.9128,
+     "andrey_tests": 2744.5,
+     "comparator_tests": 2974.0,
+     "result": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LocPC-CDE",
+   "family": "local",
+   "solution": "andrey.locpc_cde",
+   "setting": "alpha=0.05 (the default, the paper's level), indep_test='fisherz' on linear-Gaussian data and 'gsq' on binary data, degrees_of_freedom='mean' (the default)",
+   "comparator": "the authors' code of LocPC-CDE, pyCIPHOD commit 37a62c9",
+   "comparator_solution": "locpc_cde.authors",
+   "comparator_setting": "LocPC_CDE(treatment, outcome, sparsity=0.05, ci_test=...).run(frame), the repository's class for the method, with its Fisher's z test or its G-square test on binary data, PYTHONHASHSEED=0; the record read from its final graph with Andrey's reasons",
+   "lane": "locpc-cde",
+   "output": "whether the controlled direct effect is identifiable, and the outcome's parents as its adjustment set",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; every arm of a dataset ran in one job on shared nodes, so the times are indicative",
+   "cores": 1,
+   "build": "Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with the pair lane's PC arm counting its tests, as merged in this change)",
+   "regime": "identifiable_cde_gaussian",
+   "claim": "in",
+   "metric": "effect_error",
+   "error_metric": "verdict_error: 1 when the answer's identifiable is not the truth's (the true CPDAG directs every edge at the outcome, or not), an undecided or missing answer included, so that 1 minus its mean is the paper's identifiable proportion; parents_error (identifiable pairs): 1 unless the answer is identifiable with the outcome's true parents other than the treatment as its set; effect_error (linear-Gaussian identifiable pairs): the absolute error, in standard deviations, of the direct effect estimated by least squares of the outcome on the treatment and the set on a fresh sample, paired over the datasets where both arms gave a set",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_effect_error_mean": 0.0066,
+     "comparator_effect_error_mean": 0.0143,
+     "mean_D": -0.0078,
+     "bootstrap_95": [
+      -0.0195,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.032,
+       "bootstrap_95": [
+        -0.0797,
+        -0.0008
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.0243,
+       "bootstrap_95": [
+        -0.0641,
+        0.0023
+       ]
+      }
+     },
+     "andrey_s": 0.0106,
+     "comparator_s": 0.101,
+     "andrey_tests": 99.0,
+     "comparator_tests": 115.5,
+     "result": "tie"
+    },
+    {
+     "d": 20,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_effect_error_mean": 0.0284,
+     "comparator_effect_error_mean": 0.0394,
+     "mean_D": -0.011,
+     "bootstrap_95": [
+      -0.039,
+      0.0059
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.0266,
+       "bootstrap_95": [
+        -0.0645,
+        0.0016
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.0156,
+       "bootstrap_95": [
+        -0.0619,
+        0.0289
+       ]
+      }
+     },
+     "andrey_s": 0.0141,
+     "comparator_s": 0.1739,
+     "andrey_tests": 221.5,
+     "comparator_tests": 296.0,
+     "result": "tie"
+    },
+    {
+     "d": 30,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_effect_error_mean": 0.0173,
+     "comparator_effect_error_mean": 0.0189,
+     "mean_D": -0.0017,
+     "bootstrap_95": [
+      -0.0046,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.0009,
+       "bootstrap_95": [
+        -0.0086,
+        0.0087
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.0008,
+       "bootstrap_95": [
+        -0.0075,
+        0.0105
+       ]
+      }
+     },
+     "andrey_s": 0.0227,
+     "comparator_s": 0.3183,
+     "andrey_tests": 330.0,
+     "comparator_tests": 493.0,
+     "result": "tie"
+    },
+    {
+     "d": 40,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_effect_error_mean": 0.027,
+     "comparator_effect_error_mean": 0.0318,
+     "mean_D": -0.0049,
+     "bootstrap_95": [
+      -0.0146,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.0146,
+       "bootstrap_95": [
+        -0.0392,
+        0.0037
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.0097,
+       "bootstrap_95": [
+        -0.0361,
+        0.0128
+       ]
+      }
+     },
+     "andrey_s": 0.0263,
+     "comparator_s": 0.3518,
+     "andrey_tests": 383.0,
+     "comparator_tests": 438.5,
+     "result": "tie"
+    },
+    {
+     "d": 50,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_effect_error_mean": 0.0228,
+     "comparator_effect_error_mean": 0.0241,
+     "mean_D": -0.0013,
+     "bootstrap_95": [
+      -0.0038,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.0055,
+       "bootstrap_95": [
+        -0.0228,
+        0.0403
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.0068,
+       "bootstrap_95": [
+        -0.0216,
+        0.0417
+       ]
+      }
+     },
+     "andrey_s": 0.0285,
+     "comparator_s": 0.8271,
+     "andrey_tests": 525.5,
+     "comparator_tests": 1502.0,
+     "result": "tie"
+    },
+    {
+     "d": 100,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_effect_error_mean": 0.0159,
+     "comparator_effect_error_mean": 0.0159,
+     "mean_D": -0.0,
+     "bootstrap_95": [
+      -0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.0145,
+       "bootstrap_95": [
+        -0.0466,
+        0.0132
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.0145,
+       "bootstrap_95": [
+        -0.0466,
+        0.0132
+       ]
+      }
+     },
+     "andrey_s": 0.0533,
+     "comparator_s": 0.7484,
+     "andrey_tests": 931.0,
+     "comparator_tests": 963.0,
+     "result": "tie"
+    },
+    {
+     "d": 150,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_effect_error_mean": 0.0432,
+     "comparator_effect_error_mean": 0.0432,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.013,
+       "bootstrap_95": [
+        -0.0562,
+        0.1126
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.013,
+       "bootstrap_95": [
+        -0.0562,
+        0.1126
+       ]
+      }
+     },
+     "andrey_s": 0.0873,
+     "comparator_s": 1.2583,
+     "andrey_tests": 1791.0,
+     "comparator_tests": 1978.5,
+     "result": "tie"
+    },
+    {
+     "d": 200,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_effect_error_mean": 0.0187,
+     "comparator_effect_error_mean": 0.0186,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.0129,
+       "bootstrap_95": [
+        -0.0008,
+        0.0359
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.0128,
+       "bootstrap_95": [
+        -0.0008,
+        0.0359
+       ]
+      }
+     },
+     "andrey_s": 0.135,
+     "comparator_s": 1.9128,
+     "andrey_tests": 2744.5,
+     "comparator_tests": 2974.0,
+     "result": "tie"
+    }
+   ]
+  },
+  {
+   "method": "LocPC-CDE",
+   "family": "local",
+   "solution": "andrey.locpc_cde",
+   "setting": "alpha=0.05 (the default, the paper's level), indep_test='fisherz' on linear-Gaussian data and 'gsq' on binary data, degrees_of_freedom='mean' (the default)",
+   "comparator": "the authors' code of LocPC-CDE, pyCIPHOD commit 37a62c9",
+   "comparator_solution": "locpc_cde.authors",
+   "comparator_setting": "LocPC_CDE(treatment, outcome, sparsity=0.05, ci_test=...).run(frame), the repository's class for the method, with its Fisher's z test or its G-square test on binary data, PYTHONHASHSEED=0; the record read from its final graph with Andrey's reasons",
+   "lane": "locpc-cde",
+   "output": "whether the controlled direct effect is identifiable, and the outcome's parents as its adjustment set",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; every arm of a dataset ran in one job on shared nodes, so the times are indicative",
+   "cores": 1,
+   "build": "Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with the pair lane's PC arm counting its tests, as merged in this change)",
+   "regime": "nonidentifiable_cde_gaussian",
+   "claim": "in",
+   "metric": "verdict_error",
+   "error_metric": "verdict_error: 1 when the answer's identifiable is not the truth's (the true CPDAG directs every edge at the outcome, or not), an undecided or missing answer included, so that 1 minus its mean is the paper's identifiable proportion; parents_error (identifiable pairs): 1 unless the answer is identifiable with the outcome's true parents other than the treatment as its set; effect_error (linear-Gaussian identifiable pairs): the absolute error, in standard deviations, of the direct effect estimated by least squares of the outcome on the treatment and the set on a fresh sample, paired over the datasets where both arms gave a set",
+   "complete": true,
+   "rows": [
+    {
+     "d": 10,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.2,
+     "comparator_verdict_error_mean": 0.25,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.2,
+       "bootstrap_95": [
+        0.05,
+        0.4
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.25,
+       "bootstrap_95": [
+        0.1,
+        0.45
+       ]
+      }
+     },
+     "andrey_s": 0.0123,
+     "comparator_s": 0.077,
+     "andrey_tests": 115.5,
+     "comparator_tests": 103.0,
+     "result": "tie"
+    },
+    {
+     "d": 20,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.35,
+     "comparator_verdict_error_mean": 0.4,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.2,
+      0.1
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.35,
+       "bootstrap_95": [
+        0.15,
+        0.55
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.4,
+       "bootstrap_95": [
+        0.2,
+        0.6
+       ]
+      }
+     },
+     "andrey_s": 0.0192,
+     "comparator_s": 0.1772,
+     "andrey_tests": 381.5,
+     "comparator_tests": 296.0,
+     "result": "tie"
+    },
+    {
+     "d": 30,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.45,
+     "comparator_verdict_error_mean": 0.55,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.25,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.45,
+       "bootstrap_95": [
+        0.25,
+        0.65
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.55,
+       "bootstrap_95": [
+        0.35,
+        0.75
+       ]
+      }
+     },
+     "andrey_s": 0.0358,
+     "comparator_s": 0.5133,
+     "andrey_tests": 885.5,
+     "comparator_tests": 942.0,
+     "result": "tie"
+    },
+    {
+     "d": 40,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.5,
+     "comparator_verdict_error_mean": 0.55,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.2,
+      0.1
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.5,
+       "bootstrap_95": [
+        0.3,
+        0.7
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.55,
+       "bootstrap_95": [
+        0.35,
+        0.75
+       ]
+      }
+     },
+     "andrey_s": 0.0647,
+     "comparator_s": 0.6219,
+     "andrey_tests": 1588.0,
+     "comparator_tests": 1100.5,
+     "result": "tie"
+    },
+    {
+     "d": 50,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.5,
+     "comparator_verdict_error_mean": 0.65,
+     "mean_D": -0.15,
+     "bootstrap_95": [
+      -0.4,
+      0.1
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.5,
+       "bootstrap_95": [
+        0.3,
+        0.7
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.65,
+       "bootstrap_95": [
+        0.45,
+        0.85
+       ]
+      }
+     },
+     "andrey_s": 0.1034,
+     "comparator_s": 0.491,
+     "andrey_tests": 2508.5,
+     "comparator_tests": 775.5,
+     "result": "tie"
+    },
+    {
+     "d": 100,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.4,
+     "comparator_verdict_error_mean": 0.65,
+     "mean_D": -0.25,
+     "bootstrap_95": [
+      -0.45,
+      -0.1
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.4,
+       "bootstrap_95": [
+        0.2,
+        0.6
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.65,
+       "bootstrap_95": [
+        0.45,
+        0.85
+       ]
+      }
+     },
+     "andrey_s": 0.3049,
+     "comparator_s": 5.2108,
+     "andrey_tests": 10279.5,
+     "comparator_tests": 8783.0,
+     "result": "better"
+    },
+    {
+     "d": 150,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.75,
+     "comparator_verdict_error_mean": 0.75,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.75,
+       "bootstrap_95": [
+        0.55,
+        0.95
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.75,
+       "bootstrap_95": [
+        0.55,
+        0.95
+       ]
+      }
+     },
+     "andrey_s": 0.1183,
+     "comparator_s": 6.8471,
+     "andrey_tests": 2175.0,
+     "comparator_tests": 10597.5,
+     "result": "tie"
+    },
+    {
+     "d": 200,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.9,
+     "comparator_verdict_error_mean": 0.95,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.9,
+       "bootstrap_95": [
+        0.75,
+        1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.95,
+       "bootstrap_95": [
+        0.85,
+        1.0
+       ]
+      }
+     },
+     "andrey_s": 0.2294,
+     "comparator_s": 16.0279,
+     "andrey_tests": 3990.0,
+     "comparator_tests": 25294.0,
+     "result": "tie"
     }
    ]
   },

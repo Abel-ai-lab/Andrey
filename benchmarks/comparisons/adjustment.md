@@ -6,8 +6,8 @@ every Andrey method of the group that is installed, Andrey's PC read at the pair
 the authors' code of the reference methods, on models planted as the method's own paper describes
 them, and scores the answers against the truth the method's definition gives.
 
-The seven Andrey methods fill a table row each ([Adding a method](#adding-a-method)). LDECC and LOAD
-ran in the 0.18.0 campaign ([Results](#results)).
+The seven Andrey methods fill a table row each ([Adding a method](#adding-a-method)). LDECC, LOAD,
+and LocPC-CDE ran in the 0.18.0 campaign ([Results](#results)).
 
 ## Data
 
@@ -103,12 +103,13 @@ answer.
 
 ## Results
 
-The 0.18.0 campaign ran LDECC and LOAD against their authors' code on 20 datasets per cell, seeds
-0-19, and again on seeds 20-39 for a cell worse on the first 20, each fit on one core with a cap of
-1,800 s; no fit failed or timed out. A cell counts as worse when the paired 95% bootstrap interval of
-Andrey's error minus the authors' code's lies above 0 on both seed ranges. Andrey's PC read at the
+The 0.18.0 campaign ran LDECC, LOAD, and LocPC-CDE against their authors' code on 20 datasets per
+cell, seeds 0-19, and again on seeds 20-39 for a cell worse on the first 20 or below its floor, each
+fit on one core with a cap of 1,800 s. A cell counts as worse when the paired 95% bootstrap interval
+of Andrey's error minus the authors' code's lies above 0 on both seed ranges. Andrey's PC read at the
 pair ran beside them with the same test and level. Every number, per cell and measure, is in
-`benchmarks/published/0.18.0/adjustment.json`, and the release card has the tables.
+`benchmarks/published/0.18.0/adjustment.json` (LDECC and LOAD) and
+`benchmarks/published/0.18.0/locpc-cde.json` (LocPC-CDE), and the release card has the tables.
 
 - **LDECC** (`ldecc@8000` to `@32000`, `magic-niab@8000` to `@32000`; Fisher's z at
   `0.01 * 32000 / n`, as the authors' notebooks set it): a tie with the authors' code on accuracy,
@@ -122,7 +123,23 @@ pair ran beside them with the same test and level. Every number, per cell and me
   Fisher's z at 0.01): a tie on the set F1 and the effect error in all 5 cells, but the set F1 on
   MAGIC-NIAB pairs on seeds 0-19 (0.74 against 0.88), which tied on seeds 20-39. Its sets have fewer
   missing plus extra members than the empty set in every cell.
-- **PC read at the pair** was never better than either method on both effect error and time.
+- **LocPC-CDE** (`locpc-identifiable@5000,v=10` to `v=200` and `locpc-nonidentifiable@5000`, each
+  also with `family=binary`; Fisher's z or G-square at 0.05): the verdict, identifiable
+  or not, ties the authors' code in 29 of 32 cells and is better in 3, all on pairs the CPDAG does
+  not identify (Gaussian `v=100`, binary `v=40` and `v=200`); the set on identifiable pairs ties in
+  15 of 16 and is better at binary `v=150`; the effect error ties in all 8 Gaussian cells; no cell
+  is worse. With the authors' code at `PYTHONHASHSEED=1`, 79 of its 80 answers in those 4 cells do
+  not change, and binary `v=40` becomes a tie. Over the two pairs of a seed, the verdict error is
+  below the constant answer "not identifiable" in every cell but Gaussian `v=200`, on seeds 0-19 and
+  20-39, where the authors' code does not beat it either; on non-identifiable pairs alone neither
+  side beats that answer. The sets have fewer missing plus extra members than the empty set but at
+  `v=200`, as the authors' code's; the effect error is below the unadjusted regression's at `v=10`
+  only, and the authors' code's nowhere. Most answers that differ trace to the authors' code: it
+  learns each hop on the graph kept from the last one, with its marks, and visits variables in the
+  order of their names (at `v<=100`, these two explain 37 of 40 differing answers on linear-Gaussian
+  data and 25 of 36 on binary data, and the G-square test's degrees of freedom 2 more). Eight fits of the authors' code that failed to start were rerun, and
+  three that passed 1,800 s were rerun with a cap of 3,600 s.
+- **PC read at the pair** was never better than any of the three methods on both accuracy and cost.
 
 ## References
 

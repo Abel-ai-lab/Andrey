@@ -101,6 +101,16 @@ def _run_local_optimal_adjustment(X: np.ndarray, algorithm: str) -> dict:
     return project_output(out, algorithm)
 
 
+def _run_locpc_cde(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    # The treatment x0 and the outcome x2, whose edges x0 -> x2 <- x1 and x2 -> x3 the CPDAG all
+    # directs, so the effect is identifiable and x1 is its adjustment set.
+    column = datagen.column_of("gauss_7v")
+    out = andrey.locpc_cde(X, treatment=int(column[0]), outcome=int(column[2]))
+    return project_output(out, algorithm)
+
+
 def _run_mmb_by_mmb(X: np.ndarray, algorithm: str) -> dict:
     import andrey
 
@@ -184,6 +194,7 @@ ALGORITHMS = {
     "CMB": (_run_target("cmb"), "gauss_5v"),
     "LDECC": (_run_ldecc, "gauss_7v"),
     "LocalOptimalAdjustment": (_run_local_optimal_adjustment, "gauss_7v"),
+    "LocPCCDE": (_run_locpc_cde, "gauss_7v"),
     "MMBbyMMB": (_run_mmb_by_mmb, "confounded_gauss_5v"),
     "MMHC": (_facade("mmhc"), "gauss_5v"),
     "RSMAX2": (_facade("rsmax2", restrict="pc", maximize="tabu"), "gauss_5v"),

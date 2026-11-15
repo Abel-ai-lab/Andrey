@@ -1212,9 +1212,6 @@ def locpc_cde(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -1271,15 +1268,21 @@ def locpc_cde(
     ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
     ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Tested with exact d-separation on random graphs and the
-    paper's figures, and on simulated linear-Gaussian data. Without the paper's early stop (see
-    **When it stops.**), a non-identifiable effect is searched until a hop adds no variable: with
-    exact tests the mean hop of a search rose from 1.41 to 1.79 on random graphs of 6 to 15
-    variables and from 1.46 to 2.16 on graphs of 20 to 30. An unmeasured common cause breaks the
-    claim. With 5,000 rows a fit ran about 40 to 250 tests on the paper's random 10-node graphs, and
-    on its 50-node graphs about 200 to 2,000 for an identifiable effect and 300 to 5,000 for one
-    that is not, each in under a second. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** Measured against its authors' code on the random graphs of [1]_ with 10 to 200
+    variables and 5,000 rows, linear-Gaussian with Fisher's z test and binary with the G-square
+    test, at alpha 0.05: its verdicts, sets, and effect estimates were as near the truth as the
+    code's in every setting, on 20 datasets each. On pairs whose effect the CPDAG does not identify,
+    its verdict, like the code's, was wrong or undecided on 20% to 90% of the datasets; over both
+    kinds of pair it beat the constant answer "not identifiable" in every setting but the
+    linear-Gaussian graphs with 200 variables. The
+    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#locpc-cde>`_ has the
+    numbers. Without the paper's early stop (see **When it stops.**), a non-identifiable effect is
+    searched until a hop adds no variable: on the paper's linear-Gaussian graphs with 5,000 rows
+    that ran 12% more tests with 10 variables, 60% more with 50, and 128% more with 100. An
+    unmeasured common cause breaks the claim. A fit ran a median of 90 to 2,700 tests on an
+    identifiable pair and up to 17,000 on one that is not, in under a second, except about 7 seconds
+    on the binary non-identifiable pairs with 200 variables. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------

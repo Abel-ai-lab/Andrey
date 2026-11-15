@@ -466,6 +466,7 @@ variable.
    cmb
    ldecc
    local_optimal_adjustment
+   locpc_cde
    mmb_by_mmb
    icp
    ges
@@ -586,6 +587,15 @@ identifiable, and the parent sets of the treatment that its edges allow, one est
 is not. The graph holds only the edges at the two variables, and `metadata["blankets_learned"]`
 lists the variables whose blanket it learned, in order. The [0.18.0](benchmarks/0.18.0.md#load)
 release card measures it against the authors' code.
+
+LocPC-CDE (Loranchet and Assaad 2026), {py:func}`~andrey.locpc_cde`, answers for one `treatment` and
+`outcome`: it learns the graph around the outcome one hop at a time with PC's tests, run only near
+the outcome, until every edge at the outcome is oriented, so that the outcome's parents are a valid
+adjustment set for the controlled direct effect, or until a larger hop adds no variable. It stops at
+once when the treatment is not adjacent to the outcome or is its child. `metadata["effects"]` holds
+the answer with the paper's reason, the graph is the local essential graph it learned, and
+`metadata["hop"]`, `metadata["visited"]`, and `metadata["double_bar"]` describe the search. The
+[0.18.0](benchmarks/0.18.0.md#locpc-cde) release card measures it against the authors' code.
 
 CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
 smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
@@ -803,7 +813,6 @@ in a process.
    mmmb
    ldp
    ld3
-   locpc_cde
 ```
 
 DAGMA (Bello et al. 2022) is a continuous-optimization learner in the line of NOTEARS: it fits a
@@ -828,15 +837,6 @@ columns: it finds the parents of the outcome and whether the treatment is one of
 structural direct criterion), with the other parents as the adjustment set for the direct effect, in
 `metadata["effects"]`. Its graph holds the edges into the outcome, and `metadata["partition"]` the
 labels. It is experimental until its comparison with the authors' code is published.
-
-LocPC-CDE (Loranchet and Assaad 2026) answers for one `treatment` and `outcome`: it learns the graph
-around the outcome one hop at a time with PC's tests, run only near the outcome, until every edge at
-the outcome is oriented, so that the outcome's parents are a valid adjustment set for the controlled
-direct effect, or until a larger hop adds no variable. It stops at once when the treatment is not
-adjacent to the outcome or is its child. `metadata["effects"]` holds the answer with the paper's
-reason, the graph is the local essential graph it learned, and `metadata["hop"]`,
-`metadata["visited"]`, and `metadata["double_bar"]` describe the search. It is experimental until
-its comparison with the authors' code is published.
 
 A method becomes supported once it has:
 

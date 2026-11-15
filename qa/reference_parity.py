@@ -36,8 +36,11 @@ summary's ``parity_rule`` sets how its rows are judged:
   (the mean absolute error, on a fresh sample, of the effects estimated with the answer's
   adjustment sets), ``"family_error"`` (1 when the answer's parent sets are not the family the true
   CPDAG allows, else 0), ``"recall_loss"`` (1 when the treatment's true parents are not among
-  them), or ``"hausdorff_mse"`` (the squared Hausdorff distance of the estimated effects from the
-  effects the family gives in the population, in standard deviations). A row's means are
+  them), ``"hausdorff_mse"`` (the squared Hausdorff distance of the estimated effects from the
+  effects the family gives in the population, in standard deviations), ``"verdict_error"`` (1 when
+  the answer's ``identifiable`` is not the truth's, an undecided answer included), or
+  ``"parents_error"`` (1 unless the answer is identifiable with the outcome's true parents other
+  than the treatment as its set). A row's means are
   ``andrey_<metric>_mean`` and ``comparator_<metric>_mean``, or the ``*_shd_mean`` fields, which
   then hold that error's means. A method with a gated metric beside SHD has one entry per metric,
   and a row's key names the ``metric``.
@@ -128,6 +131,8 @@ METRICS: dict[str, str] = {
     "family_error": "parent-set family error",
     "recall_loss": "parent-set recall loss",
     "hausdorff_mse": "effect-set Hausdorff MSE",
+    "verdict_error": "identifiability verdict error",
+    "parents_error": "outcome-parents error",
     "edge_distance": "edge distance",
     "edge_f1_loss": "edge F1 loss",
     "claim_error": "claim errors",
