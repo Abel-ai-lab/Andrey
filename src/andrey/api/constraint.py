@@ -965,7 +965,7 @@ def fci_hybrid(
     assert score_func is not None and indep_test is not None  # method_spec picks them
     # Both phases read the same data, so the score and the test must agree on its type.
     check_same_data(name, score_func, indep_test)
-    check_rank_env(name, score_func, env)
+    check_rank_env(name, score_func, env, indep_test)
     data, index = env_index(data, env, method=name)
     X, mask, labels, constraints = fit_inputs(
         data,
@@ -1086,16 +1086,16 @@ def gfci(
     indep_test : str or None, default=None
         Conditional-independence test for the FCI phase. ``"fisherz"`` (Fisher's z) and
         ``"student_t"`` (Student-t) test partial correlation, for continuous data, and
-        ``"normal_scores"`` does so on each column's normal scores. ``"chisq"``
-        (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data,
-        coded by whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. ``"kci"``,
-        ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` also detect nonlinear dependence in continuous
-        data, at a far higher cost per test. Each as for :func:`~andrey.pc`. ``None`` picks from the
-        declared column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when
-        some are, else ``"fisherz"``. A column is declared categorical by ``categorical`` or by a
-        DataFrame's ``category``, ``bool``, or text type, never by its values.
-        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
-        declared column types when this is ``None``.
+        ``"normal_scores"`` does so on each column's normal scores and takes no ``env``, as its
+        ranks over every environment's rows would mix their distributions. ``"chisq"`` (Pearson's
+        chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by
+        whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. ``"kci"``, ``"rcot"``,
+        ``"cmiknn"``, and ``"gpdc"`` also detect nonlinear dependence in continuous data, at a far
+        higher cost per test. Each as for :func:`~andrey.pc`. ``None`` picks from the declared
+        column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are,
+        else ``"fisherz"``. A column is declared categorical by ``categorical`` or by a DataFrame's
+        ``category``, ``bool``, or text type, never by its values. ``metadata["indep_test"]`` names
+        the test the fit used: the one picked from the declared column types when this is ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
@@ -1470,17 +1470,17 @@ def cdnod(
         sparser graphs.
     indep_test : str or None, default=None
         Conditional-independence test. ``"fisherz"`` (Fisher's z) and ``"student_t"`` (Student-t)
-        test partial correlation, for continuous data, and ``"normal_scores"`` does so on each
-        column's normal scores. ``"chisq"`` (Pearson's chi-square) and
+        test partial correlation, for continuous data. ``"chisq"`` (Pearson's chi-square) and
         ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by whole numbers,
         and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. ``"kci"``, ``"rcot"``, ``"cmiknn"``,
         and ``"gpdc"`` also detect nonlinear dependence in continuous data, at a far higher cost per
-        test. Each as for :func:`~andrey.pc`; see Notes for the index. ``None`` picks from the
-        declared column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when
-        some are, else ``"fisherz"``. A column is declared categorical by ``categorical`` or by a
-        DataFrame's ``category``, ``bool``, or text type, never by its values.
-        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
-        declared column types when this is ``None``.
+        test. Each as for :func:`~andrey.pc`; see Notes for the index. ``"normal_scores"`` is not
+        offered: the tests read every environment's rows, and ranked over them, a column's normal
+        scores mix the environments' distributions. ``None`` picks from the declared column types:
+        ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are, else
+        ``"fisherz"``. A column is declared categorical by ``categorical`` or by a DataFrame's
+        ``category``, ``bool``, or text type, never by its values. ``metadata["indep_test"]`` names
+        the test the fit used: the one picked from the declared column types when this is ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
@@ -1567,18 +1567,18 @@ def cdnod(
         changes across the environments, under CD-NOD's assumption that the index is only a cause
         and no hidden common cause varies apart from it [1]_. Their descendants change in
         distribution too, through them, and are not listed. Both are empty for a single environment.
-        With ``"fisherz"``, ``"student_t"``, or ``"normal_scores"``, only a change in a variable's
-        mean that follows the index's values is found. Under a mixed-data setting,
-        ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
-        position. With ``collider_rule`` ``"conservative"`` or ``"majority"``,
-        ``metadata["ambiguous_triples"]`` lists every unshielded triple no rule reads as a collider
-        or a non-collider, as ``[x, z, y]``: 0-based column positions, the middle node second and
-        ``x < y``, in ascending order; the index, in a triple through it, is numbered
-        ``n_variables``. ``metadata["conflicts"]`` lists the edges between variables that two
-        colliders ask to orient both ways, as ``[x, y]`` pairs of 0-based column positions with
-        ``x < y``, in ascending order, decided as in :func:`~andrey.pc`. With a randomized
-        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["tie_break"]`` is the
-        tie-break rule the fit ran under, ``andrey.config.tie_break``.
+        With ``"fisherz"`` or ``"student_t"``, only a change in a variable's mean that follows the
+        index's values is found. Under a mixed-data setting, ``metadata["categorical"]`` lists the
+        categorical columns it read, by name or 0-based position. With ``collider_rule``
+        ``"conservative"`` or ``"majority"``, ``metadata["ambiguous_triples"]`` lists every
+        unshielded triple no rule reads as a collider or a non-collider, as ``[x, z, y]``: 0-based
+        column positions, the middle node second and ``x < y``, in ascending order; the index, in a
+        triple through it, is numbered ``n_variables``. ``metadata["conflicts"]`` lists the edges
+        between variables that two colliders ask to orient both ways, as ``[x, y]`` pairs of 0-based
+        column positions with ``x < y``, in ascending order, decided as in :func:`~andrey.pc`. With
+        a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -1634,12 +1634,12 @@ def cdnod(
     environment, not which variables changed in it; when every environment's intervened variables
     are known, :func:`~andrey.gies` uses them.
 
-    ``"fisherz"``, ``"student_t"``, and ``"normal_scores"`` test the index as a number, by linear
-    correlation, so they find a change in a variable's mean that follows the index's values. With
-    two domains the coding does not matter. With three domains coded ``0, 1, 2``, a shift in domain
-    ``1`` alone can go undetected, and recoding the domains can change the result. A change in a
-    variable's noise variance alone, or in the size of an effect whose cause has mean zero, leaves
-    the mean unchanged, so the index keeps no edge to that variable. ``"kci"``, the kernel
+    ``"fisherz"`` and ``"student_t"`` test the index as a number, by linear correlation, so they
+    find a change in a variable's mean that follows the index's values. With two domains the coding
+    does not matter. With three domains coded ``0, 1, 2``, a shift in domain ``1`` alone can go
+    undetected, and recoding the domains can change the result. A change in a variable's noise
+    variance alone, or in the size of an effect whose cause has mean zero, leaves the mean
+    unchanged, so the index keeps no edge to that variable. ``"kci"``, the kernel
     conditional-independence test the paper uses [1]_ [2]_, detects such changes, at a far higher
     cost per test. ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, and ``"cond_gauss"`` take each index
     value as a category, so they find a shift in any domain, whatever the coding. With
@@ -1872,18 +1872,18 @@ def fci_jci(
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     indep_test : str or None, default=None
         Conditional-independence test. ``"fisherz"`` (Fisher's z) and ``"student_t"`` (Student-t)
-        test partial correlation, for continuous data, and ``"normal_scores"`` does so on each
-        column's normal scores. ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the
-        likelihood ratio) test categorical data, coded by whole numbers, and ``"degen_gauss"`` and
-        ``"cond_gauss"`` mixed data. ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` also
-        detect nonlinear dependence in continuous data, at a far higher cost per test. Each as for
-        :func:`~andrey.fci`. The index is one more column of the data it tests: the continuous
-        tests read it as a number, and the categorical and mixed-data tests as a category; see
-        Notes. ``None`` picks from the declared column types: ``"gsq"`` when every column is
-        categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared
-        categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type,
-        never by its values. ``metadata["indep_test"]`` names the test the fit used: the one picked
-        from the declared column types when this is ``None``.
+        test partial correlation, for continuous data. ``"chisq"`` (Pearson's chi-square) and
+        ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by whole numbers,
+        and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. ``"kci"``, ``"rcot"``, ``"cmiknn"``,
+        and ``"gpdc"`` also detect nonlinear dependence in continuous data, at a far higher cost per
+        test. Each as for :func:`~andrey.fci`. The index is one more column of the data it tests:
+        the continuous tests read it as a number, and the categorical and mixed-data tests as a
+        category; see Notes. ``"normal_scores"`` is not offered: ranked over every domain's rows, a
+        column's normal scores mix the domains' distributions. ``None`` picks from the declared
+        column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are,
+        else ``"fisherz"``. A column is declared categorical by ``categorical`` or by a DataFrame's
+        ``category``, ``bool``, or text type, never by its values. ``metadata["indep_test"]`` names
+        the test the fit used: the one picked from the declared column types when this is ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
@@ -2033,8 +2033,8 @@ def fci_jci(
     change in distribution too, through them, and are not listed. An edge ``index -> x`` alone does
     not make ``x`` a direct target of the change; Mooij et al. give the condition that does [1]_.
 
-    ``"fisherz"``, ``"student_t"``, and ``"normal_scores"`` test the index as a number, by linear
-    correlation, so they find a change in a variable's mean that follows the index's values, as for
+    ``"fisherz"`` and ``"student_t"`` test the index as a number, by linear correlation, so they
+    find a change in a variable's mean that follows the index's values, as for
     :func:`~andrey.cdnod`: with three or more domains coded ``0, 1, 2``, a shift in domain ``1``
     alone can go undetected. ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, and ``"cond_gauss"`` take
     each index value as a category, so they find a shift in any domain, whatever the coding. A
@@ -2063,19 +2063,19 @@ def fci_jci(
     domains that change different variables share one index; with 2 or 10 context variables merged
     into one index numbered by domain, its errors were still below the empty graph's on every
     dataset. Its possible-d-separation step tests subsets of each set, so its cost grows fast with
-    the number of variables. ``"fisherz"``, ``"student_t"``, and ``"normal_scores"`` can miss a
-    shift in a middle domain of three or more, as above. Missing values are not benchmarked yet; the
-    tests run them on up to 20 variables with up to a fifth of the values missing completely at
-    random. With true ``required_paths``, ``forbidden_paths``, or ``confounded`` claims on 10 or 30%
-    of the pairs of simulated linear-Gaussian data from two domains with hidden common causes (10 or
-    20 variables, 500 or 2,000 rows per domain), its result had no more wrong marks than without
-    them in any setting, and fewer with required paths in every one. The fits dropped 9.8% of the
-    required paths and 0.4% of the forbidden paths as claims their graph could not meet, and no
-    confounded pair. No reference implementation takes these claims with a domain index, so they
-    were compared with the same fit without them. A required path says less than a required edge and
-    directs less: it cannot restore an edge the search left out. A known edge belongs in
-    ``required``. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    the number of variables. ``"fisherz"`` and ``"student_t"`` can miss a shift in a middle domain
+    of three or more, as above. Missing values are not benchmarked yet; the tests run them on up to
+    20 variables with up to a fifth of the values missing completely at random. With true
+    ``required_paths``, ``forbidden_paths``, or ``confounded`` claims on 10 or 30% of the pairs of
+    simulated linear-Gaussian data from two domains with hidden common causes (10 or 20 variables,
+    500 or 2,000 rows per domain), its result had no more wrong marks than without them in any
+    setting, and fewer with required paths in every one. The fits dropped 9.8% of the required paths
+    and 0.4% of the forbidden paths as claims their graph could not meet, and no confounded pair. No
+    reference implementation takes these claims with a domain index, so they were compared with the
+    same fit without them. A required path says less than a required edge and directs less: it
+    cannot restore an edge the search left out. A known edge belongs in ``required``. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------

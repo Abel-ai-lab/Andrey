@@ -51,6 +51,7 @@ whose Reproduce table lists the driver.
 | [Edges and directions at a target](comparisons/target-edges.md) | `direct_cpu.py`, `direct_summary.py` | CMB and MB-by-MB, at every target; PC read at the target | bnlearn (PC-stable read at the target); for CMB and MB-by-MB, which have no implementation, the published results of their papers | 0.18.0 |
 | [GS, Fast-IAMB, and HITON-PC](comparisons/gs-fast-iamb-hiton-pc.md) | `blanket_cpu.py`, `blanket_summary.py` | GS, Fast-IAMB, HITON-PC; IAMB, Inter-IAMB, MMPC, HITON-PC at `max_depth=3` and without its rows-per-cell rule as context | bnlearn (GS, Fast-IAMB, SI-HITON-PC), with `mi-adf` and plain `mi` | 0.18.0 |
 | [HITON-MB](comparisons/hiton-mb.md) | `blanket_cpu.py`, `blanket_summary.py` | HITON-MB; MMMB at `max_depth=3`, IAMB, Inter-IAMB, GS, PCMB, and HITON-MB with `degrees_of_freedom="nonempty"` as context | the authors' Causal Explorer 1.5 (HITON-MB), MATLAB | 0.18.0 |
+| [MMMB](comparisons/mmmb.md) | `blanket_cpu.py`, `blanket_summary.py` | MMMB; IAMB, Inter-IAMB, GS, PCMB, and MMMB with `degrees_of_freedom="mean"` as context | the authors' Causal Explorer 1.5 (MMMB), MATLAB | 0.18.0 |
 | [Missing data](comparisons/missing-data.md) | `missing_cpu.py` | PC with MVPC; GES, XGES, BOSS, GRaSP, hill climbing, Tabu search, exact search, NOTEARS, DAGMA, and CALM with structural EM; test-wise PC, listwise deletion, and mean imputation | the MVPC authors' R code, MissDAG, bnlearn's `structural.em`, Tetrad's EM covariance policy | 0.16.0, 0.17.0 |
 | [Path and confounder claims](comparisons/knowledge-paths.md) | `knowledge_paths.py` | The 22 methods that honor them, from PC to multi-group DirectLiNGAM, with `required_paths`, `forbidden_paths`, and `confounded`, against the same fit without them | enumeration of every small graph; Tetrad, pcalg, tigramite, lingam, bnlearn, and causal-learn given the same knowledge | |
 | [Mixed data](comparisons/mixed.md) | `mixed_cpu.py` | PC, GES, hill climbing | Tetrad, bnlearn | 0.6.0 |
@@ -130,7 +131,9 @@ answer and the floors. It draws GS's, Fast-IAMB's, and HITON-PC's rows from
 three methods with bnlearn, which their [comparison page](comparisons/gs-fast-iamb-hiton-pc.md)
 presents, with the fresh seeds, the floors, and the context comparisons. HITON-MB's rows come from
 [`published/0.18.0/hiton-mb.json`](published/0.18.0/hiton-mb.json), against its authors' Causal
-Explorer, which its [comparison page](comparisons/hiton-mb.md) presents the same way.
+Explorer, which its [comparison page](comparisons/hiton-mb.md) presents the same way, and MMMB's
+from [`published/0.18.0/mmmb.json`](published/0.18.0/mmmb.json), which its [comparison
+page](comparisons/mmmb.md) presents.
 
 | Release | Release card | Summary |
 |---|---|---|

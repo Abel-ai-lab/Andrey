@@ -57,14 +57,19 @@ names its pull request.
   code keeps. On hailfinder at 200 and 500 rows its sets have more errors than the empty set.
   ([#957], [#1025])
 - `andrey.mmmb`, the MMMB Markov blanket learner (Tsamardinos, Aliferis, and Statnikov 2003) in its
-  authors' corrected form, experimental, with the arguments and metadata of `iamb` and the target's
-  parents and children in `metadata["parents_and_children"]`. It runs `mmpc`, with its symmetry
-  check (Tsamardinos, Brown, and Aliferis 2006), for the target and for each of its parents and
-  children, then admits a variable as a spouse when a test finds it dependent on the target given
-  the set that separated the two and a parent or child of the target whose own set holds the
-  variable (Aliferis et al. 2010). Its G-square test counts the degrees of freedom of Spirtes et
-  al. by default (`degrees_of_freedom="nonempty"`), as its paper's tests do. The set-learner
-  benchmark lane runs it beside the authors' MMMB. ([#965], [#1025])
+  authors' corrected form, with the arguments and metadata of `iamb` and the target's parents and
+  children in `metadata["parents_and_children"]`. It runs `mmpc`, with its symmetry check
+  (Tsamardinos, Brown, and Aliferis 2006), for the target and for each of its parents and children,
+  then admits a variable as a spouse when a test finds it dependent on the target given the set that
+  separated the two and a parent or child of the target whose own set holds the variable (Aliferis
+  et al. 2010). Its G-square test counts the degrees of freedom of Spirtes et al. by default
+  (`degrees_of_freedom="nonempty"`), as its paper's tests do. It is supported: against the authors'
+  MMMB on alarm, hailfinder, insurance, win95pts, and pigs at its paper's sizes, its sets were
+  closer to the true ones in 8 of 21 settings, as close in 3, and further in 10, on hailfinder from
+  500 rows, insurance at 5,000, and win95pts at every size, where its symmetry check, its reading of
+  a test with no degrees of freedom, and its spouses' separating sets differ from the authors' code,
+  which on hailfinder at 5,000 rows also runs a test only with at least five rows per cell. In every
+  setting its sets had fewer errors than the authors' code's. ([#965], [#1025], [#1038])
 - `andrey.pcmb`, the PCMB Markov blanket learner (Peña, Nilsson, Björkegren, and Tegnér 2007),
   supported, with the arguments and metadata of `iamb`, `alpha=0.01` by default, the paper's
   level, and the target's parents and children in `metadata["parents_and_children"]`. Its own
@@ -283,9 +288,24 @@ names its pull request.
   ([#1029])
 - The treatment-outcome benchmark lane counts the conditional-independence tests of its PC arm, PC
   read at the pair, so its cost sits beside the methods'. ([#1031])
+- The documentation of `register_indep_test` and `DSepOracle` states that a registered test's
+  indices are column positions of the matrix its factory receives, and that the
+  possible-d-separation step of `fci`, `fci_jci`, and `gfci` builds its test again over the columns
+  in rank order: a test that does not read its matrix, such as an oracle by d-separation, finds
+  which variable each column holds, and `possible_dsep="fast"` keeps the data's order. The
+  environment settings and the configuration page no longer list `fci_jci` with `normal_scores`
+  among the parallel possible-d-separation searches; it does not offer that test. ([#1040])
 
 ### Fixed
 
+- `indep_test="normal_scores"` takes data from one environment. It ranks each column over every
+  row its test reads, so over several environments a column mixed their distributions: on two
+  simulated environments a true independence given the environment index was rejected in up to 95%
+  of runs at level 0.05, and the invariance tests of `igsp` and `ut_igsp` reported a change where
+  none occurred in up to all runs. `cdnod`, `fci_jci`, `igsp`, `ut_igsp`, and `jpcmciplus` no longer
+  offer it; `gfci`, `boss_fci`, and `grasp_fci` raise a `ValueError` for it with an `env`, as for
+  `score_func="normal_scores"`; and the error for a choice a method does not offer says why.
+  ([#1037])
 - The treatment-outcome benchmark lane scores the effect error of the pair asked. For a method that
   answers both directions of a pair, the summary reads the record for the treatment and the outcome
   asked, not the last record of the fit, and a record that says the effect is zero estimates 0
@@ -2871,6 +2891,9 @@ First alpha release.
 [#1000]: https://github.com/Abel-ai-lab/Andrey/pull/1000
 [#986]: https://github.com/Abel-ai-lab/Andrey/pull/986
 [#1032]: https://github.com/Abel-ai-lab/Andrey/pull/1032
+[#1037]: https://github.com/Abel-ai-lab/Andrey/pull/1037
+[#1038]: https://github.com/Abel-ai-lab/Andrey/pull/1038
+[#1040]: https://github.com/Abel-ai-lab/Andrey/pull/1040
 [#995]: https://github.com/Abel-ai-lab/Andrey/pull/995
 [#991]: https://github.com/Abel-ai-lab/Andrey/pull/991
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982

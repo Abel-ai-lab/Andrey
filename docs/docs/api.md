@@ -200,8 +200,8 @@ errors, and `forbidden_paths` is experimental in `iamb`, `inter_iamb`, and `mmpc
 found at 50 variables often has no consistent extension: a claim there acts only on an edge, the
 fits we measured dropped about 96% of the forbidden paths on such a graph, and with forbidden paths
 alone the CPDAG was 0.65 to 1.95 edges farther from the class the claims define. Both are
-experimental in `gs`, `fast_iamb`, `hiton_pc`, `hiton_mb`, and `pcmb`, which that measurement
-did not cover, and in an experimental method, such as `mmmb`. An experimental part warns with
+experimental in `gs`, `fast_iamb`, `hiton_pc`, `hiton_mb`, `mmmb`, and `pcmb`, which that
+measurement did not cover, and in an experimental method. An experimental part warns with
 {py:class}`~andrey.ExperimentalWarning`, and its meaning may change without deprecation. A
 CPDAG method reads the claims on the graph it found, so where that graph is wrong, a true claim can
 direct an edge the wrong way, and a required path cannot restore an edge the search left out. A path
@@ -460,6 +460,7 @@ variable.
    mmpc
    hiton_pc
    hiton_mb
+   mmmb
    pcmb
    mb_by_mb
    y_structures
@@ -810,7 +811,6 @@ in a process.
    :nosignatures:
 
    dagma
-   mmmb
    ldp
    ld3
 ```
@@ -864,6 +864,14 @@ A method becomes supported once it has:
 | `"cmiknn"` | Nearest-neighbor conditional mutual information, with a local permutation null | Supported |
 | `"gpdc"` | Gaussian-process regression, then a distance-correlation test of the residuals | Supported |
 
+`normal_scores` ranks each column over every row its test reads, and its model is one distribution.
+Ranked over the rows of several environments, a column mixes their distributions, and its scores
+are no longer Gaussian. So `cdnod`, `fci_jci`, `igsp`, `ut_igsp`, and `jpcmciplus`, whose tests
+always read several environments, do not offer it, and `gfci`, `boss_fci`, and `grasp_fci` raise a
+`ValueError` for it with an `env`, as they do for `score_func="normal_scores"`. Scores ranked within
+each environment would not help: they center and scale every column in each environment, so no
+variable would depend on the environment.
+
 The nonlinear tests, the last four, detect nonlinear dependence that partial correlation misses,
 at a far higher cost per test. They are benchmarked and checked in the release quality gate. Inside
 the search, KCI uses every BLAS thread from 2,000 rows and the other tests use one. On every thread,
@@ -889,6 +897,34 @@ andrey.pc(data, indep_test="cmiknn_k5")
 
 {py:meth}`CMIknn.statistic <andrey.core.ci_cmiknn.CMIknn.statistic>` returns the conditional
 mutual information estimate the test's p-value is built on, a dependence measure of its own.
+
+Every index a registered test is queried with is a column position of the matrix its factory
+received, and a search can ask the factory again for the same columns in another order: by default
+the possible-d-separation step of FCI, FCI-JCI, and GFCI builds its test over the columns sorted by
+their ranks (`possible_dsep="order_free"`). A test computed from its matrix, as every shipped test
+is, needs nothing more. A test that does not read its matrix, such as an oracle that answers by
+d-separation in a known graph (`andrey.data.latent.DSepOracle`), must find which variable each
+column of the matrix it receives holds:
+
+```python
+import numpy as np
+
+import andrey
+from andrey.core.ci import register_indep_test
+from andrey.data.latent import DSepOracle
+
+# `dag` is a networkx DiGraph over the column numbers of `data`, plus any hidden nodes.
+def factory(columns):
+    nodes = [
+        next(j for j in range(data.shape[1]) if np.array_equal(c, data[:, j])) for c in columns.T
+    ]
+    return DSepOracle(dag, nodes=nodes)
+
+register_indep_test("dsep", factory)
+andrey.fci(data, indep_test="dsep")  # the PAG of the observed columns
+```
+
+With `possible_dsep="fast"` the step keeps the columns in data order.
 
 On data with a `NaN`, {py:func}`~andrey.core.ci.make_indep_test` returns a
 {py:class}`~andrey.core.ci_missing.TestwiseDeletion` of the test: each query reads the rows observed
