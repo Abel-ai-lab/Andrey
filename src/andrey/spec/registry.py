@@ -2464,7 +2464,7 @@ _add(
             "stable ones first",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         order_note=(
             "The sparse ICA rounds differently under a new column order, which can move an entry "

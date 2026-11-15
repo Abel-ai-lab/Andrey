@@ -47,9 +47,9 @@ whose answer differs from the first fit, with the parts that differ, exiting 1 i
 
 - `--shuffle K` refits on `K` seeded column orders and maps each answer back to the original
   columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out. ICP,
-  IGSP, FCI-JCI, J-PCMCI+, CMB, and MMB-by-MMB are not refit: their data hold each row's
-  environment in one column, the target of ICP, CMB, and MMB-by-MMB is the last variable, and
-  J-PCMCI+'s contexts follow the system variables.
+  IGSP, FCI-JCI, J-PCMCI+, CMB, MMB-by-MMB, and local ISA-LiNG are not refit: their data hold each
+  row's environment in one column, the target of ICP, CMB, MMB-by-MMB, and local ISA-LiNG is the
+  last variable, and J-PCMCI+'s contexts follow the system variables.
 - `--workers N` refits PC, FCI, FCI-JCI, GFCI, CD-NOD, RSMAX2 (with PC's skeleton), GES, and PNL
   on `N` workers, with every GES pass, every skeleton pass of conditioning size two or more, and
   every possible-d-sep search sent to the worker pool.
@@ -158,7 +158,7 @@ fails, or no such run, runs the gate.
 The gate checks PC, FCI, GFCI, CD-NOD, FCI-JCI, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, HITON-PC,
 HITON-MB, PCMB, Y-structures, CMB, GES, GIES, GnIES, IGSP, ICP, XGES, AGES, HC, Tabu, MMHC,
 RSMAX2, exact search, CALM, NOTEARS, BOSS, GRaSP, BOSS-FCI, GRaSP-FCI, MMB-by-MMB, UT-IGSP,
-DirectLiNGAM, ICA-LiNGAM,
+DirectLiNGAM, ICA-LiNGAM, local ISA-LiNG,
 MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, SCORE, NoGAM, CAM-UV, GIN, ANM, PNL, LOCI, PCMCI,
 PCMCI+, LPCMCI, J-PCMCI+, VARMA-LiNGAM, LongitudinalLiNGAM, Granger, and DYNOTEARS on the datasets
 whose assumptions each method needs, PC with each supported nonlinear conditional-independence test,
@@ -181,7 +181,7 @@ KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 | `fci_jci_s4`, `fci_jci_l10`: 4 and 10 variables, two regimes of `n = 500` | 10 seeds each | FCI-JCI |
 | `multi_group_er` at `d = 10, 20`, three groups of `n = 1000` | 10 seeds each | MultiGroupDirectLiNGAM |
 | `latent_measurement` at `d = 8, 12`, `n = 1000` | 10 seeds each | GIN |
-| `lingam_sf` at `d = 20, 50` | 10 seeds each | DirectLiNGAM, ICA-LiNGAM |
+| `lingam_sf` at `d = 20, 50` | 10 seeds each | DirectLiNGAM, ICA-LiNGAM; local ISA-LiNG at the last column |
 | `latent_lingam_er` at `d = 10, 15` | 10 seeds each | RCD, BottomUpParceLiNGAM |
 | `score_paper_standardized` at `d = 10` with `d` edges and at `d = 20` with `4 d`, `n = 1000` | 10 seeds each | SCORE |
 | `score_paper_laplace_standardized` at `d = 10` with `d` edges, `score_paper_gumbel_standardized` at `d = 10` with `4 d`, `n = 1000` | 10 seeds each | NoGAM |
@@ -198,7 +198,7 @@ KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 | `var2_lagged` at `d = 5`, `n = 1000, 2000` | 10 seeds each | Granger |
 | `dynotears_paper` at `d = 10, 20`, `n = 500` | 10 seeds each | DYNOTEARS |
 | ASIA, linear-Gaussian | 10 seeds | PC, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, HITON-PC, HITON-MB, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, CALM, FCI, GFCI, BOSS-FCI, GRaSP-FCI; Y-structures; CMB and MMB-by-MMB at the last column |
-| ASIA, linear with uniform noise | 10 seeds | DirectLiNGAM, ICA-LiNGAM |
+| ASIA, linear with uniform noise | 10 seeds | DirectLiNGAM, ICA-LiNGAM; local ISA-LiNG at the last column |
 | Sachs, measured | 1 | PC, FCI, GFCI, BOSS-FCI, GRaSP-FCI, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, HITON-PC, HITON-MB, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, DirectLiNGAM, ICA-LiNGAM |
 
 - **Regimes.** `andrey.data` generates the published benchmark regimes with the benchmarks'
@@ -341,6 +341,10 @@ missing, extra, and mismarked edges there against the truth's CPDAG.
 MMB-by-MMB answers the last column too and counts the same edges there against the PAG: the
 true edges the answer lacks, the answer's edges the PAG lacks, and the edges in both with a mark
 that differs. The empty answer makes as many errors as the target has edges.
+Local ISA-LiNG answers the last column and counts the errors in its local structure, the edges into
+and out of it and into each of its children, against the DAG's: an adjacency in one local structure
+and not the other counts one, and so does a reversed edge. The empty answer makes as many errors as
+the true local structure has edges.
 Y-structures claim ancestral pairs, so their errors are the false claims plus the true ancestral
 pairs not claimed, against the empty answer's, the number of true pairs.
 GIES is scored against the interventional essential graph of the true DAG under the rows' targets,
