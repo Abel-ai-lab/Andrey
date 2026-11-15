@@ -351,6 +351,204 @@
       "cause": "trade-off",
       "reason": "Andrey's hiton_mb runs the symmetry check of the paper's definition of semi-interleaved HITON-MB: a variable stays among the target's parents and children only when the target is among the variable's, and a spouse is sought only through such a member. The toolbox's HITON_MB keeps each run's set as it is, the form the paper's experiments evaluate. With the same G-square tests and the check left out, a trace gives the toolbox's distance and F1 within the interval in both settings (ties on seeds 0-19), and the check raises the precision (0.96 against 0.89 without it) at a larger cost in recall (0.68 against 0.76). On hailfinder, pairs of variables are copies of each other in the data, so a test given one of a pair finds the other independent of the pair's children, and the check then drops that variable from each child's set. Andrey's errors, missing plus extra members, stay below the toolbox's in both settings.",
       "citation": "Aliferis, C. F., Statnikov, A., Tsamardinos, I., Mani, S., and Koutsoukos, X. D. (2010). Local causal and Markov blanket induction for causal discovery and feature selection for classification part I. JMLR 11, 171-234: p. 198, Fig. 10 (semi-interleaved HITON-MB with symmetry correction), and p. 202 (the algorithms run without symmetry correction unless it is mentioned). Causal Explorer 1.5: HITON_MB, the target's set from its own runs."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "MMMB",
+      "comparator": "Causal Explorer 1.5 MMMB",
+      "row": {"metric": "set_distance", "d": 56, "n": 500},
+      "andrey_errors": 0.6752,
+      "comparator_errors": 0.6547,
+      "cause": "correct-by-paper",
+      "reason": "Andrey's mmmb runs MMPC with the symmetry check that its authors added to it: a variable stays among the target's parents and children only when the target is among the variable's, and a spouse is sought only through such a member. The toolbox's MMMB keeps each MMPC run's set as it is, the form of the 2003 paper. With the same G-square tests and the check left out, a trace is no worse than the toolbox on distance or F1 in this setting (seeds 0-19), and the check raises the precision (0.84 against 0.65 without it) at a cost in recall (0.39 against 0.59). Andrey's errors, missing plus extra members, stay below the toolbox's.",
+      "citation": "Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian network structure learning algorithm. Machine Learning 65, 31-78 (MMPC with the symmetry check). Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Time and sample efficient discovery of Markov blankets and direct causal relations. KDD, 673-678 (MMMB). Causal Explorer 1.5: MMMB, without the check."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "MMMB",
+      "comparator": "Causal Explorer 1.5 MMMB",
+      "row": {"metric": "set_distance", "d": 56, "n": 700},
+      "andrey_errors": 0.6631,
+      "comparator_errors": 0.6181,
+      "cause": "correct-by-paper",
+      "reason": "Andrey's mmmb runs MMPC with the symmetry check that its authors added to it: a variable stays among the target's parents and children only when the target is among the variable's, and a spouse is sought only through such a member. The toolbox's MMMB keeps each MMPC run's set as it is, the form of the 2003 paper. With the same G-square tests and the check left out, a trace is no worse than the toolbox on distance or F1 in this setting (seeds 0-19), and the check raises the precision (0.85 against 0.67 without it) at a cost in recall (0.39 against 0.59). Andrey's errors, missing plus extra members, stay below the toolbox's.",
+      "citation": "Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian network structure learning algorithm. Machine Learning 65, 31-78 (MMPC with the symmetry check). Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Time and sample efficient discovery of Markov blankets and direct causal relations. KDD, 673-678 (MMMB). Causal Explorer 1.5: MMMB, without the check."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "MMMB",
+      "comparator": "Causal Explorer 1.5 MMMB",
+      "row": {"metric": "set_distance", "d": 56, "n": 1000},
+      "andrey_errors": 0.6524,
+      "comparator_errors": 0.5788,
+      "cause": "correct-by-paper",
+      "reason": "Andrey's mmmb runs MMPC with the symmetry check that its authors added to it: a variable stays among the target's parents and children only when the target is among the variable's, and a spouse is sought only through such a member. The toolbox's MMMB keeps each MMPC run's set as it is, the form of the 2003 paper. With the same G-square tests and the check left out, a trace is no worse than the toolbox on distance or F1 in this setting (seeds 0-19), and the check raises the precision (0.84 against 0.67 without it) at a cost in recall (0.40 against 0.61). Andrey's errors, missing plus extra members, stay below the toolbox's.",
+      "citation": "Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian network structure learning algorithm. Machine Learning 65, 31-78 (MMPC with the symmetry check). Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Time and sample efficient discovery of Markov blankets and direct causal relations. KDD, 673-678 (MMMB). Causal Explorer 1.5: MMMB, without the check."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "MMMB",
+      "comparator": "Causal Explorer 1.5 MMMB",
+      "row": {"metric": "set_distance", "d": 56, "n": 5000},
+      "andrey_errors": 0.6062,
+      "comparator_errors": 0.5165,
+      "cause": "trade-off",
+      "reason": "Three choices of the toolbox's MMMB account for the gap, traced by replaying the toolbox's logged tests with Andrey's G-square, which gives the same p-values: it runs no symmetry check, which the authors added to MMPC and Andrey runs; where two columns are copies of each other in the data, a test given one of them has no degrees of freedom, and the toolbox returns no p-value and never separates there, while Andrey reads the test as independence, which holds in the data and on which the paper is silent; and for a candidate spouse it searches afresh for a separating set, the first subset of the target's parents and children with a p-value above alpha, while Andrey takes the set MMPC recorded (any separating set satisfies the paper). With the three set the toolbox's way the sets are still further than the toolbox's here; adding a fourth, a test run only with at least five rows per cell of its table, the toolbox's form of the rule of the 2003 paper's experiments, makes them equal the toolbox's on every target of 14 datasets. Andrey runs every test. Its errors, missing plus extra members, are 2.13 per target here; with all four choices set the toolbox's way they are 6.92, the toolbox's level (4.12 with the first three).",
+      "citation": "Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian network structure learning algorithm. Machine Learning 65, 31-78 (MMPC with the symmetry check). Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Time and sample efficient discovery of Markov blankets and direct causal relations. KDD, 673-678 (MMMB). Causal Explorer 1.5: MMMB, without the check. Aliferis, C. F., Statnikov, A., Tsamardinos, I., Mani, S., and Koutsoukos, X. D. (2010). Local causal and Markov blanket induction for causal discovery and feature selection for classification part I. JMLR 11, 171-234 (the spouse step's separating set)."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "MMMB",
+      "comparator": "Causal Explorer 1.5 MMMB",
+      "row": {"metric": "set_distance", "d": 76, "n": 500},
+      "andrey_errors": 0.7348,
+      "comparator_errors": 0.697,
+      "cause": "correct-by-paper",
+      "reason": "Andrey's mmmb runs MMPC with the symmetry check that its authors added to it: a variable stays among the target's parents and children only when the target is among the variable's, and a spouse is sought only through such a member. The toolbox's MMMB keeps each MMPC run's set as it is, the form of the 2003 paper. With the same G-square tests and the check left out, a trace is no worse than the toolbox on distance or F1 in this setting (seeds 0-19), and the check raises the precision (0.90 against 0.74 without it) at a cost in recall (0.31 against 0.41). Andrey's errors, missing plus extra members, stay below the toolbox's.",
+      "citation": "Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian network structure learning algorithm. Machine Learning 65, 31-78 (MMPC with the symmetry check). Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Time and sample efficient discovery of Markov blankets and direct causal relations. KDD, 673-678 (MMMB). Causal Explorer 1.5: MMMB, without the check."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "MMMB",
+      "comparator": "Causal Explorer 1.5 MMMB",
+      "row": {"metric": "set_distance", "d": 76, "n": 700},
+      "andrey_errors": 0.6999,
+      "comparator_errors": 0.6581,
+      "cause": "trade-off",
+      "reason": "Three choices of the toolbox's MMMB account for the gap, traced by replaying the toolbox's logged tests with Andrey's G-square, which gives the same p-values: it runs no symmetry check, which the authors added to MMPC and Andrey runs; where two columns are copies of each other in the data, a test given one of them has no degrees of freedom, and the toolbox returns no p-value and never separates there, while Andrey reads the test as independence, which holds in the data and on which the paper is silent; and for a candidate spouse it searches afresh for a separating set, the first subset of the target's parents and children with a p-value above alpha, while Andrey takes the set MMPC recorded (any separating set satisfies the paper). With the three set the toolbox's way, Andrey's sets tie the toolbox's on distance and F1 in this setting (seeds 0-19) and equal them on 97% of the targets. Andrey's errors, missing plus extra members, stay below the toolbox's.",
+      "citation": "Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian network structure learning algorithm. Machine Learning 65, 31-78 (MMPC with the symmetry check). Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Time and sample efficient discovery of Markov blankets and direct causal relations. KDD, 673-678 (MMMB). Causal Explorer 1.5: MMMB, without the check. Aliferis, C. F., Statnikov, A., Tsamardinos, I., Mani, S., and Koutsoukos, X. D. (2010). Local causal and Markov blanket induction for causal discovery and feature selection for classification part I. JMLR 11, 171-234 (the spouse step's separating set)."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "MMMB",
+      "comparator": "Causal Explorer 1.5 MMMB",
+      "row": {"metric": "set_distance", "d": 76, "n": 1000},
+      "andrey_errors": 0.6622,
+      "comparator_errors": 0.6115,
+      "cause": "trade-off",
+      "reason": "Three choices of the toolbox's MMMB account for the gap, traced by replaying the toolbox's logged tests with Andrey's G-square, which gives the same p-values: it runs no symmetry check, which the authors added to MMPC and Andrey runs; where two columns are copies of each other in the data, a test given one of them has no degrees of freedom, and the toolbox returns no p-value and never separates there, while Andrey reads the test as independence, which holds in the data and on which the paper is silent; and for a candidate spouse it searches afresh for a separating set, the first subset of the target's parents and children with a p-value above alpha, while Andrey takes the set MMPC recorded (any separating set satisfies the paper). With the three set the toolbox's way, Andrey's sets tie the toolbox's on distance and F1 in this setting (seeds 0-19) and equal them on 98% of the targets. Andrey's errors, missing plus extra members, stay below the toolbox's.",
+      "citation": "Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian network structure learning algorithm. Machine Learning 65, 31-78 (MMPC with the symmetry check). Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Time and sample efficient discovery of Markov blankets and direct causal relations. KDD, 673-678 (MMMB). Causal Explorer 1.5: MMMB, without the check. Aliferis, C. F., Statnikov, A., Tsamardinos, I., Mani, S., and Koutsoukos, X. D. (2010). Local causal and Markov blanket induction for causal discovery and feature selection for classification part I. JMLR 11, 171-234 (the spouse step's separating set)."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "MMMB",
+      "comparator": "Causal Explorer 1.5 MMMB",
+      "row": {"metric": "set_distance", "d": 76, "n": 5000},
+      "andrey_errors": 0.4614,
+      "comparator_errors": 0.4272,
+      "cause": "trade-off",
+      "reason": "Three choices of the toolbox's MMMB account for the gap, traced by replaying the toolbox's logged tests with Andrey's G-square, which gives the same p-values: it runs no symmetry check, which the authors added to MMPC and Andrey runs; where two columns are copies of each other in the data, a test given one of them has no degrees of freedom, and the toolbox returns no p-value and never separates there, while Andrey reads the test as independence, which holds in the data and on which the paper is silent; and for a candidate spouse it searches afresh for a separating set, the first subset of the target's parents and children with a p-value above alpha, while Andrey takes the set MMPC recorded (any separating set satisfies the paper). With the three set the toolbox's way, Andrey's sets tie the toolbox's on distance and F1 in this setting (seeds 0-19) and equal them on 98% of the targets. Andrey's errors, missing plus extra members, stay below the toolbox's.",
+      "citation": "Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian network structure learning algorithm. Machine Learning 65, 31-78 (MMPC with the symmetry check). Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Time and sample efficient discovery of Markov blankets and direct causal relations. KDD, 673-678 (MMMB). Causal Explorer 1.5: MMMB, without the check. Aliferis, C. F., Statnikov, A., Tsamardinos, I., Mani, S., and Koutsoukos, X. D. (2010). Local causal and Markov blanket induction for causal discovery and feature selection for classification part I. JMLR 11, 171-234 (the spouse step's separating set)."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "MMMB",
+      "comparator": "Causal Explorer 1.5 MMMB",
+      "row": {"metric": "set_f1_loss", "d": 56, "n": 500},
+      "andrey_errors": 0.5497,
+      "comparator_errors": 0.5327,
+      "cause": "correct-by-paper",
+      "reason": "Andrey's mmmb runs MMPC with the symmetry check that its authors added to it: a variable stays among the target's parents and children only when the target is among the variable's, and a spouse is sought only through such a member. The toolbox's MMMB keeps each MMPC run's set as it is, the form of the 2003 paper. With the same G-square tests and the check left out, a trace is no worse than the toolbox on distance or F1 in this setting (seeds 0-19), and the check raises the precision (0.84 against 0.65 without it) at a cost in recall (0.39 against 0.59). Andrey's errors, missing plus extra members, stay below the toolbox's.",
+      "citation": "Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian network structure learning algorithm. Machine Learning 65, 31-78 (MMPC with the symmetry check). Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Time and sample efficient discovery of Markov blankets and direct causal relations. KDD, 673-678 (MMMB). Causal Explorer 1.5: MMMB, without the check."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "MMMB",
+      "comparator": "Causal Explorer 1.5 MMMB",
+      "row": {"metric": "set_f1_loss", "d": 56, "n": 700},
+      "andrey_errors": 0.5466,
+      "comparator_errors": 0.5,
+      "cause": "correct-by-paper",
+      "reason": "Andrey's mmmb runs MMPC with the symmetry check that its authors added to it: a variable stays among the target's parents and children only when the target is among the variable's, and a spouse is sought only through such a member. The toolbox's MMMB keeps each MMPC run's set as it is, the form of the 2003 paper. With the same G-square tests and the check left out, a trace is no worse than the toolbox on distance or F1 in this setting (seeds 0-19), and the check raises the precision (0.85 against 0.67 without it) at a cost in recall (0.39 against 0.59). Andrey's errors, missing plus extra members, stay below the toolbox's.",
+      "citation": "Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian network structure learning algorithm. Machine Learning 65, 31-78 (MMPC with the symmetry check). Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Time and sample efficient discovery of Markov blankets and direct causal relations. KDD, 673-678 (MMMB). Causal Explorer 1.5: MMMB, without the check."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "MMMB",
+      "comparator": "Causal Explorer 1.5 MMMB",
+      "row": {"metric": "set_f1_loss", "d": 56, "n": 1000},
+      "andrey_errors": 0.5381,
+      "comparator_errors": 0.4652,
+      "cause": "correct-by-paper",
+      "reason": "Andrey's mmmb runs MMPC with the symmetry check that its authors added to it: a variable stays among the target's parents and children only when the target is among the variable's, and a spouse is sought only through such a member. The toolbox's MMMB keeps each MMPC run's set as it is, the form of the 2003 paper. With the same G-square tests and the check left out, a trace is no worse than the toolbox on distance or F1 in this setting (seeds 0-19), and the check raises the precision (0.84 against 0.67 without it) at a cost in recall (0.40 against 0.61). Andrey's errors, missing plus extra members, stay below the toolbox's.",
+      "citation": "Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian network structure learning algorithm. Machine Learning 65, 31-78 (MMPC with the symmetry check). Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Time and sample efficient discovery of Markov blankets and direct causal relations. KDD, 673-678 (MMMB). Causal Explorer 1.5: MMMB, without the check."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "MMMB",
+      "comparator": "Causal Explorer 1.5 MMMB",
+      "row": {"metric": "set_f1_loss", "d": 56, "n": 5000},
+      "andrey_errors": 0.504,
+      "comparator_errors": 0.4164,
+      "cause": "trade-off",
+      "reason": "Three choices of the toolbox's MMMB account for the gap, traced by replaying the toolbox's logged tests with Andrey's G-square, which gives the same p-values: it runs no symmetry check, which the authors added to MMPC and Andrey runs; where two columns are copies of each other in the data, a test given one of them has no degrees of freedom, and the toolbox returns no p-value and never separates there, while Andrey reads the test as independence, which holds in the data and on which the paper is silent; and for a candidate spouse it searches afresh for a separating set, the first subset of the target's parents and children with a p-value above alpha, while Andrey takes the set MMPC recorded (any separating set satisfies the paper). With the three set the toolbox's way the sets are still further than the toolbox's here; adding a fourth, a test run only with at least five rows per cell of its table, the toolbox's form of the rule of the 2003 paper's experiments, makes them equal the toolbox's on every target of 14 datasets. Andrey runs every test. Its errors, missing plus extra members, are 2.13 per target here; with all four choices set the toolbox's way they are 6.92, the toolbox's level (4.12 with the first three).",
+      "citation": "Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian network structure learning algorithm. Machine Learning 65, 31-78 (MMPC with the symmetry check). Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Time and sample efficient discovery of Markov blankets and direct causal relations. KDD, 673-678 (MMMB). Causal Explorer 1.5: MMMB, without the check. Aliferis, C. F., Statnikov, A., Tsamardinos, I., Mani, S., and Koutsoukos, X. D. (2010). Local causal and Markov blanket induction for causal discovery and feature selection for classification part I. JMLR 11, 171-234 (the spouse step's separating set)."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "MMMB",
+      "comparator": "Causal Explorer 1.5 MMMB",
+      "row": {"metric": "set_f1_loss", "d": 27, "n": 5000},
+      "andrey_errors": 0.236,
+      "comparator_errors": 0.2223,
+      "cause": "correct-by-paper",
+      "reason": "Andrey's mmmb runs MMPC with the symmetry check that its authors added to it: a variable stays among the target's parents and children only when the target is among the variable's, and a spouse is sought only through such a member. The toolbox's MMMB keeps each MMPC run's set as it is, the form of the 2003 paper. With the same G-square tests and the check left out, a trace is no worse than the toolbox on distance or F1 in this setting (seeds 0-19), and the check raises the precision (0.97 against 0.86 without it) at a cost in recall (0.69 against 0.78). Andrey's errors, missing plus extra members, stay below the toolbox's.",
+      "citation": "Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian network structure learning algorithm. Machine Learning 65, 31-78 (MMPC with the symmetry check). Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Time and sample efficient discovery of Markov blankets and direct causal relations. KDD, 673-678 (MMMB). Causal Explorer 1.5: MMMB, without the check."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "MMMB",
+      "comparator": "Causal Explorer 1.5 MMMB",
+      "row": {"metric": "set_f1_loss", "d": 76, "n": 300},
+      "andrey_errors": 0.6744,
+      "comparator_errors": 0.5807,
+      "cause": "trade-off",
+      "reason": "Three choices of the toolbox's MMMB account for the gap, traced by replaying the toolbox's logged tests with Andrey's G-square, which gives the same p-values: it runs no symmetry check, which the authors added to MMPC and Andrey runs; where two columns are copies of each other in the data, a test given one of them has no degrees of freedom, and the toolbox returns no p-value and never separates there, while Andrey reads the test as independence, which holds in the data and on which the paper is silent; and for a candidate spouse it searches afresh for a separating set, the first subset of the target's parents and children with a p-value above alpha, while Andrey takes the set MMPC recorded (any separating set satisfies the paper). With the three set the toolbox's way, Andrey's sets tie the toolbox's on distance and F1 in this setting (seeds 0-19) and equal them on 95% of the targets. Andrey's errors, missing plus extra members, stay below the toolbox's.",
+      "citation": "Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian network structure learning algorithm. Machine Learning 65, 31-78 (MMPC with the symmetry check). Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Time and sample efficient discovery of Markov blankets and direct causal relations. KDD, 673-678 (MMMB). Causal Explorer 1.5: MMMB, without the check. Aliferis, C. F., Statnikov, A., Tsamardinos, I., Mani, S., and Koutsoukos, X. D. (2010). Local causal and Markov blanket induction for causal discovery and feature selection for classification part I. JMLR 11, 171-234 (the spouse step's separating set)."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "MMMB",
+      "comparator": "Causal Explorer 1.5 MMMB",
+      "row": {"metric": "set_f1_loss", "d": 76, "n": 500},
+      "andrey_errors": 0.6198,
+      "comparator_errors": 0.5199,
+      "cause": "correct-by-paper",
+      "reason": "Andrey's mmmb runs MMPC with the symmetry check that its authors added to it: a variable stays among the target's parents and children only when the target is among the variable's, and a spouse is sought only through such a member. The toolbox's MMMB keeps each MMPC run's set as it is, the form of the 2003 paper. With the same G-square tests and the check left out, a trace is no worse than the toolbox on distance or F1 in this setting (seeds 0-19), and the check raises the precision (0.90 against 0.74 without it) at a cost in recall (0.31 against 0.41). Andrey's errors, missing plus extra members, stay below the toolbox's.",
+      "citation": "Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian network structure learning algorithm. Machine Learning 65, 31-78 (MMPC with the symmetry check). Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Time and sample efficient discovery of Markov blankets and direct causal relations. KDD, 673-678 (MMMB). Causal Explorer 1.5: MMMB, without the check."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "MMMB",
+      "comparator": "Causal Explorer 1.5 MMMB",
+      "row": {"metric": "set_f1_loss", "d": 76, "n": 700},
+      "andrey_errors": 0.5849,
+      "comparator_errors": 0.4894,
+      "cause": "trade-off",
+      "reason": "Three choices of the toolbox's MMMB account for the gap, traced by replaying the toolbox's logged tests with Andrey's G-square, which gives the same p-values: it runs no symmetry check, which the authors added to MMPC and Andrey runs; where two columns are copies of each other in the data, a test given one of them has no degrees of freedom, and the toolbox returns no p-value and never separates there, while Andrey reads the test as independence, which holds in the data and on which the paper is silent; and for a candidate spouse it searches afresh for a separating set, the first subset of the target's parents and children with a p-value above alpha, while Andrey takes the set MMPC recorded (any separating set satisfies the paper). With the three set the toolbox's way, Andrey's sets tie the toolbox's on distance and F1 in this setting (seeds 0-19) and equal them on 97% of the targets. Andrey's errors, missing plus extra members, stay below the toolbox's.",
+      "citation": "Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian network structure learning algorithm. Machine Learning 65, 31-78 (MMPC with the symmetry check). Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Time and sample efficient discovery of Markov blankets and direct causal relations. KDD, 673-678 (MMMB). Causal Explorer 1.5: MMMB, without the check. Aliferis, C. F., Statnikov, A., Tsamardinos, I., Mani, S., and Koutsoukos, X. D. (2010). Local causal and Markov blanket induction for causal discovery and feature selection for classification part I. JMLR 11, 171-234 (the spouse step's separating set)."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "MMMB",
+      "comparator": "Causal Explorer 1.5 MMMB",
+      "row": {"metric": "set_f1_loss", "d": 76, "n": 1000},
+      "andrey_errors": 0.5473,
+      "comparator_errors": 0.453,
+      "cause": "trade-off",
+      "reason": "Three choices of the toolbox's MMMB account for the gap, traced by replaying the toolbox's logged tests with Andrey's G-square, which gives the same p-values: it runs no symmetry check, which the authors added to MMPC and Andrey runs; where two columns are copies of each other in the data, a test given one of them has no degrees of freedom, and the toolbox returns no p-value and never separates there, while Andrey reads the test as independence, which holds in the data and on which the paper is silent; and for a candidate spouse it searches afresh for a separating set, the first subset of the target's parents and children with a p-value above alpha, while Andrey takes the set MMPC recorded (any separating set satisfies the paper). With the three set the toolbox's way, Andrey's sets tie the toolbox's on distance and F1 in this setting (seeds 0-19) and equal them on 98% of the targets. Andrey's errors, missing plus extra members, stay below the toolbox's.",
+      "citation": "Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian network structure learning algorithm. Machine Learning 65, 31-78 (MMPC with the symmetry check). Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Time and sample efficient discovery of Markov blankets and direct causal relations. KDD, 673-678 (MMMB). Causal Explorer 1.5: MMMB, without the check. Aliferis, C. F., Statnikov, A., Tsamardinos, I., Mani, S., and Koutsoukos, X. D. (2010). Local causal and Markov blanket induction for causal discovery and feature selection for classification part I. JMLR 11, 171-234 (the spouse step's separating set)."
+    },
+    {
+      "summary": "0.18.0",
+      "method": "MMMB",
+      "comparator": "Causal Explorer 1.5 MMMB",
+      "row": {"metric": "set_f1_loss", "d": 76, "n": 5000},
+      "andrey_errors": 0.3581,
+      "comparator_errors": 0.3053,
+      "cause": "trade-off",
+      "reason": "Three choices of the toolbox's MMMB account for the gap, traced by replaying the toolbox's logged tests with Andrey's G-square, which gives the same p-values: it runs no symmetry check, which the authors added to MMPC and Andrey runs; where two columns are copies of each other in the data, a test given one of them has no degrees of freedom, and the toolbox returns no p-value and never separates there, while Andrey reads the test as independence, which holds in the data and on which the paper is silent; and for a candidate spouse it searches afresh for a separating set, the first subset of the target's parents and children with a p-value above alpha, while Andrey takes the set MMPC recorded (any separating set satisfies the paper). With the three set the toolbox's way, Andrey's sets tie the toolbox's on distance and F1 in this setting (seeds 0-19) and equal them on 98% of the targets. Andrey's errors, missing plus extra members, stay below the toolbox's.",
+      "citation": "Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian network structure learning algorithm. Machine Learning 65, 31-78 (MMPC with the symmetry check). Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Time and sample efficient discovery of Markov blankets and direct causal relations. KDD, 673-678 (MMMB). Causal Explorer 1.5: MMMB, without the check. Aliferis, C. F., Statnikov, A., Tsamardinos, I., Mani, S., and Koutsoukos, X. D. (2010). Local causal and Markov blanket induction for causal discovery and feature selection for classification part I. JMLR 11, 171-234 (the spouse step's separating set)."
     }
   ]
 }

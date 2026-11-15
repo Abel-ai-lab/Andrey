@@ -59,7 +59,6 @@ def direct(X, groups, y, S):
 def test_the_registry_holds_the_two_group_tests():
     assert set(TWO_GROUP_INVARIANCE_TESTS) <= set(INVARIANCE_TESTS)
     assert default_invariance_test("fisherz") == "gaussian"
-    assert default_invariance_test("normal_scores") == "gaussian"
     assert default_invariance_test("kci") == "indicator"
     assert default_invariance_test("gsq") == "indicator"
 
@@ -136,16 +135,6 @@ def test_a_conditioning_column_constant_in_a_group_costs_a_degree_of_freedom():
     X[groups == 0, 0] = -1.0  # constant at different values: no coefficient to compare
     test = make_invariance_test("gaussian", X, groups, indep_test="fisherz")
     assert test(2, [0]) == pytest.approx(direct(X, groups, 2, [0]), rel=1e-9)
-
-
-def test_normal_scores_read_each_column_through_its_ranks_over_all_rows():
-    X, groups = two_groups(np.random.default_rng(6), shift=0.3)
-    test = make_invariance_test("gaussian", X, groups, indep_test="normal_scores")
-    monotone = X.copy()
-    monotone[:, 0] = np.exp(X[:, 0])
-    monotone[:, 2] = X[:, 2] ** 3
-    other = make_invariance_test("gaussian", monotone, groups, indep_test="normal_scores")
-    assert other(2, [0]) == pytest.approx(test(2, [0]), rel=1e-12)
 
 
 @pytest.mark.parametrize("indep_test", ["fisherz", "kci"])

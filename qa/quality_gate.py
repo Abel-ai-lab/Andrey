@@ -997,6 +997,7 @@ SUPPORTED: dict[str, Method] = {
         lambda x: andrey.mb_by_mb(x, target=x.shape[1] - 1), "target_cpdag", TARGET_CPDAG_DATA
     ),
     "HITONMB": Method(lambda x: andrey.hiton_mb(x), "cpdag", CPDAG_DATA),
+    "MMMB": Method(lambda x: andrey.mmmb(x), "cpdag", CPDAG_DATA),
     "Y-structures": Method(y_structures_claims, "ancestors", ANCESTOR_DATA),
     "CMB": Method(
         lambda x: andrey.cmb(x, target=x.shape[1] - 1), "target_cpdag", TARGET_CPDAG_DATA

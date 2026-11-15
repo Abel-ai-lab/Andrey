@@ -2196,9 +2196,6 @@ def mmmb(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -2266,17 +2263,26 @@ def mmmb(
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
     other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Tested with exact d-separation on 15 variables, on
-    simulated linear-Gaussian data with 20 variables and 2,000 rows, and on categorical data with
-    10 variables and 3,000 rows; missing values on up to 20 variables with up to a fifth of the
-    values missing completely at random. A spouse is found only through a child that the search
-    found, so an edge its tests miss also hides that child's other parents, and each spouse's
-    verdict rests on the one separating set MMPC recorded for it. The search runs MMPC for the
-    target, for each of its parents and children, and, for the symmetry check, for each of their
-    members, so its cost grows with the sets two steps from the target. The CPDAG tests every
-    subset of the smaller blanket for each unshielded triple, so a triple whose smaller blanket
-    holds ``m`` variables takes up to ``2**m`` tests. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** Measured at alpha 0.05 on one core, every variable a target, on samples of
+    alarm, hailfinder, insurance, and win95pts (27 to 76 variables) at 300, 500, 700, 1,000, and
+    5,000 rows and of pigs (441 variables, 50 targets) at 500 rows with ``"gsq"``. Against its
+    authors' MMMB, the sets were closer to the true ones in 8 of 21 settings, as close in 3, and
+    further in 10, on hailfinder at 500 to 5,000 rows, insurance at 5,000, and win95pts at every
+    size: there the symmetry check drops members the authors' code keeps, a test given a copy of a
+    variable has no degrees of freedom and separates here but not there, and a spouse's separating
+    set comes from MMPC rather than a fresh search. On hailfinder at 5,000 rows the authors' code
+    also runs a test only with at least five rows per cell, which this search does not, and the sets
+    stay further than that code's. In every setting the sets had fewer errors, missing plus extra
+    members, than the authors' code's and than the empty set's
+    (`0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#mmmb>`_). A spouse is
+    found only through a child that the search found, so an edge its tests miss also hides that
+    child's other parents, and each spouse's verdict rests on the one separating set MMPC recorded
+    for it. The search runs MMPC for the target, for each of its parents and children, and, for the
+    symmetry check, for each of their members, so its cost grows with the sets two steps from the
+    target. The CPDAG tests every subset of the smaller blanket for each unshielded triple, so a
+    triple whose smaller blanket holds ``m`` variables takes up to ``2**m`` tests. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
