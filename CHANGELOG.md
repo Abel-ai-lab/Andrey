@@ -286,6 +286,14 @@ names its pull request.
 
 ### Fixed
 
+- `indep_test="normal_scores"` takes data from one environment. It ranks each column over every
+  row its test reads, so over several environments a column mixed their distributions: on two
+  simulated environments a true independence given the environment index was rejected at up to
+  0.29 at level 0.05, and the invariance tests of `igsp` and `ut_igsp` reported a change where none
+  occurred in up to all runs. `cdnod`, `fci_jci`, `igsp`, `ut_igsp`, and `jpcmciplus` no longer offer it, `gfci`,
+  `boss_fci`, and `grasp_fci` raise a `ValueError` for it with an `env`, as for
+  `score_func="normal_scores"`, and the error for a choice a method does not offer says why.
+  ([#1037])
 - The treatment-outcome benchmark lane scores the effect error of the pair asked. For a method that
   answers both directions of a pair, the summary reads the record for the treatment and the outcome
   asked, not the last record of the fit, and a record that says the effect is zero estimates 0
@@ -2871,6 +2879,7 @@ First alpha release.
 [#1000]: https://github.com/Abel-ai-lab/Andrey/pull/1000
 [#986]: https://github.com/Abel-ai-lab/Andrey/pull/986
 [#1032]: https://github.com/Abel-ai-lab/Andrey/pull/1032
+[#1037]: https://github.com/Abel-ai-lab/Andrey/pull/1037
 [#995]: https://github.com/Abel-ai-lab/Andrey/pull/995
 [#991]: https://github.com/Abel-ai-lab/Andrey/pull/991
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
