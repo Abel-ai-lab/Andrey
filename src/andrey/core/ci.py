@@ -895,7 +895,12 @@ class NormalScores(FisherZ):
     **Limitations.** Ranks measure monotone dependence: a relation that is not monotone, such as
     ``y = x**2`` for a symmetric ``x``, has zero rank correlation, and the test finds nothing where
     ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` do. Conditioning removes only the monotone
-    part of a dependence. The p-value is the Fisher-Z one, which holds asymptotically.
+    part of a dependence. The p-value is the Fisher-Z one, which holds asymptotically. The model
+    is one distribution: ranked over the rows of several environments that change a variable, a
+    column mixes their distributions, and its scores are no longer Gaussian; ranked within each
+    environment, every column is centered and scaled in each, so none depends on the environment.
+    The methods whose tests always read several environments do not offer the test, and the others
+    refuse it with an ``env``, as they refuse the rank-based score.
     """
 
     def __init__(self, data: np.ndarray) -> None:
@@ -1926,6 +1931,9 @@ SHIPPED_INDEP_TESTS: tuple[str, ...] = (
     *NONLINEAR_INDEP_TESTS,
 )
 DISCRETE_INDEP_TESTS: tuple[str, ...] = ("chisq", "gsq")
+#: The rank-based tests, which rank each column over every row they read; a method whose tests
+#: always read several environments does not offer them, as the ranks would mix the environments.
+RANK_INDEP_TESTS: tuple[str, ...] = ("normal_scores",)
 MIXED_INDEP_TESTS: tuple[str, ...] = ("degen_gauss", "cond_gauss")
 #: The shipped tests of continuous data: the partial-correlation and the nonlinear tests.
 CONTINUOUS_INDEP_TESTS: tuple[str, ...] = tuple(
@@ -1959,6 +1967,23 @@ def register_indep_test(name: str, factory: Callable[[np.ndarray], CITest]) -> N
     tests have, reports its own; for a test without one the family asks the call one query at a
     time and ranks the candidates by p-value, smallest first (:class:`PValueTest`), which it
     reports as the statistic ``-log10(p)``.
+
+    Every index a test is queried with is a column position of the matrix its factory received, and
+    a search can call the factory again for the same columns in another order: by default the
+    possible-d-separation step of FCI, FCI-JCI, and GFCI visits the variables in
+    :func:`~andrey.core.ties.tie_ranks` order and builds its test over the matrix in that order
+    (``possible_dsep="order_free"``). A test computed from its matrix needs nothing more. A test
+    that does not read its matrix, such as a :class:`~andrey.data.latent.DSepOracle`, must find
+    which variable each column of the matrix it receives holds::
+
+        def factory(columns):
+            nodes = [
+                next(j for j in range(data.shape[1]) if np.array_equal(c, data[:, j]))
+                for c in columns.T
+            ]
+            return DSepOracle(dag, nodes=nodes)
+
+    With ``possible_dsep="fast"`` the step keeps the columns in data order.
 
     A fit's ``metadata["n_tests"]`` counts a registered test's queries only as the test reports
     them, by calling :func:`count_tests` once per query it computes (:func:`counting_tests`).

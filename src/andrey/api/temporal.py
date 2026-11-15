@@ -1139,10 +1139,11 @@ def jpcmciplus(
         the variables.
     indep_test : str or None, default=None
         The conditional-independence test behind every p-value, a test of continuous data, as in
-        :func:`~andrey.pcmciplus`: ``"fisherz"``, ``"student_t"``, and ``"normal_scores"`` test
-        partial correlation, and ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` detect
-        nonlinear dependence at a far higher cost per test. The dummies enter a test as numeric
-        columns, so a categorical or mixed-data test raises ``ValueError``. ``None`` picks
+        :func:`~andrey.pcmciplus`: ``"fisherz"`` and ``"student_t"`` test partial correlation, and
+        ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` detect nonlinear dependence at a far
+        higher cost per test. The dummies enter a test as numeric columns, so a categorical or
+        mixed-data test raises ``ValueError``. ``"normal_scores"`` is not offered: ranked over every
+        dataset's rows, a column's normal scores mix the datasets' distributions. ``None`` picks
         ``"fisherz"``. ``metadata["indep_test"]`` names the test the fit used.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
@@ -1206,13 +1207,12 @@ def jpcmciplus(
         fewer than two system variables remain; if a time context differs between datasets at some
         step, a space context varies within a dataset, or a space context repeats another up to
         scale and shift, as any two do over two datasets; or if ``data`` holds ``NaN``. With
-        ``"fisherz"``, ``"student_t"``, or ``"normal_scores"``, also if a variable repeats another
-        up to scale and shift, at the same step or up to ``2 * tau_max`` steps apart, or a test
-        finds a system variable in the span of its conditions, as with one that sums others or a
-        pulse every dataset shares that is not a time context. Also if ``knowledge`` names a column
-        that is not a system variable, such as a context, contradicts itself, requires a link
-        without a lag or beyond ``tau_max``, or directs same-step links into a directed cycle over
-        the links the fit kept.
+        ``"fisherz"`` or ``"student_t"``, also if a variable repeats another up to scale and shift,
+        at the same step or up to ``2 * tau_max`` steps apart, or a test finds a system variable in
+        the span of its conditions, as with one that sums others or a pulse every dataset shares
+        that is not a time context. Also if ``knowledge`` names a column that is not a system
+        variable, such as a context, contradicts itself, requires a link without a lag or beyond
+        ``tau_max``, or directs same-step links into a directed cycle over the links the fit kept.
 
     Warns
     -----
