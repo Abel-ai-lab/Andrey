@@ -15,7 +15,14 @@ from andrey.core.knowledge import EDGE_PARTS, PATH_PARTS, KnowledgePart
 from andrey.core.score import RANK_SCORES, SCORES
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
-from .concepts import CMB_BLANKETS, CONCEPTS, MMB_BLANKETS, REQUIRED_TARGET, concept_param
+from .concepts import (
+    CMB_BLANKETS,
+    CONCEPTS,
+    MMB_BLANKETS,
+    REQUIRED_TARGET,
+    UNRANKED_TESTS,
+    concept_param,
+)
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
 
 # Shared inputs and parameters; a parameter that implements a concept comes from its template.
@@ -31,21 +38,33 @@ _DECLARED = (
     "cond_gauss when some are, else {fallback}. A column is declared categorical by categorical "
     "or a DataFrame category, bool, or text type, never by its values."
 )
+#: The indep_test doc: the partial-correlation tests, then the others.
+_PARTIAL_CORRELATION = (
+    "Conditional-independence test. For continuous data, on the partial correlation: "
+    "fisherz = Fisher's z-transform and the normal distribution; student_t = the Student-t "
+    "distribution, exact for Gaussian data at any sample size"
+)
+_OTHER_TESTS = (
+    "For categorical data coded by whole numbers: chisq = Pearson's chi-square; gsq = G-square. "
+    "For mixed data, with the categorical columns named by categorical: degen_gauss = degenerate "
+    "Gaussian and cond_gauss = conditional Gaussian likelihood ratio. For nonlinear effects in "
+    "continuous data, each far slower per test: kci = kernel test; rcot = its random-feature "
+    "approximation; cmiknn = nearest-neighbor conditional mutual information; gpdc = "
+    "Gaussian-process regression and distance correlation. These four rank the columns as the "
+    "searches do, so ANDREY_TIE_BREAK=position makes their p-values depend on the column order. "
+    + _DECLARED.format(every="gsq", fallback="fisherz")
+)
 _INDEP_TEST = concept_param(
     "indep_test",
-    doc="Conditional-independence test. For continuous data, on the partial correlation: "
-    "fisherz = Fisher's z-transform and the normal distribution; student_t = the Student-t "
-    "distribution, exact for Gaussian data at any sample size; normal_scores = fisherz on each "
-    "column's normal scores, for data whose columns are monotone transformations of Gaussian "
-    "variables. For categorical data coded by whole "
-    "numbers: chisq = Pearson's chi-square; gsq = G-square. For mixed data, with the categorical "
-    "columns named by categorical: degen_gauss = degenerate Gaussian and "
-    "cond_gauss = conditional Gaussian likelihood ratio. For nonlinear effects in continuous "
-    "data, each far slower per test: kci = kernel test; rcot = its random-feature approximation; "
-    "cmiknn = nearest-neighbor conditional mutual information; "
-    "gpdc = Gaussian-process regression and distance correlation. These four rank the columns as "
-    "the searches do, so ANDREY_TIE_BREAK=position makes their p-values depend on the column "
-    "order. " + _DECLARED.format(every="gsq", fallback="fisherz"),
+    doc=_PARTIAL_CORRELATION + "; normal_scores = fisherz on each column's normal scores, for data "
+    "whose columns are monotone transformations of Gaussian variables. " + _OTHER_TESTS,
+)
+#: indep_test of a method whose tests always read several environments: no normal_scores.
+_POOLED_INDEP_TEST = concept_param(
+    "indep_test",
+    choices=UNRANKED_TESTS,
+    doc=_PARTIAL_CORRELATION + ". normal_scores is not offered: ranked over the rows of every "
+    "environment, a column's normal scores mix their distributions. " + _OTHER_TESTS,
 )
 _DEGREES_OF_FREEDOM = concept_param("degrees_of_freedom")
 _CATEGORICAL = concept_param("categorical")
@@ -354,7 +373,7 @@ _add(
         ),
         params=(
             _ALPHA,
-            _INDEP_TEST,
+            _POOLED_INDEP_TEST,
             _DEGREES_OF_FREEDOM,
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
@@ -421,7 +440,7 @@ _add(
         ),
         params=(
             _ALPHA,
-            _INDEP_TEST,
+            _POOLED_INDEP_TEST,
             _DEGREES_OF_FREEDOM,
             _COLLIDER_RULE,
             _CATEGORICAL,
@@ -2266,7 +2285,7 @@ _add(
                 exclusive_maximum=True,
                 nullable=True,
             ),
-            _INDEP_TEST,
+            _POOLED_INDEP_TEST,
             _DEGREES_OF_FREEDOM,
             concept_param("invariance_test"),
             concept_param(
@@ -2359,7 +2378,7 @@ _add(
                 exclusive_maximum=True,
                 nullable=True,
             ),
-            _INDEP_TEST,
+            _POOLED_INDEP_TEST,
             _DEGREES_OF_FREEDOM,
             concept_param("invariance_test"),
             concept_param(
@@ -3024,9 +3043,10 @@ _add(
             ),
             concept_param(
                 "indep_test",
-                choices=CONTINUOUS_INDEP_TESTS,
+                choices=tuple(t for t in CONTINUOUS_INDEP_TESTS if t in UNRANKED_TESTS),
                 doc="Conditional-independence test, as in pcmciplus: a test of continuous data, as "
-                "the dummies enter it as numeric one-hot columns. null picks fisherz.",
+                "the dummies enter it as numeric one-hot columns, but not normal_scores, whose "
+                "ranks over the rows of every dataset mix their distributions. null picks fisherz.",
             ),
             _TEST_SEED,
             concept_param(

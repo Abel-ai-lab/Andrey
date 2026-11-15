@@ -328,6 +328,36 @@ def test_the_rank_based_score_takes_no_environments(spec):
         fit(spec, lambda x: x, env=True, **rank_settings(spec))
 
 
+#: The methods whose every fit reads several environments or datasets and that take a test.
+POOLED = [
+    spec
+    for spec in TABLE_SPECS
+    if accepts(spec, "fisherz")
+    and (always_env(spec) or any(i.kind == "panel" for i in spec.data.inputs))
+]
+
+
+@pytest.mark.parametrize("spec", POOLED, ids=lambda spec: spec.name)
+def test_the_methods_that_always_pool_environments_do_not_offer_the_rank_based_test(spec):
+    assert not accepts(spec, "normal_scores")
+    with pytest.raises(ValueError, match="normal_scores.* ranks each column over the rows of"):
+        fit(spec, lambda x: x, indep_test="normal_scores")
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        spec
+        for spec in TABLE_SPECS
+        if accepts(spec, "normal_scores") and any(i.kind == "context" for i in spec.data.inputs)
+    ],
+    ids=lambda spec: spec.name,
+)
+def test_the_rank_based_test_takes_no_environments(spec):
+    with pytest.raises(ValueError, match=rf'^{spec.name}: indep_test="normal_scores" .*no env'):
+        fit(spec, lambda x: x, env=True, indep_test="normal_scores")
+
+
 def test_gies_does_not_offer_the_rank_based_score():
     gies = next(spec for spec in TABLE_SPECS if spec.name == "gies")
     with pytest.raises(ValueError, match="score_func must be one of"):
