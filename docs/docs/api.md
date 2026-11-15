@@ -898,6 +898,34 @@ andrey.pc(data, indep_test="cmiknn_k5")
 {py:meth}`CMIknn.statistic <andrey.core.ci_cmiknn.CMIknn.statistic>` returns the conditional
 mutual information estimate the test's p-value is built on, a dependence measure of its own.
 
+Every index a registered test is queried with is a column position of the matrix its factory
+received, and a search can ask the factory again for the same columns in another order: by default
+the possible-d-separation step of FCI, FCI-JCI, and GFCI builds its test over the columns sorted by
+their ranks (`possible_dsep="order_free"`). A test computed from its matrix, as every shipped test
+is, needs nothing more. A test that does not read its matrix, such as an oracle that answers by
+d-separation in a known graph (`andrey.data.latent.DSepOracle`), must find which variable each
+column of the matrix it receives holds:
+
+```python
+import numpy as np
+
+import andrey
+from andrey.core.ci import register_indep_test
+from andrey.data.latent import DSepOracle
+
+# `dag` is a networkx DiGraph over the column numbers of `data`, plus any hidden nodes.
+def factory(columns):
+    nodes = [
+        next(j for j in range(data.shape[1]) if np.array_equal(c, data[:, j])) for c in columns.T
+    ]
+    return DSepOracle(dag, nodes=nodes)
+
+register_indep_test("dsep", factory)
+andrey.fci(data, indep_test="dsep")  # the PAG of the observed columns
+```
+
+With `possible_dsep="fast"` the step keeps the columns in data order.
+
 On data with a `NaN`, {py:func}`~andrey.core.ci.make_indep_test` returns a
 {py:class}`~andrey.core.ci_missing.TestwiseDeletion` of the test: each query reads the rows observed
 in all of its columns. `fisherz` and `student_t` compute the query's correlations directly from

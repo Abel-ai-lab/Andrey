@@ -288,6 +288,13 @@ names its pull request.
   ([#1029])
 - The treatment-outcome benchmark lane counts the conditional-independence tests of its PC arm, PC
   read at the pair, so its cost sits beside the methods'. ([#1031])
+- The documentation of `register_indep_test` and `DSepOracle` states that a registered test's
+  indices are column positions of the matrix its factory receives, and that the
+  possible-d-separation step of `fci`, `fci_jci`, and `gfci` builds its test again over the columns
+  in rank order: a test that does not read its matrix, such as an oracle by d-separation, finds
+  which variable each column holds, and `possible_dsep="fast"` keeps the data's order. The
+  environment settings and the configuration page no longer list `fci_jci` with `normal_scores`
+  among the parallel possible-d-separation searches; it does not offer that test. ([#1040])
 
 ### Fixed
 
@@ -2886,6 +2893,7 @@ First alpha release.
 [#1032]: https://github.com/Abel-ai-lab/Andrey/pull/1032
 [#1037]: https://github.com/Abel-ai-lab/Andrey/pull/1037
 [#1038]: https://github.com/Abel-ai-lab/Andrey/pull/1038
+[#1040]: https://github.com/Abel-ai-lab/Andrey/pull/1040
 [#995]: https://github.com/Abel-ai-lab/Andrey/pull/995
 [#991]: https://github.com/Abel-ai-lab/Andrey/pull/991
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
