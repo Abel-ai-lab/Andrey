@@ -1271,10 +1271,10 @@ def locpc_cde(
     **Limitations.** Measured against its authors' code on the random graphs of [1]_ with 10 to 200
     variables and 5,000 rows, linear-Gaussian with Fisher's z test and binary with the G-square
     test, at alpha 0.05: its verdicts, sets, and effect estimates were as near the truth as the
-    code's in every setting, on 20 datasets and again on 20 fresh ones. On pairs whose effect the
-    CPDAG does not identify, its verdict, like the code's, was wrong or undecided on 20% to 90% of
-    the datasets; over both kinds of pair it beat the constant answer "not identifiable" in every
-    setting but the linear-Gaussian graphs with 200 variables. The
+    code's in every setting, on 20 datasets each. On pairs whose effect the CPDAG does not identify,
+    its verdict, like the code's, was wrong or undecided on 20% to 90% of the datasets; over both
+    kinds of pair it beat the constant answer "not identifiable" in every setting but the
+    linear-Gaussian graphs with 200 variables. The
     `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#locpc-cde>`_ has the
     numbers. Without the paper's early stop (see **When it stops.**), a non-identifiable effect is
     searched until a hop adds no variable: on the paper's linear-Gaussian graphs with 5,000 rows
