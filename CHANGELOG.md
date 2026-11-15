@@ -301,6 +301,12 @@ names its pull request.
   one. At 5,000 rows, `locpc_cde` on 1,000 variables is 1.5 times faster, `gs` on 100 variables
   1.4 times, and `ldecc` 1.1 times. Every output, `metadata["n_tests"]` included, is the same bit
   for bit. ([#1035], [#1041])
+- The skeleton scans of `pc` and `fci` and the conditioning-set scans of the blanket learners,
+  `mb_by_mb`, and `local_optimal_adjustment` build each chunk of conditioning sets as the rows of
+  an int array from cached combination tables, where they built tuples and converted each chunk
+  back. At 5,000 rows and 1,000 variables, `mb_by_mb` at one target is 1.15 times faster,
+  `local_optimal_adjustment` 1.08 times, and `pc` 1.06 times. Every output, `metadata["n_tests"]`
+  included, is the same bit for bit. ([#1036], [#1042])
 
 ### Fixed
 
@@ -2902,6 +2908,8 @@ First alpha release.
 [#1040]: https://github.com/Abel-ai-lab/Andrey/pull/1040
 [#1035]: https://github.com/Abel-ai-lab/Andrey/pull/1035
 [#1041]: https://github.com/Abel-ai-lab/Andrey/pull/1041
+[#1036]: https://github.com/Abel-ai-lab/Andrey/pull/1036
+[#1042]: https://github.com/Abel-ai-lab/Andrey/pull/1042
 [#995]: https://github.com/Abel-ai-lab/Andrey/pull/995
 [#991]: https://github.com/Abel-ai-lab/Andrey/pull/991
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
