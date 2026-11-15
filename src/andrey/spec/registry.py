@@ -2478,8 +2478,9 @@ _add(
                 default=False,
                 doc="Read the edges by peeling sink columns of the demixing matrix (Dai et al. "
                 "2024, App. C), which assumes neither the target nor a child lies on a cycle, "
-                "instead of trying every admissible assignment (Algorithm 1); a matrix with no "
-                "sink column falls back to Algorithm 1.",
+                "instead of trying every admissible assignment (Algorithm 1); when no column is "
+                "a sink, the column with the fewest nonzero entries is read as one (the authors' "
+                "rule).",
             ),
             concept_param(
                 "w_threshold",

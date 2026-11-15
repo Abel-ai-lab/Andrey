@@ -149,8 +149,8 @@ $ANDREY_BENCH_PYTHON benchmarks/local_lingam_summary.py outputs/lil outputs/lil-
 The defaults are the three graphs at 2,000 rows, 20 seeds from `--first-seed 0`, and `--cap-wall-s`
 of 1800. `--part` and `--parts` split the datasets between jobs, `--solutions` selects solutions,
 `--resume` continues a run, and `--rescore` recomputes the scores from the stored answers without
-fitting. One JSON line per fit goes to `records.jsonl`: the solution, the cell, the seed, the target,
-the time, the answer's local weights and blanket, and the measures above. A later run folder's
+fitting. One JSON line per fit goes to `records.jsonl`: the solution, the cell, the seed, the
+target, the time, the answer's local weights and blanket, and the measures above. A later run folder's
 record replaces an earlier one's in the summary, so a rerun of some solutions is listed after the
 run it updates.
 
