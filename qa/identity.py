@@ -78,11 +78,11 @@ class Fit:
 
     ``blocks`` is the number of side-by-side copies of the variables in the data: GIES's samples
     and intervention indicators, MultiGroupDirectLiNGAM's groups; a column order moves each copy
-    the same way. ``shuffled`` is ``False`` for ICP, IGSP, FCI-JCI, J-PCMCI+, CMB, MMB-by-MMB,
-    LDECC, and LOAD, whose draws a column order does not apply to: each row's environment is a
-    column of the draw, the target of ICP, CMB, and MMB-by-MMB is the last variable, LDECC's
-    treatment and outcome and LOAD's two variables are the last and the first, and J-PCMCI+'s
-    contexts follow the system variables.
+    the same way. ``shuffled`` is ``False`` for ICP, IGSP, FCI-JCI, J-PCMCI+, MB-by-MB, CMB,
+    MMB-by-MMB, LDECC, and LOAD, whose draws a column order does not apply to: each row's
+    environment is a column of the draw, the target of ICP, MB-by-MB, CMB, and MMB-by-MMB is the
+    last variable, LDECC's treatment and outcome and LOAD's two variables are the last and the
+    first, and J-PCMCI+'s contexts follow the system variables.
     ``alpha`` is the significance level of a CI-test method.
     """
 
@@ -198,6 +198,7 @@ FITS: dict[str, Fit] = {
     "MMPC": Fit(functools.partial(andrey.mmpc, alpha=ALPHA), alpha=ALPHA),
     "HITONPC": Fit(functools.partial(andrey.hiton_pc, alpha=ALPHA), alpha=ALPHA),
     "PCMB": Fit(functools.partial(andrey.pcmb, alpha=ALPHA), alpha=ALPHA),
+    "MB-by-MB": Fit(_last_column("mb_by_mb"), shuffled=False, alpha=ALPHA),
     "HITONMB": Fit(functools.partial(andrey.hiton_mb, alpha=ALPHA), alpha=ALPHA),
     "Y-structures": Fit(functools.partial(andrey.y_structures, alpha=ALPHA), alpha=ALPHA),
     "CMB": Fit(_last_column("cmb"), shuffled=False, alpha=ALPHA),
@@ -320,6 +321,7 @@ LARGER: dict[str, str] = {
             "MMPC",
             "HITONPC",
             "PCMB",
+            "MB-by-MB",
             "HITONMB",
             "Y-structures",
             "CMB",

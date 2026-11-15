@@ -2,15 +2,15 @@
  "release": "0.18.0",
  "parity_rule": "paired bootstrap",
  "generated": "2026-11-14",
- "theme": "PCMB against the published results of its paper on samples of the Alarm and Pigs networks, every node a target; GS, Fast-IAMB, and HITON-PC against bnlearn on the papers' networks and on linear-Gaussian graphs, every node a target; CMB against global PC read at the target on its paper's Alarm setting, every node a target; HITON-MB against Causal Explorer on its paper's networks, every node a target; MMB-by-MMB against the authors' code on the paper's networks with hidden nodes; Y-structures and extended Y-structures against the authors' code on the datasets of the authors' simulation script, with and without selection; LDECC and LOAD against their authors' code on the models their papers plant",
- "build": "PCMB: Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with pcmb and its bounded subset listing as merged; the test's degrees of freedom of Spirtes et al. ran as a patch that returned the same sets and test counts as the merged default degrees_of_freedom='nonempty' on the 126 fits compared, every Alarm dataset and 6 Pigs datasets) | GS, Fast-IAMB, and HITON-PC: Andrey pre-release builds of the 0.18.0 release branch: 12 November 2026 for fast_iamb and hiton_pc as merged, 13 November 2026 for gs, whose shrink starts again from the first member after each removal | CMB: Andrey pre-release build of 13 November 2026 (the 0.18.0 release branch as merged with LOAD's skeleton step); the release branch of 14 November 2026, with exact upper-tail p-values, gave the same answers and test counts at every target of the 3 datasets rerun | HITON-MB: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with hiton_mb and mmmb as merged, mmmb's default degrees_of_freedom='nonempty') | MMB-by-MMB: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with mmb_by_mmb as merged and the lane's paper targets); the judged fits ran just before the merge of its smaller-blanket search's last commits, and the merged build gave the same marks and test counts at all 1,040 fits | Y-structures: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with the dependence check on claimed pairs and exact upper-tail p-values as merged) | LDECC and LOAD: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with ldecc reading its authors' code's five steps and local_optimal_adjustment's conflict rule, as merged in this change)",
- "verdict_rule": "PCMB: no reference implementation exists, so each row sets Andrey's mean beside the paper's mean and standard deviation (Table 6), and the release card judges no row better or worse. The floor: per dataset, the mean over the targets of the errors minus the empty set's; a row passes when the 95% percentile-bootstrap interval of the mean difference lies wholly below 0 over at least 10 datasets, and the per-dataset differences are in the row | GS, Fast-IAMB, and HITON-PC: per cell (network or Gaussian graph, rows; 20 datasets, every node a target): per dataset, the mean over the targets with a nonempty true set of the distance of the set's precision and recall from (1, 1) (an empty answer counts precision 1, distance 1) and of the set's F1; D = Andrey's minus bnlearn's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 was not rerun | CMB: no reference implementation exists, so each row sets Andrey's means beside the paper's (Table 1) and judges CMB against two global PCs read at the target, Andrey's pc with the same test and level and bnlearn 5.2.1 pc.stable with mi-adf: the mean over paired datasets of CMB's total minus the other's with its 95% percentile-bootstrap interval, better or worse when the interval lies wholly on that side of 0 over at least 10 datasets, on seeds 0-19, and a cell worse there counts only when it is worse again on seeds 20-39. The floor: per dataset, the total minus the empty answer's; a row passes when its interval lies wholly below 0 | HITON-MB: per cell (network, rows; 20 datasets): per dataset, the mean over the targets both answered with a nonempty true set of the distance of the set's precision and recall from (1, 1) (an empty answer counts precision 1, distance 1) and of the set's F1; D = Andrey's minus Causal Explorer's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 was not rerun. A target where the toolbox stopped without an answer is left out of both sides | MMB-by-MMB: per cell (network, rows; 20 datasets, the paper's named targets): per dataset, the mean over the targets with a true edge of the distance of the precision and recall of the edges at the target from (1, 1) and of their F1, an edge right only with both marks right (an answer with no edge counts precision 1, distance 1, F1 0); D = Andrey's minus the authors' code's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree | Y-structures: per cell (setting, with or without selection, form; 20 datasets of 10,000 rows from the authors' simulation script): per dataset, claim_error and claim_ap_loss; D = Andrey's minus the authors' code's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly above 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly below, a tie otherwise. A cell worse on seeds 0-19 on either measure is rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 is not rerun. The floor: claim_error minus the empty answer's, applied where the authors' code's interval lies wholly below 0, passed when Andrey's interval lies wholly below 0; every row also gives the precision floor, passed when the pooled precision exceeds the pooled base rate with its 95% interval above 0 | LDECC and LOAD: per cell (20 datasets, seeds 0-19, one treatment-outcome pair each): per dataset D = Andrey's error minus the authors' code's on the same data; worse when the 95% percentile-bootstrap interval of the mean D lies wholly above 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly below, a tie otherwise. A cell worse on seeds 0-19 on a measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree. The floor: per dataset, the error minus the empty adjustment set's (for LOAD's set, the set's missing plus extra members against the empty set's); it applies where the authors' code's interval lies wholly below 0, and a row then passes when Andrey's does too",
- "fit_protocol": "PCMB: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 14,400 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at alpha 0.01 with no limit on the conditioning set; columns that hold one value are left out of the fit and answer the empty set, scored against the full network | GS, Fast-IAMB, and HITON-PC: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored | CMB: each fit in a fresh process on one core with one BLAS thread, CMB once per target and each PC once per dataset, read at every target; no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at alpha 0.02 with no limit on the conditioning set, CMB with HITON-MB, its default blanket learner | HITON-MB: each fit in a fresh process on one core with one BLAS thread, every target of a dataset in one fit, no warm-up, a cap of 1,800 s per fit (3,600 s on Pigs), past which a fit is a timeout and never scored | MMB-by-MMB: each fit in a fresh process on one core with one BLAS thread, one target per fit, no warm-up, a cap of 1,800 s per fit (3,600 s on WIN95PTS at 5,000 rows, the largest cell), past which a fit is a timeout and never scored; no fit failed or timed out | Y-structures: each fit in a fresh process on one core with one BLAS thread, one untimed warm-up fit before the timed one, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. Fisher's z tests at alpha 0.01, the level of the authors' script | LDECC and LOAD: each fit in a fresh process on one core with one BLAS thread, no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. Fisher's z at the authors' levels: LDECC 0.01 x 32,000 / rows (its notebooks), LOAD 0.01; both arms uncapped in tests (LDECC's paper capped its runs at 7,000 tests)",
- "error_metric": "PCMB: distance: the mean over a dataset's targets with a nonempty answer of the distance of the set's precision and recall from (1, 1), the reading of the comparison with the paper: an empty answer has no precision or distance and counts in the recall as 0; distance_one counts an empty answer as distance 1; precision is the mean over the targets with an answer and recall the mean over all targets. The floor uses the set's errors, missing plus extra members, against the empty set's, the true set's size; every value is a mean over the row's datasets, and andrey_s is the median wall time of a fit for every target | GS, Fast-IAMB, and HITON-PC: set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size | CMB: total: per target, the edges at the target missing or extra against the true CPDAG plus those whose direction differs from it, an edge the CPDAG directs and the answer leaves undirected included (reversed); a dataset's value is the mean over its targets. lenient leaves out the undirected ones. The floor uses the total against the empty answer's, the target's degree | HITON-MB: set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size | MMB-by-MMB: edge_distance: the mean over the targets of the distance of the precision and recall of the edges at the target from (1, 1), an edge right only with both endpoint marks right; edge_f1_loss: 1 minus the mean over the targets of their F1. The floor uses the local endpoint SHD at the target (extra, missing, and mismarked edges) against the empty answer's, the target's true degree | Y-structures: claim_error: per dataset, the claimed ancestral pairs that are false plus the true ancestral pairs not claimed, among the system variables; claim_ap_loss: 1 minus the average precision of the ranking by the claims' scores, the pairs not claimed last. The floor uses claim_error against the empty answer's, the number of true pairs, so their difference is the false claims minus the true ones. precision_floor is the precision of the pooled claims minus the pooled base rate, the precision of claiming every pair | LDECC and LOAD: LDECC: family_error, 1 when the parent sets returned are not the family of the treatment's parent sets the true CPDAG allows; recall_loss, 1 when the treatment's true parents are not among them; hausdorff_mse, the squared Hausdorff distance of the effects estimated with the sets from the population effects of the family, in standard deviations; effect_error, the mean absolute error of the estimated effects on a fresh sample. LOAD: set_f1_loss, 1 minus the F1 of the returned set against the optimal adjustment set for the pair asked (no set counts F1 0); effect_error as for LDECC",
- "complete_definition": "PCMB: true when every row has at least 10 datasets (the paper's number) | GS, Fast-IAMB, and HITON-PC: true when every row has at least 10 paired datasets (both fitted) | CMB: true when every row has at least 10 paired datasets | HITON-MB: true when every row has at least 10 paired datasets (both fitted) | MMB-by-MMB: true when every row has at least 10 paired datasets (both fitted) | Y-structures: true when every row has at least 10 paired datasets (both fitted) | LDECC and LOAD: true when every row has at least 10 paired datasets (both fitted)",
- "seeds_note": "PCMB: Alarm rows hold 20 datasets, seeds 0-19, the first 10 the paper's number and 10 fresh; Pigs rows hold 10 datasets, seeds 0-9 | GS, Fast-IAMB, and HITON-PC: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | CMB: every cell holds 20 datasets, seeds 0-19, and 20 fresh datasets, seeds 20-39 | HITON-MB: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | MMB-by-MMB: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | Y-structures: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | LDECC and LOAD: every cell holds 20 datasets, seeds 0-19, and 20 fresh datasets, seeds 20-39",
+ "theme": "PCMB against the published results of its paper on samples of the Alarm and Pigs networks, every node a target; GS, Fast-IAMB, and HITON-PC against bnlearn on the papers' networks and on linear-Gaussian graphs, every node a target; CMB against global PC read at the target on its paper's Alarm setting, every node a target; HITON-MB against Causal Explorer on its paper's networks, every node a target; MMB-by-MMB against the authors' code on the paper's networks with hidden nodes; Y-structures and extended Y-structures against the authors' code on the datasets of the authors' simulation script, with and without selection; LDECC and LOAD against their authors' code on the models their papers plant; MB-by-MB against global PC read at the target on its paper's Alarm, Hailfinder, and chessboard settings, accuracy beside the tests per answer",
+ "build": "PCMB: Andrey pre-release build of 12 November 2026 (the 0.18.0 release branch with pcmb and its bounded subset listing as merged; the test's degrees of freedom of Spirtes et al. ran as a patch that returned the same sets and test counts as the merged default degrees_of_freedom='nonempty' on the 126 fits compared, every Alarm dataset and 6 Pigs datasets) | GS, Fast-IAMB, and HITON-PC: Andrey pre-release builds of the 0.18.0 release branch: 12 November 2026 for fast_iamb and hiton_pc as merged, 13 November 2026 for gs, whose shrink starts again from the first member after each removal | CMB: Andrey pre-release build of 13 November 2026 (the 0.18.0 release branch as merged with LOAD's skeleton step); the release branch of 14 November 2026, with exact upper-tail p-values, gave the same answers and test counts at every target of the 3 datasets rerun | HITON-MB: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with hiton_mb and mmmb as merged, mmmb's default degrees_of_freedom='nonempty') | MMB-by-MMB: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with mmb_by_mmb as merged and the lane's paper targets); the judged fits ran just before the merge of its smaller-blanket search's last commits, and the merged build gave the same marks and test counts at all 1,040 fits | Y-structures: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with the dependence check on claimed pairs and exact upper-tail p-values as merged) | LDECC and LOAD: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with ldecc reading its authors' code's five steps and local_optimal_adjustment's conflict rule, as merged in this change) | MB-by-MB: Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with MB-by-MB's independence rule)",
+ "verdict_rule": "PCMB: no reference implementation exists, so each row sets Andrey's mean beside the paper's mean and standard deviation (Table 6), and the release card judges no row better or worse. The floor: per dataset, the mean over the targets of the errors minus the empty set's; a row passes when the 95% percentile-bootstrap interval of the mean difference lies wholly below 0 over at least 10 datasets, and the per-dataset differences are in the row | GS, Fast-IAMB, and HITON-PC: per cell (network or Gaussian graph, rows; 20 datasets, every node a target): per dataset, the mean over the targets with a nonempty true set of the distance of the set's precision and recall from (1, 1) (an empty answer counts precision 1, distance 1) and of the set's F1; D = Andrey's minus bnlearn's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 was not rerun | CMB: no reference implementation exists, so each row sets Andrey's means beside the paper's (Table 1) and judges CMB against two global PCs read at the target, Andrey's pc with the same test and level and bnlearn 5.2.1 pc.stable with mi-adf: the mean over paired datasets of CMB's total minus the other's with its 95% percentile-bootstrap interval, better or worse when the interval lies wholly on that side of 0 over at least 10 datasets, on seeds 0-19, and a cell worse there counts only when it is worse again on seeds 20-39. The floor: per dataset, the total minus the empty answer's; a row passes when its interval lies wholly below 0 | HITON-MB: per cell (network, rows; 20 datasets): per dataset, the mean over the targets both answered with a nonempty true set of the distance of the set's precision and recall from (1, 1) (an empty answer counts precision 1, distance 1) and of the set's F1; D = Andrey's minus Causal Explorer's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 was not rerun. A target where the toolbox stopped without an answer is left out of both sides | MMB-by-MMB: per cell (network, rows; 20 datasets, the paper's named targets): per dataset, the mean over the targets with a true edge of the distance of the precision and recall of the edges at the target from (1, 1) and of their F1, an edge right only with both marks right (an answer with no edge counts precision 1, distance 1, F1 0); D = Andrey's minus the authors' code's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly on the worse side of 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly on the better side, a tie otherwise. A cell worse on seeds 0-19 on either measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree | Y-structures: per cell (setting, with or without selection, form; 20 datasets of 10,000 rows from the authors' simulation script): per dataset, claim_error and claim_ap_loss; D = Andrey's minus the authors' code's per dataset; worse when the 95% percentile-bootstrap interval of the mean D lies wholly above 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly below, a tie otherwise. A cell worse on seeds 0-19 on either measure is rerun on seeds 20-39 and is worse only when the fresh seeds agree; a cell better on seeds 0-19 is not rerun. The floor: claim_error minus the empty answer's, applied where the authors' code's interval lies wholly below 0, passed when Andrey's interval lies wholly below 0; every row also gives the precision floor, passed when the pooled precision exceeds the pooled base rate with its 95% interval above 0 | LDECC and LOAD: per cell (20 datasets, seeds 0-19, one treatment-outcome pair each): per dataset D = Andrey's error minus the authors' code's on the same data; worse when the 95% percentile-bootstrap interval of the mean D lies wholly above 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly below, a tie otherwise. A cell worse on seeds 0-19 on a measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree. The floor: per dataset, the error minus the empty adjustment set's (for LOAD's set, the set's missing plus extra members against the empty set's); it applies where the authors' code's interval lies wholly below 0, and a row then passes when Andrey's does too | MB-by-MB: no reference implementation exists, so each row sets Andrey's means beside the paper's (Tables 1-3) and judges MB-by-MB against two global PCs read at the target, Andrey's pc and bnlearn 5.2.1 pc.stable with mi-adf, both with the same test and level and at most 5 conditioning variables, the paper's cap, and against Andrey's CMB at the same level where it ran: the mean over paired datasets of MB-by-MB's shd minus the other's with its 95% percentile-bootstrap interval, better or worse when the interval lies wholly on that side of 0 over at least 10 datasets, on the first seeds, and a cell worse there counts only when it is worse again on the fresh seeds. A comparison dominates a cell when it is more accurate and takes fewer tests per answer; the tests over every target are context. The floor: per dataset, the shd minus the empty answer's; a row passes when its interval lies wholly below 0",
+ "fit_protocol": "PCMB: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 14,400 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at alpha 0.01 with no limit on the conditioning set; columns that hold one value are left out of the fit and answer the empty set, scored against the full network | GS, Fast-IAMB, and HITON-PC: each fit in a fresh process on one core with one BLAS thread, every node of a dataset a target in one fit, no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored | CMB: each fit in a fresh process on one core with one BLAS thread, CMB once per target and each PC once per dataset, read at every target; no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at alpha 0.02 with no limit on the conditioning set, CMB with HITON-MB, its default blanket learner | HITON-MB: each fit in a fresh process on one core with one BLAS thread, every target of a dataset in one fit, no warm-up, a cap of 1,800 s per fit (3,600 s on Pigs), past which a fit is a timeout and never scored | MMB-by-MMB: each fit in a fresh process on one core with one BLAS thread, one target per fit, no warm-up, a cap of 1,800 s per fit (3,600 s on WIN95PTS at 5,000 rows, the largest cell), past which a fit is a timeout and never scored; no fit failed or timed out | Y-structures: each fit in a fresh process on one core with one BLAS thread, one untimed warm-up fit before the timed one, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. Fisher's z tests at alpha 0.01, the level of the authors' script | LDECC and LOAD: each fit in a fresh process on one core with one BLAS thread, no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. Fisher's z at the authors' levels: LDECC 0.01 x 32,000 / rows (its notebooks), LOAD 0.01; both arms uncapped in tests (LDECC's paper capped its runs at 7,000 tests) | MB-by-MB: each run fits a range of one cell's datasets in one process, one core and one BLAS thread, a cell's datasets in one run or in several over seed ranges (CMB at Hailfinder's 500 and 1,000 rows ran in several runs per cell); MB-by-MB and CMB once per target and each PC once per dataset, read at every target; no warm-up, a cap of 1,800 s per fit, 3,600 s on the chessboard, past which a fit is a timeout and never scored; no fit failed or timed out. G-square tests at the cell's level, MB-by-MB with its defaults, IAMB's forward phase for the blankets and at most 5 conditioning variables in the local structures; CMB with HITON-MB, its default",
+ "error_metric": "PCMB: distance: the mean over a dataset's targets with a nonempty answer of the distance of the set's precision and recall from (1, 1), the reading of the comparison with the paper: an empty answer has no precision or distance and counts in the recall as 0; distance_one counts an empty answer as distance 1; precision is the mean over the targets with an answer and recall the mean over all targets. The floor uses the set's errors, missing plus extra members, against the empty set's, the true set's size; every value is a mean over the row's datasets, and andrey_s is the median wall time of a fit for every target | GS, Fast-IAMB, and HITON-PC: set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size | CMB: total: per target, the edges at the target missing or extra against the true CPDAG plus those whose direction differs from it, an edge the CPDAG directs and the answer leaves undirected included (reversed); a dataset's value is the mean over its targets. lenient leaves out the undirected ones. The floor uses the total against the empty answer's, the target's degree | HITON-MB: set_distance: the mean over the targets of the distance of the set's precision and recall from (1, 1); set_f1_loss: 1 minus the mean over the targets of the set's F1. The floor uses the set's errors, missing plus extra members (the wrong answers of andrey.metrics.target_answer_scores), against the empty set's, the true set's size | MMB-by-MMB: edge_distance: the mean over the targets of the distance of the precision and recall of the edges at the target from (1, 1), an edge right only with both endpoint marks right; edge_f1_loss: 1 minus the mean over the targets of their F1. The floor uses the local endpoint SHD at the target (extra, missing, and mismarked edges) against the empty answer's, the target's true degree | Y-structures: claim_error: per dataset, the claimed ancestral pairs that are false plus the true ancestral pairs not claimed, among the system variables; claim_ap_loss: 1 minus the average precision of the ranking by the claims' scores, the pairs not claimed last. The floor uses claim_error against the empty answer's, the number of true pairs, so their difference is the false claims minus the true ones. precision_floor is the precision of the pooled claims minus the pooled base rate, the precision of claiming every pair | LDECC and LOAD: LDECC: family_error, 1 when the parent sets returned are not the family of the treatment's parent sets the true CPDAG allows; recall_loss, 1 when the treatment's true parents are not among them; hausdorff_mse, the squared Hausdorff distance of the effects estimated with the sets from the population effects of the family, in standard deviations; effect_error, the mean absolute error of the estimated effects on a fresh sample. LOAD: set_f1_loss, 1 minus the F1 of the returned set against the optimal adjustment set for the pair asked (no set counts F1 0); effect_error as for LDECC | MB-by-MB: shd: per target, the edges at the target against the true DAG, an edge the answer leaves undirected (undirected), a true edge it misses (miss), an edge the DAG lacks (extra), and a directed edge whose direction differs (reverse), shd their sum; a dataset's value is the mean over its targets. The floor uses the shd against the empty answer's, the target's degree. Cost per answer, what answering one target costs: MB-by-MB's and CMB's tests at that target, a global PC's whole fit; cost over every target: their sum over the targets, the one fit",
+ "complete_definition": "PCMB: true when every row has at least 10 datasets (the paper's number) | GS, Fast-IAMB, and HITON-PC: true when every row has at least 10 paired datasets (both fitted) | CMB: true when every row has at least 10 paired datasets | HITON-MB: true when every row has at least 10 paired datasets (both fitted) | MMB-by-MMB: true when every row has at least 10 paired datasets (both fitted) | Y-structures: true when every row has at least 10 paired datasets (both fitted) | LDECC and LOAD: true when every row has at least 10 paired datasets (both fitted) | MB-by-MB: true when every cell of the paper has a row with at least 10 datasets paired with Andrey's PC on its first seeds",
+ "seeds_note": "PCMB: Alarm rows hold 20 datasets, seeds 0-19, the first 10 the paper's number and 10 fresh; Pigs rows hold 10 datasets, seeds 0-9 | GS, Fast-IAMB, and HITON-PC: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | CMB: every cell holds 20 datasets, seeds 0-19, and 20 fresh datasets, seeds 20-39 | HITON-MB: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | MMB-by-MMB: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | Y-structures: every cell holds 20 datasets, seeds 0-19; a rerun holds 20 fresh datasets, seeds 20-39 | LDECC and LOAD: every cell holds 20 datasets, seeds 0-19, and 20 fresh datasets, seeds 20-39 | MB-by-MB: Alarm and Hailfinder cells hold 20 datasets, seeds 0-19, and 20 fresh datasets, seeds 20-39; chessboard cells hold 10 datasets, seeds 0-9, and 10 fresh datasets, seeds 10-19, with fresh PC fits at 500 and 1,000 rows",
  "regimes": {
-  "network_tables": "net:<network>:<rows>: forward samples of the Alarm (37 variables) or Pigs (441) network's own tables, the columns in an order drawn from the seed, columns that hold one value left out of the fit",
+  "network_tables": "net:<network>:<rows>: forward samples of the network's own tables, the columns in an order drawn from the seed: Alarm (37 variables), Hailfinder (56), Pigs (441), or the 45 x 45 chessboard (2,025), whose tables are drawn from the seed; PCMB leaves columns that hold one value out of the fit",
   "discrete": "net:<network>:<rows>: forward samples of the bnlearn repository network, columns that hold one value left out of every fit, each answering the empty set at its target, every set scored against the whole network",
   "gaussian": "gauss:<d>:<rows>[:<mean degree>]: linear-Gaussian Erdos-Renyi graph, standardized, mean degree 2 unless given",
   "latent_networks": "the paper's four networks (MILDEW, ALARM, WIN95PTS, ANDES) as linear-Gaussian models, weights +-U(0.5, 1), N(0, 1) noise, 4/4/6/10 random non-target nodes hidden, columns shuffled; the truth is the PAG of the observed variables, read at each target",
@@ -46,9 +46,13 @@
   "LDECC and LOAD": {
    "LDECC authors' code": "605d8d1 (Gupta, Childers, and Lipton)",
    "LOAD authors' code": "7febfc6 (Schubert, Claassen, and Magliacane)"
+  },
+  "MB-by-MB": {
+   "bnlearn": "5.2.1",
+   "R": "4.6.1"
   }
  },
- "hardware": "PCMB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; fits ran on shared nodes, so the times are indicative | GS, Fast-IAMB, and HITON-PC: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes, except GS: its Andrey fits ran after bnlearn's, in separate runs on shared nodes of the same CPU model, so GS's times are indicative | CMB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; CMB, Andrey's PC, and bnlearn ran in the same run, one fit after the other, on shared nodes, so the times are indicative | HITON-MB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; the toolbox's fits and Andrey's ran in separate runs on shared nodes of the same CPU model, so the times are indicative | MMB-by-MMB: AMD EPYC 7713 64-Core Processor for most fits, and AMD EPYC 9534, AMD EPYC 9555, and Intel Xeon nodes for the rest, 1 core per fit, 1 BLAS thread; the authors' code, FCI, and RFCI ran in one run and Andrey's fits in another, each on shared nodes, so the times are indicative | Y-structures: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and the authors' code ran in the same run, one fit after the other, on shared nodes, so the times are indicative | LDECC and LOAD: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey, the authors' code, and Andrey's PC ran in separate jobs of one campaign on shared nodes, so the times are indicative",
+ "hardware": "PCMB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; fits ran on shared nodes, so the times are indicative | GS, Fast-IAMB, and HITON-PC: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and bnlearn ran in the same run, one fit after the other, on shared nodes, except GS: its Andrey fits ran after bnlearn's, in separate runs on shared nodes of the same CPU model, so GS's times are indicative | CMB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; CMB, Andrey's PC, and bnlearn ran in the same run, one fit after the other, on shared nodes, so the times are indicative | HITON-MB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; the toolbox's fits and Andrey's ran in separate runs on shared nodes of the same CPU model, so the times are indicative | MMB-by-MMB: AMD EPYC 7713 64-Core Processor for most fits, and AMD EPYC 9534, AMD EPYC 9555, and Intel Xeon nodes for the rest, 1 core per fit, 1 BLAS thread; the authors' code, FCI, and RFCI ran in one run and Andrey's fits in another, each on shared nodes, so the times are indicative | Y-structures: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey and the authors' code ran in the same run, one fit after the other, on shared nodes, so the times are indicative | LDECC and LOAD: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; Andrey, the authors' code, and Andrey's PC ran in separate jobs of one campaign on shared nodes, so the times are indicative | MB-by-MB: AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; MB-by-MB, CMB, and the two PCs ran in separate runs on shared nodes, so the times are indicative",
  "complete": true,
  "pending_fits": 0,
  "incomplete": [],
@@ -12270,6 +12274,2825 @@
      "andrey_tests": 2409.5,
      "comparator_tests": 1704.0,
      "result": "tie"
+    }
+   ]
+  },
+  {
+   "method": "MB-by-MB",
+   "family": "local",
+   "solution": "andrey.mb_by_mb",
+   "setting": "alpha per cell; G-square; blanket='iamb_forward', the default; local_max_depth=5, the default",
+   "paper": "Wang et al. (2014), Tables 1-3, the MB-by-MB rows on Alarm, Hailfinder, and the 45 x 45 chessboard at 500, 1,000, 2,000, and 5,000 rows and significance levels 0.01 and 0.05: the mean over its datasets of the undirected, missing, extra, and reversed edges at a target against the true DAG and their sum (SHD), every node a target on Alarm and Hailfinder and 10 fixed squares on the chessboard",
+   "lane": "mb_by_mb.paper",
+   "output": "edges and their directions at the target",
+   "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; MB-by-MB, CMB, and the two PCs ran in separate runs on shared nodes, so the times are indicative",
+   "cores": 1,
+   "build": "Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with MB-by-MB's independence rule)",
+   "regime": "network_tables",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "shd: per target, the edges at the target against the true DAG, an edge the answer leaves undirected (undirected), a true edge it misses (miss), an edge the DAG lacks (extra), and a directed edge whose direction differs (reverse), shd their sum; a dataset's value is the mean over its targets. The floor uses the shd against the empty answer's, the target's degree. Cost per answer, what answering one target costs: MB-by-MB's and CMB's tests at that target, a global PC's whole fit; cost over every target: their sum over the targets, the one fit",
+   "complete": true,
+   "rows": [
+    {
+     "network": "alarm",
+     "d": 37,
+     "targets": 37,
+     "n": 500,
+     "alpha": 0.01,
+     "seeds": 20,
+     "first_seeds": "0-19",
+     "fresh_seeds": "20-39",
+     "andrey_undirected_mean": 0.4027,
+     "andrey_miss_mean": 0.7365,
+     "andrey_extra_mean": 0.0351,
+     "andrey_reverse_mean": 0.0986,
+     "andrey_shd_mean": 1.273,
+     "paper_undirected_mean": 0.59,
+     "paper_miss_mean": 1.16,
+     "paper_extra_mean": 0.08,
+     "paper_reverse_mean": 0.09,
+     "paper_shd_mean": 1.92,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 1.5243,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.2514,
+        "bootstrap_95": [
+         -0.3486,
+         -0.1568
+        ]
+       },
+       "fresh_shd_mean": 1.5568,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.2905,
+        "bootstrap_95": [
+         -0.3946,
+         -0.1973
+        ]
+       },
+       "verdict": "better"
+      },
+      "bnlearn.pc-stable.graph": {
+       "shd_mean": 2.2459,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.973,
+        "bootstrap_95": [
+         -1.0892,
+         -0.8554
+        ]
+       },
+       "fresh_shd_mean": 2.3,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -1.0338,
+        "bootstrap_95": [
+         -1.1189,
+         -0.9419
+        ]
+       },
+       "verdict": "better"
+      },
+      "andrey.cmb": {
+       "shd_mean": 1.7446,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.4716,
+        "bootstrap_95": [
+         -0.5595,
+         -0.3811
+        ]
+       },
+       "fresh_shd_mean": 1.7473,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.4811,
+        "bootstrap_95": [
+         -0.5689,
+         -0.3946
+        ]
+       },
+       "verdict": "better"
+      }
+     },
+     "fresh": {
+      "seeds": 20,
+      "andrey_shd_mean": 1.2662
+     },
+     "empty_shd_mean": 2.4865,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean_D": -1.2135,
+       "bootstrap_95": [
+        -1.2919,
+        -1.1351
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 343.3324,
+       "tests_all_targets": 12703.3,
+       "seconds_per_answer": 0.0377,
+       "seconds_all_targets": 1.3957
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 3953.65,
+       "tests_all_targets": 3953.65,
+       "seconds_per_answer": 0.3311,
+       "seconds_all_targets": 0.3311
+      },
+      "bnlearn.pc-stable.graph": {
+       "tests_per_answer": 2596.05,
+       "tests_all_targets": 2596.05,
+       "seconds_per_answer": 0.4884,
+       "seconds_all_targets": 0.4884
+      },
+      "andrey.cmb": {
+       "tests_per_answer": 742.4392,
+       "tests_all_targets": 27470.25,
+       "seconds_per_answer": 0.1907,
+       "seconds_all_targets": 7.057
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 1.372
+    },
+    {
+     "network": "alarm",
+     "d": 37,
+     "targets": 37,
+     "n": 500,
+     "alpha": 0.05,
+     "seeds": 20,
+     "first_seeds": "0-19",
+     "fresh_seeds": "20-39",
+     "andrey_undirected_mean": 0.3568,
+     "andrey_miss_mean": 0.6459,
+     "andrey_extra_mean": 0.1297,
+     "andrey_reverse_mean": 0.1514,
+     "andrey_shd_mean": 1.2838,
+     "paper_undirected_mean": 0.39,
+     "paper_miss_mean": 1.02,
+     "paper_extra_mean": 0.25,
+     "paper_reverse_mean": 0.23,
+     "paper_shd_mean": 1.89,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 1.3405,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.0568,
+        "bootstrap_95": [
+         -0.1716,
+         0.0581
+        ]
+       },
+       "fresh_shd_mean": 1.3216,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.0243,
+        "bootstrap_95": [
+         -0.1405,
+         0.0919
+        ]
+       },
+       "verdict": "tie"
+      },
+      "bnlearn.pc-stable.graph": {
+       "shd_mean": 2.2324,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.9486,
+        "bootstrap_95": [
+         -1.0365,
+         -0.8568
+        ]
+       },
+       "fresh_shd_mean": 2.2135,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.9162,
+        "bootstrap_95": [
+         -0.996,
+         -0.8243
+        ]
+       },
+       "verdict": "better"
+      },
+      "andrey.cmb": {
+       "shd_mean": 1.6027,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.3189,
+        "bootstrap_95": [
+         -0.4284,
+         -0.2176
+        ]
+       },
+       "fresh_shd_mean": 1.5919,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.2946,
+        "bootstrap_95": [
+         -0.4216,
+         -0.1662
+        ]
+       },
+       "verdict": "better"
+      }
+     },
+     "fresh": {
+      "seeds": 20,
+      "andrey_shd_mean": 1.2973
+     },
+     "empty_shd_mean": 2.4865,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean_D": -1.2027,
+       "bootstrap_95": [
+        -1.2743,
+        -1.1338
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 509.5581,
+       "tests_all_targets": 18853.65,
+       "seconds_per_answer": 0.0613,
+       "seconds_all_targets": 2.2674
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 5073.95,
+       "tests_all_targets": 5073.95,
+       "seconds_per_answer": 0.4299,
+       "seconds_all_targets": 0.4299
+      },
+      "bnlearn.pc-stable.graph": {
+       "tests_per_answer": 3002.0,
+       "tests_all_targets": 3002.0,
+       "seconds_per_answer": 0.4975,
+       "seconds_all_targets": 0.4975
+      },
+      "andrey.cmb": {
+       "tests_per_answer": 960.0703,
+       "tests_all_targets": 35522.6,
+       "seconds_per_answer": 0.2514,
+       "seconds_all_targets": 9.3035
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 2.237
+    },
+    {
+     "network": "alarm",
+     "d": 37,
+     "targets": 37,
+     "n": 1000,
+     "alpha": 0.01,
+     "seeds": 20,
+     "first_seeds": "0-19",
+     "fresh_seeds": "20-39",
+     "andrey_undirected_mean": 0.3676,
+     "andrey_miss_mean": 0.4973,
+     "andrey_extra_mean": 0.0378,
+     "andrey_reverse_mean": 0.1351,
+     "andrey_shd_mean": 1.0378,
+     "paper_undirected_mean": 0.45,
+     "paper_miss_mean": 0.79,
+     "paper_extra_mean": 0.05,
+     "paper_reverse_mean": 0.11,
+     "paper_shd_mean": 1.4,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 1.1459,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.1081,
+        "bootstrap_95": [
+         -0.2068,
+         -0.0027
+        ]
+       },
+       "fresh_shd_mean": 1.1189,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.0311,
+        "bootstrap_95": [
+         -0.1378,
+         0.0716
+        ]
+       },
+       "verdict": "better"
+      },
+      "bnlearn.pc-stable.graph": {
+       "shd_mean": 1.9135,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.8757,
+        "bootstrap_95": [
+         -0.977,
+         -0.7784
+        ]
+       },
+       "fresh_shd_mean": 1.9757,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.8878,
+        "bootstrap_95": [
+         -0.9892,
+         -0.7946
+        ]
+       },
+       "verdict": "better"
+      },
+      "andrey.cmb": {
+       "shd_mean": 0.9824,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.0554,
+        "bootstrap_95": [
+         -0.0676,
+         0.1784
+        ]
+       },
+       "fresh_shd_mean": 0.9649,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.123,
+        "bootstrap_95": [
+         0.0405,
+         0.2054
+        ]
+       },
+       "verdict": "tie"
+      }
+     },
+     "fresh": {
+      "seeds": 20,
+      "andrey_shd_mean": 1.0878
+     },
+     "empty_shd_mean": 2.4865,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean_D": -1.4486,
+       "bootstrap_95": [
+        -1.5284,
+        -1.3703
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 388.373,
+       "tests_all_targets": 14369.8,
+       "seconds_per_answer": 0.0544,
+       "seconds_all_targets": 2.0145
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 4763.8,
+       "tests_all_targets": 4763.8,
+       "seconds_per_answer": 0.4083,
+       "seconds_all_targets": 0.4083
+      },
+      "bnlearn.pc-stable.graph": {
+       "tests_per_answer": 3096.05,
+       "tests_all_targets": 3096.05,
+       "seconds_per_answer": 0.5429,
+       "seconds_all_targets": 0.5429
+      },
+      "andrey.cmb": {
+       "tests_per_answer": 835.9459,
+       "tests_all_targets": 30930.0,
+       "seconds_per_answer": 0.2247,
+       "seconds_all_targets": 8.3133
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 1.867
+    },
+    {
+     "network": "alarm",
+     "d": 37,
+     "targets": 37,
+     "n": 1000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "first_seeds": "0-19",
+     "fresh_seeds": "20-39",
+     "andrey_undirected_mean": 0.4176,
+     "andrey_miss_mean": 0.4581,
+     "andrey_extra_mean": 0.1081,
+     "andrey_reverse_mean": 0.1203,
+     "andrey_shd_mean": 1.1041,
+     "paper_undirected_mean": 0.3,
+     "paper_miss_mean": 0.7,
+     "paper_extra_mean": 0.21,
+     "paper_reverse_mean": 0.24,
+     "paper_shd_mean": 1.45,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 1.0919,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.0122,
+        "bootstrap_95": [
+         -0.0676,
+         0.0905
+        ]
+       },
+       "fresh_shd_mean": 1.1135,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.0459,
+        "bootstrap_95": [
+         -0.0365,
+         0.1284
+        ]
+       },
+       "verdict": "tie"
+      },
+      "bnlearn.pc-stable.graph": {
+       "shd_mean": 1.8216,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.7176,
+        "bootstrap_95": [
+         -0.7703,
+         -0.6622
+        ]
+       },
+       "fresh_shd_mean": 1.8811,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.7216,
+        "bootstrap_95": [
+         -0.8162,
+         -0.6351
+        ]
+       },
+       "verdict": "better"
+      },
+      "andrey.cmb": {
+       "shd_mean": 0.9122,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.1919,
+        "bootstrap_95": [
+         0.0743,
+         0.3
+        ]
+       },
+       "fresh_shd_mean": 0.7878,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.3716,
+        "bootstrap_95": [
+         0.2959,
+         0.4446
+        ]
+       },
+       "verdict": "worse"
+      }
+     },
+     "fresh": {
+      "seeds": 20,
+      "andrey_shd_mean": 1.1595
+     },
+     "empty_shd_mean": 2.4865,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean_D": -1.3824,
+       "bootstrap_95": [
+        -1.4351,
+        -1.3284
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 612.8541,
+       "tests_all_targets": 22675.6,
+       "seconds_per_answer": 0.0789,
+       "seconds_all_targets": 2.9194
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 5806.3,
+       "tests_all_targets": 5806.3,
+       "seconds_per_answer": 0.5407,
+       "seconds_all_targets": 0.5407
+      },
+      "bnlearn.pc-stable.graph": {
+       "tests_per_answer": 3521.15,
+       "tests_all_targets": 3521.15,
+       "seconds_per_answer": 0.6683,
+       "seconds_all_targets": 0.6683
+      },
+      "andrey.cmb": {
+       "tests_per_answer": 1012.8811,
+       "tests_all_targets": 37476.6,
+       "seconds_per_answer": 0.3212,
+       "seconds_all_targets": 11.8834
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 2.988
+    },
+    {
+     "network": "alarm",
+     "d": 37,
+     "targets": 37,
+     "n": 2000,
+     "alpha": 0.01,
+     "seeds": 20,
+     "first_seeds": "0-19",
+     "fresh_seeds": "20-39",
+     "andrey_undirected_mean": 0.473,
+     "andrey_miss_mean": 0.4068,
+     "andrey_extra_mean": 0.0446,
+     "andrey_reverse_mean": 0.0541,
+     "andrey_shd_mean": 0.9784,
+     "paper_undirected_mean": 0.3,
+     "paper_miss_mean": 0.53,
+     "paper_extra_mean": 0.04,
+     "paper_reverse_mean": 0.12,
+     "paper_shd_mean": 0.99,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 0.9838,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.0054,
+        "bootstrap_95": [
+         -0.0554,
+         0.0473
+        ]
+       },
+       "fresh_shd_mean": 0.9676,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.05,
+        "bootstrap_95": [
+         -0.1041,
+         0.0027
+        ]
+       },
+       "verdict": "tie"
+      },
+      "bnlearn.pc-stable.graph": {
+       "shd_mean": 1.7135,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.7351,
+        "bootstrap_95": [
+         -0.8473,
+         -0.6243
+        ]
+       },
+       "fresh_shd_mean": 1.6811,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.7635,
+        "bootstrap_95": [
+         -0.8622,
+         -0.6581
+        ]
+       },
+       "verdict": "better"
+      },
+      "andrey.cmb": {
+       "shd_mean": 0.773,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.2054,
+        "bootstrap_95": [
+         0.0932,
+         0.3162
+        ]
+       },
+       "fresh_shd_mean": 0.7527,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.1649,
+        "bootstrap_95": [
+         0.0743,
+         0.2514
+        ]
+       },
+       "verdict": "worse"
+      }
+     },
+     "fresh": {
+      "seeds": 20,
+      "andrey_shd_mean": 0.9176
+     },
+     "empty_shd_mean": 2.4865,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean_D": -1.5081,
+       "bootstrap_95": [
+        -1.5568,
+        -1.4635
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 452.2635,
+       "tests_all_targets": 16733.75,
+       "seconds_per_answer": 0.0676,
+       "seconds_all_targets": 2.5027
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 5533.45,
+       "tests_all_targets": 5533.45,
+       "seconds_per_answer": 0.5916,
+       "seconds_all_targets": 0.5916
+      },
+      "bnlearn.pc-stable.graph": {
+       "tests_per_answer": 3672.7,
+       "tests_all_targets": 3672.7,
+       "seconds_per_answer": 0.7586,
+       "seconds_all_targets": 0.7586
+      },
+      "andrey.cmb": {
+       "tests_per_answer": 943.9162,
+       "tests_all_targets": 34924.9,
+       "seconds_per_answer": 0.2978,
+       "seconds_all_targets": 11.0168
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 2.487
+    },
+    {
+     "network": "alarm",
+     "d": 37,
+     "targets": 37,
+     "n": 2000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "first_seeds": "0-19",
+     "fresh_seeds": "20-39",
+     "andrey_undirected_mean": 0.4541,
+     "andrey_miss_mean": 0.3622,
+     "andrey_extra_mean": 0.0946,
+     "andrey_reverse_mean": 0.0757,
+     "andrey_shd_mean": 0.9865,
+     "paper_undirected_mean": 0.24,
+     "paper_miss_mean": 0.49,
+     "paper_extra_mean": 0.18,
+     "paper_reverse_mean": 0.21,
+     "paper_shd_mean": 1.11,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 0.9135,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.073,
+        "bootstrap_95": [
+         -0.0216,
+         0.1811
+        ]
+       },
+       "fresh_shd_mean": 0.8297,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.0743,
+        "bootstrap_95": [
+         -0.0054,
+         0.1554
+        ]
+       },
+       "verdict": "tie"
+      },
+      "bnlearn.pc-stable.graph": {
+       "shd_mean": 1.7811,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.7946,
+        "bootstrap_95": [
+         -0.8676,
+         -0.7176
+        ]
+       },
+       "fresh_shd_mean": 1.7703,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.8662,
+        "bootstrap_95": [
+         -0.9365,
+         -0.7878
+        ]
+       },
+       "verdict": "better"
+      },
+      "andrey.cmb": {
+       "shd_mean": 0.7676,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.2189,
+        "bootstrap_95": [
+         0.1108,
+         0.3351
+        ]
+       },
+       "fresh_shd_mean": 0.7216,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.1824,
+        "bootstrap_95": [
+         0.0946,
+         0.2649
+        ]
+       },
+       "verdict": "worse"
+      }
+     },
+     "fresh": {
+      "seeds": 20,
+      "andrey_shd_mean": 0.9041
+     },
+     "empty_shd_mean": 2.4865,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean_D": -1.5,
+       "bootstrap_95": [
+        -1.5581,
+        -1.4405
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 687.7932,
+       "tests_all_targets": 25448.35,
+       "seconds_per_answer": 0.1038,
+       "seconds_all_targets": 3.8407
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 6580.65,
+       "tests_all_targets": 6580.65,
+       "seconds_per_answer": 0.5428,
+       "seconds_all_targets": 0.5428
+      },
+      "bnlearn.pc-stable.graph": {
+       "tests_per_answer": 4112.0,
+       "tests_all_targets": 4112.0,
+       "seconds_per_answer": 0.5666,
+       "seconds_all_targets": 0.5666
+      },
+      "andrey.cmb": {
+       "tests_per_answer": 1179.2486,
+       "tests_all_targets": 43632.2,
+       "seconds_per_answer": 0.3748,
+       "seconds_all_targets": 13.8664
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 3.943
+    },
+    {
+     "network": "alarm",
+     "d": 37,
+     "targets": 37,
+     "n": 5000,
+     "alpha": 0.01,
+     "seeds": 20,
+     "first_seeds": "0-19",
+     "fresh_seeds": "20-39",
+     "andrey_undirected_mean": 0.4676,
+     "andrey_miss_mean": 0.2838,
+     "andrey_extra_mean": 0.0432,
+     "andrey_reverse_mean": 0.027,
+     "andrey_shd_mean": 0.8216,
+     "paper_undirected_mean": 0.22,
+     "paper_miss_mean": 0.3,
+     "paper_extra_mean": 0.03,
+     "paper_reverse_mean": 0.08,
+     "paper_shd_mean": 0.63,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 0.6676,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.1541,
+        "bootstrap_95": [
+         0.0514,
+         0.2527
+        ]
+       },
+       "fresh_shd_mean": 0.7054,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.0622,
+        "bootstrap_95": [
+         -0.0311,
+         0.1581
+        ]
+       },
+       "verdict": "tie"
+      },
+      "bnlearn.pc-stable.graph": {
+       "shd_mean": 1.0486,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.227,
+        "bootstrap_95": [
+         -0.277,
+         -0.1797
+        ]
+       },
+       "fresh_shd_mean": 1.0649,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.2973,
+        "bootstrap_95": [
+         -0.3432,
+         -0.2554
+        ]
+       },
+       "verdict": "better"
+      },
+      "andrey.cmb": {
+       "shd_mean": 0.5811,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.2405,
+        "bootstrap_95": [
+         0.1622,
+         0.3162
+        ]
+       },
+       "fresh_shd_mean": 0.5797,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.1878,
+        "bootstrap_95": [
+         0.1108,
+         0.2595
+        ]
+       },
+       "verdict": "worse"
+      }
+     },
+     "fresh": {
+      "seeds": 20,
+      "andrey_shd_mean": 0.7676
+     },
+     "empty_shd_mean": 2.4865,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean_D": -1.6649,
+       "bootstrap_95": [
+        -1.7041,
+        -1.6311
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 576.0446,
+       "tests_all_targets": 21313.65,
+       "seconds_per_answer": 0.1159,
+       "seconds_all_targets": 4.2892
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 6264.2,
+       "tests_all_targets": 6264.2,
+       "seconds_per_answer": 0.7311,
+       "seconds_all_targets": 0.7311
+      },
+      "bnlearn.pc-stable.graph": {
+       "tests_per_answer": 4155.45,
+       "tests_all_targets": 4155.45,
+       "seconds_per_answer": 1.241,
+       "seconds_all_targets": 1.241
+      },
+      "andrey.cmb": {
+       "tests_per_answer": 1128.5135,
+       "tests_all_targets": 41755.0,
+       "seconds_per_answer": 0.4128,
+       "seconds_all_targets": 15.2752
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 4.296
+    },
+    {
+     "network": "alarm",
+     "d": 37,
+     "targets": 37,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "first_seeds": "0-19",
+     "fresh_seeds": "20-39",
+     "andrey_undirected_mean": 0.4068,
+     "andrey_miss_mean": 0.2568,
+     "andrey_extra_mean": 0.0824,
+     "andrey_reverse_mean": 0.0392,
+     "andrey_shd_mean": 0.7851,
+     "paper_undirected_mean": 0.18,
+     "paper_miss_mean": 0.27,
+     "paper_extra_mean": 0.16,
+     "paper_reverse_mean": 0.17,
+     "paper_shd_mean": 0.78,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 0.5081,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.277,
+        "bootstrap_95": [
+         0.1838,
+         0.3676
+        ]
+       },
+       "fresh_shd_mean": 0.573,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.1784,
+        "bootstrap_95": [
+         0.0851,
+         0.2689
+        ]
+       },
+       "verdict": "worse"
+      },
+      "bnlearn.pc-stable.graph": {
+       "shd_mean": 1.0351,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.25,
+        "bootstrap_95": [
+         -0.3108,
+         -0.1865
+        ]
+       },
+       "fresh_shd_mean": 1.0351,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.2838,
+        "bootstrap_95": [
+         -0.3351,
+         -0.2338
+        ]
+       },
+       "verdict": "better"
+      },
+      "andrey.cmb": {
+       "shd_mean": 0.6135,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.1716,
+        "bootstrap_95": [
+         0.0905,
+         0.2568
+        ]
+       },
+       "fresh_shd_mean": 0.5932,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.1581,
+        "bootstrap_95": [
+         0.0621,
+         0.2473
+        ]
+       },
+       "verdict": "worse"
+      }
+     },
+     "fresh": {
+      "seeds": 20,
+      "andrey_shd_mean": 0.7514
+     },
+     "empty_shd_mean": 2.4865,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean_D": -1.7014,
+       "bootstrap_95": [
+        -1.7649,
+        -1.6365
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 930.2014,
+       "tests_all_targets": 34417.45,
+       "seconds_per_answer": 0.1576,
+       "seconds_all_targets": 5.8294
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 7355.3,
+       "tests_all_targets": 7355.3,
+       "seconds_per_answer": 0.8858,
+       "seconds_all_targets": 0.8858
+      },
+      "bnlearn.pc-stable.graph": {
+       "tests_per_answer": 4622.35,
+       "tests_all_targets": 4622.35,
+       "seconds_per_answer": 1.4479,
+       "seconds_all_targets": 1.4479
+      },
+      "andrey.cmb": {
+       "tests_per_answer": 1350.2014,
+       "tests_all_targets": 49957.45,
+       "seconds_per_answer": 0.3729,
+       "seconds_all_targets": 13.7959
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": true,
+      "dominated_all_targets_by": [
+       "andrey.pc.gsq"
+      ]
+     },
+     "andrey_s": 5.463
+    },
+    {
+     "network": "hailfinder",
+     "d": 56,
+     "targets": 56,
+     "n": 500,
+     "alpha": 0.01,
+     "seeds": 20,
+     "first_seeds": "0-19",
+     "fresh_seeds": "20-39",
+     "andrey_undirected_mean": 0.2866,
+     "andrey_miss_mean": 1.2777,
+     "andrey_extra_mean": 0.075,
+     "andrey_reverse_mean": 0.0232,
+     "andrey_shd_mean": 1.6625,
+     "paper_undirected_mean": 0.42,
+     "paper_miss_mean": 1.71,
+     "paper_extra_mean": 0.12,
+     "paper_reverse_mean": 0.27,
+     "paper_shd_mean": 2.51,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 1.6911,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.0286,
+        "bootstrap_95": [
+         -0.0661,
+         0.0027
+        ]
+       },
+       "fresh_shd_mean": 1.6946,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.0554,
+        "bootstrap_95": [
+         -0.0857,
+         -0.0259
+        ]
+       },
+       "verdict": "tie"
+      },
+      "bnlearn.pc-stable.graph": {
+       "shd_mean": 2.0536,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.3911,
+        "bootstrap_95": [
+         -0.4214,
+         -0.3598
+        ]
+       },
+       "fresh_shd_mean": 2.0536,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.4143,
+        "bootstrap_95": [
+         -0.4402,
+         -0.3884
+        ]
+       },
+       "verdict": "better"
+      },
+      "andrey.cmb": {
+       "shd_mean": 3.7598,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -2.0973,
+        "bootstrap_95": [
+         -2.1777,
+         -2.0143
+        ]
+       },
+       "fresh_shd_mean": 3.7625,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -2.1232,
+        "bootstrap_95": [
+         -2.2214,
+         -2.0339
+        ]
+       },
+       "verdict": "better"
+      }
+     },
+     "fresh": {
+      "seeds": 20,
+      "andrey_shd_mean": 1.6393
+     },
+     "empty_shd_mean": 2.3571,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean_D": -0.6946,
+       "bootstrap_95": [
+        -0.7161,
+        -0.6714
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 278.5571,
+       "tests_all_targets": 15599.2,
+       "seconds_per_answer": 0.0336,
+       "seconds_all_targets": 1.8837
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 4976.25,
+       "tests_all_targets": 4976.25,
+       "seconds_per_answer": 0.4327,
+       "seconds_all_targets": 0.4327
+      },
+      "bnlearn.pc-stable.graph": {
+       "tests_per_answer": 3767.05,
+       "tests_all_targets": 3767.05,
+       "seconds_per_answer": 0.7534,
+       "seconds_all_targets": 0.7534
+      },
+      "andrey.cmb": {
+       "tests_per_answer": 3271.1723,
+       "tests_all_targets": 183185.65,
+       "seconds_per_answer": 5.1751,
+       "seconds_all_targets": 289.803
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 1.854
+    },
+    {
+     "network": "hailfinder",
+     "d": 56,
+     "targets": 56,
+     "n": 500,
+     "alpha": 0.05,
+     "seeds": 20,
+     "first_seeds": "0-19",
+     "fresh_seeds": "20-39",
+     "andrey_undirected_mean": 0.2812,
+     "andrey_miss_mean": 1.2366,
+     "andrey_extra_mean": 0.1536,
+     "andrey_reverse_mean": 0.05,
+     "andrey_shd_mean": 1.7214,
+     "paper_undirected_mean": 0.39,
+     "paper_miss_mean": 1.64,
+     "paper_extra_mean": 0.16,
+     "paper_reverse_mean": 0.33,
+     "paper_shd_mean": 2.51,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 1.6857,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.0357,
+        "bootstrap_95": [
+         0.0053,
+         0.0679
+        ]
+       },
+       "fresh_shd_mean": 1.6518,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": 0.0705,
+        "bootstrap_95": [
+         0.0241,
+         0.1152
+        ]
+       },
+       "verdict": "worse"
+      },
+      "bnlearn.pc-stable.graph": {
+       "shd_mean": 2.0946,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.3732,
+        "bootstrap_95": [
+         -0.4179,
+         -0.3304
+        ]
+       },
+       "fresh_shd_mean": 2.0929,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.3705,
+        "bootstrap_95": [
+         -0.4179,
+         -0.3223
+        ]
+       },
+       "verdict": "better"
+      },
+      "andrey.cmb": {
+       "shd_mean": 3.9411,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -2.2196,
+        "bootstrap_95": [
+         -2.3098,
+         -2.1348
+        ]
+       },
+       "fresh_shd_mean": 3.9607,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -2.2384,
+        "bootstrap_95": [
+         -2.3241,
+         -2.1554
+        ]
+       },
+       "verdict": "better"
+      }
+     },
+     "fresh": {
+      "seeds": 20,
+      "andrey_shd_mean": 1.7223
+     },
+     "empty_shd_mean": 2.3571,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean_D": -0.6357,
+       "bootstrap_95": [
+        -0.6706,
+        -0.6009
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 353.7857,
+       "tests_all_targets": 19812.0,
+       "seconds_per_answer": 0.0446,
+       "seconds_all_targets": 2.4987
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 7576.0,
+       "tests_all_targets": 7576.0,
+       "seconds_per_answer": 0.7579,
+       "seconds_all_targets": 0.7579
+      },
+      "bnlearn.pc-stable.graph": {
+       "tests_per_answer": 4202.9,
+       "tests_all_targets": 4202.9,
+       "seconds_per_answer": 1.0639,
+       "seconds_all_targets": 1.0639
+      },
+      "andrey.cmb": {
+       "tests_per_answer": 5170.4661,
+       "tests_all_targets": 289546.1,
+       "seconds_per_answer": 15.0223,
+       "seconds_all_targets": 841.2493
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": true,
+      "dominated_all_targets_by": [
+       "andrey.pc.gsq"
+      ]
+     },
+     "andrey_s": 2.48
+    },
+    {
+     "network": "hailfinder",
+     "d": 56,
+     "targets": 56,
+     "n": 1000,
+     "alpha": 0.01,
+     "seeds": 20,
+     "first_seeds": "0-19",
+     "fresh_seeds": "20-39",
+     "andrey_undirected_mean": 0.2125,
+     "andrey_miss_mean": 1.1884,
+     "andrey_extra_mean": 0.0812,
+     "andrey_reverse_mean": 0.0205,
+     "andrey_shd_mean": 1.5027,
+     "paper_undirected_mean": 0.48,
+     "paper_miss_mean": 1.46,
+     "paper_extra_mean": 0.14,
+     "paper_reverse_mean": 0.23,
+     "paper_shd_mean": 2.31,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 1.6,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.0973,
+        "bootstrap_95": [
+         -0.1214,
+         -0.0723
+        ]
+       },
+       "fresh_shd_mean": 1.6071,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.1187,
+        "bootstrap_95": [
+         -0.1482,
+         -0.0884
+        ]
+       },
+       "verdict": "better"
+      },
+      "bnlearn.pc-stable.graph": {
+       "shd_mean": 1.8679,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.3652,
+        "bootstrap_95": [
+         -0.3884,
+         -0.3393
+        ]
+       },
+       "fresh_shd_mean": 1.8714,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.383,
+        "bootstrap_95": [
+         -0.4161,
+         -0.3518
+        ]
+       },
+       "verdict": "better"
+      },
+      "andrey.cmb": {
+       "shd_mean": 3.0018,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -1.4991,
+        "bootstrap_95": [
+         -1.5893,
+         -1.4143
+        ]
+       },
+       "fresh_shd_mean": 2.9339,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -1.4455,
+        "bootstrap_95": [
+         -1.5277,
+         -1.3714
+        ]
+       },
+       "verdict": "better"
+      }
+     },
+     "fresh": {
+      "seeds": 20,
+      "andrey_shd_mean": 1.4884
+     },
+     "empty_shd_mean": 2.3571,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean_D": -0.8545,
+       "bootstrap_95": [
+        -0.8714,
+        -0.8348
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 284.283,
+       "tests_all_targets": 15919.85,
+       "seconds_per_answer": 0.0436,
+       "seconds_all_targets": 2.4443
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 6514.8,
+       "tests_all_targets": 6514.8,
+       "seconds_per_answer": 0.9073,
+       "seconds_all_targets": 0.9073
+      },
+      "bnlearn.pc-stable.graph": {
+       "tests_per_answer": 4356.85,
+       "tests_all_targets": 4356.85,
+       "seconds_per_answer": 1.1618,
+       "seconds_all_targets": 1.1618
+      },
+      "andrey.cmb": {
+       "tests_per_answer": 3480.0607,
+       "tests_all_targets": 194883.4,
+       "seconds_per_answer": 6.0256,
+       "seconds_all_targets": 337.4357
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 2.422
+    },
+    {
+     "network": "hailfinder",
+     "d": 56,
+     "targets": 56,
+     "n": 1000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "first_seeds": "0-19",
+     "fresh_seeds": "20-39",
+     "andrey_undirected_mean": 0.2223,
+     "andrey_miss_mean": 1.1545,
+     "andrey_extra_mean": 0.1286,
+     "andrey_reverse_mean": 0.0366,
+     "andrey_shd_mean": 1.542,
+     "paper_undirected_mean": 0.34,
+     "paper_miss_mean": 1.4,
+     "paper_extra_mean": 0.19,
+     "paper_reverse_mean": 0.36,
+     "paper_shd_mean": 2.3,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 1.6036,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.0616,
+        "bootstrap_95": [
+         -0.0973,
+         -0.025
+        ]
+       },
+       "fresh_shd_mean": 1.6089,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.0732,
+        "bootstrap_95": [
+         -0.117,
+         -0.0357
+        ]
+       },
+       "verdict": "better"
+      },
+      "bnlearn.pc-stable.graph": {
+       "shd_mean": 1.8929,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.3509,
+        "bootstrap_95": [
+         -0.3848,
+         -0.317
+        ]
+       },
+       "fresh_shd_mean": 1.8911,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.3554,
+        "bootstrap_95": [
+         -0.3955,
+         -0.3161
+        ]
+       },
+       "verdict": "better"
+      },
+      "andrey.cmb": {
+       "shd_mean": 3.1321,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -1.5902,
+        "bootstrap_95": [
+         -1.6679,
+         -1.5188
+        ]
+       },
+       "fresh_shd_mean": 3.0839,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -1.5482,
+        "bootstrap_95": [
+         -1.658,
+         -1.4518
+        ]
+       },
+       "verdict": "better"
+      }
+     },
+     "fresh": {
+      "seeds": 20,
+      "andrey_shd_mean": 1.5357
+     },
+     "empty_shd_mean": 2.3571,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean_D": -0.8152,
+       "bootstrap_95": [
+        -0.8375,
+        -0.7929
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 369.1187,
+       "tests_all_targets": 20670.65,
+       "seconds_per_answer": 0.0585,
+       "seconds_all_targets": 3.2778
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 9451.0,
+       "tests_all_targets": 9451.0,
+       "seconds_per_answer": 1.1777,
+       "seconds_all_targets": 1.1777
+      },
+      "bnlearn.pc-stable.graph": {
+       "tests_per_answer": 4983.0,
+       "tests_all_targets": 4983.0,
+       "seconds_per_answer": 1.187,
+       "seconds_all_targets": 1.187
+      },
+      "andrey.cmb": {
+       "tests_per_answer": 4394.467,
+       "tests_all_targets": 246090.15,
+       "seconds_per_answer": 8.3565,
+       "seconds_all_targets": 467.9631
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 3.244
+    },
+    {
+     "network": "hailfinder",
+     "d": 56,
+     "targets": 56,
+     "n": 2000,
+     "alpha": 0.01,
+     "seeds": 20,
+     "first_seeds": "0-19",
+     "fresh_seeds": "20-39",
+     "andrey_undirected_mean": 0.1982,
+     "andrey_miss_mean": 1.1143,
+     "andrey_extra_mean": 0.1,
+     "andrey_reverse_mean": 0.0295,
+     "andrey_shd_mean": 1.442,
+     "paper_undirected_mean": 0.4,
+     "paper_miss_mean": 1.11,
+     "paper_extra_mean": 0.14,
+     "paper_reverse_mean": 0.3,
+     "paper_shd_mean": 1.95,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 1.525,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.083,
+        "bootstrap_95": [
+         -0.1134,
+         -0.0509
+        ]
+       },
+       "fresh_shd_mean": 1.5268,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.0848,
+        "bootstrap_95": [
+         -0.1098,
+         -0.0598
+        ]
+       },
+       "verdict": "better"
+      },
+      "bnlearn.pc-stable.graph": {
+       "shd_mean": 1.7214,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.2795,
+        "bootstrap_95": [
+         -0.3304,
+         -0.225
+        ]
+       },
+       "fresh_shd_mean": 1.6804,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.2384,
+        "bootstrap_95": [
+         -0.2804,
+         -0.1991
+        ]
+       },
+       "verdict": "better"
+      },
+      "andrey.cmb": {
+       "shd_mean": 2.1107,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.6687,
+        "bootstrap_95": [
+         -0.7027,
+         -0.6268
+        ]
+       },
+       "fresh_shd_mean": 2.1125,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.6705,
+        "bootstrap_95": [
+         -0.6929,
+         -0.6455
+        ]
+       },
+       "verdict": "better"
+      }
+     },
+     "fresh": {
+      "seeds": 20,
+      "andrey_shd_mean": 1.442
+     },
+     "empty_shd_mean": 2.3571,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean_D": -0.9152,
+       "bootstrap_95": [
+        -0.9339,
+        -0.8946
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 314.6295,
+       "tests_all_targets": 17619.25,
+       "seconds_per_answer": 0.0617,
+       "seconds_all_targets": 3.4532
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 8223.35,
+       "tests_all_targets": 8223.35,
+       "seconds_per_answer": 0.8735,
+       "seconds_all_targets": 0.8735
+      },
+      "bnlearn.pc-stable.graph": {
+       "tests_per_answer": 5099.35,
+       "tests_all_targets": 5099.35,
+       "seconds_per_answer": 1.4411,
+       "seconds_all_targets": 1.4411
+      },
+      "andrey.cmb": {
+       "tests_per_answer": 869.9232,
+       "tests_all_targets": 48715.7,
+       "seconds_per_answer": 0.3601,
+       "seconds_all_targets": 20.1679
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 3.338
+    },
+    {
+     "network": "hailfinder",
+     "d": 56,
+     "targets": 56,
+     "n": 2000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "first_seeds": "0-19",
+     "fresh_seeds": "20-39",
+     "andrey_undirected_mean": 0.217,
+     "andrey_miss_mean": 1.0893,
+     "andrey_extra_mean": 0.1625,
+     "andrey_reverse_mean": 0.0393,
+     "andrey_shd_mean": 1.508,
+     "paper_undirected_mean": 0.25,
+     "paper_miss_mean": 1.1,
+     "paper_extra_mean": 0.2,
+     "paper_reverse_mean": 0.47,
+     "paper_shd_mean": 2.02,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 1.575,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.067,
+        "bootstrap_95": [
+         -0.1045,
+         -0.0312
+        ]
+       },
+       "fresh_shd_mean": 1.5714,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.0991,
+        "bootstrap_95": [
+         -0.133,
+         -0.0652
+        ]
+       },
+       "verdict": "better"
+      },
+      "bnlearn.pc-stable.graph": {
+       "shd_mean": 1.8464,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.3384,
+        "bootstrap_95": [
+         -0.3955,
+         -0.2786
+        ]
+       },
+       "fresh_shd_mean": 1.825,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.3527,
+        "bootstrap_95": [
+         -0.4098,
+         -0.2938
+        ]
+       },
+       "verdict": "better"
+      },
+      "andrey.cmb": {
+       "shd_mean": 2.1652,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.6571,
+        "bootstrap_95": [
+         -0.7188,
+         -0.5821
+        ]
+       },
+       "fresh_shd_mean": 2.2,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.7277,
+        "bootstrap_95": [
+         -0.7705,
+         -0.6866
+        ]
+       },
+       "verdict": "better"
+      }
+     },
+     "fresh": {
+      "seeds": 20,
+      "andrey_shd_mean": 1.4723
+     },
+     "empty_shd_mean": 2.3571,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean_D": -0.8491,
+       "bootstrap_95": [
+        -0.8857,
+        -0.8098
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 426.4116,
+       "tests_all_targets": 23879.05,
+       "seconds_per_answer": 0.0778,
+       "seconds_all_targets": 4.3591
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 11422.9,
+       "tests_all_targets": 11422.9,
+       "seconds_per_answer": 1.1197,
+       "seconds_all_targets": 1.1197
+      },
+      "bnlearn.pc-stable.graph": {
+       "tests_per_answer": 5879.3,
+       "tests_all_targets": 5879.3,
+       "seconds_per_answer": 1.5312,
+       "seconds_all_targets": 1.5312
+      },
+      "andrey.cmb": {
+       "tests_per_answer": 1214.8107,
+       "tests_all_targets": 68029.4,
+       "seconds_per_answer": 0.4931,
+       "seconds_all_targets": 27.616
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 4.317
+    },
+    {
+     "network": "hailfinder",
+     "d": 56,
+     "targets": 56,
+     "n": 5000,
+     "alpha": 0.01,
+     "seeds": 20,
+     "first_seeds": "0-19",
+     "fresh_seeds": "20-39",
+     "andrey_undirected_mean": 0.1875,
+     "andrey_miss_mean": 1.0375,
+     "andrey_extra_mean": 0.1232,
+     "andrey_reverse_mean": 0.0312,
+     "andrey_shd_mean": 1.3795,
+     "paper_undirected_mean": 0.19,
+     "paper_miss_mean": 0.91,
+     "paper_extra_mean": 0.12,
+     "paper_reverse_mean": 0.22,
+     "paper_shd_mean": 1.44,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 1.4482,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.0687,
+        "bootstrap_95": [
+         -0.1125,
+         -0.0259
+        ]
+       },
+       "fresh_shd_mean": 1.4143,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.0679,
+        "bootstrap_95": [
+         -0.0964,
+         -0.0393
+        ]
+       },
+       "verdict": "better"
+      },
+      "bnlearn.pc-stable.graph": {
+       "shd_mean": 1.6589,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.2795,
+        "bootstrap_95": [
+         -0.3357,
+         -0.2241
+        ]
+       },
+       "fresh_shd_mean": 1.6125,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.2661,
+        "bootstrap_95": [
+         -0.3063,
+         -0.2268
+        ]
+       },
+       "verdict": "better"
+      },
+      "andrey.cmb": {
+       "shd_mean": 1.4259,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.0464,
+        "bootstrap_95": [
+         -0.0848,
+         -0.0089
+        ]
+       },
+       "fresh_shd_mean": 1.3991,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.0527,
+        "bootstrap_95": [
+         -0.0732,
+         -0.0295
+        ]
+       },
+       "verdict": "better"
+      }
+     },
+     "fresh": {
+      "seeds": 20,
+      "andrey_shd_mean": 1.3464
+     },
+     "empty_shd_mean": 2.3571,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean_D": -0.9777,
+       "bootstrap_95": [
+        -1.0134,
+        -0.942
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 404.9241,
+       "tests_all_targets": 22675.75,
+       "seconds_per_answer": 0.1153,
+       "seconds_all_targets": 6.4592
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 10720.45,
+       "tests_all_targets": 10720.45,
+       "seconds_per_answer": 0.92,
+       "seconds_all_targets": 0.92
+      },
+      "bnlearn.pc-stable.graph": {
+       "tests_per_answer": 5984.7,
+       "tests_all_targets": 5984.7,
+       "seconds_per_answer": 1.9992,
+       "seconds_all_targets": 1.9992
+      },
+      "andrey.cmb": {
+       "tests_per_answer": 506.4562,
+       "tests_all_targets": 28361.55,
+       "seconds_per_answer": 0.1836,
+       "seconds_all_targets": 10.2803
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 6.413
+    },
+    {
+     "network": "hailfinder",
+     "d": 56,
+     "targets": 56,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 20,
+     "first_seeds": "0-19",
+     "fresh_seeds": "20-39",
+     "andrey_undirected_mean": 0.183,
+     "andrey_miss_mean": 1.0188,
+     "andrey_extra_mean": 0.1304,
+     "andrey_reverse_mean": 0.0455,
+     "andrey_shd_mean": 1.3777,
+     "paper_undirected_mean": 0.24,
+     "paper_miss_mean": 0.91,
+     "paper_extra_mean": 0.16,
+     "paper_reverse_mean": 0.2,
+     "paper_shd_mean": 1.51,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 1.5768,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.1991,
+        "bootstrap_95": [
+         -0.242,
+         -0.1536
+        ]
+       },
+       "fresh_shd_mean": 1.5304,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.1759,
+        "bootstrap_95": [
+         -0.217,
+         -0.1357
+        ]
+       },
+       "verdict": "better"
+      },
+      "bnlearn.pc-stable.graph": {
+       "shd_mean": 1.8196,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.442,
+        "bootstrap_95": [
+         -0.5054,
+         -0.3812
+        ]
+       },
+       "fresh_shd_mean": 1.7661,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.4116,
+        "bootstrap_95": [
+         -0.4696,
+         -0.3571
+        ]
+       },
+       "verdict": "better"
+      },
+      "andrey.cmb": {
+       "shd_mean": 1.5286,
+       "mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.1509,
+        "bootstrap_95": [
+         -0.1839,
+         -0.1179
+        ]
+       },
+       "fresh_shd_mean": 1.5,
+       "fresh_mb_by_mb_minus": {
+        "paired": 20,
+        "mean_D": -0.1455,
+        "bootstrap_95": [
+         -0.175,
+         -0.1152
+        ]
+       },
+       "verdict": "better"
+      }
+     },
+     "fresh": {
+      "seeds": 20,
+      "andrey_shd_mean": 1.3545
+     },
+     "empty_shd_mean": 2.3571,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean_D": -0.9795,
+       "bootstrap_95": [
+        -1.0098,
+        -0.9491
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 553.083,
+       "tests_all_targets": 30972.65,
+       "seconds_per_answer": 0.1738,
+       "seconds_all_targets": 9.7312
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 14069.8,
+       "tests_all_targets": 14069.8,
+       "seconds_per_answer": 1.2197,
+       "seconds_all_targets": 1.2197
+      },
+      "bnlearn.pc-stable.graph": {
+       "tests_per_answer": 6892.15,
+       "tests_all_targets": 6892.15,
+       "seconds_per_answer": 2.2484,
+       "seconds_all_targets": 2.2484
+      },
+      "andrey.cmb": {
+       "tests_per_answer": 646.0188,
+       "tests_all_targets": 36177.05,
+       "seconds_per_answer": 0.2329,
+       "seconds_all_targets": 13.042
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 9.423
+    },
+    {
+     "network": "chess45",
+     "d": 2025,
+     "targets": 10,
+     "n": 500,
+     "alpha": 0.01,
+     "seeds": 10,
+     "first_seeds": "0-9",
+     "fresh_seeds": "10-19",
+     "andrey_undirected_mean": 0.2,
+     "andrey_miss_mean": 0.85,
+     "andrey_extra_mean": 0.01,
+     "andrey_reverse_mean": 1.09,
+     "andrey_shd_mean": 2.15,
+     "paper_undirected_mean": 0.05,
+     "paper_miss_mean": 0.96,
+     "paper_extra_mean": 0.38,
+     "paper_reverse_mean": 0.66,
+     "paper_shd_mean": 2.05,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 1.88,
+       "mb_by_mb_minus": {
+        "paired": 10,
+        "mean_D": 0.27,
+        "bootstrap_95": [
+         0.04,
+         0.51
+        ]
+       },
+       "fresh_shd_mean": 2.12,
+       "fresh_mb_by_mb_minus": {
+        "paired": 10,
+        "mean_D": 0.21,
+        "bootstrap_95": [
+         0.08,
+         0.35
+        ]
+       },
+       "verdict": "worse"
+      }
+     },
+     "fresh": {
+      "seeds": 10,
+      "andrey_shd_mean": 2.33
+     },
+     "empty_shd_mean": 4.0,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean_D": -1.85,
+       "bootstrap_95": [
+        -2.03,
+        -1.65
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 33460.37,
+       "tests_all_targets": 334603.7,
+       "seconds_per_answer": 4.5058,
+       "seconds_all_targets": 45.0583
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 4401236.9,
+       "tests_all_targets": 4401236.9,
+       "seconds_per_answer": 71.5136,
+       "seconds_all_targets": 71.5136
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 44.196
+    },
+    {
+     "network": "chess45",
+     "d": 2025,
+     "targets": 10,
+     "n": 500,
+     "alpha": 0.05,
+     "seeds": 10,
+     "first_seeds": "0-9",
+     "fresh_seeds": "10-19",
+     "andrey_undirected_mean": 0.2,
+     "andrey_miss_mean": 0.9,
+     "andrey_extra_mean": 0.01,
+     "andrey_reverse_mean": 0.96,
+     "andrey_shd_mean": 2.07,
+     "paper_undirected_mean": 0.01,
+     "paper_miss_mean": 0.93,
+     "paper_extra_mean": 0.69,
+     "paper_reverse_mean": 0.62,
+     "paper_shd_mean": 2.25,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 1.72,
+       "mb_by_mb_minus": {
+        "paired": 10,
+        "mean_D": 0.35,
+        "bootstrap_95": [
+         0.11,
+         0.58
+        ]
+       },
+       "fresh_shd_mean": 1.85,
+       "fresh_mb_by_mb_minus": {
+        "paired": 10,
+        "mean_D": 0.4,
+        "bootstrap_95": [
+         0.23,
+         0.58
+        ]
+       },
+       "verdict": "worse"
+      }
+     },
+     "fresh": {
+      "seeds": 10,
+      "andrey_shd_mean": 2.25
+     },
+     "empty_shd_mean": 4.0,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean_D": -1.93,
+       "bootstrap_95": [
+        -2.07,
+        -1.8
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 43893.79,
+       "tests_all_targets": 438937.9,
+       "seconds_per_answer": 4.7794,
+       "seconds_all_targets": 47.7943
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 29944953.8,
+       "tests_all_targets": 29944953.8,
+       "seconds_per_answer": 275.8009,
+       "seconds_all_targets": 275.8009
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 48.015
+    },
+    {
+     "network": "chess45",
+     "d": 2025,
+     "targets": 10,
+     "n": 1000,
+     "alpha": 0.01,
+     "seeds": 10,
+     "first_seeds": "0-9",
+     "fresh_seeds": "10-19",
+     "andrey_undirected_mean": 0.48,
+     "andrey_miss_mean": 0.28,
+     "andrey_extra_mean": 0.0,
+     "andrey_reverse_mean": 0.88,
+     "andrey_shd_mean": 1.64,
+     "paper_undirected_mean": 0.03,
+     "paper_miss_mean": 0.71,
+     "paper_extra_mean": 0.4,
+     "paper_reverse_mean": 0.58,
+     "paper_shd_mean": 1.72,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 1.35,
+       "mb_by_mb_minus": {
+        "paired": 10,
+        "mean_D": 0.29,
+        "bootstrap_95": [
+         0.16,
+         0.42
+        ]
+       },
+       "fresh_shd_mean": 1.41,
+       "fresh_mb_by_mb_minus": {
+        "paired": 10,
+        "mean_D": 0.57,
+        "bootstrap_95": [
+         0.34,
+         0.77
+        ]
+       },
+       "verdict": "worse"
+      }
+     },
+     "fresh": {
+      "seeds": 10,
+      "andrey_shd_mean": 1.98
+     },
+     "empty_shd_mean": 4.0,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean_D": -2.36,
+       "bootstrap_95": [
+        -2.48,
+        -2.24
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 27446.47,
+       "tests_all_targets": 274464.7,
+       "seconds_per_answer": 4.695,
+       "seconds_all_targets": 46.9495
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 4994680.8,
+       "tests_all_targets": 4994680.8,
+       "seconds_per_answer": 68.921,
+       "seconds_all_targets": 68.921
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 46.542
+    },
+    {
+     "network": "chess45",
+     "d": 2025,
+     "targets": 10,
+     "n": 1000,
+     "alpha": 0.05,
+     "seeds": 10,
+     "first_seeds": "0-9",
+     "fresh_seeds": "10-19",
+     "andrey_undirected_mean": 0.47,
+     "andrey_miss_mean": 0.33,
+     "andrey_extra_mean": 0.0,
+     "andrey_reverse_mean": 0.86,
+     "andrey_shd_mean": 1.66,
+     "paper_undirected_mean": 0.01,
+     "paper_miss_mean": 0.7,
+     "paper_extra_mean": 0.69,
+     "paper_reverse_mean": 0.8,
+     "paper_shd_mean": 2.2,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 1.17,
+       "mb_by_mb_minus": {
+        "paired": 10,
+        "mean_D": 0.49,
+        "bootstrap_95": [
+         0.27,
+         0.7
+        ]
+       },
+       "fresh_shd_mean": 1.39,
+       "fresh_mb_by_mb_minus": {
+        "paired": 10,
+        "mean_D": 0.48,
+        "bootstrap_95": [
+         0.22,
+         0.72
+        ]
+       },
+       "verdict": "worse"
+      }
+     },
+     "fresh": {
+      "seeds": 10,
+      "andrey_shd_mean": 1.87
+     },
+     "empty_shd_mean": 4.0,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean_D": -2.34,
+       "bootstrap_95": [
+        -2.51,
+        -2.19
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 38654.98,
+       "tests_all_targets": 386549.8,
+       "seconds_per_answer": 5.8078,
+       "seconds_all_targets": 58.0781
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 32041489.5,
+       "tests_all_targets": 32041489.5,
+       "seconds_per_answer": 273.3601,
+       "seconds_all_targets": 273.3601
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 57.845
+    },
+    {
+     "network": "chess45",
+     "d": 2025,
+     "targets": 10,
+     "n": 2000,
+     "alpha": 0.01,
+     "seeds": 10,
+     "first_seeds": "0-9",
+     "fresh_seeds": "10-19",
+     "andrey_undirected_mean": 0.7,
+     "andrey_miss_mean": 0.13,
+     "andrey_extra_mean": 0.0,
+     "andrey_reverse_mean": 0.64,
+     "andrey_shd_mean": 1.47,
+     "paper_undirected_mean": 0.01,
+     "paper_miss_mean": 0.34,
+     "paper_extra_mean": 0.39,
+     "paper_reverse_mean": 0.53,
+     "paper_shd_mean": 1.27,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 0.98,
+       "mb_by_mb_minus": {
+        "paired": 10,
+        "mean_D": 0.49,
+        "bootstrap_95": [
+         0.33,
+         0.66
+        ]
+       },
+       "fresh_shd_mean": null,
+       "fresh_mb_by_mb_minus": {
+        "paired": 0,
+        "mean_D": null,
+        "bootstrap_95": null
+       },
+       "verdict": "worse, not replicated"
+      }
+     },
+     "fresh": {
+      "seeds": 10,
+      "andrey_shd_mean": 1.62
+     },
+     "empty_shd_mean": 4.0,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean_D": -2.53,
+       "bootstrap_95": [
+        -2.7,
+        -2.36
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 34173.44,
+       "tests_all_targets": 341734.4,
+       "seconds_per_answer": 5.9495,
+       "seconds_all_targets": 59.4953
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 5798347.1,
+       "tests_all_targets": 5798347.1,
+       "seconds_per_answer": 82.6691,
+       "seconds_all_targets": 82.6691
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 58.857
+    },
+    {
+     "network": "chess45",
+     "d": 2025,
+     "targets": 10,
+     "n": 2000,
+     "alpha": 0.05,
+     "seeds": 10,
+     "first_seeds": "0-9",
+     "fresh_seeds": "10-19",
+     "andrey_undirected_mean": 0.67,
+     "andrey_miss_mean": 0.13,
+     "andrey_extra_mean": 0.0,
+     "andrey_reverse_mean": 0.64,
+     "andrey_shd_mean": 1.44,
+     "paper_undirected_mean": 0.01,
+     "paper_miss_mean": 0.33,
+     "paper_extra_mean": 0.58,
+     "paper_reverse_mean": 0.59,
+     "paper_shd_mean": 1.51,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 1.07,
+       "mb_by_mb_minus": {
+        "paired": 10,
+        "mean_D": 0.37,
+        "bootstrap_95": [
+         0.19,
+         0.53
+        ]
+       },
+       "fresh_shd_mean": null,
+       "fresh_mb_by_mb_minus": {
+        "paired": 0,
+        "mean_D": null,
+        "bootstrap_95": null
+       },
+       "verdict": "worse, not replicated"
+      }
+     },
+     "fresh": {
+      "seeds": 10,
+      "andrey_shd_mean": 1.5
+     },
+     "empty_shd_mean": 4.0,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean_D": -2.56,
+       "bootstrap_95": [
+        -2.71,
+        -2.4
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 51206.27,
+       "tests_all_targets": 512062.7,
+       "seconds_per_answer": 9.8306,
+       "seconds_all_targets": 98.306
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 34874901.8,
+       "tests_all_targets": 34874901.8,
+       "seconds_per_answer": 438.1002,
+       "seconds_all_targets": 438.1002
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 95.035
+    },
+    {
+     "network": "chess45",
+     "d": 2025,
+     "targets": 10,
+     "n": 5000,
+     "alpha": 0.01,
+     "seeds": 10,
+     "first_seeds": "0-9",
+     "fresh_seeds": "10-19",
+     "andrey_undirected_mean": 0.92,
+     "andrey_miss_mean": 0.05,
+     "andrey_extra_mean": 0.0,
+     "andrey_reverse_mean": 0.16,
+     "andrey_shd_mean": 1.13,
+     "paper_undirected_mean": 0.02,
+     "paper_miss_mean": 0.06,
+     "paper_extra_mean": 0.31,
+     "paper_reverse_mean": 0.43,
+     "paper_shd_mean": 0.82,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 0.61,
+       "mb_by_mb_minus": {
+        "paired": 10,
+        "mean_D": 0.52,
+        "bootstrap_95": [
+         0.34,
+         0.69
+        ]
+       },
+       "fresh_shd_mean": null,
+       "fresh_mb_by_mb_minus": {
+        "paired": 0,
+        "mean_D": null,
+        "bootstrap_95": null
+       },
+       "verdict": "worse, not replicated"
+      }
+     },
+     "fresh": {
+      "seeds": 10,
+      "andrey_shd_mean": 1.08
+     },
+     "empty_shd_mean": 4.0,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean_D": -2.87,
+       "bootstrap_95": [
+        -3.09,
+        -2.65
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 56447.21,
+       "tests_all_targets": 564472.1,
+       "seconds_per_answer": 12.4899,
+       "seconds_all_targets": 124.8991
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 7196775.1,
+       "tests_all_targets": 7196775.1,
+       "seconds_per_answer": 151.7051,
+       "seconds_all_targets": 151.7051
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 123.399
+    },
+    {
+     "network": "chess45",
+     "d": 2025,
+     "targets": 10,
+     "n": 5000,
+     "alpha": 0.05,
+     "seeds": 10,
+     "first_seeds": "0-9",
+     "fresh_seeds": "10-19",
+     "andrey_undirected_mean": 0.81,
+     "andrey_miss_mean": 0.05,
+     "andrey_extra_mean": 0.0,
+     "andrey_reverse_mean": 0.16,
+     "andrey_shd_mean": 1.02,
+     "paper_undirected_mean": 0.0,
+     "paper_miss_mean": 0.06,
+     "paper_extra_mean": 0.72,
+     "paper_reverse_mean": 0.69,
+     "paper_shd_mean": 1.47,
+     "against": {
+      "andrey.pc.gsq": {
+       "shd_mean": 0.74,
+       "mb_by_mb_minus": {
+        "paired": 10,
+        "mean_D": 0.28,
+        "bootstrap_95": [
+         0.1,
+         0.48
+        ]
+       },
+       "fresh_shd_mean": null,
+       "fresh_mb_by_mb_minus": {
+        "paired": 0,
+        "mean_D": null,
+        "bootstrap_95": null
+       },
+       "verdict": "worse, not replicated"
+      }
+     },
+     "fresh": {
+      "seeds": 10,
+      "andrey_shd_mean": 0.98
+     },
+     "empty_shd_mean": 4.0,
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 10,
+       "mean_D": -2.98,
+       "bootstrap_95": [
+        -3.21,
+        -2.75
+       ]
+      }
+     },
+     "cost": {
+      "andrey.mb_by_mb": {
+       "tests_per_answer": 92788.23,
+       "tests_all_targets": 927882.3,
+       "seconds_per_answer": 19.8608,
+       "seconds_all_targets": 198.608
+      },
+      "andrey.pc.gsq": {
+       "tests_per_answer": 39111227.1,
+       "tests_all_targets": 39111227.1,
+       "seconds_per_answer": 729.3342,
+       "seconds_all_targets": 729.3342
+      }
+     },
+     "frontier": {
+      "dominated": false,
+      "dominated_by": [],
+      "dominated_all_targets": false,
+      "dominated_all_targets_by": []
+     },
+     "andrey_s": 198.276
     }
    ]
   }

@@ -54,7 +54,7 @@ References
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from itertools import combinations
 from typing import Literal
@@ -110,7 +110,13 @@ class Rules:
     search either way. ``conflicts`` decides an edge that two v-structures direct both ways, with
     the CPDAG rules: ``"undirect"`` leaves it undirected; ``"p_value"`` directs it as the
     v-structure whose pair the tests separated most clearly asks (:func:`resolve_conflicts`), as
-    :func:`~andrey.pc` orients its colliders, and Meek's rules run again.
+    :func:`~andrey.pc` orients its colliders, and Meek's rules run again. ``drop_separated`` decides
+    what a separating set means for the growing graph: ``True`` removes, after every merge, each
+    edge whose pair a test of the run separated, a blanket learner's test included, as MB-by-MB's
+    set of found independencies does ("we certainly determine no edge between X and Y" [1]_ Sec.
+    3.2), and sets the arrowheads again from the merged colliders whose two edges remain
+    (:func:`drop_separated`); ``False`` keeps every merged edge, and a separating set is read by the
+    orientation rules alone.
 
     R3 can stop the search before the target's marks are those of the PAG: it stops at an edge
     ``t o-> v`` whose circle a discriminating path through ``v`` decides, as on the DAG
@@ -133,6 +139,7 @@ class Rules:
     stop: Literal["blocked", "r1_r3", "r1_r2"] = "blocked"
     colliders: Literal["local", "own_blanket"] = "local"
     stop_after: Literal["first", "degree"] = "first"
+    drop_separated: bool = False
     conflicts: Literal["undirect", "p_value"] = "undirect"
 
     def __post_init__(self) -> None:
@@ -154,7 +161,7 @@ class Rules:
 
 
 #: MB-by-MB as Wang et al. state it [1]_.
-MB_BY_MB = Rules()
+MB_BY_MB = Rules(drop_separated=True)
 #: MB-by-MB as LOAD runs it ([3]_ Alg. 11): the skeleton step of PC in place of IC's search, and an
 #: edge two v-structures direct both ways directed as the one most clearly separated asks.
 LOAD = Rules(local="skeleton", conflicts="p_value")
@@ -195,14 +202,16 @@ class Cache:
     :class:`~andrey.constraint.blanket.LocalSearch`, as LOAD runs the search for several targets
     ([3]_ Alg. 11): each variable's blanket in joining order, each local structure, a separating
     set for each pair a test separated, keyed by the pair, the first one found, with the p-value
-    of the set that first separated it in a local structure, and the own local structures the
-    collider check learned, with their separating sets (:func:`own_step`)."""
+    of the set that first separated it in a local structure, the own local structures the
+    collider check learned, with their separating sets (:func:`own_step`), and the colliders the
+    local structures learned from the data found."""
 
     blankets: dict[int, list[int]] = field(default_factory=dict)
     local: dict[int, LocalGraph] = field(default_factory=dict)
     sepsets: dict[Pair, tuple[int, ...]] = field(default_factory=dict)
     pvalues: dict[Pair, float] = field(default_factory=dict)
     own: dict[int, tuple[LocalGraph, dict[Pair, tuple[int, ...]]]] = field(default_factory=dict)
+    colliders: set[Triple] = field(default_factory=set)
 
     def separate(self, u: int, v: int, sepset: Iterable[int]) -> None:
         """Record ``sepset`` for ``(u, v)`` unless the pair has one."""
@@ -221,6 +230,8 @@ class Network:
         self.nodes: list[int] = []
         self.index: dict[int, int] = {}
         self._marks = np.zeros((0, 0), dtype=np.int8)
+        #: The colliders :func:`merge` put in, of those ``learned`` it was given, in order.
+        self.colliders: dict[Triple, None] = {}
 
     @property
     def marks(self) -> np.ndarray:
@@ -387,8 +398,10 @@ def sequential(
             )
             if rules.colliders == "own_blanket":
                 local = confirm_colliders(local, x, search, own)
-            merge(network, local, x)
+            merge(network, local, x, cache.colliders)
             merged += [t for t in local.colliders if x in t]
+            if rules.drop_separated:
+                drop_separated(network, cache.sepsets)
             if decided is not None:
                 direct(network, decided)
             if known is not None:
@@ -464,6 +477,7 @@ def _local_structure(
             local = network.local(sorted(nodes))
         else:
             local = learn_local(search, x, mb, how, cache, depth=depth, of=of)
+            cache.colliders.update(local.colliders)
     cache.local[x] = local
     return local
 
@@ -646,11 +660,14 @@ def confirm_colliders(
     return replace(local, colliders=frozenset(kept))
 
 
-def merge(network: Network, local: LocalGraph, x: int) -> None:
+def merge(
+    network: Network, local: LocalGraph, x: int, learned: Collection[Triple] = frozenset()
+) -> None:
     """Put into ``network`` the edges of ``local`` at ``x`` and its colliders that contain ``x``:
     the edges a collider names are added and get an arrowhead at its middle ([1]_ Step 4, [2]_
     Alg. 1 line 12). An arrowhead once placed stays, so the merge does not depend on the order of
-    the steps."""
+    the steps. Each of those colliders that ``learned`` holds, one a local structure found from the
+    data rather than one read off ``network``, joins :attr:`Network.colliders`."""
     for u, v in local.adjacent:
         if x in (u, v):
             network.add(u, v)
@@ -658,6 +675,26 @@ def merge(network: Network, local: LocalGraph, x: int) -> None:
         if x in (a, b, c):
             network.add(a, b)
             network.add(c, b)
+            network.arrow(b, a)
+            network.arrow(b, c)
+            if (a, b, c) in learned:
+                network.colliders[a, b, c] = None
+
+
+def drop_separated(network: Network, sepsets: Mapping[Pair, tuple[int, ...]]) -> None:
+    """Remove from ``network``, in place, every edge whose pair holds a separating set in
+    ``sepsets``, and set the marks again: :attr:`Network.end` at both ends of each remaining edge,
+    then an arrowhead at the middle of each of :attr:`Network.colliders` whose two edges remain.
+    MB-by-MB keeps every independence a test found, and a pair with one has no edge ([1]_ Sec.
+    3.2); under correct tests no merged edge has one (Thm. 1), so the step changes nothing there.
+    The orientation rules then run on the result."""
+    nodes, marks = network.nodes, network.marks
+    for i, j in combinations(range(len(nodes)), 2):
+        if marks[i, j] != NULL and _pair(nodes[i], nodes[j]) in sepsets:
+            marks[i, j] = marks[j, i] = NULL
+    marks[marks != NULL] = network.end
+    for a, b, c in network.colliders:
+        if network.mark(a, b) != NULL and network.mark(c, b) != NULL:
             network.arrow(b, a)
             network.arrow(b, c)
 

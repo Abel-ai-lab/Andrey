@@ -820,9 +820,9 @@ CALM_DATA = (SMALL_DATA[0], "asia_gauss")
 #: DAG without selection, which keeps its claims valid.
 ANCESTOR_DATA = (*_sizes("linear_gauss_er"), "asia_gauss")
 PAG_DATA = (*_sizes("latent_gauss_er"), "asia_gauss", "sachs")
-#: CMB, LDECC, and LOAD are scored at one variable, the last column. Sachs has one draw, and at its
-#: last column, jnk, each finds at most one of the two edges, as PC does: none scores below the
-#: empty answer there.
+#: MB-by-MB, CMB, LDECC, and LOAD are scored at one variable, the last column. Sachs has one draw,
+#: and at its last column, jnk, each finds at most one of the two edges, as PC does: none scores
+#: below the empty answer there.
 TARGET_CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss")
 #: MMB-by-MMB answers one variable, the last column. Sachs has one draw, and at its last column,
 #: jnk, the fit finds one of the two edges, as FCI does, and gets its marks wrong: its SHD there
@@ -948,8 +948,8 @@ def ut_igsp_targets(x: np.ndarray) -> list[list[int]]:
 
 #: Public defaults, except MMPC, HITON-PC, and RSMAX2: MMPC and HITON-PC return a skeleton by
 #: default, so the gate fits their CPDAG, and RSMAX2's default restrict phase is MMHC's, so the gate
-#: fits its IAMB restrict phase. CMB and MMB-by-MMB answer one variable, the last column; LDECC
-#: takes it as the treatment and the first column as the outcome, LOAD takes the two as its
+#: fits its IAMB restrict phase. MB-by-MB, CMB, and MMB-by-MMB answer one variable, the last column;
+#: LDECC takes it as the treatment and the first column as the outcome, LOAD takes the two as its
 #: variables, and each is scored by its edges at the last column. A fixed seed pins the search
 #: orders of BOSS, GRaSP, BOSS-FCI, and GRaSP-FCI, FastICA's start, and CALM's optimizer. CD-NOD and
 #: MultiGroupDirectLiNGAM run through their benchmark adapters, which call the public functions with
@@ -977,6 +977,9 @@ SUPPORTED: dict[str, Method] = {
     "MMPC": Method(lambda x: andrey.mmpc(x, structure="cpdag"), "cpdag", CPDAG_DATA),
     "HITONPC": Method(lambda x: andrey.hiton_pc(x, structure="cpdag"), "cpdag", CPDAG_DATA),
     "PCMB": Method(lambda x: andrey.pcmb(x), "cpdag", CPDAG_DATA),
+    "MB-by-MB": Method(
+        lambda x: andrey.mb_by_mb(x, target=x.shape[1] - 1), "target_cpdag", TARGET_CPDAG_DATA
+    ),
     "HITONMB": Method(lambda x: andrey.hiton_mb(x), "cpdag", CPDAG_DATA),
     "Y-structures": Method(y_structures_claims, "ancestors", ANCESTOR_DATA),
     "CMB": Method(
