@@ -703,7 +703,7 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
             "Aliferis et al. 2010",
             "Margaritis 2003",
         ),
-        "experimental",
+        "supported",
     ),
     (
         "pcmb",
