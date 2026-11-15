@@ -198,13 +198,19 @@ names its pull request.
   `metadata["effects"]`; `metadata["partition"]` lists the labels, and the graph holds the edges
   into the outcome. It assumes every parent of the outcome is observed. The treatment-outcome
   benchmark lane runs it beside the authors' code. ([#970])
-- `andrey.local_isa_ling`, local ISA-LiNG (Dai et al. 2024), experimental: the weighted edges into
-  a target and into each of its children in a linear model with non-Gaussian noise whose graph may
+- `andrey.local_isa_ling`, local ISA-LiNG (Dai et al. 2024), supported: the weighted edges into a
+  target and into each of its children in a linear model with non-Gaussian noise whose graph may
   hold cycles, from the target and its Markov blanket alone, as a weighted `digraph`. The blanket
   is the support of a Lasso regression; a sparse ICA (Zhang and Chan 2006) and HSIC tests give the
   independent subspaces, and every admissible assignment of them gives a model of the equivalence
   class, listed in `metadata["equivalent_models"]` with the stable ones first. `acyclic=True`
-  peels sink columns instead, for a target and children on no cycle. ([#986])
+  peels sink columns instead, for a target and children on no cycle; when no column is a sink, it
+  takes the column with the fewest nonzero entries, as its authors' code does, so it always gives
+  one model. The benchmark lane of local ISA-LiNG runs it beside the authors' code on the paper's
+  simulations. It is supported for graphs with cycles, where it tied the authors' code with its
+  own blanket and with the true one and made fewer errors than the empty answer; on DAGs global
+  DirectLiNGAM read at the target is more accurate and faster from 300 rows up. The 0.18.0 release
+  card has the numbers. ([#986])
 - `andrey.cmb`, CMB (Gao and Ji 2015), supported: the direct causes and direct effects of one
   target, without learning the whole graph. It learns the target's parents and children and Markov
   blanket with a topology-based learner (`blanket="hiton_mb"`, the paper's, or `mmmb`, `pcmb`),

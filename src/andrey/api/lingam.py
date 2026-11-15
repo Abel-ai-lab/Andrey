@@ -662,8 +662,6 @@ def local_isa_ling(
 
     Warns
     -----
-    ExperimentalWarning
-        Always: the method is experimental.
     DataTypeWarning
         When a column holds at most 10 distinct whole numbers and so may hold category codes, which
         the fit reads as numbers. Each message warns once per process.
@@ -675,8 +673,9 @@ def local_isa_ling(
     the graph may hold cycles (no self-loops) and every variable is measured, when only the edges at
     one variable matter [1]_. It identifies every model of the equivalence class [3]_ at the target:
     one answer when neither the target nor a child lies on a cycle, several otherwise, and with
-    disjoint cycles one stable answer [1]_. For the whole graph without cycles use
-    :func:`~andrey.direct_lingam`; for the edges at a target with Gaussian noise use
+    disjoint cycles one stable answer [1]_. On data without cycles use
+    :func:`~andrey.direct_lingam` and read the target's edges: on the paper's 50-variable DAGs it
+    is more accurate and faster from 300 rows up. For the edges at a target with Gaussian noise use
     :func:`~andrey.mb_by_mb`.
 
     **Units and column order.** The ICA and both thresholds read standardized columns, so the
@@ -690,13 +689,14 @@ def local_isa_ling(
     them. Drop the incomplete rows first, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on up to 15 variables with 1,500 rows.
-    The blanket step keeps every column whose standardized Lasso coefficient exceeds 0.01, often
-    many more than the true blanket, and the time grows with them. Algorithm 1 tries every
-    assignment of the demixing matrix's rows to the local variables that its zero pattern allows, a
-    number that grows quickly with the blanket when the matrix is dense. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    **Limitations.** Its claim is graphs with cycles, where it tied the authors' code on the
+    paper's simulations. On DAGs, global :func:`~andrey.direct_lingam` read at the target was more
+    accurate and faster from 300 rows up; the `0.18.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#local-isa-ling>`_ has the numbers. The
+    blanket step keeps every column whose standardized Lasso coefficient exceeds 0.01, often many
+    more than the true blanket, and the time grows with them. Algorithm 1 tries every assignment of
+    the demixing matrix's rows to the local variables that its zero pattern allows, a number that
+    grows quickly with the blanket when the matrix is dense.
 
     References
     ----------
