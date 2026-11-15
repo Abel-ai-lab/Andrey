@@ -6,8 +6,8 @@ every Andrey method of the group that is installed, Andrey's PC read at the pair
 the authors' code of the reference methods, on models planted as the method's own paper describes
 them, and scores the answers against the truth the method's definition gives.
 
-The lane is built before the methods: the seven Andrey methods fill a table row each
-([Adding a method](#adding-a-method)), and no row has run in a campaign yet.
+The seven Andrey methods fill a table row each ([Adding a method](#adding-a-method)). LDECC and LOAD
+ran in the 0.18.0 campaign ([Results](#results)).
 
 ## Data
 
@@ -100,6 +100,29 @@ The answers are scored by `andrey.metrics`, and the lane adds nothing to their d
 
 A fit that passes `--cap-wall-s` is a `timeout` with no answer and fails its cell, never an empty
 answer.
+
+## Results
+
+The 0.18.0 campaign ran LDECC and LOAD against their authors' code on 20 datasets per cell, seeds
+0-19, and again on seeds 20-39 for a cell worse on the first 20, each fit on one core with a cap of
+1,800 s; no fit failed or timed out. A cell counts as worse when the paired 95% bootstrap interval of
+Andrey's error minus the authors' code's lies above 0 on both seed ranges. Andrey's PC read at the
+pair ran beside them with the same test and level. Every number, per cell and measure, is in
+`benchmarks/published/0.18.0/adjustment.json`, and the release card has the tables.
+
+- **LDECC** (`ldecc@8000` to `@32000`, `magic-niab@8000` to `@32000`; Fisher's z at
+  `0.01 * 32000 / n`, as the authors' notebooks set it): a tie with the authors' code on accuracy,
+  recall, the Hausdorff MSE, and the effect error in all 8 cells, on both seed ranges. Its effect
+  error is below the empty set's on the generator's graphs; on MAGIC-NIAB the empty set is valid and
+  neither side's error is below it. On the paper's own draws, where the columns come in the order its
+  generator draws them, the authors' code's accuracy is 4 to 6 points higher with the columns as drawn
+  than shuffled, since it visits variables in column order; Andrey's answer does not depend on the
+  order.
+- **LOAD** (`random-graph@10000,degree=2,nodes=100` to `1000`, `magic-niab@10000,pair=random`;
+  Fisher's z at 0.01): a tie on the set F1 and the effect error in all 5 cells, but the set F1 on
+  MAGIC-NIAB pairs on seeds 0-19 (0.74 against 0.88), which tied on seeds 20-39. Its sets have fewer
+  missing plus extra members than the empty set in every cell.
+- **PC read at the pair** was never better than either method on both effect error and time.
 
 ## References
 

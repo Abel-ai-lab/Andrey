@@ -35,6 +35,7 @@ from andrey.constraint.sequential import (
     merge,
     open_reach,
     orient,
+    resolve_conflicts,
     sequential,
     stop_rule,
     unknown_triples,
@@ -564,3 +565,30 @@ def test_the_answer_does_not_depend_on_the_column_order_or_the_units(rules):
         shuffled = _answer(x[:, perm], int(np.flatnonzero(perm == target)[0]), rules)
         assert np.array_equal(shuffled, answer[np.ix_(perm, perm)]), target
         assert np.array_equal(_answer(x * scale, target, rules), answer), target
+
+
+def test_a_conflicting_edge_takes_the_direction_of_the_more_clearly_separated_collider():
+    """``0 -> 1 <- 2`` (pair p-value 0.9) and ``1 -> 2 <- 3`` (0.3) dispute ``1 - 2``: the edge
+    keeps the arrowhead the first asks, ``2 -> 1``, and ``3 -> 2`` keeps its own."""
+    network = Network(TAIL)
+    for u, v in ((0, 1), (1, 2), (2, 3)):
+        network.add(u, v)
+    colliders = [(0, 1, 2), (1, 2, 3)]
+    for a, b, c in colliders:
+        network.arrow(b, a)
+        network.arrow(b, c)
+    assert resolve_conflicts(network, colliders, {(0, 2): 0.9, (1, 3): 0.3})
+    assert (network.mark(1, 2), network.mark(2, 1)) == (ARROW, TAIL)
+    assert (network.mark(1, 0), network.mark(2, 3)) == (ARROW, ARROW)
+
+
+def test_a_conflicting_edge_whose_colliders_tie_stays_bidirected():
+    network = Network(TAIL)
+    for u, v in ((0, 1), (1, 2), (2, 3)):
+        network.add(u, v)
+    colliders = [(0, 1, 2), (1, 2, 3)]
+    for a, b, c in colliders:
+        network.arrow(b, a)
+        network.arrow(b, c)
+    assert not resolve_conflicts(network, colliders, {(0, 2): 0.5, (1, 3): 0.5})
+    assert (network.mark(1, 2), network.mark(2, 1)) == (ARROW, ARROW)
