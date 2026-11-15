@@ -1797,6 +1797,23 @@ def register_indep_test(name: str, factory: Callable[[np.ndarray], CITest]) -> N
     tests have, reports its own; for a test without one the family asks the call one query at a
     time and ranks the candidates by p-value, smallest first (:class:`PValueTest`), which it
     reports as the statistic ``-log10(p)``.
+
+    Every index a test is queried with is a column position of the matrix its factory received, and
+    a search can call the factory again for the same columns in another order: by default the
+    possible-d-separation step of FCI, FCI-JCI, and GFCI visits the variables in
+    :func:`~andrey.core.ties.tie_ranks` order and builds its test over the matrix in that order
+    (``possible_dsep="order_free"``). A test computed from its matrix needs nothing more. A test
+    that does not read its matrix, such as a :class:`~andrey.data.latent.DSepOracle`, must find
+    which variable each column of the matrix it receives holds::
+
+        def factory(columns):
+            nodes = [
+                next(j for j in range(data.shape[1]) if np.array_equal(c, data[:, j]))
+                for c in columns.T
+            ]
+            return DSepOracle(dag, nodes=nodes)
+
+    With ``possible_dsep="fast"`` the step keeps the columns in data order.
     """
     _CI_REGISTRY[name] = factory
 

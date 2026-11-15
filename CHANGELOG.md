@@ -10,6 +10,16 @@ names its pull request.
 
 ## [Unreleased]
 
+### Changed
+
+- The documentation of `register_indep_test` and `DSepOracle` states that a registered test's
+  indices are column positions of the matrix its factory receives, and that the
+  possible-d-separation step of `fci`, `fci_jci`, and `gfci` builds its test again over the columns
+  in rank order: a test that does not read its matrix, such as an oracle by d-separation, finds
+  which variable each column holds, and `possible_dsep="fast"` keeps the data's order. The
+  environment settings and the configuration page no longer list `fci_jci` with `normal_scores`
+  among the parallel possible-d-separation searches; it does not offer that test. ([#1040])
+
 ### Fixed
 
 - `"fisherz"` and `"normal_scores"` compute the upper tail of their p-value directly, and so do
@@ -2580,3 +2590,4 @@ First alpha release.
 [#920]: https://github.com/Abel-ai-lab/andrey/pull/920
 [#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
 [#1037]: https://github.com/Abel-ai-lab/Andrey/pull/1037
+[#1040]: https://github.com/Abel-ai-lab/Andrey/pull/1040
