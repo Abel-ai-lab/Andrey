@@ -211,7 +211,7 @@ names its pull request.
   own blanket and with the true one and made fewer errors than the empty answer. Data without
   cycles, small samples among them, are outside its claim: on DAGs global DirectLiNGAM read at the
   target is more accurate and faster from 300 rows up. The 0.18.0 release card has the numbers.
-  ([#986])
+  ([#986], [#1032])
 - `andrey.cmb`, CMB (Gao and Ji 2015), supported: the direct causes and direct effects of one
   target, without learning the whole graph. It learns the target's parents and children and Markov
   blanket with a topology-based learner (`blanket="hiton_mb"`, the paper's, or `mmmb`, `pcmb`),
@@ -2863,6 +2863,7 @@ First alpha release.
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
 [#1000]: https://github.com/Abel-ai-lab/Andrey/pull/1000
 [#986]: https://github.com/Abel-ai-lab/Andrey/pull/986
+[#1032]: https://github.com/Abel-ai-lab/Andrey/pull/1032
 [#995]: https://github.com/Abel-ai-lab/Andrey/pull/995
 [#991]: https://github.com/Abel-ai-lab/Andrey/pull/991
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
