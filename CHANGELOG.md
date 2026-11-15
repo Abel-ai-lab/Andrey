@@ -69,7 +69,7 @@ names its pull request.
   500 rows, insurance at 5,000, and win95pts at every size, where its symmetry check, its reading of
   a test with no degrees of freedom, and its spouses' separating sets differ from the authors' code,
   which on hailfinder at 5,000 rows also runs a test only with at least five rows per cell. In every
-  setting its sets had fewer errors than the authors' code's. ([#965], [#1025], [#PR])
+  setting its sets had fewer errors than the authors' code's. ([#965], [#1025], [#1038])
 - `andrey.pcmb`, the PCMB Markov blanket learner (Peña, Nilsson, Björkegren, and Tegnér 2007),
   supported, with the arguments and metadata of `iamb`, `alpha=0.01` by default, the paper's
   level, and the target's parents and children in `metadata["parents_and_children"]`. Its own
@@ -2876,6 +2876,7 @@ First alpha release.
 [#1000]: https://github.com/Abel-ai-lab/Andrey/pull/1000
 [#986]: https://github.com/Abel-ai-lab/Andrey/pull/986
 [#1032]: https://github.com/Abel-ai-lab/Andrey/pull/1032
+[#1038]: https://github.com/Abel-ai-lab/Andrey/pull/1038
 [#995]: https://github.com/Abel-ai-lab/Andrey/pull/995
 [#991]: https://github.com/Abel-ai-lab/Andrey/pull/991
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
