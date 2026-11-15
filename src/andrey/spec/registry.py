@@ -1809,8 +1809,7 @@ _add(
         family="score",
         summary="NOTEARS: least squares with an l1 penalty under the acyclicity equation "
         "tr(exp(W*W)) = d, by L-BFGS-B. Returns a weighted DAG. robust=true adds the likelihood "
-        "path of Deng et al. 2024, which does not depend on the scale of the columns. "
-        "Deterministic; no torch.",
+        "path of Deng et al. 2024. Reads the columns' units. Deterministic; no torch.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=_CONTINUOUS_OUTPUT,
         accel="numpy",
@@ -1869,12 +1868,11 @@ _add(
         family="score",
         summary="DAGMA: least squares with an l1 penalty and a log-determinant acyclicity barrier "
         "lowered along a central path, by Adam. Returns a weighted DAG. robust=true adds the "
-        "likelihood path of Deng et al. 2024, which does not depend on the scale of the columns. "
-        "Deterministic; no torch.",
+        "likelihood path of Deng et al. 2024. Reads the columns' units. Deterministic; no torch.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=_CONTINUOUS_OUTPUT,
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         reads_units=True,
         tie_break=True,

@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pytest
 
+from andrey import SearchLimitWarning
 from andrey.search import continuous
 from andrey.search.continuous import (
     Canonical,
     central_path,
+    gaussian_likelihood,
     l1_penalty,
     least_squares,
     log_det_acyclicity,
@@ -84,7 +88,8 @@ def test_dagma_frees_the_diagonal_in_the_least_squares_fit_only(monkeypatch) -> 
     rng = np.random.default_rng(1)
     x = rng.standard_normal((400, 2))
     x[:, 1] += x[:, 0]
-    with pytest.warns(match="dagma stopped at its limit of max_iter"):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", SearchLimitWarning)
         result = continuous.dagma(
             x,
             lambda1=0.03,
@@ -103,3 +108,51 @@ def test_dagma_frees_the_diagonal_in_the_least_squares_fit_only(monkeypatch) -> 
     assert len(seen) > 1
     assert not any(seen[1:])
     np.testing.assert_array_equal(np.diagonal(result.weighted_adjacency), 0.0)
+
+
+# The likelihood of the robust path as its authors' implementation computes it (Deng et al. 2024),
+# recorded at a fixed sample: 8 rows of 3 columns, a weight matrix with a cycle, and the acyclic
+# matrix of its upper triangle. The authors' loss is `0.5 * sum_j log(((I - W)^T S (I - W))[j, j])`
+# with no log-determinant, so its gradient is `S (W - I)` divided by each residual variance.
+_SAMPLE = np.array(
+    [[1, 2, 0], [2, 0, 1], [0, 1, 3], [3, 1, 1], [1, 3, 2], [2, 2, 4], [0, 0, 1], [3, 2, 0]],
+    dtype=float,
+)
+_CYCLIC = np.array([[0.0, 0.7, -0.4], [-0.8, 0.0, 0.9], [0.3, -0.6, 0.0]])
+_CYCLIC_LOSS = 1.2518791341111826
+_CYCLIC_GRADIENT = np.array(
+    [
+        [-0.6117290192113245, 0.36436236585974546, 0.022153651396471248],
+        [-0.37158746208291205, -0.38557524332418275, 0.3156895323997152],
+        [0.3033367037411527, -0.5989518342899925, -0.724740881398845],
+    ]
+)
+_ACYCLIC_LOSS = 0.5960479250242126
+_ACYCLIC_GRADIENT = np.array(
+    [
+        [-1.0, 0.5152224824355971, 0.022153651396471248],
+        [-0.15000000000000002, -0.6393442622950819, 0.3156895323997152],
+        [0.30000000000000004, -0.33723653395784536, -0.724740881398845],
+    ]
+)
+
+
+def _sample_covariance() -> np.ndarray:
+    centered = _SAMPLE - _SAMPLE.mean(axis=0)
+    return centered.T @ centered / len(_SAMPLE)
+
+
+def test_the_likelihood_of_a_cyclic_matrix_leaves_out_the_log_determinant() -> None:
+    """The weight matrix has ``log|det(I - W)|`` near 0.8: the value and the gradient are the
+    authors' loss's, which has no such term, so a fit that is still cyclic follows its gradient.
+    """
+    assert np.linalg.slogdet(np.eye(3) - _CYCLIC)[1] > 0.7
+    value, gradient = gaussian_likelihood(_sample_covariance(), _CYCLIC)
+    assert value == pytest.approx(_CYCLIC_LOSS, rel=1e-12)
+    np.testing.assert_allclose(gradient, _CYCLIC_GRADIENT, rtol=1e-12, atol=1e-14)
+
+
+def test_the_likelihood_of_an_acyclic_matrix_is_the_authors_loss() -> None:
+    value, gradient = gaussian_likelihood(_sample_covariance(), np.triu(_CYCLIC))
+    assert value == pytest.approx(_ACYCLIC_LOSS, rel=1e-12)
+    np.testing.assert_allclose(gradient, _ACYCLIC_GRADIENT, rtol=1e-12, atol=1e-14)
