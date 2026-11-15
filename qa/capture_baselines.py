@@ -120,6 +120,15 @@ def _run_mmb_by_mmb(X: np.ndarray, algorithm: str) -> dict:
     return project_output(andrey.mmb_by_mmb(X, target=target), algorithm)
 
 
+def _run_local_isa_ling(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    # The column of x1, whose answer holds an edge of each kind: x0 -> x1 into it, x1 -> x2 and
+    # x1 -> x3 out of it, and x0 -> x2 into a child.
+    target = int(datagen.column_of("lingam_5v_uniform")[1])
+    return project_output(andrey.local_isa_ling(X, target=target), algorithm)
+
+
 def _run_ut_igsp(X: np.ndarray, algorithm: str) -> dict:
     import andrey
 
@@ -154,6 +163,7 @@ def _run_igsp(X: np.ndarray, algorithm: str) -> dict:
 ALGORITHMS = {
     "DirectLiNGAM": (_facade("direct_lingam"), "lingam_5v_uniform"),
     "ICALiNGAM": (_facade("ica_lingam"), "lingam_5v_uniform"),
+    "LocalISALiNG": (_run_local_isa_ling, "lingam_5v_uniform"),
     "PC": (_facade("pc"), "gauss_5v"),
     "FCI": (_facade("fci"), "gauss_5v"),
     "GFCI": (_facade("gfci", penalty_discount=2.0), "gauss_5v"),

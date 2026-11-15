@@ -130,6 +130,32 @@ def test_target_pag_counts_the_edges_at_the_last_variable_alone() -> None:
     assert qg.shd(qg.empty_graph(4, "target_pag"), truth, "target_pag") == 2
 
 
+def test_local_dag_counts_the_local_structure_at_the_last_variable() -> None:
+    def graph(*edges: tuple[int, int], kind: str = "digraph") -> GraphStructure:
+        """A graph over five variables with the edges ``(i, j)``, ``i -> j``; a pair listed both
+        ways is a 2-cycle."""
+        marks = np.zeros((5, 5), dtype=np.int8)
+        for i, j in edges:
+            marks[i, j] = ARROW if (j, i) in edges else TAIL
+            marks[j, i] = ARROW
+        return GraphStructure.from_numpy(marks, kind=kind)
+
+    # The local structure at 4: 0 -> 4 into it, 4 -> 1 out of it, and 2 -> 1 into its child; the
+    # truth's 3 -> 2 and the answer's 3 -> 0 lie outside it and count nothing.
+    truth = qg.target_truth(graph((0, 4), (4, 1), (2, 1), (3, 2), kind="dag"), "local_dag")
+    right = graph((0, 4), (4, 1), (2, 1), (3, 0))
+    flipped = graph((4, 0), (4, 1), (2, 1))
+    two_cycle = graph((0, 4), (4, 1), (1, 4), (2, 1))
+    extra = graph((0, 4), (4, 1), (2, 1), (3, 4))
+    missing = graph((0, 4))
+    assert qg.shd(truth, truth, "local_dag") == qg.shd(right, truth, "local_dag") == 0
+    assert qg.shd(flipped, truth, "local_dag") == 1
+    assert qg.shd(two_cycle, truth, "local_dag") == 1
+    assert qg.shd(extra, truth, "local_dag") == 1
+    assert qg.shd(missing, truth, "local_dag") == 2  # 4 has no child, so 2 -> 1 is missed too
+    assert qg.shd(qg.empty_graph(5, "local_dag"), truth, "local_dag") == 3
+
+
 def test_tolerance_is_two_sided() -> None:
     def cell(median: int) -> qg.CellResult:
         return qg.CellResult("PC", "x", shd=[median], empty_shd=[20], baseline=5, tolerance=1)

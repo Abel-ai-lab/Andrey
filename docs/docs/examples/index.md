@@ -147,7 +147,8 @@ on settings whose changed variables it is told in part or not at all.
 :img-alt: The DAG DirectLiNGAM or ICA-LiNGAM recovers in this notebook
 
 DirectLiNGAM and ICA-LiNGAM orient every edge when the noise is non-Gaussian; MultiGroupDirectLiNGAM
-fits several datasets, and GIN finds latent variables.
+fits several datasets, GIN finds latent variables, and local ISA-LiNG learns the weighted edges at
+one variable, with cycles allowed.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::

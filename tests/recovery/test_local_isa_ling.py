@@ -287,7 +287,6 @@ def test_algorithm3_reads_a_dag_and_agrees_with_the_target_oracle(seed):
             continue
         W, parts, S, lt = population(B, t, rng)
         edges = algorithm3(np.where(np.abs(W) > TOL, W, 0.0), lt)
-        assert edges is not None
         truth = local_answer(B, t)
         assert same(named(edges, S), truth)
         oracle = target_oracle(B.T != 0, t, "dag").to_numpy()
