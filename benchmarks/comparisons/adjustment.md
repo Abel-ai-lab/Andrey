@@ -136,8 +136,8 @@ pair ran beside them with the same test and level. Every number, per cell and me
   `v=200`, as the authors' code's; the effect error is below the unadjusted regression's at `v=10`
   only, and the authors' code's nowhere. Most answers that differ trace to the authors' code: it
   learns each hop on the graph kept from the last one, with its marks, and visits variables in the
-  order of their names (on linear-Gaussian data at `v<=100`, 37 of 40 differing answers are
-  explained by these two). Eight fits of the authors' code that failed to start were rerun, and
+  order of their names (at `v<=100`, these two explain 37 of 40 differing answers on linear-Gaussian
+  data and 25 of 36 on binary data, and the G-square test's degrees of freedom 2 more). Eight fits of the authors' code that failed to start were rerun, and
   three that passed 1,800 s were rerun with a cap of 3,600 s.
 - **PC read at the pair** was never better than any of the three methods on both accuracy and cost.
 
