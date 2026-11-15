@@ -220,9 +220,9 @@ class PartialCorrelationTest:
             ryz = float(corr[y_int, z_idx])
             r = (rxy - rxz * ryz) / math.sqrt((1.0 - rxz * rxz) * (1.0 - ryz * ryz))
         else:
-            var = (x_int, y_int, *cond)
-            inv = self._invert(corr[np.ix_(var, var)][None])[0]
-            r = -float(inv[0, 1]) / math.sqrt(abs(float(inv[0, 0]) * float(inv[1, 1])))
+            var = np.array((x_int, y_int, *cond), dtype=np.intp)
+            inv = self._invert_one(corr[var[:, None], var])
+            r = -inv.item(0, 1) / math.sqrt(abs(inv.item(0, 0) * inv.item(1, 1)))
         return -ONE_MINUS_EPS if r < -ONE_MINUS_EPS else ONE_MINUS_EPS if r > ONE_MINUS_EPS else r
 
     def copies(self) -> tuple[tuple[int, ...], ...]:
@@ -248,6 +248,20 @@ class PartialCorrelationTest:
             )
             named.groups = copies
             raise named from error
+
+    def _invert_one(self, matrix: np.ndarray) -> np.ndarray:
+        """:meth:`_invert` of the one ``(k, k)`` submatrix ``matrix``, with the bits of a stack of
+        one: the same ``np.linalg.inv`` call and the same bound as :func:`_invert_nonsingular`. A
+        matrix the bound does not settle, or that ``np.linalg.inv`` rejects, takes :meth:`_invert`.
+        """
+        try:
+            inv = np.linalg.inv(matrix)
+        except np.linalg.LinAlgError:
+            return self._invert(matrix[None])[0]
+        size = matrix.shape[0]
+        if not abs(inv).max() < 1.0 / (BOUND_MARGIN * SINGULAR_RTOL * size * size):
+            return self._invert(matrix[None])[0]
+        return inv
 
     def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
         """Return p-values for one ``(x, y)`` pair over many conditioning sets.
@@ -1972,7 +1986,7 @@ def _separating_prefix(
 
 def _canonical(x: int, y: int, condition_set: Iterable[int]) -> tuple[int, int, list[int]]:
     """Canonicalize a query to ordered ints and a sorted-unique conditioning set."""
-    cond = sorted(set(int(c) for c in condition_set))
+    cond = sorted(set(map(int, condition_set)))
     x_int, y_int = (int(x), int(y)) if x < y else (int(y), int(x))
     assert x_int not in cond and y_int not in cond, "x, y cannot be in condition_set."
     return x_int, y_int, cond
