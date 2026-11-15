@@ -12,11 +12,15 @@ names its pull request.
 
 ### Added
 
-- `andrey.locpc_cde`, LocPC-CDE (Loranchet and Assaad 2026), experimental: whether the controlled
+- `andrey.locpc_cde`, LocPC-CDE (Loranchet and Assaad 2026), supported: whether the controlled
   direct effect of a treatment on an outcome is identifiable, from a graph learned around the
   outcome one hop at a time with PC's tests, and the outcome's parents as its adjustment set. The
   answer is one record in `metadata["effects"]` with the paper's reason; the graph is the local
-  essential graph it learned. ([#1000])
+  essential graph it learned. Against its authors' code on the paper's random graphs with 10 to 200
+  variables, linear-Gaussian and binary, at 5,000 rows, it was worse in no setting and better in 4
+  of 32. On pairs whose effect the CPDAG does not identify its verdict is wrong or undecided about as
+  often as the code's, so the constant answer "not identifiable" scores better there. ([#1000],
+  [#1031])
 - `andrey.gs`, the Grow-Shrink Markov blanket learner (Margaritis and Thrun 2000): the blanket of
   one target, or every variable's blanket joined into the CPDAG, skeleton, or moral graph, with the
   arguments and metadata of `iamb`. It visits the other variables in one order, the most dependent
@@ -270,6 +274,8 @@ names its pull request.
   it left the edge undirected; the answer then reads the pair's relation from it. Under exact tests
   no edge is disputed and the answers do not change; `mb_by_mb` and `mmb_by_mmb` do not change.
   ([#1029])
+- The treatment-outcome benchmark lane counts the conditional-independence tests of its PC arm, PC
+  read at the pair, so its cost sits beside the methods'. ([#1031])
 
 ### Fixed
 
@@ -2851,6 +2857,7 @@ First alpha release.
 [#1019]: https://github.com/Abel-ai-lab/Andrey/pull/1019
 [#1025]: https://github.com/Abel-ai-lab/Andrey/pull/1025
 [#1030]: https://github.com/Abel-ai-lab/Andrey/pull/1030
+[#1031]: https://github.com/Abel-ai-lab/Andrey/pull/1031
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988

@@ -41,7 +41,7 @@ import numpy as np
 from threadpoolctl import threadpool_limits
 
 import andrey
-from andrey import GraphStructure, data, metrics
+from andrey import GraphStructure, StructureOutput, data, metrics
 from andrey.core import ARROW, LATENT, OBSERVED, TAIL
 from andrey.data.interventions import hard
 from andrey.data.latent import marginal
@@ -820,9 +820,9 @@ CALM_DATA = (SMALL_DATA[0], "asia_gauss")
 #: DAG without selection, which keeps its claims valid.
 ANCESTOR_DATA = (*_sizes("linear_gauss_er"), "asia_gauss")
 PAG_DATA = (*_sizes("latent_gauss_er"), "asia_gauss", "sachs")
-#: MB-by-MB, CMB, LDECC, and LOAD are scored at one variable, the last column. Sachs has one draw,
-#: and at its last column, jnk, each finds at most one of the two edges, as PC does: none scores
-#: below the empty answer there.
+#: MB-by-MB, CMB, LDECC, LOAD, and LocPC-CDE are scored at one variable, the last column. Sachs has
+#: one draw, and at its last column, jnk, MB-by-MB, CMB, LDECC, and LOAD each find at most one of
+#: the two edges, as PC does: none scores below the empty answer there.
 TARGET_CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss")
 #: MMB-by-MMB answers one variable, the last column. Sachs has one draw, and at its last column,
 #: jnk, the fit finds one of the two edges, as FCI does, and gets its marks wrong: its SHD there
@@ -946,15 +946,23 @@ def ut_igsp_targets(x: np.ndarray) -> list[list[int]]:
     return [learned[k] for k in range(1, len(unknown_target_unstack(x)[2]) + 1)]
 
 
+def locpc_cde_at_last(x: np.ndarray) -> StructureOutput:
+    """LocPC-CDE with the last column as the outcome and the column most correlated with it as the
+    treatment, which is then usually adjacent to it, so the search runs past its early stop and
+    orients the edges at the outcome."""
+    strength = np.abs(np.corrcoef(x, rowvar=False)[-1, :-1])
+    return andrey.locpc_cde(x, treatment=int(np.argmax(strength)), outcome=x.shape[1] - 1)
+
+
 #: Public defaults, except MMPC, HITON-PC, and RSMAX2: MMPC and HITON-PC return a skeleton by
 #: default, so the gate fits their CPDAG, and RSMAX2's default restrict phase is MMHC's, so the gate
 #: fits its IAMB restrict phase. MB-by-MB, CMB, and MMB-by-MMB answer one variable, the last column;
 #: LDECC takes it as the treatment and the first column as the outcome, LOAD takes the two as its
-#: variables, and each is scored by its edges at the last column. A fixed seed pins the search
-#: orders of BOSS, GRaSP, BOSS-FCI, and GRaSP-FCI, FastICA's start, and CALM's optimizer. CD-NOD and
-#: MultiGroupDirectLiNGAM run through their benchmark adapters, which call the public functions with
-#: the published settings: the domain index of four equal blocks of rows, and three groups of
-#: columns.
+#: variables, LocPC-CDE takes it as the outcome (:func:`locpc_cde_at_last`), and each is scored by
+#: its edges at the last column. A fixed seed pins the search orders of BOSS, GRaSP, BOSS-FCI, and
+#: GRaSP-FCI, FastICA's start, and CALM's optimizer. CD-NOD and MultiGroupDirectLiNGAM run through
+#: their benchmark adapters, which call the public functions with the published settings: the domain
+#: index of four equal blocks of rows, and three groups of columns.
 SUPPORTED: dict[str, Method] = {
     "PC": Method(lambda x: andrey.pc(x), "cpdag", CPDAG_DATA),
     "FCI": Method(lambda x: andrey.fci(x), "pag", PAG_DATA),
@@ -995,6 +1003,7 @@ SUPPORTED: dict[str, Method] = {
         "target_cpdag",
         TARGET_CPDAG_DATA,
     ),
+    "LocPCCDE": Method(locpc_cde_at_last, "target_cpdag", TARGET_CPDAG_DATA),
     "MMHC": Method(lambda x: andrey.mmhc(x), "cpdag", CPDAG_DATA),
     "RSMAX2": Method(lambda x: andrey.rsmax2(x, restrict="iamb"), "cpdag", CPDAG_DATA),
     "CAM": Method(lambda x: andrey.cam(x), "dag", ("anm_er_n1000_d20", "anm_er_n1000_d50")),

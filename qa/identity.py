@@ -79,10 +79,11 @@ class Fit:
     ``blocks`` is the number of side-by-side copies of the variables in the data: GIES's samples
     and intervention indicators, MultiGroupDirectLiNGAM's groups; a column order moves each copy
     the same way. ``shuffled`` is ``False`` for ICP, IGSP, FCI-JCI, J-PCMCI+, MB-by-MB, CMB,
-    MMB-by-MMB, LDECC, and LOAD, whose draws a column order does not apply to: each row's
-    environment is a column of the draw, the target of ICP, MB-by-MB, CMB, and MMB-by-MMB is the
-    last variable, LDECC's treatment and outcome and LOAD's two variables are the last and the
-    first, and J-PCMCI+'s contexts follow the system variables.
+    MMB-by-MMB, LDECC, LOAD, and LocPC-CDE, whose draws a column order does not apply to: each
+    row's environment is a column of the draw, the target of ICP, MB-by-MB, CMB, and MMB-by-MMB is
+    the last variable, LDECC's treatment and outcome and LOAD's two variables are the last and the
+    first, LocPC-CDE's treatment and outcome are the first and the last, and J-PCMCI+'s contexts
+    follow the system variables.
     ``alpha`` is the significance level of a CI-test method.
     """
 
@@ -134,6 +135,12 @@ def _ldecc(x: np.ndarray) -> StructureOutput:
 def _local_optimal_adjustment(x: np.ndarray) -> StructureOutput:
     """LOAD for the draw's last and first columns, the columns the gate fits it at."""
     return andrey.local_optimal_adjustment(x, variables=[x.shape[1] - 1, 0], alpha=ALPHA)
+
+
+def _locpc_cde(x: np.ndarray) -> StructureOutput:
+    """LocPC-CDE with the draw's first column as the treatment and its last as the outcome, the
+    columns the gate fits it at."""
+    return andrey.locpc_cde(x, treatment=0, outcome=x.shape[1] - 1, alpha=ALPHA)
 
 
 def _ut_igsp(x: np.ndarray) -> StructureOutput:
@@ -204,6 +211,7 @@ FITS: dict[str, Fit] = {
     "CMB": Fit(_last_column("cmb"), shuffled=False, alpha=ALPHA),
     "LDECC": Fit(_ldecc, shuffled=False, alpha=ALPHA),
     "LocalOptimalAdjustment": Fit(_local_optimal_adjustment, shuffled=False, alpha=ALPHA),
+    "LocPCCDE": Fit(_locpc_cde, shuffled=False, alpha=ALPHA),
     "MMHC": Fit(functools.partial(andrey.mmhc, alpha=ALPHA), alpha=ALPHA),
     "RSMAX2": Fit(
         functools.partial(andrey.rsmax2, restrict="pc", maximize="tabu", alpha=ALPHA), alpha=ALPHA
@@ -327,6 +335,7 @@ LARGER: dict[str, str] = {
             "CMB",
             "LDECC",
             "LocalOptimalAdjustment",
+            "LocPCCDE",
             "MMHC",
             "RSMAX2",
             "BOSS",
