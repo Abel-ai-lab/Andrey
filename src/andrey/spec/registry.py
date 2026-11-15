@@ -1079,7 +1079,7 @@ _add(
             "treatment",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         params=(
@@ -1128,7 +1128,7 @@ _add(
             "away from them; metadata['effects'] holds one record per ordered pair of them",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         order_note="The number of tests can change with the column order: the identifiability "
         "step stops at the first undirected neighbor of the treatment that fails it.",
