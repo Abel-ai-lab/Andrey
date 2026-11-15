@@ -295,6 +295,12 @@ names its pull request.
   which variable each column holds, and `possible_dsep="fast"` keeps the data's order. The
   environment settings and the configuration page no longer list `fci_jci` with `normal_scores`
   among the parallel possible-d-separation searches; it does not offer that test. ([#1040])
+- A partial-correlation test asked one query at a time with two or more conditioning variables, as
+  `gs`, `ldecc`, and `locpc_cde` ask it, inverts the query's one submatrix directly, with the same
+  `np.linalg.inv` call and the same singularity bound, where it built an index grid and a stack of
+  one. At 5,000 rows, `locpc_cde` on 1,000 variables is 1.5 times faster, `gs` on 100 variables
+  1.4 times, and `ldecc` 1.1 times. Every output, `metadata["n_tests"]` included, is the same bit
+  for bit. ([#1035], [#1041])
 - The skeleton scans of `pc` and `fci` and the conditioning-set scans of the blanket learners,
   `mb_by_mb`, and `local_optimal_adjustment` build each chunk of conditioning sets as the rows of
   an int array from cached combination tables, where they built tuples and converted each chunk
@@ -2900,6 +2906,8 @@ First alpha release.
 [#1037]: https://github.com/Abel-ai-lab/Andrey/pull/1037
 [#1038]: https://github.com/Abel-ai-lab/Andrey/pull/1038
 [#1040]: https://github.com/Abel-ai-lab/Andrey/pull/1040
+[#1035]: https://github.com/Abel-ai-lab/Andrey/pull/1035
+[#1041]: https://github.com/Abel-ai-lab/Andrey/pull/1041
 [#1036]: https://github.com/Abel-ai-lab/Andrey/pull/1036
 [#1042]: https://github.com/Abel-ai-lab/Andrey/pull/1042
 [#995]: https://github.com/Abel-ai-lab/Andrey/pull/995
