@@ -68,6 +68,7 @@ from andrey.core import ARROW, CIRCLE, NULL, TAIL
 from andrey.core.ci import counting_tests
 from andrey.core.knowledge import Constraints
 from andrey.core.orient import meek
+from andrey.core.ties import KEY_DP
 
 #: A pair of variables, the lower position first.
 Pair = tuple[int, int]
@@ -106,7 +107,10 @@ class Rules:
     ``stop_after`` decides when the rules ``"r1_r3"`` and ``"r1_r2"`` are first read: ``"first"``
     after every step [2]_; ``"degree"`` only once the search has taken more steps than the target
     has neighbors after its own step, as the authors' code reads them. An empty waitlist ends the
-    search either way.
+    search either way. ``conflicts`` decides an edge that two v-structures direct both ways, with
+    the CPDAG rules: ``"undirect"`` leaves it undirected; ``"p_value"`` directs it as the
+    v-structure whose pair the tests separated most clearly asks (:func:`resolve_conflicts`), as
+    :func:`~andrey.pc` orients its colliders, and Meek's rules run again.
 
     R3 can stop the search before the target's marks are those of the PAG: it stops at an edge
     ``t o-> v`` whose circle a discriminating path through ``v`` decides, as on the DAG
@@ -129,6 +133,7 @@ class Rules:
     stop: Literal["blocked", "r1_r3", "r1_r2"] = "blocked"
     colliders: Literal["local", "own_blanket"] = "local"
     stop_after: Literal["first", "degree"] = "first"
+    conflicts: Literal["undirect", "p_value"] = "undirect"
 
     def __post_init__(self) -> None:
         for name, value, choices in (
@@ -138,6 +143,7 @@ class Rules:
             ("stop", self.stop, ("blocked", "r1_r3", "r1_r2")),
             ("colliders", self.colliders, ("local", "own_blanket")),
             ("stop_after", self.stop_after, ("first", "degree")),
+            ("conflicts", self.conflicts, ("undirect", "p_value")),
         ):
             if value not in choices:
                 raise ValueError(f"{name} must be one of {choices}, got {value!r}")
@@ -149,8 +155,9 @@ class Rules:
 
 #: MB-by-MB as Wang et al. state it [1]_.
 MB_BY_MB = Rules()
-#: MB-by-MB as LOAD runs it ([3]_ Alg. 11): the skeleton step of PC in place of IC's search.
-LOAD = Rules(local="skeleton")
+#: MB-by-MB as LOAD runs it ([3]_ Alg. 11): the skeleton step of PC in place of IC's search, and an
+#: edge two v-structures direct both ways directed as the one most clearly separated asks.
+LOAD = Rules(local="skeleton", conflicts="p_value")
 #: MMB-by-MMB [2]_, with the collider check and the stop guard of its authors' code, each pair at
 #: ``x`` tested on the smaller of the two blankets.
 MMB_BY_MMB = Rules(
@@ -187,12 +194,14 @@ class Cache:
     """What one run of :func:`sequential` leaves for the next over the same
     :class:`~andrey.constraint.blanket.LocalSearch`, as LOAD runs the search for several targets
     ([3]_ Alg. 11): each variable's blanket in joining order, each local structure, a separating
-    set for each pair a test separated, keyed by the pair, the first one found, and the own local
-    structures the collider check learned, with their separating sets (:func:`own_step`)."""
+    set for each pair a test separated, keyed by the pair, the first one found, with the p-value
+    of the set that first separated it in a local structure, and the own local structures the
+    collider check learned, with their separating sets (:func:`own_step`)."""
 
     blankets: dict[int, list[int]] = field(default_factory=dict)
     local: dict[int, LocalGraph] = field(default_factory=dict)
     sepsets: dict[Pair, tuple[int, ...]] = field(default_factory=dict)
+    pvalues: dict[Pair, float] = field(default_factory=dict)
     own: dict[int, tuple[LocalGraph, dict[Pair, tuple[int, ...]]]] = field(default_factory=dict)
 
     def separate(self, u: int, v: int, sepset: Iterable[int]) -> None:
@@ -330,7 +339,8 @@ def sequential(
     the waitlist (:func:`extend`), and the stop rule, read from the first step or, with
     ``stop_after="degree"``, once more steps are done than the target has neighbors after its own
     step. With the CPDAG rules, an edge whose two ends got arrowheads, from v-structures
-    that disagree, is left undirected at the end. With the CPDAG rules and ``search`` constraints
+    that disagree, is left undirected at the end, unless ``conflicts`` directs it. With the CPDAG
+    rules and ``search`` constraints
     that direct edges (tiers, edges forbidden one way), each step directs those edges after the
     merge, over any arrowhead a v-structure put on them (:func:`direct`), and Meek's rule R4 joins
     R1-R3. With the PAG rules and ``search`` constraints, each step sets the endpoints the
@@ -353,6 +363,7 @@ def sequential(
     elif search.constraints is not None:
         known = search.constraints
     waitlist, done, learned = [target], [], []
+    merged: list[Triple] = []
     stopped = "empty"
     degree = 0
 
@@ -377,6 +388,7 @@ def sequential(
             if rules.colliders == "own_blanket":
                 local = confirm_colliders(local, x, search, own)
             merge(network, local, x)
+            merged += [t for t in local.colliders if x in t]
             if decided is not None:
                 direct(network, decided)
             if known is not None:
@@ -396,6 +408,8 @@ def sequential(
                     stopped = rule
                     break
     if rules.orient == "meek" and network.nodes:
+        if rules.conflicts == "p_value" and resolve_conflicts(network, merged, cache.pvalues):
+            orient(network, cache.sepsets, rules.orient, search, rule4=decided is not None)
         network.marks[...] = undirect_conflicts(network.marks)
     return Result(network, done, learned, stopped, tests.n, cache)
 
@@ -494,12 +508,13 @@ def learn_local(
     # and the separating sets their learner records first, do not depend on the column order.
     far = {y: of(y) for y in mb} if how == "pc_smaller" and of is not None else None
     sepsets: dict[Pair, tuple[int, ...]] = {}
+    pvalues: dict[Pair, float] = {}
     caps = [c for c in (search.max_depth, depth) if c is not None]
     cap = min(caps) if caps else None
     size = 0
     while cap is None or size <= cap:
         neighbors = {v: {u for p in adjacent if v in p for u in p if u != v} for v in nodes}
-        removed: list[tuple[Pair, tuple[int, ...]]] = []
+        removed: list[tuple[Pair, tuple[int, ...], float]] = []
         tested = False
         for pair in sorted(adjacent - fixed):
             hits: list[tuple[tuple[int, ...], float]] = []
@@ -516,16 +531,18 @@ def learn_local(
             if hits:
                 sets = [s for s, _ in hits]
                 best = search.largest_sets(np.array([[p for _, p in hits]]), sets)[0]
-                removed.append((pair, tuple(best)))
+                removed.append((pair, tuple(best), max(p for _, p in hits)))
         if not tested:
             break
-        for pair, sepset in removed:
+        for pair, sepset, p in removed:
             adjacent.discard(pair)
             sepsets[pair] = sepset
+            pvalues[pair] = float(p)
         size += 1
     if cache is not None:
         for (u, v), sepset in sepsets.items():
             cache.separate(u, v, sepset)
+            cache.pvalues.setdefault((u, v), pvalues[u, v])
     colliders = set()
     for b in nodes:
         around = sorted(u for p in adjacent if b in p for u in p if u != b)
@@ -643,6 +660,39 @@ def merge(network: Network, local: LocalGraph, x: int) -> None:
             network.add(c, b)
             network.arrow(b, a)
             network.arrow(b, c)
+
+
+def resolve_conflicts(
+    network: Network, colliders: Iterable[Triple], pvalues: Mapping[Pair, float]
+) -> bool:
+    """Direct in place each edge of ``network`` with arrowheads at both ends as the collider
+    ranked first asks; return whether an edge changed.
+
+    A collider ``a -> b <- c`` of ``colliders`` asks for an arrowhead at ``b`` on its two edges;
+    its rank is ``pvalues`` of the pair ``(a, c)``, the most clearly separated pair first, as
+    :func:`~andrey.constraint.pc.orient_colliders` ranks them, and a collider whose pair has no
+    p-value ranks last. Each end of a bidirected edge takes the highest rank of the colliders that
+    ask for its arrowhead; the end ranked lower gets a tail. Only the disputed edge changes: the
+    other edge of the collider ranked lower keeps its arrowhead. An edge whose ends tie to
+    ``KEY_DP`` decimals stays bidirected.
+    """
+    marks = network.marks
+    both = np.argwhere(np.triu((marks == ARROW) & (marks.T == ARROW))).tolist()
+    if not both:
+        return False
+    rank: dict[tuple[int, int], float] = {}
+    for a, b, c in colliders:
+        p = round(pvalues.get(_pair(a, c), -1.0), KEY_DP)
+        for end in (a, c):
+            rank[b, end] = max(rank.get((b, end), -1.0), p)
+    changed = False
+    for i, j in both:
+        u, v = network.nodes[i], network.nodes[j]
+        at_u, at_v = rank.get((u, v), -1.0), rank.get((v, u), -1.0)
+        if at_u != at_v:
+            marks[(j, i) if at_u > at_v else (i, j)] = TAIL
+            changed = True
+    return changed
 
 
 def direct(network: Network, decided: np.ndarray) -> None:

@@ -78,10 +78,11 @@ class Fit:
 
     ``blocks`` is the number of side-by-side copies of the variables in the data: GIES's samples
     and intervention indicators, MultiGroupDirectLiNGAM's groups; a column order moves each copy
-    the same way. ``shuffled`` is ``False`` for ICP, IGSP, FCI-JCI, J-PCMCI+, CMB, and
-    MMB-by-MMB, whose draws a column order does not apply to: each row's environment is a
-    column of the draw, the target of ICP, CMB, and MMB-by-MMB is the last variable, and
-    J-PCMCI+'s contexts follow the system variables.
+    the same way. ``shuffled`` is ``False`` for ICP, IGSP, FCI-JCI, J-PCMCI+, CMB, MMB-by-MMB,
+    LDECC, and LOAD, whose draws a column order does not apply to: each row's environment is a
+    column of the draw, the target of ICP, CMB, and MMB-by-MMB is the last variable, LDECC's
+    treatment and outcome and LOAD's two variables are the last and the first, and J-PCMCI+'s
+    contexts follow the system variables.
     ``alpha`` is the significance level of a CI-test method.
     """
 
@@ -122,6 +123,17 @@ def _fci_jci(x: np.ndarray) -> StructureOutput:
 def _last_column(name: str) -> Callable[[np.ndarray], StructureOutput]:
     """A target-centered method at the draw's last column, as the gate fits it."""
     return lambda x: getattr(andrey, name)(x, target=x.shape[1] - 1, alpha=ALPHA)
+
+
+def _ldecc(x: np.ndarray) -> StructureOutput:
+    """LDECC with the draw's last column as the treatment and its first as the outcome, the columns
+    the gate fits it at."""
+    return andrey.ldecc(x, treatment=x.shape[1] - 1, outcome=0, alpha=ALPHA)
+
+
+def _local_optimal_adjustment(x: np.ndarray) -> StructureOutput:
+    """LOAD for the draw's last and first columns, the columns the gate fits it at."""
+    return andrey.local_optimal_adjustment(x, variables=[x.shape[1] - 1, 0], alpha=ALPHA)
 
 
 def _ut_igsp(x: np.ndarray) -> StructureOutput:
@@ -189,6 +201,8 @@ FITS: dict[str, Fit] = {
     "HITONMB": Fit(functools.partial(andrey.hiton_mb, alpha=ALPHA), alpha=ALPHA),
     "Y-structures": Fit(functools.partial(andrey.y_structures, alpha=ALPHA), alpha=ALPHA),
     "CMB": Fit(_last_column("cmb"), shuffled=False, alpha=ALPHA),
+    "LDECC": Fit(_ldecc, shuffled=False, alpha=ALPHA),
+    "LocalOptimalAdjustment": Fit(_local_optimal_adjustment, shuffled=False, alpha=ALPHA),
     "MMHC": Fit(functools.partial(andrey.mmhc, alpha=ALPHA), alpha=ALPHA),
     "RSMAX2": Fit(
         functools.partial(andrey.rsmax2, restrict="pc", maximize="tabu", alpha=ALPHA), alpha=ALPHA
@@ -309,6 +323,8 @@ LARGER: dict[str, str] = {
             "HITONMB",
             "Y-structures",
             "CMB",
+            "LDECC",
+            "LocalOptimalAdjustment",
             "MMHC",
             "RSMAX2",
             "BOSS",
