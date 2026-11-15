@@ -192,27 +192,36 @@ def algorithm1(W: np.ndarray, parts: list[list[int]], t: int, tol: float) -> lis
     return sorted(models, key=lambda md: (not md.stable, md.cycle_strength, sorted(md.edges)))
 
 
-def algorithm3(W: np.ndarray, t: int) -> Edges | None:
+def algorithm3(W: np.ndarray, t: int) -> Edges:
     """Algorithm 3 (App. C): peel sink columns of a thresholded demixing matrix.
 
     A sink is a remaining column with exactly one nonzero entry in the remaining rows. Its row
     stands for it; when that row is nonzero in the target's column, the row gives the edges
     ``k -> j`` of weight ``-W[i, k] / W[i, j]`` from the remaining columns ``k``. The search stops
     after the target. Of several sinks, the one whose entry is largest in magnitude goes first.
-    Returns ``None`` when no remaining column is a sink, which the method's acyclic assumption rules
-    out.
+    When no remaining column is a sink, which the acyclic assumption rules out but an estimated
+    matrix allows, the column with the fewest nonzero entries is taken (of several, the remaining
+    column with the least absolute sum); the row at its position among the remaining rows stands
+    for it, and the column's entries in the other remaining rows read as zero (the authors' code).
+    Such a row with a zero entry in its column gives no edges.
     """
+    W = W.copy()
     cols = list(range(W.shape[1]))
     rows = list(range(W.shape[0]))
     edges: Edges = {}
     while cols:
-        sub = W[np.ix_(rows, cols)] != 0
-        sinks = [cols[c] for c in np.flatnonzero(sub.sum(axis=0) == 1)]
-        if not sinks:
-            return None
-        j = max(sinks, key=lambda c: np.abs(W[rows, c]).max())
-        i = rows[int(np.flatnonzero(W[rows, j])[0])]
-        if W[i, t] != 0:
+        sub = W[np.ix_(rows, cols)]
+        counts = (sub != 0).sum(axis=0)
+        sinks = [cols[c] for c in np.flatnonzero(counts == 1)]
+        if sinks:
+            j = max(sinks, key=lambda c: np.abs(W[rows, c]).max())
+            i = rows[int(np.flatnonzero(W[rows, j])[0])]
+        else:
+            fewest = np.flatnonzero(counts == counts.min())
+            p = int(fewest[0]) if len(fewest) == 1 else int(np.abs(sub).sum(axis=0).argmin())
+            j, i = cols[p], rows[p]
+            W[[r for r in rows if r != i], j] = 0.0
+        if W[i, t] != 0 and W[i, j] != 0:
             for k in cols:
                 if k != j and W[i, k] != 0:
                     edges[(k, j)] = float(-W[i, k] / W[i, j])
@@ -234,8 +243,8 @@ def local_isa_ling(
 ) -> LocalFit:
     """Fit local ISA-LiNG for column ``t`` of ``X``; weights are those of standardized columns.
 
-    ``blanket`` replaces the Lasso's blanket when given (a known blanket). Under ``acyclic``, a
-    fit whose thresholded matrix has no sink falls back to Algorithm 1.
+    ``blanket`` replaces the Lasso's blanket when given (a known blanket). Under ``acyclic``,
+    Algorithm 3 reads the edges.
     """
     X = np.asarray(X, dtype=np.float64)
     Z = standardized(X)
@@ -247,10 +256,8 @@ def local_isa_ling(
     W = np.where(np.abs(ica.W) > w_threshold, ica.W, 0.0)
     back = np.asarray(local)
     if acyclic:
-        edges = algorithm3(W, lt)
-        if edges is not None:
-            model = LocalModel(_names(edges, back), True, 0.0, ())
-            return LocalFit(mb, [model], ica)
+        model = LocalModel(_names(algorithm3(W, lt), back), True, 0.0, ())
+        return LocalFit(mb, [model], ica)
     singles = [int(i) for i in np.flatnonzero(W[:, lt])]
     parts = subspaces(W @ Z[:, local].T, singles, alpha)
     models = [

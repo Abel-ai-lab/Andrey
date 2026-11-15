@@ -93,5 +93,8 @@ benchmarks/.sbcd-r/
 # The authors' Causal Explorer toolbox that benchmarks/start_causal_explorer.sh fetches, run from
 # disk and never committed.
 benchmarks/.causal-explorer/
+# The authors' Local-LiNG-Discovery clone that benchmarks/start_local_ling.sh checks out, run from
+# disk and never committed.
+benchmarks/.local-ling/
 # The published networks' files that the network lanes fetch, read from disk and never committed.
 benchmarks/.networks/

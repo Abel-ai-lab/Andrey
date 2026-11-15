@@ -489,6 +489,7 @@ variable.
    ut_igsp
    direct_lingam
    ica_lingam
+   local_isa_ling
    multi_group_direct_lingam
    cam
    resit
@@ -783,6 +784,17 @@ to pairs of the columns it names. `extended=True` tests the extended Y-structure
 patterns. The [0.18.0](benchmarks/0.18.0.md#y-structures) release card measures both against the
 authors' code.
 
+Local ISA-LiNG (Dai et al. 2024) answers for one `target` in a linear model with non-Gaussian noise
+whose graph may hold cycles: from the target and its Markov blanket alone, it returns the weighted
+edges into the target and into each of its children as a `digraph`. A cycle through the target or
+a child leaves several models the data cannot tell apart; `metadata["equivalent_models"]` lists
+them, stable ones first, and the graph holds the first. `acyclic=True` reads the edges more cheaply
+when neither the target nor a child lies on a cycle. Its use is graphs with cycles: data without
+cycles, small samples among them, are outside its claim, and `direct_lingam` read at the target is
+more accurate and faster from 300 rows up.
+The [0.18.0](benchmarks/0.18.0.md#local-isa-ling) release card measures it against the authors'
+code on its paper's simulations.
+
 ### Experimental methods
 
 A new method ships as experimental: it passes recovery tests but is not supported, because it has
@@ -801,7 +813,6 @@ in a process.
    mmmb
    ldp
    ld3
-   local_isa_ling
 ```
 
 DAGMA (Bello et al. 2022) is a continuous-optimization learner in the line of NOTEARS: it fits a
@@ -813,13 +824,6 @@ the empty graph at its default settings, which is why it is experimental. The
 fit with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
 
-Local ISA-LiNG (Dai et al. 2024) answers for one `target` in a linear model with non-Gaussian noise
-whose graph may hold cycles: from the target and its Markov blanket alone, it returns the weighted
-edges into the target and into each of its children as a `digraph`. A cycle through the target or
-a child leaves several models the data cannot tell apart; `metadata["equivalent_models"]` lists
-them, stable ones first, and the graph holds the first. `acyclic=True` reads the edges more cheaply
-when neither the target nor a child lies on a cycle. It is experimental until its comparison with
-the authors' code is published.
 
 LDP, local discovery by partitioning (Maasch et al. 2024), answers for one `treatment` and
 `outcome`: it labels each other column by its causal relation to the pair, from tests whose

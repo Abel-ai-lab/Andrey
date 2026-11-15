@@ -939,6 +939,7 @@ def test_parity_judges_the_metric_an_entry_names():
         ("edge_f1_loss", "edge F1 loss"),
         ("claim_error", "claim errors"),
         ("claim_ap_loss", "claim AP loss"),
+        ("weight_distance", "weight distance"),
     ],
 )
 def test_parity_judges_an_answer_at_every_target(metric, text):
