@@ -821,8 +821,8 @@ CALM_DATA = (SMALL_DATA[0], "asia_gauss")
 ANCESTOR_DATA = (*_sizes("linear_gauss_er"), "asia_gauss")
 PAG_DATA = (*_sizes("latent_gauss_er"), "asia_gauss", "sachs")
 #: MB-by-MB, CMB, LDECC, LOAD, and LocPC-CDE are scored at one variable, the last column. Sachs has
-#: one draw, and at its last column, jnk, MB-by-MB, CMB, LDECC, and LOAD each find at most one of the
-#: two edges, as PC does: none scores below the empty answer there.
+#: one draw, and at its last column, jnk, MB-by-MB, CMB, LDECC, and LOAD each find at most one of
+#: the two edges, as PC does: none scores below the empty answer there.
 TARGET_CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss")
 #: MMB-by-MMB answers one variable, the last column. Sachs has one draw, and at its last column,
 #: jnk, the fit finds one of the two edges, as FCI does, and gets its marks wrong: its SHD there
