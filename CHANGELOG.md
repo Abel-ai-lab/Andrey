@@ -109,7 +109,7 @@ names its pull request.
   rows, a 45 x 45 chessboard), each answer took a small fraction of the tests of one global PC
   fit and made fewer errors than the empty answer everywhere and than bnlearn's `pc.stable` on
   Alarm and Hailfinder; Andrey's PC, at many times the tests, made fewer errors in some settings.
-  The 0.18.0 release card has the numbers and the trade-off. ([#956], [#PRNUM])
+  The 0.18.0 release card has the numbers and the trade-off. ([#956], [#1030])
 - `andrey.mmb_by_mmb`, MMB-by-MMB (Xie et al. 2024), supported: the direct causes and direct
   effects of one target when unmeasured common causes may exist, the edges the target has in the PAG
   with their marks, learned one Markov blanket at a time outward from the target until its marks are
@@ -300,7 +300,7 @@ names its pull request.
 - `mb_by_mb` puts no edge between a pair that a test of its search separated, a blanket learner's
   test included, as the paper's search does. Such a pair could keep an edge, and a v-structure that
   named it could direct a neighbor's other edge. On samples of the paper's networks the answers
-  change, mostly on Hailfinder, where the errors at the target fall in most settings. ([#PRNUM])
+  change, mostly on Hailfinder, where the errors at the target fall in most settings. ([#1030])
 
 ## [0.17.1] - 2026-11-12
 
@@ -2850,6 +2850,7 @@ First alpha release.
 [#1029]: https://github.com/Abel-ai-lab/Andrey/pull/1029
 [#1019]: https://github.com/Abel-ai-lab/Andrey/pull/1019
 [#1025]: https://github.com/Abel-ai-lab/Andrey/pull/1025
+[#1030]: https://github.com/Abel-ai-lab/Andrey/pull/1030
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
