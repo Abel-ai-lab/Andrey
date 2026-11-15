@@ -295,6 +295,13 @@ names its pull request.
   which variable each column holds, and `possible_dsep="fast"` keeps the data's order. The
   environment settings and the configuration page no longer list `fci_jci` with `normal_scores`
   among the parallel possible-d-separation searches; it does not offer that test. ([#1040])
+- The blanket engine behind `iamb`, `gs`, `hiton_mb`, `mmb_by_mmb`, and the other blanket learners
+  computes the columns' tie ranks when a search first compares candidates whose keys tie, where it
+  computed them when the search was built, so a fit that never compares tied candidates skips their
+  cost, 0.4 s at 5,000 rows and 1,000 variables. At that size `mmb_by_mmb` is 1.8 times faster,
+  `iamb` at one target 1.3 times, and `hiton_mb` at one target 0.6 s faster; `mmmb` on 100 variables
+  is 1.1 times faster. Every output, `metadata["n_tests"]` included, is the same bit for bit.
+  ([#1034], [#1044])
 
 ### Fixed
 
@@ -2894,6 +2901,8 @@ First alpha release.
 [#1037]: https://github.com/Abel-ai-lab/Andrey/pull/1037
 [#1038]: https://github.com/Abel-ai-lab/Andrey/pull/1038
 [#1040]: https://github.com/Abel-ai-lab/Andrey/pull/1040
+[#1034]: https://github.com/Abel-ai-lab/Andrey/pull/1034
+[#1044]: https://github.com/Abel-ai-lab/Andrey/pull/1044
 [#995]: https://github.com/Abel-ai-lab/Andrey/pull/995
 [#991]: https://github.com/Abel-ai-lab/Andrey/pull/991
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
