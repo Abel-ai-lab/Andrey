@@ -284,11 +284,6 @@ def test_an_undeclared_pulse_raises_as_a_copy_of_a_time_dummy_level():
     assert "as a time context" in caught.value.__notes__[0]
 
 
-def test_normal_scores_reads_two_datasets():
-    out = andrey.jpcmciplus(_datasets(2, 100), indep_test="normal_scores", time_dummy=False)
-    assert out.metadata["indep_test"] == "normal_scores"
-
-
 def test_the_rows_are_checked_against_the_conditions_each_test_uses():
     # Five datasets of ten steps at tau_max=2 leave 30 rows, fewer than the largest conditioning
     # set the design allows, and every test the fit runs still fits in them.

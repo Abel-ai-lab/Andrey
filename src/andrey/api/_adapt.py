@@ -11,7 +11,12 @@ import numpy as np
 
 from andrey.api._boundary import warn_past_boundary
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, Structure, StructureOutput
-from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS, SingularCorrelationError
+from andrey.core.ci import (
+    DISCRETE_INDEP_TESTS,
+    MIXED_INDEP_TESTS,
+    RANK_INDEP_TESTS,
+    SingularCorrelationError,
+)
 from andrey.core.ci_missing import EM, EM_METHODS, EM_SUPPORTED
 from andrey.core.knowledge import as_node, column_position, resolve
 from andrey.core.score import (
@@ -608,19 +613,31 @@ def check_em(name: str, missing: str | None, score_func: str | None, env: object
         )
 
 
-def check_rank_env(name: str, score_func: str | None, env: object) -> None:
-    """Raise ``ValueError`` for ``score_func="normal_scores"`` with an ``env``.
+def check_rank_env(
+    name: str, score_func: str | None, env: object, indep_test: str | None = None
+) -> None:
+    """Raise ``ValueError`` for a rank-based ``score_func`` or ``indep_test`` with an ``env``.
 
-    The score reads each column's normal scores, ranked over every row. Pooled over environments
-    that shift a variable, a column mixes its environments' distributions, so its normal scores
-    are no longer Gaussian, and the linear-Gaussian BIC on them is no longer the nonparanormal
-    model's score.
+    ``score_func="normal_scores"`` and ``indep_test="normal_scores"`` both read each column's normal
+    scores, ranked over every row. Pooled over environments that shift a variable, a column mixes
+    its environments' distributions, so its normal scores are no longer Gaussian, and neither the
+    linear-Gaussian BIC nor the partial correlation on them is the nonparanormal model's. Scores
+    ranked within each environment do not help: they center and scale every column in each
+    environment, so no column depends on the index.
     """
-    if score_func in RANK_SCORES and env is not None:
+    if env is None:
+        return
+    if score_func in RANK_SCORES:
         raise ValueError(
             f'{name}: score_func="normal_scores" models one distribution through the ranks of each '
             "column, so it takes no env: ranked over several environments, a column mixes their "
             'distributions; fit each environment alone, or pass score_func="bic"'
+        )
+    if indep_test in RANK_INDEP_TESTS:
+        raise ValueError(
+            f'{name}: indep_test="normal_scores" models one distribution through the ranks of each '
+            "column, so it takes no env: ranked over several environments, a column mixes their "
+            'distributions; fit each environment alone, or pass indep_test="fisherz" or "kci"'
         )
 
 
