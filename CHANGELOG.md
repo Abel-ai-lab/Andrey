@@ -295,6 +295,12 @@ names its pull request.
   which variable each column holds, and `possible_dsep="fast"` keeps the data's order. The
   environment settings and the configuration page no longer list `fci_jci` with `normal_scores`
   among the parallel possible-d-separation searches; it does not offer that test. ([#1040])
+- The skeleton scans of `pc` and `fci` and the conditioning-set scans of the blanket learners,
+  `mb_by_mb`, and `local_optimal_adjustment` build each chunk of conditioning sets as the rows of
+  an int array from cached combination tables, where they built tuples and converted each chunk
+  back. At 5,000 rows and 1,000 variables, `mb_by_mb` at one target is 1.15 times faster,
+  `local_optimal_adjustment` 1.08 times, and `pc` 1.06 times. Every output, `metadata["n_tests"]`
+  included, is the same bit for bit. ([#1036], [#1042])
 
 ### Fixed
 
@@ -2894,6 +2900,8 @@ First alpha release.
 [#1037]: https://github.com/Abel-ai-lab/Andrey/pull/1037
 [#1038]: https://github.com/Abel-ai-lab/Andrey/pull/1038
 [#1040]: https://github.com/Abel-ai-lab/Andrey/pull/1040
+[#1036]: https://github.com/Abel-ai-lab/Andrey/pull/1036
+[#1042]: https://github.com/Abel-ai-lab/Andrey/pull/1042
 [#995]: https://github.com/Abel-ai-lab/Andrey/pull/995
 [#991]: https://github.com/Abel-ai-lab/Andrey/pull/991
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
