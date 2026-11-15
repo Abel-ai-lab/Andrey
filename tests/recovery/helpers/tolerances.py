@@ -10,6 +10,8 @@ from __future__ import annotations
 GRAPH_ONLY = {"structural": ["graph"], "numeric": {}}
 #: The graph exactly and the objective score within rounding.
 GRAPH_SCORE = {"structural": ["graph"], "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}}}
+#: The graph and the ``effects`` records, exactly.
+GRAPH_EFFECTS = {"structural": ["graph", "effects"], "numeric": {}}
 
 SPEC: dict[str, dict] = {
     "DirectLiNGAM": {
@@ -39,6 +41,7 @@ SPEC: dict[str, dict] = {
     "MMPC": GRAPH_ONLY,
     "HITONPC": GRAPH_ONLY,
     "PCMB": GRAPH_ONLY,
+    "MBbyMB": GRAPH_ONLY,
     "HITONMB": GRAPH_ONLY,
     "MMMB": GRAPH_ONLY,
     # Y-structures: the claimed pairs in their listed order, and the scores within rounding.
@@ -47,6 +50,8 @@ SPEC: dict[str, dict] = {
         "numeric": {"scores": {"atol": 1e-6, "rtol": 1e-6}},
     },
     "CMB": GRAPH_ONLY,
+    "LDECC": GRAPH_EFFECTS,
+    "LocalOptimalAdjustment": GRAPH_EFFECTS,
     "MMBbyMMB": GRAPH_ONLY,
     "MMHC": GRAPH_SCORE,
     "RSMAX2": GRAPH_SCORE,

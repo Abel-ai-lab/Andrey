@@ -96,14 +96,20 @@ names its pull request.
   the same data, test, significance level, and largest conditioning set. `start_causal_explorer.sh`
   fetches the public repository at a pinned commit; the arm is left out where MATLAB or the toolbox
   is absent. ([#957])
-- `andrey.mb_by_mb`, MB-by-MB (Wang et al. 2014), experimental: the direct causes and direct
+- `andrey.mb_by_mb`, MB-by-MB (Wang et al. 2014): the direct causes and direct
   effects of one target, the edges the target has in the CPDAG with their directions, learned one
   Markov blanket at a time outward from the target until no further blanket can direct one of
   them. `metadata` lists the target's `parents`, `children`, and `undirected` neighbors, the
   `blankets_learned`, and `n_tests`. Its blanket learner is IAMB's grow phase without the shrink,
   as in the paper's runs (`blanket="iamb_forward"`, a new choice of the engine's learners).
   `local_max_depth=5`, the cap of those runs, caps the local structures' tests alone; `max_depth`
-  caps every test, as in the other learners, and sets no cap by default. ([#956])
+  caps every test, as in the other learners, and sets no cap by default. As in the paper, every
+  independence a test of the search finds is kept, a blanket learner's included, and such a pair
+  holds no edge. It is supported: at its paper's settings (Alarm and Hailfinder at 500 to 5,000
+  rows, a 45 x 45 chessboard), each answer took a small fraction of the tests of one global PC
+  fit and made fewer errors than the empty answer everywhere and than bnlearn's `pc.stable` on
+  Alarm and Hailfinder; Andrey's PC, at many times the tests, made fewer errors in some settings.
+  The 0.18.0 release card has the numbers and the trade-off. ([#956], [#1030])
 - `andrey.mmb_by_mmb`, MMB-by-MMB (Xie et al. 2024), supported: the direct causes and direct
   effects of one target when unmeasured common causes may exist, the edges the target has in the PAG
   with their marks, learned one Markov blanket at a time outward from the target until its marks are
@@ -212,22 +218,26 @@ names its pull request.
   Alarm network at 1,000 rows, its paper's setting, it made fewer errors at the target than global
   PC read there and than the empty answer, on 20 datasets and again on 20 fresh ones; the 0.18.0
   release card has the numbers. ([#995], [#1020])
-- `andrey.ldecc`, LDECC (Gupta et al. 2023), experimental: the edges at one `treatment`, with their
+- `andrey.ldecc`, LDECC (Gupta et al. 2023), supported: the edges at one `treatment`, with their
   directions, and the locally valid parent sets for its effect on one `outcome`, from its Markov
   blanket (`blanket`, `"iamb"` by default) and the tests of the PC algorithm read as they come, with
   eager collider checks that direct the treatment's parents. The step that finds the neighbors
   tests each blanket member against subsets of the blanket. The graph is a CPDAG of the edges at the
-  treatment, and the answer is one record in `metadata["effects"]`. The treatment-outcome benchmark
-  lane runs it beside the authors' code. ([#991])
-- `andrey.local_optimal_adjustment`, LOAD (Schubert, Claassen and Magliacane 2026), experimental:
+  treatment, and the answer is one record in `metadata["effects"]`. Against its authors' code on the
+  graphs of its paper's generator and on the MAGIC-NIAB network at 8,000 to 32,000 rows, it tied on
+  accuracy, recall, and effect error in all 8 settings, on 20 datasets and again on 20 fresh ones.
+  ([#991], [#1029])
+- `andrey.local_optimal_adjustment`, LOAD (Schubert, Claassen and Magliacane 2026), supported:
   for two `variables` given in any order, finds whether one causes the other and the optimal
   adjustment set for the total effect when it is identifiable, else the locally valid parent sets
   of the treatment, from local structures learned one Markov blanket at a time, as MB-by-MB learns
   them but each by the skeleton step of PC over the blanket, so the tests are exponential in the
   degrees of the skeleton and not in the size of the blanket. It learns only the blankets the
   answer needs. `metadata["effects"]` holds one record per direction, the graph the edges at the
-  two variables, and `metadata["blankets_learned"]` the variables whose blanket it learned.
-  ([#1003], [#1011])
+  two variables, and `metadata["blankets_learned"]` the variables whose blanket it learned. Against
+  its authors' code on its paper's random graphs with 100 to 1,000 variables and on pairs of the
+  MAGIC-NIAB network at 10,000 rows, its sets and effects tied in every setting, on 20 datasets or
+  again on 20 fresh ones. ([#1003], [#1011], [#1029])
 
 ### Changed
 
@@ -245,6 +255,21 @@ names its pull request.
   `rsmax2` with `restrict="iamb"` or `"inter_iamb"`; results on continuous data do not change. On
   five published networks at 500 to 10,000 rows, recall is higher in 18 of 42 comparisons and
   pooled F1 is never lower. ([#969])
+
+- `ldecc` reads five steps as its authors' implementation does: two neighbors separated without the
+  treatment are parents only when they test dependent given that set and the treatment; a neighbor
+  is a child of an unshielded collider only when every set of neighbors that separates the spouse
+  from the treatment leaves it out and dependent on the spouse; a non-collider tests only the
+  undirected neighbors as children; an eager collider check with one neighbor marks parents only
+  when the other's minimal separator holds that neighbor and one more variable; and a parent set
+  checks the non-collider pairs among the undirected neighbors it adds. On the 25-node graphs of
+  Gupta et al. at 8,000 to 32,000 rows, the share of fits whose parent sets equal the true CPDAG's
+  rises from 0.16-0.25 to 0.38-0.42, and the answers under exact tests do not change. ([#1029])
+- `local_optimal_adjustment` directs an edge that two v-structures direct both ways as the
+  v-structure whose pair the tests separated most clearly asks, as `pc` orders its colliders, where
+  it left the edge undirected; the answer then reads the pair's relation from it. Under exact tests
+  no edge is disputed and the answers do not change; `mb_by_mb` and `mmb_by_mmb` do not change.
+  ([#1029])
 
 ### Fixed
 
@@ -270,6 +295,12 @@ names its pull request.
   and a fit with a 36-member blanket ran out of memory at 64 GB; one call over the 6.9 million sets
   of size 9 of 28 variables now peaks at about 115 MB instead of 3.5 GB. Answers and `n_tests` are
   unchanged. ([#1019])
+- The treatment-outcome benchmark lane computes `valid` and F1 from the sets of the pair asked; a
+  method that answers both directions no longer counts the sets of the reverse one. ([#1029])
+- `mb_by_mb` puts no edge between a pair that a test of its search separated, a blanket learner's
+  test included, as the paper's search does. Such a pair could keep an edge, and a v-structure that
+  named it could direct a neighbor's other edge. On samples of the paper's networks the answers
+  change, mostly on Hailfinder, where the errors at the target fall in most settings. ([#1030])
 
 ## [0.17.1] - 2026-11-12
 
@@ -2816,8 +2847,10 @@ First alpha release.
 [#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
 [#1022]: https://github.com/Abel-ai-lab/Andrey/pull/1022
 [#1026]: https://github.com/Abel-ai-lab/Andrey/pull/1026
+[#1029]: https://github.com/Abel-ai-lab/Andrey/pull/1029
 [#1019]: https://github.com/Abel-ai-lab/Andrey/pull/1019
 [#1025]: https://github.com/Abel-ai-lab/Andrey/pull/1025
+[#1030]: https://github.com/Abel-ai-lab/Andrey/pull/1030
 [#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
 [#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
 [#988]: https://github.com/Abel-ai-lab/Andrey/pull/988

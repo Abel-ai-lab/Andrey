@@ -559,9 +559,9 @@ NOT_SHOWN = {("nonlinear", "anm_er"), ("boss-grasp", "diabetes")}
 # own units, where the references read those units and Andrey standardizes. NOTEARS omits its
 # cells in the simulation's own units and its rescaled cells, which its release card reports and
 # does not judge; its z-scored cells are at mean degrees 4 and 8, the paper's, so ``MEAN_DEGREE``
-# leaves them to the card too. PCMB and CMB have no reference implementation: their rows sit
-# beside their papers' published results, CMB's also beside global PC read at the target, with no
-# comparator, on their release card.
+# leaves them to the card too. PCMB, CMB, and MB-by-MB have no reference implementation: their
+# rows sit beside their papers' published results, CMB's and MB-by-MB's also beside global PC read
+# at the target, with no comparator, on their release card.
 # MMB-by-MMB's rows are four networks with hidden variables read at its paper's targets, and local
 # ISA-LiNG's rows are its paper's simulations, each read at one target; their release card reports
 # both.
@@ -585,6 +585,7 @@ NOT_SHOWN_LANES = {
     "notears.rescaled",
     "pcmb.paper",
     "cmb.paper",
+    "mb_by_mb.paper",
     "mmb-by-mmb",
     "local-isa-ling",
 }

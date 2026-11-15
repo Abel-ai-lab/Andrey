@@ -461,8 +461,11 @@ variable.
    hiton_pc
    hiton_mb
    pcmb
+   mb_by_mb
    y_structures
    cmb
+   ldecc
+   local_optimal_adjustment
    mmb_by_mmb
    icp
    ges
@@ -541,6 +544,15 @@ Glymour, and Scheines (1993) do (`degrees_of_freedom="nonempty"`). No reference 
 exists, so the [0.18.0](benchmarks/0.18.0.md#pcmb) release card sets its results on two published
 networks beside those of its paper.
 
+MB-by-MB (Wang et al. 2014), {py:func}`~andrey.mb_by_mb`, answers for one `target`: it learns the
+target's Markov blanket and the local structure over it, then a neighbor's, one blanket at a time,
+until no further blanket can direct an edge at the target, and returns the edges the target has in
+the CPDAG with their directions. `metadata["parents"]`, `metadata["children"]`, and
+`metadata["undirected"]` list the columns joined to the target, and `metadata["blankets_learned"]`
+the variables whose blanket it learned, in order. No reference implementation exists, so the
+[0.18.0](benchmarks/0.18.0.md#mb-by-mb) release card compares its accuracy and its tests per target
+with global PC read at the target, on its paper's Alarm, Hailfinder, and chessboard settings.
+
 CMB, causal Markov blanket (Gao and Ji 2015), {py:func}`~andrey.cmb`, learns the edges at one
 variable and their directions without the whole graph: from the target's Markov blanket, learned
 with HITON-MB by default, it labels each neighbor a parent or a child by how its dependence on the
@@ -555,6 +567,25 @@ target's Markov blanket, then a neighbor's, one blanket at a time, until the FCI
 marks at the target, and returns the edges the target has in the PAG. The authors' code is its
 reference: the [0.18.0](benchmarks/0.18.0.md#mmb-by-mmb) release card compares them on its paper's
 four networks with hidden variables.
+
+LDECC, local discovery using eager collider checks (Gupta et al. 2023), {py:func}`~andrey.ldecc`,
+answers for one `treatment` and `outcome`: it learns the treatment's Markov blanket with `blanket`,
+`"iamb"` by default, and its neighbors among it, then reads the tests of the PC algorithm over the
+other pairs as they come, directing the treatment's parents, and stops once every neighbor is
+directed. Its graph is a CPDAG that holds only the edges at the treatment, and
+`metadata["effects"]` holds the locally valid parent sets, one for each effect the local structure
+allows. The [0.18.0](benchmarks/0.18.0.md#ldecc) release card measures it against the authors'
+code.
+
+LOAD, local optimal adjustments discovery (Schubert, Claassen and Magliacane 2026),
+{py:func}`~andrey.local_optimal_adjustment`, answers for two `variables` given in any order, without
+knowing which one causes the other: it learns the edges at each one Markov blanket at a time, as
+MB-by-MB does, and tests from them whether one is an ancestor of the other. `metadata["effects"]`
+holds one record per direction: the optimal adjustment set for the total effect when it is
+identifiable, and the parent sets of the treatment that its edges allow, one estimate each, when it
+is not. The graph holds only the edges at the two variables, and `metadata["blankets_learned"]`
+lists the variables whose blanket it learned, in order. The [0.18.0](benchmarks/0.18.0.md#load)
+release card measures it against the authors' code.
 
 CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
 smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
@@ -769,11 +800,8 @@ in a process.
 
    dagma
    mmmb
-   mb_by_mb
    ldp
    ld3
-   ldecc
-   local_optimal_adjustment
    locpc_cde
 ```
 
@@ -786,12 +814,6 @@ the empty graph at its default settings, which is why it is experimental. The
 fit with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
 
-MB-by-MB (Wang et al. 2014) answers for one `target`: it learns the target's Markov blanket and the
-local structure over it, then a neighbor's, one blanket at a time, until no further blanket can
-direct an edge at the target, and returns the edges the target has in the CPDAG with their
-directions. `metadata["parents"]`, `metadata["children"]`, and `metadata["undirected"]` list the
-columns joined to the target, and `metadata["blankets_learned"]` the variables whose blanket it
-learned, in order. No reference implementation exists to compare it with.
 
 LDP, local discovery by partitioning (Maasch et al. 2024), answers for one `treatment` and
 `outcome`: it labels each other column by its causal relation to the pair, from tests whose
@@ -805,23 +827,6 @@ columns: it finds the parents of the outcome and whether the treatment is one of
 structural direct criterion), with the other parents as the adjustment set for the direct effect, in
 `metadata["effects"]`. Its graph holds the edges into the outcome, and `metadata["partition"]` the
 labels. It is experimental until its comparison with the authors' code is published.
-
-LDECC, local discovery using eager collider checks (Gupta et al. 2023), answers for one `treatment`
-and `outcome`: it learns the treatment's Markov blanket with `blanket`, `"iamb"` by default, and its
-neighbors among it, then reads the tests of the PC algorithm over the other pairs as they come,
-directing the treatment's parents, and stops once every neighbor is directed. Its graph is a CPDAG
-that holds only the edges at the treatment, and `metadata["effects"]` holds the locally valid parent
-sets, one for each effect the local structure allows. It is experimental until its comparison with
-the authors' code is published.
-
-LOAD, local optimal adjustments discovery (Schubert, Claassen and Magliacane 2026), answers for two
-`variables` given in any order, without knowing which one causes the other: it learns the edges at
-each one Markov blanket at a time, as MB-by-MB does, and tests from them whether one is an ancestor
-of the other. `metadata["effects"]` holds one record per direction: the optimal adjustment set for
-the total effect when it is identifiable, and the parent sets of the treatment that its edges allow,
-one estimate each, when it is not. The graph holds only the edges at the two variables, and
-`metadata["blankets_learned"]` lists the variables whose blanket it learned, in order. It is
-experimental until its comparison with the authors' code is published.
 
 LocPC-CDE (Loranchet and Assaad 2026) answers for one `treatment` and `outcome`: it learns the graph
 around the outcome one hop at a time with PC's tests, run only near the outcome, until every edge at

@@ -825,8 +825,9 @@ CALM_DATA = (SMALL_DATA[0], "asia_gauss")
 #: DAG without selection, which keeps its claims valid.
 ANCESTOR_DATA = (*_sizes("linear_gauss_er"), "asia_gauss")
 PAG_DATA = (*_sizes("latent_gauss_er"), "asia_gauss", "sachs")
-#: CMB answers one variable, the last column. Sachs has one draw, and at its last column, jnk, CMB
-#: finds at most one of the two edges, as PC does: its SHD there equals the empty answer's.
+#: MB-by-MB, CMB, LDECC, and LOAD are scored at one variable, the last column. Sachs has one draw,
+#: and at its last column, jnk, each finds at most one of the two edges, as PC does: none scores
+#: below the empty answer there.
 TARGET_CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss")
 #: MMB-by-MMB answers one variable, the last column. Sachs has one draw, and at its last column,
 #: jnk, the fit finds one of the two edges, as FCI does, and gets its marks wrong: its SHD there
@@ -954,11 +955,13 @@ def ut_igsp_targets(x: np.ndarray) -> list[list[int]]:
 
 #: Public defaults, except MMPC, HITON-PC, and RSMAX2: MMPC and HITON-PC return a skeleton by
 #: default, so the gate fits their CPDAG, and RSMAX2's default restrict phase is MMHC's, so the gate
-#: fits its IAMB restrict phase. CMB, MMB-by-MMB, and local ISA-LiNG answer one variable, the last
-#: column. A fixed seed pins the search orders of BOSS, GRaSP, BOSS-FCI, and GRaSP-FCI, FastICA's
-#: start, and CALM's optimizer. CD-NOD and MultiGroupDirectLiNGAM run through their benchmark
-#: adapters, which call the public functions with the published settings: the domain index of four
-#: equal blocks of rows, and three groups of columns.
+#: fits its IAMB restrict phase. MB-by-MB, CMB, MMB-by-MMB, and local ISA-LiNG answer one variable,
+#: the last column; LDECC takes it as the treatment and the first column as the outcome, LOAD takes
+#: the two as its variables, and each is scored by its edges at the last column. A fixed seed pins
+#: the search orders of BOSS, GRaSP, BOSS-FCI, and GRaSP-FCI, FastICA's start, and CALM's
+#: optimizer. CD-NOD and MultiGroupDirectLiNGAM run through their benchmark adapters, which call the
+#: public functions with the published settings: the domain index of four equal blocks of rows, and
+#: three groups of columns.
 SUPPORTED: dict[str, Method] = {
     "PC": Method(lambda x: andrey.pc(x), "cpdag", CPDAG_DATA),
     "FCI": Method(lambda x: andrey.fci(x), "pag", PAG_DATA),
@@ -981,10 +984,23 @@ SUPPORTED: dict[str, Method] = {
     "MMPC": Method(lambda x: andrey.mmpc(x, structure="cpdag"), "cpdag", CPDAG_DATA),
     "HITONPC": Method(lambda x: andrey.hiton_pc(x, structure="cpdag"), "cpdag", CPDAG_DATA),
     "PCMB": Method(lambda x: andrey.pcmb(x), "cpdag", CPDAG_DATA),
+    "MB-by-MB": Method(
+        lambda x: andrey.mb_by_mb(x, target=x.shape[1] - 1), "target_cpdag", TARGET_CPDAG_DATA
+    ),
     "HITONMB": Method(lambda x: andrey.hiton_mb(x), "cpdag", CPDAG_DATA),
     "Y-structures": Method(y_structures_claims, "ancestors", ANCESTOR_DATA),
     "CMB": Method(
         lambda x: andrey.cmb(x, target=x.shape[1] - 1), "target_cpdag", TARGET_CPDAG_DATA
+    ),
+    "LDECC": Method(
+        lambda x: andrey.ldecc(x, treatment=x.shape[1] - 1, outcome=0),
+        "target_cpdag",
+        TARGET_CPDAG_DATA,
+    ),
+    "LocalOptimalAdjustment": Method(
+        lambda x: andrey.local_optimal_adjustment(x, variables=[x.shape[1] - 1, 0]),
+        "target_cpdag",
+        TARGET_CPDAG_DATA,
     ),
     "MMHC": Method(lambda x: andrey.mmhc(x), "cpdag", CPDAG_DATA),
     "RSMAX2": Method(lambda x: andrey.rsmax2(x, restrict="iamb"), "cpdag", CPDAG_DATA),

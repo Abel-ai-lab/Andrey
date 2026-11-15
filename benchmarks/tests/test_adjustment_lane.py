@@ -906,6 +906,26 @@ def test_the_summary_reads_the_record_of_the_pair_asked_not_the_last_of_the_fit(
     assert adjustment_cpu.asked_error(both)["error"] == pytest.approx(0.1)
 
 
+@pytest.mark.parametrize("asked_first", [True, False])
+def test_valid_and_f1_read_the_sets_of_the_pair_asked_only(asked_first):
+    asked = _answer(3, 7, sets=[[1]])
+    reverse = _answer(7, 3, sets=[[2], [4]], nonzero=False)
+    fit = _stored_fit(
+        "stand-in.both",
+        [asked, reverse] if asked_first else [reverse, asked],
+        {(3, 7): 0.1, (7, 3): 0.9},
+    )
+    scored = [
+        {"pair": [3, 7], "set": [1], "valid": True, "f1": 1.0},
+        {"pair": [7, 3], "set": [2], "valid": False, "f1": 0.0},
+        {"pair": [7, 3], "set": [4], "valid": False, "f1": 0.0},
+    ]
+    fit["scores"]["sets"] = scored if asked_first else scored[::-1]
+    (row,) = adjustment_cpu.summarize([fit])
+    assert row["valid"] == pytest.approx(1.0) and row["f1"] == pytest.approx(1.0)
+    assert [s["set"] for s in adjustment_cpu.asked_sets(fit)] == [[1]]
+
+
 def test_a_fit_whose_asked_record_abstains_has_no_error_and_is_not_answered():
     empty = _stored_fit("baseline.adjust-none", [_answer(3, 7, sets=[[]])], {(3, 7): 0.5})
     reverse_only = _stored_fit(

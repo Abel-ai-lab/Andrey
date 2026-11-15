@@ -82,6 +82,25 @@ def _run_target(name: str):
     return run
 
 
+def _run_ldecc(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    # The treatment x2, whose parents x0 and x1 form a collider, and the outcome x4, its descendant
+    # through x3.
+    column = datagen.column_of("gauss_7v")
+    out = andrey.ldecc(X, treatment=int(column[2]), outcome=int(column[4]))
+    return project_output(out, algorithm)
+
+
+def _run_local_optimal_adjustment(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    # x0 causes x3 through x2, so x2's other parent, x1, is the optimal adjustment set.
+    column = datagen.column_of("gauss_7v")
+    out = andrey.local_optimal_adjustment(X, variables=[int(column[0]), int(column[3])])
+    return project_output(out, algorithm)
+
+
 def _run_mmb_by_mmb(X: np.ndarray, algorithm: str) -> dict:
     import andrey
 
@@ -158,10 +177,13 @@ ALGORITHMS = {
     "MMPC": (_facade("mmpc", structure="cpdag"), "gauss_5v"),
     "HITONPC": (_facade("hiton_pc", structure="cpdag"), "gauss_5v"),
     "PCMB": (_facade("pcmb"), "gauss_5v"),
+    "MBbyMB": (_run_target("mb_by_mb"), "gauss_5v"),
     "HITONMB": (_facade("hiton_mb"), "gauss_5v"),
     "MMMB": (_facade("mmmb"), "gauss_5v"),
     "YStructures": (_facade("y_structures"), "gauss_7v"),
     "CMB": (_run_target("cmb"), "gauss_5v"),
+    "LDECC": (_run_ldecc, "gauss_7v"),
+    "LocalOptimalAdjustment": (_run_local_optimal_adjustment, "gauss_7v"),
     "MMBbyMMB": (_run_mmb_by_mmb, "confounded_gauss_5v"),
     "MMHC": (_facade("mmhc"), "gauss_5v"),
     "RSMAX2": (_facade("rsmax2", restrict="pc", maximize="tabu"), "gauss_5v"),

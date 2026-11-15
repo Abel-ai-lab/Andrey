@@ -22,20 +22,25 @@ summary's ``parity_rule`` sets how its rows are judged:
   field overrides its entry's.
 - ``metric``, on an entry: the error its rows pair, ``"shd"`` (the default when absent),
   ``"target_error"`` (the size of the symmetric difference of the learned and true intervention
-  targets), ``"direct_errors"`` (the directed edges against the edges between observed
-  variables that no unobserved causal or backdoor path joins), ``"set_distance"`` (a set learned
-  at every target, such as a Markov blanket: the mean over the targets of the distance of the
-  set's precision and recall from (1, 1)), ``"set_f1_loss"`` (1 minus the mean over the
-  targets of the set's F1, so that fewer is better as for the others), ``"edge_distance"`` and
-  ``"edge_f1_loss"`` (the same two over the edges a method answers at a target, an edge right
-  only with both endpoint marks right), ``"claim_error"`` (claims of ancestral pairs: the mean
-  over the datasets of the false claims plus the true pairs not claimed), ``"claim_ap_loss"``
-  (1 minus the mean over the datasets of the average precision of the claims' scores), or
-  ``"weight_distance"`` (a weighted answer at a target: the mean over the datasets of the
-  Euclidean distance between its weights and the true ones over the edges it answers). A row's
-  means are ``andrey_<metric>_mean`` and ``comparator_<metric>_mean``, or the ``*_shd_mean``
-  fields, which then hold that error's means. A method with a gated metric beside SHD has one
-  entry per metric, and a row's key names the ``metric``.
+  targets), ``"direct_errors"`` (the directed edges against the edges between observed variables
+  that no unobserved causal or backdoor path joins), ``"set_distance"`` (a set learned at every
+  target, such as a Markov blanket: the mean over the targets of the distance of the set's precision
+  and recall from (1, 1)), ``"set_f1_loss"`` (1 minus the mean over the targets of the set's F1, so
+  that fewer is better as for the others), ``"edge_distance"`` and ``"edge_f1_loss"`` (the same two
+  over the edges a method answers at a target, an edge right only with both endpoint marks right),
+  ``"claim_error"`` (claims of ancestral pairs: the mean over the datasets of the false claims plus
+  the true pairs not claimed), ``"claim_ap_loss"`` (1 minus the mean over the datasets of the
+  average precision of the claims' scores), ``"weight_distance"`` (a weighted answer at a target:
+  the mean over the datasets of the Euclidean distance between its weights and the true ones over
+  the edges it answers), and for an answer about one treatment and outcome, ``"effect_error"``
+  (the mean absolute error, on a fresh sample, of the effects estimated with the answer's
+  adjustment sets), ``"family_error"`` (1 when the answer's parent sets are not the family the true
+  CPDAG allows, else 0), ``"recall_loss"`` (1 when the treatment's true parents are not among
+  them), or ``"hausdorff_mse"`` (the squared Hausdorff distance of the estimated effects from the
+  effects the family gives in the population, in standard deviations). A row's means are
+  ``andrey_<metric>_mean`` and ``comparator_<metric>_mean``, or the ``*_shd_mean`` fields, which
+  then hold that error's means. A method with a gated metric beside SHD has one entry per metric,
+  and a row's key names the ``metric``.
 - ``role``: ``"context"`` on an entry marks a comparator the method is reported against and never
   judged by, such as another method on the same data. Its rows are reported with their numbers.
 - ``coverage``: a row's ``andrey_short`` counts the datasets the reference finished and Andrey did
@@ -119,6 +124,10 @@ METRICS: dict[str, str] = {
     "direct_errors": "direct-edge errors",
     "set_distance": "set distance",
     "set_f1_loss": "set F1 loss",
+    "effect_error": "effect error",
+    "family_error": "parent-set family error",
+    "recall_loss": "parent-set recall loss",
+    "hausdorff_mse": "effect-set Hausdorff MSE",
     "edge_distance": "edge distance",
     "edge_f1_loss": "edge F1 loss",
     "claim_error": "claim errors",

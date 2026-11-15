@@ -35,6 +35,7 @@ from andrey.constraint.sequential import (
     merge,
     open_reach,
     orient,
+    resolve_conflicts,
     sequential,
     stop_rule,
     unknown_triples,
@@ -190,6 +191,36 @@ def test_mb_by_mb_stops_when_no_variable_is_left_to_learn():
     result = sequential(_search(_dag([(2, 0), (0, 1), (4, 3), (5, 3)], 6)), 0, "iamb", MB_BY_MB)
     assert result.done == [0, 1, 2]
     assert result.network.mark(0, 2) == TAIL and result.network.mark(2, 0) == TAIL
+
+
+class _OneFalseIndependence(DSepOracle):
+    """d-separation in ``dag``, except that the pair ``pair`` tests independent given ``given``."""
+
+    def __init__(self, dag: nx.DiGraph, pair: tuple[int, int], given: tuple[int, ...]) -> None:
+        super().__init__(dag)
+        self.pair, self.given = frozenset(pair), frozenset(given)
+
+    def __call__(self, x: int, y: int, condition_set=()) -> float:
+        if {int(x), int(y)} == self.pair and {int(z) for z in condition_set} == self.given:
+            return 1.0
+        return super().__call__(x, y, condition_set)
+
+
+def test_mb_by_mb_puts_no_edge_between_a_pair_a_test_separated():
+    # 0 -> 1 -> 2 with 0 and 1 testing independent given {2}: 1's blanket learner leaves 0 out
+    # with that set, while 0's own step keeps 0 - 1. MB-by-MB keeps every independence found and
+    # puts no edge between such a pair; without the rule the edge stays.
+    dag = _dag([(0, 1), (1, 2)], 3)
+
+    def run(rules: Rules):
+        search = LocalSearch(_OneFalseIndependence(dag, (0, 1), (2,)), [0, 1, 2], 0.05)
+        return sequential(search, 0, "iamb", rules)
+
+    result = run(MB_BY_MB)
+    assert result.cache.blankets[1] == [2] and result.cache.sepsets[0, 1] == (2,)
+    assert not result.network.star(0, 3).any()
+    kept = run(replace(MB_BY_MB, drop_separated=False))
+    assert kept.network.mark(0, 1) == TAIL and kept.network.mark(1, 0) == TAIL
 
 
 def test_an_orientation_several_steps_away_reaches_the_target():
@@ -534,3 +565,30 @@ def test_the_answer_does_not_depend_on_the_column_order_or_the_units(rules):
         shuffled = _answer(x[:, perm], int(np.flatnonzero(perm == target)[0]), rules)
         assert np.array_equal(shuffled, answer[np.ix_(perm, perm)]), target
         assert np.array_equal(_answer(x * scale, target, rules), answer), target
+
+
+def test_a_conflicting_edge_takes_the_direction_of_the_more_clearly_separated_collider():
+    """``0 -> 1 <- 2`` (pair p-value 0.9) and ``1 -> 2 <- 3`` (0.3) dispute ``1 - 2``: the edge
+    keeps the arrowhead the first asks, ``2 -> 1``, and ``3 -> 2`` keeps its own."""
+    network = Network(TAIL)
+    for u, v in ((0, 1), (1, 2), (2, 3)):
+        network.add(u, v)
+    colliders = [(0, 1, 2), (1, 2, 3)]
+    for a, b, c in colliders:
+        network.arrow(b, a)
+        network.arrow(b, c)
+    assert resolve_conflicts(network, colliders, {(0, 2): 0.9, (1, 3): 0.3})
+    assert (network.mark(1, 2), network.mark(2, 1)) == (ARROW, TAIL)
+    assert (network.mark(1, 0), network.mark(2, 3)) == (ARROW, ARROW)
+
+
+def test_a_conflicting_edge_whose_colliders_tie_stays_bidirected():
+    network = Network(TAIL)
+    for u, v in ((0, 1), (1, 2), (2, 3)):
+        network.add(u, v)
+    colliders = [(0, 1, 2), (1, 2, 3)]
+    for a, b, c in colliders:
+        network.arrow(b, a)
+        network.arrow(b, c)
+    assert not resolve_conflicts(network, colliders, {(0, 2): 0.5, (1, 3): 0.5})
+    assert (network.mark(1, 2), network.mark(2, 1)) == (ARROW, ARROW)
