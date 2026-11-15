@@ -151,7 +151,8 @@ class AndreyPCAdjustment:
     class at a finite sample, so it is read after
     :func:`andrey.core.orient.cpdag_of_pdag` completes it, the same skeleton and v-structures with
     every edge oriented as the class requires; a graph with no consistent DAG extension is an
-    answer that decides nothing.
+    answer that decides nothing. The count of tests is every query PC's tests evaluated during the
+    call (:func:`andrey.core.ci.counting_tests`).
     """
 
     name = "andrey.pc.adjustment"
@@ -186,6 +187,7 @@ class AndreyPCAdjustment:
         import andrey
         from andrey import GraphStructure
         from andrey.core import adjustment as adj
+        from andrey.core.ci import counting_tests
         from andrey.core.orient import cpdag_of_pdag
 
         data = np.asarray(data, dtype=np.float64)
@@ -193,9 +195,10 @@ class AndreyPCAdjustment:
         settings = {**self.params(), **params}
         x, y = int(params[TREATMENT_PARAM]), int(params[OUTCOME_PARAM])
         estimand = params.get(ESTIMAND_PARAM, "total")
-        out = andrey.pc(
-            data, alpha=float(settings["alpha"]), indep_test=str(settings["indep_test"])
-        )
+        with counting_tests() as tests:
+            out = andrey.pc(
+                data, alpha=float(settings["alpha"]), indep_test=str(settings["indep_test"])
+            )
         record: dict[str, Any] = {
             "treatment": x,
             "outcome": y,
@@ -217,7 +220,7 @@ class AndreyPCAdjustment:
             self._direct(record, adj, marks, x, y)
         elif marks is not None:
             self._total(record, adj, graph, x, y)
-        return pack_effects([record], d, out.metadata.get("n_tests"))
+        return pack_effects([record], d, tests.n)
 
     @staticmethod
     def _total(record: dict[str, Any], adj: Any, graph: Any, x: int, y: int) -> None:

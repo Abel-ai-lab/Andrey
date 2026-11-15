@@ -1,4 +1,5 @@
-"""The 0.18.0 release card's accuracy and cost of MB-by-MB, saved as HTML beside this script.
+"""The 0.18.0 release card's accuracy and cost of MB-by-MB and LocPC-CDE, saved as HTML beside this
+script.
 
 ``mb-by-mb-frontier.html``: one panel per network of the MB-by-MB paper, Alarm, Hailfinder, and the
 45 x 45 chessboard, each cell (rows, level) a point per method: the mean SHD per target against
@@ -7,8 +8,14 @@ MB-by-MB or CMB, pays its walk at the target; a global PC, Andrey's or bnlearn's
 its whole fit. CMB and bnlearn ran on Alarm and Hailfinder only.
 
 The points come from the MB-by-MB rows of the card's direct lane (``LANE``), the rows whose first
-solution is ``andrey.mb_by_mb``. The script runs with
-``uv run python docs/docs/benchmarks/0.18.0/frontier.py [direct.json]``.
+solution is ``andrey.mb_by_mb``.
+
+``locpc-cde-frontier.html``: one panel per data family of the LocPC-CDE paper, linear-Gaussian and
+binary, each graph size a point per method: the verdict error over the identifiable and the
+non-identifiable pair of each seed against the median CI tests of one fit, on a log scale. The
+points come from the ``pooled_verdict_floor`` rows of the LocPC-CDE lane (``PAIR_LANE``).
+
+The script runs with ``uv run python docs/docs/benchmarks/0.18.0/frontier.py [direct.json]``.
 """
 
 from __future__ import annotations
@@ -21,6 +28,17 @@ from pathlib import Path
 
 HERE = Path(__file__).parent
 LANE = HERE.parents[3] / "benchmarks" / "published" / "0.18.0" / "direct.json"
+PAIR_LANE = LANE.with_name("locpc-cde.json")
+# The LocPC-CDE panels, by the lane's family, and its series, as ``SERIES`` gives them.
+FAMILIES = {
+    "gaussian": ("Linear-Gaussian", "Fisher's z test, 5,000 rows"),
+    "binary": ("Binary", "G-square test, 5,000 rows"),
+}
+PAIR_SERIES = (
+    ("andrey.locpc_cde", "LocPC-CDE", 1, "circle"),
+    ("locpc_cde.authors", "Authors' code", 2, "diamond"),
+    ("andrey.pc.adjustment", "Andrey's PC", 3, "square"),
+)
 # The panels, in the paper's order: the network, its title, and what a dataset holds.
 NETWORKS = {
     "alarm": ("Alarm", "37 variables, every node a target"),
@@ -182,10 +200,91 @@ def frontier(lane: dict) -> str:
     )
 
 
+def pair_panel(family: str, rows: list[dict]) -> str:
+    """One family's sizes: the verdict error against the median CI tests of a fit, per method."""
+    title, about = FAMILIES[family]
+    points = [(solution, row, row[solution]) for row in rows for solution, *_ in PAIR_SERIES]
+    tests = [side["tests_median"] for _, _, side in points]
+    low, high = math.floor(math.log10(min(tests))), math.ceil(math.log10(max(tests)))
+    top = math.ceil(max(side["verdict_error_mean"] for _, _, side in points) * 4) / 4
+
+    def x(value: float) -> float:
+        return LEFT + (math.log10(value) - low) / (high - low) * (RIGHT - LEFT)
+
+    def y(value: float) -> float:
+        return BOTTOM - value / top * (BOTTOM - TOP)
+
+    axis = []
+    for k in range(int(top * 4) + 1):
+        level = k / 4
+        axis.append(
+            f'<line x1="{LEFT}" x2="{RIGHT}" y1="{y(level):.1f}" y2="{y(level):.1f}"/>'
+            f'<text x="{LEFT - 5}" y="{y(level) + 3.5:.1f}" text-anchor="end">{level:g}</text>'
+        )
+    for power in range(low, high + 1):
+        axis.append(
+            f'<line x1="{x(10**power):.1f}" x2="{x(10**power):.1f}" y1="{TOP}" y2="{BOTTOM}"/>'
+            f'<text x="{x(10**power):.1f}" y="{BOTTOM + 15}" text-anchor="middle">'
+            f"{count(10**power)}</text>"
+        )
+    marks = []
+    for solution, name, color, shape in PAIR_SERIES:
+        for _, row, side in (p for p in points if p[0] == solution):
+            tip = (
+                f"{name}, {row['d']} variables: verdict error {side['verdict_error_mean']:.3f}, "
+                f"{side['tests_median']:,.0f} tests per fit"
+            )
+            marks.append(
+                marker(shape, x(side["tests_median"]), y(side["verdict_error_mean"]), color, tip)
+            )
+    label = (
+        f"{title}: verdict error against CI tests per fit on a log scale, one point per graph "
+        "size for LocPC-CDE, the authors' code, and Andrey's PC."
+    )
+    return (
+        f'<figure class="mbf-panel"><figcaption><strong>{escape(title)}</strong>'
+        f"<span>{escape(about)}</span></figcaption>"
+        f'<svg viewBox="0 0 {WIDTH} {HEIGHT}" role="img" aria-label="{escape(label)}">'
+        f"<g>{''.join(axis)}</g>"
+        f'<text class="mbf-title" x="{(LEFT + RIGHT) / 2:.0f}" y="{HEIGHT - 4}" '
+        'text-anchor="middle">CI tests per fit (log scale)</text>'
+        f'<text class="mbf-title" transform="rotate(-90)" x="{-(TOP + BOTTOM) / 2:.0f}" y="11" '
+        'text-anchor="middle">Verdict error</text>'
+        f"{''.join(marks)}</svg></figure>"
+    )
+
+
+def pair_frontier(lane: dict) -> str:
+    """The LocPC-CDE figure: the legend, a panel per family, and the caption."""
+    rows = lane["pooled_verdict_floor"]
+    panels = "".join(pair_panel(f, [r for r in rows if r["family"] == f]) for f in FAMILIES)
+    keys = "".join(
+        f'<span class="mbf-key"><svg viewBox="-5 -5 10 10" aria-hidden="true">'
+        f"{marker(shape, 0, 0, color)}</svg>{escape(name)}</span>"
+        for _, name, color, shape in PAIR_SERIES
+    )
+    note = (
+        "One point per graph size, 10 to 200 variables, over 40 datasets: lower is more accurate "
+        'and left is cheaper; the constant answer "not identifiable" scores 0.5.'
+    )
+    # Two panels share the width; on a narrow page they stack, as the three of MB-by-MB do.
+    two = (
+        "<style>.mbf-panels.mbf-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }"
+        "@container (max-width: 30rem) { .mbf-panels.mbf-two { "
+        "grid-template-columns: minmax(0, 1fr); } }</style>"
+    )
+    return (
+        f'{STYLE}{two}<figure class="mbf"><p class="mbf-legend">{keys}</p>'
+        f'<div class="mbf-panels mbf-two">{panels}</div><p class="mbf-note">{note}</p></figure>\n'
+    )
+
+
 def main() -> None:
     path = Path(sys.argv[1]) if len(sys.argv) > 1 else LANE
     lane = json.loads(path.read_text(encoding="utf-8"))
     (HERE / "mb-by-mb-frontier.html").write_text(frontier(lane), encoding="utf-8")
+    pair = json.loads(PAIR_LANE.read_text(encoding="utf-8"))
+    (HERE / "locpc-cde-frontier.html").write_text(pair_frontier(pair), encoding="utf-8")
 
 
 if __name__ == "__main__":

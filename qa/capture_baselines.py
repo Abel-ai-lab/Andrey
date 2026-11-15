@@ -101,6 +101,16 @@ def _run_local_optimal_adjustment(X: np.ndarray, algorithm: str) -> dict:
     return project_output(out, algorithm)
 
 
+def _run_locpc_cde(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    # The treatment x0 and the outcome x2, whose edges x0 -> x2 <- x1 and x2 -> x3 the CPDAG all
+    # directs, so the effect is identifiable and x1 is its adjustment set.
+    column = datagen.column_of("gauss_7v")
+    out = andrey.locpc_cde(X, treatment=int(column[0]), outcome=int(column[2]))
+    return project_output(out, algorithm)
+
+
 def _run_mmb_by_mmb(X: np.ndarray, algorithm: str) -> dict:
     import andrey
 
@@ -108,6 +118,15 @@ def _run_mmb_by_mmb(X: np.ndarray, algorithm: str) -> dict:
     # c -> e, b <-> c, and d o-> c; every other variable has one or two.
     target = int(datagen.column_of("confounded_gauss_5v")[2])
     return project_output(andrey.mmb_by_mmb(X, target=target), algorithm)
+
+
+def _run_local_isa_ling(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    # The column of x1, whose answer holds an edge of each kind: x0 -> x1 into it, x1 -> x2 and
+    # x1 -> x3 out of it, and x0 -> x2 into a child.
+    target = int(datagen.column_of("lingam_5v_uniform")[1])
+    return project_output(andrey.local_isa_ling(X, target=target), algorithm)
 
 
 def _run_ut_igsp(X: np.ndarray, algorithm: str) -> dict:
@@ -144,6 +163,7 @@ def _run_igsp(X: np.ndarray, algorithm: str) -> dict:
 ALGORITHMS = {
     "DirectLiNGAM": (_facade("direct_lingam"), "lingam_5v_uniform"),
     "ICALiNGAM": (_facade("ica_lingam"), "lingam_5v_uniform"),
+    "LocalISALiNG": (_run_local_isa_ling, "lingam_5v_uniform"),
     "PC": (_facade("pc"), "gauss_5v"),
     "FCI": (_facade("fci"), "gauss_5v"),
     "GFCI": (_facade("gfci", penalty_discount=2.0), "gauss_5v"),
@@ -174,6 +194,7 @@ ALGORITHMS = {
     "CMB": (_run_target("cmb"), "gauss_5v"),
     "LDECC": (_run_ldecc, "gauss_7v"),
     "LocalOptimalAdjustment": (_run_local_optimal_adjustment, "gauss_7v"),
+    "LocPCCDE": (_run_locpc_cde, "gauss_7v"),
     "MMBbyMMB": (_run_mmb_by_mmb, "confounded_gauss_5v"),
     "MMHC": (_facade("mmhc"), "gauss_5v"),
     "RSMAX2": (_facade("rsmax2", restrict="pc", maximize="tabu"), "gauss_5v"),

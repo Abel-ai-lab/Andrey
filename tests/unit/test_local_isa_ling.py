@@ -135,21 +135,34 @@ def test_one_column_has_an_empty_blanket():
     assert out.metadata["equivalent_models"] == [{"edges": [], "stable": True}]
 
 
-def test_acyclic_peels_sinks_and_falls_back_on_a_cycle():
+def test_acyclic_peels_sinks_and_reads_a_cycle_with_one_model():
     """On the chain the sink peeling gives the default's edges; with the target on a cycle no
-    column is a sink, and the fit runs Algorithm 1."""
+    column is a sink, and the peeling still gives one model, without subspaces."""
     dag = fit(chain(), target="y", acyclic=True)
     assert np.flatnonzero(dag.weighted_adjacency).tolist() == [1, 5]
     assert "subspaces" not in dag.metadata
-    X = cyclic_four()
-    cyclic = fit(X, target=1, acyclic=True)
-    default = fit(X, target=1)
-    assert np.array_equal(cyclic.weighted_adjacency, default.weighted_adjacency)
-    assert cyclic.metadata == default.metadata
+    cyclic = fit(cyclic_four(), target=1, acyclic=True)
+    assert len(cyclic.metadata["equivalent_models"]) == 1
+    assert "subspaces" not in cyclic.metadata
 
 
-def test_algorithm3_reports_no_sink():
-    assert local.algorithm3(np.array([[1.0, 0.5], [0.4, 1.0]]), 0) is None
+@pytest.mark.parametrize(
+    ("W", "edges"),
+    [
+        ([[1.0, 0.5], [0.4, 1.0]], {(1, 0): -0.5}),
+        (
+            [[1.0, 0.5, 0.2], [0.4, 1.0, 0.0], [0.3, 0.6, 1.0]],
+            {(0, 2): -0.3, (1, 2): -0.6, (1, 0): -0.5},
+        ),
+    ],
+)
+def test_algorithm3_without_a_sink_takes_the_column_with_the_fewest_nonzeros(W, edges):
+    """No column is a sink: the column with the fewest nonzero entries goes first (the second
+    case's last column), of several the one with the least absolute sum (the target's column),
+    each read from the row at its position after the column's other entries are zeroed."""
+    found = local.algorithm3(np.array(W), 0)
+    assert found.keys() == edges.keys()
+    assert all(found[e] == pytest.approx(w) for e, w in edges.items())
 
 
 def test_the_target_is_required_and_missing_values_raise():

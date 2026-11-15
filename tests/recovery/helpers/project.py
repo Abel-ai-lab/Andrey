@@ -71,11 +71,12 @@ _PCMCI = frozenset({"PCMCI", "PCMCIplus", "LPCMCI"})
 # at the target.
 _INVARIANT = frozenset({"ICP"})
 # Treatment-outcome methods: candidate = the graph and the ``effects`` records.
-_EFFECTS = frozenset({"LDECC", "LocalOptimalAdjustment"})
+_EFFECTS = frozenset({"LDECC", "LocalOptimalAdjustment", "LocPCCDE"})
 # Weighted temporal fits: candidate = the per-lag graphs and their weights.
 _WEIGHTED_LAGS = frozenset({"DYNOTEARS", "Granger"})
-# Weighted DAGs: candidate = the DAG and its weights, ``weighted_adjacency[i, j]`` for ``i -> j``.
-_WEIGHTED_DAG = frozenset({"NOTEARS"})
+# Weighted graphs: candidate = the graph and its weights, ``weighted_adjacency[i, j]`` for
+# ``i -> j``: NOTEARS's DAG, and local ISA-LiNG's digraph of the edges at its target.
+_WEIGHTED_GRAPH = frozenset({"NOTEARS", "LocalISALiNG"})
 # VARMA-LiNGAM: candidate = the causal order and both coefficient stacks in the native B layout.
 _VARMA = frozenset({"VARMALiNGAM", "VARMALiNGAMPruned"})
 
@@ -196,7 +197,7 @@ def project_output(out: Any, algorithm: str) -> dict:
             "graph": np.stack([s.lag(lag).to_numpy() for lag in s.lags]),
             "lag_weights": np.asarray(s.lag_weights),
         }
-    if algorithm in _WEIGHTED_DAG:
+    if algorithm in _WEIGHTED_GRAPH:
         return {
             "graph": out.structure.to_numpy(),
             "weighted_adjacency": np.asarray(out.weighted_adjacency),

@@ -52,6 +52,7 @@ SPEC: dict[str, dict] = {
     "CMB": GRAPH_ONLY,
     "LDECC": GRAPH_EFFECTS,
     "LocalOptimalAdjustment": GRAPH_EFFECTS,
+    "LocPCCDE": GRAPH_EFFECTS,
     "MMBbyMMB": GRAPH_ONLY,
     "MMHC": GRAPH_SCORE,
     "RSMAX2": GRAPH_SCORE,
@@ -85,6 +86,13 @@ SPEC: dict[str, dict] = {
     "ICALiNGAM": {
         "structural": ["causal_order"],
         "numeric": {"weighted_adjacency": {"atol": 1e-6, "rtol": 1e-5}},
+    },
+    # Local ISA-LiNG: the digraph exactly; the weights within what its sparse ICA leaves open: the
+    # ICA stops at its step cap before it settles, and a relative 1e-12 change of the inputs moves
+    # the weights by up to 2e-3.
+    "LocalISALiNG": {
+        "structural": ["graph"],
+        "numeric": {"weighted_adjacency": {"atol": 1e-2, "rtol": 0.0}},
     },
     # Multi-group: one shared causal order (structural) + a stack of per-group weighted matrices
     # (numeric, shape (n_groups, d, d) -- compared element-wise within tolerance).
