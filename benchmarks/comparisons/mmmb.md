@@ -63,8 +63,9 @@ the toolbox's on win95pts at 300, 700, 1,000, and 5,000 rows, equal on 95 to 98%
 hailfinder at 5,000 rows they come closer, 0.528 against 0.525 in distance and 0.604 against 0.577
 in F1 (seeds 0 to 19), but stay worse in distance. There they equal the toolbox's on every target of
 14 datasets only when a test also runs only with at least five rows per cell of its table, the
-toolbox's fixed setting and its form of the rule of the paper's experiments. `mmmb` runs every test:
-with that rule its errors there rise from 2.13 to 6.92 per target.
+toolbox's fixed setting and its form of the rule of the paper's experiments. `mmmb` runs every test;
+its errors there are 2.13 per target, against 6.92 with all four set the toolbox's way (4.12 with
+the first three).
 
 Andrey's errors are below the toolbox's in every setting, from 0.74 against 1.93 per target on pigs
 to 3.23 against 3.31 on win95pts at 5,000 rows, and below the empty set's in all 21. As in the
