@@ -61,10 +61,18 @@ def test_the_frontier_keeps_every_solution_no_other_beats_on_accuracy_and_cost(t
     for seed in range(12):
         rows.append(_record("empty", seed, 10, 3.0, None))
         rows.append(_record("andrey.local_isa_ling", seed, 3, 0.5, 30.0))
-        rows.append(_record("local_isa_ling.authors", seed, 4, 0.6, 40.0))
         rows.append(_record("andrey.direct_lingam", seed, 1, 0.2, 60.0))
         rows.append(_record("andrey.ica_lingam", seed, 6, 1.0, 5.0))
     front = S.frontier(_run(tmp_path, rows), "acyclic-d3", 2000, range(12))
     on = {k for k, v in front["points"].items() if v["pareto_shd"]}
-    # The authors' code is slower and less accurate than Andrey's; every other point trades one off.
+    # Each point trades accuracy against cost; none is beaten on both at once.
     assert on == {"andrey.local_isa_ling", "andrey.direct_lingam", "andrey.ica_lingam", "empty"}
+
+
+def test_sachs_keeps_each_target_of_its_one_dataset(tmp_path):
+    rows = [
+        {**_record("andrey.local_isa_ling", 0, shd, None, 1.0), "cell": "sachs", "target": t}
+        for t, shd in [(3, 2), (4, 2), (6, 1)]
+    ]
+    found = S.sachs(_run(tmp_path, rows))
+    assert [(r["target"], r["shd"]) for r in found] == [(3, 2), (4, 2), (6, 1)]

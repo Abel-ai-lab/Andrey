@@ -48,7 +48,6 @@ EMPTY = "empty"
 #: Solutions set on the accuracy-cost frontier of the estimated-blanket cells.
 FRONTIER = (
     "andrey.local_isa_ling",
-    "local_isa_ling.authors",
     "andrey.direct_lingam",
     "andrey.ica_lingam",
     EMPTY,
@@ -64,13 +63,14 @@ SUMMARY_METRICS: dict[str, str] = {"shd": "shd", "weight_dist": "weight_distance
 CELLS = {"cyclic": None, "acyclic-d3": 3, "acyclic-d5": 5}
 
 
-def load(runs: list[str]) -> dict[str, dict[tuple[str, int, int], dict]]:
-    """``{solution: {(cell, n, seed): record}}`` over the run folders (one target per dataset)."""
+def load(runs: list[str]) -> dict[str, dict[tuple[str, int, int, int], dict]]:
+    """``{solution: {(cell, n, seed, target): record}}`` over the run folders; a later folder's
+    record replaces an earlier one's."""
     out: dict = defaultdict(dict)
     for run in runs:
         for line in (Path(run) / "records.jsonl").read_text().splitlines():
             r = json.loads(line)
-            out[r["solution"]][(r["cell"], r["n"], r["seed"])] = r
+            out[r["solution"]][(r["cell"], r["n"], r["seed"], r["target"])] = r
     return out
 
 
@@ -131,8 +131,8 @@ def by_seed(runs: dict, name: str, cell: str, n: int) -> dict[int, dict]:
     """``{seed: dataset(...)}`` of one solution in one cell (finished fits only)."""
     empty = runs.get(EMPTY, {})
     return {
-        s: dataset(r, empty.get((c, m, s)))
-        for (c, m, s), r in runs.get(name, {}).items()
+        s: dataset(r, empty.get((c, m, s, t)))
+        for (c, m, s, t), r in runs.get(name, {}).items()
         if (c, m) == (cell, n)
     }
 
@@ -142,11 +142,15 @@ def cell(runs: dict, name: str, n: int, blanket: str, first: range, fresh: range
     andrey, authors = PAIRS[blanket]
     mine, theirs = by_seed(runs, andrey, name, n), by_seed(runs, authors, name, n)
     row: dict = {"cell": name, "mean_degree": CELLS[name], "d": 50, "n": n, "blanket": blanket}
-    tried_a = {s for s in first if (name, n, s) in runs.get(andrey, {})}
-    tried_b = {s for s in first if (name, n, s) in runs.get(authors, {})}
+    recs_a, recs_b = (
+        {s: r for (c, m, s, _), r in runs.get(sol, {}).items() if (c, m) == (name, n)}
+        for sol in (andrey, authors)
+    )
+    tried_a = {s for s in first if s in recs_a}
+    tried_b = {s for s in first if s in recs_b}
     ok_a = {s for s in tried_a if mine.get(s)}
     ok_b = {s for s in tried_b if theirs.get(s)}
-    status = [runs[authors][(name, n, s)]["status"] for s in tried_b]
+    status = [recs_b[s]["status"] for s in tried_b]
     row["coverage"] = {
         "datasets": len(tried_a | tried_b),
         "andrey_short": len(ok_b - ok_a),
@@ -221,7 +225,7 @@ def sachs(runs: dict) -> list[dict]:
             "shd": (r.get("scores") or {}).get("shd"),
         }
         for name, recs in sorted(runs.items())
-        for (c, _, _), r in recs.items()
+        for (c, _, _, _), r in recs.items()
         if c == "sachs"
     ]
 
@@ -229,7 +233,7 @@ def sachs(runs: dict) -> list[dict]:
 def summarize(runs: dict, first: range, fresh: range) -> tuple[list[dict], list[dict]]:
     """Every judged row and every frontier, in the cells' order."""
     sizes = sorted(
-        {(c, n) for recs in runs.values() for (c, n, _) in recs if c in CELLS},
+        {(c, n) for recs in runs.values() for (c, n, _, _) in recs if c in CELLS},
         key=lambda k: (list(CELLS).index(k[0]), k[1]),
     )
     rows = [
