@@ -57,14 +57,19 @@ names its pull request.
   code keeps. On hailfinder at 200 and 500 rows its sets have more errors than the empty set.
   ([#957], [#1025])
 - `andrey.mmmb`, the MMMB Markov blanket learner (Tsamardinos, Aliferis, and Statnikov 2003) in its
-  authors' corrected form, experimental, with the arguments and metadata of `iamb` and the target's
-  parents and children in `metadata["parents_and_children"]`. It runs `mmpc`, with its symmetry
-  check (Tsamardinos, Brown, and Aliferis 2006), for the target and for each of its parents and
-  children, then admits a variable as a spouse when a test finds it dependent on the target given
-  the set that separated the two and a parent or child of the target whose own set holds the
-  variable (Aliferis et al. 2010). Its G-square test counts the degrees of freedom of Spirtes et
-  al. by default (`degrees_of_freedom="nonempty"`), as its paper's tests do. The set-learner
-  benchmark lane runs it beside the authors' MMMB. ([#965], [#1025])
+  authors' corrected form, with the arguments and metadata of `iamb` and the target's parents and
+  children in `metadata["parents_and_children"]`. It runs `mmpc`, with its symmetry check
+  (Tsamardinos, Brown, and Aliferis 2006), for the target and for each of its parents and children,
+  then admits a variable as a spouse when a test finds it dependent on the target given the set that
+  separated the two and a parent or child of the target whose own set holds the variable (Aliferis
+  et al. 2010). Its G-square test counts the degrees of freedom of Spirtes et al. by default
+  (`degrees_of_freedom="nonempty"`), as its paper's tests do. It is supported: against the authors'
+  MMMB on alarm, hailfinder, insurance, win95pts, and pigs at its paper's sizes, its sets were
+  closer to the true ones in 8 of 21 settings, as close in 3, and further in 10, on hailfinder from
+  500 rows, insurance at 5,000, and win95pts at every size, where its symmetry check, its reading of
+  a test with no degrees of freedom, and its spouses' separating sets differ from the authors' code,
+  which on hailfinder at 5,000 rows also runs a test only with at least five rows per cell. In every
+  setting its sets had fewer errors than the authors' code's. ([#965], [#1025], [#1038])
 - `andrey.pcmb`, the PCMB Markov blanket learner (Peña, Nilsson, Björkegren, and Tegnér 2007),
   supported, with the arguments and metadata of `iamb`, `alpha=0.01` by default, the paper's
   level, and the target's parents and children in `metadata["parents_and_children"]`. Its own
@@ -2871,6 +2876,7 @@ First alpha release.
 [#1000]: https://github.com/Abel-ai-lab/Andrey/pull/1000
 [#986]: https://github.com/Abel-ai-lab/Andrey/pull/986
 [#1032]: https://github.com/Abel-ai-lab/Andrey/pull/1032
+[#1038]: https://github.com/Abel-ai-lab/Andrey/pull/1038
 [#995]: https://github.com/Abel-ai-lab/Andrey/pull/995
 [#991]: https://github.com/Abel-ai-lab/Andrey/pull/991
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
