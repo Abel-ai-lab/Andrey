@@ -622,8 +622,9 @@ def local_isa_ling(
     acyclic : bool, default=False
         Read the edges by peeling sink columns of the demixing matrix (the paper's Appendix C),
         which assumes that neither the target nor a child lies on a cycle and needs no subspace
-        tests, instead of enumerating the admissible assignments (Algorithm 1). A fit whose
-        thresholded matrix has no sink column runs Algorithm 1.
+        tests, instead of enumerating the admissible assignments (Algorithm 1). When no remaining
+        column is a sink, the column with the fewest nonzero entries is read as one (the authors'
+        rule), so the fit always gives one model.
     w_threshold : float, default=0.05
         Entries of the demixing matrix of the standardized columns at most this in magnitude read
         as zero, and a block of it whose smallest singular value is at most this reads as singular;
