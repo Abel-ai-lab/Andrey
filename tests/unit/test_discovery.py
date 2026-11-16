@@ -28,11 +28,11 @@ SOFTWARE = {
     "license": {
         "@type": "CreativeWork",
         "name": "Apache-2.0",
-        "url": "https://github.com/Abel-ai-lab/andrey/blob/main/LICENSE",
+        "url": "https://github.com/Abel-ai-lab/Andrey/blob/main/LICENSE",
     },
     "programmingLanguage": "Python",
     "runtimePlatform": "Python >=3.11",
-    "codeRepository": "https://github.com/Abel-ai-lab/andrey",
+    "codeRepository": "https://github.com/Abel-ai-lab/Andrey",
     "sameAs": ["https://pypi.org/project/andrey-core/"],
 }
 

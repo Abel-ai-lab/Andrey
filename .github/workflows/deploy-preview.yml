@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   request-build:
-    if: github.repository == 'Abel-ai-lab/andrey' && github.ref == 'refs/heads/main'
+    if: github.repository == 'Abel-ai-lab/Andrey' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

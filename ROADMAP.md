@@ -4,7 +4,7 @@ Andrey's mission is to make causal discovery more accessible, scalable, and accu
 support for agents. This roadmap lays out the planned work in a rough order; the stages overlap.
 
 Missing a method or a feature you need? Open a
-[feature request](https://github.com/Abel-ai-lab/andrey/issues/new/choose).
+[feature request](https://github.com/Abel-ai-lab/Andrey/issues/new/choose).
 
 ## 1. Major methods
 
