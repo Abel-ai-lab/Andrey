@@ -141,8 +141,9 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "plus two) reach this value, else each candidate inverts its own submatrix. The "
             "factor's p-values agree with the per-query ones to about 1e-10 relative, not bit "
             "for bit; the per-query path is the exact one. `0` factors every such scan. The "
-            "default was measured on an AMD EPYC 7713 server running Linux on one core; the "
-            "factor repays its fixed cost from a value of about 40 to 70, by set size."
+            "default was measured on an AMD EPYC 7713 server running Linux on one core, where the "
+            "factor was slower below a value of about 64 and faster from 128 for every set size "
+            "sampled."
         ),
         group="backend",
     ),

@@ -121,8 +121,8 @@ SINGULAR_RTOL = 1e-12
 BOUND_MARGIN = 1e4
 # The smallest number of candidates times the block size, len(ys) * (|S| + 2), that
 # statistic_pvalues_given answers from one factor, unless ANDREY_SHARED_SCAN_MIN_WORK sets another.
-# The factor's fixed cost is repaid from a work of about 40 (|S| = 12) to 70 (|S| = 2) on one core;
-# below it the per-query inversions are faster, and 128 is past every one of those break-evens.
+# On one core the factor is slower than the per-query inversions below a work of about 64 and faster
+# from 128 at every set size sampled (2 to 12).
 MIN_SHARED_FACTOR_WORK = 128
 # The LAPACK Cholesky factor and triangular solve of statistic_pvalues_given, called directly: on
 # the small scans it serves, the checks of scipy.linalg's wrappers would take most of the time.

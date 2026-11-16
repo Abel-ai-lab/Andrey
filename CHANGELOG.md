@@ -339,7 +339,10 @@ names its pull request.
   relative, not bit for bit: every graph and `metadata["n_tests"]` of the identity corpus is the
   same, and of 326,729 p-values compared, 4 differ in their ninth significant digit, values on a
   rounding boundary. Small scans, blocks near the singular threshold, missing values, and the other
-  tests keep the per-query path. ([#1047], [#1048])
+  tests keep the per-query path; `ANDREY_SHARED_SCAN_MIN_WORK` (default `128`, candidates times the
+  set size plus two) sets the smallest scan that takes the factor. A repeated variable in the
+  conditioning set counts once, and a correlation matrix that is not exactly symmetric gives each
+  pair one answer whichever variable is the target. ([#1047], [#1048])
 
 ### Fixed
 
