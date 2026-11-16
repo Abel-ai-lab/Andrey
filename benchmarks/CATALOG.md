@@ -43,7 +43,7 @@ whose Reproduce table lists the driver.
 | [ANM direction test](comparisons/anm.md) | `anm_pairs.py` | ANM | causal-learn | 0.4.0, 0.9.0 |
 | [CAM and RESIT](comparisons/cam-resit.md) | `fcm_cpu.py` | CAM, RESIT | CAM 1.0 (R), the authors' R code for RESIT, lingam | 0.13.0 |
 | [SCORE and NoGAM](comparisons/score-nogam.md) | `stein_cpu.py` | SCORE, NoGAM; CAM as context | the authors' SCORE code, NoGAM in dodiscover, CausalDisco (R2-SortnRegress) | 0.17.0 |
-| [NOTEARS and DAGMA](comparisons/notears-dagma.md) | `notears_cpu.py`, `notears_summary.py` | NOTEARS, DAGMA, each also with `standardize=True` and `robust=True` | the authors' NOTEARS code, the authors' dagma; CausalDisco (R2-SortnRegress, Var-SortnRegress) as controls | 0.17.0 |
+| [NOTEARS and DAGMA](comparisons/notears-dagma.md) | `notears_cpu.py`, `notears_summary.py` | NOTEARS, DAGMA, each also with `standardize=True` and `robust=True` | the authors' NOTEARS code, the authors' dagma; CausalDisco (R2-SortnRegress, Var-SortnRegress) as controls | 0.17.0, 0.18.0 |
 | [PNL direction test](comparisons/pnl.md) | `pnl_pairs.py` | PNL | causal-learn | 0.4.0, 0.9.0 |
 | [LOCI direction test](comparisons/loci.md) | `loci_pairs.py` | LOCI, both criteria; ANM, PNL, and CAM as context | the authors' LOCI code (spline features, both criteria) | 0.16.0 |
 | [Categorical data](comparisons/categorical.md) | `discrete_cpu.py` | PC, GES, BOSS, GRaSP, hill climbing | causal-learn, bnlearn, pgmpy | 0.6.0, 0.8.0 |
@@ -121,8 +121,11 @@ on the datasets of the 0.16.0 record. Their [comparison page](comparisons/missin
 all three. The NOTEARS and DAGMA lane's rows are in
 [`published/0.17.0/notears-dagma.json`](published/0.17.0/notears-dagma.json), with their
 [comparison page](comparisons/notears-dagma.md); the 0.17.0 summary holds NOTEARS's rows against its
-authors' code, with the fresh seeds of one setting, and none of DAGMA's, which is experimental. The
-AGES lane's rows are in [`published/0.17.0/ages.json`](published/0.17.0/ages.json), with their
+authors' code, with the fresh seeds of one setting. The 0.18.0 summary holds DAGMA's rows against
+its authors' package, from
+[`published/0.18.0/notears-dagma.json`](published/0.18.0/notears-dagma.json), which keeps the rows
+of the default fit that 0.17.0 measured. The AGES lane's rows are in
+[`published/0.17.0/ages.json`](published/0.17.0/ages.json), with their
 [comparison page](comparisons/ages.md); the 0.17.0 summary holds its rows against pcalg. The 0.18.0
 summary holds PCMB's rows beside the published results of its paper, which the [comparison
 page](comparisons/blankets.md#pcmb-against-its-paper) presents with the other readings of an empty

@@ -255,6 +255,16 @@ names its pull request.
   MAGIC-NIAB network at 10,000 rows, its sets and effects tied in every setting, on 20 datasets or
   again on 20 fresh ones. ([#1003], [#1011], [#1029])
 
+- `dagma` is supported, with its gap stated. Against its authors' package on its paper's simulation,
+  it made no more errors in any of the 24 settings with every column z-scored or any of the 18 on the
+  simulation's own units, and in 17 of the 18 with each variable divided by its standard deviation as
+  it is generated. On the simulation's own units it made fewer errors than the empty graph in all 18
+  settings, and on z-scored columns in none of the 24, as the package. Its result depends on the
+  data's scale (Reisach, Seiler and Weichwald 2021). The [0.18.0 release card][card-0180-dagma] has
+  the numbers and a check of `dagma` and `notears` on the Sachs data: on its 853 observational
+  measurements, four fits, default and `robust=True`, on raw and z-scored columns, made 13 or 14
+  errors against the empty graph's 17. ([#1043], [#1046])
+
 ### Changed
 
 - `iamb` and `inter_iamb` test the candidates of each grow step in one call with a
@@ -307,9 +317,44 @@ names its pull request.
   back. At 5,000 rows and 1,000 variables, `mb_by_mb` at one target is 1.15 times faster,
   `local_optimal_adjustment` 1.08 times, and `pc` 1.06 times. Every output, `metadata["n_tests"]`
   included, is the same bit for bit. ([#1036], [#1042])
+- The blanket engine behind `iamb`, `gs`, `hiton_mb`, `mmb_by_mmb`, and the other blanket learners
+  computes the columns' tie ranks when a search first compares candidates whose keys tie, where it
+  computed them when the search was built, so a fit that never compares tied candidates skips their
+  cost, 0.4 s at 5,000 rows and 1,000 variables. At that size `mmb_by_mmb` is 1.8 times faster,
+  `iamb` at one target 1.3 times, and `hiton_mb` at one target 0.6 s faster; `mmmb` on 100 variables
+  is 1.1 times faster. Every output, `metadata["n_tests"]` included, is the same bit for bit.
+  ([#1034], [#1044])
+
+- The Limitations of `notears` and `dagma` are one sentence: the result depends on the data's scale,
+  after Reisach, Seiler and Weichwald (2021), with a link to the release card. The registry and the
+  docstrings no longer say that the robust fit does not depend on the scale of the columns: its first
+  fit is least squares, and its penalty and threshold act on the weights in the data's units.
+  ([#1043], [#1046])
+- A scan of many candidates against one conditioning set of two or more variables, as the grow
+  steps of `iamb`, `inter_iamb`, `fast_iamb`, `ldecc`, `mb_by_mb`, and `local_optimal_adjustment`
+  ask it of a partial-correlation test, is answered from one Cholesky factor of the set's
+  correlation block, where each candidate inverted its own submatrix. At 5,000 rows, `iamb` at one
+  target on 1,000 variables is 3.2 times faster, and `iamb`, `inter_iamb`, and `fast_iamb` on 100
+  variables 1.3, 1.2, and 1.1 times. The p-values agree with the per-query answers to about 1e-10
+  relative, not bit for bit: every graph and `metadata["n_tests"]` of the identity corpus is the
+  same, and of 326,729 p-values compared, 4 differ in their ninth significant digit, values on a
+  rounding boundary. Small scans, blocks near the singular threshold, missing values, and the other
+  tests keep the per-query path; `ANDREY_SHARED_SCAN_MIN_WORK` (default `128`, candidates times the
+  set size plus two) sets the smallest scan that takes the factor. A repeated variable in the
+  conditioning set counts once, and a correlation matrix that is not exactly symmetric gives each
+  pair one answer whichever variable is the target. ([#1047], [#1048])
 
 ### Fixed
 
+- `notears(robust=True)` and `dagma(robust=True)` minimize the Gaussian likelihood of the path of
+  Deng et al. (2024) without `-log|det(I - W)|`, as its authors' code does. The term is zero
+  for every DAG, so the graphs each step is judged by do not change, but its gradient is not zero
+  while a fit is cyclic, and it led the path to other graphs. On the paper's simulation with z-scored
+  columns and 20 datasets per setting, the CPDAG errors of `dagma(robust=True)` fell from 23.1, 44.2,
+  23.5, and 54.0 to 21.3, 40.0, 17.9, and 39.0 on Erdos-Renyi and scale-free graphs with 10 and 20
+  variables, against 20.1, 42.4, 18.1, and 39.4 for the path run with its authors' code, and those of
+  `notears(robust=True)` at 10 variables moved from 16.6 on z-scored and 13.2 on raw columns to 18.5
+  and 11.8, against 18.4 and 11.8. ([#1043], [#1046])
 - `indep_test="normal_scores"` takes data from one environment. It ranks each column over every
   row its test reads, so over several environments a column mixed their distributions: on two
   simulated environments a true independence given the environment index was rejected in up to 95%
@@ -2906,10 +2951,16 @@ First alpha release.
 [#1037]: https://github.com/Abel-ai-lab/Andrey/pull/1037
 [#1038]: https://github.com/Abel-ai-lab/Andrey/pull/1038
 [#1040]: https://github.com/Abel-ai-lab/Andrey/pull/1040
+[#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
+[#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
 [#1035]: https://github.com/Abel-ai-lab/Andrey/pull/1035
 [#1041]: https://github.com/Abel-ai-lab/Andrey/pull/1041
 [#1036]: https://github.com/Abel-ai-lab/Andrey/pull/1036
 [#1042]: https://github.com/Abel-ai-lab/Andrey/pull/1042
+[#1034]: https://github.com/Abel-ai-lab/Andrey/pull/1034
+[#1044]: https://github.com/Abel-ai-lab/Andrey/pull/1044
+[#1047]: https://github.com/Abel-ai-lab/Andrey/pull/1047
+[#1048]: https://github.com/Abel-ai-lab/Andrey/pull/1048
 [#995]: https://github.com/Abel-ai-lab/Andrey/pull/995
 [#991]: https://github.com/Abel-ai-lab/Andrey/pull/991
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
@@ -2940,6 +2991,7 @@ First alpha release.
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
 [card-0170-dagma]: https://andrey.abel.ai/docs/benchmarks/0.17.0.html#dagma
+[card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
 [nd-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/notears-dagma.md
 [ages-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/ages.md
 [#920]: https://github.com/Abel-ai-lab/andrey/pull/920

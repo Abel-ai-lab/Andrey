@@ -224,6 +224,7 @@ FITS: dict[str, Fit] = {
     "ExactSearch": Fit(andrey.exact_search),
     "CALM": Fit(functools.partial(andrey.calm, seed=0)),
     "NOTEARS": Fit(andrey.notears),
+    "DAGMA": Fit(andrey.dagma),
     "BOSS": Fit(functools.partial(andrey.boss, seed=0)),
     "GRaSP": Fit(functools.partial(andrey.grasp, seed=0)),
     "BOSS-FCI": Fit(functools.partial(andrey.boss_fci, seed=0, alpha=ALPHA), alpha=ALPHA),
@@ -289,6 +290,7 @@ LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
         qg.order_draws, "score_paper_laplace_standardized", 12, "er1"
     ),
     "notears_paper_standardized_d60": functools.partial(qg.linear_sem_draws, "standardized", 60),
+    "notears_paper_raw_d40": functools.partial(qg.linear_sem_draws, "raw", 40),
     "ages_paper_qs0.5_qw0.5_n10000": functools.partial(qg.weak_edge_draws, 0.5, 0.5, 10000),
     "interventional_gauss_er_d100": functools.partial(qg.intervention_draws, 100, 5000),
     "domain_shift_er_d70": functools.partial(qg.model_draws, "domain_shift_er", 70, 2000),
@@ -356,6 +358,7 @@ LARGER: dict[str, str] = {
     "NoGAM": "score_paper_laplace_standardized_d12_er1",
     "CALM": "linear_gauss_er_d15",
     "NOTEARS": "notears_paper_standardized_d60",
+    "DAGMA": "notears_paper_raw_d40",
     "AGES": "ages_paper_qs0.5_qw0.5_n10000",
     "CDNOD": "domain_shift_er_d70",
     "FCI-JCI": "fci_jci_x100",
@@ -659,6 +662,9 @@ CI_QUERIES: dict[str, Callable[..., Iterable[tuple[int, int, Any, float]]]] = {
         (x, y, s, p) for s, p in zip(sets, ps)
     ],
     "first_order_pvalues": lambda ps, test, x, y, zs: [(x, y, (z,), p) for z, p in zip(zs, ps)],
+    "statistic_pvalues_given": lambda rp, test, x, ys, condition_set: [
+        (x, y, condition_set, p) for y, p in zip(ys, rp[1])
+    ],
     "pvalues_given": lambda ps, test, target, xs, condition_set=(): [
         (target, x, condition_set, p) for x, p in zip(xs, ps)
     ],
