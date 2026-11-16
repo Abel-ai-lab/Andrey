@@ -1101,12 +1101,16 @@ def _ranked_test(
 class LazyTieRanks(Sequence[int]):
     """The :func:`~andrey.core.ties.tie_ranks` of the columns of ``X``, those ``mask`` marks ranked
     as categories, computed when a rank is first read, so a search that never compares tied
-    candidates skips their cost. ``andrey.config.tie_break`` is read when the object is made."""
+    candidates skips their cost. ``andrey.config.tie_break`` and the BLAS thread limits are read
+    when the object is made: the ranks' products are exact integers on any number of threads, so a
+    first read inside a search's one-thread block (:meth:`LocalSearch.pinned`) computes them on the
+    threads of the moment the object was made, with the same result."""
 
     def __init__(self, X: np.ndarray, mask: np.ndarray) -> None:
         self._d = X.shape[1]
         self._data: tuple[np.ndarray, np.ndarray] | None = (X, mask)
         self._ranks: list[int] | None = None
+        self._threads = backend.thread_limits_now()
         if backend.config.tie_break == "position":
             self._ranks, self._data = list(range(self._d)), None
 
@@ -1116,7 +1120,8 @@ class LazyTieRanks(Sequence[int]):
     def __getitem__(self, i: Any) -> Any:
         if self._ranks is None:
             assert self._data is not None
-            self._ranks, self._data = tie_ranks(*self._data).tolist(), None
+            with self._threads():
+                self._ranks, self._data = tie_ranks(*self._data).tolist(), None
         return self._ranks[i]
 
 
