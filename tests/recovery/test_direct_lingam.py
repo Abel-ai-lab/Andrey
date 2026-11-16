@@ -5,6 +5,7 @@ import pytest
 
 import andrey
 from andrey.core import ARROW, TAIL, stats
+from andrey.core.ties import tie_ranks
 from andrey.lingam import pwling
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.harness import assert_recorded_output
@@ -48,8 +49,77 @@ def _score_candidates_serial(X: np.ndarray, U: list[int]) -> np.ndarray:
 
 def _order_by_serial_scores(X: np.ndarray, monkeypatch: pytest.MonkeyPatch) -> list[int]:
     """The causal order ``find_causal_order`` picks when it scores with the per-pair reference."""
-    monkeypatch.setattr(pwling, "score_candidates", _score_candidates_serial)
+    monkeypatch.setattr(
+        pwling, "pruned_scores", lambda groups, U, **_: _score_candidates_serial(groups[0], U)
+    )
     return pwling.find_causal_order(X)
+
+
+def _full_scores(groups: list[np.ndarray], U: list[int], weights: list[float] | None) -> np.ndarray:
+    """Every candidate's :func:`pwling.score_candidates` score, weighted and summed over groups."""
+    if weights is None:
+        return pwling.score_candidates(groups[0], U)
+    total = np.zeros(len(U))
+    for X, w in zip(groups, weights, strict=True):
+        total += w * pwling.score_candidates(X, U)
+    return total
+
+
+def _assert_pick_unchanged(pruned, groups, U, *, weights=None, allowed=None, hint=None) -> None:
+    """Check ``pruned`` scores against the full scores under the given and two other visit orders.
+
+    Every order picks the full scores' candidate, the pick carries the full score's bits, and every
+    other candidate has its full score's bits or a value at or above its score whose
+    ``sqrt(-value)`` lies more than ``_TIE_TOL`` above the best, out of the tie.
+    """
+    full = _full_scores(groups, U, weights)
+    mask = np.ones(len(U), dtype=bool) if allowed is None else allowed
+    chosen = [c for c, ok in zip(U, mask, strict=True) if ok]
+    ranks = tie_ranks(np.vstack(groups))
+    expected = pwling.pick(full[mask], chosen, ranks)
+    rng = np.random.default_rng(len(U))
+    hints = [hint, {c: float(c) for c in U}, dict(zip(U, rng.standard_normal(len(U)).tolist()))]
+    for h in hints:
+        got = pruned(groups, U, weights=weights, allowed=allowed, hint=h)
+        assert pwling.pick(got[mask], chosen, ranks) == expected
+        k = U.index(expected)
+        assert got[k].tobytes() == full[k].tobytes()
+        if np.isnan(full[mask]).any():
+            assert got.tobytes() == full.tobytes()  # such a step is scored in full
+            continue
+        cut = np.sqrt(-full[mask]).min() + pwling._TIE_TOL
+        for a in np.flatnonzero(mask):
+            exact = got[a].tobytes() == full[a].tobytes()
+            assert exact or (got[a] >= full[a] and np.sqrt(-got[a]) > cut)
+
+
+def _check_every_step(monkeypatch: pytest.MonkeyPatch) -> list[int]:
+    """Make every ``pruned_scores`` call of an order search check itself; return the call count."""
+    calls: list[int] = []
+    monkeypatch.setattr(pwling, "pruned_scores", _counted(pwling.pruned_scores, calls))
+    return calls
+
+
+def _counted(original, calls: list[int]):
+    def checked(groups, U, *, weights=None, allowed=None, hint=None):
+        calls.append(len(U))
+        got = original(groups, U, weights=weights, allowed=allowed, hint=hint)
+        _assert_pick_unchanged(original, groups, U, weights=weights, allowed=allowed, hint=hint)
+        return got
+
+    return checked
+
+
+def _exchangeable_columns(seed: int, n: int) -> np.ndarray:
+    """Columns 0 and 1 swap into a row permutation of the sample: their scores tie but for rounding.
+
+    Both are exogenous causes of column 2, and columns 3 and 4 are independent.
+    """
+    rng = np.random.default_rng(seed)
+    u, v, w = rng.uniform(-1.0, 1.0, (3, n // 2))
+    half = np.column_stack([u, v, u + v + 0.5 * w])
+    X = np.vstack([half, half[:, [1, 0, 2]]])
+    return np.column_stack([X, rng.laplace(size=(len(X), 2))])
 
 
 def test_direct_lingam_recovery():
@@ -113,3 +183,47 @@ def test_score_candidates_single_candidate():
     # DirectLiNGAM is shielded by causal_order's guard, but the primitive must not crash.
     scores = pwling.score_candidates(_random_linear_sem(seed=1, n=200, d=3, noise="uniform"), [1])
     assert scores.shape == (1,)
+
+
+@pytest.mark.parametrize(
+    "case", ["uniform", "gaussian", "exchangeable", "copy_with_precedence", "forbidden_paths"]
+)
+def test_pruned_scores_keep_every_pick(case: str, monkeypatch):
+    """The pruned search picks as the full scores do at every step of an order search.
+
+    Gaussian errors give near-tied scores, the exchangeable pair a tie within ``_TIE_TOL``, a copy
+    with precedence NaN scores (scored in full), and forbidden paths restrict the pick.
+    """
+    precedence = forbidden = None
+    if case in ("uniform", "gaussian"):
+        X = _random_linear_sem(seed=4, n=500, d=10, noise=case)
+    elif case == "exchangeable":
+        X = _exchangeable_columns(seed=5, n=600)
+    else:
+        X = _random_linear_sem(seed=6, n=400, d=7, noise="uniform")
+        precedence = np.zeros((7, 7), dtype=bool)
+        precedence[5, 1] = True
+        if case == "copy_with_precedence":
+            X = np.column_stack([X, 2.0 * X[:, 2]])
+            precedence = np.pad(precedence, (0, 1))
+        else:
+            forbidden = np.zeros((7, 7), dtype=bool)
+            forbidden[[0, 1, 2, 4], 3] = forbidden[[0, 1, 2, 4], 6] = True
+    expected = pwling.find_causal_order(X, precedence=precedence, forbidden_paths=forbidden)
+    calls = _check_every_step(monkeypatch)
+    order = pwling.find_causal_order(X, precedence=precedence, forbidden_paths=forbidden)
+    assert order == expected
+    assert len(calls) >= 4
+
+
+@pytest.mark.parametrize("with_precedence", [False, True])
+def test_pruned_scores_keep_every_multi_group_pick(with_precedence: bool, monkeypatch):
+    """The size-weighted sum over groups keeps every pick of the shared order search."""
+    groups = [
+        _random_linear_sem(seed=7, n=500, d=9, noise="uniform"),
+        _random_linear_sem(seed=7, n=300, d=9, noise="gaussian"),
+    ]
+    knowledge = andrey.Knowledge(required_paths=[(0, 4)]) if with_precedence else None
+    calls = _check_every_step(monkeypatch)
+    andrey.multi_group_direct_lingam(groups, knowledge=knowledge)
+    assert len(calls) >= 4

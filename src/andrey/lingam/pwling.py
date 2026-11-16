@@ -33,6 +33,14 @@ _TIE_TOL = 1e-10
 # rank-transformed near-copies with |corr| up to 0.999999 measure > 7e-6, and scoring both columns
 # of a pair gave orders that differed between CPUs only below 1e-14.
 COPY_TOL = 1e-12
+# :func:`pruned_scores` skips the residual entropies a pick cannot need, which is exact only when
+# every skipped one is finite: a NaN score would rank highest in :func:`pick`. It is finite when the
+# residual of two standardized columns keeps at least this fraction of their variance (``1 -
+# corr^2``), so its standard deviation exceeds its rounding error by over nine orders of magnitude,
+# and when there are fewer than ``_MAX_ROWS`` rows: a standardized column has ``|u| <= sqrt(n)``,
+# and ``cosh(u)`` overflows only past ``|u| = 710``.
+_SAFE_RESIDUAL = 1e-6
+_MAX_ROWS = 500_000
 
 
 def compute_residual(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -54,11 +62,9 @@ def score_candidates(X: np.ndarray, U: list[int]) -> np.ndarray:
     first. Order-exactness needs the float64 entropy path -- on a float32 device (atol 1e-3) a
     near-tie could flip the pick, so pin ``ANDREY_DEVICE=numpy`` for exact order.
     """
-    cols = np.asarray(U)
-    if len(cols) < 2:
-        return np.zeros(len(cols), dtype=np.float64)  # a lone candidate has no pair to score
-    sub = X[:, cols]
-    x_std = (sub - sub.mean(axis=0)) / sub.std(axis=0)  # (n, m) standardized candidate columns
+    if len(U) < 2:
+        return np.zeros(len(U), dtype=np.float64)  # a lone candidate has no pair to score
+    x_std = _standardized(X, U)  # (n, m) standardized candidate columns
     ent = stats.entropy(x_std)  # (m,) batched candidate entropy
     cov = np.cov(x_std, rowvar=False, ddof=0)  # (m, m), same ddof as var: least-squares slopes
     var = np.var(x_std, axis=0)  # (m,), ddof=0
@@ -73,12 +79,131 @@ def score_candidates(X: np.ndarray, U: list[int]) -> np.ndarray:
         np.subtract(x_std[:, a][:, None], r, out=r)  # residual of i on each j
         r /= np.std(r, axis=0)
         h[a, others] = stats.entropy(r, work=work)
-    scores = np.empty(m, dtype=np.float64)
-    for a in range(m):
-        others = np.arange(m) != a
-        diff = (ent[others] + h[a, others]) - (ent[a] + h[others, a])
-        scores[a] = -np.sum(np.minimum(0.0, diff) ** 2)
+    return np.array([_score_of(ent, h, a) for a in range(m)], dtype=np.float64)
+
+
+def _score_of(ent: np.ndarray, h: np.ndarray, a: int) -> np.float64:
+    """Candidate ``a``'s score from the entropies ``ent`` and ``h[i, j] = H(r_{i|j})``."""
+    others = np.arange(len(ent)) != a
+    diff = (ent[others] + h[a, others]) - (ent[a] + h[others, a])
+    return -np.sum(np.minimum(0.0, diff) ** 2)
+
+
+def pruned_scores(
+    groups: list[np.ndarray],
+    U: list[int],
+    *,
+    weights: list[float] | None = None,
+    allowed: np.ndarray | None = None,
+    hint: dict[int, float] | None = None,
+) -> np.ndarray:
+    """The :func:`score_candidates` scores :func:`pick` reads, computing no residual entropy more.
+
+    With one group and no ``weights``, the scores are ``score_candidates(groups[0], U)``; with
+    ``weights``, ``sum_g weights[g] * score_candidates(groups[g], U)``, added in group order. Only
+    the candidates in ``allowed`` (a mask aligned with ``U``, all by default) are scored; the others
+    get ``-inf``. Each score is ``-sum_j t_j`` with every term ``t_j >= 0``, so a candidate whose
+    partial sum, less a rounding margin, already puts its ``sqrt(-score)`` more than ``_TIE_TOL``
+    above the best complete candidate's can neither be picked nor tie. Such a candidate stops there
+    and gets ``-`` that lower bound, which lies at or above its score and still out of the tie. A
+    candidate that completes gets the bits of the full computation, so the pick is unchanged.
+
+    The first candidate is completed; then each round adds one pair to every candidate still open,
+    in batches as wide as one row of :func:`score_candidates`. Candidates and their pairs go in
+    descending ``hint`` (a column's score at the last step; unknown columns first), so the likely
+    pick completes first; the order changes how many entropies are computed, never the result. A
+    step falls back to the full computation when its entropy batches would run on a torch device,
+    a pair of columns is within ``_SAFE_RESIDUAL`` of a copy, an entropy is not finite, or a group
+    has ``_MAX_ROWS`` rows or more.
+    """
+    m = len(U)
+    width = (m - 1) // 2  # pairs per entropy call, as wide as one row of score_candidates
+    if width < 1 or any(stats.entropy_device(len(X) * (m - 1)) != "numpy" for X in groups):
+        return _full_scores(groups, U, weights)
+    parts = []
+    for X in groups:
+        x_std = _standardized(X, U)
+        ent = stats.entropy(x_std)
+        cov = np.cov(x_std, rowvar=False, ddof=0)
+        var = np.var(x_std, axis=0)
+        near = cov * cov.T >= (1.0 - _SAFE_RESIDUAL) * np.outer(var, var)
+        np.fill_diagonal(near, False)
+        finite = np.isfinite(ent).all() and np.isfinite(cov).all()
+        if len(X) >= _MAX_ROWS or near.any() or not finite:
+            return _full_scores(groups, U, weights)
+        parts.append((x_std, ent, cov, var))
+    w = [1.0] * len(groups) if weights is None else weights
+    # The terms are the full computation's floats. Summing and weighting them rounds the partial sum
+    # and the full score fewer than 3 * groups * m times in all, each by at most eps / 2 of the
+    # nonnegative value, so the full score exceeds the partial sum less this margin.
+    margin = 4.0 * np.finfo(np.float64).eps * len(groups) * m
+    h = [np.zeros((m, m), dtype=np.float64) for _ in groups]
+    known = np.eye(m, dtype=bool)
+    partial = np.zeros(m, dtype=np.float64)
+    visit = np.array(sorted(range(m), key=lambda a: -hint.get(U[a], 0.0)) if hint else range(m))
+    open_ = visit if allowed is None else visit[allowed[visit]]
+    scores = np.full(m, -np.inf, dtype=np.float64)
+    best = np.inf
+    while len(open_):
+        done = known[open_].all(axis=1)
+        for a in open_[done]:
+            total = None
+            for g, (_, ent, _, _) in enumerate(parts):
+                s = _score_of(ent, h[g], a)
+                total = s if weights is None else (0.0 if total is None else total) + w[g] * s
+            scores[a] = total
+            best = min(best, np.sqrt(-total))
+        bound = partial[open_] * (1.0 - margin)
+        out = ~done & (np.sqrt(bound) > best + _TIE_TOL)
+        scores[open_[out]] = -bound[out]
+        open_ = open_[~done & ~out]
+        if not len(open_):
+            break
+        if best == np.inf:  # complete the likeliest pick first: its score bounds the others
+            J = visit[~known[open_[0], visit]]
+            A = np.full(len(J), open_[0])
+        else:  # one more pair for every open candidate: its first unknown one in visit order
+            first = np.argmax(~known[np.ix_(open_, visit)], axis=1)
+            pairs = np.sort(np.column_stack([open_, visit[first]]), axis=1)
+            A, J = np.unique(pairs, axis=0).T
+        for k in range(0, len(A), width):
+            a, j = A[k : k + width], J[k : k + width]
+            for g, (x_std, ent, cov, var) in enumerate(parts):
+                h[g][a, j], h[g][j, a] = _pair_entropies(x_std, cov, var, a, j)
+                diff = (ent[j] + h[g][a, j]) - (ent[a] + h[g][j, a])
+                np.add.at(partial, a, w[g] * np.minimum(0.0, diff) ** 2)
+                np.add.at(partial, j, w[g] * np.minimum(0.0, -diff) ** 2)
+            known[a, j] = known[j, a] = True
     return scores
+
+
+def _full_scores(groups: list[np.ndarray], U: list[int], weights: list[float] | None) -> np.ndarray:
+    """Every candidate's score, as :func:`pruned_scores` defines it, with no pruning."""
+    if weights is None:
+        return score_candidates(groups[0], U)
+    total = np.zeros(len(U), dtype=np.float64)
+    for X, w in zip(groups, weights, strict=True):
+        total += w * score_candidates(X, U)
+    return total
+
+
+def _pair_entropies(
+    x: np.ndarray, cov: np.ndarray, var: np.ndarray, A: np.ndarray, J: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """``H(r_{A|J})`` and ``H(r_{J|A})`` for the column pairs ``(A[k], J[k])`` of ``x``.
+
+    The same operations as one row of :func:`score_candidates` on Fortran-ordered columns, whose
+    sums run down each column alone, so every value has the full computation's bits.
+    """
+    p = len(A)
+    r = np.empty((len(x), 2 * p), dtype=np.float64, order="F")
+    np.multiply(cov[A, J] / var[J], x[:, J], out=r[:, :p])
+    np.subtract(x[:, A], r[:, :p], out=r[:, :p])
+    np.multiply(cov[J, A] / var[A], x[:, A], out=r[:, p:])
+    np.subtract(x[:, J], r[:, p:], out=r[:, p:])
+    r /= np.std(r, axis=0)
+    e = stats.entropy(r)
+    return e[:p], e[p:]
 
 
 def _standardized(X: np.ndarray, U: list[int]) -> np.ndarray:
@@ -232,7 +357,8 @@ def find_causal_order(
     """Peel exogenous variables (:func:`pick` of the ``measure`` scores) one at a time.
 
     ``measure`` is one of :data:`MEASURES`; :func:`scorer` gives its scoring function, and
-    ``"pwling"`` scores with :func:`score_candidates`.
+    ``"pwling"`` scores with :func:`pruned_scores`, which gives the pick of
+    :func:`score_candidates` from fewer entropies.
 
     Each pick is residualized out of the rest. Only one column of each copy group
     (:func:`copy_groups`) is scored; when it is picked, its copies follow it directly in the order.
@@ -250,6 +376,7 @@ def find_causal_order(
     order: list[int] = []
     residualized = np.array(X, dtype=np.float64)  # copy + float64: the write-back must not truncate
     ranks = tie_ranks(residualized)
+    hint: dict[int, float] = {}
     while remaining:
         if precedence is None:
             copies = copy_groups([residualized], remaining, ranks)
@@ -259,12 +386,19 @@ def find_causal_order(
         # A lone candidate needs no scoring (and has no pair to score).
         if len(candidates) == 1:
             m = candidates[0]
-        elif precedence is None:
-            m = pick(score(residualized, candidates), candidates, ranks)
         else:
-            allowed = eligible(precedence, forbidden_paths, candidates)
-            values = score(residualized, candidates)[allowed]
-            m = pick(values, [c for c, ok in zip(candidates, allowed) if ok], ranks)
+            allowed = (
+                None if precedence is None else eligible(precedence, forbidden_paths, candidates)
+            )
+            if measure == "pwling":
+                values = pruned_scores([residualized], candidates, allowed=allowed, hint=hint)
+                hint = dict(zip(candidates, values.tolist(), strict=True))
+            else:
+                values = score(residualized, candidates)
+            if allowed is None:
+                m = pick(values, candidates, ranks)
+            else:
+                m = pick(values[allowed], [c for c, ok in zip(candidates, allowed) if ok], ranks)
         placed = [m, *copies[m]]
         remaining = [u for u in remaining if u not in placed]
         for i in remaining:
