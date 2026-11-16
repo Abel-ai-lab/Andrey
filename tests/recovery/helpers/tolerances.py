@@ -164,6 +164,12 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {"weighted_adjacency": {"atol": 1e-2, "rtol": 0.0}},
     },
+    # DAGMA: the DAG exactly, the weights within rounding: its Adam steps are smooth in the input,
+    # and a relative 1e-12 change of the input moved them by up to 2e-13 over ten refits.
+    "DAGMA": {
+        "structural": ["graph"],
+        "numeric": {"weighted_adjacency": {"atol": 1e-6, "rtol": 1e-5}},
+    },
     # Granger has no causal order: the per-lag graphs exactly, the weights within rounding.
     "Granger": {
         "structural": ["graph"],
