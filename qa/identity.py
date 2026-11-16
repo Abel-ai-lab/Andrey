@@ -976,29 +976,40 @@ def _close(a: Any, b: Any) -> bool:
         return a.keys() == b.keys() and all(_close(a[key], b[key]) for key in a)
     if isinstance(a, np.ndarray) or isinstance(b, np.ndarray):
         a, b = np.asarray(a), np.asarray(b)
-        numeric = a.dtype.kind in "fiu" and b.dtype.kind in "fiu"
-        if numeric:
+        kinds = a.dtype.kind, b.dtype.kind
+        if kinds[0] in "iu" and kinds[1] in "iu":
+            return bool(np.array_equal(a, b))
+        if kinds == ("f", "f"):
             return a.shape == b.shape and bool(np.allclose(a, b, RTOL, ATOL, equal_nan=True))
+        if kinds[0] in "fiu" or kinds[1] in "fiu":
+            return False  # an integer array and a float array are not the same values
         return _close(a.tolist(), b.tolist())
     if isinstance(a, list | tuple) and isinstance(b, list | tuple):
         return len(a) == len(b) and all(_close(x, y) for x, y in zip(a, b, strict=True))
     real = (float, int, np.floating, np.integer)
     if isinstance(a, real) and isinstance(b, real) and not isinstance(a, bool | np.bool_):
-        if isinstance(a, int | np.integer) and isinstance(b, int | np.integer):
-            return bool(a == b)
+        if isinstance(a, int | np.integer) or isinstance(b, int | np.integer):
+            return isinstance(a, int | np.integer) and isinstance(b, int | np.integer) and a == b
         return math.isclose(a, b, rel_tol=RTOL, abs_tol=ATOL) or (math.isnan(a) and math.isnan(b))
     return bool(a == b)
 
 
 def _rounded(first: Any, refit: Any) -> bool:
-    """Whether the edge weights, the lag weights, and the metadata of ``refit`` equal ``first``'s
-    up to rounding (:func:`_close`)."""
+    """Whether the edge weights, the lag and time weights of a time series's structure, and the
+    metadata of ``refit`` equal ``first``'s up to rounding (:func:`_close`), and its lags and times
+    are the same."""
     if isinstance(first, list):
         return len(first) == len(refit) and all(_rounded(a, b) for a, b in zip(first, refit))
-    lags = [getattr(o.structure, "lag_weights", None) for o in (first, refit)]
+    a, b = first.structure, refit.structure
+    axes = all(getattr(a, name, None) == getattr(b, name, None) for name in ("lags", "times"))
+    weights = all(
+        _close(getattr(a, name, None), getattr(b, name, None))
+        for name in ("lag_weights", "lag_weights_ma", "time_weights")
+    )
     return (
-        _close(first.weighted_adjacency, refit.weighted_adjacency)
-        and _close(lags[0], lags[1])
+        axes
+        and weights
+        and _close(first.weighted_adjacency, refit.weighted_adjacency)
         and _close(dict(first.metadata), dict(refit.metadata))
     )
 

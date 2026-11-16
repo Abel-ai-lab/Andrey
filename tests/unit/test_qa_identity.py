@@ -8,6 +8,7 @@ import pkgutil
 import struct
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -259,6 +260,36 @@ def test_a_value_that_changes_by_more_than_rounding_fails_under_a_column_order()
     kind, changed = identity.classify(_output(0.25), _output(0.9), column_order=True)
     assert (kind, changed) == ("values", ["metadata.p_values"])
     assert "values" in identity.FAILING
+
+
+def test_an_integer_that_becomes_a_float_is_not_rounding() -> None:
+    first = StructureOutput.new(
+        GraphStructure.from_numpy(np.zeros((2, 2), dtype=np.int8), kind="dag"),
+        metadata={"score": 1, "counts": [1, 2]},
+    )
+    refit = StructureOutput.new(
+        GraphStructure.from_numpy(np.zeros((2, 2), dtype=np.int8), kind="dag"),
+        metadata={"score": 1.0, "counts": [1.0, 2.0]},
+    )
+    assert identity.classify(first, refit, column_order=True) == (
+        "values",
+        ["metadata.counts", "metadata.score"],
+    )
+
+
+def test_a_time_series_weights_differ_by_rounding_or_more() -> None:
+    def output(lag, time=None, lags=(1,)):
+        structure = SimpleNamespace(
+            lags=lags, times=(0,), lag_weights=lag, lag_weights_ma=None, time_weights=time
+        )
+        return SimpleNamespace(structure=structure, weighted_adjacency=None, metadata={})
+
+    base = output(np.array([[[0.5, 0.0], [0.25, 0.0]]]), np.full((1, 1, 2, 2), np.nan))
+    rounded = output(base.structure.lag_weights * (1 + 1e-13), base.structure.time_weights)
+    assert identity._rounded(base, rounded)
+    assert not identity._rounded(base, output(base.structure.lag_weights * 1.1))
+    assert not identity._rounded(base, output(base.structure.lag_weights, np.zeros((1, 1, 2, 2))))
+    assert not identity._rounded(base, output(base.structure.lag_weights, lags=(2,)))
 
 
 def test_a_different_graph_or_causal_order_fails_under_a_column_order() -> None:
