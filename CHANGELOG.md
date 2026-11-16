@@ -18,7 +18,7 @@ names its pull request.
   target alone. The twelve with a test-based search answer every target with one search, making a
   step two targets share once, and split the targets over `andrey.config(n_jobs=...)` worker
   processes for a partial-correlation test, with the same results for any number of workers
-  ([#NNNN]).
+  ([#1058]).
 - `andrey.locpc_cde`, LocPC-CDE (Loranchet and Assaad 2026), supported: whether the controlled
   direct effect of a treatment on an outcome is identifiable, from a graph learned around the
   outcome one hop at a time with PC's tests, and the outcome's parents as its adjustment set. The
@@ -2977,7 +2977,7 @@ First alpha release.
 [#1048]: https://github.com/Abel-ai-lab/Andrey/pull/1048
 [#1045]: https://github.com/Abel-ai-lab/Andrey/issues/1045
 [#1051]: https://github.com/Abel-ai-lab/Andrey/pull/1051
-[#NNNN]: https://github.com/Abel-ai-lab/Andrey/pull/NNNN
+[#1058]: https://github.com/Abel-ai-lab/Andrey/pull/1058
 [#995]: https://github.com/Abel-ai-lab/Andrey/pull/995
 [#991]: https://github.com/Abel-ai-lab/Andrey/pull/991
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
