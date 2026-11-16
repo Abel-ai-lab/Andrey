@@ -56,6 +56,17 @@ def chain(seed: int = 0) -> np.ndarray:
     return on_grid(x)
 
 
+def shifted_chain(seed: int = 1) -> np.ndarray:
+    """The chain whose variable 1 has its noise shifted by 1 in the second half of the rows, the
+    second domain of :func:`domains`: ICP finds the parent 1 of variable 2 through the shift."""
+    u = np.random.default_rng(seed).uniform(-1, 1, size=(N, 3)) ** 3
+    u[N // 2 :, 1] += 1.0
+    x = u.copy()
+    x[:, 1] += 1.2 * u[:, 0]
+    x[:, 2] += 0.7 * x[:, 1]
+    return on_grid(x)
+
+
 def graphs(structure) -> list[np.ndarray]:
     """The endpoint marks of every graph a structure holds: itself, or each lag and each cell."""
     if isinstance(structure, TemporalStructure):
@@ -110,9 +121,11 @@ def test_shifting_the_columns_keeps_every_methods_graphs(spec):
     if spec.name == "calm":
         pytest.importorskip("torch")
     fit = getattr(andrey, spec.name)
-    data = chain()
+    data = shifted_chain() if spec.name == "icp" else chain()
     settings = {**fit_settings(spec.name), **CONTEXT.get(spec.name, {})}
     want = marks(fit(*inputs(spec, data, (1.0, 0.0)), **settings))
+    if spec.name == "icp":
+        assert any(m.any() for m in want), "ICP finds no parent on the unshifted data"
     for shift in SHIFTS.values():
         got = marks(fit(*inputs(spec, data, shift), **settings))
         assert len(got) == len(want)

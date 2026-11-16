@@ -44,7 +44,7 @@ def test_colab_link_opens_the_notebook_from_the_public_repository(notebook):
     links = re.findall(
         r"https://colab\.research\.google\.com/github/\S+?(?=\))", "".join(cells[0]["source"])
     )
-    public = "https://colab.research.google.com/github/Abel-ai-lab/andrey/blob/main/examples/"
+    public = "https://colab.research.google.com/github/Abel-ai-lab/Andrey/blob/main/examples/"
     assert links == [public + notebook.name]
     # The badge has a line of its own: the docs put the notebook's download link to its right.
     badge = (

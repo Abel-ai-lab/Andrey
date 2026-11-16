@@ -56,8 +56,8 @@ andrey = "andrey.cli:main"
 [project.urls]
 Homepage = "https://andrey.abel.ai"
 Documentation = "https://andrey.abel.ai/docs/"
-Source = "https://github.com/Abel-ai-lab/andrey"
-Issues = "https://github.com/Abel-ai-lab/andrey/issues"
+Source = "https://github.com/Abel-ai-lab/Andrey"
+Issues = "https://github.com/Abel-ai-lab/Andrey/issues"
 Changelog = "https://andrey.abel.ai/docs/changelog.html"
 
 [dependency-groups]                # not published
@@ -103,7 +103,7 @@ path = "README.md"
 
 [[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
 pattern = '(src|srcset)="(\.github/readme/[^"]+)"'
-replacement = '\1="https://raw.githubusercontent.com/Abel-ai-lab/andrey/v$HFPR_VERSION/\2"'
+replacement = '\1="https://raw.githubusercontent.com/Abel-ai-lab/Andrey/v$HFPR_VERSION/\2"'
 
 # Wheel and sdist ship src/andrey plus hatchling's metadata files; scripts/check_dist.py fails on
 # anything else.
