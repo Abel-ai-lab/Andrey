@@ -926,6 +926,49 @@ def test_valid_and_f1_read_the_sets_of_the_pair_asked_only(asked_first):
     assert [s["set"] for s in adjustment_cpu.asked_sets(fit)] == [[1]]
 
 
+def _scored_fit(seed, valid, *, status="ok"):
+    """A fit of one pair whose scored sets are one set, valid or not, or none when ``valid`` is None."""
+    fit = _stored_fit(
+        "stand-in.both",
+        [_answer(3, 7, sets=[[1]] * (valid is not None))],
+        {(3, 7): None},
+        seed=seed,
+    )
+    fit["status"] = status
+    if valid is not None:
+        fit["scores"]["sets"] = [{"pair": [3, 7], "set": [1], "valid": valid}]
+    return fit
+
+
+def test_an_abstention_is_an_error_of_one_in_the_valid_set_loss_and_pairs_with_the_other_arm():
+    from andrey_bench import pairing
+
+    # Of 20 datasets one arm answers 19 with 15 valid sets, the other 17 with 15 valid sets.
+    mine = [True] * 15 + [False] * 4 + [None]
+    ref = [True] * 15 + [False] * 2 + [None] * 3
+    a = [adjustment_cpu.valid_set_loss(_scored_fit(s, v)) for s, v in enumerate(mine)]
+    b = [adjustment_cpu.valid_set_loss(_scored_fit(s, v)) for s, v in enumerate(ref)]
+    assert a[-1] == 1.0 and b[-3:] == [1.0] * 3  # an abstention
+    assert a[15] == 1.0 and b[15] == 1.0  # a set that is not valid
+    assert a[0] == 0.0
+    assert None not in a + b
+    assert np.mean(a) == np.mean(b) == 0.25
+    assert pairing.compare(a, b)["paired"] == 20
+    rows = {
+        r["solution"]: r
+        for r in adjustment_cpu.summarize(
+            [{**_scored_fit(s, v), "solution": "stand-in.ref"} for s, v in enumerate(ref)]
+        )
+    }
+    assert rows["stand-in.ref"]["valid_set_loss"] == 0.25
+    assert rows["stand-in.ref"]["valid"] == pytest.approx(15 / 17)  # the share of returned sets
+
+
+def test_a_fit_that_did_not_finish_has_no_valid_set_loss():
+    assert adjustment_cpu.valid_set_loss(_scored_fit(0, True, status="timeout")) is None
+    assert adjustment_cpu.valid_set_loss(_scored_fit(0, None, status="timeout")) is None
+
+
 def test_a_fit_whose_asked_record_abstains_has_no_error_and_is_not_answered():
     empty = _stored_fit("baseline.adjust-none", [_answer(3, 7, sets=[[]])], {(3, 7): 0.5})
     reverse_only = _stored_fit(
