@@ -211,7 +211,15 @@ def ldp(
     variables are post-treatment. A ``Zmix`` variable independent of such a candidate is a
     confounder, and any other is post-treatment. A candidate dependent on a confounder found in
     that collider test is a confounder, and any other is an instrument; this step reuses those
-    tests and runs none. Each query is tested once and its p-value kept. Where the algorithm is
+    tests and runs none. The Z5 criterion is tested with each instrument independent of every
+    confounder found (condition C2 read on the labels). An instrument dependent on one can be
+    separated from the outcome by the confounders found while a back-door path stays open: with
+    ``A -> B -> W``, ``U -> B``, ``W -> X``, ``W -> Y``, ``U -> Y``, an instrument of ``X``, a
+    cause of ``Y`` independent of ``X``, and no effect of ``X`` on ``Y``, ``A`` is labeled an
+    instrument and ``W`` post-treatment, and ``B`` separates ``A`` from ``Y``. With exact tests on
+    25,072 random graphs that meet C1 and C2, the check removes the 10 invalid sets the criterion
+    over every instrument returns, and gives no set on 20 where that criterion gives a valid one.
+    Each query is tested once and its p-value kept. Where the algorithm is
     open, the authors' code decides: every candidate in such a collider is kept, Step 6's second
     pass covers ``Zmix`` alone, and ``Z7`` is ``Z5,7`` less the candidates. Only ``Z4``, ``Z7``,
     and ``Z8`` are labeled right in every graph (Theorem 4.6); the other labels need stronger

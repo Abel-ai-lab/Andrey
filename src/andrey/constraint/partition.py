@@ -95,10 +95,12 @@ def ldp(search: LocalSearch, x: int, y: int, others: Sequence[int]) -> LDPResult
     the treatment and the rest make independent of the outcome (``Zmix``); Step 6 finds the
     confounders by the collider each forms at the treatment with an instrument candidate; Step 7
     splits those candidates into confounders and instruments from the tests already run; Step 8 is
-    the Z5 criterion. Where Algorithm 1 is open the authors' code decides: every candidate that
-    forms the collider joins ``Z1,5``, not only the first; Step 6's second pass covers Step 5's
-    variables only, and ``Z7`` is ``Z5,7`` less ``Z1,5``; Step 7 compares with the confounders of
-    Step 6's first pass, those adjacent to the outcome, whose tests it has run.
+    the Z5 criterion, tested only with the instruments marginally independent of every confounder
+    found (condition C2 read on the labels). Where Algorithm 1 is open the authors' code decides:
+    every candidate that forms the collider joins ``Z1,5``, not only the first; Step 6's second
+    pass covers Step 5's variables only, and ``Z7`` is ``Z5,7`` less ``Z1,5``; Step 7 compares
+    with the confounders of Step 6's first pass, those adjacent to the outcome, whose tests it has
+    run.
     """
     tests = _Tests(search)
     indep = tests.independent
@@ -166,8 +168,8 @@ def ldp(search: LocalSearch, x: int, y: int, others: Sequence[int]) -> LDPResult
         else:
             z5.append(u)
 
-    # Step 8: the Z5 criterion.
-    valid = any(indep(v, y, (x, *z1)) for v in z5)
+    # Step 8: the Z5 criterion, tested with the instruments independent of every confounder found.
+    valid = any(all(indep(v, u) for u in z1) and indep(v, y, (x, *z1)) for v in z5)
 
     labeled = {*z1, *z4, *z5, *unsplit, *z7, *z8, *post}
     sets = {

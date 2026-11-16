@@ -122,6 +122,26 @@ def test_ldp_gives_no_set_for_a_zero_effect_a_set_identifies():
     assert names(observed, result.partition["Z4"]) == {"V3"}
 
 
+def test_ldp_criterion_reads_only_instruments_independent_of_the_confounders():
+    # Both graphs meet C1 (P) and C2 (I). First: no effect of X on Y, so I is independent of Y
+    # and Step 5 misses it; W, dependent on every Zmix variable, is labeled post-treatment, A an
+    # instrument, and B separates A from Y given X and the confounders while X <- W -> Y is open.
+    # Second: H is hidden and the instrument J reaches X only through the confounders E and D,
+    # which separate it from Y while X <- H -> M -> Y is open (no set blocks that path).
+    first = [tuple(e) for e in "AB BW WX WY UB UY IX PY".split()]
+    second = [tuple(e) for e in "JE FE ED DX FY HX HM XM MY IX PY".split()]
+    for edges, observed, instrument in (
+        (first, ["A", "B", "U", "W", "I", "P", "X", "Y"], "A"),
+        (second, ["J", "E", "F", "D", "M", "I", "P", "X", "Y"], "J"),
+    ):
+        result = oracle_answer("ldp", edges, observed)
+        z1 = names(observed, result.partition["Z1"])
+        assert instrument in names(observed, result.partition["Z5"])
+        assert nx.is_d_separator(nx.DiGraph(edges), instrument, "Y", {"X", *z1})
+        assert not true_graph(edges, all_nodes(edges)).is_adjustment_set("X", "Y", z1)
+        assert not result.valid
+
+
 def assert_theorem_4_6(edges, observed, result, x="X", y="Y"):
     """Z4, Z7, and Z8 as Table 1 defines them: Z4 variables are not descendants of the outcome,
     depend on it, and are independent of the treatment; Z7 variables are descendants of the
