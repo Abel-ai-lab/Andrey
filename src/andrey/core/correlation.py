@@ -1,28 +1,32 @@
-"""The sample correlation matrix of a data set's columns, computed tile by tile, whole or lazily.
+"""The sample correlation matrix of a data set's columns, computed block by block, whole or lazily.
 
 Every entry comes from one fixed computation, so the whole matrix and a row computed alone agree
 bit for bit. :func:`centered` centers each column and finds its Euclidean norm, on a contiguous
 copy whose rows are the columns, so the result does not depend on the data's memory layout. The
-columns fall into tiles of ``TILE`` consecutive positions, and the entries between tiles ``i <= j``
-are one product of their centered columns, ``C_i @ C_j.T``, on one BLAS thread, divided by the
-products of the norms and clipped to ``[-1, 1]``; the entries of tiles ``j < i`` are the transpose
-of tile ``(j, i)``, and a tile with itself keeps its upper triangle, mirrored, so the matrix is
-exactly symmetric. Dividing after the sums keeps an exact sum exact: on data whose sums of products
-round nowhere, such as small integers in a power-of-two number of rows, two columns that hold the
-same values in another row order correlate equally with a third column. The diagonal is
+columns fall into blocks of ``BLOCK`` consecutive positions, and the entries between blocks
+``i <= j`` are one product of their centered columns, ``C_i @ C_j.T``, divided by the products of
+the norms and clipped to ``[-1, 1]``; the entries of blocks ``j < i`` are the transpose of block
+``(j, i)``, and a block with itself keeps its upper triangle, mirrored, so the matrix is exactly
+symmetric. Each product runs on one BLAS thread, and as many Python threads as the BLAS has run
+different products at once. A product that the BLAS itself splits among threads can differ in its
+last bits (OpenBLAS's does at a few hundred rows or fewer), so this way the entries are the same on
+any number of threads. Dividing after the sums keeps an exact sum exact: on data whose sums of
+products round nowhere, such as small integers in a power-of-two number of rows, two columns that
+hold the same values in another row order correlate equally with a third column. The diagonal is
 exactly ``1``, or ``NaN`` for a column whose values are all equal. :func:`correlation_matrix` gives
-the whole matrix; :class:`LazyCorrelation` computes the rows of one tile when a row of it is first
-read and keeps them, the same products in the same order, so its rows equal those of
+the whole matrix; :class:`LazyCorrelation` computes the ``BLOCK`` rows of one block when a row of it
+is first read and keeps them, the same products in the same order, so its rows equal those of
 :func:`correlation_matrix` bit for bit.
 
 A search that reads few rows, as a local causal discovery method does, then costs time and memory
-in proportion to ``n * d`` per tile of rows it reads instead of ``n * d**2`` time and ``d**2``
+in proportion to ``n * d`` per block of rows it reads instead of ``n * d**2`` time and ``d**2``
 memory up front.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import numpy.typing as npt
@@ -30,12 +34,12 @@ import numpy.typing as npt
 from . import backend
 from .score import ZERO_RESIDUAL, copies_error
 
-__all__ = ["TILE", "LazyCorrelation", "centered", "correlation_matrix"]
+__all__ = ["BLOCK", "LazyCorrelation", "centered", "correlation_matrix"]
 
-#: The number of consecutive columns in one tile. A lazily read row computes the rows of its tile:
-#: on one AMD EPYC 7713 core, 0.11 s at 2,000 rows and 16,000 columns (0.18 s with 64), while the
-#: whole matrix of 4,000 columns takes 1.6 times the 1.1 s of ``np.corrcoef`` (1.25 times with 64).
-TILE = 32
+#: The number of consecutive columns in one block, enough that each product is worth a thread. A
+#: lazily read row computes the ``BLOCK`` rows of its block: ``BLOCK * d * 8`` bytes, 33 MB at
+#: 16,000 columns.
+BLOCK = 256
 
 
 def centered(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -49,17 +53,17 @@ def centered(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     d, n = c.shape
     c -= (c.sum(axis=1) / n)[:, None]
     norm = np.empty(d)
-    for start in range(0, d, TILE):
-        block = c[start : start + TILE]
-        norm[start : start + TILE] = np.sqrt((block * block).sum(axis=1))
+    for start in range(0, d, BLOCK):
+        rows = c[start : start + BLOCK]
+        norm[start : start + BLOCK] = np.sqrt((rows * rows).sum(axis=1))
     return c, norm
 
 
-def _tile(c: np.ndarray, norm: np.ndarray, i: int, j: int) -> np.ndarray:
-    """The correlations between tiles ``i <= j`` of the centered columns ``c`` with norms
-    ``norm``, clipped to ``[-1, 1]``; tile ``i`` with itself is its upper triangle mirrored, with
+def _block(c: np.ndarray, norm: np.ndarray, i: int, j: int) -> np.ndarray:
+    """The correlations between blocks ``i <= j`` of the centered columns ``c`` with norms
+    ``norm``, clipped to ``[-1, 1]``; block ``i`` with itself is its upper triangle mirrored, with
     the unit diagonal (``NaN`` for a zero norm)."""
-    span_i, span_j = slice(i * TILE, (i + 1) * TILE), slice(j * TILE, (j + 1) * TILE)
+    span_i, span_j = slice(i * BLOCK, (i + 1) * BLOCK), slice(j * BLOCK, (j + 1) * BLOCK)
     rows = c[span_i]
     if i == j:
         product = rows @ rows.T
@@ -73,29 +77,43 @@ def _tile(c: np.ndarray, norm: np.ndarray, i: int, j: int) -> np.ndarray:
     return np.clip(product, -1.0, 1.0, out=product)
 
 
-def _matrix(c: np.ndarray, norm: np.ndarray) -> np.ndarray:
-    """The whole correlation matrix of the centered columns ``c`` with norms ``norm``."""
-    d = c.shape[0]
-    tiles = -(-d // TILE)
-    out = np.empty((d, d))
+def _run(work: Callable[[int, int], None], jobs: Sequence[tuple[int, int]], threads: int) -> None:
+    """``work(i, j)`` for each of ``jobs``, on up to ``threads`` Python threads with the BLAS held
+    to one thread, so each product is the same whatever ``threads`` is."""
     with backend.one_blas_thread():
-        for i in range(tiles):
-            for j in range(i, tiles):
-                product = _tile(c, norm, i, j)
-                out[i * TILE : (i + 1) * TILE, j * TILE : (j + 1) * TILE] = product
-                if j > i:
-                    out[j * TILE : (j + 1) * TILE, i * TILE : (i + 1) * TILE] = product.T
+        if threads <= 1 or len(jobs) <= 1:
+            for i, j in jobs:
+                work(i, j)
+            return
+        with ThreadPoolExecutor(min(threads, len(jobs))) as pool:
+            list(pool.map(lambda job: work(*job), jobs))
+
+
+def _matrix(c: np.ndarray, norm: np.ndarray, threads: int) -> np.ndarray:
+    """The whole correlation matrix of the centered columns ``c`` with norms ``norm``, its blocks
+    computed on up to ``threads`` threads."""
+    d = c.shape[0]
+    blocks = -(-d // BLOCK)
+    out = np.empty((d, d))
+
+    def fill(i: int, j: int) -> None:
+        product = _block(c, norm, i, j)
+        out[i * BLOCK : (i + 1) * BLOCK, j * BLOCK : (j + 1) * BLOCK] = product
+        if j > i:
+            out[j * BLOCK : (j + 1) * BLOCK, i * BLOCK : (i + 1) * BLOCK] = product.T
+
+    _run(fill, [(i, j) for i in range(blocks) for j in range(i, blocks)], threads)
     return out
 
 
 def correlation_matrix(data: np.ndarray) -> np.ndarray:
     """The ``(d, d)`` sample correlation matrix of the columns of the ``(n, d)`` ``data``.
 
-    Computed tile by tile from :func:`centered` columns as the module describes: exactly
+    Computed block by block from :func:`centered` columns as the module describes: exactly
     symmetric, its diagonal ``1`` (``NaN`` for a constant column), its entries clipped to
     ``[-1, 1]``, and each row equal bit for bit to the row :class:`LazyCorrelation` computes.
     """
-    return _matrix(*centered(data))
+    return _matrix(*centered(data), backend.blas_threads())
 
 
 def _groups(pairs: Sequence[tuple[int, int]]) -> tuple[tuple[int, ...], ...]:
@@ -118,7 +136,7 @@ def _groups(pairs: Sequence[tuple[int, int]]) -> tuple[tuple[int, ...], ...]:
 
 
 class LazyCorrelation:
-    """The correlation matrix of the columns of ``data``, a tile of rows computed when one of its
+    """The correlation matrix of the columns of ``data``, a block of rows computed when one of its
     rows is first read and kept for the life of the object.
 
     The rows equal :func:`correlation_matrix`'s bit for bit, and the matrix is exactly symmetric, so
@@ -127,10 +145,14 @@ class LazyCorrelation:
     often, so the row of a search's target serves its candidates. The centered columns, as large as
     the data, are made at the first read.
 
-    Each computed tile is checked for columns that repeat another up to scale and shift, as
+    Each computed block is checked for columns that repeat another up to scale and shift, as
     :func:`~andrey.core.score.copy_groups` defines them: a copy shown by a computed row raises
     :class:`~andrey.core.score.CopiedColumnsError` naming its group, on that read and every later
-    read of the tile. Copies among columns whose rows are never computed do not raise.
+    read of the block. Copies among columns whose rows are never computed do not raise.
+
+    The products of a block run on as many threads as the BLAS has when the object is made, wherever
+    a row is first read, so a first read inside a search's one-thread block still uses them, with
+    the same result.
     """
 
     def __init__(self, data: np.ndarray) -> None:
@@ -144,6 +166,7 @@ class LazyCorrelation:
         self._rows = np.empty((0, self.d))
         self._count = 0
         self._asked = np.zeros(self.d, dtype=np.intp)  # reads that found neither row computed
+        self._threads = backend.blas_threads()
 
     @property
     def computed(self) -> int:
@@ -162,7 +185,7 @@ class LazyCorrelation:
         if self._count == self.d:
             return self._rows[self._slot]
         self._center()
-        full = _matrix(self._z, self._norm)
+        full = _matrix(self._z, self._norm, self._threads)
         self._check(full, np.arange(self.d))
         return full
 
@@ -177,31 +200,33 @@ class LazyCorrelation:
             raise copies_error(_groups([(int(ids[k]), int(b)) for k, b in found]))
 
     def load(self, cols: npt.ArrayLike) -> None:
-        """Compute the rows of the tiles holding the columns ``cols``, those not computed yet."""
+        """Compute the rows of the blocks holding the columns ``cols``, those not computed yet."""
         cols = np.asarray(cols, dtype=np.intp).reshape(-1)
         missing = cols[self._slot[cols] < 0]
         if not len(missing):
             return
         self._center()
-        tiles = -(-self.d // TILE)
-        with backend.one_blas_thread():
-            for i in np.unique(missing // TILE).tolist():
-                ids = np.arange(i * TILE, min(self.d, (i + 1) * TILE))
-                block = np.empty((len(ids), self.d))
-                for j in range(tiles):
-                    tile = _tile(self._z, self._norm, *((i, j) if j >= i else (j, i)))
-                    block[:, j * TILE : (j + 1) * TILE] = tile if j >= i else tile.T
-                self._check(block, ids)
-                self._store(block, ids)
+        blocks = -(-self.d // BLOCK)
+        for i in np.unique(missing // BLOCK).tolist():
+            ids = np.arange(i * BLOCK, min(self.d, (i + 1) * BLOCK))
+            rows = np.empty((len(ids), self.d))
 
-    def _store(self, block: np.ndarray, ids: np.ndarray) -> None:
+            def fill(i: int, j: int, rows: np.ndarray = rows) -> None:
+                block = _block(self._z, self._norm, *((i, j) if j >= i else (j, i)))
+                rows[:, j * BLOCK : (j + 1) * BLOCK] = block if j >= i else block.T
+
+            _run(fill, [(i, j) for j in range(blocks)], self._threads)
+            self._check(rows, ids)
+            self._store(rows, ids)
+
+    def _store(self, rows: np.ndarray, ids: np.ndarray) -> None:
         if self._count + len(ids) > len(self._rows):
             size = max(min(2 * len(self._rows), self.d), self._count + len(ids))
             grown = np.empty((size, self.d))
             grown[: self._count] = self._rows[: self._count]
             self._rows = grown
         slots = np.arange(self._count, self._count + len(ids))
-        self._rows[slots] = block
+        self._rows[slots] = rows
         self._slot[ids] = slots
         for v, s in zip(ids.tolist(), slots.tolist()):
             self._slots[v] = s
