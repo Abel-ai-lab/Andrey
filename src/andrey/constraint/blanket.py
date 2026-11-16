@@ -55,6 +55,7 @@ p-value to ``KEY_DP`` significant digits.
 from __future__ import annotations
 
 import math
+from collections import Counter
 from collections.abc import Callable, Generator, Iterable, Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager, contextmanager, nullcontext
 from dataclasses import dataclass
@@ -68,7 +69,7 @@ import numpy as np
 from andrey.constraint._skeleton import CHUNK, adjacent_pairs, scan_conditioning_sets
 from andrey.core import ARROW, NULL, TAIL, backend
 from andrey.core.ci import CITest, counting_tests, make_indep_test, pins_blas
-from andrey.core.ci_missing import TestwiseDeletion
+from andrey.core.ci_missing import TestwiseDeletion, count_rows, rows_tested
 from andrey.core.knowledge import Constraints, orient
 from andrey.core.orient import meek
 from andrey.core.ties import (
@@ -85,6 +86,9 @@ _FIRST_CHUNK = 32
 Sepsets = dict[int, tuple[int, ...]]
 #: A query as the tests canonicalize it: the lower and the higher variable and the sorted set.
 Query = tuple[int, int, tuple[int, ...]]
+#: A step a :class:`LocalSearch` keeps: ``("run", learner, variable)`` or ``("spouses", learner,
+#: target)``.
+Step = tuple[str, str, int]
 
 
 def _tests_every_set(test: CITest) -> bool:
@@ -1111,7 +1115,8 @@ class LazyTieRanks(Sequence[int]):
     candidates skips their cost. ``andrey.config.tie_break`` and the BLAS thread limits are read
     when the object is made: the ranks' products are exact integers on any number of threads, so a
     first read inside a search's one-thread block (:meth:`LocalSearch.pinned`) computes them on the
-    threads of the moment the object was made, with the same result."""
+    threads of the moment the object was made, with the same result. A copy made in another
+    process (pickling) computes them under that process's limits."""
 
     def __init__(self, X: np.ndarray, mask: np.ndarray) -> None:
         self._d = X.shape[1]
@@ -1130,6 +1135,21 @@ class LazyTieRanks(Sequence[int]):
             with self._threads():
                 self._ranks, self._data = tie_ranks(*self._data).tolist(), None
         return self._ranks[i]
+
+    def __getstate__(self) -> dict[str, Any]:
+        """The ranks, or the data to compute them from, without the thread limits: a copy in
+        another process computes the same ranks on any number of threads."""
+        return {"_d": self._d, "_data": self._data, "_ranks": self._ranks}
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        self.__dict__.update(state)
+        self.use_active_limits()
+
+    def use_active_limits(self) -> None:
+        """Compute the ranks under the limits active when one is first read, not those of the
+        moment the object was made: a worker process that pins its BLAS threads calls this, as a
+        pickled copy does."""
+        self._threads = nullcontext
 
 
 #: Runs one learner for one target of a :class:`LocalSearch` and returns the target's set in the
@@ -1273,6 +1293,36 @@ class SearchCounts:
         return None if self.queries is None else len(self.queries)
 
 
+@dataclass
+class Reading:
+    """What one answer read from a :class:`LocalSearch` (:meth:`LocalSearch.reading`): the kept
+    steps it read, in the order it first read them, the tests it computed outside them, and the
+    rows every test of its steps and its own read (:func:`~andrey.core.ci_missing.rows_tested`),
+    whichever answer computed the step."""
+
+    steps: list[Step]
+    own: int
+    rows: Counter[int]
+
+
+def first_reads(readings: Sequence[Reading], tests: Mapping[Step, int]) -> list[int]:
+    """The tests each answer computed, for answers made in order over one :class:`LocalSearch`:
+    its own tests and those of each kept step no earlier answer read, ``tests`` giving each step's
+    (:attr:`LocalSearch.step_tests`).
+
+    A step is a deterministic function of the data, the settings, and its variable, and computes
+    the same tests wherever it runs on a test that keeps no answers, so the counts do not depend on
+    how the answers were split between searches.
+    """
+    seen: set[Step] = set()
+    counts = []
+    for reading in readings:
+        new = [step for step in reading.steps if step not in seen]
+        seen.update(new)
+        counts.append(reading.own + sum(tests[step] for step in new))
+    return counts
+
+
 class LocalSearch:
     """The learners of :data:`LEARNERS` over one test, each run at most once per target.
 
@@ -1285,8 +1335,9 @@ class LocalSearch:
     none as categories, and ``n`` is the number of rows: what :func:`table_size` and a learner's
     sparse-table rule read. A run, and the spouses :meth:`local` finds, are kept for the life of
     the object, so the symmetry check, the spouse step, and a caller that asks for a target again
-    read them without a test. A test with BLAS calls gives the same bits on every host inside
-    :meth:`pinned`.
+    read them without a test; each depends only on the data, the settings, and its variable, so a
+    search kept across targets answers each one as a new search would. A test with BLAS calls gives
+    the same bits on every host inside :meth:`pinned`.
 
     A learner asks its tests through :meth:`scan`, :meth:`scan_given_rest`, :meth:`weakest`, and
     :meth:`separating`, and picks between candidates with :meth:`strongest`, which reads ``ranks``
@@ -1323,6 +1374,12 @@ class LocalSearch:
         self._measuring = False
         self._runs: dict[tuple[str, int], tuple[list[int], Sepsets]] = {}
         self._spouses: dict[tuple[str, int], list[int]] = {}
+        # The tests and the rows read by the tests each kept step computed when it ran, the tests'
+        # sum, and the steps a reading() block has read.
+        self.step_tests: dict[Step, int] = {}
+        self.step_rows: dict[Step, Counter[int]] = {}
+        self._kept_tests = 0
+        self._read: dict[Step, None] | None = None
 
     def scan(
         self, target: int, xs: Sequence[int], cond: Sequence[int] = ()
@@ -1558,6 +1615,38 @@ class LocalSearch:
         a block that does nothing otherwise."""
         return backend.one_blas_thread() if pins_blas(self.test) else nullcontext()
 
+    @contextmanager
+    def reading(self) -> Generator[Reading]:
+        """The kept steps (runs and spouse steps) read inside the block, the tests computed
+        outside them, and the rows read by all the tests, filled when the block ends
+        (:func:`first_reads`)."""
+        reading = Reading([], 0, Counter())
+        self._read, kept, before = {}, self._kept_tests, len(self.step_rows)
+        try:
+            with counting_tests() as tests, rows_tested() as rows:
+                yield reading
+        finally:
+            reading.steps, self._read = list(self._read), None
+        reading.own = tests.n - (self._kept_tests - kept)
+        reading.rows = rows - self._rows_of(before)
+        for step in reading.steps:
+            reading.rows.update(self.step_rows[step])
+
+    def _rows_of(self, before: int) -> Counter[int]:
+        """The rows read by the tests of the kept steps made after the first ``before``."""
+        total: Counter[int] = Counter()
+        for rows in list(self.step_rows.values())[before:]:
+            total.update(rows)
+        return total
+
+    def _kept(self, step: Step, n: int, rows: Counter[int]) -> None:
+        """Record that the kept step ``step`` computed ``n`` tests of its own, which read
+        ``rows``, and pass ``rows`` to the enclosing block."""
+        self.step_tests[step] = n
+        self.step_rows[step] = rows
+        self._kept_tests += n
+        count_rows(rows)
+
     def run(self, method: str, target: int) -> tuple[list[int], Sepsets]:
         """``target``'s set by the ``"blanket"`` or ``"pc"`` learner ``method``, in joining order,
         and the separating set of each candidate its tests dropped.
@@ -1566,14 +1655,17 @@ class LocalSearch:
         must not modify.
         """
         key = (method, target)
+        if self._read is not None:
+            self._read["run", method, target] = None
         if key not in self._runs:
             search = LEARNERS[method].search
             if search is None:
                 raise ValueError(f"{method!r} has no search of its own; ask LocalSearch.local")
             sepsets: Sepsets = {}
-            with self._measured():
+            with self._measured(), counting_tests() as tests, rows_tested() as rows:
                 members = search(self, target, sepsets)
             self._runs[key] = (members, sepsets)
+            self._kept(("run", method, target), tests.n, rows)
         return self._runs[key]
 
     def parents_children(self, method: str, target: int) -> list[int]:
@@ -1608,10 +1700,21 @@ class LocalSearch:
                 sepsets[x] = self.run(name, x)[1][target]
         if learner.kind == "pc":
             return pc, None, sepsets
+        if self._read is not None:
+            self._read["spouses", method, target] = None
         if (method, target) not in self._spouses:
-            self._spouses[method, target] = self.spouses(
-                name, target, pc, sepsets, cell_rows=learner.cell_rows, df_rows=learner.df_rows
+            kept, before = self._kept_tests, len(self.step_rows)
+            with counting_tests() as tests, rows_tested() as rows:
+                self._spouses[method, target] = self.spouses(
+                    name, target, pc, sepsets, cell_rows=learner.cell_rows, df_rows=learner.df_rows
+                )
+            # The runs the step made inside it passed their rows to this block, not to the one
+            # around it.
+            nested = self._rows_of(before)
+            self._kept(
+                ("spouses", method, target), tests.n - (self._kept_tests - kept), rows - nested
             )
+            count_rows(nested)
         return pc, pc + self._spouses[method, target], sepsets
 
     def spouses(

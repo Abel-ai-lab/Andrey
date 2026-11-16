@@ -26,6 +26,7 @@ JSON_TYPE = {
     "bool": "boolean",
     "int_pair": "array",
     "str_list": "array",
+    "str_or_list": "string|array",
     "knowledge": "object",
     "targets": "object",
 }
@@ -66,7 +67,8 @@ def test_method_schema_matches_spec(name):
     for p in spec.params:
         entry = props[p.name]
         assert entry["default"] == json.loads(json.dumps(p.default)) and "description" in entry
-        assert types_of(entry) == {JSON_TYPE[p.type], *(["null"] if p.nullable else [])}
+        expected_types = {*JSON_TYPE[p.type].split("|"), *(["null"] if p.nullable else [])}
+        assert types_of(entry) == expected_types
         if p.choices:
             expected = [*p.choices, None] if p.nullable else list(p.choices)
             assert entry["enum"] == expected
@@ -118,3 +120,23 @@ def test_skill_is_an_installable_skill_that_explains_every_edge_type():
     assert set(EDGE_MEANINGS) == set(EDGE_GLYPHS)
     for name, glyph in EDGE_GLYPHS.items():
         assert name in skill and glyph in skill
+
+
+TARGET_METHODS = [n for n, spec in REGISTRY.items() if any(p.name == "target" for p in spec.params)]
+
+
+@pytest.mark.parametrize("name", TARGET_METHODS)
+def test_target_is_a_column_or_a_list_of_columns_in_the_schema(name):
+    """One column, or a list of at least one that returns a list of results; null where optional."""
+    spec = get_spec(name)
+    entry = to_json_schema(spec)["params"]["properties"]["target"]
+    optional = next(p for p in spec.params if p.name == "target").nullable
+    assert types_of(entry) == {"string", "array", *(["null"] if optional else [])}
+    assert entry["items"] == {"type": "string"} and entry["minItems"] == 1
+    assert entry["concept"] == "target" and "target=[a,b]" in entry["description"]
+
+
+def test_the_contract_says_where_a_list_of_targets_answers_go():
+    envelope = help_schema()["cli"]["result_envelope"]
+    assert "target=[a,b]" in envelope["results"] and "multi: true" in envelope["results"]
+    assert "target=[a,b]" in render_skill()

@@ -130,6 +130,8 @@ def _type_matches(ptype: str, default: object) -> bool:
         return isinstance(default, tuple) and all(isinstance(x, int) for x in default)
     if ptype == "str_list":
         return isinstance(default, (tuple, list))
+    if ptype == "str_or_list":
+        return isinstance(default, (str, tuple, list))
     if ptype == "knowledge":
         return isinstance(default, dict)
     return False
