@@ -217,10 +217,11 @@ class TieKeys(dict[int, int]):
     once by the sum of each column's squared relations modulo a prime, which equal relations share,
     in ``O(n**2 d)`` time and ``O(n**2 + n d)`` memory for ``n`` rows and ``d`` columns, where
     :func:`tie_ranks` takes ``O(n d**2)`` time and ``O(d**2)`` memory; columns whose sums agree are
-    then compared in full. After 256 columns read one at a time, a read computes every column, 128
-    at a time, in :func:`tie_ranks`' time and ``O(n d)`` memory; computing every column at once
-    (:meth:`fill`) compares their hashes instead of their sums. :meth:`applies` says where the keys
-    are cheaper than :func:`tie_ranks`.
+    then compared in full. After 256 columns read one at a time, or one eighth of the columns where
+    that is more, a read computes every column, 128 at a time, in :func:`tie_ranks`' time and
+    ``O(n d)`` memory, since a column in a block costs under a third of one read alone. Computing
+    every column at once (:meth:`fill`) compares their hashes instead of their sums.
+    :meth:`applies` says where the keys are cheaper than :func:`tie_ranks`.
 
     The one difference from :func:`tie_ranks`: two columns whose relations differ but whose 8-byte
     hashes agree, about once in ``2**65 / d**2`` data sets, get equal keys here, where
@@ -236,6 +237,7 @@ class TieKeys(dict[int, int]):
         self._classes: np.ndarray | None = None
         self._unique: np.ndarray | None = None
         self._singles = 0
+        self._single_reads = max(256, self._x.shape[1] // 8)
 
     @staticmethod
     def applies(x: np.ndarray, categorical: np.ndarray) -> bool:
@@ -252,7 +254,7 @@ class TieKeys(dict[int, int]):
     def __missing__(self, j: int) -> int:
         if not 0 <= j < self._x.shape[1]:
             raise IndexError(j)
-        if self._singles < 256:
+        if self._singles < self._single_reads:
             self._singles += 1
             self.fill([j])
         else:

@@ -232,6 +232,20 @@ def test_tie_keys_order_the_columns_as_the_tie_ranks(kind, read) -> None:
     assert len(set(keys.values())) == 300
 
 
+def test_tie_keys_read_one_eighth_of_the_columns_alone_before_computing_every_one() -> None:
+    """Columns read one at a time are computed alone until 256 or one eighth of the columns have
+    been, whichever is more, and then all at once, with the same keys."""
+    x = np.random.default_rng(7).standard_normal((60, 2400))
+    keys = TieKeys(x)
+    for j in range(300):
+        keys[j]
+    assert len(keys) == 300
+    keys[300]
+    assert len(keys) == 2400
+    order = sorted(range(2400), key=keys.__getitem__)
+    np.testing.assert_array_equal(order, np.argsort(tie_ranks(x)))
+
+
 def test_tie_ranks_stay_importable_from_hc() -> None:
     """Code written against earlier builds imports ``tie_ranks`` from ``andrey.search.hc``."""
     from andrey.search.hc import tie_ranks as from_hc
