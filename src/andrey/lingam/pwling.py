@@ -147,10 +147,12 @@ def pruned_scores(
     while len(open_):
         done = known[open_].all(axis=1)
         for a in open_[done]:
-            total = None
-            for g, (_, ent, _, _) in enumerate(parts):
-                s = _score_of(ent, h[g], a)
-                total = s if weights is None else (0.0 if total is None else total) + w[g] * s
+            each = [_score_of(part[1], h[g], a) for g, part in enumerate(parts)]
+            total = each[0]
+            if weights is not None:  # added in group order from zero, as _full_scores adds
+                total = np.float64(0.0)
+                for wg, s in zip(w, each, strict=True):
+                    total = total + wg * s
             scores[a] = total
             best = min(best, np.sqrt(-total))
         bound = partial[open_] * (1.0 - margin)
