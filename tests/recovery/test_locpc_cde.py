@@ -28,8 +28,6 @@ from andrey.metrics import effect_oracle, effect_scores, pooled_answer_scores, t
 
 BENCHMARKS = Path(__file__).resolve().parents[2] / "benchmarks"
 
-pytestmark = pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-
 #: The paper's Figure 1(a).
 FIGURE_1 = [
     *(("X", "M"), ("M", "Y"), ("X", "Y"), ("Y", "Z1"), ("Z2", "X"), ("Z2", "Y"), ("Z2", "Z3")),

@@ -523,13 +523,12 @@ def _ldecc_record(result, x: int, y: int, name) -> dict:
             set_kind="local_parents",
             name=name,
         )
-    kept = [[v for v in s if v != y] for s in sets]
     return effect_record(
         x,
         y,
         estimand="total",
-        adjustment_sets=kept,
-        set_kind="local_parents" if kept else None,
+        adjustment_sets=[[v for v in s if v != y] for s in sets],
+        set_kind="local_parents",
         name=name,
     )
 
@@ -634,9 +633,8 @@ def ldecc(
         at the treatment, the outcome left out of a set that holds it. With one set,
         ``identifiable`` is ``True``; with several, ``None``. When the outcome is a parent of the
         treatment, the effect is zero in every graph the answer allows and no set is valid:
-        ``nonzero`` and ``identifiable`` are ``False`` and ``adjustment_sets`` is ``[]``. When the
-        marks conflict, so that no parent set is locally valid, ``adjustment_sets`` is ``[]`` and
-        ``identifiable`` ``None``: the method gives no answer. ``nonzero`` is ``None`` otherwise.
+        ``nonzero`` and ``identifiable`` are ``False`` and ``adjustment_sets`` is ``[]``.
+        ``nonzero`` is ``None`` otherwise.
         ``metadata["algorithm"]`` is ``"ldecc"``. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
         ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the number
@@ -660,9 +658,6 @@ def ldecc(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -683,22 +678,34 @@ def ldecc(
     **How it works.** Fig. 5 of [1]_. The first step learns the treatment's Markov blanket with
     ``blanket``. The neighbors are the blanket members that no subset of the rest of the blanket
     separates from the treatment, the rule of [2]_ (App. A.1.1, Lemma A.2) for this step: each
-    member is tested against the subsets of the blanket without it. A neighbor outside a spouse's
-    separating set and dependent on the spouse given it is a child, an unshielded collider at the
-    neighbor. The PC algorithm's tests then run over the pairs that do not hold the treatment, the
-    treatment adjacent to its neighbors only. For each independence of ``a`` and ``b`` given
-    ``S``: two neighbors separated without the treatment are parents, as are the neighbors in
-    ``S``; two neighbors separated by a set holding the treatment are a non-collider at it, and a
-    neighbor that makes them dependent again is a child; otherwise, when ``a`` and ``b`` are
-    dependent given ``S`` and the treatment, the treatment is a collider or a descendant of one
+    member is tested against the subsets of the blanket without it. A neighbor is a child, an
+    unshielded collider at it, when some set of neighbors separates a spouse from the treatment and
+    every such set leaves the neighbor out and dependent on the spouse. The PC algorithm's tests
+    then run over the pairs that do not hold the treatment, the treatment adjacent to its neighbors
+    only. For each independence of ``a`` and ``b`` given ``S``: two neighbors separated without the
+    treatment that are dependent given ``S`` and the treatment are parents, as are the neighbors in
+    ``S``; two neighbors separated by a set holding the treatment are a non-collider at it, and an
+    undirected neighbor that makes them dependent again is a child; otherwise, when ``a`` and ``b``
+    are dependent given ``S`` and the treatment, the treatment is a collider or a descendant of one
     between them, and their minimal neighbor separators, the smallest sets of neighbors that
     separate each from the treatment, are parents (Prop. 4; with ``check``, only when the two are
-    equal). A neighbor joined to a parent by a non-collider is a child. A neighbor marked both
-    ways is a child, as in the authors' code. Each query is tested once. Variables and subsets
-    are visited in an order the data fix, the treatment's neighbors first and the treatment first
-    in a conditioning set, as in the authors' code, and the first subset that separates a pair is
-    kept, so the answer does not depend on the column order; it does not depend on the columns'
-    units when the test does not.
+    equal; when one of the two is a neighbor, only when the other's separator holds it and one more
+    variable). A neighbor joined to a parent by a non-collider is a child. A neighbor marked both
+    ways is a child. A parent set adds to the parents each set of undirected neighbors that holds no
+    non-collider pair.
+
+    Five of these steps follow the authors' implementation where the text of [1]_ (Figs. 4-5) reads
+    them more broadly: the text marks two neighbors separated without the treatment as parents with
+    no further test, tests a neighbor against a spouse given the one set that separated the spouse,
+    tests every neighbor outside ``S`` as a child, marks a neighbor and the other's separator in
+    every eager collider check with one neighbor, and checks the non-collider pairs over the whole
+    parent set. With exact tests both readings gave the same answers on every graph tested; with
+    finite samples the implementation's readings mark fewer parents as children and fewer children
+    as parents, the errors that most often move a fit away from the treatment's true parents. Each
+    query is tested once. Variables and subsets are visited in an order the data fix, the
+    treatment's neighbors first and the treatment first in a conditioning set, as in the authors'
+    code, and the first subset that separates a pair is kept, so the answer does not depend on the
+    column order; it does not depend on the columns' units when the test does not.
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [3]_ [4]_, so it keeps rows that
@@ -709,16 +716,20 @@ def ldecc(
     ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
     ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Tested with exact d-separation on the graphs of [1]_
-    and [2]_ and on random graphs, and on simulated linear-Gaussian data. In some graphs the
-    eager collider checks leave a parent of the treatment undirected that the CPDAG directs [2]_
-    (App. A.2): the answer then lists more parent sets than the CPDAG allows, the treatment's
-    true parents among them. When some neighbor stays undirected, the PC algorithm's tests run
-    over every pair, as many as learning the whole skeleton, and the sets number up to two to the
-    power of the undirected neighbors. On the 25-node graphs of [1]_ (App. C.1) with 8,000 to
-    32,000 rows, a fit ran a median of 310 to 350 tests, in under a second. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    **Limitations.** Measured against its authors' code on the graphs of the generator of [1]_
+    (App. C.1) and on the MAGIC-NIAB network at 8,000 to 32,000 rows, with Fisher's z test at the
+    level of their notebooks: its parent sets and effect estimates were as near the truth as the
+    code's in every setting, on 20 datasets and again on 20 fresh ones. Like the code's, its answers
+    scored below the better of abstaining and adjusting for nothing in every setting. The
+    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#ldecc>`_ has the
+    numbers. In some graphs the eager collider checks leave a parent of the treatment undirected
+    that the CPDAG directs [2]_ (App. A.2): the answer then lists more parent sets than the CPDAG
+    allows, the treatment's true parents among them. When some neighbor stays undirected, the PC
+    algorithm's tests run over every pair, as many as learning the whole skeleton, and the sets
+    number up to two to the power of the undirected neighbors. A fit ran a median of 500 to 570
+    tests, in under a tenth of a second, on the 25-node graphs, and 72,000 to 166,000 tests, in 4 to
+    11 seconds, on MAGIC-NIAB (44 nodes). The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -907,9 +918,6 @@ def local_optimal_adjustment(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -927,30 +935,32 @@ def local_optimal_adjustment(
     pair whose order you know and an adjustment set that need not be optimal, see
     :func:`~andrey.ldp`.
 
-    **How it works.** Algorithm 3 of [1]_ in four steps. Step 1 learns the edges at each of the
-    two variables with MB-by-MB [5]_ as [1]_ runs it: Grow-Shrink blankets, each local structure
-    learned by PC's search over a variable and its blanket, a pair at that variable tested against
-    the subsets of the rest of the blanket, Meek's rules, and every blanket, local structure, and
-    separating set kept for the later searches. A variable is an explicit ancestor of the other
-    when the other is its child, or, when the two are not adjacent, when the test finds them
-    dependent given the first one's parents and undirected neighbors; it is a possible ancestor
-    when the other is its child or undirected neighbor, or, when not adjacent, when they test
-    dependent given its parents alone [2]_. With no explicit ancestor, each direction gets the
-    parent sets of its treatment when the treatment is a possible ancestor, and a zero effect
-    otherwise. Step 2 learns the edges of each undirected neighbor of the treatment and keeps the
-    effect identifiable only when no such neighbor is adjacent to the outcome and each tests
-    independent of the outcome given its parents and the treatment (Lemma 4.3 of [1]_). Step 3
-    marks as possible descendants of the treatment its children and undirected neighbors and each
-    other variable that tests dependent on it given its parents. Step 4 runs MB-by-MB at the
-    outcome over the variables that are not possible descendants, with the treatment and the
-    outcome, and the outcome's parents there, the treatment left out, are the optimal set (Lemma
-    4.4 of [1]_). The parent sets of a treatment are its parents with each subset of its other
-    undirected neighbors whose members are adjacent to every other parent in the set, so that no
-    new v-structure forms [4]_. The variable whose rank, computed from the data, comes first is
-    searched first, ties between candidates go by rank as for :func:`~andrey.mb_by_mb`, and the
-    neighbors of Step 2 go in rank order, so the answer does not depend on the column order unless
-    two columns are identical. An edge that two v-structures direct both ways, which exact tests
-    never give, is left undirected, so each end reads the other as an undirected neighbor.
+    **How it works.** Algorithm 3 of [1]_ in four steps. Step 1 learns the edges at each of the two
+    variables with MB-by-MB [5]_ as [1]_ runs it: Grow-Shrink blankets, each local structure learned
+    by the skeleton step of PC over a variable and its blanket, Meek's rules, and every blanket,
+    local structure, and separating set kept for the later searches. A variable is an explicit
+    ancestor of the other when the other is its child, or, when the two are not adjacent, when the
+    test finds them dependent given the first one's parents and undirected neighbors; it is a
+    possible ancestor when the other is its child or undirected neighbor, or, when not adjacent,
+    when they test dependent given its parents alone [2]_. With no explicit ancestor, each direction
+    gets the parent sets of its treatment when the treatment is a possible ancestor, and a zero
+    effect otherwise. Step 2 learns the edges of each undirected neighbor of the treatment and keeps
+    the effect identifiable only when no such neighbor is adjacent to the outcome and each tests
+    independent of the outcome given its parents and the treatment (Lemma 4.3 of [1]_). Step 3 marks
+    as possible descendants of the treatment its children and undirected neighbors and each other
+    variable that tests dependent on it given its parents. Step 4 runs MB-by-MB at the outcome over
+    the variables that are not possible descendants, with the treatment and the outcome, and the
+    outcome's parents there, the treatment left out, are the optimal set (Lemma 4.4 of [1]_). The
+    parent sets of a treatment are its parents with each subset of its other undirected neighbors
+    whose members are adjacent to every other parent in the set, so that no new v-structure forms
+    [4]_. The variable whose rank, computed from the data, comes first is searched first, ties
+    between candidates go by rank as for :func:`~andrey.mb_by_mb`, and the neighbors of Step 2 go in
+    rank order, so the answer does not depend on the column order unless two columns are identical.
+    An edge that two v-structures direct both ways, which exact tests never give and [1]_ leaves
+    open, takes the direction of the v-structure whose pair the tests separated most clearly (the
+    largest p-value), the order in which :func:`~andrey.pc` orients its colliders, and Meek's rules
+    run again; when the two tie, the edge is left undirected, so each end reads the other as an
+    undirected neighbor. :func:`~andrey.mb_by_mb` leaves such an edge undirected.
 
     **Zero effects.** A zero effect between two adjacent variables, the treatment a child of the
     outcome, is not identifiable here: the edge into the treatment is a back-door path that no set
@@ -967,12 +977,19 @@ def local_optimal_adjustment(
     ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
     ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Tested with exact d-separation on random graphs of up to
-    20 variables, against the relation, the identifiability, and the optimal set of the true
-    graph, and on simulated linear-Gaussian data. Each local structure tests the pairs of a blanket
-    against subsets of the rest with no cap, so a variable with a large blanket costs many tests.
-    The numbers are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    **Limitations.** Measured against its authors' code on the random graphs of [1]_ with 100 to
+    1,000 variables and on pairs drawn from the MAGIC-NIAB network at 10,000 rows, with Fisher's z
+    test at alpha 0.01: its sets and effect estimates were as near the truth as the code's in every
+    setting, on 20 datasets or again on 20 fresh ones, and its sets nearer the optimal set than the
+    empty set. Like the code's, its answers scored below adjusting for nothing in every setting. An
+    edge that two v-structures direct both ways is directed as the more clearly separated one asks,
+    and on 11 of those 200 datasets that answered no effect where the truth has one. The
+    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#load>`_ has the
+    numbers. Each local structure tests a pair against the subsets of the neighbors of its ends with
+    no cap, so a variable with many neighbors costs many tests, and the parent sets of a treatment
+    grow with the subsets of its undirected neighbors. A fit ran a median of 1,300 to 14,000 tests,
+    in under 3 seconds, on those graphs. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1195,9 +1212,6 @@ def locpc_cde(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -1254,15 +1268,21 @@ def locpc_cde(
     ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
     ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Tested with exact d-separation on random graphs and the
-    paper's figures, and on simulated linear-Gaussian data. Without the paper's early stop (see
-    **When it stops.**), a non-identifiable effect is searched until a hop adds no variable: with
-    exact tests the mean hop of a search rose from 1.41 to 1.79 on random graphs of 6 to 15
-    variables and from 1.46 to 2.16 on graphs of 20 to 30. An unmeasured common cause breaks the
-    claim. With 5,000 rows a fit ran about 40 to 250 tests on the paper's random 10-node graphs, and
-    on its 50-node graphs about 200 to 2,000 for an identifiable effect and 300 to 5,000 for one
-    that is not, each in under a second. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** Measured against its authors' code on the random graphs of [1]_ with 10 to 200
+    variables and 5,000 rows, linear-Gaussian with Fisher's z test and binary with the G-square
+    test, at alpha 0.05: its verdicts, sets, and effect estimates were as near the truth as the
+    code's in every setting, on 20 datasets each. On pairs whose effect the CPDAG does not identify,
+    its verdict, like the code's, was wrong or undecided on 20% to 90% of the datasets; over both
+    kinds of pair it beat the constant answer "not identifiable" in every setting but the
+    linear-Gaussian graphs with 200 variables. The
+    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#locpc-cde>`_ has the
+    numbers. Without the paper's early stop (see **When it stops.**), a non-identifiable effect is
+    searched until a hop adds no variable: on the paper's linear-Gaussian graphs with 5,000 rows
+    that ran 12% more tests with 10 variables, 60% more with 50, and 128% more with 100. An
+    unmeasured common cause breaks the claim. A fit ran a median of 90 to 2,700 tests on an
+    identifiable pair and up to 17,000 on one that is not, in under a second, except about 7 seconds
+    on the binary non-identifiable pairs with 200 variables. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------

@@ -36,7 +36,8 @@ endpoints given the middle node and each subset of the smaller blanket
 completes the result by Meek's rules.
 
 A learner asks its tests through its :class:`LocalSearch`. :meth:`LocalSearch.scan` tests many
-candidates against one conditioning set, in one call where the test can;
+candidates against one conditioning set, in one call where the test can, from one factor of the
+set's correlation block for a partial-correlation test;
 :meth:`LocalSearch.scan_given_rest` tests each candidate given all the other variables, from one
 inverse of the correlation matrix where the test can; :meth:`LocalSearch.weakest` gives each
 candidate's weakest association over many sets (a max-min step); and
@@ -99,14 +100,20 @@ def _scan(
     """:meth:`LocalSearch.scan` on ``test``: the strengths and p-values of ``target`` against each
     of ``xs`` given ``cond``.
 
-    A test with ``statistic_pvalue`` (a partial-correlation test) answers two or more candidates in
-    one ``statistic_pvalues`` call, whose entries equal the calls one by one bit for bit, and its
-    strength is the absolute partial correlation. Another test's strength is the negated p-value; a
+    A test with ``statistic_pvalue`` (a partial-correlation test) reports the absolute partial
+    correlation as the strength. It answers two or more candidates in one call: a
+    partial-correlation test on complete data with ``statistic_pvalues_given``, from one factor of
+    the set's correlation block, equal to the calls one by one up to rounding; another with
+    ``statistic_pvalues``, equal bit for bit. Another test's strength is the negated p-value; a
     test with ``pvalues_given`` (the chi-square tests) answers two or more candidates in one call,
     with the same bits, and any other test answers them one call at a time.
     """
     one = getattr(test, "statistic_pvalue", None)
     if one is not None:
+        given = getattr(test, "statistic_pvalues_given", None)
+        if given is not None and len(xs) > 1:
+            r, p = given(target, xs, cond)
+            return np.abs(np.asarray(r, dtype=np.float64)), np.asarray(p, dtype=np.float64)
         many = getattr(test, "statistic_pvalues", None)
         if many is not None and len(xs) > 1:
             k = len(xs)
@@ -309,10 +316,11 @@ def _gs(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     Grow: each pass visits every candidate outside the blanket in that order, tests it given the
     current blanket, and adds it at once when the p-value is at or below ``alpha``, so the next
     candidate of the pass is tested given the larger blanket; passes repeat until one adds nothing.
-    Shrink: each pass visits the members in the same order and drops each one the test finds
-    independent of ``target`` given the other current members; passes repeat until one drops
-    nothing. A test whose conditioning set has not changed since the candidate's last test is not
-    asked again, and while the blanket is still empty the grow test is the ordering test itself.
+    A candidate whose conditioning set has not changed since its last test is not asked again, and
+    while the blanket is still empty the grow test is the ordering test itself.
+    Shrink: the members are visited in the order they joined; a member the test finds independent
+    of ``target`` given the other current members is dropped at once, and the visit starts again
+    from the first member, until every member tests dependent.
 
     ``max_depth``, ``constraints``, and ``sepsets`` act as in :func:`markov_blanket`: the grow
     stops once the blanket holds more than ``max_depth`` members, a member a required edge joins to
@@ -357,23 +365,18 @@ def _gs(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
                 last[y] = len(blanket)
                 sepsets[y] = tuple(sorted(blanket))
         growing = growing and added
-    # The removals made when each member was last found dependent: the blanket only shrinks here.
-    kept: dict[int, int] = {}
-    removed = 0
-    while True:
-        before = removed
-        for x in [y for y in order if y in blanket]:
-            if kept.get(x) == removed:
+    removing = True
+    while removing:
+        removing = False
+        for x in blanket:
+            if x in required:
                 continue
             rest = [z for z in blanket if z != x]
             if search.scan(target, [x], rest)[1][0] > alpha:
                 blanket.remove(x)
-                removed += 1
                 sepsets[x] = tuple(sorted(rest))
-            else:
-                kept[x] = removed
-        if removed == before:
-            break
+                removing = True
+                break
     for x in blanket:
         sepsets.pop(x, None)
     if constraints is None:
@@ -655,12 +658,11 @@ def _max_min(search: LocalSearch, target: int, sepsets: Sepsets | None) -> list[
         rest = sorted(z for z in members if z != x)
         top = len(rest) if max_depth is None else min(len(rest), max_depth)
         for size in range(1, top + 1):
-            separating = search.separating(target, x, rest, size, before)
-            if separating:
+            found = search.separating(target, x, rest, size, before)
+            if found is not None:
                 members.remove(x)
                 if sepsets is not None:
-                    pvalues = np.array([[p for _, p in separating]])
-                    [sepsets[x]] = search.largest_sets(pvalues, [s for s, _ in separating])
+                    sepsets[x] = found[0]
                 break
     return members
 
@@ -1093,14 +1095,41 @@ def _ranked_test(
     categorical: np.ndarray | None,
     seed: int | None,
     degrees_of_freedom: str,
-) -> tuple[CITest, list[int]]:
+) -> tuple[CITest, Sequence[int]]:
     """The ``indep_test`` test, seeded by ``seed``, with ``degrees_of_freedom``, over ``X`` and
-    each column's :func:`~andrey.core.ties.tie_ranks`, the columns the test reads as categories
-    ranked as categories (:func:`~andrey.core.ties.tie_mask`)."""
+    each column's :func:`~andrey.core.ties.tie_ranks` (:class:`LazyTieRanks`), the columns the
+    test reads as categories ranked as categories (:func:`~andrey.core.ties.tie_mask`)."""
     test = make_indep_test(
         indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
     )
-    return test, tie_ranks(X, tie_mask(indep_test, categorical, X.shape[1])).tolist()
+    return test, LazyTieRanks(X, tie_mask(indep_test, categorical, X.shape[1]))
+
+
+class LazyTieRanks(Sequence[int]):
+    """The :func:`~andrey.core.ties.tie_ranks` of the columns of ``X``, those ``mask`` marks ranked
+    as categories, computed when a rank is first read, so a search that never compares tied
+    candidates skips their cost. ``andrey.config.tie_break`` and the BLAS thread limits are read
+    when the object is made: the ranks' products are exact integers on any number of threads, so a
+    first read inside a search's one-thread block (:meth:`LocalSearch.pinned`) computes them on the
+    threads of the moment the object was made, with the same result."""
+
+    def __init__(self, X: np.ndarray, mask: np.ndarray) -> None:
+        self._d = X.shape[1]
+        self._data: tuple[np.ndarray, np.ndarray] | None = (X, mask)
+        self._ranks: list[int] | None = None
+        self._threads = backend.thread_limits_now()
+        if backend.config.tie_break == "position":
+            self._ranks, self._data = list(range(self._d)), None
+
+    def __len__(self) -> int:
+        return self._d
+
+    def __getitem__(self, i: Any) -> Any:
+        if self._ranks is None:
+            assert self._data is not None
+            with self._threads():
+                self._ranks, self._data = tie_ranks(*self._data).tolist(), None
+        return self._ranks[i]
 
 
 #: Runs one learner for one target of a :class:`LocalSearch` and returns the target's set in the
@@ -1304,9 +1333,10 @@ class LocalSearch:
         A larger strength is a stronger dependence: the absolute partial correlation for a test
         that reports one (``statistic_pvalue``), else the negated p-value, so that ``-round(s,
         KEY_DP)`` is a key for :meth:`strongest`. The candidates are tested together where the test
-        can (a partial-correlation test's ``statistic_pvalues``, a chi-square test's
-        ``pvalues_given``), else one call at a time; either way each entry equals the test's answer
-        to that query alone, bit for bit. ``xs`` excludes ``target`` and the members of ``cond``.
+        can (:func:`_scan`), else one call at a time. Each entry equals the test's answer to that
+        query alone, bit for bit, except on a partial-correlation test on complete data given two
+        or more variables, which answers from one factor of the set's correlation block and agrees
+        up to rounding. ``xs`` excludes ``target`` and the members of ``cond``.
         """
         start = perf_counter()
         strengths, pvalues = _scan(self.test, target, xs, cond)
@@ -1377,23 +1407,45 @@ class LocalSearch:
         among: Sequence[int],
         size: int,
         skip_within: set[int] | None = None,
-    ) -> list[tuple[tuple[int, ...], float]]:
-        """The sets of ``size`` members of ``among`` that separate ``x`` from ``target`` (a p-value
-        above ``alpha``), each with its p-value, in the order of ``combinations``.
+    ) -> tuple[tuple[int, ...], float] | None:
+        """The set of ``size`` members of ``among`` that separates ``x`` from ``target`` (a p-value
+        above ``alpha``) with the largest p-value, as ``(set, p-value)``, or ``None`` when no set
+        does; of sets whose p-values agree, the one :meth:`largest_sets` picks.
 
         Every such set is tested, those lying inside ``skip_within`` excepted, in chunks of one
         call where the test has ``batched_call``
-        (:func:`~andrey.constraint._skeleton.scan_conditioning_sets`). ``among`` is ascending and
-        excludes ``target`` and ``x``. A test that stops its shuffles once the side of ``alpha`` is
-        certain may report a bound in place of a p-value above ``alpha``.
+        (:func:`~andrey.constraint._skeleton.scan_conditioning_sets`). Only the number of sets
+        tested and the best separating set so far are kept, so the memory does not grow with the
+        number of sets. ``among`` is ascending and excludes ``target`` and ``x``. A test that stops
+        its shuffles once the side of ``alpha`` is certain may report a bound in place of a
+        p-value above ``alpha``.
         """
         start = perf_counter()
-        trace: list[dict] = []
+        tested = 0
+        kept: list[tuple[int, ...]] | None = [] if self.counts.queries is not None else None
+        best: list[tuple[tuple[int, ...], float]] = []
+
+        def visit(chunk: np.ndarray, pvalues: Sequence[float]) -> None:
+            nonlocal tested
+            tested += len(chunk)
+            if kept is not None:
+                kept.extend(map(tuple, chunk.tolist()))
+            p = np.asarray(pvalues, dtype=np.float64)
+            hits = [
+                (tuple(chunk[j].tolist()), float(p[j]))
+                for j in np.flatnonzero(p > self.alpha).tolist()
+            ]
+            if hits:
+                found = best + hits
+                sets = [s for s, _ in found]
+                [pick] = self.largest_sets(np.array([[q for _, q in found]]), sets)
+                best[:] = [found[sets.index(pick)]]
+
         scan_conditioning_sets(
-            self.test, target, x, list(among), size, self.alpha, set(), skip_within, trace
+            self.test, target, x, list(among), size, self.alpha, set(), skip_within, visit=visit
         )
-        self._asked(start, target, [x], len(trace), lambda: (record["S"] for record in trace))
-        return [(record["S"], record["p"]) for record in trace if record["removed"]]
+        self._asked(start, target, [x], tested, lambda: kept or ())
+        return best[0] if best else None
 
     def reliable(
         self,

@@ -48,15 +48,15 @@ requested backend uses `auto`, without a warning.
   also use the worker processes for their skeleton search with the `fisherz`, `student_t`,
   `normal_scores`, and `rcot` tests on complete data, and send a conditioning-set size to them only
   when it has enough tests to repay them; with `rcot` the p-values are the same with any number of
-  workers. FCI, FCI-JCI, and GFCI also send each large possible-d-separation search to them with the
-  `fisherz`, `student_t`, and `normal_scores` tests on complete data; the pairs are still searched
-  one at a time, in the serial order, and every graph is the serial one. `andrey.bootstrap` fits
-  its resamples on them, one fit per worker, with the same result at any number. `1` (the default)
-  and `0` run serially; `-1` uses every usable core. `pnl` with one worker leaves the BLAS threads
-  unlimited and with several limits each thread to one, so on a machine with several cores its
-  p-values and statistics can differ in the last digits between one worker and several. Each `pnl`
-  thread holds three n x n float64 matrices; when the threads you ask for would hold more than 4
-  GiB, fewer run, with a `PerformanceWarning`.
+  workers. FCI and GFCI also send each large possible-d-separation search to them with the
+  `fisherz`, `student_t`, and `normal_scores` tests on complete data, and FCI-JCI with `fisherz` and
+  `student_t`; the pairs are still searched one at a time, in the serial order, and every graph is
+  the serial one. `andrey.bootstrap` fits its resamples on them, one fit per worker, with the same
+  result at any number. `1` (the default) and `0` run serially; `-1` uses every usable core. `pnl`
+  with one worker leaves the BLAS threads unlimited and with several limits each thread to one, so
+  on a machine with several cores its p-values and statistics can differ in the last digits between
+  one worker and several. Each `pnl` thread holds three n x n float64 matrices; when the threads
+  you ask for would hold more than 4 GiB, fewer run, with a `PerformanceWarning`.
 - `ANDREY_GES_PARALLEL_MIN_WORK`: a GES pass uses the workers only when it expects to evaluate more
   candidates than this. The default is `10000`; `0` always uses them.
 - `ANDREY_SKELETON_PARALLEL_MIN_WORK`: a conditioning-size pass of the skeleton search of PC, FCI,
@@ -86,6 +86,21 @@ the workers start with `fork` or `spawn`. The results do not change. Set `TMPDIR
 a local file system to silence the warning. `andrey.data.generate`, which is deprecated and stops
 working in 0.16.0, starts its workers the same way when your Python's default start method is the
 forkserver, as on Linux from Python 3.14; otherwise it keeps the default.
+
+## Scan dispatch
+
+- `ANDREY_SHARED_SCAN_MIN_WORK`: with `fisherz`, `student_t`, or `normal_scores` on complete data,
+  a blanket learner's scan of two or more candidates against one conditioning set of two or more
+  variables is answered from one Cholesky factor of the set's correlation block only when its
+  candidates times the block size (the set plus two) reach this value; below it each candidate
+  inverts its own submatrix. The default is `128`, measured on an AMD EPYC 7713 server running
+  Linux on one core, where the factor was slower below about 64 and faster from 128 for every set
+  size sampled. The two paths agree to about 1e-10 relative in the p-value; the per-query path is
+  the exact one, and `0` factors every such scan.
+- `ANDREY_LINGAM_PRUNE_MIN_WORK`: a step of the `pwling` order search (DirectLiNGAM and the methods
+  built on it) stops scoring a candidate that can no longer be picked only when its rows times
+  ordered pairs of candidates reach this value (default `100000`, about the break-even on one core
+  of an AMD EPYC 7713); the order is the same bit for bit either way, and `0` prunes every step.
 
 ## GPU dispatch
 

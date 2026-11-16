@@ -415,15 +415,35 @@ def check_argument(param: ParamSpec, value: Any, method: str) -> object:
 
     Raises what :meth:`~andrey.spec.models.ParamSpec.check` raises; when ``value`` is a choice that
     a release removed, the ``ValueError`` adds what the choice is called now
-    (:func:`~andrey.core.removed.removal_hint`).
+    (:func:`~andrey.core.removed.removal_hint`), and when it is a choice of the shared parameter
+    that this method does not offer, why not (:class:`~andrey.spec.concepts.Deviation`).
     """
     try:
         return param.check(value, method, choices=runtime_choices(param))
     except ValueError as error:
         hint = removal_hint(method, param.name, value)
-        if hint is None:
+        if hint is not None:
+            raise ValueError(f"{error}; {hint}") from None
+        reason = withheld_reason(param, value, method)
+        if reason is None:
             raise
-        raise ValueError(f"{error}; {hint}") from None
+        raise ValueError(f"{error}. {reason}") from None
+
+
+def withheld_reason(param: ParamSpec, value: Any, method: str) -> str | None:
+    """Why ``method`` does not offer ``value``, a choice of the concept ``param`` implements.
+
+    ``None`` when the concept offers no such choice or no deviation of the method withholds it.
+    """
+    from andrey.spec.concepts import CONCEPTS
+
+    concept = CONCEPTS.get(param.concept) if param.concept else None
+    if concept is None or concept.param is None or value not in (concept.param.choices or ()):
+        return None
+    for deviation in concept.deviations:
+        if deviation.method == method and value not in (deviation.choices or (value,)):
+            return deviation.reason
+    return None
 
 
 def draws_random_numbers(spec: MethodSpec, arguments: dict[str, Any]) -> bool:

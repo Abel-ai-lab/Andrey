@@ -163,9 +163,9 @@ by its p-value, smallest first.
 `"mean"`, the default, is the mean of the statistic when `y` is shuffled within each configuration
 of the conditioning set, and `"nonempty"` is `(r_x - 1) * (r_y - 1)` per configuration over the
 values of `x` and `y` present in it, the table's empty rows and columns struck (Spirtes, Glymour and
-Scheines 1993). The two differ only on sparse tables. `pcmb` defaults to `"nonempty"`, the test its
-paper runs. Only `"chisq"` and `"gsq"` read it, so passing `degrees_of_freedom` with another test
-raises a `ValueError`.
+Scheines 1993). The two differ only on sparse tables. `pcmb` and `mmmb` default to `"nonempty"`, the
+test their papers run. Only `"chisq"` and `"gsq"` read it, so passing `degrees_of_freedom` with
+another test raises a `ValueError`.
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
@@ -202,8 +202,8 @@ errors, and `forbidden_paths` is experimental in `iamb`, `inter_iamb`, and `mmpc
 found at 50 variables often has no consistent extension: a claim there acts only on an edge, the
 fits we measured dropped about 96% of the forbidden paths on such a graph, and with forbidden paths
 alone the CPDAG was 0.65 to 1.95 edges farther from the class the claims define. Both are
-experimental in `gs`, `fast_iamb`, `hiton_pc`, and `pcmb`, which that measurement did not cover,
-and in an experimental method, such as `hiton_mb` or `mmmb`. An experimental part warns with
+experimental in `gs`, `fast_iamb`, `hiton_pc`, `hiton_mb`, `mmmb`, and `pcmb`, which that
+measurement did not cover, and in an experimental method. An experimental part warns with
 {py:class}`~andrey.ExperimentalWarning`, and its meaning may change without deprecation. A
 CPDAG method reads the claims on the graph it found, so where that graph is wrong, a true claim can
 direct an edge the wrong way, and a required path cannot restore an edge the search left out. A path
@@ -461,7 +461,16 @@ variable.
    fast_iamb
    mmpc
    hiton_pc
+   hiton_mb
+   mmmb
    pcmb
+   mb_by_mb
+   y_structures
+   cmb
+   ldecc
+   local_optimal_adjustment
+   locpc_cde
+   mmb_by_mmb
    icp
    ges
    gies
@@ -473,6 +482,7 @@ variable.
    exact_search
    calm
    notears
+   dagma
    mmhc
    rsmax2
    boss
@@ -483,6 +493,7 @@ variable.
    ut_igsp
    direct_lingam
    ica_lingam
+   local_isa_ling
    multi_group_direct_lingam
    cam
    resit
@@ -509,13 +520,15 @@ CALM is a continuous-optimization method in the line of NOTEARS ({py:func}`~andr
 {py:func}`~andrey.dagma`): it minimizes a Gaussian likelihood with L0 gates under a smooth
 acyclicity constraint, within an estimated moral graph.
 
-NOTEARS (Zheng et al. 2018), {py:func}`~andrey.notears`, fits a weighted DAG by minimizing the
-least-squares loss of a linear model with an `l1` penalty under a smooth acyclicity constraint, with
-NumPy and SciPy only. It returns a DAG with the coefficient of each edge, and its fit reads the
-columns' units, and on standardized columns its result depends on the `l1` penalty. `robust=True`
-follows the first fit with a refit under the Gaussian likelihood (Deng et al. 2024). The
-[0.17.0](benchmarks/0.17.0.md#notears) release card measures it from 10 to 100 variables against
-the authors' code.
+NOTEARS (Zheng et al. 2018), {py:func}`~andrey.notears`, and DAGMA (Bello et al. 2022),
+{py:func}`~andrey.dagma`, fit a weighted DAG by minimizing the least-squares loss of a linear model
+with an `l1` penalty under a smooth acyclicity constraint, with NumPy and SciPy only. They return a
+DAG with the coefficient of each edge. Their fits read the columns' units, so their results depend
+on the data's scale (Reisach, Seiler, and Weichwald 2021). `robust=True` follows the first fit with
+a refit under the Gaussian likelihood (Deng et al. 2024). The
+[0.17.0](benchmarks/0.17.0.md#notears) release card measures NOTEARS from 10 to 100 variables
+against the authors' code, and the [0.18.0](benchmarks/0.18.0.md#dagma) release card measures both
+on measured data.
 
 AGES, aggregative greedy equivalence search (Eigenmann, Nandy, and Maathuis 2017),
 {py:func}`~andrey.ages`, is for linear-Gaussian data with weak edges. A weak edge that closes a
@@ -537,6 +550,58 @@ or a moral graph, as `iamb` does. On categorical data it counts degrees of freed
 Glymour, and Scheines (1993) do (`degrees_of_freedom="nonempty"`). No reference implementation
 exists, so the [0.18.0](benchmarks/0.18.0.md#pcmb) release card sets its results on two published
 networks beside those of its paper.
+
+MB-by-MB (Wang et al. 2014), {py:func}`~andrey.mb_by_mb`, answers for one `target`: it learns the
+target's Markov blanket and the local structure over it, then a neighbor's, one blanket at a time,
+until no further blanket can direct an edge at the target, and returns the edges the target has in
+the CPDAG with their directions. `metadata["parents"]`, `metadata["children"]`, and
+`metadata["undirected"]` list the columns joined to the target, and `metadata["blankets_learned"]`
+the variables whose blanket it learned, in order. No reference implementation exists, so the
+[0.18.0](benchmarks/0.18.0.md#mb-by-mb) release card compares its accuracy and its tests per target
+with global PC read at the target, on its paper's Alarm, Hailfinder, and chessboard settings.
+
+CMB, causal Markov blanket (Gao and Ji 2015), {py:func}`~andrey.cmb`, learns the edges at one
+variable and their directions without the whole graph: from the target's Markov blanket, learned
+with HITON-MB by default, it labels each neighbor a parent or a child by how its dependence on the
+others changes once the target is conditioned on, then visits the undecided neighbors in turn and
+directs the target's edges from what their blankets show. No reference implementation exists, so
+the [0.18.0](benchmarks/0.18.0.md#cmb) release card compares it with global PC read at the target,
+on its paper's Alarm setting.
+
+MMB-by-MMB (Xie et al. 2024), {py:func}`~andrey.mmb_by_mmb`, learns the edges at one variable and
+their marks when unmeasured common causes may exist, without the whole graph: it learns the
+target's Markov blanket, then a neighbor's, one blanket at a time, until the FCI rules decide the
+marks at the target, and returns the edges the target has in the PAG. The authors' code is its
+reference: the [0.18.0](benchmarks/0.18.0.md#mmb-by-mmb) release card compares them on its paper's
+four networks with hidden variables.
+
+LDECC, local discovery using eager collider checks (Gupta et al. 2023), {py:func}`~andrey.ldecc`,
+answers for one `treatment` and `outcome`: it learns the treatment's Markov blanket with `blanket`,
+`"iamb"` by default, and its neighbors among it, then reads the tests of the PC algorithm over the
+other pairs as they come, directing the treatment's parents, and stops once every neighbor is
+directed. Its graph is a CPDAG that holds only the edges at the treatment, and
+`metadata["effects"]` holds the locally valid parent sets, one for each effect the local structure
+allows. The [0.18.0](benchmarks/0.18.0.md#ldecc) release card measures it against the authors'
+code.
+
+LOAD, local optimal adjustments discovery (Schubert, Claassen and Magliacane 2026),
+{py:func}`~andrey.local_optimal_adjustment`, answers for two `variables` given in any order, without
+knowing which one causes the other: it learns the edges at each one Markov blanket at a time, as
+MB-by-MB does, and tests from them whether one is an ancestor of the other. `metadata["effects"]`
+holds one record per direction: the optimal adjustment set for the total effect when it is
+identifiable, and the parent sets of the treatment that its edges allow, one estimate each, when it
+is not. The graph holds only the edges at the two variables, and `metadata["blankets_learned"]`
+lists the variables whose blanket it learned, in order. The [0.18.0](benchmarks/0.18.0.md#load)
+release card measures it against the authors' code.
+
+LocPC-CDE (Loranchet and Assaad 2026), {py:func}`~andrey.locpc_cde`, answers for one `treatment` and
+`outcome`: it learns the graph around the outcome one hop at a time with PC's tests, run only near
+the outcome, until every edge at the outcome is oriented, so that the outcome's parents are a valid
+adjustment set for the controlled direct effect, or until a larger hop adds no variable. It stops at
+once when the treatment is not adjacent to the outcome or is its child. `metadata["effects"]` holds
+the answer with the paper's reason, the graph is the local essential graph it learned, and
+`metadata["hop"]`, `metadata["visited"]`, and `metadata["double_bar"]` describe the search. The
+[0.18.0](benchmarks/0.18.0.md#locpc-cde) release card measures it against the authors' code.
 
 CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
 smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
@@ -587,12 +652,13 @@ RSMAX2 generalizes it: its restrict phase keeps the pairs of the skeleton of MMP
 Inter-IAMB, or of PC's skeleton, and its maximize phase runs hill climbing or tabu search among
 them.
 
-GS, Grow-Shrink (Margaritis and Thrun 2000), learns a variable's Markov blanket as `iamb` does,
-by growing the blanket with conditional-independence tests and then shrinking it, and takes the
-same arguments. It visits the other variables in one fixed order, the most dependent first, and
-adds each at once when a test finds it dependent given the blanket so far, in passes until none
-joins, where `iamb` adds the most dependent variable at each step. Without a `target` it joins
-the blankets into the same CPDAG, skeleton, or moral graph. The
+GS, Grow-Shrink (Margaritis and Thrun 2000), learns a variable's Markov blanket as `iamb` does, by
+growing the blanket with conditional-independence tests and then shrinking it, and takes the same
+arguments. It visits the other variables in one fixed order, the most dependent first, and adds each
+at once when a test finds it dependent given the blanket so far, in passes until none joins, where
+`iamb` adds the most dependent variable at each step. It then removes each member a test finds
+independent given the others, starting again from the first member after each removal. Without a
+`target` it joins the blankets into the same CPDAG, skeleton, or moral graph. The
 [0.18.0](benchmarks/0.18.0.md#gs) release card measures it against bnlearn's `gs`.
 
 Fast-IAMB (Yaramakala and Margaritis 2005) learns the same blanket with fewer tests: each round
@@ -715,6 +781,26 @@ links in `metadata["context_links"]` and the dummies' links in `metadata["index_
 `metadata["time_index_edges"]`. The [0.15.0](benchmarks/0.15.0.md#j-pcmci) release card
 measures it against tigramite, the package of its authors.
 
+Y-structures (Mani et al. 2006; Mooij and Cremers 2015) claim that one variable is a causal
+ancestor of another from a pattern of four variables, and the claims hold when the rows were
+selected by a mechanism the variables affect, with hidden common causes allowed (Versteeg et al.
+2022). `y_structures` returns a graph with no edges: each claim is a record in
+`metadata["effects"]` with its score and the patterns behind it, and `variables` limits the claims
+to pairs of the columns it names. `extended=True` tests the extended Y-structure, which finds more
+patterns. The [0.18.0](benchmarks/0.18.0.md#y-structures) release card measures both against the
+authors' code.
+
+Local ISA-LiNG (Dai et al. 2024) answers for one `target` in a linear model with non-Gaussian noise
+whose graph may hold cycles: from the target and its Markov blanket alone, it returns the weighted
+edges into the target and into each of its children as a `digraph`. A cycle through the target or
+a child leaves several models the data cannot tell apart; `metadata["equivalent_models"]` lists
+them, stable ones first, and the graph holds the first. `acyclic=True` reads the edges more cheaply
+when neither the target nor a child lies on a cycle. Its use is graphs with cycles: data without
+cycles, small samples among them, are outside its claim, and `direct_lingam` read at the target is
+more accurate and faster from 300 rows up.
+The [0.18.0](benchmarks/0.18.0.md#local-isa-ling) release card measures it against the authors'
+code on its paper's simulations.
+
 ### Experimental methods
 
 A new method ships as experimental: it passes recovery tests but is not supported, because it has
@@ -729,68 +815,11 @@ in a process.
    :toctree: api
    :nosignatures:
 
-   dagma
-   hiton_mb
-   mmmb
-   mb_by_mb
-   cmb
-   mmb_by_mmb
-   y_structures
    ldp
    ld3
-   ldecc
-   local_optimal_adjustment
-   locpc_cde
-   local_isa_ling
    lhts
    nhts
 ```
-
-DAGMA (Bello et al. 2022) is a continuous-optimization learner in the line of NOTEARS: it fits a
-weighted DAG by minimizing a loss under a smooth acyclicity constraint, with NumPy and SciPy only.
-It is for data whose units are meaningful: on the usual simulated data its accuracy comes from the
-columns' variances following the causal order, and on standardized columns it does no better than
-the empty graph at its default settings, which is why it is experimental. The
-[0.17.0](benchmarks/0.17.0.md#dagma) release card has the numbers. `robust=True` follows the first
-fit with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
-(Deng et al. 2024).
-
-MB-by-MB (Wang et al. 2014) answers for one `target`: it learns the target's Markov blanket and the
-local structure over it, then a neighbor's, one blanket at a time, until no further blanket can
-direct an edge at the target, and returns the edges the target has in the CPDAG with their
-directions. `metadata["parents"]`, `metadata["children"]`, and `metadata["undirected"]` list the
-columns joined to the target, and `metadata["blankets_learned"]` the variables whose blanket it
-learned, in order. No reference implementation exists to compare it with.
-
-Y-structures (Mani et al. 2006; Mooij and Cremers 2015) claim that one variable is a causal
-ancestor of another from a pattern of four variables, and the claims hold when the rows were
-selected by a mechanism the variables affect, with hidden common causes allowed (Versteeg et al.
-2022). `y_structures` returns a graph with no edges: each claim is a record in
-`metadata["effects"]` with its score and the patterns behind it, and `variables` limits the claims
-to pairs of the columns it names. `extended=True` tests the extended Y-structure, which finds more
-patterns. It is experimental until its comparison with the authors' code is published.
-
-Local ISA-LiNG (Dai et al. 2024) answers for one `target` in a linear model with non-Gaussian noise
-whose graph may hold cycles: from the target and its Markov blanket alone, it returns the weighted
-edges into the target and into each of its children as a `digraph`. A cycle through the target or
-a child leaves several models the data cannot tell apart; `metadata["equivalent_models"]` lists
-them, stable ones first, and the graph holds the first. `acyclic=True` reads the edges more cheaply
-when neither the target nor a child lies on a cycle. It is experimental until its comparison with
-the authors' code is published.
-
-LHTS (Hiremath et al. 2024) learns a DAG in a linear model with non-Gaussian noise from the top
-down: for each pair of variables it decides from regressions of the pair on each other, after their
-known common ancestors are regressed out, whether one is an ancestor of the other, sorts the
-variables into layers by their longest directed path from a root, and then finds each variable's
-parents among the earlier layers by conditional-independence tests, `indep_test="kci"` by default.
-It returns a DAG and a causal order, and `metadata["partial_order"]` holds the layers. It is
-experimental until its benchmark is published.
-
-NHTS (Hiremath et al. 2024) does the same for nonlinear effects with additive noise of any
-distribution: it finds the roots from kernel ridge regressions on one variable or a few, places each
-next layer from regressions on the variables already placed, and finds the parents among the
-earlier layers as LHTS does. Its tests grow quickly with the layers and the rows, so it suits
-graphs with few layers. It is experimental until its benchmark is published.
 
 LDP, local discovery by partitioning (Maasch et al. 2024), answers for one `treatment` and
 `outcome`: it labels each other column by its causal relation to the pair, from tests whose
@@ -805,31 +834,19 @@ structural direct criterion), with the other parents as the adjustment set for t
 `metadata["effects"]`. Its graph holds the edges into the outcome, and `metadata["partition"]` the
 labels. It is experimental until its comparison with the authors' code is published.
 
-LDECC, local discovery using eager collider checks (Gupta et al. 2023), answers for one `treatment`
-and `outcome`: it learns the treatment's Markov blanket with `blanket`, `"iamb"` by default, and its
-neighbors among it, then reads the tests of the PC algorithm over the other pairs as they come,
-directing the treatment's parents, and stops once every neighbor is directed. Its graph is a CPDAG
-that holds only the edges at the treatment, and `metadata["effects"]` holds the locally valid parent
-sets, one for each effect the local structure allows. It is experimental until its comparison with
-the authors' code is published.
+LHTS (Hiremath et al. 2024) learns a DAG in a linear model with non-Gaussian noise from the top
+down: for each pair of variables it decides from regressions of the pair on each other, after their
+known common ancestors are regressed out, whether one is an ancestor of the other, sorts the
+variables into layers by their longest directed path from a root, and then finds each variable's
+parents among the earlier layers by conditional-independence tests, `indep_test="kci"` by default.
+It returns a DAG and a causal order, and `metadata["partial_order"]` holds the layers. It is
+experimental until its benchmark is published.
 
-LOAD, local optimal adjustments discovery (Schubert, Claassen and Magliacane 2026), answers for two
-`variables` given in any order, without knowing which one causes the other: it learns the edges at
-each one Markov blanket at a time, as MB-by-MB does, and tests from them whether one is an ancestor
-of the other. `metadata["effects"]` holds one record per direction: the optimal adjustment set for
-the total effect when it is identifiable, and the parent sets of the treatment that its edges allow,
-one estimate each, when it is not. The graph holds only the edges at the two variables, and
-`metadata["blankets_learned"]` lists the variables whose blanket it learned, in order. It is
-experimental until its comparison with the authors' code is published.
-
-LocPC-CDE (Loranchet and Assaad 2026) answers for one `treatment` and `outcome`: it learns the graph
-around the outcome one hop at a time with PC's tests, run only near the outcome, until every edge at
-the outcome is oriented, so that the outcome's parents are a valid adjustment set for the controlled
-direct effect, or until a larger hop adds no variable. It stops at once when the treatment is not
-adjacent to the outcome or is its child. `metadata["effects"]` holds the answer with the paper's
-reason, the graph is the local essential graph it learned, and `metadata["hop"]`,
-`metadata["visited"]`, and `metadata["double_bar"]` describe the search. It is experimental until
-its comparison with the authors' code is published.
+NHTS (Hiremath et al. 2024) does the same for nonlinear effects with additive noise of any
+distribution: it finds the roots from kernel ridge regressions on one variable or a few, places each
+next layer from regressions on the variables already placed, and finds the parents among the
+earlier layers as LHTS does. Its tests grow quickly with the layers and the rows, so it suits
+graphs with few layers. It is experimental until its benchmark is published.
 
 A method becomes supported once it has:
 
@@ -857,6 +874,14 @@ A method becomes supported once it has:
 | `"cmiknn"` | Nearest-neighbor conditional mutual information, with a local permutation null | Supported |
 | `"gpdc"` | Gaussian-process regression, then a distance-correlation test of the residuals | Supported |
 
+`normal_scores` ranks each column over every row its test reads, and its model is one distribution.
+Ranked over the rows of several environments, a column mixes their distributions, and its scores
+are no longer Gaussian. So `cdnod`, `fci_jci`, `igsp`, `ut_igsp`, and `jpcmciplus`, whose tests
+always read several environments, do not offer it, and `gfci`, `boss_fci`, and `grasp_fci` raise a
+`ValueError` for it with an `env`, as they do for `score_func="normal_scores"`. Scores ranked within
+each environment would not help: they center and scale every column in each environment, so no
+variable would depend on the environment.
+
 The nonlinear tests, the last four, detect nonlinear dependence that partial correlation misses,
 at a far higher cost per test. They are benchmarked and checked in the release quality gate. Inside
 the search, KCI uses every BLAS thread from 2,000 rows and the other tests use one. On every thread,
@@ -882,6 +907,34 @@ andrey.pc(data, indep_test="cmiknn_k5")
 
 {py:meth}`CMIknn.statistic <andrey.core.ci_cmiknn.CMIknn.statistic>` returns the conditional
 mutual information estimate the test's p-value is built on, a dependence measure of its own.
+
+Every index a registered test is queried with is a column position of the matrix its factory
+received, and a search can ask the factory again for the same columns in another order: by default
+the possible-d-separation step of FCI, FCI-JCI, and GFCI builds its test over the columns sorted by
+their ranks (`possible_dsep="order_free"`). A test computed from its matrix, as every shipped test
+is, needs nothing more. A test that does not read its matrix, such as an oracle that answers by
+d-separation in a known graph (`andrey.data.latent.DSepOracle`), must find which variable each
+column of the matrix it receives holds:
+
+```python
+import numpy as np
+
+import andrey
+from andrey.core.ci import register_indep_test
+from andrey.data.latent import DSepOracle
+
+# `dag` is a networkx DiGraph over the column numbers of `data`, plus any hidden nodes.
+def factory(columns):
+    nodes = [
+        next(j for j in range(data.shape[1]) if np.array_equal(c, data[:, j])) for c in columns.T
+    ]
+    return DSepOracle(dag, nodes=nodes)
+
+register_indep_test("dsep", factory)
+andrey.fci(data, indep_test="dsep")  # the PAG of the observed columns
+```
+
+With `possible_dsep="fast"` the step keeps the columns in data order.
 
 On data with a `NaN`, {py:func}`~andrey.core.ci.make_indep_test` returns a
 {py:class}`~andrey.core.ci_missing.TestwiseDeletion` of the test: each query reads the rows observed

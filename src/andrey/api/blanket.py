@@ -818,12 +818,16 @@ def gs(
     the papers leave the order open and suggest visiting the most associated variables first [2]_.
     The grow phase visits the variables outside the blanket in that order, tests each given the
     current blanket, and adds it at once when its p-value is at or below ``alpha``, so the next one
-    is tested given the larger blanket; it passes over them again until a pass adds none. With
-    exact tests, the first pass adds at least the parents and children and the second the
-    children's other parents [2]_. The shrink phase visits the members in the same order and drops
-    each one the test finds independent of the target given the other current members, again until
-    a pass drops none. A test whose conditioning set is unchanged since the variable's last test is
-    not run again. With exact tests, the result is the true Markov blanket [1]_ [2]_.
+    is tested given the larger blanket; it passes over them again until a pass adds none, and does
+    not test a variable again given the blanket of its last test. With exact tests, the first pass
+    adds at least the parents and children and the second the children's other parents [2]_. The
+    shrink phase visits the members in the order they joined; a member the test finds independent
+    of the target given the other current members is dropped, and the visit starts again from the
+    first member, until every member tests dependent. The papers state the shrink as removing a
+    member while one tests independent and leave open which goes first [1]_ [2]_; starting again
+    tests the earlier members at once, given the smaller blanket, and on Gaussian graphs with mean
+    degree 4 it kept fewer wrong members than going on to the next member, at 30% to 47% more tests.
+    With exact tests, the result is the true Markov blanket [1]_ [2]_.
 
     The strength is the absolute partial correlation for ``"fisherz"`` and ``"student_t"``, compared
     to nine decimals, which keeps its order where p-values underflow to zero, and the p-value for
@@ -870,10 +874,10 @@ def gs(
     <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#gs>`_ shows; the benchmark scores the set at
     each target, not the graphs the sets give. The sets have fewer errors, missing plus extra
     members, than the empty set in every measured setting except hepar2, where they have more at
-    every size, 5.6, 5.1, and 4.7 per target against 4.5, as those of :func:`~andrey.iamb` do. On
-    hepar2, with 70 variables, 2.8 to 3.4 members per target are extra, close to ``alpha`` times the
+    every size, 5.5, 5.0, and 4.7 per target against 4.5, as those of :func:`~andrey.iamb` do. On
+    hepar2, with 70 variables, 2.7 to 3.4 members per target are extra, close to ``alpha`` times the
     variables outside the blanket, while 1.3 to 2.8 of its 4.5 members are missed. The median fit
-    for every target took 1.3 to 26 s on the networks and 0.35 to 4.1 s on the Gaussian graphs.
+    for every target took 1.0 to 28 s on the networks and 0.46 to 5.2 s on the Gaussian graphs.
     Tested with exact d-separation on 15 variables. Missing values are not benchmarked; the tests
     run them on up to 20 variables with up to a fifth of the values missing completely at random. At
     a fixed ``alpha``, the grow phase tests every variable outside the blanket, so the false members
@@ -1908,9 +1912,6 @@ def hiton_mb(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -1977,10 +1978,16 @@ def hiton_mb(
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
     other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Tested with exact d-separation on 15 variables, on
-    simulated linear-Gaussian data with 20 variables and 2,000 rows, and on categorical data with
-    10 variables and 3,000 rows; missing values on up to 20 variables with up to a fifth of the
-    values missing completely at random. The parents and children come from HITON-PC, with its
+    **Limitations.** Measured at alpha 0.05 on one core, every variable a target, on samples of
+    child, insurance, alarm, and hailfinder (20 to 56 variables) at 200, 500, and 5,000 rows and of
+    pigs (441 variables, 50 targets) at 500 rows with ``"gsq"``, and on linear-Gaussian graphs with
+    20, 50, and 100 variables at 1,000 and 5,000 rows with ``"fisherz"``. Against its authors'
+    HITON-MB, the sets were closer to the true ones in 11 of 13 settings and further at 5,000 rows
+    on hailfinder and insurance, where the symmetry check drops members the authors' code keeps
+    (`0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#hiton-mb>`_). On
+    hailfinder at 200 and 500 rows the sets have more errors, missing plus extra members, than the
+    empty set, 4.0 and 4.4 per target against 3.7 and 3.3, since the rule of five rows per cell
+    leaves many of the tests there unrun. The parents and children come from HITON-PC, with its
     limits: a newcomer is tested only against the members before it, so a member that a later one
     separates stays until the last candidate has joined and enlarges the conditioning sets until
     then. A spouse is found only through a child that the search found, so an edge its tests miss
@@ -2054,7 +2061,7 @@ def mmmb(
     structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
-    degrees_of_freedom: str = "mean",
+    degrees_of_freedom: str = "nonempty",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -2099,13 +2106,14 @@ def mmmb(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
-    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+    degrees_of_freedom : {"mean", "nonempty"}, default="nonempty"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
         sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        ``ValueError``. MMMB defaults to ``"nonempty"``, the degrees of freedom of the G-square
+        test its paper runs, after Spirtes, Glymour and Scheines [1]_ [10]_.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -2188,9 +2196,6 @@ def mmmb(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -2258,17 +2263,26 @@ def mmmb(
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
     other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Tested with exact d-separation on 15 variables, on
-    simulated linear-Gaussian data with 20 variables and 2,000 rows, and on categorical data with
-    10 variables and 3,000 rows; missing values on up to 20 variables with up to a fifth of the
-    values missing completely at random. A spouse is found only through a child that the search
-    found, so an edge its tests miss also hides that child's other parents, and each spouse's
-    verdict rests on the one separating set MMPC recorded for it. The search runs MMPC for the
-    target, for each of its parents and children, and, for the symmetry check, for each of their
-    members, so its cost grows with the sets two steps from the target. The CPDAG tests every
-    subset of the smaller blanket for each unshielded triple, so a triple whose smaller blanket
-    holds ``m`` variables takes up to ``2**m`` tests. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** Measured at alpha 0.05 on one core, every variable a target, on samples of
+    alarm, hailfinder, insurance, and win95pts (27 to 76 variables) at 300, 500, 700, 1,000, and
+    5,000 rows and of pigs (441 variables, 50 targets) at 500 rows with ``"gsq"``. Against its
+    authors' MMMB, the sets were closer to the true ones in 8 of 21 settings, as close in 3, and
+    further in 10, on hailfinder at 500 to 5,000 rows, insurance at 5,000, and win95pts at every
+    size: there the symmetry check drops members the authors' code keeps, a test given a copy of a
+    variable has no degrees of freedom and separates here but not there, and a spouse's separating
+    set comes from MMPC rather than a fresh search. On hailfinder at 5,000 rows the authors' code
+    also runs a test only with at least five rows per cell, which this search does not, and the sets
+    stay further than that code's. In every setting the sets had fewer errors, missing plus extra
+    members, than the authors' code's and than the empty set's
+    (`0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#mmmb>`_). A spouse is
+    found only through a child that the search found, so an edge its tests miss also hides that
+    child's other parents, and each spouse's verdict rests on the one separating set MMPC recorded
+    for it. The search runs MMPC for the target, for each of its parents and children, and, for the
+    symmetry check, for each of their members, so its cost grows with the sets two steps from the
+    target. The CPDAG tests every subset of the smaller blanket for each unshielded triple, so a
+    triple whose smaller blanket holds ``m`` variables takes up to ``2**m`` tests. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -2296,6 +2310,8 @@ def mmmb(
     .. [9] Tu, R., Zhang, C., Ackermann, P., Mohan, K., Kjellstrom, H., and Zhang, K. (2019). Causal
        discovery in the presence of missing data. Proceedings of Machine Learning Research 89,
        1762-1770.
+    .. [10] Spirtes, P., Glymour, C., and Scheines, R. (2000). Causation, Prediction, and Search,
+       2nd edition. MIT Press.
 
     Examples
     --------

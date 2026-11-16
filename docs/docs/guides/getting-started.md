@@ -519,15 +519,15 @@ narrow the causal order, as their paper describes (Shimizu et al., 2011). Every 
 supported wherever true claims [measured no
 worse](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
 than the same fit without them and than a reference package given the same knowledge, which is every
-method that honors them except nine. Required paths are experimental in Tabu search, MMHC, and
+method that honors them except twelve. Required paths are experimental in Tabu search, MMHC, and
 RSMAX2, where a reference package given the edges those paths imply made fewer errors. Forbidden
 paths are experimental in IAMB, Inter-IAMB, and MMPC, where the graph found at 50 variables often
 has no consistent extension: a claim there acts only on an edge, the fits we measured dropped about
 96% of the forbidden paths on such a graph, and with forbidden paths alone the CPDAG was 0.65 to
-1.95 edges farther from the class the claims define. Both are experimental in GS, Fast-IAMB, and
-HITON-PC, which that measurement did not cover. A path claim says less than an edge and so
-directs less: a required path cannot restore an edge the search left out. When you know the edge
-itself, state it as `required`.
+1.95 edges farther from the class the claims define. Both are experimental in GS, Fast-IAMB,
+HITON-PC, HITON-MB, MMMB, and PCMB, which that measurement did not cover. A path claim says less
+than an edge and so directs less: a required path cannot restore an edge the search left out. When
+you know the edge itself, state it as `required`.
 
 Knowledge that no graph meets, such as `required_paths` that lead in a cycle, raises a `ValueError`
 before the search. A true claim can still be one the graph a fit finds does not meet: on finite
@@ -578,8 +578,11 @@ Each test and score reads the columns as one kind of data:
 | Categorical | `chisq`, `gsq` (the default when every column is categorical) | `bdeu` (the default when every column is categorical), `discrete_bic` |
 | Mixed | `degen_gauss`, `cond_gauss` (the default when some columns are categorical) | `cond_gauss` (the default when some columns are categorical), `degen_gauss` |
 
-{{ indep_test_names }} take the tests; {{ score_func_names }} take every score, except
-`normal_scores` in `gies`, which scores each variable on the rows without an intervention on it.
+{{ indep_test_names }} take the tests, except `normal_scores` in `cdnod`, `fci_jci`, `igsp`,
+`ut_igsp`, and `jpcmciplus`, whose tests read several environments at once; {{ score_func_names }}
+take every score, except `normal_scores` in `gies`, which scores each variable on the rows without
+an intervention on it. The ranks of `normal_scores` model one distribution, so neither option takes
+an `env`.
 `gfci`, `boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take a score and a test that read the same
 kind of data, such as `andrey.gfci(data, score_func="bdeu", indep_test="chisq")`; with
 `score_func="normal_scores"` and `indep_test="normal_scores"`, both read each column's normal

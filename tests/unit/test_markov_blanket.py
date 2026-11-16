@@ -53,7 +53,7 @@ from andrey.core.ci import (
 )
 from andrey.core.ci_missing import rows_tested
 from andrey.core.orient import dag2cpdag
-from andrey.core.ties import KEY_DP, tie_ranks
+from andrey.core.ties import KEY_DP, tie_mask, tie_ranks
 from andrey.data.latent import DSepOracle
 from andrey.search.calm import moral_graph
 from andrey.spec import REGISTRY
@@ -154,9 +154,32 @@ def test_gs_admits_on_a_later_pass_a_spouse_an_earlier_member_hid():
 
 def test_gs_shrinks_a_member_its_order_admitted_early():
     """0 -> 1 -> 2 with 2 ranked first: both depend on 0, so 2 is visited first and joins, 1 joins
-    given {2}, and the shrink, in the same order, drops 2 given {1}."""
+    given {2}, and the shrink, in the order they joined, drops 2 given {1}."""
     oracle = DSepOracle(nx.DiGraph([(0, 1), (1, 2)]))
     assert LocalSearch(oracle, [0, 2, 1], 0.5).run("gs", 0) == ([1], {2: (1,)})
+
+
+class _Independent:
+    """A test that finds ``x`` independent of the target given exactly the sets listed for ``x`` and
+    dependent given any other, and logs each query in the order asked."""
+
+    def __init__(self, independent: dict[int, list[set[int]]]) -> None:
+        self.independent = independent
+        self.log: list[tuple[int, int, tuple[int, ...]]] = []
+
+    def __call__(self, x, y, cond=()):
+        self.log.append((x, y, tuple(cond)))
+        return 1.0 if set(cond) in self.independent.get(y, []) else 0.0
+
+
+def test_gs_retests_a_member_a_later_removal_made_removable():
+    """1, 2, and 3 depend on 0 and join in that order. Given the others, 2 tests independent and
+    1 and 3 dependent, so 2 goes. Without 2, 1 tests independent given {3} and 3 given {1}, but
+    each depends on 0 alone: the shrink starts again from 1, drops it, and keeps 3. A shrink that
+    went on to 3 after dropping 2 would drop 3 given {1} and keep 1."""
+    test = _Independent({2: [{1, 3}], 1: [{3}], 3: [{1}]})
+    assert LocalSearch(test, [0, 1, 2, 3], 0.5).run("gs", 0) == ([3], {2: (1, 3), 1: (3,)})
+    assert test.log[-4:] == [(0, 1, (2, 3)), (0, 2, (1, 3)), (0, 1, (3,)), (0, 3, ())]
 
 
 @pytest.mark.parametrize("seed", range(4))
@@ -295,6 +318,21 @@ def test_the_order_reads_ranks_only_when_keys_tie():
     assert ordered({4: 0.1, 2: 0.3, 6: 0.2}, ranks) == [4, 6, 2]
     assert ranks.read == []
     assert ordered({}, ranks) == []
+
+
+def test_the_tie_ranks_are_computed_on_the_first_read(monkeypatch: pytest.MonkeyPatch):
+    x = np.random.default_rng(0).standard_normal((200, 12))
+    real, calls = blanket.tie_ranks, []
+    monkeypatch.setattr(blanket, "tie_ranks", lambda *args: calls.append(args) or real(*args))
+    search = local_search(x, alpha=0.05, indep_test="fisherz")
+    assert len(search.ranks) == 12
+    assert not calls
+    want = real(x, tie_mask("fisherz", None, 12)).tolist()
+    assert [search.ranks[i] for i in range(12)] == want
+    assert list(search.ranks) == want
+    assert len(calls) == 1
+    andrey.iamb(x, target=0, alpha=0.05)
+    assert len(calls) == 1
 
 
 @pytest.mark.parametrize("seed", range(4))
@@ -978,23 +1016,59 @@ def _scan_data(kind: str, seed: int = 3) -> np.ndarray:
 
 
 @pytest.mark.parametrize("kind", list(_BATCHED))
-def test_a_scan_is_its_candidates_asked_one_at_a_time_bit_for_bit(kind):
-    """The scan of many candidates, answered in one call, gives each candidate the bits of the scan
-    of that candidate alone and of the test's own answer, in the order of the candidates."""
+def test_a_scan_is_its_candidates_asked_one_at_a_time(kind):
+    """The scan of many candidates, answered in one call, gives each candidate the answer of the
+    scan of that candidate alone and of the test's own answer, in the order of the candidates: bit
+    for bit, except that a partial-correlation test on complete data given two or more variables
+    answers from one factor of the set's block, which agrees to rounding (the strength to 1e-12,
+    the p-value to 1e-9 relative, every p-value on the same side of alpha)."""
     x = _scan_data(kind)
     test = make_indep_test(kind.removesuffix("-missing"), x)
     assert hasattr(test, "statistic_pvalues" if _BATCHED[kind] == "gaussian" else "pvalues_given")
+    shared = kind in ("fisherz", "student_t", "normal_scores")
+    assert hasattr(test, "statistic_pvalues_given") == shared
     search = LocalSearch(test, tie_ranks(x).tolist(), 0.05)
     target = 4
     for cond in [(), (7,), (2, 9), (0, 3, 8, 11)]:
         xs = [v for v in range(12) if v != target and v not in cond]
         strengths, pvalues = search.scan(target, xs, cond)
         alone = [search.scan(target, [v], cond) for v in xs]
-        assert strengths.tobytes() == np.concatenate([s for s, _ in alone]).tobytes(), cond
-        assert pvalues.tobytes() == np.concatenate([p for _, p in alone]).tobytes(), cond
-        assert pvalues.tolist() == [test(target, v, cond) for v in xs], cond
+        want_s = np.concatenate([s for s, _ in alone])
+        want_p = np.concatenate([p for _, p in alone])
         backward = search.scan(target, xs[::-1], cond)
+        if shared and len(cond) >= 2:
+            np.testing.assert_allclose(strengths, want_s, rtol=0.0, atol=1e-12)
+            np.testing.assert_allclose(pvalues, want_p, rtol=1e-9, atol=1e-300)
+            assert ((pvalues <= 0.05) == (want_p <= 0.05)).all(), cond
+            np.testing.assert_allclose(backward[1], pvalues[::-1], rtol=1e-9, atol=1e-300)
+            continue
+        assert strengths.tobytes() == want_s.tobytes(), cond
+        assert pvalues.tobytes() == want_p.tobytes(), cond
+        assert pvalues.tolist() == [test(target, v, cond) for v in xs], cond
         assert backward[1].tobytes() == pvalues[::-1].tobytes(), cond
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "student_t", "normal_scores"])
+def test_a_large_scan_given_a_shared_set_is_answered_from_one_factor(kind):
+    """A scan of enough candidates given two or more variables goes to the test's one-factor path,
+    counts one test per candidate, and agrees with each candidate's own scan to rounding."""
+    x = data.sample_scm(graph="erdos_renyi", d=40, n=400, seed=3, density=3.0).data
+    test = make_indep_test(kind, x)
+    factored = []
+    factor = test._schur_partial_correlations
+    test._schur_partial_correlations = lambda *args: factored.append(1) or factor(*args)
+    search = LocalSearch(test, tie_ranks(x).tolist(), 0.05)
+    cond = (2, 9, 17)
+    xs = [v for v in range(40) if v != 4 and v not in cond]
+    with counting_tests() as tests:
+        strengths, pvalues = search.scan(4, xs, cond)
+    assert factored == [1] and tests.n == len(xs)
+    alone = [search.scan(4, [v], cond) for v in xs]
+    want_s = np.concatenate([s for s, _ in alone])
+    want_p = np.concatenate([p for _, p in alone])
+    np.testing.assert_allclose(strengths, want_s, rtol=0.0, atol=1e-12)
+    np.testing.assert_allclose(pvalues, want_p, rtol=1e-9, atol=1e-300)
+    assert ((pvalues <= 0.05) == (want_p <= 0.05)).all()
 
 
 def _given_rest(target: int, v: int, d: int) -> list[int]:

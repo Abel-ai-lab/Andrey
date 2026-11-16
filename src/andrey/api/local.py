@@ -178,9 +178,6 @@ def mb_by_mb(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -208,7 +205,9 @@ def mb_by_mb(
     done earlier, or every member of the blanket is done, the local structure is read from what is
     already learned instead [1]_. Only the edges at ``x`` and the v-structures that contain ``x``
     join the growing graph: the rest of the local structure may come from variables outside the
-    blanket [1]_.
+    blanket [1]_. Every independence a test of the search found is kept, a blanket learner's
+    included, and a pair it separates holds no edge [1]_: after each step, such an edge leaves the
+    growing graph, and a v-structure that named it no longer directs its other edge.
     Meek's rules [2]_ then direct the edges that follow, reading a missing edge as an absence only
     where a test separated the pair, and a triple as a non-collider only where the separating set
     holds its middle [1]_. Last, every waitlist variable that each path to the target in the
@@ -232,17 +231,19 @@ def mb_by_mb(
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
     other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet, and no reference implementation exists to compare with.
-    Tested with exact d-separation on every target of 11 random graphs of up to 30 variables and of
-    a 5 x 5 chessboard, and on simulated linear-Gaussian data with 20 variables and categorical data
-    with 10. Each local structure tests every pair of a blanket against every subset of the rest, up
-    to ``local_max_depth`` members, so a blanket of ``m`` variables takes up to about
-    ``m**2 * 2**m`` tests without the cap. Under the default ``local_max_depth=5``, a pair that
-    only a larger set separates keeps its edge. The default blanket learner never drops a variable
-    it added, so a large sample, in which more variables test dependent, gives larger blankets, and
-    each test of the blanket learner conditions on the whole set so far. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    **Limitations.** At its paper's settings (Alarm and Hailfinder samples at 500 to 5,000 rows, a
+    45 x 45 chessboard) it made fewer errors at the target than the empty answer, with a small
+    fraction of the tests of one :func:`~andrey.pc` fit; that fit made fewer errors in a few cells,
+    among them Alarm at 5,000 rows with alpha 0.05 and Hailfinder at 500 rows with alpha 0.05, and
+    on the chessboard. The `0.18.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#mb-by-mb>`_ has the numbers. Each local
+    structure tests every pair of a blanket against every subset of the rest, up to
+    ``local_max_depth`` members, so a blanket of ``m`` variables takes up to about ``m**2 * 2**m``
+    tests without the cap. Under the default ``local_max_depth=5``, a pair that only a larger set
+    separates keeps its edge. The default blanket learner never drops a variable it added, so a
+    large sample, in which more variables test dependent, gives larger blankets, and each test of
+    the blanket learner conditions on the whole set so far. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -459,9 +460,6 @@ def mmb_by_mmb(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -476,9 +474,9 @@ def mmb_by_mmb(
     reads such data; the other tests read categorical or mixed data or detect nonlinear effects,
     as :func:`~andrey.pc` describes, with a blanket learner whose tests condition on fewer
     variables, such as ``"iamb"``. It is designed for large graphs in which each variable has a
-    small Markov blanket: it learns only the blankets the answer needs [1]_. It returns the edges
-    at the target with the marks the PAG gives them; for the whole PAG, use :func:`~andrey.fci`,
-    and with no unmeasured common causes, :func:`~andrey.mb_by_mb`.
+    small Markov blanket: it learns the blankets near the target, not the whole graph [1]_. It
+    returns the edges at the target with the marks the PAG gives them; for the whole PAG, use
+    :func:`~andrey.fci`, and with no unmeasured common causes, :func:`~andrey.mb_by_mb`.
 
     **How it works.** A waitlist starts with the target [1]_. Each step takes the waitlist's head
     ``x`` and learns its Markov blanket ``MB(x)`` with the ``blanket`` learner: with hidden
@@ -487,7 +485,10 @@ def mmb_by_mmb(
     its blanket with the search of :func:`~andrey.pc`: ``x`` and a member are adjacent unless some
     subset of the rest of the blanket separates them, every other pair is tested against the
     subsets of either end's neighbors, and a triple ``a - b - c`` with ``a`` and ``c`` separated
-    by a set without ``b`` is a v-structure ``a *-> b <-* c`` [1]_. When the blanket and ``x`` lie
+    by a set without ``b`` is a v-structure ``a *-> b <-* c`` [1]_. Since a member and ``x`` are
+    adjacent exactly when no subset of the rest of the member's own blanket separates them either
+    [1]_, the pair is tested on the smaller of the two blankets, as MBCS* limits the search [3]_;
+    the method learns the blanket of each member to compare them. When the blanket and ``x`` lie
     inside those of a variable done earlier, or every member of the blanket is done, the local
     structure is read from what is already learned instead [1]_. Only the edges at ``x`` and the
     v-structures that contain ``x`` join the growing graph, since the rest of the local structure
@@ -532,16 +533,15 @@ def mmb_by_mmb(
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
     other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Tested with exact d-separation on every target of random
-    graphs with hidden common causes, where the answer holds the PAG's edges with each mark the
-    PAG's or a circle, the PAG's at 654 of 657 targets, and on simulated linear-Gaussian data with
-    hidden nodes. The collider check learns the blanket and local structure of each variable it
-    reads, so a fit runs more tests than the paper's steps alone. ``"total_conditioning"`` tests
-    each variable given all the others, so it needs more rows than variables and continuous data
-    with linear effects; on other data, choose another learner. Each local structure tests up to
-    ``local_max_depth`` members per set, and a pair that only a larger set separates keeps its
-    edge. The numbers are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    **Limitations.** On the paper's four networks with hidden nodes, at 1,000 and 5,000 rows and the
+    paper's targets, its edges and marks were better than those of the authors' code in five of
+    eight settings and no worse in the rest, and its errors at the target were below the empty
+    answer's in all eight; the
+    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#mmb-by-mmb>`_ has the
+    numbers. Two adjacent variables that both have very wide blankets can still take long.
+    ``"total_conditioning"`` needs more rows than variables and continuous data with linear
+    effects; on other data, choose another learner. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -727,9 +727,6 @@ def cmb(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -783,14 +780,17 @@ def cmb(
     has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
     other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet, and no reference implementation exists to compare with.
-    With exact tests and exact blankets, every edge and every direction it returns is the true
-    CPDAG's, but it can leave undirected an edge the CPDAG directs: one whose direction follows from
-    a separating set its steps never test, or from directions its visits do not find. Over every
-    target of 100 random graphs of 6 to 20 variables, that happened at 2%, 5%, and 20% of targets
-    at an average of 1.5, 2.5, and 4 neighbors per variable. Tested with exact d-separation on
-    those graphs and the paper's two examples, and on simulated linear-Gaussian data with 20
-    variables and categorical data with 10. The numbers are a reference, not a hard limit: they
+    **Limitations.** Measured on samples of the Alarm network (37 variables) at 1,000 rows with
+    G-square tests at alpha 0.02, every variable a target, as its paper ran it: its edges at the
+    target were nearer the true CPDAG's than those of :func:`~andrey.pc` on the same data and than
+    the empty answer, on 20 datasets and again on 20 fresh ones. The
+    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#cmb>`_ has the
+    numbers. With exact tests and exact blankets, every edge and every direction it returns is the
+    true CPDAG's, but it can leave undirected an edge the CPDAG directs: one whose direction follows
+    from a separating set its steps never test, or from directions its visits do not find. Over
+    every target of 100 random graphs of 6 to 20 variables, that happened at 2%, 5%, and 20% of
+    targets at an average of 1.5, 2.5, and 4 neighbors per variable, and on Alarm to 0.09 edges per
+    target. The numbers are a reference, not a hard limit: they
     change with the data generator, the density, the method's settings, and the machine.
 
     References

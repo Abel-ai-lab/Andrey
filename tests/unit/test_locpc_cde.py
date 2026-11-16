@@ -15,8 +15,6 @@ from andrey.core.ci import counting_tests
 from andrey.core.effects import check_effects
 from andrey.data.latent import DSepOracle
 
-pytestmark = pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-
 
 def frame(n: int = 3000, seed: int = 0) -> pd.DataFrame:
     """a -> x <- c, x -> y <- b, y -> m: the effect of x on y is identifiable (a -> x <- c

@@ -18,8 +18,9 @@ queries a CI test or a local score also records two deterministic counts (:class
 compare names every row where one changed and fails on any change, a fall as well as a rise, unless
 ``--allow-fewer-queries`` accepts a fall.
 
-``--shuffle K`` refits each draw but ICP's, IGSP's, FCI-JCI's, and J-PCMCI+'s (:class:`Fit`) on
-``K`` seeded column orders and maps each answer back to the original columns before hashing it;
+``--shuffle K`` refits each draw but ICP's, IGSP's, FCI-JCI's, J-PCMCI+'s, CMB's, MMB-by-MMB's,
+and local ISA-LiNG's (:class:`Fit`) on ``K`` seeded column orders and maps each answer back to the
+original columns before hashing it;
 ``--workers N`` refits the methods that run worker processes or threads (:data:`WORKER_METHODS`) on
 ``N`` workers, with every GES pass, every skeleton pass of conditioning size two or more, and every
 possible-d-sep search sent to the pool. Both report each refit whose answer differs from the first
@@ -77,9 +78,12 @@ class Fit:
 
     ``blocks`` is the number of side-by-side copies of the variables in the data: GIES's samples
     and intervention indicators, MultiGroupDirectLiNGAM's groups; a column order moves each copy
-    the same way. ``shuffled`` is ``False`` for ICP, IGSP, FCI-JCI, and J-PCMCI+, whose draws a
-    column order does not apply to: each row's environment is a column of the draw, ICP's target is
-    the last variable, and J-PCMCI+'s contexts follow the system variables.
+    the same way. ``shuffled`` is ``False`` for ICP, IGSP, FCI-JCI, J-PCMCI+, MB-by-MB, CMB,
+    MMB-by-MMB, local ISA-LiNG, LDECC, LOAD, and LocPC-CDE, whose draws a column order does not
+    apply to: each row's environment is a column of the draw, the target of ICP, MB-by-MB, CMB,
+    MMB-by-MMB, and local ISA-LiNG is the last variable, LDECC's treatment and outcome and LOAD's
+    two variables are the last and the first, LocPC-CDE's treatment and outcome are the first and
+    the last, and J-PCMCI+'s contexts follow the system variables.
     ``alpha`` is the significance level of a CI-test method.
     """
 
@@ -115,6 +119,28 @@ def _environments(x: np.ndarray) -> tuple[np.ndarray, np.ndarray, int]:
 def _fci_jci(x: np.ndarray) -> StructureOutput:
     """FCI-JCI with the draw's last column as the environment, as the gate fits it."""
     return andrey.fci_jci(x[:, :-1], x[:, -1], alpha=ALPHA)
+
+
+def _last_column(name: str) -> Callable[[np.ndarray], StructureOutput]:
+    """A target-centered method at the draw's last column, as the gate fits it."""
+    return lambda x: getattr(andrey, name)(x, target=x.shape[1] - 1, alpha=ALPHA)
+
+
+def _ldecc(x: np.ndarray) -> StructureOutput:
+    """LDECC with the draw's last column as the treatment and its first as the outcome, the columns
+    the gate fits it at."""
+    return andrey.ldecc(x, treatment=x.shape[1] - 1, outcome=0, alpha=ALPHA)
+
+
+def _local_optimal_adjustment(x: np.ndarray) -> StructureOutput:
+    """LOAD for the draw's last and first columns, the columns the gate fits it at."""
+    return andrey.local_optimal_adjustment(x, variables=[x.shape[1] - 1, 0], alpha=ALPHA)
+
+
+def _locpc_cde(x: np.ndarray) -> StructureOutput:
+    """LocPC-CDE with the draw's first column as the treatment and its last as the outcome, the
+    columns the gate fits it at."""
+    return andrey.locpc_cde(x, treatment=0, outcome=x.shape[1] - 1, alpha=ALPHA)
 
 
 def _ut_igsp(x: np.ndarray) -> StructureOutput:
@@ -179,6 +205,14 @@ FITS: dict[str, Fit] = {
     "MMPC": Fit(functools.partial(andrey.mmpc, alpha=ALPHA), alpha=ALPHA),
     "HITONPC": Fit(functools.partial(andrey.hiton_pc, alpha=ALPHA), alpha=ALPHA),
     "PCMB": Fit(functools.partial(andrey.pcmb, alpha=ALPHA), alpha=ALPHA),
+    "MB-by-MB": Fit(_last_column("mb_by_mb"), shuffled=False, alpha=ALPHA),
+    "HITONMB": Fit(functools.partial(andrey.hiton_mb, alpha=ALPHA), alpha=ALPHA),
+    "MMMB": Fit(functools.partial(andrey.mmmb, alpha=ALPHA), alpha=ALPHA),
+    "Y-structures": Fit(functools.partial(andrey.y_structures, alpha=ALPHA), alpha=ALPHA),
+    "CMB": Fit(_last_column("cmb"), shuffled=False, alpha=ALPHA),
+    "LDECC": Fit(_ldecc, shuffled=False, alpha=ALPHA),
+    "LocalOptimalAdjustment": Fit(_local_optimal_adjustment, shuffled=False, alpha=ALPHA),
+    "LocPCCDE": Fit(_locpc_cde, shuffled=False, alpha=ALPHA),
     "MMHC": Fit(functools.partial(andrey.mmhc, alpha=ALPHA), alpha=ALPHA),
     "RSMAX2": Fit(
         functools.partial(andrey.rsmax2, restrict="pc", maximize="tabu", alpha=ALPHA), alpha=ALPHA
@@ -190,12 +224,15 @@ FITS: dict[str, Fit] = {
     "ExactSearch": Fit(andrey.exact_search),
     "CALM": Fit(functools.partial(andrey.calm, seed=0)),
     "NOTEARS": Fit(andrey.notears),
+    "DAGMA": Fit(andrey.dagma),
     "BOSS": Fit(functools.partial(andrey.boss, seed=0)),
     "GRaSP": Fit(functools.partial(andrey.grasp, seed=0)),
     "BOSS-FCI": Fit(functools.partial(andrey.boss_fci, seed=0, alpha=ALPHA), alpha=ALPHA),
     "GRaSP-FCI": Fit(functools.partial(andrey.grasp_fci, seed=0, alpha=ALPHA), alpha=ALPHA),
+    "MMB-by-MMB": Fit(_last_column("mmb_by_mmb"), shuffled=False, alpha=ALPHA),
     "DirectLiNGAM": Fit(andrey.direct_lingam),
     "ICA-LiNGAM": Fit(functools.partial(andrey.ica_lingam, seed=0)),
+    "LocalISALiNG": Fit(lambda x: andrey.local_isa_ling(x, target=x.shape[1] - 1), shuffled=False),
     "MultiGroupDirectLiNGAM": Fit(
         lambda x: andrey.multi_group_direct_lingam(qg.regime_models.split_groups(x, _GROUPS)),
         blocks=_GROUPS,
@@ -253,6 +290,7 @@ LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
         qg.order_draws, "score_paper_laplace_standardized", 12, "er1"
     ),
     "notears_paper_standardized_d60": functools.partial(qg.linear_sem_draws, "standardized", 60),
+    "notears_paper_raw_d40": functools.partial(qg.linear_sem_draws, "raw", 40),
     "ages_paper_qs0.5_qw0.5_n10000": functools.partial(qg.weak_edge_draws, 0.5, 0.5, 10000),
     "interventional_gauss_er_d100": functools.partial(qg.intervention_draws, 100, 5000),
     "domain_shift_er_d70": functools.partial(qg.model_draws, "domain_shift_er", 70, 2000),
@@ -295,6 +333,14 @@ LARGER: dict[str, str] = {
             "MMPC",
             "HITONPC",
             "PCMB",
+            "MB-by-MB",
+            "HITONMB",
+            "MMMB",
+            "Y-structures",
+            "CMB",
+            "LDECC",
+            "LocalOptimalAdjustment",
+            "LocPCCDE",
             "MMHC",
             "RSMAX2",
             "BOSS",
@@ -302,8 +348,8 @@ LARGER: dict[str, str] = {
         ),
         "linear_gauss_er_d100",
     ),
-    **dict.fromkeys(("FCI", "GFCI", "BOSS-FCI", "GRaSP-FCI"), "latent_gauss_er_d100"),
-    **dict.fromkeys(("DirectLiNGAM", "ICA-LiNGAM"), "lingam_sf_d70"),
+    **dict.fromkeys(("FCI", "GFCI", "BOSS-FCI", "GRaSP-FCI", "MMB-by-MMB"), "latent_gauss_er_d100"),
+    **dict.fromkeys(("DirectLiNGAM", "ICA-LiNGAM", "LocalISALiNG"), "lingam_sf_d70"),
     **dict.fromkeys(("RCD", "BottomUpParceLiNGAM"), "latent_lingam_er_d17"),
     "ExactSearch": "linear_gauss_er_d16",
     "CAM": "anm_er_n1000_d30",
@@ -312,6 +358,7 @@ LARGER: dict[str, str] = {
     "NoGAM": "score_paper_laplace_standardized_d12_er1",
     "CALM": "linear_gauss_er_d15",
     "NOTEARS": "notears_paper_standardized_d60",
+    "DAGMA": "notears_paper_raw_d40",
     "AGES": "ages_paper_qs0.5_qw0.5_n10000",
     "CDNOD": "domain_shift_er_d70",
     "FCI-JCI": "fci_jci_x100",
@@ -615,6 +662,9 @@ CI_QUERIES: dict[str, Callable[..., Iterable[tuple[int, int, Any, float]]]] = {
         (x, y, s, p) for s, p in zip(sets, ps)
     ],
     "first_order_pvalues": lambda ps, test, x, y, zs: [(x, y, (z,), p) for z, p in zip(zs, ps)],
+    "statistic_pvalues_given": lambda rp, test, x, ys, condition_set: [
+        (x, y, condition_set, p) for y, p in zip(ys, rp[1])
+    ],
     "pvalues_given": lambda ps, test, target, xs, condition_set=(): [
         (target, x, condition_set, p) for x, p in zip(xs, ps)
     ],

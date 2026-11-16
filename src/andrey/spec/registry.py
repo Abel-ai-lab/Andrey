@@ -15,7 +15,14 @@ from andrey.core.knowledge import EDGE_PARTS, PATH_PARTS, KnowledgePart
 from andrey.core.score import RANK_SCORES, SCORES
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
-from .concepts import CMB_BLANKETS, CONCEPTS, MMB_BLANKETS, REQUIRED_TARGET, concept_param
+from .concepts import (
+    CMB_BLANKETS,
+    CONCEPTS,
+    MMB_BLANKETS,
+    REQUIRED_TARGET,
+    UNRANKED_TESTS,
+    concept_param,
+)
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
 
 # Shared inputs and parameters; a parameter that implements a concept comes from its template.
@@ -31,21 +38,33 @@ _DECLARED = (
     "cond_gauss when some are, else {fallback}. A column is declared categorical by categorical "
     "or a DataFrame category, bool, or text type, never by its values."
 )
+#: The indep_test doc: the partial-correlation tests, then the others.
+_PARTIAL_CORRELATION = (
+    "Conditional-independence test. For continuous data, on the partial correlation: "
+    "fisherz = Fisher's z-transform and the normal distribution; student_t = the Student-t "
+    "distribution, exact for Gaussian data at any sample size"
+)
+_OTHER_TESTS = (
+    "For categorical data coded by whole numbers: chisq = Pearson's chi-square; gsq = G-square. "
+    "For mixed data, with the categorical columns named by categorical: degen_gauss = degenerate "
+    "Gaussian and cond_gauss = conditional Gaussian likelihood ratio. For nonlinear effects in "
+    "continuous data, each far slower per test: kci = kernel test; rcot = its random-feature "
+    "approximation; cmiknn = nearest-neighbor conditional mutual information; gpdc = "
+    "Gaussian-process regression and distance correlation. These four rank the columns as the "
+    "searches do, so ANDREY_TIE_BREAK=position makes their p-values depend on the column order. "
+    + _DECLARED.format(every="gsq", fallback="fisherz")
+)
 _INDEP_TEST = concept_param(
     "indep_test",
-    doc="Conditional-independence test. For continuous data, on the partial correlation: "
-    "fisherz = Fisher's z-transform and the normal distribution; student_t = the Student-t "
-    "distribution, exact for Gaussian data at any sample size; normal_scores = fisherz on each "
-    "column's normal scores, for data whose columns are monotone transformations of Gaussian "
-    "variables. For categorical data coded by whole "
-    "numbers: chisq = Pearson's chi-square; gsq = G-square. For mixed data, with the categorical "
-    "columns named by categorical: degen_gauss = degenerate Gaussian and "
-    "cond_gauss = conditional Gaussian likelihood ratio. For nonlinear effects in continuous "
-    "data, each far slower per test: kci = kernel test; rcot = its random-feature approximation; "
-    "cmiknn = nearest-neighbor conditional mutual information; "
-    "gpdc = Gaussian-process regression and distance correlation. These four rank the columns as "
-    "the searches do, so ANDREY_TIE_BREAK=position makes their p-values depend on the column "
-    "order. " + _DECLARED.format(every="gsq", fallback="fisherz"),
+    doc=_PARTIAL_CORRELATION + "; normal_scores = fisherz on each column's normal scores, for data "
+    "whose columns are monotone transformations of Gaussian variables. " + _OTHER_TESTS,
+)
+#: indep_test of a method whose tests always read several environments: no normal_scores.
+_POOLED_INDEP_TEST = concept_param(
+    "indep_test",
+    choices=UNRANKED_TESTS,
+    doc=_PARTIAL_CORRELATION + ". normal_scores is not offered: ranked over the rows of every "
+    "environment, a column's normal scores mix their distributions. " + _OTHER_TESTS,
 )
 _DEGREES_OF_FREEDOM = concept_param("degrees_of_freedom")
 _CATEGORICAL = concept_param("categorical")
@@ -354,7 +373,7 @@ _add(
         ),
         params=(
             _ALPHA,
-            _INDEP_TEST,
+            _POOLED_INDEP_TEST,
             _DEGREES_OF_FREEDOM,
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
@@ -421,7 +440,7 @@ _add(
         ),
         params=(
             _ALPHA,
-            _INDEP_TEST,
+            _POOLED_INDEP_TEST,
             _DEGREES_OF_FREEDOM,
             _COLLIDER_RULE,
             _CATEGORICAL,
@@ -560,6 +579,13 @@ _OWN_DEGREES_OF_FREEDOM = {
         + " PCMB defaults to nonempty: its paper runs G-square as Spirtes, Glymour and Scheines do "
         "(Pena et al. 2007).",
     ),
+    "mmmb": concept_param(
+        "degrees_of_freedom",
+        default="nonempty",
+        doc=_DEGREES_OF_FREEDOM.doc
+        + " MMMB defaults to nonempty: its paper runs G-square as Spirtes, Glymour and Scheines "
+        "describe it (Tsamardinos, Aliferis & Statnikov 2003).",
+    ),
 }
 _OWN_ALPHA = {
     "pcmb": concept_param(
@@ -677,7 +703,7 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
         _BLANKET_STRUCTURE,
         "cpdag",
         ("Aliferis et al. 2010", "Margaritis 2003"),
-        "experimental",
+        "supported",
     ),
     (
         "mmmb",
@@ -696,7 +722,7 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
             "Aliferis et al. 2010",
             "Margaritis 2003",
         ),
-        "experimental",
+        "supported",
     ),
     (
         "pcmb",
@@ -763,7 +789,7 @@ _add(
             "the search learned, in order",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         params=(
@@ -820,7 +846,7 @@ _add(
             "metadata['blankets_learned'] the variables whose blanket the fit learned, in order",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         params=(
@@ -868,7 +894,7 @@ _add(
             "variables whose blanket the search learned, in order",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         params=(
@@ -935,7 +961,7 @@ _add(
             "treatment, by descending score, each with its score and patterns",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         order_note="The listing order of claims with equal scores and of a claim's patterns "
         "follows the column order.",
@@ -1072,7 +1098,7 @@ _add(
             "treatment",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         params=(
@@ -1121,7 +1147,7 @@ _add(
             "away from them; metadata['effects'] holds one record per ordered pair of them",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         order_note="The number of tests can change with the column order: the identifiability "
         "step stops at the first undirected neighbor of the treatment that fails it.",
@@ -1181,7 +1207,7 @@ _add(
             "metadata['visited'], and metadata['double_bar'] describe the search",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         params=(
@@ -1783,8 +1809,7 @@ _add(
         family="score",
         summary="NOTEARS: least squares with an l1 penalty under the acyclicity equation "
         "tr(exp(W*W)) = d, by L-BFGS-B. Returns a weighted DAG. robust=true adds the likelihood "
-        "path of Deng et al. 2024, which does not depend on the scale of the columns. "
-        "Deterministic; no torch.",
+        "path of Deng et al. 2024. Reads the columns' units. Deterministic; no torch.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=_CONTINUOUS_OUTPUT,
         accel="numpy",
@@ -1843,12 +1868,11 @@ _add(
         family="score",
         summary="DAGMA: least squares with an l1 penalty and a log-determinant acyclicity barrier "
         "lowered along a central path, by Adam. Returns a weighted DAG. robust=true adds the "
-        "likelihood path of Deng et al. 2024, which does not depend on the scale of the columns. "
-        "Deterministic; no torch.",
+        "likelihood path of Deng et al. 2024. Reads the columns' units. Deterministic; no torch.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=_CONTINUOUS_OUTPUT,
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         reads_units=True,
         tie_break=True,
@@ -2259,7 +2283,7 @@ _add(
                 exclusive_maximum=True,
                 nullable=True,
             ),
-            _INDEP_TEST,
+            _POOLED_INDEP_TEST,
             _DEGREES_OF_FREEDOM,
             concept_param("invariance_test"),
             concept_param(
@@ -2352,7 +2376,7 @@ _add(
                 exclusive_maximum=True,
                 nullable=True,
             ),
-            _INDEP_TEST,
+            _POOLED_INDEP_TEST,
             _DEGREES_OF_FREEDOM,
             concept_param("invariance_test"),
             concept_param(
@@ -2457,7 +2481,7 @@ _add(
             "stable ones first",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         order_note=(
             "The sparse ICA rounds differently under a new column order, which can move an entry "
@@ -2471,8 +2495,9 @@ _add(
                 default=False,
                 doc="Read the edges by peeling sink columns of the demixing matrix (Dai et al. "
                 "2024, App. C), which assumes neither the target nor a child lies on a cycle, "
-                "instead of trying every admissible assignment (Algorithm 1); a matrix with no "
-                "sink column falls back to Algorithm 1.",
+                "instead of trying every admissible assignment (Algorithm 1); when no column is "
+                "a sink, the column with the fewest nonzero entries is read as one (the authors' "
+                "rule).",
             ),
             concept_param(
                 "w_threshold",
@@ -3107,9 +3132,10 @@ _add(
             ),
             concept_param(
                 "indep_test",
-                choices=CONTINUOUS_INDEP_TESTS,
+                choices=tuple(t for t in CONTINUOUS_INDEP_TESTS if t in UNRANKED_TESTS),
                 doc="Conditional-independence test, as in pcmciplus: a test of continuous data, as "
-                "the dummies enter it as numeric one-hot columns. null picks fisherz.",
+                "the dummies enter it as numeric one-hot columns, but not normal_scores, whose "
+                "ranks over the rows of every dataset mix their distributions. null picks fisherz.",
             ),
             _TEST_SEED,
             concept_param(

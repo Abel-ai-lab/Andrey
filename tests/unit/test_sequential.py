@@ -2,15 +2,18 @@
 
 Under a d-separation oracle, the CPDAG rules return at every target of random DAGs the target's
 edges and marks in the true CPDAG, and the PAG rules with R1 and R2 those in the true PAG over the
-observed variables, hidden variables included; the walks of the papers' examples are reproduced,
-an orientation that waits several steps away is found, and the stop rules end early with the
-answer still right. Each step is checked alone: the local structure decides a pair at the node
-by the node's blanket, the merge keeps the node's edges and the v-structures that contain it, the
-orientation reads a non-adjacency only where a test separated the pair, and the stop rules read
-the paths. On data the answer does not depend on the column order or the columns' units.
+observed variables, hidden variables included; the walks of the papers' examples are reproduced, an
+orientation that waits several steps away is found, and the stop rules end early with the answer
+still right. Each step is checked alone: the local structure decides a pair at the node by the
+node's blanket or, under the skeleton rule of LOAD, by the adjacencies of the pair's ends, the merge
+keeps the node's edges and the v-structures that contain it, the orientation reads a non-adjacency
+only where a test separated the pair, and the stop rules read the paths. On data the answer does not
+depend on the column order or the columns' units.
 """
 
 from __future__ import annotations
+
+from dataclasses import replace
 
 import networkx as nx
 import numpy as np
@@ -32,6 +35,7 @@ from andrey.constraint.sequential import (
     merge,
     open_reach,
     orient,
+    resolve_conflicts,
     sequential,
     stop_rule,
     unknown_triples,
@@ -189,6 +193,36 @@ def test_mb_by_mb_stops_when_no_variable_is_left_to_learn():
     assert result.network.mark(0, 2) == TAIL and result.network.mark(2, 0) == TAIL
 
 
+class _OneFalseIndependence(DSepOracle):
+    """d-separation in ``dag``, except that the pair ``pair`` tests independent given ``given``."""
+
+    def __init__(self, dag: nx.DiGraph, pair: tuple[int, int], given: tuple[int, ...]) -> None:
+        super().__init__(dag)
+        self.pair, self.given = frozenset(pair), frozenset(given)
+
+    def __call__(self, x: int, y: int, condition_set=()) -> float:
+        if {int(x), int(y)} == self.pair and {int(z) for z in condition_set} == self.given:
+            return 1.0
+        return super().__call__(x, y, condition_set)
+
+
+def test_mb_by_mb_puts_no_edge_between_a_pair_a_test_separated():
+    # 0 -> 1 -> 2 with 0 and 1 testing independent given {2}: 1's blanket learner leaves 0 out
+    # with that set, while 0's own step keeps 0 - 1. MB-by-MB keeps every independence found and
+    # puts no edge between such a pair; without the rule the edge stays.
+    dag = _dag([(0, 1), (1, 2)], 3)
+
+    def run(rules: Rules):
+        search = LocalSearch(_OneFalseIndependence(dag, (0, 1), (2,)), [0, 1, 2], 0.05)
+        return sequential(search, 0, "iamb", rules)
+
+    result = run(MB_BY_MB)
+    assert result.cache.blankets[1] == [2] and result.cache.sepsets[0, 1] == (2,)
+    assert not result.network.star(0, 3).any()
+    kept = run(replace(MB_BY_MB, drop_separated=False))
+    assert kept.network.mark(0, 1) == TAIL and kept.network.mark(1, 0) == TAIL
+
+
 def test_an_orientation_several_steps_away_reaches_the_target():
     # p -> q <- r, q -> s -> t -> T: only the collider at q, three blankets away, orients t -> T.
     t_, t, s, q, p, r = range(6)
@@ -242,6 +276,134 @@ def test_a_pair_at_the_node_is_decided_by_subsets_of_its_blanket(how):
     local = learn_local(search, 0, mb, how)
     assert {p for p in local.adjacent if 0 in p} == {(0, 1), (0, 3)}
     assert {(0, 1, 2), (0, 3, 4)} <= local.colliders
+
+
+def _at(local: LocalGraph, x: int):
+    """The pairs that hold ``x`` and the v-structures that contain it."""
+    return (
+        {p for p in local.adjacent if x in p},
+        {c for c in local.colliders if x in c},
+    )
+
+
+@pytest.mark.parametrize(("seed", "d"), [(s, 10 + s % 5) for s in range(12)])
+def test_the_skeleton_rule_keeps_the_edges_and_v_structures_at_the_node_of_the_blanket_rule(
+    seed, d
+):
+    # Under exact tests, testing a pair at the node against the adjacencies of both ends keeps the
+    # node's edges and the v-structures that contain it, as testing it against its blanket does.
+    dag = _random_dag(seed, d)
+    search = _search(dag)
+    for x in range(d):
+        mb = search.local("iamb", x)[1]
+        assert _at(learn_local(search, x, mb, "skeleton"), x) == _at(
+            learn_local(search, x, mb, "pc"), x
+        )
+
+
+def test_the_skeleton_rule_separates_a_spouse_by_the_adjacencies_of_its_far_end():
+    # Schubert et al. (2026) Ex. A.1: 0 and its spouse 4 are separated by {1, 2} only; 2 is not
+    # adjacent to 0 but is to 4, so the far end's adjacencies hold the set.
+    dag = _dag([(0, 1), (0, 3), (1, 4), (2, 1), (2, 4), (4, 3)], 5)
+    search = _search(dag)
+    local = learn_local(search, 0, search.local("iamb", 0)[1], "skeleton")
+    assert {p for p in local.adjacent if 0 in p} == {(0, 1), (0, 3)}
+    assert {(0, 1, 2), (0, 3, 4)} <= local.colliders
+
+
+def test_the_skeleton_rule_tests_far_fewer_sets_where_the_blanket_is_wide():
+    # 0 has two children, each with six other parents: |MB(0)| is 14 and no variable has more than
+    # seven neighbors. An adjacent pair at 0 passes every subset of its blanket, 2 ** 13 of them,
+    # while the adjacencies of its ends hold at most 2 ** 6.
+    edges = [(0, c) for c in (1, 2)]
+    edges += [(p, 1) for p in range(3, 9)] + [(p, 2) for p in range(9, 15)]
+    dag = _dag(edges, 15)
+    counts, found = {}, {}
+    for how in ("pc", "skeleton"):
+        search = _search(dag)
+        mb = search.local("iamb", 0)[1]
+        with counting_tests() as tests:
+            found[how] = _at(learn_local(search, 0, mb, how), 0)
+        counts[how] = tests.n
+    assert found["skeleton"] == found["pc"]
+    assert counts["skeleton"] * 10 < counts["pc"]
+
+
+@pytest.mark.parametrize(("seed", "d", "hidden"), [(s, 10 + s % 5, s % 4) for s in range(12)])
+def test_the_smaller_blanket_keeps_the_answer_of_the_node_blanket_at_every_target(seed, d, hidden):
+    # Under exact tests a pair x - y is separated by a subset of MB(y) without x exactly when a
+    # subset of MB(x) without y separates it, with hidden variables too, so the answer is the same.
+    dag = _random_dag(seed, d, hidden, mediated=seed % 2 == 1)
+    truth = _pag(dag, d)
+    for target in range(d):
+        stars = [
+            sequential(_search(dag, _ranks(seed, d)), target, "iamb", rules).network.star(target, d)
+            for rules in (MMB_BY_MMB, replace(MMB_BY_MMB, local="pc"))
+        ]
+        assert np.array_equal(*stars), target
+        want = _star(truth, target)
+        assert np.array_equal(stars[0] != NULL, want != NULL), target
+        assert np.all((stars[0] == want) | (stars[0] == CIRCLE)), target
+
+
+def test_the_smaller_blanket_tests_far_fewer_sets_at_a_hub():
+    # 0 has two children, each with six other parents: |MB(0)| is 14 and each child's blanket has
+    # 7 members. An adjacent pair at 0 passes every subset of 0's blanket, 2 ** 13 of them, and
+    # every subset of the child's, 2 ** 6.
+    edges = [(0, 1), (0, 2)] + [(p, 1) for p in range(3, 9)] + [(p, 2) for p in range(9, 15)]
+    dag = _dag(edges, 15)
+    counts, found = {}, {}
+    for how in ("pc", "pc_smaller"):
+        search = _search(dag)
+        mb = search.local("iamb", 0)[1]
+        with counting_tests() as tests:
+            local = learn_local(search, 0, mb, how, of=lambda v: search.local("iamb", v)[1])
+            found[how] = _at(local, 0)
+        counts[how] = tests.n
+    assert found["pc_smaller"] == found["pc"]
+    assert counts["pc_smaller"] * 5 < counts["pc"]
+
+
+def test_the_collider_check_drops_a_v_structure_the_smaller_blanket_brings_in():
+    # 1's blanket {2, 6, 7, 10}: 2 <- 3 -> 7 -> 1 makes 2 - 7 an edge of L_1, and MB(2) = {1, 3,
+    # 10} separates 1 from 2 by {3}, a set without 7, so L_1 holds 1 *-> 7 <-* 2. 7's own step
+    # leaves 7 and 2 apart, and the check drops it.
+    edges = [(0, 4), (1, 6), (1, 10), (2, 10), (3, 2), (3, 7), (5, 0), (6, 8), (7, 1), (7, 5)]
+    dag = _dag(edges + [(7, 9), (9, 0), (10, 6), (10, 9)], 11)
+    search = _search(dag)
+    mb = search.local("iamb", 1)[1]
+    local = learn_local(search, 1, mb, "pc_smaller", of=lambda v: search.local("iamb", v)[1])
+    assert (1, 7, 2) in local.colliders
+    truth = _pag(dag, 11)
+    result = sequential(_search(dag), 1, "iamb", MMB_BY_MMB)
+    assert np.array_equal(result.network.star(1, 11), _star(truth, 1))
+
+
+def test_the_smaller_blanket_falls_back_to_the_node_blanket():
+    # A far blanket that does not hold x, as a learner can return on data, is not read.
+    edges = [(0, 1), (0, 2)] + [(p, 1) for p in range(3, 9)] + [(p, 2) for p in range(9, 15)]
+    dag = _dag(edges, 15)
+    counts, found = {}, {}
+    for how, of in (("pc", None), ("pc_smaller", lambda v: [])):
+        search = _search(dag)
+        mb = search.local("iamb", 0)[1]
+        with counting_tests() as tests:
+            found[how] = learn_local(search, 0, mb, how, of=of)
+        counts[how] = tests.n
+    assert found["pc_smaller"] == found["pc"]
+    assert counts["pc_smaller"] == counts["pc"]
+
+
+def test_load_learns_its_local_structures_by_the_skeleton_rule():
+    edges = [(0, 1), (0, 2)] + [(p, 1) for p in range(3, 9)] + [(p, 2) for p in range(9, 15)]
+    dag = _dag(edges, 15)
+    counts, marks = {}, {}
+    for name, rules in (("load", LOAD), ("blanket", replace(LOAD, local="pc"))):
+        search = _search(dag)
+        result = sequential(search, 0, "gs", rules)
+        counts[name], marks[name] = result.n_tests, result.network.marks.copy()
+    assert np.array_equal(marks["load"], marks["blanket"])
+    assert counts["load"] * 10 < counts["blanket"]
 
 
 @pytest.mark.parametrize("how", ["ic", "pc"])
@@ -350,6 +512,8 @@ def test_rules_refuse_unknown_choices_and_a_learner_of_parents_and_children():
         Rules(colliders="never")
     with pytest.raises(ValueError, match="stop_after"):
         Rules(stop_after="degree")
+    with pytest.raises(ValueError, match="own_blanket"):
+        Rules(local="pc_smaller")
     with pytest.raises(ValueError, match="parents and children"):
         sequential(_search(_dag([(0, 1)], 2)), 0, "mmpc")
 
@@ -401,3 +565,30 @@ def test_the_answer_does_not_depend_on_the_column_order_or_the_units(rules):
         shuffled = _answer(x[:, perm], int(np.flatnonzero(perm == target)[0]), rules)
         assert np.array_equal(shuffled, answer[np.ix_(perm, perm)]), target
         assert np.array_equal(_answer(x * scale, target, rules), answer), target
+
+
+def test_a_conflicting_edge_takes_the_direction_of_the_more_clearly_separated_collider():
+    """``0 -> 1 <- 2`` (pair p-value 0.9) and ``1 -> 2 <- 3`` (0.3) dispute ``1 - 2``: the edge
+    keeps the arrowhead the first asks, ``2 -> 1``, and ``3 -> 2`` keeps its own."""
+    network = Network(TAIL)
+    for u, v in ((0, 1), (1, 2), (2, 3)):
+        network.add(u, v)
+    colliders = [(0, 1, 2), (1, 2, 3)]
+    for a, b, c in colliders:
+        network.arrow(b, a)
+        network.arrow(b, c)
+    assert resolve_conflicts(network, colliders, {(0, 2): 0.9, (1, 3): 0.3})
+    assert (network.mark(1, 2), network.mark(2, 1)) == (ARROW, TAIL)
+    assert (network.mark(1, 0), network.mark(2, 3)) == (ARROW, ARROW)
+
+
+def test_a_conflicting_edge_whose_colliders_tie_stays_bidirected():
+    network = Network(TAIL)
+    for u, v in ((0, 1), (1, 2), (2, 3)):
+        network.add(u, v)
+    colliders = [(0, 1, 2), (1, 2, 3)]
+    for a, b, c in colliders:
+        network.arrow(b, a)
+        network.arrow(b, c)
+    assert not resolve_conflicts(network, colliders, {(0, 2): 0.5, (1, 3): 0.5})
+    assert (network.mark(1, 2), network.mark(2, 1)) == (ARROW, ARROW)

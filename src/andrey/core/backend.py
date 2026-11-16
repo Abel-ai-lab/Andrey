@@ -25,6 +25,7 @@ import os
 import sys
 import threading
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -612,6 +613,14 @@ def one_blas_thread() -> contextlib.AbstractContextManager:
     The libraries are found once per process; one loaded after the first call is not limited.
     """
     return _thread_pools().limit(limits=1)
+
+
+def thread_limits_now() -> Callable[[], contextlib.AbstractContextManager]:
+    """The loaded BLAS and OpenMP thread pools' limits at this call, as a function that opens a
+    ``with`` block under them: work deferred from here into a block that pins one thread
+    (:func:`one_blas_thread`) runs on the threads it would have had here."""
+    limits = {pool["prefix"]: pool["num_threads"] for pool in _thread_pools().info()}
+    return lambda: _thread_pools().limit(limits=limits)
 
 
 # ---- tensor transfer (torch backends) -----------------------------------------------------------

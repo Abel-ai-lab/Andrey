@@ -28,6 +28,7 @@ from andrey.constraint.blanket import LEARNERS
 from andrey.core.ci import (
     CONTINUOUS_INDEP_TESTS,
     DEGREES_OF_FREEDOM,
+    RANK_INDEP_TESTS,
     SHIPPED_INDEP_TESTS,
     STOCHASTIC_INDEP_TESTS,
 )
@@ -159,6 +160,13 @@ LINGAM = (
 RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl", "loci")
 #: The searches that take n_starts.
 STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_igsp")
+#: The tests of a method whose tests always read several environments: all but the rank-based
+#: ones, which rank each column over the rows of every environment.
+UNRANKED_TESTS = tuple(t for t in SHIPPED_INDEP_TESTS if t not in RANK_INDEP_TESTS)
+_POOLED_RANKS = (
+    "normal_scores ranks each column over the rows of every environment, which mixes their "
+    "distributions"
+)
 #: The methods that take a conditional-independence test.
 TESTED = (
     *(*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp", "y_structures"),
@@ -422,13 +430,35 @@ _CONCEPTS = (
             ),
         ),
         deviations=(
+            *(
+                Deviation(
+                    method=method,
+                    name="indep_test",
+                    default=None,
+                    choices=UNRANKED_TESTS,
+                    reason=f"{why} {_POOLED_RANKS}.",
+                )
+                for method, why in (
+                    ("cdnod", "Its tests read every environment's rows with their index, and"),
+                    ("fci_jci", "Its tests read every environment's rows with their index, and"),
+                    (
+                        "igsp",
+                        "Its invariance tests compare a setting with the observational rows, and",
+                    ),
+                    (
+                        "ut_igsp",
+                        "Its invariance tests compare a setting with the observational rows, and",
+                    ),
+                )
+            ),
             Deviation(
                 method="jpcmciplus",
                 name="indep_test",
                 default=None,
-                choices=CONTINUOUS_INDEP_TESTS,
+                choices=tuple(t for t in CONTINUOUS_INDEP_TESTS if t in UNRANKED_TESTS),
                 reason="The dummies enter every test as numeric one-hot columns, so it takes the "
-                "tests of continuous data.",
+                "tests of continuous data, but not normal_scores, which ranks each column over the "
+                "rows of every dataset and so mixes their distributions.",
             ),
             *(
                 Deviation(
@@ -473,6 +503,15 @@ _CONCEPTS = (
                 choices=DEGREES_OF_FREEDOM,
                 reason="Its paper runs G-square as Spirtes, Glymour and Scheines do (Pena et al. "
                 "2007, Section 3), whose degrees of freedom drop the cells with no expected count.",
+            ),
+            Deviation(
+                method="mmmb",
+                name="degrees_of_freedom",
+                default="nonempty",
+                choices=DEGREES_OF_FREEDOM,
+                reason="Its paper runs G-square as Spirtes, Glymour and Scheines describe it "
+                "(Tsamardinos, Aliferis and Statnikov 2003, Section 2), whose degrees of freedom "
+                "drop the cells with no expected count.",
             ),
         ),
     ),

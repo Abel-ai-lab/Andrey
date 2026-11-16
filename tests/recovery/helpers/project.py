@@ -27,6 +27,11 @@ _GRAPH = (
             "MMPC",
             "HITONPC",
             "PCMB",
+            "MBbyMB",
+            "HITONMB",
+            "MMMB",
+            "CMB",
+            "MMBbyMMB",
             "ExactSearch",
             "BOSS",
             "BOSSFCI",
@@ -65,12 +70,21 @@ _PCMCI = frozenset({"PCMCI", "PCMCIplus", "LPCMCI"})
 # ICP: candidate = the DAG into the target, the accepted sets, and each column's p-value, ``None``
 # at the target.
 _INVARIANT = frozenset({"ICP"})
+# Treatment-outcome methods: candidate = the graph and the ``effects`` records.
+_EFFECTS = frozenset({"LDECC", "LocalOptimalAdjustment", "LocPCCDE"})
 # Weighted temporal fits: candidate = the per-lag graphs and their weights.
 _WEIGHTED_LAGS = frozenset({"DYNOTEARS", "Granger"})
-# Weighted DAGs: candidate = the DAG and its weights, ``weighted_adjacency[i, j]`` for ``i -> j``.
-_WEIGHTED_DAG = frozenset({"NOTEARS"})
+# Weighted graphs: candidate = the graph and its weights, ``weighted_adjacency[i, j]`` for
+# ``i -> j``: the DAGs of NOTEARS and DAGMA, and local ISA-LiNG's digraph of the edges at its
+# target.
+_WEIGHTED_GRAPH = frozenset({"NOTEARS", "DAGMA", "LocalISALiNG"})
 # VARMA-LiNGAM: candidate = the causal order and both coefficient stacks in the native B layout.
 _VARMA = frozenset({"VARMALiNGAM", "VARMALiNGAMPruned"})
+
+
+# Y-structures: candidate = the edgeless graph, the claimed ``[treatment, outcome]`` pairs by
+# descending score, and their scores.
+_CLAIMS = frozenset({"YStructures"})
 
 
 def found_dag(out: Any) -> GraphStructure:
@@ -124,12 +138,21 @@ def project_output(out: Any, algorithm: str) -> dict:
         return {"graph": out.structure.to_numpy(), "latent_pairs": pairs}
     if algorithm in _ORDERED_DAG:
         return {"graph": out.structure.to_numpy(), "causal_order": np.asarray(out.ordering)}
+    if algorithm in _CLAIMS:
+        claims = out.metadata["effects"]
+        return {
+            "graph": out.structure.to_numpy(),
+            "claims": [[c["treatment"], c["outcome"]] for c in claims],
+            "scores": [c["score"] for c in claims],
+        }
     if algorithm in _INVARIANT:
         return {
             "graph": out.structure.to_numpy(),
             "accepted_sets": out.metadata["accepted_sets"],
             "p_values": out.metadata["p_values"],
         }
+    if algorithm in _EFFECTS:
+        return {"graph": out.structure.to_numpy(), "effects": out.metadata["effects"]}
     if algorithm in _PAIRWISE:
         md = out.metadata
         fields = _PAIRWISE_FIELDS | (_LIKELIHOOD_FIELDS if algorithm == "LOCI" else {})
@@ -175,7 +198,7 @@ def project_output(out: Any, algorithm: str) -> dict:
             "graph": np.stack([s.lag(lag).to_numpy() for lag in s.lags]),
             "lag_weights": np.asarray(s.lag_weights),
         }
-    if algorithm in _WEIGHTED_DAG:
+    if algorithm in _WEIGHTED_GRAPH:
         return {
             "graph": out.structure.to_numpy(),
             "weighted_adjacency": np.asarray(out.weighted_adjacency),

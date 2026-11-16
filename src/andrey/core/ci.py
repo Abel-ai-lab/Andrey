@@ -89,9 +89,10 @@ from typing import Any, Protocol, Self, cast, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
+from scipy.linalg import get_lapack_funcs
 from scipy.special import chdtrc, gammaln, ndtr, stdtr
 
-from . import categorical, stats
+from . import categorical, env, stats
 from .categorical import BATCH_CELLS, DENSE_MIN, DENSE_ROWS
 from .mixed import ConditionalGaussian, DegenerateGaussian
 from .score import copies_error, copies_message, copy_groups
@@ -118,6 +119,14 @@ SINGULAR_RTOL = 1e-12
 # How far the inverse bound in _invert_nonsingular stays above that threshold; the factor absorbs
 # the rounding of the computed inverse and of the eigenvalues.
 BOUND_MARGIN = 1e4
+# The smallest number of candidates times the block size, len(ys) * (|S| + 2), that
+# statistic_pvalues_given answers from one factor, unless ANDREY_SHARED_SCAN_MIN_WORK sets another.
+# On one core the factor is slower than the per-query inversions below a work of about 64 and faster
+# from 128 at every set size sampled (2 to 12).
+MIN_SHARED_FACTOR_WORK = 128
+# The LAPACK Cholesky factor and triangular solve of statistic_pvalues_given, called directly: on
+# the small scans it serves, the checks of scipy.linalg's wrappers would take most of the time.
+_POTRF, _TRTRS = get_lapack_funcs(("potrf", "trtrs"), (np.empty((1, 1)),))
 
 
 @dataclass(slots=True)
@@ -216,7 +225,9 @@ class PartialCorrelationTest:
     separating-set search, and :meth:`batched_call` call with queries canonical as built, use
     identical partial-correlation, clip, and p-value arithmetic. Their p-values match exactly, so
     repeated queries take the same ``p > alpha`` decision across call paths, including at the
-    threshold.
+    threshold. :meth:`statistic_pvalues_given_rest` and :meth:`statistic_pvalues_given`, which
+    answer the blanket learners' scans from one inverse or one factor, agree with them up to
+    rounding.
     """
 
     # The data's groups of copies, set by the first singular inversion.
@@ -278,9 +289,9 @@ class PartialCorrelationTest:
             ryz = float(corr[y_int, z_idx])
             r = (rxy - rxz * ryz) / math.sqrt((1.0 - rxz * rxz) * (1.0 - ryz * ryz))
         else:
-            var = (x_int, y_int, *cond)
-            inv = self._invert(corr[np.ix_(var, var)][None])[0]
-            r = -float(inv[0, 1]) / math.sqrt(abs(float(inv[0, 0]) * float(inv[1, 1])))
+            var = np.array((x_int, y_int, *cond), dtype=np.intp)
+            inv = self._invert_one(corr[var[:, None], var])
+            r = -inv.item(0, 1) / math.sqrt(abs(inv.item(0, 0) * inv.item(1, 1)))
         return -ONE_MINUS_EPS if r < -ONE_MINUS_EPS else ONE_MINUS_EPS if r > ONE_MINUS_EPS else r
 
     def copies(self) -> tuple[tuple[int, ...], ...]:
@@ -306,6 +317,20 @@ class PartialCorrelationTest:
             )
             named.groups = copies
             raise named from error
+
+    def _invert_one(self, matrix: np.ndarray) -> np.ndarray:
+        """:meth:`_invert` of the one ``(k, k)`` submatrix ``matrix``, with the bits of a stack of
+        one: the same ``np.linalg.inv`` call and the same bound as :func:`_invert_nonsingular`. A
+        matrix the bound does not settle, or that ``np.linalg.inv`` rejects, takes :meth:`_invert`.
+        """
+        try:
+            inv = np.linalg.inv(matrix)
+        except np.linalg.LinAlgError:
+            return self._invert(matrix[None])[0]
+        size = matrix.shape[0]
+        if not abs(inv).max() < 1.0 / (BOUND_MARGIN * SINGULAR_RTOL * size * size):
+            return self._invert(matrix[None])[0]
+        return inv
 
     def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
         """Return p-values for one ``(x, y)`` pair over many conditioning sets.
@@ -468,6 +493,88 @@ class PartialCorrelationTest:
         count_tests(len(ys))
         return r, p
 
+    def statistic_pvalues_given(
+        self, x: int, ys: Sequence[int], condition_set: Iterable[int]
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Partial correlations and p-values of ``x`` and each of ``ys`` given one conditioning set.
+
+        Entry ``i`` is :meth:`statistic_pvalue` of ``x`` and ``ys[i]`` given ``condition_set``, up
+        to rounding; a repeated column of the set counts once. For a set ``S`` of two or more
+        columns and two or more candidates whose ``len(ys) * (|S| + 2)`` reaches
+        ``MIN_SHARED_FACTOR_WORK`` (128, or the ``ANDREY_SHARED_SCAN_MIN_WORK`` that overrides it;
+        ``0`` factors every such scan), one Cholesky factor ``L`` of the set's correlation block
+        ``R_SS`` serves every candidate: with ``w_a = L^-1 R_Sa``, the Schur complement
+        ``P_ab = R_ab - w_a . w_b`` gives the partial correlation ``P_xy / sqrt(P_xx P_yy)``, where
+        :meth:`statistic_pvalue` inverts each ``[x, y, *S]`` block. The two agree to about ``1e-10``
+        relative in the p-value, so a p-value on a rounding boundary can differ in its ninth
+        significant digit, and a candidate's last bits can change with the other candidates of the
+        call. Every entry of the correlation matrix is read as ``corr[min, max]`` of its two
+        columns, so a matrix that is not exactly symmetric gives each pair one answer whichever
+        column is ``x``. Each query counts as one test.
+
+        The other calls take :meth:`statistic_pvalues`, which answers or raises as it does: a
+        smaller set, fewer candidates, and any call with a block that the factor does not show to
+        be well inside the nonsingular range of :func:`_invert_nonsingular`, so that every block
+        the current rule calls singular, such as a candidate that copies ``x`` or a member of the
+        set, raises the same error. ``ys`` excludes ``x`` and the members of the set.
+        """
+        cols = np.asarray(ys, dtype=np.intp).reshape(-1)
+        cond = np.unique(np.fromiter(condition_set, dtype=np.intp))
+        min_work = env.SHARED_SCAN_MIN_WORK.read()
+        if min_work is None:
+            min_work = MIN_SHARED_FACTOR_WORK
+        if len(cond) >= 2 and len(cols) >= 2 and len(cols) * (len(cond) + 2) >= min_work:
+            df = self._degrees_of_freedom(len(cond))
+            r = self._schur_partial_correlations(int(x), cols, cond)
+            if r is not None:
+                r = np.clip(r, -ONE_MINUS_EPS, ONE_MINUS_EPS)
+                p = np.asarray(self._pvalue(r, df), dtype=np.float64)
+                count_tests(len(cols))
+                return r, p
+        xs = np.full(len(cols), x, dtype=np.intp)
+        return self.statistic_pvalues(xs, cols, np.tile(cond, (len(cols), 1)))
+
+    def _schur_partial_correlations(
+        self, x: int, ys: np.ndarray, cond: np.ndarray
+    ) -> np.ndarray | None:
+        """The unclamped partial correlations of :meth:`statistic_pvalues_given` from the Schur
+        complements of the block ``R_SS`` of the sorted distinct set ``cond``, or ``None`` when a
+        block ``A = [x, y, *S]`` may not pass :func:`_invert_nonsingular`.
+
+        The inverse of ``A`` is ``diag(R_SS^-1, 0) + [V; -I] M^-1 [V; -I]^T``, with ``M`` the 2 x 2
+        Schur complement of ``x`` and ``y`` and ``V = R_SS^-1 R_S[x, y]``, whose squared norm is at
+        most ``2 g`` on a unit diagonal, where ``g = ||L^-1||_F^2 >= ||R_SS^-1||_2``. So
+        ``||A^-1||_2 <= g + (1 + 2 g) / lambda_min(M)``. Below ``1 / (BOUND_MARGIN * SINGULAR_RTOL *
+        k)``, with ``k = |S| + 2 >= lambda_max(A)``, every block has ``lambda_min > BOUND_MARGIN *
+        SINGULAR_RTOL * lambda_max`` and the eigenvalue test passes; a NaN fails the comparison.
+        """
+        corr = self._corr
+        size, n = len(cond), len(ys)
+        factor, info = _POTRF(corr[cond[:, None], cond], lower=0)  # the upper triangle; cond sorted
+        if info != 0:
+            return None
+        rhs = np.empty((size, n + 1 + size))
+        rhs[:, 0] = corr[np.minimum(cond, x), np.maximum(cond, x)]
+        rhs[:, 1 : n + 1] = corr[np.minimum(cond[:, None], ys), np.maximum(cond[:, None], ys)]
+        rhs[:, n + 1 :] = np.eye(size)
+        w, info = _TRTRS(factor, rhs, lower=0, trans=1)
+        if info != 0:
+            return None
+        g = np.einsum("ij,ij->", w[:, n + 1 :], w[:, n + 1 :])
+        squares = np.einsum("ij,ij->j", w[:, : n + 1], w[:, : n + 1])
+        pxx = corr[x, x] - squares[0]
+        pyy = corr[ys, ys] - squares[1:]
+        pxy = corr[np.minimum(x, ys), np.maximum(x, ys)] - np.einsum(
+            "i,ij->j", w[:, 0], w[:, 1 : n + 1]
+        )
+        smallest = 0.5 * (pxx + pyy) - np.hypot(0.5 * (pxx - pyy), pxy)  # lambda_min(M) per y
+        if not (smallest > 0.0).all():
+            return None
+        bound = g + (1.0 + 2.0 * g) / smallest
+        if not (bound < 1.0 / (BOUND_MARGIN * SINGULAR_RTOL * (size + 2))).all():
+            return None
+        return pxy / np.sqrt(pxx * pyy)
+
     def residual_statistic_pvalues(
         self, data: np.ndarray, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
     ) -> tuple[np.ndarray, np.ndarray]:
@@ -568,9 +675,10 @@ class FisherZ(PartialCorrelationTest):
     """Fisher-Z partial-correlation conditional-independence test.
 
     Applies Fisher's z-transform to the partial correlation ``r`` and reports
-    ``p = 2 * (1 - Phi(sqrt(n - |S| - 3) * |z|))`` with ``z = atanh(r)`` and ``Phi`` the
-    standard-normal CDF. A query needs ``n >= |S| + 3``. See :class:`PartialCorrelationTest` for
-    the partial correlation, the query paths, and their exact agreement.
+    ``p = 2 * Phi(-sqrt(n - |S| - 3) * |z|)`` with ``z = atanh(r)`` and ``Phi`` the standard-normal
+    CDF. The upper tail is computed directly, so a strong dependence keeps a positive p-value far
+    below ``1e-16``. A query needs ``n >= |S| + 3``. See :class:`PartialCorrelationTest` for the
+    partial correlation, the query paths, and their exact agreement.
     """
 
     def _degrees_of_freedom(self, size: int) -> int:
@@ -585,7 +693,7 @@ class FisherZ(PartialCorrelationTest):
     @staticmethod
     def _pvalue(r: np.ndarray | float, df: int) -> np.ndarray | float:
         z = 0.5 * np.log((1.0 + r) / (1.0 - r))
-        return 2.0 * (1.0 - ndtr(np.sqrt(df) * np.abs(z)))
+        return 2.0 * ndtr(-np.sqrt(df) * np.abs(z))
 
 
 class StudentT(PartialCorrelationTest):
@@ -880,7 +988,12 @@ class NormalScores(FisherZ):
     **Limitations.** Ranks measure monotone dependence: a relation that is not monotone, such as
     ``y = x**2`` for a symmetric ``x``, has zero rank correlation, and the test finds nothing where
     ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` do. Conditioning removes only the monotone
-    part of a dependence. The p-value is the Fisher-Z one, which holds asymptotically.
+    part of a dependence. The p-value is the Fisher-Z one, which holds asymptotically. The model
+    is one distribution: ranked over the rows of several environments that change a variable, a
+    column mixes their distributions, and its scores are no longer Gaussian; ranked within each
+    environment, every column is centered and scaled in each, so none depends on the environment.
+    The methods whose tests always read several environments do not offer the test, and the others
+    refuse it with an ``env``, as they refuse the rank-based score.
     """
 
     def __init__(self, data: np.ndarray) -> None:
@@ -1911,6 +2024,9 @@ SHIPPED_INDEP_TESTS: tuple[str, ...] = (
     *NONLINEAR_INDEP_TESTS,
 )
 DISCRETE_INDEP_TESTS: tuple[str, ...] = ("chisq", "gsq")
+#: The rank-based tests, which rank each column over every row they read; a method whose tests
+#: always read several environments does not offer them, as the ranks would mix the environments.
+RANK_INDEP_TESTS: tuple[str, ...] = ("normal_scores",)
 MIXED_INDEP_TESTS: tuple[str, ...] = ("degen_gauss", "cond_gauss")
 #: The shipped tests of continuous data: the partial-correlation and the nonlinear tests.
 CONTINUOUS_INDEP_TESTS: tuple[str, ...] = tuple(
@@ -1944,6 +2060,23 @@ def register_indep_test(name: str, factory: Callable[[np.ndarray], CITest]) -> N
     tests have, reports its own; for a test without one the family asks the call one query at a
     time and ranks the candidates by p-value, smallest first (:class:`PValueTest`), which it
     reports as the statistic ``-log10(p)``.
+
+    Every index a test is queried with is a column position of the matrix its factory received, and
+    a search can call the factory again for the same columns in another order: by default the
+    possible-d-separation step of FCI, FCI-JCI, and GFCI visits the variables in
+    :func:`~andrey.core.ties.tie_ranks` order and builds its test over the matrix in that order
+    (``possible_dsep="order_free"``). A test computed from its matrix needs nothing more. A test
+    that does not read its matrix, such as a :class:`~andrey.data.latent.DSepOracle`, must find
+    which variable each column of the matrix it receives holds::
+
+        def factory(columns):
+            nodes = [
+                next(j for j in range(data.shape[1]) if np.array_equal(c, data[:, j]))
+                for c in columns.T
+            ]
+            return DSepOracle(dag, nodes=nodes)
+
+    With ``possible_dsep="fast"`` the step keeps the columns in data order.
 
     A fit's ``metadata["n_tests"]`` counts a registered test's queries only as the test reports
     them, by calling :func:`count_tests` once per query it computes (:func:`counting_tests`).
@@ -2109,7 +2242,7 @@ def _separating_prefix(
 
 def _canonical(x: int, y: int, condition_set: Iterable[int]) -> tuple[int, int, list[int]]:
     """Canonicalize a query to ordered ints and a sorted-unique conditioning set."""
-    cond = sorted(set(int(c) for c in condition_set))
+    cond = sorted(set(map(int, condition_set)))
     x_int, y_int = (int(x), int(y)) if x < y else (int(y), int(x))
     assert x_int not in cond and y_int not in cond, "x, y cannot be in condition_set."
     return x_int, y_int, cond
