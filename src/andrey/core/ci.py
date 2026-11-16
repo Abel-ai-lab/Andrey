@@ -505,7 +505,10 @@ class PartialCorrelationTest:
         correlation ``P_xy / sqrt(P_xx P_yy)``, where :meth:`statistic_pvalue` inverts each
         ``[x, y, *S]`` block. The two agree to about ``1e-10`` relative in the p-value, so a p-value
         on a rounding boundary can differ in its ninth significant digit, and a candidate's last
-        bits can change with the other candidates of the call. Each query counts as one test.
+        bits can change with the other candidates of the call. Every entry of the correlation
+        matrix is read as ``corr[min, max]`` of its two columns, so a matrix that is not exactly
+        symmetric gives each pair one answer whichever column is ``x``. Each query counts as one
+        test.
 
         The other calls take :meth:`statistic_pvalues`, which answers or raises as it does: a
         smaller set, fewer candidates, and any call with a block that the factor does not show to
@@ -542,21 +545,23 @@ class PartialCorrelationTest:
         """
         corr = self._corr
         size, n = len(cond), len(ys)
-        factor, info = _POTRF(corr[cond[:, None], cond], lower=1)
+        factor, info = _POTRF(corr[cond[:, None], cond], lower=0)  # the upper triangle; cond sorted
         if info != 0:
             return None
         rhs = np.empty((size, n + 1 + size))
-        rhs[:, 0] = corr[cond, x]
-        rhs[:, 1 : n + 1] = corr[cond[:, None], ys]
+        rhs[:, 0] = corr[np.minimum(cond, x), np.maximum(cond, x)]
+        rhs[:, 1 : n + 1] = corr[np.minimum(cond[:, None], ys), np.maximum(cond[:, None], ys)]
         rhs[:, n + 1 :] = np.eye(size)
-        w, info = _TRTRS(factor, rhs, lower=1)
+        w, info = _TRTRS(factor, rhs, lower=0, trans=1)
         if info != 0:
             return None
         g = np.einsum("ij,ij->", w[:, n + 1 :], w[:, n + 1 :])
         squares = np.einsum("ij,ij->j", w[:, : n + 1], w[:, : n + 1])
         pxx = corr[x, x] - squares[0]
         pyy = corr[ys, ys] - squares[1:]
-        pxy = corr[x, ys] - np.einsum("i,ij->j", w[:, 0], w[:, 1 : n + 1])
+        pxy = corr[np.minimum(x, ys), np.maximum(x, ys)] - np.einsum(
+            "i,ij->j", w[:, 0], w[:, 1 : n + 1]
+        )
         smallest = 0.5 * (pxx + pyy) - np.hypot(0.5 * (pxx - pyy), pxy)  # lambda_min(M) per y
         if not (smallest > 0.0).all():
             return None

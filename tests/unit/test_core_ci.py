@@ -291,6 +291,50 @@ def test_a_shared_set_agrees_with_each_query_to_rounding(test_class, seed):
         assert ((p <= 0.05) == (want_p <= 0.05)).all()
 
 
+def _not_quite_symmetric(test_class, scale, seed=0):
+    """A test over 60 columns whose correlation matrix has ``scale`` noise below the diagonal."""
+    x = sample_scm(graph="erdos_renyi", d=60, n=300, seed=seed, density=3.0).data
+    corr = np.corrcoef(x, rowvar=False)
+    noise = np.random.default_rng(seed).standard_normal(corr.shape)
+    return test_class.from_corr(corr + scale * np.tril(noise, -1), 300)
+
+
+@pytest.mark.parametrize("test_class", [FisherZ, StudentT, NormalScores])
+def test_a_shared_set_on_a_matrix_that_is_not_quite_symmetric_agrees_with_each_query(test_class):
+    """At rounding-size asymmetry, the factor's answers agree with each query as on a symmetric
+    matrix."""
+    test = _not_quite_symmetric(test_class, 1e-15)
+    for target, ys, cond in _shared_set_cases(3):
+        r, p = test.statistic_pvalues_given(target, ys.tolist(), cond.tolist())
+        want_r, want_p = test.statistic_pvalues(
+            np.full(len(ys), target), ys, np.tile(cond, (len(ys), 1))
+        )
+        np.testing.assert_allclose(r, want_r, rtol=0.0, atol=1e-12)
+        above = want_p > 1e-300
+        np.testing.assert_allclose(p[above], want_p[above], rtol=1e-9, atol=0.0)
+
+
+def test_a_shared_set_gives_a_pair_one_answer_whichever_column_is_the_target():
+    """The factor reads each pair of columns in one order, so with a visibly asymmetric matrix a
+    pair has the same answer from either endpoint, and equals the one on the matrix that copies
+    its upper triangle below the diagonal."""
+    test = _not_quite_symmetric(FisherZ, 1e-3)
+    upper = np.triu(test._corr) + np.triu(test._corr, 1).T
+    mirrored = FisherZ.from_corr(upper, 300)
+    cond = [10, 20, 30, 40]
+    others = [y for y in range(60) if y not in cond]
+    for a, b in [(5, 50), (12, 3), (45, 55)]:
+        ys_a = [b] + [y for y in others if y not in (a, b)]
+        ys_b = [a] + [y for y in others if y not in (a, b)]
+        from_a = test.statistic_pvalues_given(a, ys_a, cond)
+        from_b = test.statistic_pvalues_given(b, ys_b, cond)
+        same = mirrored.statistic_pvalues_given(a, ys_a, cond)
+        np.testing.assert_allclose(from_a[0][0], from_b[0][0], rtol=0.0, atol=1e-12)
+        np.testing.assert_allclose(from_a[1][0], from_b[1][0], rtol=1e-9, atol=0.0)
+        np.testing.assert_allclose(from_a[0], same[0], rtol=0.0, atol=1e-12)
+        np.testing.assert_allclose(from_a[1], same[1], rtol=1e-9, atol=0.0)
+
+
 @pytest.mark.parametrize(
     "ys, cond", [([1, 2, 4], []), ([1, 2, 4], [3]), ([4], [3, 5]), ([1, 2, 4], [3, 5])]
 )
