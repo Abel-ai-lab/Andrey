@@ -711,7 +711,8 @@ rebuild the data to preserve the independence of each pair tested. When a variab
 the data goes missing because of a common effect of that pair, the extra edge can stay. This occurs
 in the paper's Figure 1c and when two effects of the same causes each cause the other's missingness.
 The paper's density-ratio correction for those cases is not implemented. `andrey.data.missingness`
-simulates data whose missingness graph you know, to see where the correction helps.
+simulates data whose missingness graph you know, to see where the correction helps. The
+[missing values notebook](../examples/missing_values) runs that comparison on one simulated dataset.
 
 On simulated data in the paper's setting, MVPC made fewer errors than test-wise deletion in 10 of
 16 settings where values go missing for a reason and tied in the rest. It also tied where values

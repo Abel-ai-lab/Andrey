@@ -10,6 +10,13 @@ names its pull request.
 
 ## [Unreleased]
 
+### Added
+
+- An example notebook on missing values, `examples/missing_values.ipynb`: it removes values from
+  simulated data so that whether a value is missing depends on another variable, fits `pc` with its
+  default handling and with `missing="mvpc"` and `ges` with `missing="em"`, and scores each against
+  the true graph. ([#1059])
+
 ### Changed
 
 - The documentation of `register_indep_test` and `DSepOracle` states that a registered test's
@@ -2608,3 +2615,4 @@ First alpha release.
 [#1041]: https://github.com/Abel-ai-lab/Andrey/pull/1041
 [#1045]: https://github.com/Abel-ai-lab/Andrey/issues/1045
 [#1051]: https://github.com/Abel-ai-lab/Andrey/pull/1051
+[#1059]: https://github.com/Abel-ai-lab/Andrey/pull/1059
