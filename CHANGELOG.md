@@ -264,6 +264,16 @@ names its pull request.
   the numbers and a check of `dagma` and `notears` on the Sachs data: on its 853 observational
   measurements, four fits, default and `robust=True`, on raw and z-scored columns, made 13 or 14
   errors against the empty graph's 17. ([#1043], [#1046])
+- `andrey.lhts` and `andrey.nhts`, the hierarchical topological sorts LHTS and NHTS followed by edge
+  discovery (Hiremath et al. 2024), experimental, with `alpha=0.05` and `indep_test="kci"` by
+  default. LHTS decides the ancestor relation of each pair of variables from least-squares
+  regressions of the pair on each other, after their known common ancestors are regressed out
+  jointly; NHTS finds the roots from kernel ridge regressions on one variable or a few and places
+  the other variables layer by layer. Edge discovery tests each variable of an earlier layer given
+  its own parents and the candidates found in the layers between, then tests each candidate that
+  shares or follows a layer with another given all the other candidates. Both return a DAG, a causal
+  order that lists the layers in turn, the layers in `metadata["partial_order"]`, and the placements
+  no test decided in `metadata["forced_decisions"]`. ([#1006])
 
 ### Changed
 
@@ -2936,6 +2946,7 @@ First alpha release.
 [#896]: https://github.com/Abel-ai-lab/Andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/Andrey/pull/899
 [#1003]: https://github.com/Abel-ai-lab/Andrey/pull/1003
+[#1006]: https://github.com/Abel-ai-lab/Andrey/pull/1006
 [#1009]: https://github.com/Abel-ai-lab/Andrey/pull/1009
 [#1011]: https://github.com/Abel-ai-lab/Andrey/pull/1011
 [#1020]: https://github.com/Abel-ai-lab/Andrey/pull/1020
