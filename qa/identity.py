@@ -612,7 +612,7 @@ def unpermute(out: Any, order: np.ndarray) -> Any:
         if icp and key == "target":
             value = int(order[value])
         elif icp and key in PER_VARIABLE:
-            value = [value[i] for i in back]
+            value = None if value is None else [value[i] for i in back]
         elif isinstance(value, Mapping) and set(value) == set(DIRECTIONS):
             forward, backward = DIRECTIONS
             value = {forward: value[backward], backward: value[forward]} if swapped else value

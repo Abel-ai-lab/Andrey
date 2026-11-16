@@ -224,6 +224,18 @@ def test_icps_target_and_per_variable_metadata_map_back() -> None:
     )
 
 
+def test_a_rejected_icp_fit_keeps_its_missing_intervals() -> None:
+    """ICP sets ``confidence_intervals`` to ``None`` when it rejects every candidate set."""
+    meta = {"algorithm": "icp", "target": 1, "p_values": [0.0, None], "confidence_intervals": None}
+    out = StructureOutput.new(
+        GraphStructure.from_numpy(np.zeros((2, 2), dtype=np.int8), kind="dag"), metadata=meta
+    )
+    back = identity.unpermute(out, np.array([1, 0]))
+    assert back.metadata["confidence_intervals"] is None
+    assert back.metadata["p_values"] == [None, 0.0]
+    assert back.metadata["target"] == 0
+
+
 def test_counts_separation_and_distinct_conditioning_sets() -> None:
     counts = identity.Counts(alpha=0.05)
     counts.ci([(0, 2, (), 0.001), (2, 0, (1,), 0.4), (0, 2, (3,), 0.01), (2, 0, (1, 3), 0.9)])
