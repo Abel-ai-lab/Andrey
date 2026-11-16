@@ -304,6 +304,21 @@ def test_a_shared_set_too_small_to_factor_is_the_per_query_answer_bit_for_bit(ys
     assert r.tobytes() == want_r.tobytes() and p.tobytes() == want_p.tobytes()
 
 
+def test_a_shared_set_counts_a_repeated_column_once():
+    """A repeated column of the set gives the answers of the set without the repeat, as the
+    per-query path canonicalizes it."""
+    test = FisherZ(_forty_columns())
+    ys = [y for y in range(1, 40) if y not in (2, 3, 5)]
+    r, p = test.statistic_pvalues_given(0, ys, [5, 2, 3, 2, 5])
+    want_r, want_p = test.statistic_pvalues(
+        np.zeros(len(ys), dtype=int), np.array(ys), [[2, 3, 5]] * len(ys)
+    )
+    np.testing.assert_allclose(r, want_r, rtol=0.0, atol=1e-12)
+    np.testing.assert_allclose(p, want_p, rtol=1e-9, atol=0.0)
+    for y, got in zip(ys, p):
+        np.testing.assert_allclose(got, test(0, y, [5, 2, 3, 2, 5]), rtol=1e-9, atol=0.0)
+
+
 def _forty_columns(copy=None):
     """Forty Gaussian columns over 300 rows; ``copy`` builds column 39 from the others."""
     X = np.random.default_rng(1).standard_normal((300, 40))

@@ -497,9 +497,10 @@ class PartialCorrelationTest:
         """Partial correlations and p-values of ``x`` and each of ``ys`` given one conditioning set.
 
         Entry ``i`` is :meth:`statistic_pvalue` of ``x`` and ``ys[i]`` given ``condition_set``, up
-        to rounding. For a set ``S`` of two or more columns and enough candidates, two or more and
-        ``len(ys) * (|S| + 2) >= SHARED_FACTOR_MIN``, where it is the faster path, one Cholesky
-        factor ``L`` of the set's correlation block ``R_SS`` serves every candidate: with
+        to rounding; a repeated column of the set counts once. For a set ``S`` of two or more
+        columns and enough candidates, two or more and ``len(ys) * (|S| + 2) >=
+        SHARED_FACTOR_MIN``, where it is the faster path, one Cholesky factor ``L`` of the set's
+        correlation block ``R_SS`` serves every candidate: with
         ``w_a = L^-1 R_Sa``, the Schur complement ``P_ab = R_ab - w_a . w_b`` gives the partial
         correlation ``P_xy / sqrt(P_xx P_yy)``, where :meth:`statistic_pvalue` inverts each
         ``[x, y, *S]`` block. The two agree to about ``1e-10`` relative in the p-value, so a p-value
@@ -513,7 +514,7 @@ class PartialCorrelationTest:
         set, raises the same error. ``ys`` excludes ``x`` and the members of the set.
         """
         cols = np.asarray(ys, dtype=np.intp).reshape(-1)
-        cond = np.sort(np.fromiter(condition_set, dtype=np.intp))
+        cond = np.unique(np.fromiter(condition_set, dtype=np.intp))
         if len(cond) >= 2 and len(cols) >= 2 and len(cols) * (len(cond) + 2) >= SHARED_FACTOR_MIN:
             df = self._degrees_of_freedom(len(cond))
             r = self._schur_partial_correlations(int(x), cols, cond)
@@ -529,8 +530,8 @@ class PartialCorrelationTest:
         self, x: int, ys: np.ndarray, cond: np.ndarray
     ) -> np.ndarray | None:
         """The unclamped partial correlations of :meth:`statistic_pvalues_given` from the Schur
-        complements of the block ``R_SS`` of the sorted set ``cond``, or ``None`` when a block
-        ``A = [x, y, *S]`` may not pass :func:`_invert_nonsingular`.
+        complements of the block ``R_SS`` of the sorted distinct set ``cond``, or ``None`` when a
+        block ``A = [x, y, *S]`` may not pass :func:`_invert_nonsingular`.
 
         The inverse of ``A`` is ``diag(R_SS^-1, 0) + [V; -I] M^-1 [V; -I]^T``, with ``M`` the 2 x 2
         Schur complement of ``x`` and ``y`` and ``V = R_SS^-1 R_S[x, y]``, whose squared norm is at
