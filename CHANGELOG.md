@@ -317,6 +317,13 @@ names its pull request.
   back. At 5,000 rows and 1,000 variables, `mb_by_mb` at one target is 1.15 times faster,
   `local_optimal_adjustment` 1.08 times, and `pc` 1.06 times. Every output, `metadata["n_tests"]`
   included, is the same bit for bit. ([#1036], [#1042])
+- The blanket engine behind `iamb`, `gs`, `hiton_mb`, `mmb_by_mmb`, and the other blanket learners
+  computes the columns' tie ranks when a search first compares candidates whose keys tie, where it
+  computed them when the search was built, so a fit that never compares tied candidates skips their
+  cost, 0.4 s at 5,000 rows and 1,000 variables. At that size `mmb_by_mmb` is 1.8 times faster,
+  `iamb` at one target 1.3 times, and `hiton_mb` at one target 0.6 s faster; `mmmb` on 100 variables
+  is 1.1 times faster. Every output, `metadata["n_tests"]` included, is the same bit for bit.
+  ([#1034], [#1044])
 
 - The Limitations of `notears` and `dagma` are one sentence: the result depends on the data's scale,
   after Reisach, Seiler and Weichwald (2021), with a link to the release card. The registry and the
@@ -2947,6 +2954,8 @@ First alpha release.
 [#1041]: https://github.com/Abel-ai-lab/Andrey/pull/1041
 [#1036]: https://github.com/Abel-ai-lab/Andrey/pull/1036
 [#1042]: https://github.com/Abel-ai-lab/Andrey/pull/1042
+[#1034]: https://github.com/Abel-ai-lab/Andrey/pull/1034
+[#1044]: https://github.com/Abel-ai-lab/Andrey/pull/1044
 [#1047]: https://github.com/Abel-ai-lab/Andrey/pull/1047
 [#1048]: https://github.com/Abel-ai-lab/Andrey/pull/1048
 [#995]: https://github.com/Abel-ai-lab/Andrey/pull/995
