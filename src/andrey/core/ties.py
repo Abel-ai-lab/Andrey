@@ -218,7 +218,9 @@ class TieKeys(dict[int, int]):
     in ``O(n**2 d)`` time and ``O(n**2 + n d)`` memory for ``n`` rows and ``d`` columns, where
     :func:`tie_ranks` takes ``O(n d**2)`` time and ``O(d**2)`` memory; columns whose sums agree are
     then compared in full. After 256 columns read one at a time, a read computes every column, 128
-    at a time. :meth:`applies` says where the keys are cheaper than :func:`tie_ranks`.
+    at a time, in :func:`tie_ranks`' time and ``O(n d)`` memory; computing every column at once
+    (:meth:`fill`) compares their hashes instead of their sums. :meth:`applies` says where the keys
+    are cheaper than :func:`tie_ranks`.
 
     The one difference from :func:`tie_ranks`: two columns whose relations differ but whose 8-byte
     hashes agree, about once in ``2**65 / d**2`` data sets, get equal keys here, where
@@ -347,7 +349,7 @@ def _residues(a: np.ndarray, prime: int) -> np.ndarray:
 
 
 def _prime_at_most(bound: int) -> int:
-    """The largest prime at most ``bound``, an odd number when ``bound`` is at least 9."""
+    """The largest prime at most ``bound``, for ``bound`` of 9 or more."""
     divisors = np.arange(3, math.isqrt(bound) + 1, 2)
     m = bound - (bound % 2 == 0)
     while (m % divisors == 0).any():
