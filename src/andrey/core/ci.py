@@ -119,6 +119,9 @@ SINGULAR_RTOL = 1e-12
 # How far the inverse bound in _invert_nonsingular stays above that threshold; the factor absorbs
 # the rounding of the computed inverse and of the eigenvalues.
 BOUND_MARGIN = 1e4
+# The smallest number of candidates times the block size, len(ys) * (|S| + 2), that
+# statistic_pvalues_given answers from one factor; below it the per-query inversions are faster.
+SHARED_FACTOR_MIN = 128
 # The LAPACK Cholesky factor and triangular solve of statistic_pvalues_given, called directly: on
 # the small scans it serves, the checks of scipy.linalg's wrappers would take most of the time.
 _POTRF, _TRTRS = get_lapack_funcs(("potrf", "trtrs"), (np.empty((1, 1)),))
@@ -494,8 +497,9 @@ class PartialCorrelationTest:
         """Partial correlations and p-values of ``x`` and each of ``ys`` given one conditioning set.
 
         Entry ``i`` is :meth:`statistic_pvalue` of ``x`` and ``ys[i]`` given ``condition_set``, up
-        to rounding. For a set ``S`` of two or more columns and two or more candidates, one
-        Cholesky factor ``L`` of the set's correlation block ``R_SS`` serves every candidate: with
+        to rounding. For a set ``S`` of two or more columns and enough candidates, two or more and
+        ``len(ys) * (|S| + 2) >= SHARED_FACTOR_MIN``, where it is the faster path, one Cholesky
+        factor ``L`` of the set's correlation block ``R_SS`` serves every candidate: with
         ``w_a = L^-1 R_Sa``, the Schur complement ``P_ab = R_ab - w_a . w_b`` gives the partial
         correlation ``P_xy / sqrt(P_xx P_yy)``, where :meth:`statistic_pvalue` inverts each
         ``[x, y, *S]`` block. The two agree to about ``1e-10`` relative in the p-value, so a p-value
@@ -503,14 +507,14 @@ class PartialCorrelationTest:
         bits can change with the other candidates of the call. Each query counts as one test.
 
         The other calls take :meth:`statistic_pvalues`, which answers or raises as it does: a
-        smaller set, a single candidate, and any call with a block that the factor does not show to
+        smaller set, fewer candidates, and any call with a block that the factor does not show to
         be well inside the nonsingular range of :func:`_invert_nonsingular`, so that every block
         the current rule calls singular, such as a candidate that copies ``x`` or a member of the
         set, raises the same error. ``ys`` excludes ``x`` and the members of the set.
         """
         cols = np.asarray(ys, dtype=np.intp).reshape(-1)
         cond = np.sort(np.fromiter(condition_set, dtype=np.intp))
-        if len(cond) >= 2 and len(cols) >= 2:
+        if len(cond) >= 2 and len(cols) >= 2 and len(cols) * (len(cond) + 2) >= SHARED_FACTOR_MIN:
             df = self._degrees_of_freedom(len(cond))
             r = self._schur_partial_correlations(int(x), cols, cond)
             if r is not None:
