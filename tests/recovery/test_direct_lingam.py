@@ -65,12 +65,13 @@ def _full_scores(groups: list[np.ndarray], U: list[int], weights: list[float] | 
     return total
 
 
-def _assert_pick_unchanged(pruned, groups, U, *, weights=None, allowed=None, hint=None) -> None:
+def _assert_pick_unchanged(pruned, groups, U, *, weights=None, allowed=None, hint=None) -> int:
     """Check ``pruned`` scores against the full scores under the given and two other visit orders.
 
     Every order picks the full scores' candidate, the pick carries the full score's bits, and every
     other candidate has its full score's bits or a value at or above its score whose
-    ``sqrt(-value)`` lies more than ``_TIE_TOL`` above the best, out of the tie.
+    ``sqrt(-value)`` lies more than ``_TIE_TOL`` above the best, out of the tie. Returns the number
+    of candidates that stopped early under the given order.
     """
     full = _full_scores(groups, U, weights)
     mask = np.ones(len(U), dtype=bool) if allowed is None else allowed
@@ -79,6 +80,7 @@ def _assert_pick_unchanged(pruned, groups, U, *, weights=None, allowed=None, hin
     expected = pwling.pick(full[mask], chosen, ranks)
     rng = np.random.default_rng(len(U))
     hints = [hint, {c: float(c) for c in U}, dict(zip(U, rng.standard_normal(len(U)).tolist()))]
+    stopped = []
     for h in hints:
         got = pruned(groups, U, weights=weights, allowed=allowed, hint=h)
         assert pwling.pick(got[mask], chosen, ranks) == expected
@@ -86,25 +88,32 @@ def _assert_pick_unchanged(pruned, groups, U, *, weights=None, allowed=None, hin
         assert got[k].tobytes() == full[k].tobytes()
         if np.isnan(full[mask]).any():
             assert got.tobytes() == full.tobytes()  # such a step is scored in full
+            stopped.append(0)
             continue
         cut = np.sqrt(-full[mask]).min() + pwling._TIE_TOL
-        for a in np.flatnonzero(mask):
-            exact = got[a].tobytes() == full[a].tobytes()
-            assert exact or (got[a] >= full[a] and np.sqrt(-got[a]) > cut)
+        exact = np.array([got[a].tobytes() == full[a].tobytes() for a in range(len(U))])
+        assert np.all(exact[mask] | ((got >= full) & (np.sqrt(-got) > cut))[mask])
+        stopped.append(int((mask & ~exact).sum()))
+    return stopped[0]
 
 
 def _check_every_step(monkeypatch: pytest.MonkeyPatch) -> list[int]:
-    """Make every ``pruned_scores`` call of an order search check itself; return the call count."""
+    """Make every ``pruned_scores`` call of an order search prune and check itself.
+
+    Returns a list that receives, per call, the number of candidates that stopped early.
+    """
     calls: list[int] = []
+    monkeypatch.setattr(pwling, "_MIN_PRUNED_VALUES", 0)
     monkeypatch.setattr(pwling, "pruned_scores", _counted(pwling.pruned_scores, calls))
     return calls
 
 
 def _counted(original, calls: list[int]):
     def checked(groups, U, *, weights=None, allowed=None, hint=None):
-        calls.append(len(U))
         got = original(groups, U, weights=weights, allowed=allowed, hint=hint)
-        _assert_pick_unchanged(original, groups, U, weights=weights, allowed=allowed, hint=hint)
+        calls.append(
+            _assert_pick_unchanged(original, groups, U, weights=weights, allowed=allowed, hint=hint)
+        )
         return got
 
     return checked
@@ -213,7 +222,7 @@ def test_pruned_scores_keep_every_pick(case: str, monkeypatch):
     calls = _check_every_step(monkeypatch)
     order = pwling.find_causal_order(X, precedence=precedence, forbidden_paths=forbidden)
     assert order == expected
-    assert len(calls) >= 4
+    assert len(calls) >= 4 and sum(calls) > 0
 
 
 @pytest.mark.parametrize("with_precedence", [False, True])
@@ -226,4 +235,4 @@ def test_pruned_scores_keep_every_multi_group_pick(with_precedence: bool, monkey
     knowledge = andrey.Knowledge(required_paths=[(0, 4)]) if with_precedence else None
     calls = _check_every_step(monkeypatch)
     andrey.multi_group_direct_lingam(groups, knowledge=knowledge)
-    assert len(calls) >= 4
+    assert len(calls) >= 4 and sum(calls) > 0
