@@ -1001,22 +1001,35 @@ def _scan_data(kind: str, seed: int = 3) -> np.ndarray:
 
 
 @pytest.mark.parametrize("kind", list(_BATCHED))
-def test_a_scan_is_its_candidates_asked_one_at_a_time_bit_for_bit(kind):
-    """The scan of many candidates, answered in one call, gives each candidate the bits of the scan
-    of that candidate alone and of the test's own answer, in the order of the candidates."""
+def test_a_scan_is_its_candidates_asked_one_at_a_time(kind):
+    """The scan of many candidates, answered in one call, gives each candidate the answer of the
+    scan of that candidate alone and of the test's own answer, in the order of the candidates: bit
+    for bit, except that a partial-correlation test on complete data given two or more variables
+    answers from one factor of the set's block, which agrees to rounding (the strength to 1e-12,
+    the p-value to 1e-9 relative, every p-value on the same side of alpha)."""
     x = _scan_data(kind)
     test = make_indep_test(kind.removesuffix("-missing"), x)
     assert hasattr(test, "statistic_pvalues" if _BATCHED[kind] == "gaussian" else "pvalues_given")
+    shared = kind in ("fisherz", "student_t", "normal_scores")
+    assert hasattr(test, "statistic_pvalues_given") == shared
     search = LocalSearch(test, tie_ranks(x).tolist(), 0.05)
     target = 4
     for cond in [(), (7,), (2, 9), (0, 3, 8, 11)]:
         xs = [v for v in range(12) if v != target and v not in cond]
         strengths, pvalues = search.scan(target, xs, cond)
         alone = [search.scan(target, [v], cond) for v in xs]
-        assert strengths.tobytes() == np.concatenate([s for s, _ in alone]).tobytes(), cond
-        assert pvalues.tobytes() == np.concatenate([p for _, p in alone]).tobytes(), cond
-        assert pvalues.tolist() == [test(target, v, cond) for v in xs], cond
+        want_s = np.concatenate([s for s, _ in alone])
+        want_p = np.concatenate([p for _, p in alone])
         backward = search.scan(target, xs[::-1], cond)
+        if shared and len(cond) >= 2:
+            np.testing.assert_allclose(strengths, want_s, rtol=0.0, atol=1e-12)
+            np.testing.assert_allclose(pvalues, want_p, rtol=1e-9, atol=1e-300)
+            assert ((pvalues <= 0.05) == (want_p <= 0.05)).all(), cond
+            np.testing.assert_allclose(backward[1], pvalues[::-1], rtol=1e-9, atol=1e-300)
+            continue
+        assert strengths.tobytes() == want_s.tobytes(), cond
+        assert pvalues.tobytes() == want_p.tobytes(), cond
+        assert pvalues.tolist() == [test(target, v, cond) for v in xs], cond
         assert backward[1].tobytes() == pvalues[::-1].tobytes(), cond
 
 

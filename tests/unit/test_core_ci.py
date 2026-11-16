@@ -23,6 +23,7 @@ from scipy.special import ndtr
 import andrey
 from andrey.core import ci
 from andrey.core.ci import FisherZ, NormalScores, StudentT
+from andrey.data import sample_scm
 
 
 @pytest.fixture(autouse=True)
@@ -255,6 +256,94 @@ def test_the_residual_path_refuses_a_column_in_the_span_of_its_conditions():
     test = StudentT(X)
     with pytest.raises(ci.SingularCorrelationError, match="span"):
         test.residual_statistic_pvalues(X, np.array([0]), np.array([1]), np.array([[2, 3]]))
+
+
+# ---- one conditioning set shared by many candidates ---------------------------------------
+
+
+def _shared_set_cases(seed: int, d: int = 30):
+    """Random ``(target, candidates, set)`` queries over ``d`` columns, sets of 2 to 12 columns."""
+    rng = np.random.default_rng(seed)
+    for _ in range(8):
+        order = rng.permutation(d)
+        size = int(rng.integers(2, 13))
+        yield int(order[0]), order[1 + size :], order[1 : 1 + size]
+
+
+@pytest.mark.parametrize("test_class", [FisherZ, StudentT, NormalScores])
+@pytest.mark.parametrize("seed", range(6))
+def test_a_shared_set_agrees_with_each_query_to_rounding(test_class, seed):
+    """From one factor of the set's block, every candidate's partial correlation agrees with the
+    per-query inversion to 1e-12, every p-value above 1e-300 to 1e-9 relative and on the same side
+    of 0.05, and the call counts one test per candidate."""
+    x = sample_scm(graph="erdos_renyi", d=30, n=300, seed=seed, density=3.0).data
+    test = test_class(x)
+    for target, ys, cond in _shared_set_cases(seed):
+        with ci.counting_tests() as counted:
+            r, p = test.statistic_pvalues_given(target, ys.tolist(), cond.tolist())
+        want_r, want_p = test.statistic_pvalues(
+            np.full(len(ys), target), ys, np.tile(cond, (len(ys), 1))
+        )
+        assert counted.n == len(ys)
+        np.testing.assert_allclose(r, want_r, rtol=0.0, atol=1e-12)
+        above = want_p > 1e-300
+        np.testing.assert_allclose(p[above], want_p[above], rtol=1e-9, atol=0.0)
+        assert ((p <= 0.05) == (want_p <= 0.05)).all()
+
+
+@pytest.mark.parametrize("ys, cond", [([1, 2, 4], []), ([1, 2, 4], [3]), ([4], [3, 5])])
+def test_a_shared_set_too_small_to_factor_is_the_per_query_answer_bit_for_bit(ys, cond, data):
+    """A set of fewer than two columns, or a single candidate, takes the per-query path."""
+    test = FisherZ(data)
+    r, p = test.statistic_pvalues_given(0, ys, cond)
+    sets = np.array([cond] * len(ys), dtype=int).reshape(len(ys), len(cond))
+    want_r, want_p = test.statistic_pvalues(np.zeros(len(ys), dtype=int), np.array(ys), sets)
+    assert r.tobytes() == want_r.tobytes() and p.tobytes() == want_p.tobytes()
+
+
+def test_a_shared_set_near_the_singular_threshold_is_the_per_query_answer_bit_for_bit():
+    """A candidate that nearly repeats the target leaves its block nonsingular by the eigenvalue
+    test but too close to it for the factor's bound, so the call gives the per-query bits."""
+    rng = np.random.default_rng(1)
+    X = rng.standard_normal((300, 7))
+    X[:, 6] = X[:, 0] + 1e-5 * rng.standard_normal(300)
+    test = FisherZ(X)
+    ys, cond = [1, 2, 6], [3, 4, 5]
+    r, p = test.statistic_pvalues_given(0, ys, cond)
+    want_r, want_p = test.statistic_pvalues(np.zeros(3, dtype=int), np.array(ys), [cond] * 3)
+    assert r.tobytes() == want_r.tobytes() and p.tobytes() == want_p.tobytes()
+    assert abs(r[2]) > 0.99
+
+
+@pytest.mark.parametrize(
+    "copy, cond, ys",
+    [
+        (lambda X: 2.0 * X[:, 0] + 1.0, [2, 3], [1, 4, 6]),  # a candidate repeats the target
+        (lambda X: -X[:, 2], [2, 3], [1, 4, 6]),  # a candidate repeats a member of the set
+        (lambda X: 3.0 * X[:, 2] - 2.0, [2, 3, 6], [1, 4]),  # two members repeat each other
+        (lambda X: X[:, 2] - X[:, 3], [2, 3], [1, 4, 6]),  # a candidate in the span of the set
+    ],
+)
+def test_a_shared_set_raises_where_each_query_raises(copy, cond, ys):
+    """A block that the per-query rule calls singular raises the same error, message, and groups."""
+    X = np.random.default_rng(0).standard_normal((100, 7))
+    X[:, 6] = copy(X)
+    test = FisherZ(X)
+    with pytest.raises(ci.SingularCorrelationError) as shared:
+        test.statistic_pvalues_given(0, ys, cond)
+    with pytest.raises(ci.SingularCorrelationError) as each:
+        test.statistic_pvalues(np.zeros(len(ys), dtype=int), np.array(ys), [cond] * len(ys))
+    assert str(shared.value) == str(each.value)
+    assert shared.value.groups == each.value.groups
+
+
+def test_a_shared_set_with_too_few_rows_raises_the_degrees_of_freedom_error():
+    X = np.random.default_rng(0).standard_normal((6, 7))
+    with pytest.raises(ValueError) as shared:
+        FisherZ(X).statistic_pvalues_given(0, [1, 2], [3, 4, 5, 6])
+    with pytest.raises(ValueError) as each:
+        FisherZ(X)(0, 1, [3, 4, 5, 6])
+    assert str(shared.value) == str(each.value)
 
 
 def test_a_singular_submatrix_raises_the_singular_error_type():
