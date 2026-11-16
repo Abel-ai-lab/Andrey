@@ -414,6 +414,23 @@ CASES: dict[str, dict] = {
             [0.0, 0.0, 0.0, 0.0, 0.0, 0.8, 0.0],
         ],
     },
+    # Linear-Gaussian SEM around the treatment 3 and the outcome 5, which has no child: the
+    # confounder 0, the cause of the treatment only 1, the cause of the outcome only 2, the
+    # mediator 4, and a child of the treatment 6, each with a strong weight.
+    "adjustment_7v": {
+        "noise": "gaussian",
+        "seed": 20261116,
+        "n_samples": 2000,
+        "weights": [
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.8, 0.7, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.8, 0.0, 0.0, 0.0],
+            [0.6, 0.0, 0.7, 0.8, 0.7, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.9, 0.0, 0.0, 0.0],
+        ],
+    },
     # The ``gauss_5v`` model in three environments of 500 rows: the second multiplies the noise
     # standard deviation of variable 3 by 3, the third that of variable 4 - GnIES, which learns
     # those targets with the graph they orient.

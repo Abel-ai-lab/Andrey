@@ -47,11 +47,11 @@ whose answer differs from the first fit, with the parts that differ, exiting 1 i
 
 - `--shuffle K` refits on `K` seeded column orders and maps each answer back to the original
   columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out. ICP,
-  IGSP, FCI-JCI, J-PCMCI+, MB-by-MB, CMB, MMB-by-MMB, local ISA-LiNG, LDECC, LOAD, and LocPC-CDE are
-  not refit: their data hold each row's environment in one column, the target of ICP, MB-by-MB,
-  CMB, MMB-by-MMB, and local ISA-LiNG is the last variable, LDECC's treatment and outcome and LOAD's
-  two variables are the last and the first, LocPC-CDE's treatment and outcome are the first and the
-  last, and J-PCMCI+'s contexts follow the system variables.
+  IGSP, FCI-JCI, J-PCMCI+, MB-by-MB, CMB, MMB-by-MMB, local ISA-LiNG, LDP, LD3, LDECC, LOAD, and
+  LocPC-CDE are not refit: their data hold each row's environment in one column, the target of ICP,
+  MB-by-MB, CMB, MMB-by-MMB, and local ISA-LiNG is the last variable, LDP's, LD3's, and LocPC-CDE's
+  treatment and outcome are the first and the last, and LDECC's treatment and outcome and LOAD's two
+  variables are the last and the first, and J-PCMCI+'s contexts follow the system variables.
 - `--workers N` refits PC, FCI, FCI-JCI, GFCI, CD-NOD, RSMAX2 (with PC's skeleton), GES, and PNL
   on `N` workers, with every GES pass, every skeleton pass of conditioning size two or more, and
   every possible-d-sep search sent to the worker pool.
@@ -158,13 +158,13 @@ such pushes traces back to a run that fitted the methods. A path outside those p
 fails, or no such run, runs the gate.
 
 The gate checks PC, FCI, GFCI, CD-NOD, FCI-JCI, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, HITON-PC,
-HITON-MB, MMMB, PCMB, MB-by-MB, Y-structures, CMB, LDECC, LOAD, LocPC-CDE, GES, GIES, GnIES, IGSP,
-ICP, XGES, AGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, NOTEARS, DAGMA, BOSS, GRaSP, BOSS-FCI,
-GRaSP-FCI, MMB-by-MMB, UT-IGSP, DirectLiNGAM, ICA-LiNGAM, local ISA-LiNG, MultiGroupDirectLiNGAM,
-RCD, BottomUpParceLiNGAM, SCORE, NoGAM, CAM-UV, GIN, ANM, PNL, LOCI, PCMCI, PCMCI+, LPCMCI,
-J-PCMCI+, VARMA-LiNGAM, LongitudinalLiNGAM, Granger, and DYNOTEARS on the datasets whose assumptions
-each method needs, PC with each supported nonlinear conditional-independence test, KCI, RCoT,
-CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
+HITON-MB, MMMB, PCMB, MB-by-MB, Y-structures, CMB, LDP, LD3, LDECC, LOAD, LocPC-CDE, GES, GIES,
+GnIES, IGSP, ICP, XGES, AGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, NOTEARS, DAGMA, BOSS,
+GRaSP, BOSS-FCI, GRaSP-FCI, MMB-by-MMB, UT-IGSP, DirectLiNGAM, ICA-LiNGAM, local ISA-LiNG,
+MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, SCORE, NoGAM, CAM-UV, GIN, ANM, PNL, LOCI, PCMCI,
+PCMCI+, LPCMCI, J-PCMCI+, VARMA-LiNGAM, LongitudinalLiNGAM, Granger, and DYNOTEARS on the datasets
+whose assumptions each method needs, PC with each supported nonlinear conditional-independence
+test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 
 | Dataset | Draws | Methods |
 |---|---|---|
@@ -178,6 +178,8 @@ CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 | `noise_interventional_gauss_er` at `d = 10, 20`, four environments of `n = 1000` | 10 seeds each | GnIES |
 | `unknown_target_shift_gauss_er`, `unknown_target_variance_gauss_er` at `d = 20`, six environments of `n = 1000` | 10 seeds each | UT-IGSP, its graph and its targets |
 | `icp_do` at `d = 6, 10`, `n = 200` per environment, every other variable intervened | 10 seeds each | ICP |
+| `ldp_figure3` at `n = 1000, 5000`: LDP's Figure 3, 10 variables | 10 seeds each | LDP |
+| `ld3_figure_d1` at `n = 1000, 10000`: LD3's Figure D.1, 18 variables | 10 seeds each | LD3 |
 | `known_targets_one_setting_gauss_er`, `known_targets_two_settings_gauss_er` at `d = 20`, `n = 1000` per environment | 10 seeds each | IGSP |
 | `domain_shift_er` at `d = 20, 50`, `n = 2000` | 10 seeds each | CD-NOD |
 | `fci_jci_s4`, `fci_jci_l10`: 4 and 10 variables, two regimes of `n = 500` | 10 seeds each | FCI-JCI |
@@ -327,6 +329,17 @@ CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
   errors as the empty answer. The empty answer's median errors are the last column's median
   number of edges in the PAG, 1.5 on the `latent_gauss_er` cells and 2 on ASIA. Identity fits the
   same column, so it skips the column-order refits, as it does for ICP.
+- **Planted graphs.** LDP needs a confounder, a cause of the treatment only, and a cause of the
+  outcome only, and LD3 an outcome that is a sink with every parent observed, which no other
+  dataset of the gate has. Each is a linear-Gaussian model of the published graph, with standardized
+  columns, the treatment `X` as the first column and the outcome `Y` as the last. The other columns
+  come in an order drawn from the seed, so they say nothing of the causal order. LDP's Figure 3 has
+  a confounder `Z1`, a cause of the treatment only `Z5`, a cause of the outcome only `Z4`, a
+  mediator `Z3`, a collider `Z2`, a child of the treatment `Z7`, a child of the outcome `Z6`, and an
+  isolated node `Z8`. LD3's Figure D.1 has eight parents of the outcome, among them mediators, a
+  collider of the treatment and a cause of the outcome, and the parents of an M-structure. The gate
+  fits each at the first column as the treatment and the last as the outcome, so identity skips the
+  column-order refits, and fits it once more on 20,000 rows.
 - **ASIA.** The 8-arc network of Lauritzen and Spiegelhalter (1988), sampled as a linear SCM with
   1,000 rows per seed. Its arcs are bnlearn's (`andrey.data.load_dataset("asia")`); the gate lists
   them in its own order, which fixes each seed's weights, and a test checks the two agree.
@@ -358,6 +371,12 @@ Local ISA-LiNG answers the last column and counts the errors in its local struct
 and out of it and into each of its children, against the DAG's: an adjacency in one local structure
 and not the other counts one, and so does a reversed edge. The empty answer makes as many errors as
 the true local structure has edges.
+LD3 is scored as ICP is, by the false and missed parents of the last column, the outcome: the empty
+answer makes as many errors as the outcome has parents, 8 on Figure D.1. LDP returns adjustment sets
+and no edges: a draw scores 0 when it returns at least one set and every set is a valid adjustment
+set in the true DAG for the first column as the treatment and the last as the outcome, and 1 when it
+returns none or any set is not valid. The empty answer is the empty set, which the confounder
+`Z1` makes not valid, so it makes 1 error on every draw.
 GIES is scored against the interventional essential graph of the true DAG under the rows' targets,
 IGSP against the one under the settings' targets, GnIES and UT-IGSP against the one under the true
 targets, and CD-NOD against the CPDAG in which the domain index orients the edges it reaches.
@@ -390,7 +409,7 @@ one BLAS thread, so the host's accelerators and core count do not enter the resu
 absorb rounding differences between CPUs. On every pull request,
 `tests/recovery/test_quality_gate.py` feeds each method the empty graph and a column-shifted true
 graph, and UT-IGSP's targets check the given targets alone and the true targets moved one variable,
-and the gate rejects both.
+and the gate rejects both. For LDP the shifted answer is the treatment's parents moved one column.
 
 ```shell
 uv run python -m qa.quality_gate PC FCI

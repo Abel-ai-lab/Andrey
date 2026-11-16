@@ -93,9 +93,9 @@ quick_start
 PC's CPDAG and FCI's and GFCI's PAGs from conditional-independence tests; IAMB, Inter-IAMB, GS,
 Fast-IAMB, MMPC, HITON-PC, HITON-MB, MMMB, and PCMB, which join each variable's local structure into
 a graph; MB-by-MB's and CMB's edges at one variable and MMB-by-MMB's under hidden common causes;
-Y-structures' ancestor claims from rows that may have been selected; LDECC's, LOAD's, and
-LocPC-CDE's adjustment sets for a treatment and an outcome; CD-NOD and FCI-JCI on data from several
-domains; and ICP's parents of one variable from several environments.
+Y-structures' ancestor claims from rows that may have been selected; LDP's, LD3's, LDECC's, LOAD's,
+and LocPC-CDE's adjustment sets for a treatment and an outcome; CD-NOD and FCI-JCI on data from
+several domains; and ICP's parents of one variable from several environments.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::

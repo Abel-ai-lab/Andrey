@@ -1028,7 +1028,7 @@ _add(
             "for the total effect when the Z5 criterion passes, no answer otherwise",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         order_note="The number of tests can change with the column order: a search stops at the "
         "first variable that decides it.",
@@ -1064,7 +1064,7 @@ _add(
             "for the direct effect",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         params=(
             _TREATMENT,

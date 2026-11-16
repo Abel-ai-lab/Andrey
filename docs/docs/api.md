@@ -465,6 +465,8 @@ variable.
    mb_by_mb
    y_structures
    cmb
+   ldp
+   ld3
    ldecc
    local_optimal_adjustment
    locpc_cde
@@ -572,6 +574,20 @@ target's Markov blanket, then a neighbor's, one blanket at a time, until the FCI
 marks at the target, and returns the edges the target has in the PAG. The authors' code is its
 reference: the [0.18.0](benchmarks/0.18.0.md#mmb-by-mmb) release card compares them on its paper's
 four networks with hidden variables.
+
+LDP, local discovery by partitioning (Maasch et al. 2024), {py:func}`~andrey.ldp`, answers for one
+`treatment` and `outcome`: it labels each other column by its causal relation to the pair, from
+tests whose conditioning sets are the labels found before, and it returns the confounders as a valid
+adjustment set for the total effect when its Z5 criterion passes, and no set otherwise.
+`metadata["effects"]` holds the answer, `metadata["partition"]` the labels, and the graph has no
+edges. The [0.18.0](benchmarks/0.18.0.md#ldp) release card reports its benchmark.
+
+LD3 (Maasch et al. 2025), {py:func}`~andrey.ld3`, answers for one `treatment` and `outcome` that has
+no descendants among the columns: it finds the parents of the outcome and whether the treatment is
+one of them (the structural direct criterion), with the other parents as the adjustment set for the
+direct effect, in `metadata["effects"]`. Its graph holds the edges into the outcome, and
+`metadata["partition"]` the labels. The [0.18.0](benchmarks/0.18.0.md#ld3) release card reports its
+benchmark.
 
 LDECC, local discovery using eager collider checks (Gupta et al. 2023), {py:func}`~andrey.ldecc`,
 answers for one `treatment` and `outcome`: it learns the treatment's Markov blanket with `blanket`,
@@ -806,29 +822,7 @@ no published benchmark yet or did not pass one (its **Limitations** say which), 
 without deprecation, and it warns with {py:class}`~andrey.ExperimentalWarning` on its first call
 in a process.
 
-```{eval-rst}
-.. currentmodule:: andrey
-
-.. autosummary::
-   :toctree: api
-   :nosignatures:
-
-   ldp
-   ld3
-```
-
-LDP, local discovery by partitioning (Maasch et al. 2024), answers for one `treatment` and
-`outcome`: it labels each other column by its causal relation to the pair, from tests whose
-conditioning sets are the labels found before, and it returns the confounders as a valid adjustment
-set for the total effect when its Z5 criterion passes, and no set otherwise. `metadata["effects"]`
-holds the answer, `metadata["partition"]` the labels, and the graph has no edges. It is experimental
-until its comparison with the authors' code is published.
-
-LD3 (Maasch et al. 2025) answers for one `treatment` and `outcome` that has no descendants among the
-columns: it finds the parents of the outcome and whether the treatment is one of them (the
-structural direct criterion), with the other parents as the adjustment set for the direct effect, in
-`metadata["effects"]`. Its graph holds the edges into the outcome, and `metadata["partition"]` the
-labels. It is experimental until its comparison with the authors' code is published.
+No method is experimental in this release.
 
 A method becomes supported once it has:
 

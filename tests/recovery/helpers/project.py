@@ -72,6 +72,8 @@ _PCMCI = frozenset({"PCMCI", "PCMCIplus", "LPCMCI"})
 _INVARIANT = frozenset({"ICP"})
 # Treatment-outcome methods: candidate = the graph and the ``effects`` records.
 _EFFECTS = frozenset({"LDECC", "LocalOptimalAdjustment", "LocPCCDE"})
+# LDP and LD3: candidate = the graph, the ``effects`` records, and the labels of the other columns.
+_PARTITION = frozenset({"LDP", "LD3"})
 # Weighted temporal fits: candidate = the per-lag graphs and their weights.
 _WEIGHTED_LAGS = frozenset({"DYNOTEARS", "Granger"})
 # Weighted graphs: candidate = the graph and its weights, ``weighted_adjacency[i, j]`` for
@@ -153,6 +155,12 @@ def project_output(out: Any, algorithm: str) -> dict:
         }
     if algorithm in _EFFECTS:
         return {"graph": out.structure.to_numpy(), "effects": out.metadata["effects"]}
+    if algorithm in _PARTITION:
+        return {
+            "graph": out.structure.to_numpy(),
+            "effects": out.metadata["effects"],
+            "partition": out.metadata["partition"],
+        }
     if algorithm in _PAIRWISE:
         md = out.metadata
         fields = _PAIRWISE_FIELDS | (_LIKELIHOOD_FIELDS if algorithm == "LOCI" else {})

@@ -79,11 +79,11 @@ class Fit:
     ``blocks`` is the number of side-by-side copies of the variables in the data: GIES's samples
     and intervention indicators, MultiGroupDirectLiNGAM's groups; a column order moves each copy
     the same way. ``shuffled`` is ``False`` for ICP, IGSP, FCI-JCI, J-PCMCI+, MB-by-MB, CMB,
-    MMB-by-MMB, local ISA-LiNG, LDECC, LOAD, and LocPC-CDE, whose draws a column order does not
-    apply to: each row's environment is a column of the draw, the target of ICP, MB-by-MB, CMB,
-    MMB-by-MMB, and local ISA-LiNG is the last variable, LDECC's treatment and outcome and LOAD's
-    two variables are the last and the first, LocPC-CDE's treatment and outcome are the first and
-    the last, and J-PCMCI+'s contexts follow the system variables.
+    MMB-by-MMB, local ISA-LiNG, LDP, LD3, LDECC, LOAD, and LocPC-CDE, whose draws a column order
+    does not apply to: each row's environment is a column of the draw, the target of ICP, MB-by-MB,
+    CMB, MMB-by-MMB, and local ISA-LiNG is the last variable, LDP's, LD3's, and LocPC-CDE's
+    treatment and outcome are the first and the last, LDECC's treatment and outcome and LOAD's two
+    variables are the last and the first, and J-PCMCI+'s contexts follow the system variables.
     ``alpha`` is the significance level of a CI-test method.
     """
 
@@ -124,6 +124,18 @@ def _fci_jci(x: np.ndarray) -> StructureOutput:
 def _last_column(name: str) -> Callable[[np.ndarray], StructureOutput]:
     """A target-centered method at the draw's last column, as the gate fits it."""
     return lambda x: getattr(andrey, name)(x, target=x.shape[1] - 1, alpha=ALPHA)
+
+
+def _ldp(x: np.ndarray) -> StructureOutput:
+    """LDP with the draw's first column as the treatment and its last as the outcome, the columns
+    the gate fits it at."""
+    return andrey.ldp(x, treatment=0, outcome=x.shape[1] - 1, alpha=ALPHA)
+
+
+def _ld3(x: np.ndarray) -> StructureOutput:
+    """LD3 with the draw's first column as the treatment and its last as the outcome, the columns
+    the gate fits it at."""
+    return andrey.ld3(x, treatment=0, outcome=x.shape[1] - 1, alpha=ALPHA)
 
 
 def _ldecc(x: np.ndarray) -> StructureOutput:
@@ -210,6 +222,8 @@ FITS: dict[str, Fit] = {
     "MMMB": Fit(functools.partial(andrey.mmmb, alpha=ALPHA), alpha=ALPHA),
     "Y-structures": Fit(functools.partial(andrey.y_structures, alpha=ALPHA), alpha=ALPHA),
     "CMB": Fit(_last_column("cmb"), shuffled=False, alpha=ALPHA),
+    "LDP": Fit(_ldp, shuffled=False, alpha=ALPHA),
+    "LD3": Fit(_ld3, shuffled=False, alpha=ALPHA),
     "LDECC": Fit(_ldecc, shuffled=False, alpha=ALPHA),
     "LocalOptimalAdjustment": Fit(_local_optimal_adjustment, shuffled=False, alpha=ALPHA),
     "LocPCCDE": Fit(_locpc_cde, shuffled=False, alpha=ALPHA),
@@ -317,6 +331,8 @@ LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
     ),
     "dynotears_paper_d40_n1000": functools.partial(qg.series_draws, "dynotears_paper", 40, 1000),
     "jpcmciplus_half_m200_t10": functools.partial(qg.context_draws, "half-M200-T10"),
+    "ldp_figure3_n20000": functools.partial(qg.planted_draws, qg.LDP_FIGURE_3, ("Z8",), 20000),
+    "ld3_figure_d1_n20000": functools.partial(qg.planted_draws, qg.LD3_FIGURE_D1, ("Z8",), 20000),
 }
 LARGER: dict[str, str] = {
     **dict.fromkeys(
@@ -351,6 +367,8 @@ LARGER: dict[str, str] = {
     **dict.fromkeys(("FCI", "GFCI", "BOSS-FCI", "GRaSP-FCI", "MMB-by-MMB"), "latent_gauss_er_d100"),
     **dict.fromkeys(("DirectLiNGAM", "ICA-LiNGAM", "LocalISALiNG"), "lingam_sf_d70"),
     **dict.fromkeys(("RCD", "BottomUpParceLiNGAM"), "latent_lingam_er_d17"),
+    "LDP": "ldp_figure3_n20000",
+    "LD3": "ld3_figure_d1_n20000",
     "ExactSearch": "linear_gauss_er_d16",
     "CAM": "anm_er_n1000_d30",
     "RESIT": "anm_er_n1000_d12",

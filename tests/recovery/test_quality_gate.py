@@ -32,13 +32,16 @@ def empty_answer(draw: qg.Draw, target: qg.Target) -> object:
 def shifted_truth(draw: qg.Draw, target: qg.Target) -> object:
     """The true graph with each variable moved one column: an off-by-one in column handling. A
     measurement model moves its indicators and keeps its latents last; learned targets move to
-    the next variable; claimed ancestral pairs are the shifted graph's."""
+    the next variable; claimed ancestral pairs are the shifted graph's; adjustment sets are the
+    treatment's parents, moved."""
     if target == "targets":
         p = draw.truth.n_nodes
         return [sorted((v + 1) % p for v in t) for t in draw.targets]
     if target in qg.SERIES_TARGETS:
         return shifted_series_truth(draw.truth, target)
     truth = qg.target_truth(draw.truth, target)
+    if target == "adjustment":  # the treatment's parents, a valid set, each moved one column
+        return [{(v + 1) % truth.n_nodes for v in qg.parents_of(truth, 0)}]
     marks = truth.to_numpy()
     shift = np.arange(len(marks))
     types = None if target != "clusters" else np.asarray(truth.node_types)
@@ -128,6 +131,24 @@ def test_target_pag_counts_the_edges_at_the_last_variable_alone() -> None:
     assert qg.shd(wrong, truth, "target_pag") == 2
     assert qg.shd(missing, truth, "target_pag") == 1
     assert qg.shd(qg.empty_graph(4, "target_pag"), truth, "target_pag") == 2
+
+
+def test_adjustment_counts_one_for_an_abstention_or_a_set_that_is_not_valid() -> None:
+    marks = np.zeros((4, 4), dtype=np.int8)
+    for i, j in ((1, 0), (1, 3), (2, 3), (0, 3)):  # 1 confounds the treatment 0 and the outcome 3
+        marks[i, j], marks[j, i] = TAIL, ARROW
+    truth = GraphStructure.from_numpy(marks, kind="dag")
+    assert qg.shd([{1}], truth, "adjustment") == qg.shd([{1}, {1, 2}], truth, "adjustment") == 0
+    assert qg.shd([], truth, "adjustment") == 1  # no answer
+    assert qg.shd([set()], truth, "adjustment") == 1  # the confounder is open
+    assert qg.shd([{1}, {2}], truth, "adjustment") == 1  # one set of two is not valid
+    assert qg.shd([{1, 3}], truth, "adjustment") == 1  # a set holding the outcome
+    assert (
+        qg.shd(
+            qg.empty_estimate(qg.Draw(np.zeros((1, 4)), truth), "adjustment"), truth, "adjustment"
+        )
+        == 1
+    )
 
 
 def test_local_dag_counts_the_local_structure_at_the_last_variable() -> None:

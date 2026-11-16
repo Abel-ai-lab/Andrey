@@ -20,7 +20,6 @@ from pathlib import Path
 
 import networkx as nx
 import numpy as np
-import pytest
 
 from andrey import GraphStructure, ld3, ldp
 from andrey.constraint import partition
@@ -29,8 +28,6 @@ from andrey.data.latent import DSepOracle
 from andrey.metrics import effect_oracle, effect_scores, pooled_answer_scores
 
 BENCHMARKS = Path(__file__).resolve().parents[2] / "benchmarks"
-
-pytestmark = pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 
 #: LDP's Figure 3: one node per partition.
 FIGURE_3 = [

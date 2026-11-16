@@ -82,6 +82,26 @@ def _run_target(name: str):
     return run
 
 
+def _run_ldp(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    # The treatment x3 and the outcome x5: x0 confounds them, x1 and x2 cause only one of them, and
+    # the mediator x4 and the child x6 follow the treatment, so x0 is the valid adjustment set.
+    column = datagen.column_of("adjustment_7v")
+    out = andrey.ldp(X, treatment=int(column[3]), outcome=int(column[5]))
+    return project_output(out, algorithm)
+
+
+def _run_ld3(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    # The treatment x3 and the outcome x5, a sink whose parents x0, x2, x3, and x4 are all
+    # observed, so the treatment is found to be one of them and the others are the adjustment set.
+    column = datagen.column_of("adjustment_7v")
+    out = andrey.ld3(X, treatment=int(column[3]), outcome=int(column[5]))
+    return project_output(out, algorithm)
+
+
 def _run_ldecc(X: np.ndarray, algorithm: str) -> dict:
     import andrey
 
@@ -192,6 +212,8 @@ ALGORITHMS = {
     "MMMB": (_facade("mmmb"), "gauss_5v"),
     "YStructures": (_facade("y_structures"), "gauss_7v"),
     "CMB": (_run_target("cmb"), "gauss_5v"),
+    "LDP": (_run_ldp, "adjustment_7v"),
+    "LD3": (_run_ld3, "adjustment_7v"),
     "LDECC": (_run_ldecc, "gauss_7v"),
     "LocalOptimalAdjustment": (_run_local_optimal_adjustment, "gauss_7v"),
     "LocPCCDE": (_run_locpc_cde, "gauss_7v"),
