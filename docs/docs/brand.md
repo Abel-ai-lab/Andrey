@@ -124,4 +124,4 @@ Don't:
 - Use the marks in a way that suggests Andrey endorses you or your product.
 
 The Apache License 2.0 covers Andrey's code, not its name or marks. For questions,
-[open an issue](https://github.com/Abel-ai-lab/andrey/issues/new).
+[open an issue](https://github.com/Abel-ai-lab/Andrey/issues/new).
