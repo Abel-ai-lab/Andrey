@@ -346,9 +346,9 @@ names its pull request.
 - The causal-order search of `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and
   `longitudinal_lingam` with `measure="pwling"` stops scoring a candidate once its partial score,
   a sum of nonnegative terms, shows it can be neither picked nor tied, and scores every other
-  candidate in full. At 2,500 to 3,500 rows, `direct_lingam` on 50 and 70 variables is 2.0 and 2.4
-  times faster, and `multi_group_direct_lingam` on 30 variables 1.4 times. Every order, graph, and
-  weight is the same bit for bit. Steps with fewer rows times ordered pairs of candidates than
+  candidate in full. `direct_lingam` on 50 variables at 2,500 rows and on 70 at 3,500 is 2.0 and
+  2.4 times faster, and `multi_group_direct_lingam` on three groups of 1,000 rows and 30 variables
+  1.4 times. Every order, graph, and weight is the same bit for bit. Steps with fewer rows times ordered pairs of candidates than
   `ANDREY_LINGAM_PRUNE_MIN_WORK` (default `100000`) score every candidate. ([#1045], [#1051])
 
 ### Fixed
