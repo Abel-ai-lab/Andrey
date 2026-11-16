@@ -168,3 +168,8 @@ def test_unpickled_ranks_compute_under_the_active_thread_limit():
     with threadpool_limits(limits=1), copy._threads():
         assert all(pool["num_threads"] == 1 for pool in threadpool_info())
     assert list(copy) == list(ranks)
+    with threadpool_limits(limits=2):  # a forked worker inherits the object instead
+        inherited = LazyTieRanks(np.round(_gaussian().to_numpy()), np.zeros(8, dtype=bool))
+    inherited.use_active_limits()
+    with threadpool_limits(limits=1), inherited._threads():
+        assert all(pool["num_threads"] == 1 for pool in threadpool_info())

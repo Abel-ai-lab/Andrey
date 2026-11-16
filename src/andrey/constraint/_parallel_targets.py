@@ -24,7 +24,7 @@ from concurrent.futures import ProcessPoolExecutor
 from typing import TypeVar
 
 from andrey.constraint._skeleton import canonical_capable
-from andrey.constraint.blanket import LocalSearch, Reading, Step, first_reads
+from andrey.constraint.blanket import LazyTieRanks, LocalSearch, Reading, Step, first_reads
 from andrey.core.ci import count_tests, counting_tests
 
 T = TypeVar("T")
@@ -47,6 +47,8 @@ def _init_worker(search: LocalSearch) -> None:
 
     _WORKER_BLAS = threadpool_limits(limits=1)
     backend.config.backend = "numpy"
+    if isinstance(search.ranks, LazyTieRanks):  # a forked worker inherits the caller's limits
+        search.ranks.use_active_limits()
     _WORKER_SEARCH = search
 
 

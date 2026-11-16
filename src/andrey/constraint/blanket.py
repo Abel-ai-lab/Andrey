@@ -1142,9 +1142,13 @@ class LazyTieRanks(Sequence[int]):
         return {"_d": self._d, "_data": self._data, "_ranks": self._ranks}
 
     def __setstate__(self, state: dict[str, Any]) -> None:
-        """Restore the copy to compute its ranks under the limits active when it first reads one,
-        a worker's one thread included."""
         self.__dict__.update(state)
+        self.use_active_limits()
+
+    def use_active_limits(self) -> None:
+        """Compute the ranks under the limits active when one is first read, not those of the
+        moment the object was made: a worker process that pins its BLAS threads calls this, as a
+        pickled copy does."""
         self._threads = nullcontext
 
 
