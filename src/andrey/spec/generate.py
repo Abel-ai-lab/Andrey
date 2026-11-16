@@ -68,6 +68,8 @@ _JSON_TYPES: dict[str, dict] = {
     "bool": {"type": "boolean"},
     "int_pair": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2},
     "str_list": {"type": "array", "items": {"type": "string"}},
+    # One column, or a list of at least one: the answer of a list is a list of answers.
+    "str_or_list": {"type": ["string", "array"], "items": {"type": "string"}, "minItems": 1},
     "knowledge": {
         "type": "object",
         "properties": {
@@ -113,8 +115,9 @@ def _param_schema(p: ParamSpec) -> dict:
     schema = dict(_JSON_TYPES[p.type])
     if p.choices:  # a nullable choice param must admit null as a valid enum member (its default)
         schema["enum"] = [*p.choices, None] if p.nullable else list(p.choices)
-    if p.nullable and isinstance(schema.get("type"), str):
-        schema["type"] = [schema["type"], "null"]
+    if p.nullable:
+        kinds = schema["type"]
+        schema["type"] = [*([kinds] if isinstance(kinds, str) else kinds), "null"]
     schema["default"] = list(p.default) if isinstance(p.default, tuple) else p.default
     number = schema  # JSON Schema applies a bound to a number only, so a pair's go on its items
     if p.type == "int_pair":
@@ -315,6 +318,11 @@ def cli_meta() -> dict:
                 "and weight when the method estimates one), latent_nodes (GIN), ordering"
             ),
             "metadata": "scores / p-values / provenance from the run",
+            "results": (
+                "with multi: true, in place of structure and metadata: one {structure, metadata} "
+                "per group (multi_group_direct_lingam) or per target, in the order of a list such "
+                "as 'target=[a,b]' on a target-centered method"
+            ),
             "run": "resolved params, seed, versions, elapsed, n_samples, n_variables, and the "
             "fit's warnings (category, message)",
         },
@@ -499,7 +507,8 @@ def render_skill() -> str:
     a("## Reading the result")
     a("")
     a(
-        "A run's envelope holds `structure` (or `results`, one per group): its `kind` (`dag`, "
+        "A run's envelope holds `structure` (or `results`, one per group, or one per target when "
+        "`target=[a,b]` is a list): its `kind` (`dag`, "
         "`cpdag`, `pag`, or temporal), `labels`, `n_edges`, an `edge_types` count, and `edges`. "
         "Each edge has a `source` and a `target`, indexes into `labels`, a `type`, and, from a "
         "method with weights (`output.weighted` in its contract), a `weight`. A causal order is "

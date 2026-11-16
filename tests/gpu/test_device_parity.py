@@ -19,6 +19,7 @@ import pytest
 
 import andrey
 from andrey.core import backend, stats
+from andrey.core.ci import make_indep_test
 from andrey.core.ci_cmiknn import CMIknn
 from andrey.core.ci_kernel import KCI
 from andrey.irregular.pnl import pnl_pairs
@@ -70,6 +71,21 @@ def test_cov_corrcoef_match_oracle(device, data):
             stats.corrcoef(data.T, rowvar=False), np.corrcoef(data.T, rowvar=False), **tol
         )
     assert backend.dispatch_stats() == {("cov", device): 3, ("corrcoef", device): 2}
+
+
+def test_a_lazy_test_takes_its_matrix_from_the_pinned_device(device):
+    """Lazy correlation follows the backend: a pinned device computes the whole matrix, on the
+    device, and the test answers as the NumPy one does."""
+    X = np.random.default_rng(2).standard_normal((500, 12))
+    with andrey.config(backend="numpy"):
+        reference = make_indep_test("fisherz", X, lazy=True)
+        assert reference.correlation_rows() == 0
+    backend._dispatch_counts.clear()
+    with andrey.config(backend=device):
+        test = make_indep_test("fisherz", X, lazy=True)
+    assert backend.dispatch_stats() == {("corrcoef", device): 1}
+    assert test.correlation_rows() == X.shape[1]
+    assert np.isclose(test(0, 1, [2, 3]), reference(0, 1, [2, 3]), **_TOL[device])
 
 
 def test_entropy_matches_oracle(device, standardized):

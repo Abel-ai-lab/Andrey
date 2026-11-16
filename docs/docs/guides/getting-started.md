@@ -358,6 +358,23 @@ datasets, and the methods under [Environments and interventions](#environments-a
 also take each row's environment. `andrey list` names the methods, and {doc}`graph-types` explains
 which graph each one returns.
 
+### Answers for a few variables
+
+When you need the neighborhood of a few variables rather than the whole graph, a local method
+answers for each `target` alone and tests far fewer pairs. `mmpc` and `hiton_pc` return a target's
+parents and children, `iamb`, `hiton_mb`, and the other blanket learners its Markov blanket, and
+`mb_by_mb`, `cmb`, and `mmb_by_mmb` the directions of its edges. Pass a list to answer for several
+targets in one call: you get one result per target, each equal to a call for that target alone, and
+the work two targets share is done once.
+
+```python
+outs = andrey.mmpc(data, target=["pkc", "raf"])
+outs[0].metadata["parents_and_children"]
+```
+
+Set `andrey.config(n_jobs=...)` to spread the targets over worker processes; the results do not
+change with the number of workers.
+
 ### Environments and interventions
 
 % concept: env
@@ -713,7 +730,8 @@ rebuild the data to preserve the independence of each pair tested. When a variab
 the data goes missing because of a common effect of that pair, the extra edge can stay. This occurs
 in the paper's Figure 1c and when two effects of the same causes each cause the other's missingness.
 The paper's density-ratio correction for those cases is not implemented. `andrey.data.missingness`
-simulates data whose missingness graph you know, to see where the correction helps.
+simulates data whose missingness graph you know, to see where the correction helps. The
+[missing values notebook](../examples/missing_values) runs that comparison on one simulated dataset.
 
 On simulated data in the paper's setting, MVPC made fewer errors than test-wise deletion in 10 of
 16 settings where values go missing for a reason and tied in the rest. It also tied where values
