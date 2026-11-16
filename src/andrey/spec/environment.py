@@ -15,6 +15,7 @@ from andrey.constraint._parallel_skeleton import (
 )
 from andrey.core.backend import GPU_THRESHOLDS
 from andrey.core.env import SEED_MAX
+from andrey.lingam.pwling import MIN_PRUNE_WORK
 from andrey.search._parallel_ges import MIN_POOL_GES_WORK
 
 from .models import EnvVarSpec
@@ -125,6 +126,21 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "worker count (`n_jobs` / `ANDREY_N_JOBS`) is above 1. A fit with more than one "
             "worker warns once on the default when a pass reaches a tenth of it; `andrey "
             "calibrate --method rcot` measures a value for your machine."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_LINGAM_PRUNE_MIN_WORK",
+        values="integer (rows times ordered pairs of candidates per step)",
+        default=str(MIN_PRUNE_WORK),
+        effect=(
+            "Per-step gate for the `pwling` causal-order search of DirectLiNGAM, "
+            "MultiGroupDirectLiNGAM, VARMA-LiNGAM, and longitudinal LiNGAM: a step stops scoring "
+            "a candidate once its partial score shows it cannot be picked only when the rows "
+            "times the ordered pairs of candidates reach this value, else it scores every "
+            "candidate in full. Both give the same order bit for bit. `0` prunes every step. The "
+            "default was measured on an AMD EPYC 7713 server running Linux on one core, where "
+            "pruning broke even at 60,000 to 80,000."
         ),
         group="backend",
     ),

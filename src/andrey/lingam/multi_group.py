@@ -72,7 +72,8 @@ def _find_shared_causal_order(
     """Peel exogenous variables by size-weighted sum of per-group ``measure`` scores.
 
     Mirrors :func:`pwling.find_causal_order` but sums the candidate scores across groups (each
-    weighted by ``n_g / total_n``) and residualizes every group independently against the pick.
+    weighted by ``n_g / total_n``; :func:`pwling.pruned_scores` for ``"pwling"``) and residualizes
+    every group independently against the pick.
     Ties are broken by :func:`~andrey.core.ties.tie_ranks` of the stacked input groups. Columns
     that are copies in any group form one copy group (:func:`pwling.copy_groups`), scored by its
     representative and followed directly by the other copies. With ``precedence``, as for
@@ -86,6 +87,7 @@ def _find_shared_causal_order(
     # Copy + float64 so the in-place residual write-back never truncates.
     residualized = [np.array(X, dtype=np.float64) for X in groups]
     ranks = tie_ranks(np.vstack(groups))
+    hint: dict[int, float] = {}
 
     while remaining:
         if precedence is None:
@@ -96,13 +98,22 @@ def _find_shared_causal_order(
         if len(candidates) == 1:
             m = candidates[0]
         else:
-            neg_mg = np.zeros(len(candidates), dtype=np.float64)
-            for X in residualized:
-                neg_mg += (len(X) / total_n) * score(X, candidates)
-            if precedence is None:
+            eligible = None
+            if precedence is not None:
+                eligible = pwling.eligible(precedence, forbidden_paths, candidates)
+            weights = [len(X) / total_n for X in residualized]
+            if measure == "pwling":
+                neg_mg = pwling.pruned_scores(
+                    residualized, candidates, weights=weights, allowed=eligible, hint=hint
+                )
+                hint = dict(zip(candidates, neg_mg.tolist(), strict=True))
+            else:
+                neg_mg = np.zeros(len(candidates), dtype=np.float64)
+                for X, w in zip(residualized, weights, strict=True):
+                    neg_mg += w * score(X, candidates)
+            if eligible is None:
                 m = pwling.pick(neg_mg, candidates, ranks)
             else:
-                eligible = pwling.eligible(precedence, forbidden_paths, candidates)
                 chosen = [c for c, ok in zip(candidates, eligible, strict=True) if ok]
                 m = pwling.pick(neg_mg[eligible], chosen, ranks)
         placed = [m, *copies[m]]
