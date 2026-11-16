@@ -495,7 +495,8 @@ _add(
             concept_param(
                 "target",
                 doc="Required: the variable whose parents to find, a column name from the data "
-                "file's header or a 0-based position.",
+                "file's header or a 0-based position, or a list of them, such as target=[a,b], "
+                "for one result for each, in order.",
             ),
             ParamSpec(
                 name="targets",
