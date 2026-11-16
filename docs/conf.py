@@ -215,7 +215,7 @@ html_js_files = [
     ("nav-new.js", {"defer": "defer"}),
     ("page-outline.js", {"defer": "defer"}),
 ]
-REPO_URL = "https://github.com/Abel-ai-lab/andrey"
+REPO_URL = "https://github.com/Abel-ai-lab/Andrey"
 PYPI_URL = "https://pypi.org/project/andrey-core/"
 SITE_URL = "https://andrey.abel.ai/"
 ABEL_URL = "https://abel.ai/"
