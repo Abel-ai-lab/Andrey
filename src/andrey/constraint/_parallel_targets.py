@@ -26,7 +26,6 @@ from typing import TypeVar
 from andrey.constraint._skeleton import canonical_capable
 from andrey.constraint.blanket import LocalSearch, Reading, Step, first_reads
 from andrey.core.ci import count_tests, counting_tests
-from andrey.core.ci_missing import rows_tested
 
 T = TypeVar("T")
 
@@ -74,23 +73,25 @@ def answers(
     targets: Sequence[int],
     workers: int = 1,
 ) -> list[tuple[T, int, Counter[int]]]:
-    """``answer(search, t)`` for each target ``t``, with the tests it computed and the rows each
-    of them read (:func:`~andrey.core.ci_missing.rows_tested`), in the order of ``targets``.
+    """``answer(search, t)`` for each target ``t``, with the tests it computed and the rows read
+    by every test it read (:func:`~andrey.core.ci_missing.rows_tested`), in the order of
+    ``targets``.
 
     A test counts toward the first answer that reads it, so the counts add up to the tests the
-    call computed. ``answer`` is a module-level function when ``workers`` is above 1, so that it
-    reaches the workers. The tests the workers compute are added to the caller's
-    :func:`~andrey.core.ci.counting_tests` count. The rows are counted only in this process: a
-    test-wise deletion test, the one test that counts them, answers here.
+    call computed, while the rows of an answer are those a search of its own would count, the
+    steps an earlier answer made included. ``answer`` is a module-level function when ``workers`` is
+    above 1, so that it reaches the workers. The tests the workers compute are added to the
+    caller's :func:`~andrey.core.ci.counting_tests` count. The rows are counted only in this
+    process: a test-wise deletion test, the one test that counts them, answers here.
     """
     if workers > 1 and len(targets) > 1 and canonical_capable(search.test):
         return _pooled(search, answer, targets, workers)
     out = []
     with search.pinned():
         for t in targets:
-            with rows_tested() as rows, counting_tests() as tests:
+            with counting_tests() as tests, search.reading() as reading:
                 found = answer(search, t)
-            out.append((found, tests.n, rows))
+            out.append((found, tests.n, reading.rows))
     return out
 
 
@@ -122,4 +123,4 @@ def _pooled(
             tests.setdefault(step, n)
     counts = first_reads([reading for _, reading in found], tests)
     count_tests(sum(counts))
-    return [(value, n, Counter()) for (value, _), n in zip(found, counts, strict=True)]
+    return [(value, n, reading.rows) for (value, reading), n in zip(found, counts, strict=True)]

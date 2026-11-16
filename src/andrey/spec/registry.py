@@ -541,7 +541,7 @@ _LOCAL_OUTPUT_DOC = (
     "without a target, the graph structure names: the CPDAG, the skeleton, or, for the blankets, "
     "the moral graph; with a target, undirected edges from target to each member, "
     "metadata['target'] naming the target and metadata['{key}'] listing the members in the order "
-    "they joined"
+    "they joined; with a list of targets, a list of those results, one per target in order"
 )
 _BLANKET_STRUCTURE = concept_param("structure")
 #: A set learner's own max_depth, where its default is not the concept's.

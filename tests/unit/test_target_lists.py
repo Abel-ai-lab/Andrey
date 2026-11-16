@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import pickle
+
 import numpy as np
 import pandas as pd
 import pytest
 
 import andrey
+from andrey.constraint.blanket import LazyTieRanks
 from andrey.core.ci import counting_tests
 
 SET_LEARNERS = (
@@ -132,3 +135,36 @@ def test_a_bad_list_raises(target, message):
 def test_bootstrap_takes_one_target():
     with pytest.raises(ValueError, match="one target at a time"):
         andrey.bootstrap("mmpc", _gaussian(), target=["x1", "x2"], n_resamples=2)
+
+
+@pytest.mark.parametrize("method", ["mmpc", "hiton_mb", "pcmb", "mb_by_mb"])
+def test_rows_tested_is_the_answer_of_its_own_call_with_missing_values(method):
+    """A step an earlier target made still counts its rows for the later target that reads it."""
+    data = _gaussian()
+    data.iloc[::7, 2] = np.nan
+    data.iloc[3::11, 5] = np.nan
+    outs = _fit(method, data, TARGETS)
+    assert "rows_tested" in outs[0].metadata
+    for out, t in zip(outs, TARGETS, strict=True):
+        _same(out, _fit(method, data, t), tests=False)
+
+
+def test_any_sequence_of_columns_is_a_list():
+    data = _gaussian()
+    outs = andrey.mmpc(data, target=range(3))
+    assert [out.metadata["target"] for out in outs] == ["x0", "x1", "x2"]
+    (out,) = andrey.mmpc(data, target=("x3",))
+    _same(out, andrey.mmpc(data, target="x3"))
+
+
+def test_unpickled_ranks_compute_under_the_active_thread_limit():
+    """A worker pins its BLAS threads after it unpickles the search, and the ranks it computes
+    later run under that pin, not under the limits of the moment it unpickled them."""
+    from threadpoolctl import threadpool_info, threadpool_limits
+
+    ranks = LazyTieRanks(np.round(_gaussian().to_numpy()), np.zeros(8, dtype=bool))
+    with threadpool_limits(limits=2):
+        copy = pickle.loads(pickle.dumps(ranks))
+    with threadpool_limits(limits=1), copy._threads():
+        assert all(pool["num_threads"] == 1 for pool in threadpool_info())
+    assert list(copy) == list(ranks)

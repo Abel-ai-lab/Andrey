@@ -1695,15 +1695,17 @@ _CONCEPTS = (
         "0-based position. A set learner takes it optionally, null learning every variable's set; "
         "a method that answers only for one variable takes it in its required form "
         "(REQUIRED_TARGET) and raises ValueError without it. With a target, the fit returns the "
-        "answer of target_answer. In Python, a list of targets returns a list of answers, one per "
-        "target in its order, each the answer of a call for that target alone.",
+        "answer of target_answer. A list of targets returns a list of answers, one per target in "
+        "its order, each the answer of a call for that target alone; on the command line, the "
+        "envelope holds them as results (multi: true).",
         param=_template(
             "target",
-            "str",
+            "str_or_list",
             None,
             "The variable whose set to learn: a column name from the data file's header or a "
-            "0-based position. null learns every variable's set and keeps a pair when each is in "
-            "the other's set.",
+            "0-based position, or a list of them, such as target=[a,b], that learns one set for "
+            "each with one search and returns one result for each, in order. null learns every "
+            "variable's set and keeps a pair when each is in the other's set.",
             nullable=True,
         ),
         fragment="a column label (a string) or a 0-based position (an integer)",
@@ -2069,7 +2071,8 @@ def concept_param(key: str, **update: Any) -> ParamSpec:
 REQUIRED_TARGET = concept_param(
     "target",
     doc="Required: the variable to answer for, a column name from the data file's header or a "
-    "0-based position.",
+    "0-based position, or a list of them, such as target=[a,b], for one result for each, in "
+    "order.",
 )
 
 

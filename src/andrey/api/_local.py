@@ -12,6 +12,7 @@ sets under the keys of :data:`TARGET_SETS`. The pair methods' answer is the ``ef
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from typing import TypeGuard
 
 import numpy as np
 
@@ -54,12 +55,17 @@ def target_column(target: object, labels: Sequence[str] | None, d: int, method: 
     return column_position(as_node(target, f"{method}: target"), labels, d, f"{method}: target")
 
 
+def is_column_list(target: object) -> TypeGuard[Sequence[object]]:
+    """Whether ``target`` is a list of columns: any sequence but a string."""
+    return isinstance(target, Sequence) and not isinstance(target, str | bytes)
+
+
 def target_columns(
     target: object, labels: Sequence[str] | None, d: int, method: str
 ) -> list[int] | None:
     """Return the positions of the columns a list of targets names, in its order.
 
-    ``None`` when ``target`` is not a list or a tuple: one column, or none.
+    ``None`` when ``target`` is not a list (:func:`is_column_list`): one column, or none.
 
     Raises
     ------
@@ -68,7 +74,7 @@ def target_columns(
     TypeError
         If a member is neither a column label nor a position.
     """
-    if not isinstance(target, list | tuple):
+    if not is_column_list(target):
         return None
     what = f"{method}: target"
     if not target:

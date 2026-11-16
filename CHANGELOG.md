@@ -17,8 +17,10 @@ names its pull request.
   `icp`, `local_isa_ling`): one call returns one result per target, each equal to a call for that
   target alone. The twelve with a test-based search answer every target with one search, making a
   step two targets share once, and split the targets over `andrey.config(n_jobs=...)` worker
-  processes for a partial-correlation test, with the same results for any number of workers
-  ([#1058]).
+  processes for a partial-correlation test, with the same results for any number of workers.
+  `andrey run` takes the list as `'target=[a,b]'`, by header name or position, or as a list in
+  `--config`; its envelope then holds `multi: true` and `results`, one per target, and the
+  `--help --json` schema types `target` as a string or a list of strings ([#1058]).
 - `andrey.locpc_cde`, LocPC-CDE (Loranchet and Assaad 2026), supported: whether the controlled
   direct effect of a treatment on an outcome is identifiable, from a graph learned around the
   outcome one hop at a time with PC's tests, and the outcome's parents as its adjustment set. The
