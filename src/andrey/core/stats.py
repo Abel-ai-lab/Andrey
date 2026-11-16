@@ -449,9 +449,11 @@ def cov(X: np.ndarray, *, rowvar: bool = True, ddof: int = 1) -> np.ndarray:
 def corrcoef(X: np.ndarray, *, rowvar: bool = True) -> np.ndarray:
     """Pearson correlation matrix of the rows of ``X``, or of its columns when ``rowvar`` is false.
 
-    On numpy it is :func:`~andrey.core.correlation.correlation_matrix`, computed tile by tile with
-    an exactly symmetric result and a unit diagonal; it agrees with ``np.corrcoef`` up to rounding.
-    On a GPU it is ``torch.corrcoef``, which agrees with both up to rounding.
+    On numpy a matrix of two or more variables is
+    :func:`~andrey.core.correlation.correlation_matrix`, computed block by block with an exactly
+    symmetric result and a unit diagonal; it agrees with ``np.corrcoef`` up to rounding. Any other
+    input, one variable or an array that is not 2-D, is ``np.corrcoef(X, rowvar=rowvar)``. On a
+    GPU it is ``torch.corrcoef``, which agrees with both up to rounding.
     """
     X = np.asarray(X, dtype=np.float64)
     thr = _resolve_thresholds(
@@ -466,6 +468,8 @@ def corrcoef(X: np.ndarray, *, rowvar: bool = True) -> np.ndarray:
     # One-shot, like cov: FisherZ computes its correlation matrix once per fit.
     dev = backend.resolve(X.size, thr, op="corrcoef")
     if dev == "numpy":
+        if X.ndim != 2 or X.shape[0 if rowvar else 1] < 2:
+            return np.corrcoef(X, rowvar=rowvar)
         from .correlation import correlation_matrix
 
         return correlation_matrix(X.T if rowvar else X)

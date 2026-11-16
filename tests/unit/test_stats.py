@@ -52,6 +52,17 @@ def test_corrcoef_is_the_tiled_matrix(force_numpy, data):
     np.testing.assert_allclose(full, np.corrcoef(data), rtol=0, atol=1e-14)
 
 
+def test_corrcoef_keeps_numpys_handling_of_one_dimension_and_one_variable(force_numpy):
+    x = np.random.default_rng(3).standard_normal(50)
+    for X, rowvar in [(x, True), (x, False), (x[None, :], True), (x[:, None], False)]:
+        got, want = corrcoef(X, rowvar=rowvar), np.corrcoef(X, rowvar=rowvar)
+        assert np.shape(got) == np.shape(want) == () and got == want
+    two = np.column_stack([x, x**2])
+    assert corrcoef(two, rowvar=False).shape == np.corrcoef(two, rowvar=False).shape == (2, 2)
+    with pytest.raises(ValueError, match="more than 2 dimensions"):
+        corrcoef(np.ones((2, 3, 4)))
+
+
 def test_entropy_numpy_reference(force_numpy, standardized):
     e = entropy(standardized)
     assert e.shape == (4,)
