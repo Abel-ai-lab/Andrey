@@ -1695,7 +1695,8 @@ _CONCEPTS = (
         "0-based position. A set learner takes it optionally, null learning every variable's set; "
         "a method that answers only for one variable takes it in its required form "
         "(REQUIRED_TARGET) and raises ValueError without it. With a target, the fit returns the "
-        "answer of target_answer.",
+        "answer of target_answer. In Python, a list of targets returns a list of answers, one per "
+        "target in its order, each the answer of a call for that target alone.",
         param=_template(
             "target",
             "str",

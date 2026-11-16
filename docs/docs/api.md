@@ -392,6 +392,18 @@ No method takes the number of workers or the device as an argument. Set them for
 block with `andrey.config(n_jobs=...)`, or with the `ANDREY_*` variables of
 [Configuration](configuration.md); `bootstrap` follows them too.
 
+% concept: target
+`iamb`, `inter_iamb`, `gs`, `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`,
+`mb_by_mb`, `cmb`, `mmb_by_mmb`, `icp`, and `local_isa_ling` take `target`, the variable they
+answer for, as a column label or a 0-based position. A list of them returns a list of results, one
+per target in the list's order, each the result a call for that target alone returns. The first
+twelve answer every target with one search, so a step two targets share, such as the parents and
+children of a common neighbor, is made once, and each result's `metadata["n_tests"]` counts only
+the tests no earlier result counts. With `andrey.config(n_jobs=...)` above 1 and a
+partial-correlation `indep_test` (`"fisherz"`, `"student_t"`, `"normal_scores"`), they split the
+targets over that many worker processes, with the same results for any number of workers. `icp` and
+`local_isa_ling` answer each target in turn.
+
 % concept: penalty_discount
 `ges`, `gies`, `gnies`, `xges`, `ages`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`,
 `boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take `penalty_discount`, the multiplier on the BIC
