@@ -1,8 +1,9 @@
 """Columns and answers shared by the methods that answer for one variable or a pair of variables.
 
-A target-centered method answers for one column, ``target``; a treatment-outcome method for an
-ordered pair, ``treatment`` and ``outcome``; a method that answers for every ordered pair of a few
-columns takes them unordered as ``variables``. The helpers here turn those arguments into column
+A target-centered method answers for one column, ``target``, or for each column of a list of them
+(:func:`target_columns`); a treatment-outcome method for an ordered pair, ``treatment`` and
+``outcome``; a method that answers for every ordered pair of a few columns takes them unordered as
+``variables``. The helpers here turn those arguments into column
 positions with one set of messages, and :func:`target_metadata` writes a target-centered answer's
 sets under the keys of :data:`TARGET_SETS`. The pair methods' answer is the ``effects`` record of
 :mod:`andrey.core.effects`.
@@ -12,6 +13,10 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
 
+import numpy as np
+
+from andrey.api._adapt import categorical_metadata
+from andrey.core.ci_missing import rows_metadata
 from andrey.core.knowledge import as_node, column_position
 
 #: The metadata key of each set a target-centered answer lists, and what puts a column in it. A
@@ -31,9 +36,7 @@ TARGET_SETS: dict[str, str] = {
 }
 
 
-def target_column(
-    target: str | int | None, labels: Sequence[str] | None, d: int, method: str
-) -> int:
+def target_column(target: object, labels: Sequence[str] | None, d: int, method: str) -> int:
     """Return the position of the column ``target`` names, for a method that requires one.
 
     Raises
@@ -49,6 +52,31 @@ def target_column(
             "position"
         )
     return column_position(as_node(target, f"{method}: target"), labels, d, f"{method}: target")
+
+
+def target_columns(
+    target: object, labels: Sequence[str] | None, d: int, method: str
+) -> list[int] | None:
+    """Return the positions of the columns a list of targets names, in its order.
+
+    ``None`` when ``target`` is not a list or a tuple: one column, or none.
+
+    Raises
+    ------
+    ValueError
+        If the list is empty, names a column the data lack, or names one column twice.
+    TypeError
+        If a member is neither a column label nor a position.
+    """
+    if not isinstance(target, list | tuple):
+        return None
+    what = f"{method}: target"
+    if not target:
+        raise ValueError(f"{what} is an empty list; pass a column or a list of columns")
+    found = [column_position(as_node(t, what), labels, d, what) for t in target]
+    if len(set(found)) != len(found):
+        raise ValueError(f"{what} names a column twice: {list(target)}")
+    return found
 
 
 def pair_columns(
@@ -145,3 +173,14 @@ def target_metadata(
             raise ValueError(f"the set {key!r} holds the target")
         out[key] = [name(j) for j in listed]
     return out
+
+
+def fit_metadata(
+    mask: np.ndarray | None, data: object, rows: Mapping[int, int], n_tests: int
+) -> dict[str, object]:
+    """Return the metadata every answer of a local method ends with.
+
+    It names the categorical columns, the rows the tests read
+    (:func:`~andrey.core.ci_missing.rows_metadata`), and ``n_tests``.
+    """
+    return categorical_metadata(mask, data) | rows_metadata(rows) | {"n_tests": n_tests}
