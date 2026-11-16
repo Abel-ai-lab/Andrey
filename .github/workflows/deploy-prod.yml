@@ -21,18 +21,18 @@ concurrency:
 jobs:
   ci:
     if: >-
-      github.repository == 'Abel-ai-lab/andrey'
+      github.repository == 'Abel-ai-lab/Andrey'
       && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
     uses: ./.github/workflows/ci.yml
   docs:
     if: >-
-      github.repository == 'Abel-ai-lab/andrey'
+      github.repository == 'Abel-ai-lab/Andrey'
       && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
     uses: ./.github/workflows/docs.yml
   request-build:
     needs: [ci, docs]
     if: >-
-      github.repository == 'Abel-ai-lab/andrey'
+      github.repository == 'Abel-ai-lab/Andrey'
       && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
     # The environment holds the job until its required reviewer approves; administrators cannot
     # bypass it, so no production deploy starts without the owner.

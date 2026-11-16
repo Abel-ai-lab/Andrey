@@ -57,8 +57,8 @@ for Intel GPUs.
 The `main` branch on GitHub holds the latest release:
 
 ```shell
-uv add "andrey-core @ git+https://github.com/Abel-ai-lab/andrey@main"
-pip install "andrey-core @ git+https://github.com/Abel-ai-lab/andrey@main"
+uv add "andrey-core @ git+https://github.com/Abel-ai-lab/Andrey@main"
+pip install "andrey-core @ git+https://github.com/Abel-ai-lab/Andrey@main"
 ```
 
 The distribution is `andrey-core`. After the `@`, name any branch, tag, or commit to install that
@@ -69,14 +69,14 @@ one.
 Build the wheel and the source distribution yourself, then install the wheel:
 
 ```shell
-git clone https://github.com/Abel-ai-lab/andrey
+git clone https://github.com/Abel-ai-lab/Andrey
 cd andrey
 uv build                                  # writes both to dist/
 uv pip install dist/andrey_core-*.whl     # into the active environment
 ```
 
 To work on Andrey itself, `uv sync` in the clone sets up a development environment instead; see
-[CONTRIBUTING](https://github.com/Abel-ai-lab/andrey/blob/main/CONTRIBUTING.md).
+[CONTRIBUTING](https://github.com/Abel-ai-lab/Andrey/blob/main/CONTRIBUTING.md).
 
 ## The data
 
@@ -534,7 +534,7 @@ cause. DirectLiNGAM and multi-group DirectLiNGAM read `required_paths` and `forb
 narrow the causal order, as their paper describes (Shimizu et al., 2011). Every other method raises
 `NotImplementedError` for a part it does not honor, naming the methods that do. The parts are
 supported wherever true claims [measured no
-worse](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
+worse](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
 than the same fit without them and than a reference package given the same knowledge, which is every
 method that honors them except twelve. Required paths are experimental in Tabu search, MMHC, and
 RSMAX2, where a reference package given the edges those paths imply made fewer errors. Forbidden
@@ -784,7 +784,7 @@ graph in 2 to 6% of the fits, and in 20% of `grasp`'s, most often with 50 variab
 Such a fit logs a warning, and more rows help. EM also costs time: a fit runs the search 10 times
 and the E-step 56 times, and it took 2 to 72 times as long as the same search on complete data. The
 [missing-data
-comparison](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md)
+comparison](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/missing-data.md)
 has every number. In `xges`, `exact_search`, `dagma`, and `calm`, `missing="em"` is experimental: no
 reference implementation exists to compare them with, so the [release
 card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data) reports them beside test-wise

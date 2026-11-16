@@ -569,7 +569,7 @@ def test_every_page_carries_structured_data_that_matches_its_preview(html):
         assert any("mixed" in fact and "time series" in fact for fact in software["featureList"])
         assert software["license"]["name"] == "Apache-2.0"
         assert software["license"]["url"].endswith("/blob/main/LICENSE")
-        assert software["codeRepository"] == "https://github.com/Abel-ai-lab/andrey"
+        assert software["codeRepository"] == "https://github.com/Abel-ai-lab/Andrey"
         assert software["image"] == "https://andrey.abel.ai/_static/favicon.svg"
         assert (html / "_static" / "favicon.svg").is_file()
         assert node["about"]["@id"] == software["@id"]
@@ -578,7 +578,7 @@ def test_every_page_carries_structured_data_that_matches_its_preview(html):
         assert software["alternateName"] == "andrey-core"
         assert software["sameAs"] == [
             "https://pypi.org/project/andrey-core/",
-            "https://github.com/Abel-ai-lab/andrey",
+            "https://github.com/Abel-ai-lab/Andrey",
         ]
         assert nodes["WebSite"]["alternateName"] == "Andrey causal discovery"
         assert nodes["Organization"]["sameAs"] == ["https://github.com/Abel-ai-lab"]
