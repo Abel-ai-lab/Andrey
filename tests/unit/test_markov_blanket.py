@@ -1033,6 +1033,29 @@ def test_a_scan_is_its_candidates_asked_one_at_a_time(kind):
         assert backward[1].tobytes() == pvalues[::-1].tobytes(), cond
 
 
+@pytest.mark.parametrize("kind", ["fisherz", "student_t", "normal_scores"])
+def test_a_large_scan_given_a_shared_set_is_answered_from_one_factor(kind):
+    """A scan of enough candidates given two or more variables goes to the test's one-factor path,
+    counts one test per candidate, and agrees with each candidate's own scan to rounding."""
+    x = data.sample_scm(graph="erdos_renyi", d=40, n=400, seed=3, density=3.0).data
+    test = make_indep_test(kind, x)
+    factored = []
+    factor = test._schur_partial_correlations
+    test._schur_partial_correlations = lambda *args: factored.append(1) or factor(*args)
+    search = LocalSearch(test, tie_ranks(x).tolist(), 0.05)
+    cond = (2, 9, 17)
+    xs = [v for v in range(40) if v != 4 and v not in cond]
+    with counting_tests() as tests:
+        strengths, pvalues = search.scan(4, xs, cond)
+    assert factored == [1] and tests.n == len(xs)
+    alone = [search.scan(4, [v], cond) for v in xs]
+    want_s = np.concatenate([s for s, _ in alone])
+    want_p = np.concatenate([p for _, p in alone])
+    np.testing.assert_allclose(strengths, want_s, rtol=0.0, atol=1e-12)
+    np.testing.assert_allclose(pvalues, want_p, rtol=1e-9, atol=1e-300)
+    assert ((pvalues <= 0.05) == (want_p <= 0.05)).all()
+
+
 def _given_rest(target: int, v: int, d: int) -> list[int]:
     return [z for z in range(d) if z not in (target, v)]
 
