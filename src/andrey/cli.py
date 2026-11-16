@@ -499,6 +499,12 @@ def render_human(
     if not isinstance(out, list):
         lines = summary_lines(out, name=spec.name, limit=limit, more=_MORE_HINT)
         return "\n".join(lines) + _run_footer(run)
+    if not spec.output.multi:  # a list of targets: one summary per target
+        lines = [f"{spec.name}  |  {len(out)} targets"]
+        for o in out:
+            name = f"target {o.metadata['target']}"
+            lines += ["", *summary_lines(o, name=name, limit=limit, more=_MORE_HINT)]
+        return "\n".join(lines) + _run_footer(run)
     lines = [f"{spec.name}  |  {len(out)} groups"]  # multi-group: one block per group
     for k, o in enumerate(out):
         graph = o.structure
@@ -587,7 +593,7 @@ def _coerce(raw: str, param: ParamSpec) -> object:
         return _targets_value(raw, param.name)
     value, quoted = _unquote(raw)
     if quoted:  # a quoted value is a literal string -- only a str param can accept one
-        if param.type != "str":
+        if param.type not in ("str", "str_or_list"):
             raise CliError(
                 "bad_value", f"{param.name} is a {param.type}, not a quoted string", EXIT_USAGE
             )
@@ -638,7 +644,7 @@ def _coerce(raw: str, param: ParamSpec) -> object:
                 expected_shape="[int, int]",
             )
         return pair
-    if kind == "str_list":
+    if kind == "str_list" or (kind == "str_or_list" and value.startswith("[")):
         return tuple(_bracket_items(value, param.name))
     return _current_choice(value, param)
 
@@ -710,8 +716,9 @@ def _targets_object(value: object, name: str) -> dict:
 
 def _validate_config_value(value: object, param: ParamSpec) -> object:
     """A `--config` value is already typed (YAML/JSON): take it as the param's type without parsing
-    a string, for :func:`_checked` to check. A str or str_list must hold strings, which
-    ``ParamSpec.check`` leaves to the method. Returns tuples for int_pair / str_list."""
+    a string, for :func:`_checked` to check. A str, str_list, or str_or_list must hold strings,
+    which ``ParamSpec.check`` leaves to the method. Returns tuples for int_pair / str_list /
+    str_or_list."""
     if value is None:
         if param.nullable:
             return None
@@ -724,12 +731,12 @@ def _validate_config_value(value: object, param: ParamSpec) -> object:
         if isinstance(value, str):
             return _targets_value(value, param.name)
         return _targets_object(value, param.name)
-    if param.type == "str" and isinstance(value, str):
+    if param.type in ("str", "str_or_list") and isinstance(value, str):
         return _current_choice(value, param)
     strings = isinstance(value, (list, tuple)) and all(isinstance(i, str) for i in value)
-    if param.type == "str_list" and strings:
+    if param.type in ("str_list", "str_or_list") and strings:
         return tuple(value)
-    if param.type in ("str", "str_list"):
+    if param.type in ("str", "str_list", "str_or_list"):
         raise CliError(
             "bad_value", f"{param.name} in --config is not a valid {param.type}", EXIT_USAGE
         )
@@ -1013,7 +1020,8 @@ def prepare_call(
 ) -> tuple[list, dict, tuple[str, ...] | None]:
     """Shape the loaded inputs and coerced params into what the facade takes.
 
-    ``categorical=`` names become positions, and ``knowledge=`` becomes an ``andrey.Knowledge``;
+    ``categorical=`` and ``target=`` names become positions, and ``knowledge=`` becomes an
+    ``andrey.Knowledge``;
     the method reads each text key of ``targets=`` that spells a number as the label of ``--env``
     it spells. A method that reads column types or knowledge, or whose graph adds latent nodes
     (GIN), gets the data as a DataFrame, so its warnings and its graph name the header's columns.
@@ -1021,8 +1029,15 @@ def prepare_call(
     """
     if fkwargs.get("categorical") is not None:
         fkwargs = {**fkwargs, "categorical": column_positions(fkwargs["categorical"], labels)}
-    if fkwargs.get("target") is not None:
-        fkwargs = {**fkwargs, "target": column_positions([fkwargs["target"]], labels, "target")[0]}
+    target = fkwargs.get("target")
+    if isinstance(target, (list, tuple)):  # one answer per target, in order
+        positions = column_positions(target, labels, "target")
+        if not positions or len(set(positions)) != len(positions):
+            why = "is an empty list" if not positions else "names a column twice"
+            raise CliError("bad_value", f"target {why}: {list(target)}", EXIT_USAGE)
+        fkwargs = {**fkwargs, "target": positions}
+    elif target is not None:
+        fkwargs = {**fkwargs, "target": column_positions([target], labels, "target")[0]}
     contexts = [key for key in ("time_contexts", "space_contexts") if fkwargs.get(key) is not None]
     for key in contexts:
         fkwargs = {**fkwargs, key: column_positions(fkwargs[key], labels, key)}
@@ -1191,6 +1206,10 @@ def execute_bootstrap(
     bad = [
         message
         for ok, message in (
+            (
+                not isinstance(fkwargs.get("target"), (list, tuple)),
+                "the bootstrap resamples one target at a time; pass target as one column",
+            ),
             (n_resamples >= 1, f"--n-resamples must be at least 1, got {n_resamples}"),
             (seed is None or seed >= 0, f"--seed must not be negative, got {seed}"),
             (block_length is None or block_length >= 1, "--block-length must be at least 1"),

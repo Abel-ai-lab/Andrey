@@ -358,6 +358,23 @@ datasets, and the methods under [Environments and interventions](#environments-a
 also take each row's environment. `andrey list` names the methods, and {doc}`graph-types` explains
 which graph each one returns.
 
+### Answers for a few variables
+
+When you need the neighborhood of a few variables rather than the whole graph, a local method
+answers for each `target` alone and tests far fewer pairs. `mmpc` and `hiton_pc` return a target's
+parents and children, `iamb`, `hiton_mb`, and the other blanket learners its Markov blanket, and
+`mb_by_mb`, `cmb`, and `mmb_by_mmb` the directions of its edges. Pass a list to answer for several
+targets in one call: you get one result per target, each equal to a call for that target alone, and
+the work two targets share is done once.
+
+```python
+outs = andrey.mmpc(data, target=["pkc", "raf"])
+outs[0].metadata["parents_and_children"]
+```
+
+Set `andrey.config(n_jobs=...)` to spread the targets over worker processes; the results do not
+change with the number of workers.
+
 ### Environments and interventions
 
 % concept: env
