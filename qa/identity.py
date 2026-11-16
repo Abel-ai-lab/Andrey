@@ -662,6 +662,9 @@ CI_QUERIES: dict[str, Callable[..., Iterable[tuple[int, int, Any, float]]]] = {
         (x, y, s, p) for s, p in zip(sets, ps)
     ],
     "first_order_pvalues": lambda ps, test, x, y, zs: [(x, y, (z,), p) for z, p in zip(zs, ps)],
+    "statistic_pvalues_given": lambda rp, test, x, ys, condition_set: [
+        (x, y, condition_set, p) for y, p in zip(ys, rp[1])
+    ],
     "pvalues_given": lambda ps, test, target, xs, condition_set=(): [
         (target, x, condition_set, p) for x, p in zip(xs, ps)
     ],
