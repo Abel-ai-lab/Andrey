@@ -94,9 +94,9 @@ def test_icp_answers_each_target():
 @pytest.mark.parametrize("method", ["mmpc", "hiton_mb", "iamb"])
 def test_kept_chi_square_answers_change_no_result(method):
     data = _discrete()
-    outs = _fit(method, data, [3, 1, 4, 0])
+    outs = _fit(method, data, [3, 1, 4, 0], indep_test="chisq")
     for out, t in zip(outs, [3, 1, 4, 0], strict=True):
-        _same(out, _fit(method, data, t), tests=False)
+        _same(out, _fit(method, data, t, indep_test="chisq"), tests=False)
 
 
 @pytest.mark.parametrize("method", ["iamb", "hiton_mb", "cmb"])
