@@ -253,3 +253,18 @@ def test_prune_min_work_sets_the_pruned_steps(monkeypatch):
     monkeypatch.setenv("ANDREY_LINGAM_PRUNE_MIN_WORK", "many")
     with pytest.raises(ValueError, match="ANDREY_LINGAM_PRUNE_MIN_WORK must be an integer"):
         pwling.pruned_scores([X], U)
+
+
+def test_pruned_scores_count_only_the_entropy_calls_that_run(monkeypatch):
+    """Asking which device a step's entropies would take counts no entropy call."""
+    from andrey.core import backend
+
+    monkeypatch.setenv("ANDREY_LINGAM_PRUNE_MIN_WORK", "0")
+    X = _random_linear_sem(seed=9, n=300, d=8, noise="uniform")
+    calls = []
+    real = stats.entropy
+    monkeypatch.setattr(stats, "entropy", lambda *a, **k: calls.append(1) or real(*a, **k))
+    backend._dispatch_counts.clear()
+    with andrey.config(backend="numpy"):
+        pwling.pruned_scores([X], list(range(8)))
+    assert backend.dispatch_stats() == {("entropy", "numpy"): len(calls)}

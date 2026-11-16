@@ -127,7 +127,11 @@ def pruned_scores(
     min_work = env.LINGAM_PRUNE_MIN_WORK.read()
     min_work = MIN_PRUNE_WORK if min_work is None else min_work
     small = sum(len(X) for X in groups) * m * (m - 1) < min_work
-    if width < 1 or small or any(stats.entropy_device(len(X) * (m - 1)) != "numpy" for X in groups):
+    if (
+        width < 1
+        or small
+        or any(stats.entropy_device(len(X) * (m - 1), record=False) != "numpy" for X in groups)
+    ):
         return _full_scores(groups, U, weights)
     parts = []
     for X in groups:
