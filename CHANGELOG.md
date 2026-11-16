@@ -330,6 +330,19 @@ names its pull request.
   docstrings no longer say that the robust fit does not depend on the scale of the columns: its first
   fit is least squares, and its penalty and threshold act on the weights in the data's units.
   ([#1043], [#1046])
+- A scan of many candidates against one conditioning set of two or more variables, as the grow
+  steps of `iamb`, `inter_iamb`, `fast_iamb`, `ldecc`, `mb_by_mb`, and `local_optimal_adjustment`
+  ask it of a partial-correlation test, is answered from one Cholesky factor of the set's
+  correlation block, where each candidate inverted its own submatrix. At 5,000 rows, `iamb` at one
+  target on 1,000 variables is 3.2 times faster, and `iamb`, `inter_iamb`, and `fast_iamb` on 100
+  variables 1.3, 1.2, and 1.1 times. The p-values agree with the per-query answers to about 1e-10
+  relative, not bit for bit: every graph and `metadata["n_tests"]` of the identity corpus is the
+  same, and of 326,729 p-values compared, 4 differ in their ninth significant digit, values on a
+  rounding boundary. Small scans, blocks near the singular threshold, missing values, and the other
+  tests keep the per-query path; `ANDREY_SHARED_SCAN_MIN_WORK` (default `128`, candidates times the
+  set size plus two) sets the smallest scan that takes the factor. A repeated variable in the
+  conditioning set counts once, and a correlation matrix that is not exactly symmetric gives each
+  pair one answer whichever variable is the target. ([#1047], [#1048])
 
 ### Fixed
 
@@ -2946,6 +2959,8 @@ First alpha release.
 [#1042]: https://github.com/Abel-ai-lab/Andrey/pull/1042
 [#1034]: https://github.com/Abel-ai-lab/Andrey/pull/1034
 [#1044]: https://github.com/Abel-ai-lab/Andrey/pull/1044
+[#1047]: https://github.com/Abel-ai-lab/Andrey/pull/1047
+[#1048]: https://github.com/Abel-ai-lab/Andrey/pull/1048
 [#995]: https://github.com/Abel-ai-lab/Andrey/pull/995
 [#991]: https://github.com/Abel-ai-lab/Andrey/pull/991
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982

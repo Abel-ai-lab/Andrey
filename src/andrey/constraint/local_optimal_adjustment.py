@@ -130,6 +130,7 @@ class ColumnView:
 
     statistic_pvalue: Callable[..., Any] | None = None
     statistic_pvalues: Callable[..., Any] | None = None
+    statistic_pvalues_given: Callable[..., Any] | None = None
     pvalues_given: Callable[..., Any] | None = None
     batched_call: Callable[..., Any] | None = None
     _bounded_pvalue: Callable[..., Any] | None = None
@@ -151,6 +152,8 @@ class ColumnView:
                 c[np.asarray(ys, dtype=np.intp)],
                 c[np.asarray(sets, dtype=np.intp)],
             )
+        if (shared := getattr(test, "statistic_pvalues_given", None)) is not None:
+            self.statistic_pvalues_given = lambda t, xs, s: shared(int(c[t]), cols(xs), cols(s))
         if (given := getattr(test, "pvalues_given", None)) is not None:
             self.pvalues_given = lambda t, xs, s: given(int(c[t]), cols(xs), cols(s))
         if (batched := getattr(test, "batched_call", None)) is not None:

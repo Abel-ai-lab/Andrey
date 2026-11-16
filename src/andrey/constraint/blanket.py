@@ -36,7 +36,8 @@ endpoints given the middle node and each subset of the smaller blanket
 completes the result by Meek's rules.
 
 A learner asks its tests through its :class:`LocalSearch`. :meth:`LocalSearch.scan` tests many
-candidates against one conditioning set, in one call where the test can;
+candidates against one conditioning set, in one call where the test can, from one factor of the
+set's correlation block for a partial-correlation test;
 :meth:`LocalSearch.scan_given_rest` tests each candidate given all the other variables, from one
 inverse of the correlation matrix where the test can; :meth:`LocalSearch.weakest` gives each
 candidate's weakest association over many sets (a max-min step); and
@@ -99,14 +100,20 @@ def _scan(
     """:meth:`LocalSearch.scan` on ``test``: the strengths and p-values of ``target`` against each
     of ``xs`` given ``cond``.
 
-    A test with ``statistic_pvalue`` (a partial-correlation test) answers two or more candidates in
-    one ``statistic_pvalues`` call, whose entries equal the calls one by one bit for bit, and its
-    strength is the absolute partial correlation. Another test's strength is the negated p-value; a
+    A test with ``statistic_pvalue`` (a partial-correlation test) reports the absolute partial
+    correlation as the strength. It answers two or more candidates in one call: a
+    partial-correlation test on complete data with ``statistic_pvalues_given``, from one factor of
+    the set's correlation block, equal to the calls one by one up to rounding; another with
+    ``statistic_pvalues``, equal bit for bit. Another test's strength is the negated p-value; a
     test with ``pvalues_given`` (the chi-square tests) answers two or more candidates in one call,
     with the same bits, and any other test answers them one call at a time.
     """
     one = getattr(test, "statistic_pvalue", None)
     if one is not None:
+        given = getattr(test, "statistic_pvalues_given", None)
+        if given is not None and len(xs) > 1:
+            r, p = given(target, xs, cond)
+            return np.abs(np.asarray(r, dtype=np.float64)), np.asarray(p, dtype=np.float64)
         many = getattr(test, "statistic_pvalues", None)
         if many is not None and len(xs) > 1:
             k = len(xs)
@@ -1326,9 +1333,10 @@ class LocalSearch:
         A larger strength is a stronger dependence: the absolute partial correlation for a test
         that reports one (``statistic_pvalue``), else the negated p-value, so that ``-round(s,
         KEY_DP)`` is a key for :meth:`strongest`. The candidates are tested together where the test
-        can (a partial-correlation test's ``statistic_pvalues``, a chi-square test's
-        ``pvalues_given``), else one call at a time; either way each entry equals the test's answer
-        to that query alone, bit for bit. ``xs`` excludes ``target`` and the members of ``cond``.
+        can (:func:`_scan`), else one call at a time. Each entry equals the test's answer to that
+        query alone, bit for bit, except on a partial-correlation test on complete data given two
+        or more variables, which answers from one factor of the set's correlation block and agrees
+        up to rounding. ``xs`` excludes ``target`` and the members of ``cond``.
         """
         start = perf_counter()
         strengths, pvalues = _scan(self.test, target, xs, cond)

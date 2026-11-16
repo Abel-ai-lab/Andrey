@@ -1016,23 +1016,59 @@ def _scan_data(kind: str, seed: int = 3) -> np.ndarray:
 
 
 @pytest.mark.parametrize("kind", list(_BATCHED))
-def test_a_scan_is_its_candidates_asked_one_at_a_time_bit_for_bit(kind):
-    """The scan of many candidates, answered in one call, gives each candidate the bits of the scan
-    of that candidate alone and of the test's own answer, in the order of the candidates."""
+def test_a_scan_is_its_candidates_asked_one_at_a_time(kind):
+    """The scan of many candidates, answered in one call, gives each candidate the answer of the
+    scan of that candidate alone and of the test's own answer, in the order of the candidates: bit
+    for bit, except that a partial-correlation test on complete data given two or more variables
+    answers from one factor of the set's block, which agrees to rounding (the strength to 1e-12,
+    the p-value to 1e-9 relative, every p-value on the same side of alpha)."""
     x = _scan_data(kind)
     test = make_indep_test(kind.removesuffix("-missing"), x)
     assert hasattr(test, "statistic_pvalues" if _BATCHED[kind] == "gaussian" else "pvalues_given")
+    shared = kind in ("fisherz", "student_t", "normal_scores")
+    assert hasattr(test, "statistic_pvalues_given") == shared
     search = LocalSearch(test, tie_ranks(x).tolist(), 0.05)
     target = 4
     for cond in [(), (7,), (2, 9), (0, 3, 8, 11)]:
         xs = [v for v in range(12) if v != target and v not in cond]
         strengths, pvalues = search.scan(target, xs, cond)
         alone = [search.scan(target, [v], cond) for v in xs]
-        assert strengths.tobytes() == np.concatenate([s for s, _ in alone]).tobytes(), cond
-        assert pvalues.tobytes() == np.concatenate([p for _, p in alone]).tobytes(), cond
-        assert pvalues.tolist() == [test(target, v, cond) for v in xs], cond
+        want_s = np.concatenate([s for s, _ in alone])
+        want_p = np.concatenate([p for _, p in alone])
         backward = search.scan(target, xs[::-1], cond)
+        if shared and len(cond) >= 2:
+            np.testing.assert_allclose(strengths, want_s, rtol=0.0, atol=1e-12)
+            np.testing.assert_allclose(pvalues, want_p, rtol=1e-9, atol=1e-300)
+            assert ((pvalues <= 0.05) == (want_p <= 0.05)).all(), cond
+            np.testing.assert_allclose(backward[1], pvalues[::-1], rtol=1e-9, atol=1e-300)
+            continue
+        assert strengths.tobytes() == want_s.tobytes(), cond
+        assert pvalues.tobytes() == want_p.tobytes(), cond
+        assert pvalues.tolist() == [test(target, v, cond) for v in xs], cond
         assert backward[1].tobytes() == pvalues[::-1].tobytes(), cond
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "student_t", "normal_scores"])
+def test_a_large_scan_given_a_shared_set_is_answered_from_one_factor(kind):
+    """A scan of enough candidates given two or more variables goes to the test's one-factor path,
+    counts one test per candidate, and agrees with each candidate's own scan to rounding."""
+    x = data.sample_scm(graph="erdos_renyi", d=40, n=400, seed=3, density=3.0).data
+    test = make_indep_test(kind, x)
+    factored = []
+    factor = test._schur_partial_correlations
+    test._schur_partial_correlations = lambda *args: factored.append(1) or factor(*args)
+    search = LocalSearch(test, tie_ranks(x).tolist(), 0.05)
+    cond = (2, 9, 17)
+    xs = [v for v in range(40) if v != 4 and v not in cond]
+    with counting_tests() as tests:
+        strengths, pvalues = search.scan(4, xs, cond)
+    assert factored == [1] and tests.n == len(xs)
+    alone = [search.scan(4, [v], cond) for v in xs]
+    want_s = np.concatenate([s for s, _ in alone])
+    want_p = np.concatenate([p for _, p in alone])
+    np.testing.assert_allclose(strengths, want_s, rtol=0.0, atol=1e-12)
+    np.testing.assert_allclose(pvalues, want_p, rtol=1e-9, atol=1e-300)
+    assert ((pvalues <= 0.05) == (want_p <= 0.05)).all()
 
 
 def _given_rest(target: int, v: int, d: int) -> list[int]:

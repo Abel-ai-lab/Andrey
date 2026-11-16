@@ -23,6 +23,7 @@ from scipy.special import ndtr
 import andrey
 from andrey.core import ci
 from andrey.core.ci import FisherZ, NormalScores, StudentT
+from andrey.data import sample_scm
 
 
 @pytest.fixture(autouse=True)
@@ -255,6 +256,200 @@ def test_the_residual_path_refuses_a_column_in_the_span_of_its_conditions():
     test = StudentT(X)
     with pytest.raises(ci.SingularCorrelationError, match="span"):
         test.residual_statistic_pvalues(X, np.array([0]), np.array([1]), np.array([[2, 3]]))
+
+
+# ---- one conditioning set shared by many candidates ---------------------------------------
+
+
+def _shared_set_cases(seed: int, d: int = 60):
+    """Random ``(target, candidates, set)`` queries over ``d`` columns, sets of 2 to 12 columns."""
+    rng = np.random.default_rng(seed)
+    for _ in range(8):
+        order = rng.permutation(d)
+        size = int(rng.integers(2, 13))
+        yield int(order[0]), order[1 + size :], order[1 : 1 + size]
+
+
+@pytest.mark.parametrize("test_class", [FisherZ, StudentT, NormalScores])
+@pytest.mark.parametrize("seed", range(6))
+def test_a_shared_set_agrees_with_each_query_to_rounding(test_class, seed):
+    """From one factor of the set's block, every candidate's partial correlation agrees with the
+    per-query inversion to 1e-12, every p-value above 1e-300 to 1e-9 relative and on the same side
+    of 0.05, and the call counts one test per candidate."""
+    x = sample_scm(graph="erdos_renyi", d=60, n=300, seed=seed, density=3.0).data
+    test = test_class(x)
+    for target, ys, cond in _shared_set_cases(seed):
+        with ci.counting_tests() as counted:
+            r, p = test.statistic_pvalues_given(target, ys.tolist(), cond.tolist())
+        want_r, want_p = test.statistic_pvalues(
+            np.full(len(ys), target), ys, np.tile(cond, (len(ys), 1))
+        )
+        assert counted.n == len(ys)
+        np.testing.assert_allclose(r, want_r, rtol=0.0, atol=1e-12)
+        above = want_p > 1e-300
+        np.testing.assert_allclose(p[above], want_p[above], rtol=1e-9, atol=0.0)
+        assert ((p <= 0.05) == (want_p <= 0.05)).all()
+
+
+def test_a_shared_set_counts_a_repeated_column_once():
+    """A repeated column of the set gives the answers of the set without the repeat, as the
+    per-query path canonicalizes it."""
+    test = FisherZ(_forty_columns())
+    ys = [y for y in range(1, 40) if y not in (2, 3, 5)]
+    r, p = test.statistic_pvalues_given(0, ys, [5, 2, 3, 2, 5])
+    want_r, want_p = test.statistic_pvalues(
+        np.zeros(len(ys), dtype=int), np.array(ys), [[2, 3, 5]] * len(ys)
+    )
+    np.testing.assert_allclose(r, want_r, rtol=0.0, atol=1e-12)
+    np.testing.assert_allclose(p, want_p, rtol=1e-9, atol=0.0)
+    for y, got in zip(ys, p):
+        np.testing.assert_allclose(got, test(0, y, [5, 2, 3, 2, 5]), rtol=1e-9, atol=0.0)
+
+
+def _not_quite_symmetric(test_class, scale, seed=0):
+    """A test over 60 columns whose correlation matrix has ``scale`` noise below the diagonal."""
+    x = sample_scm(graph="erdos_renyi", d=60, n=300, seed=seed, density=3.0).data
+    corr = np.corrcoef(x, rowvar=False)
+    noise = np.random.default_rng(seed).standard_normal(corr.shape)
+    return test_class.from_corr(corr + scale * np.tril(noise, -1), 300)
+
+
+@pytest.mark.parametrize("test_class", [FisherZ, StudentT, NormalScores])
+def test_a_shared_set_on_a_matrix_that_is_not_quite_symmetric_agrees_with_each_query(test_class):
+    """At rounding-size asymmetry, the factor's answers agree with each query as on a symmetric
+    matrix."""
+    test = _not_quite_symmetric(test_class, 1e-15)
+    for target, ys, cond in _shared_set_cases(3):
+        r, p = test.statistic_pvalues_given(target, ys.tolist(), cond.tolist())
+        want_r, want_p = test.statistic_pvalues(
+            np.full(len(ys), target), ys, np.tile(cond, (len(ys), 1))
+        )
+        np.testing.assert_allclose(r, want_r, rtol=0.0, atol=1e-12)
+        above = want_p > 1e-300
+        np.testing.assert_allclose(p[above], want_p[above], rtol=1e-9, atol=0.0)
+
+
+def test_a_shared_set_gives_a_pair_one_answer_whichever_column_is_the_target():
+    """The factor reads each pair of columns in one order, so with a visibly asymmetric matrix a
+    pair has the same answer from either endpoint, and equals the one on the matrix that copies
+    its upper triangle below the diagonal."""
+    test = _not_quite_symmetric(FisherZ, 1e-3)
+    upper = np.triu(test._corr) + np.triu(test._corr, 1).T
+    mirrored = FisherZ.from_corr(upper, 300)
+    cond = [10, 20, 30, 40]
+    others = [y for y in range(60) if y not in cond]
+    for a, b in [(5, 50), (12, 3), (45, 55)]:
+        ys_a = [b] + [y for y in others if y not in (a, b)]
+        ys_b = [a] + [y for y in others if y not in (a, b)]
+        from_a = test.statistic_pvalues_given(a, ys_a, cond)
+        from_b = test.statistic_pvalues_given(b, ys_b, cond)
+        same = mirrored.statistic_pvalues_given(a, ys_a, cond)
+        np.testing.assert_allclose(from_a[0][0], from_b[0][0], rtol=0.0, atol=1e-12)
+        np.testing.assert_allclose(from_a[1][0], from_b[1][0], rtol=1e-9, atol=0.0)
+        np.testing.assert_allclose(from_a[0], same[0], rtol=0.0, atol=1e-12)
+        np.testing.assert_allclose(from_a[1], same[1], rtol=1e-9, atol=0.0)
+
+
+@pytest.mark.parametrize(
+    "ys, cond", [([1, 2, 4], []), ([1, 2, 4], [3]), ([4], [3, 5]), ([1, 2, 4], [3, 5])]
+)
+def test_a_shared_set_too_small_to_factor_is_the_per_query_answer_bit_for_bit(ys, cond, data):
+    """A set of fewer than two columns, a single candidate, or too few candidates for the factor
+    to pay (:data:`~andrey.core.ci.MIN_SHARED_FACTOR_WORK`) takes the per-query path."""
+    test = FisherZ(data)
+    r, p = test.statistic_pvalues_given(0, ys, cond)
+    sets = np.array([cond] * len(ys), dtype=int).reshape(len(ys), len(cond))
+    want_r, want_p = test.statistic_pvalues(np.zeros(len(ys), dtype=int), np.array(ys), sets)
+    assert r.tobytes() == want_r.tobytes() and p.tobytes() == want_p.tobytes()
+
+
+def test_the_shared_scan_setting_moves_the_cutoff_in_both_directions(monkeypatch):
+    """``ANDREY_SHARED_SCAN_MIN_WORK`` sets the work from which a scan is answered from one factor:
+    ``0`` factors a scan the default leaves to the per-query path, and a huge value leaves a large
+    scan to it."""
+    test = FisherZ(_forty_columns())
+    cond = [3, 4, 5]
+    every = [y for y in range(1, 40) if y not in cond]
+    small, large = every[:8], every  # work 40 and 180, either side of the default
+    factored = []
+    real = ci.PartialCorrelationTest._schur_partial_correlations
+    monkeypatch.setattr(
+        ci.PartialCorrelationTest,
+        "_schur_partial_correlations",
+        lambda *args: factored.append(len(args[2])) or real(*args),
+    )
+    for setting, scan, expected in [
+        (None, small, []),
+        ("0", small, [8]),
+        (None, large, [len(large)]),
+        (str(10**9), large, []),
+    ]:
+        factored.clear()
+        if setting is None:
+            monkeypatch.delenv("ANDREY_SHARED_SCAN_MIN_WORK", raising=False)
+        else:
+            monkeypatch.setenv("ANDREY_SHARED_SCAN_MIN_WORK", setting)
+        test.statistic_pvalues_given(0, scan, cond)
+        assert factored == expected, (setting, len(scan))
+
+
+def test_a_bad_shared_scan_setting_raises_naming_the_variable(monkeypatch):
+    monkeypatch.setenv("ANDREY_SHARED_SCAN_MIN_WORK", "many")
+    with pytest.raises(ValueError, match="ANDREY_SHARED_SCAN_MIN_WORK must be an integer"):
+        FisherZ(_forty_columns()).statistic_pvalues_given(0, [1, 2, 6], [3, 4, 5])
+
+
+def _forty_columns(copy=None):
+    """Forty Gaussian columns over 300 rows; ``copy`` builds column 39 from the others."""
+    X = np.random.default_rng(1).standard_normal((300, 40))
+    if copy is not None:
+        X[:, 39] = copy(X)
+    return X
+
+
+def test_a_shared_set_near_the_singular_threshold_is_the_per_query_answer_bit_for_bit():
+    """A candidate that nearly repeats the target leaves its block nonsingular by the eigenvalue
+    test but too close to it for the factor's bound, so the call gives the per-query bits."""
+    noise = 1e-5 * np.random.default_rng(2).standard_normal(300)
+    test = FisherZ(_forty_columns(lambda X: X[:, 0] + noise))
+    cond = [3, 4, 5]
+    ys = [y for y in range(1, 40) if y not in cond]
+    r, p = test.statistic_pvalues_given(0, ys, cond)
+    n = len(ys)
+    want_r, want_p = test.statistic_pvalues(np.zeros(n, dtype=int), np.array(ys), [cond] * n)
+    assert r.tobytes() == want_r.tobytes() and p.tobytes() == want_p.tobytes()
+    assert abs(r[-1]) > 0.99
+
+
+@pytest.mark.parametrize(
+    "copy, cond",
+    [
+        (lambda X: 2.0 * X[:, 0] + 1.0, [2, 3]),  # a candidate repeats the target
+        (lambda X: -X[:, 2], [2, 3]),  # a candidate repeats a member of the set
+        (lambda X: X[:, 2] - X[:, 3], [2, 3]),  # a candidate in the span of the set
+        (lambda X: 3.0 * X[:, 2] - 2.0, [2, 3, 39]),  # two members repeat each other
+    ],
+)
+def test_a_shared_set_raises_where_each_query_raises(copy, cond):
+    """A block that the per-query rule calls singular raises the same error, message, and groups."""
+    test = FisherZ(_forty_columns(copy))
+    ys = [y for y in range(1, 40) if y not in cond]
+    n = len(ys)
+    with pytest.raises(ci.SingularCorrelationError) as shared:
+        test.statistic_pvalues_given(0, ys, cond)
+    with pytest.raises(ci.SingularCorrelationError) as each:
+        test.statistic_pvalues(np.zeros(n, dtype=int), np.array(ys), [cond] * n)
+    assert str(shared.value) == str(each.value)
+    assert shared.value.groups == each.value.groups
+
+
+def test_a_shared_set_with_too_few_rows_raises_the_degrees_of_freedom_error():
+    X = np.random.default_rng(0).standard_normal((6, 70))
+    with pytest.raises(ValueError) as shared:
+        FisherZ(X).statistic_pvalues_given(0, list(range(7, 70)), [3, 4, 5, 6])
+    with pytest.raises(ValueError) as each:
+        FisherZ(X)(0, 1, [3, 4, 5, 6])
+    assert str(shared.value) == str(each.value)
 
 
 def test_a_singular_submatrix_raises_the_singular_error_type():
