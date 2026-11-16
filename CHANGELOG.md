@@ -263,7 +263,7 @@ names its pull request.
   data's scale (Reisach, Seiler and Weichwald 2021). The [0.18.0 release card][card-0180-dagma] has
   the numbers and a check of `dagma` and `notears` on the Sachs data: on its 853 observational
   measurements, four fits, default and `robust=True`, on raw and z-scored columns, made 13 or 14
-  errors against the empty graph's 17. ([#1043], [#NNN])
+  errors against the empty graph's 17. ([#1043], [#1046])
 
 ### Changed
 
@@ -322,7 +322,7 @@ names its pull request.
   after Reisach, Seiler and Weichwald (2021), with a link to the release card. The registry and the
   docstrings no longer say that the robust fit does not depend on the scale of the columns: its first
   fit is least squares, and its penalty and threshold act on the weights in the data's units.
-  ([#1043], [#NNN])
+  ([#1043], [#1046])
 
 ### Fixed
 
@@ -334,7 +334,7 @@ names its pull request.
   23.5, and 54.0 to 21.3, 40.0, 17.9, and 39.0 on Erdos-Renyi and scale-free graphs with 10 and 20
   variables, against 20.1, 42.4, 18.1, and 39.4 for the path run with its authors' code, and those of
   `notears(robust=True)` at 10 variables moved from 16.6 on z-scored and 13.2 on raw columns to 18.5
-  and 11.8, against 18.4 and 11.8. ([#1043], [#NNN])
+  and 11.8, against 18.4 and 11.8. ([#1043], [#1046])
 - `indep_test="normal_scores"` takes data from one environment. It ranks each column over every
   row its test reads, so over several environments a column mixed their distributions: on two
   simulated environments a true independence given the environment index was rejected in up to 95%
@@ -2932,7 +2932,7 @@ First alpha release.
 [#1038]: https://github.com/Abel-ai-lab/Andrey/pull/1038
 [#1040]: https://github.com/Abel-ai-lab/Andrey/pull/1040
 [#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
-[#NNN]: https://github.com/Abel-ai-lab/Andrey/pull/NNN
+[#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
 [#1035]: https://github.com/Abel-ai-lab/Andrey/pull/1035
 [#1041]: https://github.com/Abel-ai-lab/Andrey/pull/1041
 [#1036]: https://github.com/Abel-ai-lab/Andrey/pull/1036
