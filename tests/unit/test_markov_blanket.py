@@ -53,7 +53,7 @@ from andrey.core.ci import (
 )
 from andrey.core.ci_missing import rows_tested
 from andrey.core.orient import dag2cpdag
-from andrey.core.ties import KEY_DP, tie_ranks
+from andrey.core.ties import KEY_DP, tie_mask, tie_ranks
 from andrey.data.latent import DSepOracle
 from andrey.search.calm import moral_graph
 from andrey.spec import REGISTRY
@@ -318,6 +318,21 @@ def test_the_order_reads_ranks_only_when_keys_tie():
     assert ordered({4: 0.1, 2: 0.3, 6: 0.2}, ranks) == [4, 6, 2]
     assert ranks.read == []
     assert ordered({}, ranks) == []
+
+
+def test_the_tie_ranks_are_computed_on_the_first_read(monkeypatch: pytest.MonkeyPatch):
+    x = np.random.default_rng(0).standard_normal((200, 12))
+    real, calls = blanket.tie_ranks, []
+    monkeypatch.setattr(blanket, "tie_ranks", lambda *args: calls.append(args) or real(*args))
+    search = local_search(x, alpha=0.05, indep_test="fisherz")
+    assert len(search.ranks) == 12
+    assert not calls
+    want = real(x, tie_mask("fisherz", None, 12)).tolist()
+    assert [search.ranks[i] for i in range(12)] == want
+    assert list(search.ranks) == want
+    assert len(calls) == 1
+    andrey.iamb(x, target=0, alpha=0.05)
+    assert len(calls) == 1
 
 
 @pytest.mark.parametrize("seed", range(4))

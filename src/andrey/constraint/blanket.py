@@ -1088,14 +1088,41 @@ def _ranked_test(
     categorical: np.ndarray | None,
     seed: int | None,
     degrees_of_freedom: str,
-) -> tuple[CITest, list[int]]:
+) -> tuple[CITest, Sequence[int]]:
     """The ``indep_test`` test, seeded by ``seed``, with ``degrees_of_freedom``, over ``X`` and
-    each column's :func:`~andrey.core.ties.tie_ranks`, the columns the test reads as categories
-    ranked as categories (:func:`~andrey.core.ties.tie_mask`)."""
+    each column's :func:`~andrey.core.ties.tie_ranks` (:class:`LazyTieRanks`), the columns the
+    test reads as categories ranked as categories (:func:`~andrey.core.ties.tie_mask`)."""
     test = make_indep_test(
         indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
     )
-    return test, tie_ranks(X, tie_mask(indep_test, categorical, X.shape[1])).tolist()
+    return test, LazyTieRanks(X, tie_mask(indep_test, categorical, X.shape[1]))
+
+
+class LazyTieRanks(Sequence[int]):
+    """The :func:`~andrey.core.ties.tie_ranks` of the columns of ``X``, those ``mask`` marks ranked
+    as categories, computed when a rank is first read, so a search that never compares tied
+    candidates skips their cost. ``andrey.config.tie_break`` and the BLAS thread limits are read
+    when the object is made: the ranks' products are exact integers on any number of threads, so a
+    first read inside a search's one-thread block (:meth:`LocalSearch.pinned`) computes them on the
+    threads of the moment the object was made, with the same result."""
+
+    def __init__(self, X: np.ndarray, mask: np.ndarray) -> None:
+        self._d = X.shape[1]
+        self._data: tuple[np.ndarray, np.ndarray] | None = (X, mask)
+        self._ranks: list[int] | None = None
+        self._threads = backend.thread_limits_now()
+        if backend.config.tie_break == "position":
+            self._ranks, self._data = list(range(self._d)), None
+
+    def __len__(self) -> int:
+        return self._d
+
+    def __getitem__(self, i: Any) -> Any:
+        if self._ranks is None:
+            assert self._data is not None
+            with self._threads():
+                self._ranks, self._data = tie_ranks(*self._data).tolist(), None
+        return self._ranks[i]
 
 
 #: Runs one learner for one target of a :class:`LocalSearch` and returns the target's set in the

@@ -74,7 +74,7 @@ class Tests:
     def __init__(self, search: LocalSearch) -> None:
         self.search = search
         self.alpha = search.alpha
-        self.ranks = search.ranks
+        self.ranks = list(search.ranks)  # read in the sorts of every step, so read as a list
         self.max_depth = search.max_depth
         self.kept: dict[Query, float] = {}
 
