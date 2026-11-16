@@ -236,6 +236,49 @@ def test_a_rejected_icp_fit_keeps_its_missing_intervals() -> None:
     assert back.metadata["target"] == 0
 
 
+def _output(p_value: float, *, ordering: list[int] | None = None, edge: bool = True):
+    marks = np.zeros((3, 3), dtype=np.int8)
+    if edge:
+        marks[0, 1], marks[1, 0] = 1, 2  # 0 -> 1
+    return StructureOutput.new(
+        GraphStructure.from_numpy(marks, kind="dag"),
+        ordering=ordering,
+        metadata={"algorithm": "test", "p_values": [p_value]},
+    )
+
+
+def test_the_last_bits_of_a_value_differ_under_a_column_order_without_failing() -> None:
+    first, refit = _output(0.25), _output(float(np.nextafter(0.25, 1.0)))
+    assert identity.classify(first, refit, column_order=False) == ("bits", ["metadata.p_values"])
+    assert identity.classify(first, refit, column_order=True) == ("digits", ["metadata.p_values"])
+    assert identity.classify(first, first, column_order=True) is None
+    assert "digits" not in identity.FAILING and "bits" in identity.FAILING
+
+
+def test_a_different_graph_or_causal_order_fails_under_a_column_order() -> None:
+    first = _output(0.25, ordering=[0, 1, 2])
+    kind, changed = identity.classify(_output(0.25, edge=False), first, column_order=True)
+    assert kind == "graph" and "graph" in changed
+    kind, changed = identity.classify(_output(0.25, ordering=[1, 0, 2]), first, column_order=True)
+    assert (kind, changed) == ("structure", ["ordering"])
+    assert {"graph", "structure"} <= set(identity.FAILING)
+
+
+@pytest.mark.parametrize(
+    ("kind", "code"), [("digits", 0), ("bits", 1), ("structure", 1), ("graph", 1)]
+)
+def test_the_exit_status_fails_on_a_structural_difference_and_reports_the_rest(
+    kind, code, monkeypatch, capsys
+) -> None:
+    monkeypatch.setattr(
+        identity, "run", lambda *args: ([], [(kind, "PC d seed 0 permutation 1: x")])
+    )
+    assert identity.main(["PC", "--shuffle", "1"]) == code
+    out = capsys.readouterr().out
+    assert identity.LABELS[kind] + ": PC d seed 0 permutation 1: x" in out
+    assert (f"{identity.LABELS[kind]}" in out) and "does not fail the check" in out
+
+
 def test_counts_separation_and_distinct_conditioning_sets() -> None:
     counts = identity.Counts(alpha=0.05)
     counts.ci([(0, 2, (), 0.001), (2, 0, (1,), 0.4), (0, 2, (3,), 0.01), (2, 0, (1, 3), 0.9)])
