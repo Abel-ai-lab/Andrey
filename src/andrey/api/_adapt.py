@@ -1054,6 +1054,37 @@ def structure_output(
     return StructureOutput.new(structure, ordering=order, weighted_adjacency=weights, metadata=meta)
 
 
+def is_column_list(target: object) -> bool:
+    """Whether ``target`` is a list of columns: any sequence but a string."""
+    return isinstance(target, Sequence) and not isinstance(target, str | bytes)
+
+
+def target_columns(
+    target: object, labels: Sequence[str] | None, d: int, method: str
+) -> list[int] | None:
+    """Return the positions of the columns a list of targets names, in its order.
+
+    ``None`` when ``target`` is not a list (:func:`is_column_list`): one column, or none.
+
+    Raises
+    ------
+    ValueError
+        If the list is empty, names a column the data lack, or names one column twice.
+    TypeError
+        If a member is neither a column label nor a position.
+    """
+    if not is_column_list(target):
+        return None
+    assert isinstance(target, Sequence)
+    what = f"{method}: target"
+    if not target:
+        raise ValueError(f"{what} is an empty list; pass a column or a list of columns")
+    found = [column_position(as_node(t, what), labels, d, what) for t in target]
+    if len(set(found)) != len(found):
+        raise ValueError(f"{what} names a column twice: {list(target)}")
+    return found
+
+
 def column_namer(labels: tuple[str, ...] | None) -> Callable[[int], str]:
     """Name a column position by its label in ``labels``, quoted, or by its number.
 

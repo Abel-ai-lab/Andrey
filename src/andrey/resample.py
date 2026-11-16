@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 import numpy as np
 
 from andrey import api
-from andrey.api._adapt import flag, int_in_range
+from andrey.api._adapt import flag, int_in_range, is_column_list
 from andrey.api._method import removed_name_error
 from andrey.core import ARROW, CIRCLE, LATENT, TAIL, GraphStructure, StructureOutput, environments
 from andrey.core import backend as _backend
@@ -1341,6 +1341,10 @@ def build_job(
     within each environment.
     """
     kwargs = dict(kwargs)
+    if is_column_list(kwargs.get("target")):
+        raise ValueError(
+            f"bootstrap: {spec.name} resamples one target at a time; pass target as one column"
+        )
     entry = next((i for i in spec.data.inputs[1:] if i.name == "env"), None)
     apart = False
     if entry is not None:

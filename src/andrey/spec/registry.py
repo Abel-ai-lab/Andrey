@@ -502,10 +502,11 @@ _add(
         params=(
             ParamSpec(
                 name="target",
-                type="str",
+                type="str_or_list",
                 default=None,
                 doc="Required: the variable whose parents to find, a column name from the data "
-                "file's header or a 0-based position.",
+                "file's header or a 0-based position, or a list of them, such as target=[a,b], "
+                "for one result for each, in order.",
                 nullable=True,
             ),
             ParamSpec(
@@ -549,17 +550,19 @@ _add(
 
 _TARGET = ParamSpec(
     name="target",
-    type="str",
+    type="str_or_list",
     default=None,
     doc="The variable whose set to learn: a column name from the data file's header or a 0-based "
-    "position. null learns every variable's set and keeps a pair when each is in the other's set.",
+    "position, or a list of them, such as target=[a,b], that learns one set for each with one "
+    "search and returns one result for each, in order. null learns every variable's set and keeps "
+    "a pair when each is in the other's set.",
     nullable=True,
 )
 _LOCAL_OUTPUT_DOC = (
     "without a target, the graph structure names: the CPDAG, the skeleton, or, for the blankets, "
     "the moral graph; with a target, undirected edges from target to each member, "
     "metadata['target'] naming the target and metadata['{key}'] listing the members in the order "
-    "they joined"
+    "they joined; with a list of targets, a list of those results, one per target in order"
 )
 _BLANKET_STRUCTURE = concept_param("structure")
 for _name, _summary, _key, _structure, _kind, _refs in (

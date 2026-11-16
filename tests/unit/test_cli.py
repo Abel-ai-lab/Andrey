@@ -1253,6 +1253,82 @@ def test_target_names_a_header_column_or_a_position(capsys, tmp_path):
     assert code == 2 and json.loads(err)["error"]["code"] == "unknown_column"
 
 
+def _collider_file(tmp_path):
+    rng = np.random.default_rng(3)
+    a, b, e = rng.standard_normal((3, 500))
+    path = tmp_path / "collider.csv"
+    path.write_text("a,b,c\n" + "\n".join(f"{x},{y},{z}" for x, y, z in zip(a, b, a + b + 0.5 * e)))
+    return path
+
+
+def _results(out):
+    """Each target's answer in an envelope, without its test count."""
+    env = json.loads(out)
+    assert env["multi"] is True and "structure" not in env and "metadata" not in env
+    return [
+        (r["structure"], {k: v for k, v in r["metadata"].items() if k != "n_tests"})
+        for r in env["results"]
+    ]
+
+
+def test_a_list_of_targets_gives_each_target_its_own_result(capsys, tmp_path):
+    """A bracket list names columns by header or position, and each result is the single call's."""
+    base = ["run", "iamb", "--data", str(_collider_file(tmp_path))]
+    code, out, _ = _run([*base, "target=[c,a]"], capsys)
+    assert code == 0
+    listed = _results(out)
+    assert [metadata["target"] for _, metadata in listed] == ["c", "a"]
+    for target, answer in zip("ca", listed, strict=True):
+        _, one, _ = _run([*base, f"target={target}"], capsys)
+        env = json.loads(one)
+        assert answer == (
+            env["structure"],
+            {k: v for k, v in env["metadata"].items() if k != "n_tests"},
+        )
+    code, by_position, _ = _run([*base, "target=[2,0]"], capsys)
+    assert code == 0 and _results(by_position) == listed
+    code, one_entry, _ = _run([*base, "target=[c]"], capsys)  # a list of one is still a list
+    assert code == 0 and _results(one_entry) == listed[:1]
+
+
+def test_a_list_of_targets_in_a_config_file(capsys, tmp_path):
+    path = _collider_file(tmp_path)
+    cfg = tmp_path / "targets.yaml"
+    cfg.write_text("target: [c, a]\n")
+    code, out, _ = _run(["run", "mmpc", "--data", str(path), "--config", str(cfg)], capsys)
+    assert code == 0
+    assert [metadata["target"] for _, metadata in _results(out)] == ["c", "a"]
+    code, out, _ = _run(
+        ["run", "mmpc", "--data", str(path), "--config", str(cfg), "target=b"], capsys
+    )
+    assert code == 0 and json.loads(out)["metadata"]["target"] == "b"  # the override wins
+    cfg.write_text("target: 2\n")  # positions in a config file are strings, as for categorical
+    code, _out, err = _run(["run", "mmpc", "--data", str(path), "--config", str(cfg)], capsys)
+    assert code == 2 and json.loads(err)["error"]["code"] == "invalid_params"
+
+
+@pytest.mark.parametrize(
+    ("target", "code"),
+    [("[]", "invalid_params"), ("[c,2]", "bad_value"), ("[a,h]", "unknown_column")],
+)
+def test_a_bad_list_of_targets_is_a_usage_error(capsys, tmp_path, target, code):
+    """An empty list, one column twice (by name and by position), and a column the file lacks."""
+    argv = ["run", "iamb", "--data", str(_collider_file(tmp_path)), f"target={target}"]
+    status, _out, err = _run(argv, capsys)
+    assert status == 2 and json.loads(err)["error"]["code"] == code
+
+
+def test_a_list_of_targets_has_a_human_summary_and_no_bootstrap(capsys, monkeypatch, tmp_path):
+    path = str(_collider_file(tmp_path))
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+    code, out, _ = _run(["run", "iamb", "--data", path, "target=[c,a]"], capsys)
+    assert code == 0 and out.startswith("iamb  |  2 targets")
+    assert "target c" in out and "target a" in out
+    monkeypatch.setattr("sys.stdout.isatty", lambda: False)
+    code, _out, err = _run(["bootstrap", "iamb", "--data", path, "target=[c,a]"], capsys)
+    assert code == 2 and "one target at a time" in json.loads(err)["error"]["message"]
+
+
 def test_a_mixed_run_reads_the_named_columns_and_warns_of_undeclared_codes(capsys, tmp_path):
     """A data file holds numbers only, so ``categorical`` names the categorical columns; without
     it, a whole-number column stays continuous and the warning names it."""
