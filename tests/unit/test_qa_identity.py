@@ -113,6 +113,117 @@ def test_permuted_moves_each_block_of_variables_alike() -> None:
     assert identity.permuted(x, order, 3).ravel().tolist() == expected
 
 
+def spy(monkeypatch: pytest.MonkeyPatch, name: str) -> list[tuple[tuple, dict]]:
+    """Record each call's arguments to ``andrey.<name>``, which still fits."""
+    calls: list[tuple[tuple, dict]] = []
+    fit = getattr(andrey, name)
+
+    def recorded(*args, **kwargs):
+        calls.append((args, kwargs))
+        return fit(*args, **kwargs)
+
+    monkeypatch.setattr(andrey, name, recorded)
+    return calls
+
+
+def test_icp_moves_its_target_with_the_columns_and_keeps_its_environments(monkeypatch) -> None:
+    rng = np.random.default_rng(0)
+    x = np.column_stack([np.arange(120) * 3 // 120, rng.standard_normal((120, 4))])
+    x[:, 4] += x[:, 2]  # the target, the last variable, follows variable 1
+    calls = spy(monkeypatch, "icp")
+    refit = identity.FITS["ICP"].refit
+    assert refit is not None
+    refit(x, np.random.default_rng(5))
+    order = np.random.default_rng(5).permutation(4)
+    (samples, env), kwargs = calls[0]
+    assert np.array_equal(samples, x[:, 1:][:, order])
+    assert np.array_equal(env, x[:, 0])
+    assert np.array_equal(samples[:, kwargs["target"]], x[:, -1])
+
+
+def test_igsp_moves_its_targets_with_the_columns_and_keeps_its_environments(monkeypatch) -> None:
+    rng = np.random.default_rng(1)
+    samples = rng.standard_normal((150, 4))
+    env = np.arange(150) * 3 // 150
+    x = qg.known_target_stack(samples, env, [[1], [2, 3]])
+    calls = spy(monkeypatch, "igsp")
+    refit = identity.FITS["IGSP"].refit
+    assert refit is not None
+    refit(x, np.random.default_rng(5))
+    order = np.random.default_rng(5).permutation(4)
+    (moved, moved_env), kwargs = calls[0]
+    assert np.array_equal(moved, samples[:, order])
+    assert np.array_equal(moved_env, env)
+    # the columns each setting names are the original targets
+    assert {k: sorted(int(order[j]) for j in v) for k, v in kwargs["targets"].items()} == {
+        0: [],
+        1: [1],
+        2: [2, 3],
+    }
+
+
+def test_fci_jci_keeps_its_environment_column_last(monkeypatch) -> None:
+    rng = np.random.default_rng(2)
+    x = np.column_stack([rng.standard_normal((150, 4)), np.arange(150) * 2 // 150])
+    calls = spy(monkeypatch, "fci_jci")
+    refit = identity.FITS["FCI-JCI"].refit
+    assert refit is not None
+    refit(x, np.random.default_rng(5))
+    order = np.random.default_rng(5).permutation(4)
+    (moved, env), _ = calls[0]
+    assert np.array_equal(moved, x[:, order])
+    assert np.array_equal(env, x[:, -1])
+
+
+@pytest.mark.filterwarnings("ignore::andrey.DataTypeWarning")
+def test_jpcmciplus_names_the_contexts_new_columns(monkeypatch) -> None:
+    rng = np.random.default_rng(3)
+    x = rng.standard_normal((2, 60, qg.CONTEXT_SYSTEM + 2))  # one time and one space context
+    x[..., 5] = rng.standard_normal(60)  # the time context is the same in every dataset
+    x[..., 6] = np.arange(2)[:, None]  # the space context is constant within a dataset
+    contexts = qg.context_columns(x)
+    assert contexts == {"time_contexts": [5], "space_contexts": [6]}
+    calls = spy(monkeypatch, "jpcmciplus")
+    refit = identity.FITS["J-PCMCI+"].refit
+    assert refit is not None
+    refit(x, np.random.default_rng(5))
+    order = np.random.default_rng(5).permutation(qg.CONTEXT_SYSTEM + 2)
+    (moved,), kwargs = calls[0]
+    for dataset, original in zip(moved, x, strict=True):
+        assert np.array_equal(dataset, original[:, order])
+        assert np.array_equal(dataset[:, kwargs["time_contexts"]], original[:, [5]])
+        assert np.array_equal(dataset[:, kwargs["space_contexts"]], original[:, [6]])
+
+
+def test_icps_target_and_per_variable_metadata_map_back() -> None:
+    marks = np.zeros((3, 3), dtype=np.int8)
+    marks[1, 2], marks[2, 1] = 1, 2  # 1 -> 2, the target
+    meta = {
+        "algorithm": "icp",
+        "target": 2,
+        "parents": [1],
+        "p_values": [0.2, 0.01, None],
+        "confidence_intervals": [[-1.0, 1.0], [0.5, 0.9], None],
+        "accepted_sets": [[1], [0, 1]],
+    }
+    order = np.array([2, 0, 1])  # permuted column k is original column order[k]
+    back = np.argsort(order)
+    fitted = StructureOutput.new(  # the same answer, as a fit on x[:, order] gives it
+        GraphStructure.from_numpy(marks[np.ix_(order, order)], kind="dag"),
+        metadata={
+            **meta,
+            "target": int(back[2]),
+            "p_values": [meta["p_values"][i] for i in order],
+            "confidence_intervals": [meta["confidence_intervals"][i] for i in order],
+            "accepted_sets": [[0], [0, 2]],  # laid out in the order of the columns
+        },
+    )
+    original = StructureOutput.new(GraphStructure.from_numpy(marks, kind="dag"), metadata=meta)
+    assert identity.digest(identity.unpermute(fitted, order)) == identity.digest(
+        identity.unpermute(original, np.arange(3))
+    )
+
+
 def test_counts_separation_and_distinct_conditioning_sets() -> None:
     counts = identity.Counts(alpha=0.05)
     counts.ci([(0, 2, (), 0.001), (2, 0, (1,), 0.4), (0, 2, (3,), 0.01), (2, 0, (1, 3), 0.9)])

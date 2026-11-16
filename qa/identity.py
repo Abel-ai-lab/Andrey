@@ -18,9 +18,9 @@ queries a CI test or a local score also records two deterministic counts (:class
 compare names every row where one changed and fails on any change, a fall as well as a rise, unless
 ``--allow-fewer-queries`` accepts a fall.
 
-``--shuffle K`` refits each draw but ICP's, IGSP's, FCI-JCI's, J-PCMCI+'s, CMB's, MMB-by-MMB's,
-and local ISA-LiNG's (:class:`Fit`) on ``K`` seeded column orders and maps each answer back to the
-original columns before hashing it;
+``--shuffle K`` refits each draw but CMB's, MMB-by-MMB's, and local ISA-LiNG's (:class:`Fit`) on
+``K`` seeded column orders, moving the targets of ICP and IGSP and the contexts of J-PCMCI+ with the
+columns, and maps each answer back to the original columns before hashing it;
 ``--workers N`` refits the methods that run worker processes or threads (:data:`WORKER_METHODS`) on
 ``N`` workers, with every GES pass, every skeleton pass of conditioning size two or more, and every
 possible-d-sep search sent to the pool. Both report each refit whose answer differs from the first
@@ -78,19 +78,23 @@ class Fit:
 
     ``blocks`` is the number of side-by-side copies of the variables in the data: GIES's samples
     and intervention indicators, MultiGroupDirectLiNGAM's groups; a column order moves each copy
-    the same way. ``shuffled`` is ``False`` for ICP, IGSP, FCI-JCI, J-PCMCI+, MB-by-MB, CMB,
-    MMB-by-MMB, local ISA-LiNG, LDECC, LOAD, and LocPC-CDE, whose draws a column order does not
-    apply to: each row's environment is a column of the draw, the target of ICP, MB-by-MB, CMB,
-    MMB-by-MMB, and local ISA-LiNG is the last variable, LDECC's treatment and outcome and LOAD's
-    two variables are the last and the first, LocPC-CDE's treatment and outcome are the first and
-    the last, and J-PCMCI+'s contexts follow the system variables.
-    ``alpha`` is the significance level of a CI-test method.
+    the same way. ``refit`` is set for the methods whose draws hold more than the variables, ICP,
+    IGSP, FCI-JCI, and J-PCMCI+: ``refit(x, rng)`` draws a column order from ``rng``, fits the draw
+    with its columns in that order, moving the environments, targets, and contexts the call names
+    along with them, and returns the answer mapped back to the original columns
+    (:func:`unpermute`). ``shuffled`` is ``False`` for
+    MB-by-MB, CMB, MMB-by-MMB, local ISA-LiNG, LDECC, LOAD, and LocPC-CDE, whose draws a column
+    order does not apply to: the target of MB-by-MB, CMB, MMB-by-MMB, and local ISA-LiNG is the last
+    variable, LDECC's treatment and outcome and LOAD's two variables are the last and the first, and
+    LocPC-CDE's treatment and outcome are the first and the last. ``alpha`` is the significance
+    level of a CI-test method.
     """
 
     call: Callable[[np.ndarray], Any]
     blocks: int = 1
     shuffled: bool = True
     alpha: float | None = None
+    refit: Callable[[np.ndarray, np.random.Generator], Any] | None = None
 
 
 _CDNOD = qg.AndreyCDNOD().params()
@@ -177,6 +181,54 @@ def _jpcmciplus(x: np.ndarray) -> StructureOutput:
     )
 
 
+def _icp_refit(x: np.ndarray, rng: np.random.Generator) -> StructureOutput:
+    """ICP on a draw with its variables in a drawn order: each row's environment (the first column)
+    stays, and the target, the last variable, moves to where the order puts it."""
+    n = x.shape[1] - 1
+    order = rng.permutation(n)
+    moved = np.ascontiguousarray(x[:, [0, *(order + 1)]])
+    target = int(np.flatnonzero(order == n - 1)[0])
+    return unpermute(andrey.icp(moved[:, 1:], moved[:, 0], target=target), order)
+
+
+def _igsp_refit(x: np.ndarray, rng: np.random.Generator) -> StructureOutput:
+    """IGSP on a stacked draw (:func:`qg.known_target_stack`) with its variables in a drawn order:
+    the samples and the matrix marking each setting's targets move alike, and each row's
+    environment, the column between them, stays."""
+    p = (x.shape[1] - 1) // 2
+    order = rng.permutation(p)
+    moved = np.ascontiguousarray(x[:, [*order, p, *(order + p + 1)]])
+    return unpermute(qg.igsp_fit(moved), order)
+
+
+def _fci_jci_refit(x: np.ndarray, rng: np.random.Generator) -> StructureOutput:
+    """FCI-JCI on a draw with its variables in a drawn order; each row's environment, the last
+    column, stays."""
+    order = rng.permutation(x.shape[1] - 1)
+    moved = np.ascontiguousarray(x[:, [*order, x.shape[1] - 1]])
+    return unpermute(_fci_jci(moved), order)
+
+
+def _jpcmciplus_refit(x: np.ndarray, rng: np.random.Generator) -> StructureOutput:
+    """J-PCMCI+ on a draw with its columns, contexts among them, in a drawn order: the context lists
+    name the contexts' new columns, and the answer's system variables follow their order among
+    the columns."""
+    contexts = qg.context_columns(x)
+    order = rng.permutation(x.shape[-1])
+    new = np.argsort(order)  # the column each original column moves to
+    moved = np.ascontiguousarray(x[..., order])
+    out = andrey.jpcmciplus(
+        list(moved),
+        time_contexts=[int(new[c]) for c in contexts["time_contexts"]],
+        space_contexts=[int(new[c]) for c in contexts["space_contexts"]],
+        time_dummy=True,
+        tau_max=2,
+        alpha=ALPHA,
+    )
+    context = {c for kind in contexts.values() for c in kind}
+    return unpermute(out, np.array([c for c in order if c not in context]))
+
+
 def _longitudinal(x):
     """Longitudinal LiNGAM with the gate adapter's settings; the adapter names the lag ``n_lags``,
     as lingam does."""
@@ -191,7 +243,7 @@ FITS: dict[str, Fit] = {
     "FCI": Fit(functools.partial(andrey.fci, alpha=ALPHA), alpha=ALPHA),
     "GFCI": Fit(functools.partial(andrey.gfci, alpha=ALPHA), alpha=ALPHA),
     "CDNOD": Fit(_domains, alpha=_CDNOD["alpha"]),
-    "FCI-JCI": Fit(_fci_jci, shuffled=False, alpha=ALPHA),
+    "FCI-JCI": Fit(_fci_jci, alpha=ALPHA, refit=_fci_jci_refit),
     "GES": Fit(andrey.ges),
     "GIES": Fit(qg.gies_fit, blocks=2),
     "XGES": Fit(andrey.xges),
@@ -246,7 +298,7 @@ FITS: dict[str, Fit] = {
     "PCMCI": Fit(_pcmci),
     "PCMCIplus": Fit(lambda x: andrey.pcmciplus(x, **qg.andrey_pcmciplus_adapter(5).params())),
     "LPCMCI": Fit(lambda x: andrey.lpcmci(x, **qg.andrey_lpcmci_adapter(3).params())),
-    "J-PCMCI+": Fit(_jpcmciplus, shuffled=False, alpha=ALPHA),
+    "J-PCMCI+": Fit(_jpcmciplus, alpha=ALPHA, refit=_jpcmciplus_refit),
     "VARMA-LiNGAM": Fit(
         lambda x: andrey.varma_lingam(
             x, order=tuple(_VARMA["order"]), criterion=_VARMA["criterion"], prune=_VARMA["prune"]
@@ -256,8 +308,8 @@ FITS: dict[str, Fit] = {
     "Granger": Fit(lambda x: andrey.granger(x, tau_max=qg.GRANGER_LAGS)),
     "UT-IGSP": Fit(_ut_igsp, blocks=2),
     "GnIES": Fit(_gnies, blocks=2),
-    "ICP": Fit(qg.icp_fit, shuffled=False),
-    "IGSP": Fit(qg.igsp_fit, shuffled=False),
+    "ICP": Fit(qg.icp_fit, refit=_icp_refit),
+    "IGSP": Fit(qg.igsp_fit, refit=_igsp_refit),
     "CAM-UV": Fit(andrey.camuv),
     "DYNOTEARS": Fit(lambda x: andrey.dynotears(x, **_DYNOTEARS)),
 }
@@ -518,12 +570,17 @@ NODE_LISTS = (
     "conflicts",
     "cycle_edges",
     "dag",
+    "accepted_sets",
+    "context_links",
     "index_edges",
     "latent_pairs",
     "parents",
     "partial_order",
+    "time_index_edges",
     "unordered",
 )
+#: ICP's metadata with a value for each variable, ``[i]``.
+PER_VARIABLE = ("p_values", "confidence_intervals")
 #: The keys of a pair's two directions, first column to second and back, which a swap exchanges.
 DIRECTIONS = ("forward", "backward")
 
@@ -539,8 +596,8 @@ def unpermute(out: Any, order: np.ndarray) -> Any:
     """Return ``out``, fitted on the data's columns in ``order``, with each node moved back to its
     original column: the graphs, the time series's weights, the causal order, the edge weights,
     and the metadata in :data:`LAG_MATRICES`. Hidden nodes after the observed ones keep their
-    places, a swapped pair's :data:`DIRECTIONS` trade places, and the metadata in
-    :data:`NODE_LISTS` is left out."""
+    places, a swapped pair's :data:`DIRECTIONS` trade places, ICP's target and its metadata in
+    :data:`PER_VARIABLE` move back, and the metadata in :data:`NODE_LISTS` is left out."""
     if isinstance(out, list):
         return [unpermute(o, order) for o in out]
     order = np.concatenate([order, np.arange(len(order), out.structure.n_nodes)])
@@ -548,10 +605,15 @@ def unpermute(out: Any, order: np.ndarray) -> Any:
     weights = out.weighted_adjacency
     swapped = len(order) == 2 and order[0] == 1
     metadata = {}
+    icp = out.metadata.get("algorithm") == "icp"
     for key, value in out.metadata.items():
         if key in NODE_LISTS:
             continue
-        if isinstance(value, Mapping) and set(value) == set(DIRECTIONS):
+        if icp and key == "target":
+            value = int(order[value])
+        elif icp and key in PER_VARIABLE:
+            value = [value[i] for i in back]
+        elif isinstance(value, Mapping) and set(value) == set(DIRECTIONS):
             forward, backward = DIRECTIONS
             value = {forward: value[backward], backward: value[forward]} if swapped else value
         elif key in LAG_MATRICES:
@@ -914,9 +976,15 @@ def run(
             refits = []  # (permutation, workers, the first fit hashed as the refit is, the refit)
             n_vars = x.shape[-1] // fit.blocks
             for k in range(1, shuffle + 1 if fit.shuffled else 1):
-                order = np.random.default_rng([seed, k]).permutation(n_vars)
-                refit = unpermute(fit.call(permuted(x, order, fit.blocks)), order)
-                refits.append((k, 1, unpermute(out, np.arange(n_vars)), refit))
+                rng = np.random.default_rng([seed, k])
+                if fit.refit is None:
+                    order = rng.permutation(n_vars)
+                    refit = unpermute(fit.call(permuted(x, order, fit.blocks)), order)
+                    first = unpermute(out, np.arange(n_vars))
+                else:
+                    refit = fit.refit(x, rng)
+                    first = unpermute(out, np.arange(out.structure.n_nodes))
+                refits.append((k, 1, first, refit))
             if workers > 1 and method in WORKER_METHODS:
                 with (
                     andrey.config(n_jobs=workers),

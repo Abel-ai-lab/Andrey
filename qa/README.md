@@ -46,12 +46,14 @@ one manifest only, or has a count that rose. Two more options refit each draw an
 whose answer differs from the first fit, with the parts that differ, exiting 1 if there is one:
 
 - `--shuffle K` refits on `K` seeded column orders and maps each answer back to the original
-  columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out. ICP,
-  IGSP, FCI-JCI, J-PCMCI+, MB-by-MB, CMB, MMB-by-MMB, local ISA-LiNG, LDECC, LOAD, and LocPC-CDE are
-  not refit: their data hold each row's environment in one column, the target of ICP, MB-by-MB,
-  CMB, MMB-by-MMB, and local ISA-LiNG is the last variable, LDECC's treatment and outcome and LOAD's
-  two variables are the last and the first, LocPC-CDE's treatment and outcome are the first and the
-  last, and J-PCMCI+'s contexts follow the system variables.
+  columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out. ICP's
+  target, IGSP's targets, and J-PCMCI+'s contexts move with the columns, and each row's environment
+  stays with its row. MB-by-MB, CMB, MMB-by-MMB, local ISA-LiNG, LDECC, LOAD, and LocPC-CDE are not
+  refit: the target of MB-by-MB, CMB, MMB-by-MMB, and local ISA-LiNG is the last variable, LDECC's
+  treatment and outcome and LOAD's two variables are the last and the first, and LocPC-CDE's
+  treatment and outcome are the first and the last. The p-values of ICP and J-PCMCI+ differ from
+  the first fit's in the last digits, about `1e-14`, because their regressions sum in the order of
+  the columns; the refits are listed as differing in bits, and no graph changes.
 - `--workers N` refits PC, FCI, FCI-JCI, GFCI, CD-NOD, RSMAX2 (with PC's skeleton), GES, and PNL
   on `N` workers, with every GES pass, every skeleton pass of conditioning size two or more, and
   every possible-d-sep search sent to the worker pool.

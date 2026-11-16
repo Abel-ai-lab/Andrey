@@ -84,8 +84,9 @@ datasets and lists every output that changes.
 
 **Exceptions.** Each method's `column_order` in the registry records whether reordering relabels its
 result, and the [column-order table](guides/column-order.md#each-method) prints it with the reason.
-`qa/identity.py` runs by hand and does not refit ICP, IGSP, FCI-JCI, or J-PCMCI+; the last release
-card that reports a run is [0.9.0](benchmarks/0.9.0.md)'s.
+`qa/identity.py` runs by hand; the last release card that reports a run is
+[0.9.0](benchmarks/0.9.0.md)'s. Its refits of ICP and J-PCMCI+ differ from the first fit in the last
+digits of their p-values and not in any graph.
 
 ## Units and transforms
 
