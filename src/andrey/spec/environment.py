@@ -16,6 +16,7 @@ from andrey.constraint._parallel_skeleton import (
 from andrey.core.backend import GPU_THRESHOLDS
 from andrey.core.ci import MIN_SHARED_FACTOR_WORK
 from andrey.core.env import SEED_MAX
+from andrey.lingam.pwling import MIN_PRUNE_WORK
 from andrey.search._parallel_ges import MIN_POOL_GES_WORK
 
 from .models import EnvVarSpec
@@ -161,6 +162,21 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "default was measured on an AMD EPYC 7713 server running Linux on one core, where the "
             "factor was slower below a value of about 64 and faster from 128 for every set size "
             "sampled."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_LINGAM_PRUNE_MIN_WORK",
+        values="integer (rows times ordered pairs of candidates per step)",
+        default=str(MIN_PRUNE_WORK),
+        effect=(
+            "Per-step gate for the `pwling` causal-order search of DirectLiNGAM, "
+            "MultiGroupDirectLiNGAM, VARMA-LiNGAM, and longitudinal LiNGAM: a step stops scoring "
+            "a candidate once its partial score shows it cannot be picked only when the rows "
+            "times the ordered pairs of candidates reach this value, else it scores every "
+            "candidate in full. Both give the same order bit for bit. `0` prunes every step. The "
+            "default was measured on an AMD EPYC 7713 server running Linux on one core, where "
+            "pruning broke even at 60,000 to 80,000."
         ),
         group="backend",
     ),

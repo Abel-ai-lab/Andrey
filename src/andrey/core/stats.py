@@ -485,6 +485,19 @@ def entropy(U: np.ndarray, *, work: np.ndarray | None = None) -> np.ndarray:
     U = np.asarray(U, dtype=np.float64)
     if U.ndim == 1:
         U = U[:, None]
+    dev = entropy_device(U.size)
+    if dev == "numpy":
+        return _entropy_numpy(U, work)
+    return _entropy_torch(U, dev)
+
+
+def entropy_device(size: int, *, record: bool = True) -> str:
+    """The device :func:`entropy` runs a batch of ``size`` values (``n_samples * d``) on.
+
+    ``"numpy"`` or a torch device. Under automatic selection a smaller batch never leaves numpy
+    when a larger one stays on it; a pinned backend takes every batch. ``record=False`` asks
+    without counting an entropy call in :func:`~andrey.core.backend.dispatch_stats`.
+    """
     thr = _resolve_thresholds(
         "entropy",
         env.ENTROPY_GPU_THRESHOLD,
@@ -495,10 +508,7 @@ def entropy(U: np.ndarray, *, work: np.ndarray | None = None) -> np.ndarray:
         amortized=True,
     )
     # Entropy gates on `U.size = n*B` and may bootstrap the device because it recurs per fit.
-    dev = backend.resolve(U.size, thr, amortized=True, op="entropy")
-    if dev == "numpy":
-        return _entropy_numpy(U, work)
-    return _entropy_torch(U, dev)
+    return backend.resolve(size, thr, amortized=True, op="entropy" if record else None)
 
 
 def _entropy_numpy(U: np.ndarray, work: np.ndarray | None = None) -> np.ndarray:

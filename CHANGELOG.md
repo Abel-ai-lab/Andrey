@@ -366,6 +366,13 @@ names its pull request.
   checks record is the same, 2,484 of 4.2 million partial-correlation p-values differ in their ninth
   significant digit and none crosses 0.05, and the two recorded baselines whose values move are
   captured again for that change alone. ([#1050], [#PR])
+- The causal-order search of `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and
+  `longitudinal_lingam` with `measure="pwling"` stops scoring a candidate once its partial score,
+  a sum of nonnegative terms, shows it can be neither picked nor tied, and scores every other
+  candidate in full. `direct_lingam` on 50 variables at 2,500 rows and on 70 at 3,500 is 2.0 and
+  2.4 times faster, and `multi_group_direct_lingam` on three groups of 1,000 rows and 30 variables
+  1.4 times. Every order, graph, and weight is the same bit for bit. Steps with fewer rows times ordered pairs of candidates than
+  `ANDREY_LINGAM_PRUNE_MIN_WORK` (default `100000`) score every candidate. ([#1045], [#1051])
 
 ### Fixed
 
@@ -2985,6 +2992,8 @@ First alpha release.
 [#1047]: https://github.com/Abel-ai-lab/Andrey/pull/1047
 [#1048]: https://github.com/Abel-ai-lab/Andrey/pull/1048
 [#1050]: https://github.com/Abel-ai-lab/Andrey/issues/1050
+[#1045]: https://github.com/Abel-ai-lab/Andrey/issues/1045
+[#1051]: https://github.com/Abel-ai-lab/Andrey/pull/1051
 [#995]: https://github.com/Abel-ai-lab/Andrey/pull/995
 [#991]: https://github.com/Abel-ai-lab/Andrey/pull/991
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
