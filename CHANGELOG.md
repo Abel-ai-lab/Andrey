@@ -347,23 +347,26 @@ names its pull request.
   `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, and `pcmb`, and `mb_by_mb`, `mmb_by_mmb`, `cmb`, `ldecc`,
   `local_optimal_adjustment`, `locpc_cde`, `ldp`, `ld3`, and `y_structures`, and the restrict phase
   of `mmhc` and `rsmax2`) with `fisherz`, `student_t`, or `normal_scores` on complete data compute
-  each row of the correlation matrix when a test first reads it and keep it, where they computed the
-  whole matrix before the search; once every row is computed, the test reads them as the whole
-  matrix. At 2,000 rows and 16,000 variables, `iamb` at one target takes 1.3 seconds and 0.3 GB in
-  all, where the whole matrix and its copied-column check took 20 seconds and 8 GB before the first
-  test, and at 100,000 variables, whose matrix would need 80 GB, it takes 5 seconds and 1 GB.
-  `mmb_by_mmb`, `ldecc`, and `local_optimal_adjustment` still rank every column's ties to order
-  their visits, about 6 GB at 16,000 variables. The check for copied columns runs on the rows
-  computed: a copy raises when a row that shows it is computed, and copies among columns whose rows
-  are never computed no longer raise. `ANDREY_LAZY_CORRELATION=0` computes the whole matrix and
-  checks every column before the search. ([#1050], [#1053])
-- The correlation matrix of `fisherz`, `student_t`, and `normal_scores` is computed in tiles of 32
-  columns on one BLAS thread, the same products whether a row is computed alone or with the whole
-  matrix, so a lazily computed row equals the whole matrix's bit for bit; the matrix is exactly
-  symmetric with a unit diagonal. The whole matrix takes 1.6 times as long as before on one thread
-  (1.8 seconds at 2,000 rows and 4,000 variables), and 5 times as long as eight BLAS threads took
-  before. The correlations change in their last bits, once: every graph that Andrey's identity
-  checks record is the same, 2,484 of 4.2 million partial-correlation p-values differ in their ninth
+  the rows of the correlation matrix 256 at a time, when a test first reads one of them, and keep
+  them, where they computed the whole matrix before the search; once every row is computed, the test
+  reads them as the whole matrix. At 2,000 rows and 16,000 variables, `iamb` at one target takes 2.1
+  seconds and 0.4 GB in all on one thread (0.9 seconds on eight), where the whole matrix and its
+  copied-column check took 18 seconds and 8 GB before the first test, and at 100,000 variables,
+  whose matrix would need 80 GB, it takes 15 seconds and 2.6 GB. `mmb_by_mmb`, `ldecc`, and
+  `local_optimal_adjustment` still rank every column's ties to order their visits, about 6 GB at
+  16,000 variables. The check for copied columns runs on the rows computed: a copy raises when a row
+  that shows it is computed, and copies among columns whose rows are never computed no longer
+  raise. A backend that puts the correlation matrix on a GPU computes the whole matrix there, as
+  before. `ANDREY_LAZY_CORRELATION=0` computes the whole matrix and checks every column before the
+  search. ([#1050], [#1053])
+- The correlation matrix of `fisherz`, `student_t`, and `normal_scores` is computed in blocks of 256
+  columns, each product on one BLAS thread and as many products at once as the BLAS has threads,
+  the same products whether a row is computed alone or with the whole matrix, so a lazily computed
+  row equals the whole matrix's bit for bit, the matrix is the same on any number of threads, and it
+  is exactly symmetric with a unit diagonal. At 2,000 rows and 16,000 variables the whole matrix
+  takes 15.5 seconds on one thread and 2.4 seconds on eight, where `np.corrcoef` took 14.7 and 4.0.
+  The correlations change in their last bits, once: every graph that Andrey's identity checks
+  record is the same, 2,433 of 4.2 million partial-correlation p-values differ in their ninth
   significant digit and none crosses 0.05, and the two recorded baselines whose values move are
   captured again for that change alone. ([#1050], [#1053])
 - The causal-order search of `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and
