@@ -16,7 +16,7 @@ own DAG + weights.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
@@ -28,7 +28,7 @@ from andrey.api._adapt import (
     shared_labels,
     structure_output,
 )
-from andrey.api._local import target_column, target_metadata
+from andrey.api._local import target_column, target_columns, target_metadata
 from andrey.api._marks import directed_marks
 from andrey.api._method import method_spec
 from andrey.core import GraphStructure
@@ -597,11 +597,11 @@ def _local_weights(edges: Mapping[tuple[int, int], float], std: np.ndarray, d: i
 def local_isa_ling(
     data: npt.ArrayLike,
     *,
-    target: str | int | None = None,
+    target: str | int | Sequence[str | int] | None = None,
     acyclic: bool = False,
     w_threshold: float = 0.05,
     alpha: float = 0.05,
-) -> StructureOutput:
+) -> StructureOutput | list[StructureOutput]:
     """Learn the weighted edges into one variable and into its children, with cycles allowed.
 
     Local ISA-LiNG [1]_ reads a linear model with independent non-Gaussian noise whose graph may
@@ -616,9 +616,9 @@ def local_isa_ling(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    target : str, int, or None, default=None
+    target : str, int, list of them, or None, default=None
         Required: the variable to answer for, a column label (a string) or a 0-based position (an
-        integer). ``None`` raises ``ValueError``.
+        integer), or a list of them, each answered in turn. ``None`` raises ``ValueError``.
     acyclic : bool, default=False
         Read the edges by peeling sink columns of the demixing matrix (the paper's Appendix C),
         which assumes that neither the target nor a child lies on a cycle and needs no subspace
@@ -635,8 +635,10 @@ def local_isa_ling(
 
     Returns
     -------
-    StructureOutput
-        Wraps a ``digraph`` :class:`~andrey.core.GraphStructure` over every column holding the
+    StructureOutput or list of StructureOutput
+        With a list of targets, a list holding each target's result, in its order, as that target
+        alone gives it. Otherwise, wraps a ``digraph`` :class:`~andrey.core.GraphStructure` over
+        every column holding the
         edges of the first model alone: those into ``target`` and into each of its children, where
         a 2-cycle is two directed edges. An absent edge between two other columns means nothing.
         ``weighted_adjacency[i, j]`` is the weight of edge ``i -> j`` in the data's units.
@@ -728,6 +730,16 @@ def local_isa_ling(
     X = data_matrix(data, method="local_isa_ling")
     labels = column_labels(data)
     d = X.shape[1]
+    if target_columns(target, labels, d, "local_isa_ling") is not None:
+        return [
+            cast(
+                "StructureOutput",
+                local_isa_ling(
+                    data, target=each, acyclic=acyclic, w_threshold=w_threshold, alpha=alpha
+                ),
+            )
+            for each in cast("Sequence[str | int]", target)
+        ]
     t = target_column(target, labels, d, "local_isa_ling")
     with one_blas_thread():
         fit = _native(X, t, acyclic=acyclic, w_threshold=w_threshold, alpha=alpha)

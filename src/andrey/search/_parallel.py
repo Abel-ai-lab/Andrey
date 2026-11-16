@@ -116,6 +116,7 @@ def fork_safe() -> bool:
 _FORKSERVER_PRELOAD = (
     "andrey.search._parallel_ges",
     "andrey.constraint._parallel_skeleton",
+    "andrey.constraint._parallel_targets",
     "andrey.resample",
     "andrey.core.ci_kernel",
 )

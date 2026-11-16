@@ -495,7 +495,8 @@ _add(
             concept_param(
                 "target",
                 doc="Required: the variable whose parents to find, a column name from the data "
-                "file's header or a 0-based position.",
+                "file's header or a 0-based position, or a list of them, such as target=[a,b], "
+                "for one result for each, in order.",
             ),
             ParamSpec(
                 name="targets",
@@ -541,7 +542,7 @@ _LOCAL_OUTPUT_DOC = (
     "without a target, the graph structure names: the CPDAG, the skeleton, or, for the blankets, "
     "the moral graph; with a target, undirected edges from target to each member, "
     "metadata['target'] naming the target and metadata['{key}'] listing the members in the order "
-    "they joined"
+    "they joined; with a list of targets, a list of those results, one per target in order"
 )
 _BLANKET_STRUCTURE = concept_param("structure")
 #: A set learner's own max_depth, where its default is not the concept's.

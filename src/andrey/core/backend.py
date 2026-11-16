@@ -615,6 +615,13 @@ def one_blas_thread() -> contextlib.AbstractContextManager:
     return _thread_pools().limit(limits=1)
 
 
+def blas_threads() -> int:
+    """The number of threads the loaded BLAS libraries use at this call, ``1`` if none is found."""
+    return max(
+        (p["num_threads"] for p in _thread_pools().info() if p["user_api"] == "blas"), default=1
+    )
+
+
 def thread_limits_now() -> Callable[[], contextlib.AbstractContextManager]:
     """The loaded BLAS and OpenMP thread pools' limits at this call, as a function that opens a
     ``with`` block under them: work deferred from here into a block that pins one thread
