@@ -33,15 +33,25 @@ from andrey.spec.concepts import (
     CI_SEARCHES,
     CONCEPTS,
     PCMCI_FAMILY,
+    STARTS,
+    TESTED,
     Concept,
 )
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.ci_tests import PValueOnly
-from tests.unit.methods import REQUIRED, SHORT, domains, environments
+from tests.unit.methods import (
+    REQUIRED,
+    SHORT,
+    domains,
+    environments,
+    requires_pair,
+    requires_target,
+)
 
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
 CHANGELOG = API_MD.parents[2] / "CHANGELOG.md"
 UPGRADING = API_MD.parent / "guides" / "upgrading.md"
+GETTING_STARTED = API_MD.parent / "guides" / "getting-started.md"
 #: Public callables outside the registry that a concept may name.
 UTILITIES = ("bootstrap",)
 
@@ -250,14 +260,23 @@ def test_returns_names_the_categorical_columns_a_fit_records(method):
 N = 200
 
 
-def frame(seed: int, *, codes: bool, gaps: bool = False) -> pd.DataFrame:
+#: The methods whose answer needs a pattern of four variables: their data add a second cause w of
+#: y, so that x -> y <- w, y -> z is a Y-structure.
+FOUR_VARIABLES = ("y_structures",)
+
+
+def frame(seed: int, *, codes: bool, gaps: bool = False, w: bool = False) -> pd.DataFrame:
     """A chain x -> y -> z; with ``codes``, x holds four whole numbers that look like categories,
-    and with ``gaps``, a few values of x and y are missing."""
+    with ``gaps``, a few values of x and y are missing, and with ``w``, a fourth column w is a
+    second cause of y."""
     rng = np.random.default_rng(seed)
     u = rng.uniform(-1, 1, size=(N, 3)) ** 3
     x = rng.integers(0, 4, N).astype(float) if codes else u[:, 0]
-    y = 0.8 * x + u[:, 1]
+    cause = rng.uniform(-1, 1, size=N) ** 3 if w else np.zeros(N)
+    y = 0.8 * x + u[:, 1] + cause
     data = pd.DataFrame({"x": x, "y": y, "z": 0.7 * y + u[:, 2]})
+    if w:
+        data["w"] = cause
     if gaps:
         data.iloc[::13, 0] = np.nan
         data.iloc[5::11, 1] = np.nan
@@ -288,7 +307,7 @@ def needed(method: str, inp) -> bool:
 
 def inputs(method: str, *, codes: bool, gaps: bool = False) -> list:
     spec = REGISTRY[method]
-    frames = [frame(seed, codes=codes, gaps=gaps) for seed in range(3)]
+    frames = [frame(seed, codes=codes, gaps=gaps, w=method in FOUR_VARIABLES) for seed in range(3)]
     args = []
     for inp in spec.data.inputs:
         if not needed(method, inp):
@@ -353,13 +372,16 @@ UNIT_CASES = {
     **dict.fromkeys(
         (
             *("pc", "fci", "gfci", "cdnod", "fci_jci", "iamb", "inter_iamb", "gs", "fast_iamb"),
-            *("mmpc", "mmhc", "rsmax2"),
+            *("mmpc", "hiton_pc", "hiton_mb", "mmmb", "pcmb", "mb_by_mb", "mmb_by_mmb", "mmhc"),
+            *("cmb", "rsmax2"),
             *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
-            *("boss_fci", "grasp_fci", "igsp", "ut_igsp"),
+            *("boss_fci", "grasp_fci", "igsp", "ut_igsp", "ldp", "ld3", "ldecc", "locpc_cde"),
+            "local_optimal_adjustment",
         ),
         "gauss_5v",
     ),
     "direct_lingam": "lingam_5v_uniform",
+    "local_isa_ling": "lingam_5v_uniform",
     "multi_group_direct_lingam": "mgdl_2groups",
     "varma_lingam": "varma_3v",
     "longitudinal_lingam": "panel_4v",
@@ -381,6 +403,7 @@ UNIT_CASES = {
     "nogam": "rational_chain_4v",
     "camuv": "nonmonotone_4v",
     "icp": "gauss_5v",
+    "y_structures": "gauss_7v",
 }
 UNIT_ROWS = 1000
 #: Two draws of units: variable ``j`` of every case is multiplied by ``2**k[j]``, an exact product.
@@ -410,7 +433,8 @@ def unit_inputs(method: str, exponents: np.ndarray) -> list:
 
 
 def graphs_and_orders(out) -> list:
-    """The endpoint marks of every graph (each lag, occasion, and group) and every causal order."""
+    """The endpoint marks of every graph (each lag, occasion, and group), every causal order, and
+    the claims about pairs."""
     if isinstance(out, list):
         return [graphs_and_orders(o) for o in out]
     s = out.structure
@@ -418,7 +442,7 @@ def graphs_and_orders(out) -> list:
         graphs = [s.at(t, k) for t in s.times for k in s.lags] if s.n_times else map(s.lag, s.lags)
     else:
         graphs = [s]
-    keys = ("partial_order", "cluster_order", "causal_orders", "unordered")
+    keys = ("partial_order", "cluster_order", "causal_orders", "unordered", "effects")
     orders = {k: out.metadata.get(k) for k in keys}
     return [[g.to_numpy().tolist() for g in graphs], out.ordering, orders]
 
@@ -581,6 +605,14 @@ def unsupported_data(kind: str, rng: np.random.Generator) -> pd.DataFrame:
     return table
 
 
+#: A target-centered method answers for the edges at its target, so the target is the edge's end;
+#: a pair method learns the edges around its outcome, so the edge is its pair.
+EDGE_TARGET = {
+    **{m: {"target": "y"} for m in REGISTRY if requires_target(m)},
+    **{m: {"treatment": "x", "outcome": "y"} for m in REGISTRY if requires_pair(m)},
+}
+
+
 def required_edge_is_kept(method: str, kind: str) -> bool:
     """Whether a fit with the required edge x -> y keeps it on data that do not support it."""
     spec = REGISTRY[method]
@@ -591,7 +623,10 @@ def required_edge_is_kept(method: str, kind: str) -> bool:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         out = facade(method)(
-            *args_for(method, tables), knowledge=knowledge, **SERIES_SETTINGS.get(method, {})
+            *args_for(method, tables),
+            knowledge=knowledge,
+            **SERIES_SETTINGS.get(method, {}),
+            **EDGE_TARGET.get(method, {}),
         )
     out = out[0] if isinstance(out, list) else out
     s = out.structure
@@ -746,7 +781,10 @@ SEEDED = [m for m, spec in REGISTRY.items() if spec.seeded]
 #: The settings that make a fit draw random numbers: a randomized test, or a later start of a search
 #: that changes the best DAG at random.
 RANDOMIZED = {
-    **{m: {"indep_test": "rcot"} for m in (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus")},
+    **{
+        m: {"indep_test": "rcot"}
+        for m in (*CI_SEARCHES, *PCMCI_FAMILY, *(m for m in TESTED if m not in STARTS))
+    },
     **{m: {"n_starts": 2} for m in CONCEPTS["n_perturbations"].suitable},
 }
 
@@ -972,6 +1010,13 @@ CI_CASES = {
     "gs": [{}, {"target": 0}],
     "fast_iamb": [{}, {"target": 0}],
     "mmpc": [{}, {"target": 0}],
+    "hiton_pc": [{}, {"target": 0}],
+    "hiton_mb": [{}, {"target": 0}],
+    "mmmb": [{}, {"target": 0}],
+    "pcmb": [{}, {"target": 0}],
+    "mb_by_mb": [{"target": 0}],
+    "cmb": [{"target": 0}, {"target": 0, "blanket": "mmmb"}],
+    "mmb_by_mmb": [{"target": 0}, {"target": 0, "blanket": "iamb"}],
     "mmhc": [{}],
     "rsmax2": [{"restrict": "pc"}, {"restrict": "iamb"}],
     "pcmci": [{}],
@@ -1037,6 +1082,81 @@ def test_the_seed_reaches_every_randomized_test_a_search_builds(
     assert built_seeds
     assert set(built_seeds) == {7}
     assert out.metadata["seed"] == 7
+
+
+#: The methods that take ``degrees_of_freedom``, read from the registry.
+DEGREES_OF_FREEDOM_METHODS = [m for m in REGISTRY if tagged(CONCEPTS["degrees_of_freedom"], m)]
+
+
+def categorical_inputs(method: str) -> list:
+    """The method's inputs with every column of its data cut into three categories."""
+
+    def cut(table: pd.DataFrame) -> pd.DataFrame:
+        return table.apply(lambda column: pd.qcut(column, 3, labels=False)).astype("category")
+
+    return [
+        cut(arg)
+        if isinstance(arg, pd.DataFrame)
+        else [cut(t) for t in arg]
+        if isinstance(arg, list)
+        else arg
+        for arg in inputs(method, codes=False)
+    ]
+
+
+@pytest.fixture
+def built_rules(monkeypatch):
+    """The ``degrees_of_freedom`` each categorical test a fit builds receives."""
+    rules = []
+    for name in ci.DISCRETE_INDEP_TESTS:
+
+        def build(data, *args, _factory=ci._CI_REGISTRY[name], **options):
+            rules.append(options.get("degrees_of_freedom"))
+            return _factory(data, *args, **options)
+
+        monkeypatch.setitem(ci._CI_REGISTRY, name, build)
+    return rules
+
+
+def test_the_methods_that_take_a_categorical_test_take_degrees_of_freedom():
+    accepts = [
+        m
+        for m in REGISTRY
+        if (param := tagged(CONCEPTS["indep_test"], m)) is not None
+        and set(ci.DISCRETE_INDEP_TESTS) <= set(param.choices or ())
+    ]
+    assert accepts == DEGREES_OF_FREEDOM_METHODS
+
+
+@pytest.mark.parametrize(
+    ("method", "settings", "rule"),
+    [
+        pytest.param(m, s, r, id=f"{m}-{r}-{'+'.join(s) or 'default'}")
+        for m in DEGREES_OF_FREEDOM_METHODS
+        for s in CI_CASES.get(m, [{}])
+        for r in (None, *ci.DEGREES_OF_FREEDOM)
+    ],
+)
+def test_degrees_of_freedom_reach_every_categorical_test_a_fit_builds(
+    method, settings, rule, built_rules
+):
+    """On categorical data every test a fit builds gets the argument, or the method's default."""
+    passed = {} if rule is None else {"degrees_of_freedom": rule}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        facade(method)(*categorical_inputs(method), **settings, **passed)
+    default = tagged(CONCEPTS["degrees_of_freedom"], method).default  # ty: ignore[possibly-missing-attribute]
+    assert built_rules
+    assert set(built_rules) == {default if rule is None else rule}
+
+
+@pytest.mark.parametrize("method", DEGREES_OF_FREEDOM_METHODS)
+def test_degrees_of_freedom_with_a_test_that_does_not_read_it_raises(method):
+    """The call checks it before the fit, and the entry names the error."""
+    with pytest.raises(ValueError, match="degrees_of_freedom sets the degrees of freedom"):
+        facade(method)(*inputs(method, codes=False), degrees_of_freedom="mean")
+    entry = docstring_entries(inspect.getdoc(getattr(andrey, method)) or "")["degrees_of_freedom"]
+    assert "valueerror" in entry
 
 
 @pytest.mark.parametrize("method", (*CI_SEARCHES, *PCMCI_FAMILY))
@@ -1303,10 +1423,11 @@ def test_every_warning_the_package_raises_is_an_andrey_warning():
     assert calls > 10
 
 
-def test_documented_method_lists_match_the_table():
-    """A paragraph of docs/docs/api.md marked ``% concept: <key>`` names exactly the methods that
-    take the concept today, under any name."""
-    lines = API_MD.read_text(encoding="utf-8").splitlines()
+@pytest.mark.parametrize("page", [API_MD, GETTING_STARTED], ids=lambda page: page.name)
+def test_documented_method_lists_match_the_table(page):
+    """A paragraph of the API reference or the getting-started guide marked ``% concept: <key>``
+    names exactly the methods that take the concept today, under any name."""
+    lines = page.read_text(encoding="utf-8").splitlines()
     marked = [
         (i, line.split(":", 1)[1].strip())
         for i, line in enumerate(lines)

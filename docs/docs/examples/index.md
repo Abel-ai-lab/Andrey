@@ -9,6 +9,40 @@ html_theme.sidebar_secondary.remove: true
 
 # Examples
 
+New to Andrey? Work through the notebooks in this order; each part adds one step to the last.
+
+- **Part 1.** [Concepts](../guides/concepts.md): the model behind every method, what the data
+  can identify, and what each kind of graph claims.
+- **Part 2.** [Getting started](../guides/getting-started.md) and the
+  {doc}`quick start <quick_start>`: install Andrey, learn a graph from the Sachs protein
+  measurements, and read the result.
+- **Part 3.** {doc}`Visualize a causal graph <viz>`: draw a result and read the mark at each end
+  of an edge.
+- **Part 4.** {doc}`Constraint-based discovery <constraint_based>`: learn a graph from
+  conditional-independence tests, and allow hidden common causes with FCI.
+- **Part 5.** {doc}`Score-based search <score_search>` and
+  {doc}`permutation-based search <permutation_based>`: search for the graph with the best score,
+  over graphs or over orderings of the variables.
+- **Part 6.** {doc}`Background knowledge <knowledge>`: pass what you already know, such as tiers
+  in time, to narrow the search.
+- **Part 7.** {doc}`Linear non-Gaussian models <lingam>`: orient every edge when the noise is
+  non-Gaussian.
+- **Part 8.** {doc}`Pairs that share a hidden cause <rcd>` and
+  {doc}`causal order with hidden causes <bottom_up_parce_lingam>`: find the variables a hidden
+  cause joins.
+- **Part 9.** {doc}`Nonlinear additive-noise models <functional>` and
+  {doc}`pairwise direction <pairwise>`: orient edges when each effect is a nonlinear function of
+  its causes.
+- **Part 10.** {doc}`Continuous optimization <calm>`: fit a weighted DAG by gradient descent
+  instead of a search over graphs.
+- **Part 11.** {doc}`Time series <time_series>`: find the causes in data measured over time.
+- **Part 12.** {doc}`Bootstrap <bootstrap>`: refit on resamples of the rows to see how stable each
+  edge is.
+- **Part 13.** {doc}`Markov check <markov_check>`: test whether the data contradict the graph you
+  learned.
+
+{doc}`Speed on your machine <speed_on_your_machine>` times PC on your own hardware at any point.
+
 Each notebook runs one method or task, on your own machine or in Colab; each has **Open in Colab**
 and **Download this notebook** links. The [interactive demos](#interactive-demos) run in your
 browser instead. From a source checkout, start Jupyter with `uv run --with jupyter jupyter lab`. A
@@ -56,9 +90,12 @@ quick_start
 :img-top: /_generated/thumbs/constraint_based.svg
 :img-alt: The graph PC or FCI recovers in this notebook
 
-PC's CPDAG and FCI's and GFCI's PAGs from conditional-independence tests; IAMB, Inter-IAMB, and
-MMPC, which join each variable's local structure into a graph; CD-NOD and FCI-JCI on data from
-several domains; and ICP's parents of one variable from several environments.
+PC's CPDAG and FCI's and GFCI's PAGs from conditional-independence tests; IAMB, Inter-IAMB, GS,
+Fast-IAMB, MMPC, HITON-PC, HITON-MB, MMMB, and PCMB, which join each variable's local structure into
+a graph; MB-by-MB's and CMB's edges at one variable and MMB-by-MMB's under hidden common causes;
+Y-structures' ancestor claims from rows that may have been selected; LDECC's, LOAD's, and
+LocPC-CDE's adjustment sets for a treatment and an outcome; CD-NOD and FCI-JCI on data from several
+domains; and ICP's parents of one variable from several environments.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -83,8 +120,8 @@ environments whose changes it is not told.
 :img-top: /_generated/thumbs/calm.svg
 :img-alt: The true graph of this notebook's data
 
-CALM learns a weighted DAG by gradient descent on a penalized likelihood, on torch; NOTEARS by
-least squares with an `l1` penalty, where the result depends on the units of the columns.
+CALM learns a weighted DAG by gradient descent on a penalized likelihood, on torch; NOTEARS and
+DAGMA by least squares with an `l1` penalty, where the result depends on the units of the columns.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -110,7 +147,8 @@ on settings whose changed variables it is told in part or not at all.
 :img-alt: The DAG DirectLiNGAM or ICA-LiNGAM recovers in this notebook
 
 DirectLiNGAM and ICA-LiNGAM orient every edge when the noise is non-Gaussian; MultiGroupDirectLiNGAM
-fits several datasets, and GIN finds latent variables.
+fits several datasets, GIN finds latent variables, and local ISA-LiNG learns the weighted edges at
+one variable, with cycles allowed.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::

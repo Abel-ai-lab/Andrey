@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Benchmark ancestral claims under selection bias: the authors' Y-structure code.
+"""Benchmark ancestral claims under selection bias: Andrey's and the authors' Y-structure code.
 
 Runs the simulation of Versteeg, Zhang, and Mooij (2022, Sect. 4.2) (:mod:`andrey_bench.selection_models`):
 a linear-Gaussian model on the fixed 7-node graph of its Figure 5(a), or on a random graph of
@@ -11,10 +11,10 @@ claims, true and false positives, precision, recall, the area under the precisio
 and the base rate, the precision of claiming every pair, which a method that claims anything has
 to beat.
 
-The solutions are the authors' Y-structure and extended Y-structure code, each on the same data at
-the same ``alpha``. :data:`ANDREY_ARMS` is where the adapters of Andrey's own method go; each needs
-the contract of :class:`~andrey_bench.local_lane.ClaimAdapter` and nothing else in the driver. The
-empty answer claims nothing, so its row is the base rate.
+The solutions are Andrey's ``y_structures`` and the authors' code, each as the Y-structure and the
+extended Y-structure, on the same data at the same ``alpha``. :data:`ANDREY_ARMS` holds the adapters
+of Andrey's method; each needs the contract of :class:`~andrey_bench.local_lane.ClaimAdapter` and
+nothing else in the driver. The empty answer claims nothing, so its row is the base rate.
 
 :data:`ROWS` is the paper's ``n = 10000``. One JSON line per fit goes to ``<out>/records.jsonl``
 with the claims and their scores, so ``--rescore`` recomputes the scores without fitting;
@@ -38,14 +38,15 @@ from pathlib import Path
 import numpy as np
 
 from andrey_bench import rsession, rundir, selection_models
+from andrey_bench.adapters.andrey_y_structures import AndreyYStructures
 from andrey_bench.adapters.versteeg_ystructures import VersteegYStructures
 from andrey_bench.local_lane import claim_scores, unpack_answer
 from andrey_bench.runner import available_cores, check_interpreters, run_task, split_cores
 
-#: Adapters of Andrey's own ``y_structures``. Each follows
+#: Adapters of Andrey's ``y_structures``, the Y-structure and the extended one. Each follows
 #: :class:`~andrey_bench.local_lane.ClaimAdapter`: ``fit`` reads the context in the last column and
 #: packs the claims' scores.
-ANDREY_ARMS: list = []
+ANDREY_ARMS: list = [AndreyYStructures(extended=False), AndreyYStructures(extended=True)]
 
 #: The references: the Y-structure and the extended Y-structure.
 REFERENCES = [VersteegYStructures(extended=False), VersteegYStructures(extended=True)]
@@ -112,7 +113,9 @@ def rescore(out: Path, meta: dict) -> list[dict]:
             continue
         key = (record["setting"], record["seed"])
         if key not in truths:  # the model, so the truth, does not depend on n
-            truths[key] = selection_models.sample(key[0], n=2, seed=key[1]).ancestral
+            truths[key] = selection_models.sample(
+                key[0], n=2, seed=key[1], rule=meta["rule"]
+            ).ancestral
         score_record(record, truths[key], record["d"])
     (out / RECORDS).write_text("".join(json.dumps(r) + "\n" for r in records))
     return records
@@ -126,6 +129,13 @@ def main(argv: list[str] | None = None) -> int:
         nargs="+",
         default=list(selection_models.SETTINGS),
         help="the paper's settings (default: fixed small large)",
+    )
+    p.add_argument(
+        "--rule",
+        choices=selection_models.RULES,
+        default="authors",
+        help="how a random graph's selection variables are drawn (default: authors, the rule of "
+        "the authors' simulation script; text, the rule of the paper's text, is harder)",
     )
     p.add_argument("--rows", type=int, nargs="+", default=list(ROWS), help="sample sizes")
     p.add_argument("--seeds", type=int, default=20, help="models per setting (default: 20)")
@@ -207,6 +217,7 @@ def main(argv: list[str] | None = None) -> int:
             rsession.check_environment("pcalg") if any(a.package == "sbcd" for a in field) else {}
         ),
         "sampler": selection_models.SAMPLER,
+        "rule": args.rule,
         "weight_range": list(selection_models.WEIGHT_RANGE),
         "interval": list(selection_models.INTERVAL),
         "settings": args.settings,
@@ -247,7 +258,7 @@ def main(argv: list[str] | None = None) -> int:
         for setting, seed in units:
             walls: dict[str, list[float]] = {a.name: [] for a in field}
             for n in args.rows:
-                draw = selection_models.sample(setting, n=n, seed=seed)
+                draw = selection_models.sample(setting, n=n, seed=seed, rule=args.rule)
                 d = draw.biased.shape[1]
                 for selection in SELECTIONS:
                     data = getattr(draw, selection)

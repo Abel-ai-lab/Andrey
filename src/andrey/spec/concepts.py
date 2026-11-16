@@ -25,12 +25,18 @@ from andrey import api
 from andrey.api._local import TARGET_SETS
 from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.constraint.blanket import LEARNERS
-from andrey.core.ci import CONTINUOUS_INDEP_TESTS, SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
+from andrey.core.ci import (
+    CONTINUOUS_INDEP_TESTS,
+    DEGREES_OF_FREEDOM,
+    RANK_INDEP_TESTS,
+    SHIPPED_INDEP_TESTS,
+    STOCHASTIC_INDEP_TESTS,
+)
 from andrey.core.ci_missing import EM, EM_METHODS, MISSING_HANDLING, MVPC
 from andrey.core.env import SEED_MAX
 from andrey.core.fdr import FDR_METHODS
 from andrey.core.invariance import TWO_GROUP_INVARIANCE_TESTS
-from andrey.core.score import SCORES
+from andrey.core.score import RANK_SCORES, SCORES
 from andrey.core.structure import Kind
 from andrey.search.gfci import EDGE_REMOVALS
 
@@ -39,6 +45,14 @@ from .models import ParamSpec, ParamType, Spec
 #: The learners a method's ``blanket`` can name: every Markov blanket learner of
 #: :data:`~andrey.constraint.blanket.LEARNERS`, the parents-and-children learners left out.
 BLANKET_LEARNERS: tuple[str, ...] = tuple(m for m, row in LEARNERS.items() if row.kind != "pc")
+#: The learners ``mmb_by_mmb`` can name: those that find the blanket with hidden variables too,
+#: total conditioning and the grow-shrink learners, whose correctness rests on properties
+#: m-separation keeps (Pellet and Elisseeff 2008); the forward phase alone returns a superset and
+#: HITON-MB assembles the blanket from a DAG's parents, children, and spouses.
+MMB_BLANKETS: tuple[str, ...] = ("total_conditioning", "gs", "iamb", "inter_iamb", "fast_iamb")
+#: The learners ``cmb`` can name: the topology-based ones, which return a variable's parents and
+#: children apart from its spouses, as CMB's steps read them (Gao and Ji 2015).
+CMB_BLANKETS: tuple[str, ...] = tuple(m for m, row in LEARNERS.items() if row.kind == "pc_spouses")
 
 #: The graphs a Markov-blanket search returns without a target (``structure``), and the kind of
 #: each.
@@ -114,7 +128,9 @@ def _exempt(reason: str, *methods: str) -> tuple[Exemption, ...]:
 # Method groups the rules below name.
 CI_SEARCHES = (
     *("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci"),
-    *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "mmhc", "rsmax2"),
+    *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"),
+    "pcmb",
+    *("mb_by_mb", "cmb", "mmb_by_mmb", "mmhc", "rsmax2"),
 )
 PCMCI_FAMILY = ("pcmci", "pcmciplus", "lpcmci")
 SCORE_SEARCHES = (
@@ -144,10 +160,25 @@ LINGAM = (
 RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl", "loci")
 #: The searches that take n_starts.
 STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_igsp")
+#: The tests of a method whose tests always read several environments: all but the rank-based
+#: ones, which rank each column over the rows of every environment.
+UNRANKED_TESTS = tuple(t for t in SHIPPED_INDEP_TESTS if t not in RANK_INDEP_TESTS)
+_POOLED_RANKS = (
+    "normal_scores ranks each column over the rows of every environment, which mixes their "
+    "distributions"
+)
 #: The methods that take a conditional-independence test.
-TESTED = (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp")
-#: The methods with no edge to name in knowledge, and ICP, whose tests take none.
-NO_KNOWLEDGE = ("gin", "anm", "pnl", "loci", "icp", "ages")
+TESTED = (
+    *(*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp", "y_structures"),
+    *("ldp", "ld3", "ldecc", "local_optimal_adjustment", "locpc_cde"),
+)
+#: The methods with no edge to name in knowledge, ICP, whose tests take none, and the methods that
+#: take none yet.
+NO_KNOWLEDGE = (
+    *("gin", "anm", "pnl", "loci", "icp", "ages", "y_structures", "ldp", "ld3", "ldecc"),
+    "local_isa_ling",
+    "local_optimal_adjustment",
+)
 #: The methods whose main loop a cap can stop early.
 CAPPED_LOOPS = (
     "hc",
@@ -193,6 +224,13 @@ _CONCEPTS = (
             "icp",
             "igsp",
             "ut_igsp",
+            "y_structures",
+            "ldp",
+            "ld3",
+            "ldecc",
+            "locpc_cde",
+            "local_isa_ling",
+            "local_optimal_adjustment",
         ),
         exempt=(
             *_exempt("A score search: no test decides an edge.", *PURE_SCORE, "gnies", "ages"),
@@ -222,6 +260,56 @@ _CONCEPTS = (
                 default=0.01,
                 reason="It matches pcmciplus's default, as J-PCMCI+ runs the phases of PCMCI+; "
                 "the experiments of Gunther, Ninad and Runge (2023) use 0.05.",
+            ),
+            Deviation(
+                method="y_structures",
+                name="alpha",
+                default=0.01,
+                reason="0.01 is the level of the method's published simulations (Versteeg, Zhang "
+                "and Mooij 2022, Appendix C.2).",
+            ),
+            Deviation(
+                method="ldp",
+                name="alpha",
+                default=0.005,
+                reason="0.005 is the level of the authors' code; Maasch et al. (2024) use 0.01, "
+                "0.005, or 0.001 by setting.",
+            ),
+            Deviation(
+                method="ld3",
+                name="alpha",
+                default=0.005,
+                reason="0.005 is the level of the authors' code; Maasch et al. (2025) use 0.005, "
+                "0.01, and 0.05.",
+            ),
+            Deviation(
+                method="cmb",
+                name="alpha",
+                default=0.02,
+                reason="0.02 is the level of the method's published experiments (Gao and Ji 2015, "
+                "Section 4).",
+            ),
+            Deviation(
+                method="local_optimal_adjustment",
+                name="alpha",
+                default=0.01,
+                reason="0.01 is the level of every test in the method's published experiments "
+                "(Schubert, Claassen and Magliacane 2026, Section 5).",
+            ),
+            Deviation(
+                method="mmb_by_mmb",
+                name="alpha",
+                default=0.01,
+                reason="Xie et al. 2024 state no level; 0.01 is the level of their code, whose "
+                "total-conditioning blanket learner tests at alpha / (10 floor(d / 10)) over d "
+                "columns, alpha itself below 10 columns, as mmb_by_mmb does.",
+            ),
+            Deviation(
+                method="pcmb",
+                name="alpha",
+                default=0.01,
+                reason="0.01 is the level of the method's published experiments (Pena et al. "
+                "2007, Section 4.1).",
             ),
             Deviation(
                 method="rcd",
@@ -307,6 +395,10 @@ _CONCEPTS = (
         suitable=TESTED,
         exempt=(
             *_exempt(
+                "Its HSIC tests of the ICA's components are part of its own model.",
+                "local_isa_ling",
+            ),
+            *_exempt(
                 "It tests the independence of residuals as part of its own model.",
                 *RESIDUAL,
                 "resit",
@@ -334,13 +426,76 @@ _CONCEPTS = (
             ),
         ),
         deviations=(
+            *(
+                Deviation(
+                    method=method,
+                    name="indep_test",
+                    default=None,
+                    choices=UNRANKED_TESTS,
+                    reason=f"{why} {_POOLED_RANKS}.",
+                )
+                for method, why in (
+                    ("cdnod", "Its tests read every environment's rows with their index, and"),
+                    ("fci_jci", "Its tests read every environment's rows with their index, and"),
+                    (
+                        "igsp",
+                        "Its invariance tests compare a setting with the observational rows, and",
+                    ),
+                    (
+                        "ut_igsp",
+                        "Its invariance tests compare a setting with the observational rows, and",
+                    ),
+                )
+            ),
             Deviation(
                 method="jpcmciplus",
                 name="indep_test",
                 default=None,
-                choices=CONTINUOUS_INDEP_TESTS,
+                choices=tuple(t for t in CONTINUOUS_INDEP_TESTS if t in UNRANKED_TESTS),
                 reason="The dummies enter every test as numeric one-hot columns, so it takes the "
-                "tests of continuous data.",
+                "tests of continuous data, but not normal_scores, which ranks each column over the "
+                "rows of every dataset and so mixes their distributions.",
+            ),
+        ),
+    ),
+    Concept(
+        key="degrees_of_freedom",
+        summary="The degrees of freedom of the categorical tests, chisq and gsq: mean = the mean "
+        "of the statistic when y is shuffled within each configuration of the conditioning set; "
+        "nonempty = (r_x - 1)(r_y - 1) per configuration over the values present, its table's "
+        "empty rows and columns struck (Spirtes, Glymour and Scheines 1993, Section 5.5). The two "
+        "differ only on sparse tables. A call that passes it with another test raises ValueError.",
+        param=_template(
+            "degrees_of_freedom",
+            "str",
+            "mean",
+            "Degrees of freedom of the categorical tests, chisq and gsq: mean = the mean of the "
+            "statistic when y is shuffled within each configuration of the conditioning set; "
+            "nonempty = (r_x - 1) * (r_y - 1) per configuration over the values of x and y present "
+            "in it, the table's empty rows and columns struck. They differ only on sparse tables. "
+            "Only chisq and gsq read it: passing it with another test raises ValueError.",
+            choices=DEGREES_OF_FREEDOM,
+        ),
+        fragment="degrees of freedom",
+        suitable=tuple(m for m in TESTED if m != "jpcmciplus"),
+        others_exempt="Takes no categorical conditional-independence test.",
+        deviations=(
+            Deviation(
+                method="pcmb",
+                name="degrees_of_freedom",
+                default="nonempty",
+                choices=DEGREES_OF_FREEDOM,
+                reason="Its paper runs G-square as Spirtes, Glymour and Scheines do (Pena et al. "
+                "2007, Section 3), whose degrees of freedom drop the cells with no expected count.",
+            ),
+            Deviation(
+                method="mmmb",
+                name="degrees_of_freedom",
+                default="nonempty",
+                choices=DEGREES_OF_FREEDOM,
+                reason="Its paper runs G-square as Spirtes, Glymour and Scheines describe it "
+                "(Tsamardinos, Aliferis and Statnikov 2003, Section 2), whose degrees of freedom "
+                "drop the cells with no expected count.",
             ),
         ),
     ),
@@ -392,6 +547,16 @@ _CONCEPTS = (
             "gnies",
         ),
         others_exempt="Not a search over parent sets scored by a decomposable score.",
+        deviations=(
+            Deviation(
+                method="gies",
+                name="score_func",
+                default=None,
+                choices=tuple(s for s in SCORES if s not in RANK_SCORES),
+                reason="It scores each variable on the rows without an intervention on it, and "
+                "normal_scores ranks every row, so the ranks would mix the intervened rows in.",
+            ),
+        ),
     ),
     Concept(
         key="penalty_discount",
@@ -419,7 +584,8 @@ _CONCEPTS = (
             "Weight on the extended-BIC term 2 * ebic_gamma * log C(n_variables - 1, n_parents) "
             "that the linear-Gaussian BIC adds per variable; it grows with the number of "
             "variables, from 0 to 1. Larger values give sparser graphs; 0.0 is the standard BIC. "
-            "Only bic uses it: passing it with another score raises ValueError.",
+            "Only bic and normal_scores use it: passing it with another score raises "
+            "ValueError.",
             minimum=0,
             maximum=1,
         ),
@@ -492,8 +658,19 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="weight magnitude",
-        suitable=(*CONTINUOUS, "calm", "dynotears"),
+        suitable=(*CONTINUOUS, "calm", "dynotears", "local_isa_ling"),
         others_exempt="No weighted continuous fit to threshold.",
+        deviations=(
+            Deviation(
+                method="local_isa_ling",
+                name="w_threshold",
+                default=0.05,
+                reason="0.05 is the threshold of the method's published experiments (Dai et "
+                "al. 2024, App. E.1), applied to the demixing matrix of the standardized "
+                "columns.",
+                fragment="in magnitude read as zero",
+            ),
+        ),
     ),
     Concept(
         key="standardize",
@@ -551,8 +728,26 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="conditioning-set size",
-        suitable=(*CI_SEARCHES, "pcmci", "pcmciplus", "jpcmciplus", "rcd", "camuv"),
+        suitable=(
+            *CI_SEARCHES,
+            "pcmci",
+            "pcmciplus",
+            "jpcmciplus",
+            "rcd",
+            "camuv",
+            "ldecc",
+            "locpc_cde",
+        ),
         exempt=(
+            *_exempt(
+                "Its ancestry and amenability tests condition on sets the local structures fix; no "
+                "cap is defined for them.",
+                "local_optimal_adjustment",
+            ),
+            *_exempt(
+                "No conditional-independence tests over growing conditioning sets.",
+                "local_isa_ling",
+            ),
             *_exempt(
                 "Every test includes the default conditions; its cap counts beyond them, "
                 "max_p_global.",
@@ -587,8 +782,32 @@ _CONCEPTS = (
                 "igsp",
                 "ut_igsp",
             ),
+            *_exempt(
+                "Every test is marginal or conditions on one variable, the pattern's middle one.",
+                "y_structures",
+            ),
+            *_exempt(
+                "Each test conditions on a set the algorithm fixes from the labels found before; "
+                "no cap is defined.",
+                "ldp",
+                "ld3",
+            ),
         ),
         deviations=(
+            Deviation(
+                method="hiton_pc",
+                name="max_depth",
+                default=3,
+                reason="Aliferis et al. 2010 leave the cap open and run HITON-PC with caps 1 to 4; "
+                "3 is the cap of their Markov-blanket experiments. null runs it uncapped.",
+            ),
+            Deviation(
+                method="hiton_mb",
+                name="max_depth",
+                default=3,
+                reason="Aliferis et al. 2010 leave the cap open and run HITON-MB with a cap of 3 "
+                "only. null runs it uncapped.",
+            ),
             Deviation(
                 method="rcd",
                 name="max_depth",
@@ -657,6 +876,10 @@ _CONCEPTS = (
         suitable=(*SCORE_SEARCHES, "cam", "gnies", "icp"),
         exempt=(
             *_exempt(
+                "Reads the parents from the nonzero entries of the demixing matrix.",
+                "local_isa_ling",
+            ),
+            *_exempt(
                 "A constraint-based search: max_depth bounds the same cost.",
                 "pc",
                 "fci",
@@ -667,6 +890,16 @@ _CONCEPTS = (
                 "gs",
                 "fast_iamb",
                 "mmpc",
+                "hiton_pc",
+                "hiton_mb",
+                "mmmb",
+                "pcmb",
+                "mb_by_mb",
+                "cmb",
+                "mmb_by_mmb",
+                "ldecc",
+                "local_optimal_adjustment",
+                "locpc_cde",
             ),
             *_exempt(
                 "A cardinality cap is not part of the continuous objective.",
@@ -680,6 +913,8 @@ _CONCEPTS = (
                 "ages",
             ),
             *_exempt("Parents come from the adaptive Lasso on the order.", *LINGAM),
+            *_exempt("Claims ancestors from fixed test patterns; no parent sets.", "y_structures"),
+            *_exempt("Labels variables from fixed test patterns; no parent sets.", "ldp", "ld3"),
             *_exempt(
                 "No search over parent sets.",
                 *PCMCI_FAMILY,
@@ -756,8 +991,25 @@ _CONCEPTS = (
             maximum=SEED_MAX,
         ),
         fragment="not a fresh random one",
-        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", *STARTS, "calm", "ica_lingam"),
+        suitable=(
+            *CI_SEARCHES,
+            *PCMCI_FAMILY,
+            "jpcmciplus",
+            *STARTS,
+            "calm",
+            "ica_lingam",
+            "y_structures",
+            "ldp",
+            "ld3",
+            "ldecc",
+            "local_optimal_adjustment",
+            "locpc_cde",
+        ),
         exempt=(
+            *_exempt(
+                "Deterministic: the sparse ICA starts from a regression.",
+                "local_isa_ling",
+            ),
             *_exempt(
                 "Deterministic.",
                 *(m for m in PURE_SCORE if m not in STARTS),
@@ -946,6 +1198,16 @@ _CONCEPTS = (
         fragment="background knowledge",
         suitable=tuple(m for m in ALL_METHODS if m not in NO_KNOWLEDGE),
         exempt=(
+            *_exempt(
+                "Its paper and the authors' code take no knowledge, and how knowledge would steer "
+                "its ancestry tests is not defined yet.",
+                "local_optimal_adjustment",
+            ),
+            *_exempt(
+                "The paper gives no rule for background knowledge: the edges are the rows of "
+                "the demixing matrix that the admissible assignments read.",
+                "local_isa_ling",
+            ),
             *_exempt("Its edges run from latent variables, which Knowledge cannot name.", "gin"),
             *_exempt(
                 "Two variables: knowledge of the edge would be the answer.", "anm", "pnl", "loci"
@@ -960,6 +1222,18 @@ _CONCEPTS = (
                 "knowledge; ges takes knowledge.",
                 "ages",
             ),
+            *_exempt(
+                "Fixed test patterns and no graph: a claim reads only its four variables' tests, "
+                "which no knowledge of edges enters.",
+                "y_structures",
+            ),
+            *_exempt(
+                "Fixed test patterns: each label reads the tests its algorithm names, which no "
+                "knowledge of edges enters.",
+                "ldp",
+                "ld3",
+            ),
+            *_exempt("Its paper gives no rule for background knowledge.", "ldecc"),
         ),
     ),
     Concept(
@@ -971,9 +1245,27 @@ _CONCEPTS = (
         exempt=(
             *_exempt(
                 "Has no edge for knowledge to name (the knowledge concept).",
-                *(m for m in NO_KNOWLEDGE if m not in ("icp", "ages")),
+                *(
+                    m
+                    for m in NO_KNOWLEDGE
+                    if m
+                    not in (
+                        *("icp", "ages", "y_structures", "ldp", "ld3", "ldecc", "local_isa_ling"),
+                        "local_optimal_adjustment",
+                    )
+                ),
             ),
-            *_exempt("Takes no knowledge (the knowledge concept).", "icp", "ages"),
+            *_exempt(
+                "Takes no knowledge (the knowledge concept).",
+                "icp",
+                "ages",
+                "y_structures",
+                "ldp",
+                "ld3",
+                "ldecc",
+                "local_isa_ling",
+                "local_optimal_adjustment",
+            ),
         ),
     ),
     Concept(
@@ -1006,6 +1298,12 @@ _CONCEPTS = (
             *PCMCI_FAMILY,
             "igsp",
             "ut_igsp",
+            "y_structures",
+            "ldp",
+            "ld3",
+            "ldecc",
+            "local_optimal_adjustment",
+            "locpc_cde",
         ),
         others_exempt="A continuous model.",
     ),
@@ -1043,13 +1341,30 @@ _CONCEPTS = (
             "gs",
             "fast_iamb",
             "mmpc",
+            "hiton_pc",
+            "hiton_mb",
+            "mmmb",
+            "pcmb",
+            "y_structures",
+            "ldp",
+            "ld3",
+            "ldecc",
+            "locpc_cde",
+            "mb_by_mb",
+            "cmb",
+            "mmb_by_mmb",
             *PCMCI_FAMILY,
             "anm",
             "pnl",
             "loci",
             *EM_METHODS,
+            "local_optimal_adjustment",
         ),
         exempt=(
+            *_exempt(
+                "The independent components unmix every local variable over the same rows.",
+                "local_isa_ling",
+            ),
             *_exempt(
                 "Its score phase reads every column.",
                 *("gfci", "boss_fci", "grasp_fci", "mmhc", "rsmax2"),
@@ -1188,6 +1503,15 @@ _CONCEPTS = (
         ),
         exempt=(
             *_exempt(
+                "Its graph is over the columns of data, and a context variable is one more column.",
+                "local_optimal_adjustment",
+            ),
+            *_exempt(
+                "Its model reads the noise of continuous variables, which an environment "
+                "label does not have.",
+                "local_isa_ling",
+            ),
+            *_exempt(
                 "cdnod is PC with env, the environment index tested as a context variable "
                 "(Huang et al. 2020).",
                 "pc",
@@ -1223,12 +1547,37 @@ _CONCEPTS = (
             *_exempt(
                 "A Markov-blanket search, with no place for a context variable; cdnod is the "
                 "test-based search that takes env.",
-                *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"),
+                *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"),
+                "pcmb",
+                "mb_by_mb",
+                "cmb",
+                "mmb_by_mmb",
+            ),
+            *_exempt(
+                "A local search around one outcome, with no place for a context variable; cdnod is "
+                "the test-based search that takes env.",
+                "locpc_cde",
             ),
             *_exempt(
                 "The paper defines the aggregation for data from one environment; ges is the "
                 "score search that takes env.",
                 "ages",
+            ),
+            *_exempt(
+                "Its patterns are among the columns of data, and a context variable is one more "
+                "column.",
+                "y_structures",
+            ),
+            *_exempt(
+                "Its labels are among the columns of data, and a context variable is one more "
+                "column.",
+                "ldp",
+                "ld3",
+            ),
+            *_exempt(
+                "A local search around one treatment, with no place for a context variable; cdnod "
+                "is the test-based search that takes env.",
+                "ldecc",
             ),
             *_exempt(
                 "Its model reads the noise of continuous variables, which an environment label "
@@ -1284,10 +1633,10 @@ _CONCEPTS = (
     Concept(
         key="structure",
         summary="The graph a Markov-blanket search returns without a target: iamb, inter_iamb, gs, "
-        "and fast_iamb return the CPDAG (cpdag) by default, and mmpc the skeleton, the graph its "
-        "sets of parents and children give. cpdag is the CPDAG of the Grow-Shrink structure "
-        "learner (Margaritis 2003); skeleton, its adjacencies; moral, the moral graph of the "
-        "Markov blankets.",
+        "fast_iamb, hiton_mb, mmmb, and pcmb return the CPDAG (cpdag) by default, and mmpc "
+        "and hiton_pc the skeleton, the graph their sets of parents and children give. cpdag is "
+        "the CPDAG of the Grow-Shrink structure learner (Margaritis 2003); skeleton, its "
+        "adjacencies; moral, the moral graph of the Markov blankets.",
         param=_template(
             "structure",
             "str",
@@ -1299,7 +1648,25 @@ _CONCEPTS = (
             choices=tuple(BLANKET_STRUCTURES),
         ),
         fragment="cpdag",
-        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"),
+        suitable=(
+            *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"),
+            "pcmb",
+        ),
+        exempt=(
+            *_exempt(
+                "Answers for one target: the edges at it, as its CPDAG holds them.", "mb_by_mb"
+            ),
+            *_exempt(
+                "Answers for one target: the edges at it, with the directions its tests decide.",
+                "cmb",
+            ),
+            *_exempt(
+                "Answers for one target: the edges at it, as its PAG holds them.", "mmb_by_mmb"
+            ),
+            *_exempt(
+                "Answers for one treatment: the edges at it, as its CPDAG holds them.", "ldecc"
+            ),
+        ),
         others_exempt="Learns the whole graph of one kind.",
         deviations=(
             Deviation(
@@ -1310,6 +1677,15 @@ _CONCEPTS = (
                 reason="The skeleton is the graph MMPC's sets give (Tsamardinos, Brown and "
                 "Aliferis 2006); cpdag stays available. MMPC learns parents and children, which "
                 "hold no child's other parents, so it has no moral graph to return.",
+            ),
+            Deviation(
+                method="hiton_pc",
+                name="structure",
+                default="skeleton",
+                choices=("skeleton", "cpdag"),
+                reason="As for mmpc: the skeleton is the graph HITON-PC's sets of parents and "
+                "children give (Aliferis et al. 2010), which hold no child's other parents, so it "
+                "has no moral graph to return; cpdag stays available.",
             ),
         ),
     ),
@@ -1330,7 +1706,24 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="a column label (a string) or a 0-based position (an integer)",
-        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "icp"),
+        suitable=(
+            *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"),
+            "pcmb",
+            *("icp", "mb_by_mb", "cmb", "mmb_by_mmb", "local_isa_ling"),
+        ),
+        exempt=(
+            *_exempt(
+                "Answers for one treatment-outcome pair, not one variable.",
+                "ldp",
+                "ld3",
+                "ldecc",
+                "locpc_cde",
+            ),
+            *_exempt(
+                "Answers for the ordered pairs of two variables, not one.",
+                "local_optimal_adjustment",
+            ),
+        ),
         others_exempt="Answers for every variable at once.",
     ),
     Concept(
@@ -1347,7 +1740,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="a column label (a string) or a 0-based position (an integer)",
-        suitable=(),
+        suitable=("ldp", "ld3", "ldecc", "locpc_cde"),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(
@@ -1363,7 +1756,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="a column label (a string) or a 0-based position (an integer)",
-        suitable=(),
+        suitable=("ldp", "ld3", "ldecc", "locpc_cde"),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(
@@ -1381,13 +1774,18 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="in any order",
-        suitable=(),
+        suitable=(
+            "y_structures",
+            "local_optimal_adjustment",
+        ),
         others_exempt="Answers for no set of variables given together.",
     ),
     Concept(
         key="blanket",
         summary="The Markov blanket learner a method runs as one of its steps, by the name of its "
-        "public function. A method offers the learners its proof allows, so its choices may be "
+        "public function, or iamb_forward, IAMB's grow phase without its shrink (Wang et al. "
+        "2014), or total_conditioning, a test of each variable given all the others (Pellet and "
+        "Elisseeff 2008). A method offers the learners its proof allows, so its choices may be "
         "fewer than every learner's.",
         param=_template(
             "blanket",
@@ -1399,8 +1797,48 @@ _CONCEPTS = (
         ),
         fragment="markov blanket learner",
         default_rule="Each method defaults to the learner its paper uses.",
-        suitable=(),
+        suitable=("mb_by_mb", "cmb", "mmb_by_mmb", "ldecc", "local_optimal_adjustment"),
         others_exempt="Runs no Markov blanket learner as a step.",
+        deviations=(
+            Deviation(
+                method="mb_by_mb",
+                name="blanket",
+                default="iamb_forward",
+                choices=BLANKET_LEARNERS,
+                reason="Wang et al. 2014 run MB-by-MB with IAMB's grow phase without its shrink, "
+                "to keep a variable added in error rather than lose a member; any blanket "
+                "learner, or a superset of the blanket, satisfies its proof.",
+            ),
+            Deviation(
+                method="cmb",
+                name="blanket",
+                default="hiton_mb",
+                choices=CMB_BLANKETS,
+                reason="Gao and Ji 2015 run CMB with HITON-MB. Its steps read a variable's parents "
+                "and children apart from its spouses, which only the topology-based learners "
+                "return.",
+            ),
+            Deviation(
+                method="local_optimal_adjustment",
+                name="blanket",
+                default="gs",
+                choices=BLANKET_LEARNERS,
+                reason="Schubert, Claassen and Magliacane 2026 run MB-by-MB with Grow-Shrink in "
+                "place of IAMB; any blanket learner satisfies the proof of MB-by-MB it relies on.",
+            ),
+            Deviation(
+                method="mmb_by_mmb",
+                name="blanket",
+                default="total_conditioning",
+                choices=MMB_BLANKETS,
+                reason="Xie et al. 2024 run MMB-by-MMB with total conditioning (Pellet and "
+                "Elisseeff 2008). Its proof needs the blanket of the maximal ancestral graph, "
+                "which total conditioning and the grow-shrink learners find, since m-separation "
+                "keeps the properties their correctness rests on; IAMB's grow phase alone returns "
+                "a superset, and HITON-MB assembles the blanket from a DAG's parents, children, "
+                "and spouses.",
+            ),
+        ),
     ),
     Concept(
         key="target_answer",
@@ -1409,7 +1847,24 @@ _CONCEPTS = (
         "undirected for a set, so an absent edge away from the target means nothing. "
         "metadata['target'] names the target, and each set the fit learns is a list of columns "
         "under its own key: " + ", ".join(TARGET_SETS) + " (andrey.api._local.TARGET_SETS).",
-        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "icp"),
+        suitable=(
+            *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"),
+            "pcmb",
+            *("icp", "mb_by_mb", "cmb", "mmb_by_mmb"),
+        ),
+        exempt=(
+            *_exempt(
+                "Answers for one treatment-outcome pair, not one variable.",
+                "ldp",
+                "ld3",
+                "ldecc",
+                "locpc_cde",
+            ),
+            *_exempt(
+                "Answers for the ordered pairs of two variables, not one.",
+                "local_optimal_adjustment",
+            ),
+        ),
         others_exempt="Answers for every variable at once.",
     ),
     Concept(
@@ -1417,7 +1872,19 @@ _CONCEPTS = (
         summary="metadata['n_tests'] is the number of conditional-independence tests the fit "
         "evaluated, counted in the shared test layer (andrey.core.ci.counting_tests): one per "
         "query whose p-value a test computed, none for a query answered from a kept answer.",
-        suitable=("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"),
+        suitable=(
+            *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"),
+            "pcmb",
+            "mb_by_mb",
+            "cmb",
+            "mmb_by_mmb",
+            "y_structures",
+            "ldp",
+            "ld3",
+            "ldecc",
+            "local_optimal_adjustment",
+            "locpc_cde",
+        ),
         others_exempt="Does not report its test count.",
     ),
     Concept(
@@ -1425,7 +1892,7 @@ _CONCEPTS = (
         summary="A method that learns the Markov blankets of several variables in turn lists them "
         "in metadata['blankets_learned'], by column, in the order it learned them, so the count "
         "of blankets it needed is the list's length.",
-        suitable=(),
+        suitable=("mb_by_mb", "cmb", "mmb_by_mmb", "local_optimal_adjustment"),
         others_exempt="Learns no sequence of Markov blankets.",
     ),
     Concept(
@@ -1433,7 +1900,7 @@ _CONCEPTS = (
         summary="A method that answers for ordered treatment-outcome pairs lists one record per "
         "pair in metadata['effects'] (andrey.core.effects): treatment, outcome, estimand, "
         "nonzero, identifiable, adjustment_sets, and set_kind.",
-        suitable=(),
+        suitable=("y_structures", "ldp", "ld3", "ldecc", "local_optimal_adjustment", "locpc_cde"),
         others_exempt="Answers for no ordered pair of variables.",
     ),
     Concept(
@@ -1471,6 +1938,30 @@ _CONCEPTS = (
                 "gs",
                 "fast_iamb",
                 "mmpc",
+                "hiton_pc",
+                "hiton_mb",
+                "mmmb",
+                "pcmb",
+            ),
+            *_exempt(
+                "Each local structure decides a triple by the separating set of its endpoints, "
+                "as MB-by-MB states (Wang et al. 2014); no vote over several sets.",
+                "mb_by_mb",
+            ),
+            *_exempt(
+                "Each local structure decides a triple by the separating set of its endpoints, "
+                "as MMB-by-MMB states (Xie et al. 2024); no vote over several sets.",
+                "mmb_by_mmb",
+            ),
+            *_exempt(
+                "Decides a direction from one pair's two tests, without and with the target in "
+                "the conditioning set, as CMB states (Gao and Ji 2015); no vote over several sets.",
+                "cmb",
+            ),
+            *_exempt(
+                "Each eager collider check reads the first separating set found, and check "
+                "picks how it directs parents; no vote over several sets.",
+                "ldecc",
             ),
         ),
         others_exempt="No separating-set orientation.",

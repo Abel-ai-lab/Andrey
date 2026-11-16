@@ -296,7 +296,10 @@ class DSepOracle:
     is therefore irrelevant. Queries are memoized (FCI re-asks pairs constantly), and each query
     answered afresh counts as one test (:func:`~andrey.core.ci.counting_tests`). Query index
     ``k`` names the DAG node ``nodes[k]``, or ``k`` itself when ``nodes`` is ``None``, and every
-    query also conditions on the DAG nodes ``given``.
+    query also conditions on the DAG nodes ``given``. A search that visits the variables in another
+    order than the data's builds its test again over the reordered columns, so registered by name
+    (:func:`~andrey.core.ci.register_indep_test`), the oracle's factory sets ``nodes`` from the
+    matrix it receives.
 
     Notes
     -----

@@ -24,11 +24,16 @@ import numpy as np
 from andrey.api._adapt import default_score, default_test, label_of
 from andrey.core import environments
 from andrey.core.backend import config
-from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS, available_indep_tests
+from andrey.core.ci import (
+    DISCRETE_INDEP_TESTS,
+    SHIPPED_INDEP_TESTS,
+    STOCHASTIC_INDEP_TESTS,
+    available_indep_tests,
+)
 from andrey.core.ci_missing import TESTWISE
 from andrey.core.knowledge import PATH_PARTS, Knowledge, resolve
 from andrey.core.removed import removal_hint
-from andrey.core.score import LINEAR_SCORES, PENALIZED_SCORES
+from andrey.core.score import LINEAR_SCORES, PENALIZED_SCORES, RANK_SCORES
 from andrey.core.seeding import resolve_seed
 from andrey.core.structure import ARROW, TAIL, column_labels
 from andrey.core.warning_policy import (
@@ -76,7 +81,9 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
     (:func:`path_constraints`); a ``None`` ``indep_test`` or ``score_func`` is picked from the
     declared column types, and the facade gets the pick and the columns it reads
     (:func:`chosen_settings`); a call that passes ``ebic_gamma`` or ``equivalent_sample_size`` with
-    a score that does not use it raises ``ValueError`` (:func:`check_penalties`).
+    a score that does not use it raises ``ValueError`` (:func:`check_penalties`), and so does one
+    that passes ``degrees_of_freedom`` with a test that does not read it
+    (:func:`check_degrees_of_freedom`).
     After it: a CPDAG result keeps the DAGs it stands for that meet ``required_paths`` and
     ``forbidden_paths`` (:func:`restrict_paths`), a PAG or a DAG is checked against them
     (:func:`meet_paths`), and a claim the result does not meet is dropped with a warning
@@ -119,6 +126,7 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
                 warn_experimental(name)
             chosen = chosen_settings(spec, bound.arguments)
             check_penalties(spec, bound.arguments, chosen.get("score_func"))
+            check_degrees_of_freedom(spec, bound.arguments, chosen.get("indep_test"))
             out = facade(*bound.args, **bound.kwargs)
             if paths is not None:
                 out = (restrict_paths if spec.restricts_paths else meet_paths)(out, paths, name)
@@ -407,15 +415,35 @@ def check_argument(param: ParamSpec, value: Any, method: str) -> object:
 
     Raises what :meth:`~andrey.spec.models.ParamSpec.check` raises; when ``value`` is a choice that
     a release removed, the ``ValueError`` adds what the choice is called now
-    (:func:`~andrey.core.removed.removal_hint`).
+    (:func:`~andrey.core.removed.removal_hint`), and when it is a choice of the shared parameter
+    that this method does not offer, why not (:class:`~andrey.spec.concepts.Deviation`).
     """
     try:
         return param.check(value, method, choices=runtime_choices(param))
     except ValueError as error:
         hint = removal_hint(method, param.name, value)
-        if hint is None:
+        if hint is not None:
+            raise ValueError(f"{error}; {hint}") from None
+        reason = withheld_reason(param, value, method)
+        if reason is None:
             raise
-        raise ValueError(f"{error}; {hint}") from None
+        raise ValueError(f"{error}. {reason}") from None
+
+
+def withheld_reason(param: ParamSpec, value: Any, method: str) -> str | None:
+    """Why ``method`` does not offer ``value``, a choice of the concept ``param`` implements.
+
+    ``None`` when the concept offers no such choice or no deviation of the method withholds it.
+    """
+    from andrey.spec.concepts import CONCEPTS
+
+    concept = CONCEPTS.get(param.concept) if param.concept else None
+    if concept is None or concept.param is None or value not in (concept.param.choices or ()):
+        return None
+    for deviation in concept.deviations:
+        if deviation.method == method and value not in (deviation.choices or (value,)):
+            return deviation.reason
+    return None
 
 
 def draws_random_numbers(spec: MethodSpec, arguments: dict[str, Any]) -> bool:
@@ -475,12 +503,12 @@ def chosen_settings(spec: MethodSpec, arguments: dict[str, Any]) -> dict[str, st
 #: The scores each penalty concept weighs; the other scores ignore it.
 PENALTIES = {
     "penalty_discount": PENALIZED_SCORES,
-    "ebic_gamma": LINEAR_SCORES,
+    "ebic_gamma": (*LINEAR_SCORES, *RANK_SCORES),
     "equivalent_sample_size": ("bdeu",),
 }
-#: What each argument that only one score reads weighs; a call that passes it with another score
-#: raises. ``penalty_discount`` is not among them: every score but BDeu uses it, and BDeu ignores
-#: it.
+#: What each argument that only one kind of score reads weighs; a call that passes it with another
+#: score raises. ``penalty_discount`` is not among them: every score but BDeu uses it, and BDeu
+#: ignores it.
 SCORE_ONLY = {
     "ebic_gamma": "the extended-BIC term",
     "equivalent_sample_size": "the Dirichlet prior",
@@ -493,9 +521,9 @@ def used_penalties(
     """Return the penalties the score ``score`` used in a fit of ``spec``, by argument name.
 
     ``penalty_discount`` weighs every score but BDeu, ``ebic_gamma`` only the linear-Gaussian BIC,
-    and ``equivalent_sample_size`` only BDeu (:data:`PENALTIES`); a penalty the score ignores is
-    left out. A method without ``score_func`` has one score, which uses every penalty it takes. The
-    value is the call's, or the default.
+    on the values or on the normal scores, and ``equivalent_sample_size`` only BDeu
+    (:data:`PENALTIES`); a penalty the score ignores is left out. A method without ``score_func``
+    has one score, which uses every penalty it takes. The value is the call's, or the default.
     """
     one_score = not any(p.concept == "score_func" for p in spec.params)
     return {
@@ -508,10 +536,10 @@ def used_penalties(
 def check_penalties(spec: MethodSpec, arguments: dict[str, Any], score: str | None) -> None:
     """Raise ``ValueError`` when the call passes an argument that only one score reads with another.
 
-    ``ebic_gamma`` weighs the extended-BIC term of ``"bic"`` alone, and ``equivalent_sample_size``
-    the Dirichlet prior of ``"bdeu"`` alone (:data:`SCORE_ONLY`). ``score`` is the one the fit uses
-    (:func:`chosen_settings`). A method without ``score_func`` has one score, which reads every
-    argument it takes.
+    ``ebic_gamma`` weighs the extended-BIC term of ``"bic"`` and ``"normal_scores"`` alone, and
+    ``equivalent_sample_size`` the Dirichlet prior of ``"bdeu"`` alone (:data:`SCORE_ONLY`).
+    ``score`` is the one the fit uses (:func:`chosen_settings`). A method without ``score_func`` has
+    one score, which reads every argument it takes.
     """
     passed = [
         (p.name, p.concept) for p in spec.params if p.concept in SCORE_ONLY and p.name in arguments
@@ -526,6 +554,21 @@ def check_penalties(spec: MethodSpec, arguments: dict[str, Any], score: str | No
                 f"{spec.name}: {name} weighs {weighed} of score_func={used[0]!r}, which "
                 f"score_func={score!r} does not use; drop {name}, or pass score_func={used[0]!r}"
             )
+
+
+def check_degrees_of_freedom(spec: MethodSpec, arguments: dict[str, Any], test: str | None) -> None:
+    """Raise ``ValueError`` when the call passes ``degrees_of_freedom`` with a test that ignores it.
+
+    Only the categorical tests (:data:`~andrey.core.ci.DISCRETE_INDEP_TESTS`) read it; ``test`` is
+    the one the fit uses (:func:`chosen_settings`). A default is never checked, so a method whose
+    default is ``"nonempty"`` runs with any test.
+    """
+    if "degrees_of_freedom" in arguments and test not in DISCRETE_INDEP_TESTS:
+        raise ValueError(
+            f"{spec.name}: degrees_of_freedom sets the degrees of freedom of indep_test='chisq' "
+            f"and 'gsq', which indep_test={test!r} does not use; drop degrees_of_freedom, or pass "
+            "indep_test='gsq'"
+        )
 
 
 def runtime_choices(param: ParamSpec) -> tuple[str, ...] | None:

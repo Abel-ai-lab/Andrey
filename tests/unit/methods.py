@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from andrey.spec import REGISTRY
+
 #: Settings that shorten a slow fit; the facade path stays the same, and the properties the
 #: package-wide tests check do not depend on the fit converging.
 SHORT = {
@@ -15,8 +17,40 @@ SHORT = {
     "varma_lingam": {"max_iter": 1},
     "jpcmciplus": {"time_dummy": False},
 }
-#: The arguments a method needs beyond its inputs: ICP's target, by position.
-REQUIRED = {"icp": {"target": 2}}
+
+
+def requires_target(method: str) -> bool:
+    """Whether ``method`` answers for one variable only: its ``target`` entry opens "Required:",
+    as ``REQUIRED_TARGET`` and ICP's own entry do."""
+    return any(
+        p.concept == "target" and p.doc.startswith("Required:") for p in REGISTRY[method].params
+    )
+
+
+def requires_pair(method: str) -> bool:
+    """Whether ``method`` answers for one treatment-outcome pair: its ``treatment`` entry opens
+    "Required:"."""
+    return any(
+        p.concept == "treatment" and p.doc.startswith("Required:") for p in REGISTRY[method].params
+    )
+
+
+def requires_variables(method: str) -> bool:
+    """Whether ``method`` answers for the pairs of variables it must be given: its ``variables``
+    entry opens "Required:"."""
+    return any(
+        p.concept == "variables" and p.doc.startswith("Required:") for p in REGISTRY[method].params
+    )
+
+
+#: The arguments a method needs beyond its inputs: a target, by position, for each method that
+#: requires one, a treatment and an outcome for each method that answers for a pair, and two
+#: variables for each method that answers for the pairs of the variables it is given.
+REQUIRED = {
+    **{method: {"target": 2} for method in REGISTRY if requires_target(method)},
+    **{method: {"treatment": 1, "outcome": 2} for method in REGISTRY if requires_pair(method)},
+    **{method: {"variables": [1, 2]} for method in REGISTRY if requires_variables(method)},
+}
 
 
 def fit_settings(method: str) -> dict:

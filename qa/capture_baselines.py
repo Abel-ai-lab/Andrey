@@ -70,6 +70,65 @@ def _run_icp(X: np.ndarray, algorithm: str) -> dict:
     return project_output(andrey.icp(X, datagen.domain_index("gauss_5v"), target=target), algorithm)
 
 
+def _run_target(name: str):
+    def run(X: np.ndarray, algorithm: str) -> dict:
+        import andrey
+
+        # The column of x3, the variable with the most edges in the true graph: x1 -> x3 <- x2
+        # and x3 -> x4.
+        target = int(datagen.column_of("gauss_5v")[3])
+        return project_output(getattr(andrey, name)(X, target=target), algorithm)
+
+    return run
+
+
+def _run_ldecc(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    # The treatment x2, whose parents x0 and x1 form a collider, and the outcome x4, its descendant
+    # through x3.
+    column = datagen.column_of("gauss_7v")
+    out = andrey.ldecc(X, treatment=int(column[2]), outcome=int(column[4]))
+    return project_output(out, algorithm)
+
+
+def _run_local_optimal_adjustment(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    # x0 causes x3 through x2, so x2's other parent, x1, is the optimal adjustment set.
+    column = datagen.column_of("gauss_7v")
+    out = andrey.local_optimal_adjustment(X, variables=[int(column[0]), int(column[3])])
+    return project_output(out, algorithm)
+
+
+def _run_locpc_cde(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    # The treatment x0 and the outcome x2, whose edges x0 -> x2 <- x1 and x2 -> x3 the CPDAG all
+    # directs, so the effect is identifiable and x1 is its adjustment set.
+    column = datagen.column_of("gauss_7v")
+    out = andrey.locpc_cde(X, treatment=int(column[0]), outcome=int(column[2]))
+    return project_output(out, algorithm)
+
+
+def _run_mmb_by_mmb(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    # The column of c, which has one edge of each kind the answer holds in this case's PAG,
+    # c -> e, b <-> c, and d o-> c; every other variable has one or two.
+    target = int(datagen.column_of("confounded_gauss_5v")[2])
+    return project_output(andrey.mmb_by_mmb(X, target=target), algorithm)
+
+
+def _run_local_isa_ling(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    # The column of x1, whose answer holds an edge of each kind: x0 -> x1 into it, x1 -> x2 and
+    # x1 -> x3 out of it, and x0 -> x2 into a child.
+    target = int(datagen.column_of("lingam_5v_uniform")[1])
+    return project_output(andrey.local_isa_ling(X, target=target), algorithm)
+
+
 def _run_ut_igsp(X: np.ndarray, algorithm: str) -> dict:
     import andrey
 
@@ -104,6 +163,7 @@ def _run_igsp(X: np.ndarray, algorithm: str) -> dict:
 ALGORITHMS = {
     "DirectLiNGAM": (_facade("direct_lingam"), "lingam_5v_uniform"),
     "ICALiNGAM": (_facade("ica_lingam"), "lingam_5v_uniform"),
+    "LocalISALiNG": (_run_local_isa_ling, "lingam_5v_uniform"),
     "PC": (_facade("pc"), "gauss_5v"),
     "FCI": (_facade("fci"), "gauss_5v"),
     "GFCI": (_facade("gfci", penalty_discount=2.0), "gauss_5v"),
@@ -122,7 +182,20 @@ ALGORITHMS = {
     "Tabu": (_facade("tabu"), "gauss_5v"),
     "IAMB": (_facade("iamb"), "gauss_5v"),
     "InterIAMB": (_facade("inter_iamb"), "gauss_5v"),
+    "GS": (_facade("gs"), "gauss_5v"),
+    "FastIAMB": (_facade("fast_iamb"), "gauss_5v"),
     "MMPC": (_facade("mmpc", structure="cpdag"), "gauss_5v"),
+    "HITONPC": (_facade("hiton_pc", structure="cpdag"), "gauss_5v"),
+    "PCMB": (_facade("pcmb"), "gauss_5v"),
+    "MBbyMB": (_run_target("mb_by_mb"), "gauss_5v"),
+    "HITONMB": (_facade("hiton_mb"), "gauss_5v"),
+    "MMMB": (_facade("mmmb"), "gauss_5v"),
+    "YStructures": (_facade("y_structures"), "gauss_7v"),
+    "CMB": (_run_target("cmb"), "gauss_5v"),
+    "LDECC": (_run_ldecc, "gauss_7v"),
+    "LocalOptimalAdjustment": (_run_local_optimal_adjustment, "gauss_7v"),
+    "LocPCCDE": (_run_locpc_cde, "gauss_7v"),
+    "MMBbyMMB": (_run_mmb_by_mmb, "confounded_gauss_5v"),
     "MMHC": (_facade("mmhc"), "gauss_5v"),
     "RSMAX2": (_facade("rsmax2", restrict="pc", maximize="tabu"), "gauss_5v"),
     "ExactSearch": (_facade("exact_search"), "gauss_5v"),
@@ -131,6 +204,7 @@ ALGORITHMS = {
     "UT-IGSP": (_run_ut_igsp, "gauss_5v_noise_shift"),
     "CALM": (_facade("calm"), "gauss_tree_5v"),
     "NOTEARS": (_facade("notears"), "gauss_5v"),
+    "DAGMA": (_facade("dagma"), "gauss_5v"),
     "CAM": (_facade("cam"), "nonmonotone_4v"),
     "VARMALiNGAM": (_facade("varma_lingam", order=(1, 1), prune=False), "varma_3v"),
     "VARMALiNGAMPruned": (_facade("varma_lingam", order=(1, 1), prune=True), "varma_3v"),

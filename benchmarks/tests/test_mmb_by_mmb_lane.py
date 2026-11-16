@@ -25,6 +25,7 @@ import mmb_by_mmb_cpu  # noqa: E402
 
 from andrey_bench import latent_networks, networks, runner  # noqa: E402
 from andrey_bench import local_lane as L  # noqa: E402
+from andrey_bench.adapters import andrey_mmb_by_mmb as andrey_mmb  # noqa: E402
 from andrey_bench.adapters import xie_mmb_by_mmb as xie  # noqa: E402
 from andrey_bench.adapters.baseline_empty import BaselineEmpty  # noqa: E402
 
@@ -122,6 +123,7 @@ def lane(tmp_path, monkeypatch):
     monkeypatch.setattr(mmb_by_mmb_cpu, "run_task", fit_here)
     monkeypatch.setattr(mmb_by_mmb_cpu, "check_interpreters", lambda field: {})
     monkeypatch.setattr(mmb_by_mmb_cpu, "REFERENCES", [PerfectLocal()])
+    monkeypatch.setattr(mmb_by_mmb_cpu, "ANDREY_ARMS", [])
     flags = ["--out", str(tmp_path / "run"), "--networks", "asia", "--hidden", "2", "--rows", "400"]
     return tmp_path / "run", flags + ["--seeds", "2", "--targets", "2"], calls
 
@@ -208,6 +210,59 @@ def test_the_papers_four_networks_and_their_hidden_counts():
     with pytest.raises(SystemExit, match="no hidden count"):
         mmb_by_mmb_cpu.hidden_for("pigs", None)
     assert mmb_by_mmb_cpu.solutions()[-1].name == BaselineEmpty().name
+    assert [a.name for a in mmb_by_mmb_cpu.ANDREY_ARMS] == [
+        "andrey.mmb_by_mmb",
+        "andrey.mmb_by_mmb.iamb",
+    ]
+
+
+def test_the_papers_networks_take_its_named_targets_and_others_the_most_connected():
+    assert set(latent_networks.PAPER_TARGETS) == set(mmb_by_mmb_cpu.NETWORKS)
+    assert [len(t) for t in latent_networks.PAPER_TARGETS.values()] == [4, 4, 5, 7]
+    named = latent_networks.PAPER_TARGETS["alarm"]
+    others = ("HUB", "A", "B", "C")
+    arcs = tuple(("HUB", v) for v in (*named, "A", "B")) + (("A", "B"),)
+    alarm = networks.Network("alarm", (*named, *others), arcs)
+    assert mmb_by_mmb_cpu.targets_for(alarm, None) == named
+    assert mmb_by_mmb_cpu.targets_for(alarm, 2) == ("HUB", "A")
+    elsewhere = networks.Network("elsewhere", alarm.nodes, arcs)
+    assert mmb_by_mmb_cpu.targets_for(elsewhere, None) == ("HUB", "A")
+
+
+def test_the_run_records_its_targets_by_name(lane):
+    out, flags, _ = lane
+    mmb_by_mmb_cpu.main(flags)
+    meta = json.loads((out / "run_meta.json").read_text())
+    asia = networks.load_network("asia")
+    assert meta["targets"] == {"asia": list(latent_networks.default_targets(asia, 2))}
+    for r in _records(out):
+        assert set(r["target_names"].values()) == set(meta["targets"]["asia"])
+
+
+@pytest.mark.parametrize("blanket", ["total_conditioning", "iamb"])
+def test_andreys_adapter_answers_a_target_of_a_hidden_variable_network_as_the_truth_does(blanket):
+    """The fork with a hidden root of the authors' test: Andrey's answer at z is the truth's."""
+    net = networks.Network(
+        "fork", ("h", "x", "y", "z", "w"), (("h", "x"), ("h", "y"), ("x", "z"), ("w", "z"))
+    )
+    draw = latent_networks.sample(
+        net, n=6000, seed=1, hidden=1, targets=("x", "y", "z", "w"), shuffle=False
+    )
+    adapter = andrey_mmb.AndreyMMBbyMMB(blanket)
+    assert isinstance(adapter, L.LocalAdapter) and adapter.params() == {
+        "alpha": 0.01,
+        "indep_test": "fisherz",
+        "blanket": blanket,
+    }
+    adapter.setup()
+    for target in draw.targets:
+        answer, tests = L.unpack_answer(
+            adapter.fit(draw.data, {**adapter.params(), L.TARGET_PARAM: target})
+        )
+        assert tests is not None and tests > 0
+        truth = latent_networks.truth(draw)
+        assert L.target_edges(answer, target) == L.target_edges(truth, target), target
+    assert adapter.to_structure(L.pack_answer(answer)).kind == "pag"
 
 
 # ----- the references --------------------------------------------------------------------------

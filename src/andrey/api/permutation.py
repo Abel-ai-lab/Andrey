@@ -87,9 +87,13 @@ def boss(
         Local score objective: ``"bic"``, the covariance-based linear-Gaussian BIC; ``"bdeu"`` and
         ``"discrete_bic"`` are the BDeu score and the multinomial BIC for categorical data coded by
         whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` are the degenerate and conditional
-        Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` picks from the declared
-        column types: ``"bdeu"`` when every column is categorical, ``"cond_gauss"`` when some are,
-        else ``"bic"``. A column is declared categorical by ``categorical`` or by a DataFrame's
+        Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``"normal_scores"``, experimental,
+        is ``"bic"`` on each column's normal scores, for continuous data that are Gaussian only
+        after an unknown increasing transformation of each column, as :func:`~andrey.ges` describes,
+        with its limits; the consistency result for this score covers GES, so with this search it is
+        the analogous construction, not a proven result. ``None`` picks from the declared column
+        types: ``"bdeu"`` when every column is categorical, ``"cond_gauss"`` when some are, else
+        ``"bic"``. A column is declared categorical by ``categorical`` or by a DataFrame's
         ``category``, ``bool``, or text type, never by its values.
         ``metadata["score_func"]`` names the score the fit used: the one picked from the
         declared column types when this is ``None``.
@@ -102,8 +106,8 @@ def boss(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
-        raises ``ValueError``. See Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` and ``"normal_scores"`` use it: passing it
+        with another score raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
@@ -485,9 +489,13 @@ def grasp(
         Local score objective: ``"bic"``, the covariance-based linear-Gaussian BIC; ``"bdeu"`` and
         ``"discrete_bic"`` are the BDeu score and the multinomial BIC for categorical data coded by
         whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` are the degenerate and conditional
-        Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` picks from the declared
-        column types: ``"bdeu"`` when every column is categorical, ``"cond_gauss"`` when some are,
-        else ``"bic"``. A column is declared categorical by ``categorical`` or by a DataFrame's
+        Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``"normal_scores"``, experimental,
+        is ``"bic"`` on each column's normal scores, for continuous data that are Gaussian only
+        after an unknown increasing transformation of each column, as :func:`~andrey.ges` describes,
+        with its limits; the consistency result for this score covers GES, so with this search it is
+        the analogous construction, not a proven result. ``None`` picks from the declared column
+        types: ``"bdeu"`` when every column is categorical, ``"cond_gauss"`` when some are, else
+        ``"bic"``. A column is declared categorical by ``categorical`` or by a DataFrame's
         ``category``, ``bool``, or text type, never by its values.
         ``metadata["score_func"]`` names the score the fit used: the one picked from the
         declared column types when this is ``None``.
@@ -500,8 +508,8 @@ def grasp(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be from 0 to 1. Only ``"bic"`` uses it: passing it with another score
-        raises ``ValueError``. See Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` and ``"normal_scores"`` use it: passing it
+        with another score raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
@@ -869,6 +877,7 @@ def igsp(
     alpha: float | None = None,
     invariance_alpha: float | None = None,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     invariance_test: str | None = None,
     n_starts: int = 10,
     seed: int | None = None,
@@ -925,23 +934,32 @@ def igsp(
         tests, ``metadata["alpha"]``.
     indep_test : str or None, default=None
         The conditional-independence test, on the observational rows. For continuous data, on the
-        partial correlation: ``"fisherz"``, ``"student_t"``, and ``"normal_scores"``; for
-        categorical data coded by whole numbers: ``"chisq"`` and ``"gsq"``; for mixed data, with
-        the categorical columns named by ``categorical``: ``"degen_gauss"`` and ``"cond_gauss"``;
-        for nonlinear effects in continuous data, each far slower: ``"kci"``, ``"rcot"``,
-        ``"cmiknn"``, and ``"gpdc"``, as for :func:`~andrey.pc`. ``None`` picks from the declared
-        column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are,
-        else ``"fisherz"``. ``metadata["indep_test"]`` names the test the fit used.
+        partial correlation: ``"fisherz"`` and ``"student_t"``; for categorical data coded by whole
+        numbers: ``"chisq"`` and ``"gsq"``; for mixed data, with the categorical columns named by
+        ``categorical``: ``"degen_gauss"`` and ``"cond_gauss"``; for nonlinear effects in continuous
+        data, each far slower: ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"``, as for
+        :func:`~andrey.pc`. ``"normal_scores"`` is not offered: the invariance tests compare a
+        setting with the observational rows, and ranked over both, a column's normal scores mix
+        their distributions. ``None`` picks from the declared column types: ``"gsq"`` when every
+        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``.
+        ``metadata["indep_test"]`` names the test the fit used.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     invariance_test : {"gaussian", "indicator"} or None, default=None
         The invariance test, which asks whether a variable's distribution given a set of others is
         the same in a setting as in the observational rows. ``"gaussian"`` compares the linear
-        regressions of the two groups of rows: their coefficients and intercept by the Chow test
-        and their residual variances by an F-test, each at half the level. ``"indicator"`` runs
+        regressions of the two groups of rows: their coefficients and intercept by the Chow test and
+        their residual variances by an F-test, each at half the level. ``"indicator"`` runs
         ``indep_test`` between the variable and a 0/1 indicator of the setting's rows given the
-        others. ``None`` picks ``"gaussian"`` under ``"fisherz"``, ``"student_t"``, and
-        ``"normal_scores"``, else ``"indicator"``. ``"gaussian"`` reads every column as numbers,
-        so with a categorical or mixed-data ``indep_test`` it raises ``ValueError``.
-        ``metadata["invariance_test"]`` names the test the fit used. See Notes.
+        others. ``None`` picks ``"gaussian"`` under ``"fisherz"`` and ``"student_t"``, else
+        ``"indicator"``. ``"gaussian"`` reads every column as numbers, so with a categorical or
+        mixed-data ``indep_test`` it raises ``ValueError``. ``metadata["invariance_test"]`` names
+        the test the fit used. See Notes.
     n_starts : int, default=10
         Number of searches, at least ``1``, each from a minimum-degree order of the variables:
         the first breaks ties by each column's rank, and each later one draws them, and the order
@@ -1061,16 +1079,15 @@ def igsp(
     graph under the targets [3]_.
 
     **Invariance tests.** Under ``"gaussian"``, a variable given a set of others is invariant when
-    the linear regressions with an intercept agree in the two groups of rows: the Chow test of
-    equal coefficients and intercept and the F-test of equal residual variances [4]_, exact under
-    Gaussian noise, each at half the level. With no other variable it compares the means and
-    variances, so it sees a perfect intervention that keeps the mean. A group with no more rows
-    than the regression has parameters leaves nothing to compare, and the variable reads as
-    invariant. Under ``"normal_scores"`` the regressions read every column's normal scores over
-    all rows. Under ``"indicator"``, a variable is invariant when ``indep_test`` finds it
-    independent of a 0/1 indicator of the setting's rows given the others, on the rows of the
-    setting and the observational ones [5]_; under ``"fisherz"`` and ``"student_t"`` this sees a
-    change of the mean alone, which is why ``"gaussian"`` is their default.
+    the linear regressions with an intercept agree in the two groups of rows: the Chow test of equal
+    coefficients and intercept and the F-test of equal residual variances [4]_, exact under Gaussian
+    noise, each at half the level. With no other variable it compares the means and variances, so it
+    sees a perfect intervention that keeps the mean. A group with no more rows than the regression
+    has parameters leaves nothing to compare, and the variable reads as invariant. Under
+    ``"indicator"``, a variable is invariant when ``indep_test`` finds it independent of a 0/1
+    indicator of the setting's rows given the others, on the rows of the setting and the
+    observational ones [5]_; under ``"fisherz"`` and ``"student_t"`` this sees a change of the mean
+    alone, which is why ``"gaussian"`` is their default.
 
     **Environments and targets.** Every environment whose targets are ``[]`` is observational, and
     their rows are pooled. Every other environment is a setting, compared with the observational
@@ -1176,6 +1193,7 @@ def igsp(
             alpha=level,
             invariance_alpha=level if invariance_alpha is None else invariance_alpha,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             invariance_test=invariance_test,
             categorical=mask,
             n_starts=n_starts,
@@ -1201,6 +1219,7 @@ def ut_igsp(
     alpha: float | None = None,
     invariance_alpha: float | None = None,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     invariance_test: str | None = None,
     n_starts: int = 10,
     seed: int | None = None,
@@ -1262,23 +1281,32 @@ def ut_igsp(
         conditional-independence tests, ``metadata["alpha"]``.
     indep_test : str or None, default=None
         The conditional-independence test, on the observational rows. For continuous data, on the
-        partial correlation: ``"fisherz"``, ``"student_t"``, and ``"normal_scores"``; for
-        categorical data coded by whole numbers: ``"chisq"`` and ``"gsq"``; for mixed data, with
-        the categorical columns named by ``categorical``: ``"degen_gauss"`` and ``"cond_gauss"``;
-        for nonlinear effects in continuous data, each far slower: ``"kci"``, ``"rcot"``,
-        ``"cmiknn"``, and ``"gpdc"``, as for :func:`~andrey.pc`. ``None`` picks from the declared
-        column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are,
-        else ``"fisherz"``. ``metadata["indep_test"]`` names the test the fit used.
+        partial correlation: ``"fisherz"`` and ``"student_t"``; for categorical data coded by whole
+        numbers: ``"chisq"`` and ``"gsq"``; for mixed data, with the categorical columns named by
+        ``categorical``: ``"degen_gauss"`` and ``"cond_gauss"``; for nonlinear effects in continuous
+        data, each far slower: ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"``, as for
+        :func:`~andrey.pc`. ``"normal_scores"`` is not offered: the invariance tests compare a
+        setting with the observational rows, and ranked over both, a column's normal scores mix
+        their distributions. ``None`` picks from the declared column types: ``"gsq"`` when every
+        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``.
+        ``metadata["indep_test"]`` names the test the fit used.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     invariance_test : {"gaussian", "indicator"} or None, default=None
         The invariance test, which asks whether a variable's distribution given a set of others is
         the same in a setting as in the observational rows. ``"gaussian"`` compares the linear
-        regressions of the two groups of rows: their coefficients and intercept by the Chow test
-        and their residual variances by an F-test, each at half the level. ``"indicator"`` runs
+        regressions of the two groups of rows: their coefficients and intercept by the Chow test and
+        their residual variances by an F-test, each at half the level. ``"indicator"`` runs
         ``indep_test`` between the variable and a 0/1 indicator of the setting's rows given the
-        others. ``None`` picks ``"gaussian"`` under ``"fisherz"``, ``"student_t"``, and
-        ``"normal_scores"``, else ``"indicator"``. ``"gaussian"`` reads every column as numbers,
-        so with a categorical or mixed-data ``indep_test`` it raises ``ValueError``.
-        ``metadata["invariance_test"]`` names the test the fit used. See Notes.
+        others. ``None`` picks ``"gaussian"`` under ``"fisherz"`` and ``"student_t"``, else
+        ``"indicator"``. ``"gaussian"`` reads every column as numbers, so with a categorical or
+        mixed-data ``indep_test`` it raises ``ValueError``. ``metadata["invariance_test"]`` names
+        the test the fit used. See Notes.
     n_starts : int, default=10
         Number of searches, at least ``1``, each from a minimum-degree order of the variables:
         the first breaks ties by each column's rank, and each later one draws them, and the order
@@ -1408,19 +1436,18 @@ def ut_igsp(
     searches, returned as its interventional essential graph under the targets found [2]_.
 
     **Invariance tests.** Under ``"gaussian"``, a variable given a set of others is invariant when
-    the linear regressions with an intercept agree in the two groups of rows: the Chow test of
-    equal coefficients and intercept and the F-test of equal residual variances [3]_, exact under
-    Gaussian noise, each at half the level, so a variable is a target when either rejects. A
-    regressor constant within a group, as under a hard intervention without noise, costs that
-    group one degree of freedom. A group with no more rows than the regression has parameters, as
-    a setting of 3 rows given 2 other variables, leaves nothing to compare, and the variable reads
-    as invariant: such a setting learns no target from that query and blocks the reversal of an
-    edge from one of its known targets into that variable. Under ``"normal_scores"`` the
-    regressions read every column's normal scores over all rows. Under ``"indicator"``, a variable
-    is invariant when ``indep_test`` finds it independent of a 0/1 indicator of the setting's rows
-    given the others, on the rows of the setting and the observational ones [4]_; under
-    ``"fisherz"`` and ``"student_t"`` this sees a change of the mean alone, which is why
-    ``"gaussian"`` is their default.
+    the linear regressions with an intercept agree in the two groups of rows: the Chow test of equal
+    coefficients and intercept and the F-test of equal residual variances [3]_, exact under Gaussian
+    noise, each at half the level, so a variable is a target when either rejects. A regressor
+    constant within a group, as under a hard intervention without noise, costs that group one degree
+    of freedom. A group with no more rows than the regression has parameters, as a setting of 3 rows
+    given 2 other variables, leaves nothing to compare, and the variable reads as invariant: such a
+    setting learns no target from that query and blocks the reversal of an edge from one of its
+    known targets into that variable. Under ``"indicator"``, a variable is invariant when
+    ``indep_test`` finds it independent of a 0/1 indicator of the setting's rows given the others,
+    on the rows of the setting and the observational ones [4]_; under ``"fisherz"`` and
+    ``"student_t"`` this sees a change of the mean alone, which is why ``"gaussian"`` is their
+    default.
 
     **Environments and targets.** Every environment whose targets are ``[]`` is observational, and
     their rows are pooled. Every other environment is a setting, compared with the observational
@@ -1530,6 +1557,7 @@ def ut_igsp(
             alpha=level,
             invariance_alpha=level if invariance_alpha is None else invariance_alpha,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             invariance_test=invariance_test,
             categorical=mask,
             n_starts=n_starts,
@@ -1559,6 +1587,7 @@ def boss_fci(
     ebic_gamma: float = 0.0,
     equivalent_sample_size: float = 1.0,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     alpha: float = 0.05,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
@@ -1601,9 +1630,15 @@ def boss_fci(
         Local score driving the BOSS phase, as for :func:`~andrey.boss`: ``"bic"``, the
         linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"`` for categorical data, coded by whole
         numbers; or ``"degen_gauss"`` or ``"cond_gauss"``, the degenerate or conditional Gaussian
-        BIC for mixed data. ``None`` picks from the declared column types, as for
-        :func:`~andrey.boss`. ``metadata["score_func"]`` names the score the fit used: the one
-        picked from the declared column types when this is ``None``.
+        BIC for mixed data. ``"normal_scores"``, experimental, is ``"bic"`` on each column's normal
+        scores, for continuous data that are Gaussian only after an unknown increasing
+        transformation of each column, as :func:`~andrey.ges` describes, with its limits. With
+        ``indep_test="normal_scores"`` both phases read one nonparanormal model, and a strictly
+        increasing transformation of any column leaves the graph unchanged; the consistency results
+        for the rank-based test and score cover PC, GES, and ARGES, so with this search it is the
+        analogous construction, not a proven result. ``None`` picks from the declared column types,
+        as for :func:`~andrey.boss`. ``metadata["score_func"]`` names the score the fit used: the
+        one picked from the declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter in the BOSS phase. Larger
         values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the standard BIC. Must be
@@ -1630,6 +1665,13 @@ def boss_fci(
         declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
         type, never by its values. ``metadata["indep_test"]`` names the test the fit used: the one
         picked from the declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
@@ -1861,6 +1903,7 @@ def boss_fci(
         env,
         score_func=score_func,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         collider_rule=collider_rule,
         edge_removal=edge_removal,
@@ -1888,6 +1931,7 @@ def grasp_fci(
     equivalent_sample_size: float = 1.0,
     grasp_depth: int = 3,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     alpha: float = 0.05,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
@@ -1930,9 +1974,15 @@ def grasp_fci(
         Local score driving the GRaSP phase, as for :func:`~andrey.grasp`: ``"bic"``, the
         linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"`` for categorical data, coded by whole
         numbers; or ``"degen_gauss"`` or ``"cond_gauss"``, the degenerate or conditional Gaussian
-        BIC for mixed data. ``None`` picks from the declared column types, as for
-        :func:`~andrey.grasp`. ``metadata["score_func"]`` names the score the fit used: the one
-        picked from the declared column types when this is ``None``.
+        BIC for mixed data. ``"normal_scores"``, experimental, is ``"bic"`` on each column's normal
+        scores, for continuous data that are Gaussian only after an unknown increasing
+        transformation of each column, as :func:`~andrey.ges` describes, with its limits. With
+        ``indep_test="normal_scores"`` both phases read one nonparanormal model, and a strictly
+        increasing transformation of any column leaves the graph unchanged; the consistency results
+        for the rank-based test and score cover PC, GES, and ARGES, so with this search it is the
+        analogous construction, not a proven result. ``None`` picks from the declared column types,
+        as for :func:`~andrey.grasp`. ``metadata["score_func"]`` names the score the fit used: the
+        one picked from the declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter in the GRaSP phase. Larger
         values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the standard BIC. Must be
@@ -1963,6 +2013,13 @@ def grasp_fci(
         declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
         type, never by its values. ``metadata["indep_test"]`` names the test the fit used: the one
         picked from the declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
@@ -2185,6 +2242,7 @@ def grasp_fci(
         env,
         score_func=score_func,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         collider_rule=collider_rule,
         edge_removal=edge_removal,

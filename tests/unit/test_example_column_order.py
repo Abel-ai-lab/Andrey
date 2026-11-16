@@ -25,6 +25,8 @@ DRAWS = {
     "bottom_up_parce_lingam": {"sample": "EDGES"},
     "constraint_based": {
         "sample_chain": "CHAIN",
+        "sample_collider": "COLLIDER",
+        "sample_effect": "EFFECT",
         "sample_hidden": "HIDDEN",
         "sample_domains": "DOMAINS",
         "sample_confounded_domains": "CONFOUNDED_DOMAINS",

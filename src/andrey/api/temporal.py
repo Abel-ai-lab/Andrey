@@ -441,6 +441,7 @@ def pcmci(
     alpha: float = 0.05,
     fdr_method: str = "fdr_bh",
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -499,6 +500,13 @@ def pcmci(
         ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
         values. ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -723,6 +731,7 @@ def pcmci(
             alpha_level=alpha,
             fdr_method=fdr_method,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             constraints=constraints,
             max_depth=max_depth,
             categorical=mask,
@@ -741,6 +750,7 @@ def pcmciplus(
     fdr_method: str = "fdr_bh",
     collider_rule: str = "majority",
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -806,6 +816,13 @@ def pcmciplus(
         ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
         values. ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1044,6 +1061,7 @@ def pcmciplus(
             fdr_method=fdr_method,
             collider_rule=collider_rule,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             constraints=constraints,
             max_depth=max_depth,
             max_p_global=max_p_global,
@@ -1121,10 +1139,11 @@ def jpcmciplus(
         the variables.
     indep_test : str or None, default=None
         The conditional-independence test behind every p-value, a test of continuous data, as in
-        :func:`~andrey.pcmciplus`: ``"fisherz"``, ``"student_t"``, and ``"normal_scores"`` test
-        partial correlation, and ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` detect
-        nonlinear dependence at a far higher cost per test. The dummies enter a test as numeric
-        columns, so a categorical or mixed-data test raises ``ValueError``. ``None`` picks
+        :func:`~andrey.pcmciplus`: ``"fisherz"`` and ``"student_t"`` test partial correlation, and
+        ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` detect nonlinear dependence at a far
+        higher cost per test. The dummies enter a test as numeric columns, so a categorical or
+        mixed-data test raises ``ValueError``. ``"normal_scores"`` is not offered: ranked over every
+        dataset's rows, a column's normal scores mix the datasets' distributions. ``None`` picks
         ``"fisherz"``. ``metadata["indep_test"]`` names the test the fit used.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
@@ -1188,13 +1207,12 @@ def jpcmciplus(
         fewer than two system variables remain; if a time context differs between datasets at some
         step, a space context varies within a dataset, or a space context repeats another up to
         scale and shift, as any two do over two datasets; or if ``data`` holds ``NaN``. With
-        ``"fisherz"``, ``"student_t"``, or ``"normal_scores"``, also if a variable repeats another
-        up to scale and shift, at the same step or up to ``2 * tau_max`` steps apart, or a test
-        finds a system variable in the span of its conditions, as with one that sums others or a
-        pulse every dataset shares that is not a time context. Also if ``knowledge`` names a column
-        that is not a system variable, such as a context, contradicts itself, requires a link
-        without a lag or beyond ``tau_max``, or directs same-step links into a directed cycle over
-        the links the fit kept.
+        ``"fisherz"`` or ``"student_t"``, also if a variable repeats another up to scale and shift,
+        at the same step or up to ``2 * tau_max`` steps apart, or a test finds a system variable in
+        the span of its conditions, as with one that sums others or a pulse every dataset shares
+        that is not a time context. Also if ``knowledge`` names a column that is not a system
+        variable, such as a context, contradicts itself, requires a link without a lag or beyond
+        ``tau_max``, or directs same-step links into a directed cycle over the links the fit kept.
 
     Warns
     -----
@@ -1353,6 +1371,7 @@ def lpcmci(
     alpha: float = 0.05,
     n_preliminary_iterations: int = 1,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -1401,6 +1420,13 @@ def lpcmci(
         ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
         values. ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1643,6 +1669,7 @@ def lpcmci(
             pc_alpha=alpha,
             n_preliminary_iterations=n_preliminary_iterations,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             max_p_global=max_p_global,
             constraints=constraints,
             categorical=mask,

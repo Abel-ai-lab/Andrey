@@ -1,0 +1,6099 @@
+{
+ "release": "0.18.0",
+ "generated": "2026-11-14",
+ "lane": "locpc-cde",
+ "about": "LocPC-CDE against its authors' code on the paper's random DAGs, with global PC read at the pair beside them; the release summary's LocPC-CDE entries are built from it",
+ "build": "Andrey pre-release build of 14 November 2026 (the 0.18.0 release branch with the pair lane's PC arm counting its tests, as merged in this change)",
+ "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; every arm of a dataset ran in one job on shared nodes, so the times are indicative",
+ "packages": {
+  "LocPC-CDE authors' code": "pyCIPHOD 37a62c9 (Loranchet and Assaad)"
+ },
+ "parity_rule": "paired bootstrap",
+ "verdict_rule": "per cell (20 datasets, seeds 0-19, one treatment-outcome pair each): per dataset D = Andrey's error minus the authors' code's on the same data; worse when the 95% percentile-bootstrap interval of the mean D lies wholly above 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly below, a tie otherwise. A cell worse on seeds 0-19 on a measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree. The floor, per dataset: the verdict error minus the constant 'not identifiable' answer's (1 on identifiable pairs, 0 on the others), the set's missing plus extra members minus the empty set's, and the effect error minus the unadjusted regression's; it applies where the authors' code's interval lies wholly below 0, and a row then passes when Andrey's does too",
+ "error_metric": "verdict_error: 1 when the answer's identifiable is not the truth's (the true CPDAG directs every edge at the outcome, or not), an undecided or missing answer included, so that 1 minus its mean is the paper's identifiable proportion; parents_error (identifiable pairs): 1 unless the answer is identifiable with the outcome's true parents other than the treatment as its set; effect_error (linear-Gaussian identifiable pairs): the absolute error, in standard deviations, of the direct effect estimated by least squares of the outcome on the treatment and the set on a fresh sample, paired over the datasets where both arms gave a set",
+ "fit_protocol": "each fit in a fresh process on one core with one BLAS thread, no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; the authors' code's fits that passed it (three, with 200 binary variables) were rerun with a cap of 3,600 s, and eight of its fits that failed to start were rerun. Fisher's z on linear-Gaussian data and the G-square test on binary data at alpha 0.05, the paper's, on both arms; the authors' code with PYTHONHASHSEED=0, since its graph depends on the string hash seed",
+ "seeds_note": "every cell holds 20 datasets, seeds 0-19; no cell was worse on a measure, and the cells with 200 variables, whose verdict or set floor failed on seeds 0-19, also hold 20 fresh datasets, seeds 20-39 (replication)",
+ "cells_note": "locpc-<identifiable|nonidentifiable>@5000,v=<d>[,family=binary]: the paper's Erdos-Renyi DAGs with edge probability 2 / (d - 1) and a pair X -> Y whose controlled direct effect is identifiable, or not, in the true CPDAG; linear Gaussian, or the paper's logistic binary model; 5,000 rows; the columns in an order drawn from the seed",
+ "bootstrap": {
+  "resamples": 10000,
+  "interval": "percentile 95%",
+  "rng": "numpy default_rng(0)"
+ },
+ "pooled_verdict_floor_note": "per family and size, seed s pairs the identifiable and the non-identifiable dataset: the mean of their two verdict errors minus 0.5, the error of the constant 'not identifiable' answer over the pair; a row passes when the interval lies wholly below 0. Each arm's row also holds its mean verdict error and its median tests and seconds over the 40 fits, the release card's accuracy against cost",
+ "pooled_verdict_floor": [
+  {
+   "family": "gaussian",
+   "d": 10,
+   "andrey.locpc_cde": {
+    "pairs": 20,
+    "mean": -0.4,
+    "bootstrap_95": [
+     -0.475,
+     -0.3
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.1,
+    "tests_median": 108.0,
+    "s_median": 0.0113
+   },
+   "locpc_cde.authors": {
+    "pairs": 20,
+    "mean": -0.375,
+    "bootstrap_95": [
+     -0.45,
+     -0.275
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.125,
+    "tests_median": 109.5,
+    "s_median": 0.0946
+   },
+   "andrey.pc.adjustment": {
+    "pairs": 20,
+    "mean": -0.325,
+    "bootstrap_95": [
+     -0.45,
+     -0.175
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.175,
+    "tests_median": 161.0,
+    "s_median": 0.4423
+   }
+  },
+  {
+   "family": "gaussian",
+   "d": 20,
+   "andrey.locpc_cde": {
+    "pairs": 20,
+    "mean": -0.3,
+    "bootstrap_95": [
+     -0.425,
+     -0.175
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.2,
+    "tests_median": 255.0,
+    "s_median": 0.0157
+   },
+   "locpc_cde.authors": {
+    "pairs": 20,
+    "mean": -0.275,
+    "bootstrap_95": [
+     -0.4,
+     -0.15
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.225,
+    "tests_median": 296.0,
+    "s_median": 0.1739
+   },
+   "andrey.pc.adjustment": {
+    "pairs": 20,
+    "mean": -0.3,
+    "bootstrap_95": [
+     -0.4,
+     -0.2
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.2,
+    "tests_median": 683.0,
+    "s_median": 0.3779
+   }
+  },
+  {
+   "family": "gaussian",
+   "d": 30,
+   "andrey.locpc_cde": {
+    "pairs": 20,
+    "mean": -0.275,
+    "bootstrap_95": [
+     -0.375,
+     -0.175
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.225,
+    "tests_median": 530.5,
+    "s_median": 0.0246
+   },
+   "locpc_cde.authors": {
+    "pairs": 20,
+    "mean": -0.225,
+    "bootstrap_95": [
+     -0.325,
+     -0.125
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.275,
+    "tests_median": 779.5,
+    "s_median": 0.4559
+   },
+   "andrey.pc.adjustment": {
+    "pairs": 20,
+    "mean": -0.275,
+    "bootstrap_95": [
+     -0.4,
+     -0.125
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.225,
+    "tests_median": 1961.0,
+    "s_median": 0.427
+   }
+  },
+  {
+   "family": "gaussian",
+   "d": 40,
+   "andrey.locpc_cde": {
+    "pairs": 20,
+    "mean": -0.225,
+    "bootstrap_95": [
+     -0.325,
+     -0.125
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.275,
+    "tests_median": 558.0,
+    "s_median": 0.0297
+   },
+   "locpc_cde.authors": {
+    "pairs": 20,
+    "mean": -0.2,
+    "bootstrap_95": [
+     -0.3,
+     -0.1
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.3,
+    "tests_median": 797.5,
+    "s_median": 0.4893
+   },
+   "andrey.pc.adjustment": {
+    "pairs": 20,
+    "mean": -0.2,
+    "bootstrap_95": [
+     -0.35,
+     -0.025
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.3,
+    "tests_median": 3744.0,
+    "s_median": 0.4447
+   }
+  },
+  {
+   "family": "gaussian",
+   "d": 50,
+   "andrey.locpc_cde": {
+    "pairs": 20,
+    "mean": -0.225,
+    "bootstrap_95": [
+     -0.35,
+     -0.1
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.275,
+    "tests_median": 1000.0,
+    "s_median": 0.0399
+   },
+   "locpc_cde.authors": {
+    "pairs": 20,
+    "mean": -0.15,
+    "bootstrap_95": [
+     -0.25,
+     -0.05
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.35,
+    "tests_median": 1168.5,
+    "s_median": 0.6183
+   },
+   "andrey.pc.adjustment": {
+    "pairs": 20,
+    "mean": -0.175,
+    "bootstrap_95": [
+     -0.3,
+     -0.05
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.325,
+    "tests_median": 5515.5,
+    "s_median": 0.4528
+   }
+  },
+  {
+   "family": "gaussian",
+   "d": 100,
+   "andrey.locpc_cde": {
+    "pairs": 20,
+    "mean": -0.3,
+    "bootstrap_95": [
+     -0.4,
+     -0.2
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.2,
+    "tests_median": 1665.5,
+    "s_median": 0.0735
+   },
+   "locpc_cde.authors": {
+    "pairs": 20,
+    "mean": -0.175,
+    "bootstrap_95": [
+     -0.275,
+     -0.075
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.325,
+    "tests_median": 1977.0,
+    "s_median": 1.1462
+   },
+   "andrey.pc.adjustment": {
+    "pairs": 20,
+    "mean": -0.125,
+    "bootstrap_95": [
+     -0.275,
+     0.025
+    ],
+    "pass": false,
+    "verdict_error_mean": 0.375,
+    "tests_median": 22918.5,
+    "s_median": 0.4937
+   }
+  },
+  {
+   "family": "gaussian",
+   "d": 150,
+   "andrey.locpc_cde": {
+    "pairs": 20,
+    "mean": -0.125,
+    "bootstrap_95": [
+     -0.225,
+     -0.025
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.375,
+    "tests_median": 1919.5,
+    "s_median": 0.0984
+   },
+   "locpc_cde.authors": {
+    "pairs": 20,
+    "mean": -0.125,
+    "bootstrap_95": [
+     -0.225,
+     -0.025
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.375,
+    "tests_median": 2499.0,
+    "s_median": 1.8734
+   },
+   "andrey.pc.adjustment": {
+    "pairs": 20,
+    "mean": 0.125,
+    "bootstrap_95": [
+     -0.025,
+     0.25
+    ],
+    "pass": false,
+    "verdict_error_mean": 0.625,
+    "tests_median": 47930.0,
+    "s_median": 0.5713
+   }
+  },
+  {
+   "family": "gaussian",
+   "d": 200,
+   "andrey.locpc_cde": {
+    "pairs": 20,
+    "mean": -0.05,
+    "bootstrap_95": [
+     -0.125,
+     0.0
+    ],
+    "pass": false,
+    "verdict_error_mean": 0.45,
+    "tests_median": 3190.0,
+    "s_median": 0.1647
+   },
+   "locpc_cde.authors": {
+    "pairs": 20,
+    "mean": -0.025,
+    "bootstrap_95": [
+     -0.075,
+     0.0
+    ],
+    "pass": false,
+    "verdict_error_mean": 0.475,
+    "tests_median": 3585.0,
+    "s_median": 2.1861
+   },
+   "andrey.pc.adjustment": {
+    "pairs": 20,
+    "mean": 0.3,
+    "bootstrap_95": [
+     0.2,
+     0.4
+    ],
+    "pass": false,
+    "verdict_error_mean": 0.8,
+    "tests_median": 89807.5,
+    "s_median": 0.6
+   }
+  },
+  {
+   "family": "binary",
+   "d": 10,
+   "andrey.locpc_cde": {
+    "pairs": 20,
+    "mean": -0.325,
+    "bootstrap_95": [
+     -0.45,
+     -0.2
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.175,
+    "tests_median": 100.0,
+    "s_median": 0.0532
+   },
+   "locpc_cde.authors": {
+    "pairs": 20,
+    "mean": -0.3,
+    "bootstrap_95": [
+     -0.4,
+     -0.2
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.2,
+    "tests_median": 105.5,
+    "s_median": 1.4641
+   },
+   "andrey.pc.adjustment": {
+    "pairs": 20,
+    "mean": -0.4,
+    "bootstrap_95": [
+     -0.475,
+     -0.3
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.1,
+    "tests_median": 140.0,
+    "s_median": 0.4124
+   }
+  },
+  {
+   "family": "binary",
+   "d": 20,
+   "andrey.locpc_cde": {
+    "pairs": 20,
+    "mean": -0.3,
+    "bootstrap_95": [
+     -0.425,
+     -0.175
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.2,
+    "tests_median": 214.5,
+    "s_median": 0.1267
+   },
+   "locpc_cde.authors": {
+    "pairs": 20,
+    "mean": -0.3,
+    "bootstrap_95": [
+     -0.4,
+     -0.2
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.2,
+    "tests_median": 221.0,
+    "s_median": 3.2487
+   },
+   "andrey.pc.adjustment": {
+    "pairs": 20,
+    "mean": -0.325,
+    "bootstrap_95": [
+     -0.45,
+     -0.175
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.175,
+    "tests_median": 542.0,
+    "s_median": 0.4297
+   }
+  },
+  {
+   "family": "binary",
+   "d": 30,
+   "andrey.locpc_cde": {
+    "pairs": 20,
+    "mean": -0.225,
+    "bootstrap_95": [
+     -0.325,
+     -0.125
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.275,
+    "tests_median": 284.5,
+    "s_median": 0.1286
+   },
+   "locpc_cde.authors": {
+    "pairs": 20,
+    "mean": -0.2,
+    "bootstrap_95": [
+     -0.325,
+     -0.075
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.3,
+    "tests_median": 440.0,
+    "s_median": 5.0337
+   },
+   "andrey.pc.adjustment": {
+    "pairs": 20,
+    "mean": -0.325,
+    "bootstrap_95": [
+     -0.45,
+     -0.1994
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.175,
+    "tests_median": 1456.5,
+    "s_median": 0.4034
+   }
+  },
+  {
+   "family": "binary",
+   "d": 40,
+   "andrey.locpc_cde": {
+    "pairs": 20,
+    "mean": -0.25,
+    "bootstrap_95": [
+     -0.35,
+     -0.15
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.25,
+    "tests_median": 349.0,
+    "s_median": 0.1611
+   },
+   "locpc_cde.authors": {
+    "pairs": 20,
+    "mean": -0.15,
+    "bootstrap_95": [
+     -0.3,
+     0.0
+    ],
+    "pass": false,
+    "verdict_error_mean": 0.35,
+    "tests_median": 322.5,
+    "s_median": 3.7819
+   },
+   "andrey.pc.adjustment": {
+    "pairs": 20,
+    "mean": -0.25,
+    "bootstrap_95": [
+     -0.375,
+     -0.1
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.25,
+    "tests_median": 2682.0,
+    "s_median": 0.5078
+   }
+  },
+  {
+   "family": "binary",
+   "d": 50,
+   "andrey.locpc_cde": {
+    "pairs": 20,
+    "mean": -0.2,
+    "bootstrap_95": [
+     -0.325,
+     -0.075
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.3,
+    "tests_median": 480.5,
+    "s_median": 0.2147
+   },
+   "locpc_cde.authors": {
+    "pairs": 20,
+    "mean": -0.2,
+    "bootstrap_95": [
+     -0.3,
+     -0.1
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.3,
+    "tests_median": 541.5,
+    "s_median": 6.0889
+   },
+   "andrey.pc.adjustment": {
+    "pairs": 20,
+    "mean": -0.2,
+    "bootstrap_95": [
+     -0.35,
+     -0.025
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.3,
+    "tests_median": 3881.5,
+    "s_median": 0.5677
+   }
+  },
+  {
+   "family": "binary",
+   "d": 100,
+   "andrey.locpc_cde": {
+    "pairs": 20,
+    "mean": -0.2,
+    "bootstrap_95": [
+     -0.3,
+     -0.1
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.3,
+    "tests_median": 719.5,
+    "s_median": 0.4502
+   },
+   "locpc_cde.authors": {
+    "pairs": 20,
+    "mean": -0.175,
+    "bootstrap_95": [
+     -0.275,
+     -0.075
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.325,
+    "tests_median": 910.0,
+    "s_median": 15.5368
+   },
+   "andrey.pc.adjustment": {
+    "pairs": 20,
+    "mean": -0.225,
+    "bootstrap_95": [
+     -0.325,
+     -0.125
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.275,
+    "tests_median": 15963.0,
+    "s_median": 1.1661
+   }
+  },
+  {
+   "family": "binary",
+   "d": 150,
+   "andrey.locpc_cde": {
+    "pairs": 20,
+    "mean": -0.15,
+    "bootstrap_95": [
+     -0.25,
+     -0.05
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.35,
+    "tests_median": 1146.5,
+    "s_median": 0.5714
+   },
+   "locpc_cde.authors": {
+    "pairs": 20,
+    "mean": -0.15,
+    "bootstrap_95": [
+     -0.25,
+     -0.05
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.35,
+    "tests_median": 1186.5,
+    "s_median": 13.577
+   },
+   "andrey.pc.adjustment": {
+    "pairs": 20,
+    "mean": -0.275,
+    "bootstrap_95": [
+     -0.4,
+     -0.15
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.225,
+    "tests_median": 35067.5,
+    "s_median": 1.7431
+   }
+  },
+  {
+   "family": "binary",
+   "d": 200,
+   "andrey.locpc_cde": {
+    "pairs": 20,
+    "mean": -0.25,
+    "bootstrap_95": [
+     -0.35,
+     -0.15
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.25,
+    "tests_median": 1981.0,
+    "s_median": 1.0011
+   },
+   "locpc_cde.authors": {
+    "pairs": 20,
+    "mean": -0.15,
+    "bootstrap_95": [
+     -0.25,
+     -0.05
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.35,
+    "tests_median": 1768.5,
+    "s_median": 20.7968
+   },
+   "andrey.pc.adjustment": {
+    "pairs": 20,
+    "mean": -0.225,
+    "bootstrap_95": [
+     -0.35,
+     -0.1
+    ],
+    "pass": true,
+    "verdict_error_mean": 0.275,
+    "tests_median": 66146.5,
+    "s_median": 2.7206
+   }
+  }
+ ],
+ "pareto_note": "pareto: LocPC-CDE against global PC read at the pair (andrey.pc.adjustment) with the same test and level, accuracy against cost: PC minus Andrey on the verdict error and, on identifiable pairs, the parents error (better when PC's interval lies wholly below 0), and the median tests and seconds per fit. PC counts every query its tests evaluated, Andrey the tests it evaluated (a cached repeat is not a new test), the authors' code every test it ran. PC is better on both only when it is better on accuracy, worse on neither measure, and cheaper in tests and seconds",
+ "rows": [
+  {
+   "cell": "locpc-identifiable@5000,family=binary,v=10",
+   "kind": "identifiable",
+   "family": "binary",
+   "d": 10,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.1,
+     "parents_error": 0.15,
+     "set_errors": 0.2,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.0,
+     "tests_median": 85.5,
+     "s_median": 0.0565
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.05,
+     "parents_error": 0.2,
+     "set_errors": 0.25,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.0,
+     "tests_median": 105.5,
+     "s_median": 1.479,
+     "verdict_error_by_its_flag": 0.0
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.15,
+     "parents_error": 0.25,
+     "set_errors": 0.35,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.0,
+     "tests_median": 140.0,
+     "s_median": 0.441
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.6,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0001
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.6,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0001
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.1,
+     "comparator_verdict_error_mean": 0.05,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      0.0,
+      0.15
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -1.0,
+        -0.75
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      }
+     },
+     "andrey_s": 0.0565,
+     "comparator_s": 1.479,
+     "andrey_tests": 85.5,
+     "comparator_tests": 105.5,
+     "result": "tie"
+    },
+    "parents_error": {
+     "paired": 20,
+     "andrey_parents_error_mean": 0.15,
+     "comparator_parents_error_mean": 0.2,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.4,
+       "bootstrap_95": [
+        -1.9,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.35,
+       "bootstrap_95": [
+        -1.85,
+        -0.95
+       ]
+      }
+     },
+     "andrey_s": 0.0565,
+     "comparator_s": 1.479,
+     "andrey_tests": 85.5,
+     "comparator_tests": 105.5,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": 0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.25
+      ],
+      "verdict": "tie"
+     },
+     "parents_error": {
+      "pc_minus_andrey": 0.1,
+      "bootstrap_95": [
+       -0.1,
+       0.3
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 85.5,
+    "pc_tests_median": 140.0,
+    "authors_tests_median": 105.5,
+    "andrey_s_median": 0.0565,
+    "pc_s_median": 0.441,
+    "authors_s_median": 1.479,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-identifiable@5000,family=binary,v=20",
+   "kind": "identifiable",
+   "family": "binary",
+   "d": 20,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.15,
+     "parents_error": 0.3,
+     "set_errors": 0.4,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.0,
+     "tests_median": 203.0,
+     "s_median": 0.1101
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.1,
+     "parents_error": 0.35,
+     "set_errors": 0.4,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.0,
+     "tests_median": 246.0,
+     "s_median": 3.6351,
+     "verdict_error_by_its_flag": 0.05
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.2,
+     "parents_error": 0.35,
+     "set_errors": 0.45,
+     "answer_rate": 0.9,
+     "estimate_rate": 0.0,
+     "tests_median": 547.5,
+     "s_median": 0.4564
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.3,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0001
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.3,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0001
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.15,
+     "comparator_verdict_error_mean": 0.1,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      0.0,
+      0.15
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.85,
+       "bootstrap_95": [
+        -1.0,
+        -0.7
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -1.0,
+        -0.75
+       ]
+      }
+     },
+     "andrey_s": 0.1101,
+     "comparator_s": 3.6351,
+     "andrey_tests": 203.0,
+     "comparator_tests": 246.0,
+     "result": "tie"
+    },
+    "parents_error": {
+     "paired": 20,
+     "andrey_parents_error_mean": 0.3,
+     "comparator_parents_error_mean": 0.35,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -1.35,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -1.35,
+        -0.5
+       ]
+      }
+     },
+     "andrey_s": 0.1101,
+     "comparator_s": 3.6351,
+     "andrey_tests": 203.0,
+     "comparator_tests": 246.0,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": 0.05,
+      "bootstrap_95": [
+       -0.1,
+       0.2
+      ],
+      "verdict": "tie"
+     },
+     "parents_error": {
+      "pc_minus_andrey": 0.05,
+      "bootstrap_95": [
+       -0.1,
+       0.2
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 203.0,
+    "pc_tests_median": 547.5,
+    "authors_tests_median": 246.0,
+    "andrey_s_median": 0.1101,
+    "pc_s_median": 0.4564,
+    "authors_s_median": 3.6351,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-identifiable@5000,family=binary,v=30",
+   "kind": "identifiable",
+   "family": "binary",
+   "d": 30,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.1,
+     "parents_error": 0.4,
+     "set_errors": 0.5,
+     "answer_rate": 0.9,
+     "estimate_rate": 0.0,
+     "tests_median": 207.5,
+     "s_median": 0.0959
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.1,
+     "parents_error": 0.35,
+     "set_errors": 0.45,
+     "answer_rate": 0.9,
+     "estimate_rate": 0.0,
+     "tests_median": 252.5,
+     "s_median": 2.8763,
+     "verdict_error_by_its_flag": 0.0
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.2,
+     "parents_error": 0.35,
+     "set_errors": 0.45,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.0,
+     "tests_median": 1451.0,
+     "s_median": 0.3918
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.45,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.45,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.1,
+     "comparator_verdict_error_mean": 0.1,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -1.0,
+        -0.75
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -1.0,
+        -0.75
+       ]
+      }
+     },
+     "andrey_s": 0.0959,
+     "comparator_s": 2.8763,
+     "andrey_tests": 207.5,
+     "comparator_tests": 252.5,
+     "result": "tie"
+    },
+    "parents_error": {
+     "paired": 20,
+     "andrey_parents_error_mean": 0.4,
+     "comparator_parents_error_mean": 0.35,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      0.0,
+      0.15
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.4,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.45,
+        -0.55
+       ]
+      }
+     },
+     "andrey_s": 0.0959,
+     "comparator_s": 2.8763,
+     "andrey_tests": 207.5,
+     "comparator_tests": 252.5,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": 0.1,
+      "bootstrap_95": [
+       0.0,
+       0.25
+      ],
+      "verdict": "tie"
+     },
+     "parents_error": {
+      "pc_minus_andrey": -0.05,
+      "bootstrap_95": [
+       -0.25,
+       0.15
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 207.5,
+    "pc_tests_median": 1451.0,
+    "authors_tests_median": 252.5,
+    "andrey_s_median": 0.0959,
+    "pc_s_median": 0.3918,
+    "authors_s_median": 2.8763,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-identifiable@5000,family=binary,v=40",
+   "kind": "identifiable",
+   "family": "binary",
+   "d": 40,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.15,
+     "parents_error": 0.3,
+     "set_errors": 0.6,
+     "answer_rate": 0.85,
+     "estimate_rate": 0.0,
+     "tests_median": 266.5,
+     "s_median": 0.1464
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.15,
+     "parents_error": 0.35,
+     "set_errors": 0.65,
+     "answer_rate": 0.85,
+     "estimate_rate": 0.0,
+     "tests_median": 278.0,
+     "s_median": 3.5116,
+     "verdict_error_by_its_flag": 0.0
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.15,
+     "parents_error": 0.45,
+     "set_errors": 0.75,
+     "answer_rate": 0.9,
+     "estimate_rate": 0.0,
+     "tests_median": 2733.5,
+     "s_median": 0.5221
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.45,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.45,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.15,
+     "comparator_verdict_error_mean": 0.15,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.85,
+       "bootstrap_95": [
+        -1.0,
+        -0.7
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.85,
+       "bootstrap_95": [
+        -1.0,
+        -0.7
+       ]
+      }
+     },
+     "andrey_s": 0.1464,
+     "comparator_s": 3.5116,
+     "andrey_tests": 266.5,
+     "comparator_tests": 278.0,
+     "result": "tie"
+    },
+    "parents_error": {
+     "paired": 20,
+     "andrey_parents_error_mean": 0.3,
+     "comparator_parents_error_mean": 0.35,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.85,
+       "bootstrap_95": [
+        -1.2,
+        -0.55
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.8,
+       "bootstrap_95": [
+        -1.15,
+        -0.5
+       ]
+      }
+     },
+     "andrey_s": 0.1464,
+     "comparator_s": 3.5116,
+     "andrey_tests": 266.5,
+     "comparator_tests": 278.0,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": 0.0,
+      "bootstrap_95": [
+       -0.25,
+       0.25
+      ],
+      "verdict": "tie"
+     },
+     "parents_error": {
+      "pc_minus_andrey": 0.15,
+      "bootstrap_95": [
+       0.0,
+       0.3
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 266.5,
+    "pc_tests_median": 2733.5,
+    "authors_tests_median": 278.0,
+    "andrey_s_median": 0.1464,
+    "pc_s_median": 0.5221,
+    "authors_s_median": 3.5116,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-identifiable@5000,family=binary,v=50",
+   "kind": "identifiable",
+   "family": "binary",
+   "d": 50,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.05,
+     "parents_error": 0.25,
+     "set_errors": 0.2,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.0,
+     "tests_median": 378.5,
+     "s_median": 0.1712
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.05,
+     "parents_error": 0.25,
+     "set_errors": 0.2,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.0,
+     "tests_median": 386.0,
+     "s_median": 3.896,
+     "verdict_error_by_its_flag": 0.05
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.25,
+     "parents_error": 0.4,
+     "set_errors": 0.55,
+     "answer_rate": 0.8,
+     "estimate_rate": 0.0,
+     "tests_median": 3851.5,
+     "s_median": 0.562
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.35,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.35,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.05,
+     "comparator_verdict_error_mean": 0.05,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      }
+     },
+     "andrey_s": 0.1712,
+     "comparator_s": 3.896,
+     "andrey_tests": 378.5,
+     "comparator_tests": 386.0,
+     "result": "tie"
+    },
+    "parents_error": {
+     "paired": 20,
+     "andrey_parents_error_mean": 0.25,
+     "comparator_parents_error_mean": 0.25,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.15,
+       "bootstrap_95": [
+        -1.55,
+        -0.75
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.15,
+       "bootstrap_95": [
+        -1.55,
+        -0.75
+       ]
+      }
+     },
+     "andrey_s": 0.1712,
+     "comparator_s": 3.896,
+     "andrey_tests": 378.5,
+     "comparator_tests": 386.0,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": 0.2,
+      "bootstrap_95": [
+       0.05,
+       0.4
+      ],
+      "verdict": "worse"
+     },
+     "parents_error": {
+      "pc_minus_andrey": 0.15,
+      "bootstrap_95": [
+       -0.05,
+       0.35
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 378.5,
+    "pc_tests_median": 3851.5,
+    "authors_tests_median": 386.0,
+    "andrey_s_median": 0.1712,
+    "pc_s_median": 0.562,
+    "authors_s_median": 3.896,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-identifiable@5000,family=binary,v=100",
+   "kind": "identifiable",
+   "family": "binary",
+   "d": 100,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.0,
+     "parents_error": 0.1,
+     "set_errors": 0.1,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.0,
+     "tests_median": 573.0,
+     "s_median": 0.2955
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.0,
+     "parents_error": 0.15,
+     "set_errors": 0.15,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.0,
+     "tests_median": 683.5,
+     "s_median": 7.562,
+     "verdict_error_by_its_flag": 0.0
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.2,
+     "parents_error": 0.2,
+     "set_errors": 0.15,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.0,
+     "tests_median": 15283.0,
+     "s_median": 1.1063
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.2,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.2,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0001
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.0,
+     "comparator_verdict_error_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "andrey_s": 0.2955,
+     "comparator_s": 7.562,
+     "andrey_tests": 573.0,
+     "comparator_tests": 683.5,
+     "result": "tie"
+    },
+    "parents_error": {
+     "paired": 20,
+     "andrey_parents_error_mean": 0.1,
+     "comparator_parents_error_mean": 0.15,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.1,
+       "bootstrap_95": [
+        -1.4,
+        -0.8
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.05,
+       "bootstrap_95": [
+        -1.4,
+        -0.75
+       ]
+      }
+     },
+     "andrey_s": 0.2955,
+     "comparator_s": 7.562,
+     "andrey_tests": 573.0,
+     "comparator_tests": 683.5,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": 0.2,
+      "bootstrap_95": [
+       0.05,
+       0.4
+      ],
+      "verdict": "worse"
+     },
+     "parents_error": {
+      "pc_minus_andrey": 0.1,
+      "bootstrap_95": [
+       -0.1,
+       0.3
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 573.0,
+    "pc_tests_median": 15283.0,
+    "authors_tests_median": 683.5,
+    "andrey_s_median": 0.2955,
+    "pc_s_median": 1.1063,
+    "authors_s_median": 7.562,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-identifiable@5000,family=binary,v=150",
+   "kind": "identifiable",
+   "family": "binary",
+   "d": 150,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.0,
+     "parents_error": 0.25,
+     "set_errors": 0.25,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.0,
+     "tests_median": 1082.0,
+     "s_median": 0.5078
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.0,
+     "parents_error": 0.45,
+     "set_errors": 0.5,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.0,
+     "tests_median": 1168.0,
+     "s_median": 12.3915,
+     "verdict_error_by_its_flag": 0.0
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.15,
+     "parents_error": 0.3,
+     "set_errors": 0.35,
+     "answer_rate": 0.9,
+     "estimate_rate": 0.0,
+     "tests_median": 35370.0,
+     "s_median": 1.6542
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.65,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.65,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0001
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.0,
+     "comparator_verdict_error_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "andrey_s": 0.5078,
+     "comparator_s": 12.3915,
+     "andrey_tests": 1082.0,
+     "comparator_tests": 1168.0,
+     "result": "tie"
+    },
+    "parents_error": {
+     "paired": 20,
+     "andrey_parents_error_mean": 0.25,
+     "comparator_parents_error_mean": 0.45,
+     "mean_D": -0.2,
+     "bootstrap_95": [
+      -0.4,
+      -0.05
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.4,
+       "bootstrap_95": [
+        -1.8,
+        -1.05
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.15,
+       "bootstrap_95": [
+        -1.65,
+        -0.65
+       ]
+      }
+     },
+     "andrey_s": 0.5078,
+     "comparator_s": 12.3915,
+     "andrey_tests": 1082.0,
+     "comparator_tests": 1168.0,
+     "result": "better"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": 0.15,
+      "bootstrap_95": [
+       0.0,
+       0.3
+      ],
+      "verdict": "tie"
+     },
+     "parents_error": {
+      "pc_minus_andrey": 0.05,
+      "bootstrap_95": [
+       -0.2,
+       0.3
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 1082.0,
+    "pc_tests_median": 35370.0,
+    "authors_tests_median": 1168.0,
+    "andrey_s_median": 0.5078,
+    "pc_s_median": 1.6542,
+    "authors_s_median": 12.3915,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-identifiable@5000,family=binary,v=200",
+   "kind": "identifiable",
+   "family": "binary",
+   "d": 200,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.05,
+     "parents_error": 0.4,
+     "set_errors": 0.85,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.0,
+     "tests_median": 1790.5,
+     "s_median": 0.8241
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.05,
+     "parents_error": 0.45,
+     "set_errors": 1.05,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.0,
+     "tests_median": 1625.0,
+     "s_median": 19.9364,
+     "verdict_error_by_its_flag": 0.0
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.1,
+     "parents_error": 0.6,
+     "set_errors": 0.8,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.0,
+     "tests_median": 66956.0,
+     "s_median": 2.6311
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.45,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.45,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0001
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.05,
+     "comparator_verdict_error_mean": 0.05,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      }
+     },
+     "andrey_s": 0.8241,
+     "comparator_s": 19.9364,
+     "andrey_tests": 1790.5,
+     "comparator_tests": 1625.0,
+     "result": "tie"
+    },
+    "parents_error": {
+     "paired": 20,
+     "andrey_parents_error_mean": 0.4,
+     "comparator_parents_error_mean": 0.45,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.2,
+      0.1
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.6,
+       "bootstrap_95": [
+        -1.2,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.4,
+       "bootstrap_95": [
+        -1.05,
+        0.3
+       ]
+      }
+     },
+     "andrey_s": 0.8241,
+     "comparator_s": 19.9364,
+     "andrey_tests": 1790.5,
+     "comparator_tests": 1625.0,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": 0.05,
+      "bootstrap_95": [
+       -0.1,
+       0.2
+      ],
+      "verdict": "tie"
+     },
+     "parents_error": {
+      "pc_minus_andrey": 0.2,
+      "bootstrap_95": [
+       0.0,
+       0.4
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 1790.5,
+    "pc_tests_median": 66956.0,
+    "authors_tests_median": 1625.0,
+    "andrey_s_median": 0.8241,
+    "pc_s_median": 2.6311,
+    "authors_s_median": 19.9364,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-nonidentifiable@5000,family=binary,v=10",
+   "kind": "nonidentifiable",
+   "family": "binary",
+   "d": 10,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.25,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.0,
+     "tests_median": 104.5,
+     "s_median": 0.0526
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.35,
+     "answer_rate": 0.9,
+     "estimate_rate": 0.0,
+     "tests_median": 102.0,
+     "s_median": 1.1024,
+     "verdict_error_by_its_flag": 0.35
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.05,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.0,
+     "tests_median": 141.0,
+     "s_median": 0.2896
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.25,
+     "comparator_verdict_error_mean": 0.35,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.25,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.25,
+       "bootstrap_95": [
+        0.1,
+        0.45
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.35,
+       "bootstrap_95": [
+        0.15,
+        0.55
+       ]
+      }
+     },
+     "andrey_s": 0.0526,
+     "comparator_s": 1.1024,
+     "andrey_tests": 104.5,
+     "comparator_tests": 102.0,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": -0.2,
+      "bootstrap_95": [
+       -0.45,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 104.5,
+    "pc_tests_median": 141.0,
+    "authors_tests_median": 102.0,
+    "andrey_s_median": 0.0526,
+    "pc_s_median": 0.2896,
+    "authors_s_median": 1.1024,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-nonidentifiable@5000,family=binary,v=20",
+   "kind": "nonidentifiable",
+   "family": "binary",
+   "d": 20,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.25,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.0,
+     "tests_median": 348.0,
+     "s_median": 0.1848
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.3,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.0,
+     "tests_median": 208.0,
+     "s_median": 2.9411,
+     "verdict_error_by_its_flag": 0.3
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.15,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.0,
+     "tests_median": 541.5,
+     "s_median": 0.3953
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.25,
+     "comparator_verdict_error_mean": 0.3,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.2,
+      0.1
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.25,
+       "bootstrap_95": [
+        0.1,
+        0.45
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.3,
+       "bootstrap_95": [
+        0.1,
+        0.5
+       ]
+      }
+     },
+     "andrey_s": 0.1848,
+     "comparator_s": 2.9411,
+     "andrey_tests": 348.0,
+     "comparator_tests": 208.0,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": -0.1,
+      "bootstrap_95": [
+       -0.25,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 348.0,
+    "pc_tests_median": 541.5,
+    "authors_tests_median": 208.0,
+    "andrey_s_median": 0.1848,
+    "pc_s_median": 0.3953,
+    "authors_s_median": 2.9411,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-nonidentifiable@5000,family=binary,v=30",
+   "kind": "nonidentifiable",
+   "family": "binary",
+   "d": 30,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.45,
+     "answer_rate": 0.9,
+     "estimate_rate": 0.0,
+     "tests_median": 640.0,
+     "s_median": 0.2657
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.5,
+     "answer_rate": 0.9,
+     "estimate_rate": 0.0,
+     "tests_median": 466.5,
+     "s_median": 6.2399,
+     "verdict_error_by_its_flag": 0.45
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.15,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.0,
+     "tests_median": 1456.5,
+     "s_median": 0.4265
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.45,
+     "comparator_verdict_error_mean": 0.5,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.45,
+       "bootstrap_95": [
+        0.25,
+        0.65
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.5,
+       "bootstrap_95": [
+        0.3,
+        0.7
+       ]
+      }
+     },
+     "andrey_s": 0.2657,
+     "comparator_s": 6.2399,
+     "andrey_tests": 640.0,
+     "comparator_tests": 466.5,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": -0.3,
+      "bootstrap_95": [
+       -0.5,
+       -0.1
+      ],
+      "verdict": "better"
+     }
+    },
+    "andrey_tests_median": 640.0,
+    "pc_tests_median": 1456.5,
+    "authors_tests_median": 466.5,
+    "andrey_s_median": 0.2657,
+    "pc_s_median": 0.4265,
+    "authors_s_median": 6.2399,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-nonidentifiable@5000,family=binary,v=40",
+   "kind": "nonidentifiable",
+   "family": "binary",
+   "d": 40,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.35,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.0,
+     "tests_median": 1027.0,
+     "s_median": 0.3963
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.55,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.0,
+     "tests_median": 375.5,
+     "s_median": 4.0971,
+     "verdict_error_by_its_flag": 0.55
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.35,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.0,
+     "tests_median": 2652.5,
+     "s_median": 0.486
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.35,
+     "comparator_verdict_error_mean": 0.55,
+     "mean_D": -0.2,
+     "bootstrap_95": [
+      -0.4,
+      -0.05
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.35,
+       "bootstrap_95": [
+        0.15,
+        0.55
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.55,
+       "bootstrap_95": [
+        0.35,
+        0.75
+       ]
+      }
+     },
+     "andrey_s": 0.3963,
+     "comparator_s": 4.0971,
+     "andrey_tests": 1027.0,
+     "comparator_tests": 375.5,
+     "result": "better"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 1027.0,
+    "pc_tests_median": 2652.5,
+    "authors_tests_median": 375.5,
+    "andrey_s_median": 0.3963,
+    "pc_s_median": 0.486,
+    "authors_s_median": 4.0971,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-nonidentifiable@5000,family=binary,v=50",
+   "kind": "nonidentifiable",
+   "family": "binary",
+   "d": 50,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.55,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.0,
+     "tests_median": 1098.0,
+     "s_median": 0.5645
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.55,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.0,
+     "tests_median": 941.5,
+     "s_median": 11.2017,
+     "verdict_error_by_its_flag": 0.55
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.35,
+     "answer_rate": 0.9,
+     "estimate_rate": 0.0,
+     "tests_median": 3915.5,
+     "s_median": 0.5718
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0001
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.55,
+     "comparator_verdict_error_mean": 0.55,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.3,
+      0.25
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.55,
+       "bootstrap_95": [
+        0.35,
+        0.75
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.55,
+       "bootstrap_95": [
+        0.35,
+        0.75
+       ]
+      }
+     },
+     "andrey_s": 0.5645,
+     "comparator_s": 11.2017,
+     "andrey_tests": 1098.0,
+     "comparator_tests": 941.5,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": -0.2,
+      "bootstrap_95": [
+       -0.45,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 1098.0,
+    "pc_tests_median": 3915.5,
+    "authors_tests_median": 941.5,
+    "andrey_s_median": 0.5645,
+    "pc_s_median": 0.5718,
+    "authors_s_median": 11.2017,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-nonidentifiable@5000,family=binary,v=100",
+   "kind": "nonidentifiable",
+   "family": "binary",
+   "d": 100,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.6,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.0,
+     "tests_median": 907.5,
+     "s_median": 0.5064
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.65,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.0,
+     "tests_median": 1301.5,
+     "s_median": 18.2072,
+     "verdict_error_by_its_flag": 0.65
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.35,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.0,
+     "tests_median": 16466.0,
+     "s_median": 1.2952
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0001
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.6,
+     "comparator_verdict_error_mean": 0.65,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.2,
+      0.1
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.6,
+       "bootstrap_95": [
+        0.4,
+        0.8
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.65,
+       "bootstrap_95": [
+        0.45,
+        0.85
+       ]
+      }
+     },
+     "andrey_s": 0.5064,
+     "comparator_s": 18.2072,
+     "andrey_tests": 907.5,
+     "comparator_tests": 1301.5,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": -0.25,
+      "bootstrap_95": [
+       -0.5,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 907.5,
+    "pc_tests_median": 16466.0,
+    "authors_tests_median": 1301.5,
+    "andrey_s_median": 0.5064,
+    "pc_s_median": 1.2952,
+    "authors_s_median": 18.2072,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-nonidentifiable@5000,family=binary,v=150",
+   "kind": "nonidentifiable",
+   "family": "binary",
+   "d": 150,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.7,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.0,
+     "tests_median": 1830.0,
+     "s_median": 0.9056
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.7,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.0,
+     "tests_median": 1257.0,
+     "s_median": 14.8679,
+     "verdict_error_by_its_flag": 0.7
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.3,
+     "answer_rate": 0.8,
+     "estimate_rate": 0.0,
+     "tests_median": 34844.0,
+     "s_median": 1.8556
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0001
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.7,
+     "comparator_verdict_error_mean": 0.7,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.7,
+       "bootstrap_95": [
+        0.5,
+        0.9
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.7,
+       "bootstrap_95": [
+        0.5,
+        0.9
+       ]
+      }
+     },
+     "andrey_s": 0.9056,
+     "comparator_s": 14.8679,
+     "andrey_tests": 1830.0,
+     "comparator_tests": 1257.0,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": -0.4,
+      "bootstrap_95": [
+       -0.65,
+       -0.15
+      ],
+      "verdict": "better"
+     }
+    },
+    "andrey_tests_median": 1830.0,
+    "pc_tests_median": 34844.0,
+    "authors_tests_median": 1257.0,
+    "andrey_s_median": 0.9056,
+    "pc_s_median": 1.8556,
+    "authors_s_median": 14.8679,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-nonidentifiable@5000,family=binary,v=200",
+   "kind": "nonidentifiable",
+   "family": "binary",
+   "d": 200,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.45,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.0,
+     "tests_median": 17264.5,
+     "s_median": 6.8711
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.65,
+     "answer_rate": 0.85,
+     "estimate_rate": 0.0,
+     "tests_median": 1953.5,
+     "s_median": 25.8592,
+     "verdict_error_by_its_flag": 0.5
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.45,
+     "answer_rate": 0.75,
+     "estimate_rate": 0.0,
+     "tests_median": 65288.0,
+     "s_median": 2.7535
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0001
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "answer_rate": 0.0,
+     "estimate_rate": 0.0,
+     "tests_median": null,
+     "s_median": 0.0001
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.45,
+     "comparator_verdict_error_mean": 0.65,
+     "mean_D": -0.2,
+     "bootstrap_95": [
+      -0.4,
+      -0.05
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.45,
+       "bootstrap_95": [
+        0.25,
+        0.65
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.65,
+       "bootstrap_95": [
+        0.45,
+        0.85
+       ]
+      }
+     },
+     "andrey_s": 6.8711,
+     "comparator_s": 25.8592,
+     "andrey_tests": 17264.5,
+     "comparator_tests": 1953.5,
+     "result": "better"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": 0.0,
+      "bootstrap_95": [
+       -0.25,
+       0.25
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 17264.5,
+    "pc_tests_median": 65288.0,
+    "authors_tests_median": 1953.5,
+    "andrey_s_median": 6.8711,
+    "pc_s_median": 2.7535,
+    "authors_s_median": 25.8592,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-identifiable@5000,v=10",
+   "kind": "identifiable",
+   "family": "gaussian",
+   "d": 10,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.0,
+     "parents_error": 0.1,
+     "set_errors": 0.1,
+     "effect_error": 0.0066,
+     "answer_rate": 1.0,
+     "estimate_rate": 1.0,
+     "tests_median": 99.0,
+     "s_median": 0.0106
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.0,
+     "parents_error": 0.25,
+     "set_errors": 0.25,
+     "effect_error": 0.0143,
+     "answer_rate": 1.0,
+     "estimate_rate": 1.0,
+     "tests_median": 115.5,
+     "s_median": 0.101,
+     "verdict_error_by_its_flag": 0.0
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.15,
+     "parents_error": 0.2,
+     "set_errors": 0.25,
+     "effect_error": 0.0068,
+     "answer_rate": 0.85,
+     "estimate_rate": 0.85,
+     "tests_median": 155.5,
+     "s_median": 0.4684
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.6,
+     "effect_error": 0.0386,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.6,
+     "effect_error": 0.0777,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.0,
+     "comparator_verdict_error_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "andrey_s": 0.0106,
+     "comparator_s": 0.101,
+     "andrey_tests": 99.0,
+     "comparator_tests": 115.5,
+     "result": "tie"
+    },
+    "parents_error": {
+     "paired": 20,
+     "andrey_parents_error_mean": 0.1,
+     "comparator_parents_error_mean": 0.25,
+     "mean_D": -0.15,
+     "bootstrap_95": [
+      -0.3,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.5,
+       "bootstrap_95": [
+        -1.95,
+        -1.15
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.35,
+       "bootstrap_95": [
+        -1.7,
+        -1.05
+       ]
+      }
+     },
+     "andrey_s": 0.0106,
+     "comparator_s": 0.101,
+     "andrey_tests": 99.0,
+     "comparator_tests": 115.5,
+     "result": "tie"
+    },
+    "effect_error": {
+     "paired": 20,
+     "andrey_effect_error_mean": 0.0066,
+     "comparator_effect_error_mean": 0.0143,
+     "mean_D": -0.0078,
+     "bootstrap_95": [
+      -0.0195,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.032,
+       "bootstrap_95": [
+        -0.0797,
+        -0.0008
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.0243,
+       "bootstrap_95": [
+        -0.0641,
+        0.0023
+       ]
+      }
+     },
+     "andrey_s": 0.0106,
+     "comparator_s": 0.101,
+     "andrey_tests": 99.0,
+     "comparator_tests": 115.5,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": 0.15,
+      "bootstrap_95": [
+       0.0,
+       0.3
+      ],
+      "verdict": "tie"
+     },
+     "parents_error": {
+      "pc_minus_andrey": 0.1,
+      "bootstrap_95": [
+       0.0,
+       0.25
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 99.0,
+    "pc_tests_median": 155.5,
+    "authors_tests_median": 115.5,
+    "andrey_s_median": 0.0106,
+    "pc_s_median": 0.4684,
+    "authors_s_median": 0.101,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-identifiable@5000,v=20",
+   "kind": "identifiable",
+   "family": "gaussian",
+   "d": 20,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.05,
+     "parents_error": 0.2,
+     "set_errors": 0.4,
+     "effect_error": 0.0284,
+     "answer_rate": 0.95,
+     "estimate_rate": 1.0,
+     "tests_median": 221.5,
+     "s_median": 0.0141
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.05,
+     "parents_error": 0.25,
+     "set_errors": 0.5,
+     "effect_error": 0.0394,
+     "answer_rate": 0.95,
+     "estimate_rate": 1.0,
+     "tests_median": 296.0,
+     "s_median": 0.1739,
+     "verdict_error_by_its_flag": 0.0
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.1,
+     "parents_error": 0.3,
+     "set_errors": 0.65,
+     "effect_error": 0.03,
+     "answer_rate": 0.9,
+     "estimate_rate": 0.9,
+     "tests_median": 683.0,
+     "s_median": 0.3786
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.3,
+     "effect_error": 0.055,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.3,
+     "effect_error": 0.1098,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.05,
+     "comparator_verdict_error_mean": 0.05,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      }
+     },
+     "andrey_s": 0.0141,
+     "comparator_s": 0.1739,
+     "andrey_tests": 221.5,
+     "comparator_tests": 296.0,
+     "result": "tie"
+    },
+    "parents_error": {
+     "paired": 20,
+     "andrey_parents_error_mean": 0.2,
+     "comparator_parents_error_mean": 0.25,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -1.4,
+        -0.35
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.8,
+       "bootstrap_95": [
+        -1.3,
+        -0.25
+       ]
+      }
+     },
+     "andrey_s": 0.0141,
+     "comparator_s": 0.1739,
+     "andrey_tests": 221.5,
+     "comparator_tests": 296.0,
+     "result": "tie"
+    },
+    "effect_error": {
+     "paired": 20,
+     "andrey_effect_error_mean": 0.0284,
+     "comparator_effect_error_mean": 0.0394,
+     "mean_D": -0.011,
+     "bootstrap_95": [
+      -0.039,
+      0.0059
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.0266,
+       "bootstrap_95": [
+        -0.0645,
+        0.0016
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.0156,
+       "bootstrap_95": [
+        -0.0619,
+        0.0289
+       ]
+      }
+     },
+     "andrey_s": 0.0141,
+     "comparator_s": 0.1739,
+     "andrey_tests": 221.5,
+     "comparator_tests": 296.0,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": 0.05,
+      "bootstrap_95": [
+       -0.1,
+       0.2
+      ],
+      "verdict": "tie"
+     },
+     "parents_error": {
+      "pc_minus_andrey": 0.1,
+      "bootstrap_95": [
+       0.0,
+       0.25
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 221.5,
+    "pc_tests_median": 683.0,
+    "authors_tests_median": 296.0,
+    "andrey_s_median": 0.0141,
+    "pc_s_median": 0.3786,
+    "authors_s_median": 0.1739,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-identifiable@5000,v=30",
+   "kind": "identifiable",
+   "family": "gaussian",
+   "d": 30,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.0,
+     "parents_error": 0.15,
+     "set_errors": 0.25,
+     "effect_error": 0.0173,
+     "answer_rate": 1.0,
+     "estimate_rate": 1.0,
+     "tests_median": 330.0,
+     "s_median": 0.0227
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.0,
+     "parents_error": 0.15,
+     "set_errors": 0.3,
+     "effect_error": 0.0189,
+     "answer_rate": 1.0,
+     "estimate_rate": 1.0,
+     "tests_median": 493.0,
+     "s_median": 0.3183,
+     "verdict_error_by_its_flag": 0.0
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.15,
+     "parents_error": 0.3,
+     "set_errors": 0.4,
+     "effect_error": 0.0171,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.85,
+     "tests_median": 1903.5,
+     "s_median": 0.4597
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.45,
+     "effect_error": 0.0181,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.45,
+     "effect_error": 0.0608,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.0,
+     "comparator_verdict_error_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "andrey_s": 0.0227,
+     "comparator_s": 0.3183,
+     "andrey_tests": 330.0,
+     "comparator_tests": 493.0,
+     "result": "tie"
+    },
+    "parents_error": {
+     "paired": 20,
+     "andrey_parents_error_mean": 0.15,
+     "comparator_parents_error_mean": 0.15,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.15,
+      0.15
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.2,
+       "bootstrap_95": [
+        -1.6,
+        -0.7
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.15,
+       "bootstrap_95": [
+        -1.65,
+        -0.6
+       ]
+      }
+     },
+     "andrey_s": 0.0227,
+     "comparator_s": 0.3183,
+     "andrey_tests": 330.0,
+     "comparator_tests": 493.0,
+     "result": "tie"
+    },
+    "effect_error": {
+     "paired": 20,
+     "andrey_effect_error_mean": 0.0173,
+     "comparator_effect_error_mean": 0.0189,
+     "mean_D": -0.0017,
+     "bootstrap_95": [
+      -0.0046,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.0009,
+       "bootstrap_95": [
+        -0.0086,
+        0.0087
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.0008,
+       "bootstrap_95": [
+        -0.0075,
+        0.0105
+       ]
+      }
+     },
+     "andrey_s": 0.0227,
+     "comparator_s": 0.3183,
+     "andrey_tests": 330.0,
+     "comparator_tests": 493.0,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": 0.15,
+      "bootstrap_95": [
+       0.0,
+       0.3
+      ],
+      "verdict": "tie"
+     },
+     "parents_error": {
+      "pc_minus_andrey": 0.15,
+      "bootstrap_95": [
+       -0.05,
+       0.35
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 330.0,
+    "pc_tests_median": 1903.5,
+    "authors_tests_median": 493.0,
+    "andrey_s_median": 0.0227,
+    "pc_s_median": 0.4597,
+    "authors_s_median": 0.3183,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-identifiable@5000,v=40",
+   "kind": "identifiable",
+   "family": "gaussian",
+   "d": 40,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.05,
+     "parents_error": 0.25,
+     "set_errors": 0.4,
+     "effect_error": 0.027,
+     "answer_rate": 0.95,
+     "estimate_rate": 1.0,
+     "tests_median": 383.0,
+     "s_median": 0.0263
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.05,
+     "parents_error": 0.3,
+     "set_errors": 0.5,
+     "effect_error": 0.0318,
+     "answer_rate": 0.95,
+     "estimate_rate": 1.0,
+     "tests_median": 438.5,
+     "s_median": 0.3518,
+     "verdict_error_by_its_flag": 0.0
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.25,
+     "parents_error": 0.45,
+     "set_errors": 0.7,
+     "effect_error": 0.0441,
+     "answer_rate": 0.85,
+     "estimate_rate": 0.8,
+     "tests_median": 3525.0,
+     "s_median": 0.457
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.45,
+     "effect_error": 0.0415,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.45,
+     "effect_error": 0.0558,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.05,
+     "comparator_verdict_error_mean": 0.05,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      }
+     },
+     "andrey_s": 0.0263,
+     "comparator_s": 0.3518,
+     "andrey_tests": 383.0,
+     "comparator_tests": 438.5,
+     "result": "tie"
+    },
+    "parents_error": {
+     "paired": 20,
+     "andrey_parents_error_mean": 0.25,
+     "comparator_parents_error_mean": 0.3,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.05,
+       "bootstrap_95": [
+        -1.55,
+        -0.55
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.5,
+        -0.4
+       ]
+      }
+     },
+     "andrey_s": 0.0263,
+     "comparator_s": 0.3518,
+     "andrey_tests": 383.0,
+     "comparator_tests": 438.5,
+     "result": "tie"
+    },
+    "effect_error": {
+     "paired": 20,
+     "andrey_effect_error_mean": 0.027,
+     "comparator_effect_error_mean": 0.0318,
+     "mean_D": -0.0049,
+     "bootstrap_95": [
+      -0.0146,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.0146,
+       "bootstrap_95": [
+        -0.0392,
+        0.0037
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.0097,
+       "bootstrap_95": [
+        -0.0361,
+        0.0128
+       ]
+      }
+     },
+     "andrey_s": 0.0263,
+     "comparator_s": 0.3518,
+     "andrey_tests": 383.0,
+     "comparator_tests": 438.5,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": 0.2,
+      "bootstrap_95": [
+       0.0,
+       0.45
+      ],
+      "verdict": "tie"
+     },
+     "parents_error": {
+      "pc_minus_andrey": 0.2,
+      "bootstrap_95": [
+       0.05,
+       0.4
+      ],
+      "verdict": "worse"
+     }
+    },
+    "andrey_tests_median": 383.0,
+    "pc_tests_median": 3525.0,
+    "authors_tests_median": 438.5,
+    "andrey_s_median": 0.0263,
+    "pc_s_median": 0.457,
+    "authors_s_median": 0.3518,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-identifiable@5000,v=50",
+   "kind": "identifiable",
+   "family": "gaussian",
+   "d": 50,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.05,
+     "parents_error": 0.3,
+     "set_errors": 0.4,
+     "effect_error": 0.0228,
+     "answer_rate": 0.95,
+     "estimate_rate": 1.0,
+     "tests_median": 525.5,
+     "s_median": 0.0285
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.05,
+     "parents_error": 0.4,
+     "set_errors": 0.6,
+     "effect_error": 0.0241,
+     "answer_rate": 0.95,
+     "estimate_rate": 1.0,
+     "tests_median": 1502.0,
+     "s_median": 0.8271,
+     "verdict_error_by_its_flag": 0.0
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.3,
+     "parents_error": 0.45,
+     "set_errors": 0.45,
+     "effect_error": 0.0298,
+     "answer_rate": 0.85,
+     "estimate_rate": 0.75,
+     "tests_median": 5701.5,
+     "s_median": 0.3975
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.35,
+     "effect_error": 0.0173,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.35,
+     "effect_error": 0.0724,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.05,
+     "comparator_verdict_error_mean": 0.05,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      }
+     },
+     "andrey_s": 0.0285,
+     "comparator_s": 0.8271,
+     "andrey_tests": 525.5,
+     "comparator_tests": 1502.0,
+     "result": "tie"
+    },
+    "parents_error": {
+     "paired": 20,
+     "andrey_parents_error_mean": 0.3,
+     "comparator_parents_error_mean": 0.4,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.25,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.45,
+        -0.4
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.75,
+       "bootstrap_95": [
+        -1.3,
+        -0.2
+       ]
+      }
+     },
+     "andrey_s": 0.0285,
+     "comparator_s": 0.8271,
+     "andrey_tests": 525.5,
+     "comparator_tests": 1502.0,
+     "result": "tie"
+    },
+    "effect_error": {
+     "paired": 20,
+     "andrey_effect_error_mean": 0.0228,
+     "comparator_effect_error_mean": 0.0241,
+     "mean_D": -0.0013,
+     "bootstrap_95": [
+      -0.0038,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.0055,
+       "bootstrap_95": [
+        -0.0228,
+        0.0403
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.0068,
+       "bootstrap_95": [
+        -0.0216,
+        0.0417
+       ]
+      }
+     },
+     "andrey_s": 0.0285,
+     "comparator_s": 0.8271,
+     "andrey_tests": 525.5,
+     "comparator_tests": 1502.0,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": 0.25,
+      "bootstrap_95": [
+       0.1,
+       0.45
+      ],
+      "verdict": "worse"
+     },
+     "parents_error": {
+      "pc_minus_andrey": 0.15,
+      "bootstrap_95": [
+       -0.1,
+       0.4
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 525.5,
+    "pc_tests_median": 5701.5,
+    "authors_tests_median": 1502.0,
+    "andrey_s_median": 0.0285,
+    "pc_s_median": 0.3975,
+    "authors_s_median": 0.8271,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-identifiable@5000,v=100",
+   "kind": "identifiable",
+   "family": "gaussian",
+   "d": 100,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.0,
+     "parents_error": 0.35,
+     "set_errors": 0.5,
+     "effect_error": 0.0159,
+     "answer_rate": 1.0,
+     "estimate_rate": 1.0,
+     "tests_median": 931.0,
+     "s_median": 0.0533
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.0,
+     "parents_error": 0.35,
+     "set_errors": 0.55,
+     "effect_error": 0.0159,
+     "answer_rate": 1.0,
+     "estimate_rate": 1.0,
+     "tests_median": 963.0,
+     "s_median": 0.7484,
+     "verdict_error_by_its_flag": 0.0
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.4,
+     "parents_error": 0.55,
+     "set_errors": 0.55,
+     "effect_error": 0.1137,
+     "answer_rate": 0.65,
+     "estimate_rate": 0.65,
+     "tests_median": 22772.5,
+     "s_median": 0.5271
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.2,
+     "effect_error": 0.0304,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.2,
+     "effect_error": 0.0369,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0001
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.0,
+     "comparator_verdict_error_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "andrey_s": 0.0533,
+     "comparator_s": 0.7484,
+     "andrey_tests": 931.0,
+     "comparator_tests": 963.0,
+     "result": "tie"
+    },
+    "parents_error": {
+     "paired": 20,
+     "andrey_parents_error_mean": 0.35,
+     "comparator_parents_error_mean": 0.35,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.7,
+       "bootstrap_95": [
+        -1.2,
+        -0.15
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.65,
+       "bootstrap_95": [
+        -1.15,
+        -0.1
+       ]
+      }
+     },
+     "andrey_s": 0.0533,
+     "comparator_s": 0.7484,
+     "andrey_tests": 931.0,
+     "comparator_tests": 963.0,
+     "result": "tie"
+    },
+    "effect_error": {
+     "paired": 20,
+     "andrey_effect_error_mean": 0.0159,
+     "comparator_effect_error_mean": 0.0159,
+     "mean_D": -0.0,
+     "bootstrap_95": [
+      -0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.0145,
+       "bootstrap_95": [
+        -0.0466,
+        0.0132
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.0145,
+       "bootstrap_95": [
+        -0.0466,
+        0.0132
+       ]
+      }
+     },
+     "andrey_s": 0.0533,
+     "comparator_s": 0.7484,
+     "andrey_tests": 931.0,
+     "comparator_tests": 963.0,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": 0.4,
+      "bootstrap_95": [
+       0.2,
+       0.6
+      ],
+      "verdict": "worse"
+     },
+     "parents_error": {
+      "pc_minus_andrey": 0.2,
+      "bootstrap_95": [
+       0.05,
+       0.4
+      ],
+      "verdict": "worse"
+     }
+    },
+    "andrey_tests_median": 931.0,
+    "pc_tests_median": 22772.5,
+    "authors_tests_median": 963.0,
+    "andrey_s_median": 0.0533,
+    "pc_s_median": 0.5271,
+    "authors_s_median": 0.7484,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-identifiable@5000,v=150",
+   "kind": "identifiable",
+   "family": "gaussian",
+   "d": 150,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.0,
+     "parents_error": 0.3,
+     "set_errors": 0.6,
+     "effect_error": 0.0432,
+     "answer_rate": 1.0,
+     "estimate_rate": 1.0,
+     "tests_median": 1791.0,
+     "s_median": 0.0873
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.0,
+     "parents_error": 0.3,
+     "set_errors": 0.6,
+     "effect_error": 0.0432,
+     "answer_rate": 1.0,
+     "estimate_rate": 1.0,
+     "tests_median": 1978.5,
+     "s_median": 1.2583,
+     "verdict_error_by_its_flag": 0.0
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.6,
+     "parents_error": 0.8,
+     "set_errors": 1.3,
+     "effect_error": 0.1106,
+     "answer_rate": 0.4,
+     "estimate_rate": 0.4,
+     "tests_median": 46592.5,
+     "s_median": 0.5902
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.65,
+     "effect_error": 0.0301,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.65,
+     "effect_error": 0.0381,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0001
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.0,
+     "comparator_verdict_error_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "andrey_s": 0.0873,
+     "comparator_s": 1.2583,
+     "andrey_tests": 1791.0,
+     "comparator_tests": 1978.5,
+     "result": "tie"
+    },
+    "parents_error": {
+     "paired": 20,
+     "andrey_parents_error_mean": 0.3,
+     "comparator_parents_error_mean": 0.3,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.05,
+       "bootstrap_95": [
+        -1.55,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.05,
+       "bootstrap_95": [
+        -1.55,
+        -0.5
+       ]
+      }
+     },
+     "andrey_s": 0.0873,
+     "comparator_s": 1.2583,
+     "andrey_tests": 1791.0,
+     "comparator_tests": 1978.5,
+     "result": "tie"
+    },
+    "effect_error": {
+     "paired": 20,
+     "andrey_effect_error_mean": 0.0432,
+     "comparator_effect_error_mean": 0.0432,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.013,
+       "bootstrap_95": [
+        -0.0562,
+        0.1126
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.013,
+       "bootstrap_95": [
+        -0.0562,
+        0.1126
+       ]
+      }
+     },
+     "andrey_s": 0.0873,
+     "comparator_s": 1.2583,
+     "andrey_tests": 1791.0,
+     "comparator_tests": 1978.5,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": 0.6,
+      "bootstrap_95": [
+       0.4,
+       0.8
+      ],
+      "verdict": "worse"
+     },
+     "parents_error": {
+      "pc_minus_andrey": 0.5,
+      "bootstrap_95": [
+       0.3,
+       0.7
+      ],
+      "verdict": "worse"
+     }
+    },
+    "andrey_tests_median": 1791.0,
+    "pc_tests_median": 46592.5,
+    "authors_tests_median": 1978.5,
+    "andrey_s_median": 0.0873,
+    "pc_s_median": 0.5902,
+    "authors_s_median": 1.2583,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-identifiable@5000,v=200",
+   "kind": "identifiable",
+   "family": "gaussian",
+   "d": 200,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.0,
+     "parents_error": 0.45,
+     "set_errors": 0.75,
+     "effect_error": 0.0187,
+     "answer_rate": 1.0,
+     "estimate_rate": 1.0,
+     "tests_median": 2744.5,
+     "s_median": 0.135
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.0,
+     "parents_error": 0.55,
+     "set_errors": 0.9,
+     "effect_error": 0.0186,
+     "answer_rate": 1.0,
+     "estimate_rate": 1.0,
+     "tests_median": 2974.0,
+     "s_median": 1.9128,
+     "verdict_error_by_its_flag": 0.0
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.6,
+     "parents_error": 0.65,
+     "set_errors": 0.7,
+     "effect_error": 0.0057,
+     "answer_rate": 0.45,
+     "estimate_rate": 0.4,
+     "tests_median": 88424.0,
+     "s_median": 0.6051
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.45,
+     "effect_error": 0.0058,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "parents_error": 1.0,
+     "set_errors": 1.45,
+     "effect_error": 0.0761,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0001
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.0,
+     "comparator_verdict_error_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "andrey_s": 0.135,
+     "comparator_s": 1.9128,
+     "andrey_tests": 2744.5,
+     "comparator_tests": 2974.0,
+     "result": "tie"
+    },
+    "parents_error": {
+     "paired": 20,
+     "andrey_parents_error_mean": 0.45,
+     "comparator_parents_error_mean": 0.55,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.25,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.7,
+       "bootstrap_95": [
+        -1.55,
+        0.05
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.55,
+       "bootstrap_95": [
+        -1.4,
+        0.25
+       ]
+      }
+     },
+     "andrey_s": 0.135,
+     "comparator_s": 1.9128,
+     "andrey_tests": 2744.5,
+     "comparator_tests": 2974.0,
+     "result": "tie"
+    },
+    "effect_error": {
+     "paired": 20,
+     "andrey_effect_error_mean": 0.0187,
+     "comparator_effect_error_mean": 0.0186,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.0129,
+       "bootstrap_95": [
+        -0.0008,
+        0.0359
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.0128,
+       "bootstrap_95": [
+        -0.0008,
+        0.0359
+       ]
+      }
+     },
+     "andrey_s": 0.135,
+     "comparator_s": 1.9128,
+     "andrey_tests": 2744.5,
+     "comparator_tests": 2974.0,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": 0.6,
+      "bootstrap_95": [
+       0.4,
+       0.8
+      ],
+      "verdict": "worse"
+     },
+     "parents_error": {
+      "pc_minus_andrey": 0.2,
+      "bootstrap_95": [
+       -0.05,
+       0.45
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 2744.5,
+    "pc_tests_median": 88424.0,
+    "authors_tests_median": 2974.0,
+    "andrey_s_median": 0.135,
+    "pc_s_median": 0.6051,
+    "authors_s_median": 1.9128,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-nonidentifiable@5000,v=10",
+   "kind": "nonidentifiable",
+   "family": "gaussian",
+   "d": 10,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.2,
+     "effect_error": 0.0067,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.2,
+     "tests_median": 115.5,
+     "s_median": 0.0123
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.25,
+     "effect_error": 0.1592,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.25,
+     "tests_median": 103.0,
+     "s_median": 0.077,
+     "verdict_error_by_its_flag": 0.25
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.2,
+     "effect_error": 0.0072,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.15,
+     "tests_median": 165.0,
+     "s_median": 0.4316
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "effect_error": 0.0276,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "effect_error": 0.1193,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.2,
+     "comparator_verdict_error_mean": 0.25,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.2,
+       "bootstrap_95": [
+        0.05,
+        0.4
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.25,
+       "bootstrap_95": [
+        0.1,
+        0.45
+       ]
+      }
+     },
+     "andrey_s": 0.0123,
+     "comparator_s": 0.077,
+     "andrey_tests": 115.5,
+     "comparator_tests": 103.0,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": 0.0,
+      "bootstrap_95": [
+       -0.15,
+       0.15
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 115.5,
+    "pc_tests_median": 165.0,
+    "authors_tests_median": 103.0,
+    "andrey_s_median": 0.0123,
+    "pc_s_median": 0.4316,
+    "authors_s_median": 0.077,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-nonidentifiable@5000,v=20",
+   "kind": "nonidentifiable",
+   "family": "gaussian",
+   "d": 20,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.35,
+     "effect_error": 0.1466,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.35,
+     "tests_median": 381.5,
+     "s_median": 0.0192
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.4,
+     "effect_error": 0.1184,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.4,
+     "tests_median": 296.0,
+     "s_median": 0.1772,
+     "verdict_error_by_its_flag": 0.4
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.3,
+     "effect_error": 0.1873,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.25,
+     "tests_median": 668.5,
+     "s_median": 0.3779
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "effect_error": 0.014,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "effect_error": 0.0781,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.35,
+     "comparator_verdict_error_mean": 0.4,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.2,
+      0.1
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.35,
+       "bootstrap_95": [
+        0.15,
+        0.55
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.4,
+       "bootstrap_95": [
+        0.2,
+        0.6
+       ]
+      }
+     },
+     "andrey_s": 0.0192,
+     "comparator_s": 0.1772,
+     "andrey_tests": 381.5,
+     "comparator_tests": 296.0,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": -0.05,
+      "bootstrap_95": [
+       -0.2,
+       0.1
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 381.5,
+    "pc_tests_median": 668.5,
+    "authors_tests_median": 296.0,
+    "andrey_s_median": 0.0192,
+    "pc_s_median": 0.3779,
+    "authors_s_median": 0.1772,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-nonidentifiable@5000,v=30",
+   "kind": "nonidentifiable",
+   "family": "gaussian",
+   "d": 30,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.45,
+     "effect_error": 0.0388,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.45,
+     "tests_median": 885.5,
+     "s_median": 0.0358
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.55,
+     "effect_error": 0.0517,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.55,
+     "tests_median": 942.0,
+     "s_median": 0.5133,
+     "verdict_error_by_its_flag": 0.5
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.3,
+     "effect_error": 0.1509,
+     "answer_rate": 0.9,
+     "estimate_rate": 0.25,
+     "tests_median": 2055.0,
+     "s_median": 0.3864
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "effect_error": 0.0077,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "effect_error": 0.1037,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.45,
+     "comparator_verdict_error_mean": 0.55,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.25,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.45,
+       "bootstrap_95": [
+        0.25,
+        0.65
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.55,
+       "bootstrap_95": [
+        0.35,
+        0.75
+       ]
+      }
+     },
+     "andrey_s": 0.0358,
+     "comparator_s": 0.5133,
+     "andrey_tests": 885.5,
+     "comparator_tests": 942.0,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": -0.15,
+      "bootstrap_95": [
+       -0.4,
+       0.1
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 885.5,
+    "pc_tests_median": 2055.0,
+    "authors_tests_median": 942.0,
+    "andrey_s_median": 0.0358,
+    "pc_s_median": 0.3864,
+    "authors_s_median": 0.5133,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-nonidentifiable@5000,v=40",
+   "kind": "nonidentifiable",
+   "family": "gaussian",
+   "d": 40,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.5,
+     "effect_error": 0.086,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.5,
+     "tests_median": 1588.0,
+     "s_median": 0.0647
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.55,
+     "effect_error": 0.1338,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.55,
+     "tests_median": 1100.5,
+     "s_median": 0.6219,
+     "verdict_error_by_its_flag": 0.5
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.35,
+     "effect_error": 0.1504,
+     "answer_rate": 0.85,
+     "estimate_rate": 0.25,
+     "tests_median": 4071.5,
+     "s_median": 0.4405
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "effect_error": 0.0072,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "effect_error": 0.0835,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.5,
+     "comparator_verdict_error_mean": 0.55,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.2,
+      0.1
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.5,
+       "bootstrap_95": [
+        0.3,
+        0.7
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.55,
+       "bootstrap_95": [
+        0.35,
+        0.75
+       ]
+      }
+     },
+     "andrey_s": 0.0647,
+     "comparator_s": 0.6219,
+     "andrey_tests": 1588.0,
+     "comparator_tests": 1100.5,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": -0.15,
+      "bootstrap_95": [
+       -0.4,
+       0.1
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 1588.0,
+    "pc_tests_median": 4071.5,
+    "authors_tests_median": 1100.5,
+    "andrey_s_median": 0.0647,
+    "pc_s_median": 0.4405,
+    "authors_s_median": 0.6219,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-nonidentifiable@5000,v=50",
+   "kind": "nonidentifiable",
+   "family": "gaussian",
+   "d": 50,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.5,
+     "effect_error": 0.1994,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.5,
+     "tests_median": 2508.5,
+     "s_median": 0.1034
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.65,
+     "effect_error": 0.2304,
+     "answer_rate": 0.9,
+     "estimate_rate": 0.65,
+     "tests_median": 775.5,
+     "s_median": 0.491,
+     "verdict_error_by_its_flag": 0.6
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.35,
+     "effect_error": 0.1457,
+     "answer_rate": 0.9,
+     "estimate_rate": 0.3,
+     "tests_median": 5460.5,
+     "s_median": 0.4713
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "effect_error": 0.0245,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "effect_error": 0.0991,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0001
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.5,
+     "comparator_verdict_error_mean": 0.65,
+     "mean_D": -0.15,
+     "bootstrap_95": [
+      -0.4,
+      0.1
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.5,
+       "bootstrap_95": [
+        0.3,
+        0.7
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.65,
+       "bootstrap_95": [
+        0.45,
+        0.85
+       ]
+      }
+     },
+     "andrey_s": 0.1034,
+     "comparator_s": 0.491,
+     "andrey_tests": 2508.5,
+     "comparator_tests": 775.5,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": -0.15,
+      "bootstrap_95": [
+       -0.35,
+       0.05
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 2508.5,
+    "pc_tests_median": 5460.5,
+    "authors_tests_median": 775.5,
+    "andrey_s_median": 0.1034,
+    "pc_s_median": 0.4713,
+    "authors_s_median": 0.491,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-nonidentifiable@5000,v=100",
+   "kind": "nonidentifiable",
+   "family": "gaussian",
+   "d": 100,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.4,
+     "effect_error": 0.1956,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.4,
+     "tests_median": 10279.5,
+     "s_median": 0.3049
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.65,
+     "effect_error": 0.1425,
+     "answer_rate": 0.95,
+     "estimate_rate": 0.65,
+     "tests_median": 8783.0,
+     "s_median": 5.2108,
+     "verdict_error_by_its_flag": 0.65
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.35,
+     "effect_error": 0.2868,
+     "answer_rate": 0.8,
+     "estimate_rate": 0.2,
+     "tests_median": 22918.5,
+     "s_median": 0.4733
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "effect_error": 0.007,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "effect_error": 0.1445,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0001
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.4,
+     "comparator_verdict_error_mean": 0.65,
+     "mean_D": -0.25,
+     "bootstrap_95": [
+      -0.45,
+      -0.1
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.4,
+       "bootstrap_95": [
+        0.2,
+        0.6
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.65,
+       "bootstrap_95": [
+        0.45,
+        0.85
+       ]
+      }
+     },
+     "andrey_s": 0.3049,
+     "comparator_s": 5.2108,
+     "andrey_tests": 10279.5,
+     "comparator_tests": 8783.0,
+     "result": "better"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": -0.05,
+      "bootstrap_95": [
+       -0.2,
+       0.1
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 10279.5,
+    "pc_tests_median": 22918.5,
+    "authors_tests_median": 8783.0,
+    "andrey_s_median": 0.3049,
+    "pc_s_median": 0.4733,
+    "authors_s_median": 5.2108,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-nonidentifiable@5000,v=150",
+   "kind": "nonidentifiable",
+   "family": "gaussian",
+   "d": 150,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.75,
+     "effect_error": 0.2377,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.75,
+     "tests_median": 2175.0,
+     "s_median": 0.1183
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.75,
+     "effect_error": 0.1624,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.75,
+     "tests_median": 10597.5,
+     "s_median": 6.8471,
+     "verdict_error_by_its_flag": 0.75
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 0.65,
+     "effect_error": 0.3297,
+     "answer_rate": 0.7,
+     "estimate_rate": 0.4,
+     "tests_median": 48291.0,
+     "s_median": 0.5575
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "effect_error": 0.0067,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0001
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "effect_error": 0.0934,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0001
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.75,
+     "comparator_verdict_error_mean": 0.75,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.75,
+       "bootstrap_95": [
+        0.55,
+        0.95
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.75,
+       "bootstrap_95": [
+        0.55,
+        0.95
+       ]
+      }
+     },
+     "andrey_s": 0.1183,
+     "comparator_s": 6.8471,
+     "andrey_tests": 2175.0,
+     "comparator_tests": 10597.5,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": -0.1,
+      "bootstrap_95": [
+       -0.25,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 2175.0,
+    "pc_tests_median": 48291.0,
+    "authors_tests_median": 10597.5,
+    "andrey_s_median": 0.1183,
+    "pc_s_median": 0.5575,
+    "authors_s_median": 6.8471,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "locpc-nonidentifiable@5000,v=200",
+   "kind": "nonidentifiable",
+   "family": "gaussian",
+   "d": 200,
+   "n": 5000,
+   "solutions": {
+    "andrey.locpc_cde": {
+     "fits": 20,
+     "verdict_error": 0.9,
+     "effect_error": 0.1525,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.9,
+     "tests_median": 3990.0,
+     "s_median": 0.2294
+    },
+    "locpc_cde.authors": {
+     "fits": 20,
+     "verdict_error": 0.95,
+     "effect_error": 0.1217,
+     "answer_rate": 1.0,
+     "estimate_rate": 0.95,
+     "tests_median": 25294.0,
+     "s_median": 16.0279,
+     "verdict_error_by_its_flag": 0.95
+    },
+    "andrey.pc.adjustment": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "effect_error": 0.2858,
+     "answer_rate": 0.25,
+     "estimate_rate": 0.25,
+     "tests_median": 90420.5,
+     "s_median": 0.5947
+    },
+    "baseline.adjust-none": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "effect_error": 0.007,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0001
+    },
+    "baseline.adjust-all": {
+     "fits": 20,
+     "verdict_error": 1.0,
+     "effect_error": 0.1145,
+     "answer_rate": 0.0,
+     "estimate_rate": 1.0,
+     "tests_median": null,
+     "s_median": 0.0001
+    }
+   },
+   "metrics": {
+    "verdict_error": {
+     "paired": 20,
+     "andrey_verdict_error_mean": 0.9,
+     "comparator_verdict_error_mean": 0.95,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": 0.9,
+       "bootstrap_95": [
+        0.75,
+        1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": 0.95,
+       "bootstrap_95": [
+        0.85,
+        1.0
+       ]
+      }
+     },
+     "andrey_s": 0.2294,
+     "comparator_s": 16.0279,
+     "andrey_tests": 3990.0,
+     "comparator_tests": 25294.0,
+     "result": "tie"
+    }
+   },
+   "pareto": {
+    "accuracy": {
+     "verdict_error": {
+      "pc_minus_andrey": 0.1,
+      "bootstrap_95": [
+       0.0,
+       0.25
+      ],
+      "verdict": "tie"
+     }
+    },
+    "andrey_tests_median": 3990.0,
+    "pc_tests_median": 90420.5,
+    "authors_tests_median": 25294.0,
+    "andrey_s_median": 0.2294,
+    "pc_s_median": 0.5947,
+    "authors_s_median": 16.0279,
+    "pc_better_on_both": false
+   }
+  }
+ ],
+ "replication_note": "the cells with 200 variables, whose verdict floor or set floor failed on seeds 0-19, rerun on seeds 20-39 with every arm",
+ "replication": {
+  "seeds": "20-39",
+  "rows": [
+   {
+    "cell": "locpc-identifiable@5000,family=binary,v=200",
+    "kind": "identifiable",
+    "family": "binary",
+    "d": 200,
+    "n": 5000,
+    "solutions": {
+     "andrey.locpc_cde": {
+      "fits": 20,
+      "verdict_error": 0.05,
+      "parents_error": 0.35,
+      "effect_error": null,
+      "tests_median": 1395.0,
+      "s_median": 0.8317
+     },
+     "locpc_cde.authors": {
+      "fits": 20,
+      "verdict_error": 0.05,
+      "parents_error": 0.4,
+      "effect_error": null,
+      "tests_median": 1380.0,
+      "s_median": 18.1959
+     },
+     "andrey.pc.adjustment": {
+      "fits": 20,
+      "verdict_error": 0.2,
+      "parents_error": 0.45,
+      "effect_error": null,
+      "tests_median": 70673.5,
+      "s_median": 3.3938
+     },
+     "baseline.adjust-none": {
+      "fits": 20,
+      "verdict_error": 1.0,
+      "parents_error": 1.0,
+      "effect_error": null,
+      "tests_median": null,
+      "s_median": 0.0001
+     }
+    },
+    "metrics": {
+     "verdict_error": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 20,
+        "mean": -0.95,
+        "bootstrap_95": [
+         -1.0,
+         -0.85
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 20,
+        "mean": -0.95,
+        "bootstrap_95": [
+         -1.0,
+         -0.85
+        ]
+       }
+      }
+     },
+     "parents_error": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "floor": {
+       "applies": false,
+       "andrey_minus_empty": {
+        "paired": 20,
+        "mean": -0.4,
+        "bootstrap_95": [
+         -0.9,
+         0.2
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 20,
+        "mean": -0.35,
+        "bootstrap_95": [
+         -0.85,
+         0.25
+        ]
+       }
+      }
+     }
+    }
+   },
+   {
+    "cell": "locpc-nonidentifiable@5000,family=binary,v=200",
+    "kind": "nonidentifiable",
+    "family": "binary",
+    "d": 200,
+    "n": 5000,
+    "solutions": {
+     "andrey.locpc_cde": {
+      "fits": 20,
+      "verdict_error": 0.55,
+      "parents_error": 0.8,
+      "effect_error": null,
+      "tests_median": 4385.5,
+      "s_median": 2.2296
+     },
+     "locpc_cde.authors": {
+      "fits": 20,
+      "verdict_error": 0.65,
+      "parents_error": 0.95,
+      "effect_error": null,
+      "tests_median": 5434.5,
+      "s_median": 80.5484
+     },
+     "andrey.pc.adjustment": {
+      "fits": 20,
+      "verdict_error": 0.35,
+      "parents_error": 0.95,
+      "effect_error": null,
+      "tests_median": 70785.0,
+      "s_median": 3.0971
+     },
+     "baseline.adjust-none": {
+      "fits": 20,
+      "verdict_error": 1.0,
+      "parents_error": 1.0,
+      "effect_error": null,
+      "tests_median": null,
+      "s_median": 0.0
+     }
+    },
+    "metrics": {
+     "verdict_error": {
+      "paired": 20,
+      "mean_D": -0.1,
+      "bootstrap_95": [
+       -0.3,
+       0.1
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "floor": {
+       "applies": false,
+       "andrey_minus_empty": {
+        "paired": 20,
+        "mean": 0.55,
+        "bootstrap_95": [
+         0.35,
+         0.75
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 20,
+        "mean": 0.65,
+        "bootstrap_95": [
+         0.45,
+         0.85
+        ]
+       }
+      }
+     }
+    }
+   },
+   {
+    "cell": "locpc-identifiable@5000,v=200",
+    "kind": "identifiable",
+    "family": "gaussian",
+    "d": 200,
+    "n": 5000,
+    "solutions": {
+     "andrey.locpc_cde": {
+      "fits": 20,
+      "verdict_error": 0.0,
+      "parents_error": 0.45,
+      "effect_error": 0.0254,
+      "tests_median": 2532.5,
+      "s_median": 0.1375
+     },
+     "locpc_cde.authors": {
+      "fits": 20,
+      "verdict_error": 0.0,
+      "parents_error": 0.55,
+      "effect_error": 0.0259,
+      "tests_median": 2550.0,
+      "s_median": 1.5242
+     },
+     "andrey.pc.adjustment": {
+      "fits": 20,
+      "verdict_error": 0.95,
+      "parents_error": 0.95,
+      "effect_error": 0.1284,
+      "tests_median": 100101.5,
+      "s_median": 0.5439
+     },
+     "baseline.adjust-none": {
+      "fits": 20,
+      "verdict_error": 1.0,
+      "parents_error": 1.0,
+      "effect_error": 0.0098,
+      "tests_median": null,
+      "s_median": 0.0
+     }
+    },
+    "metrics": {
+     "verdict_error": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 20,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 20,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       }
+      }
+     },
+     "parents_error": {
+      "paired": 20,
+      "mean_D": -0.1,
+      "bootstrap_95": [
+       -0.25,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "floor": {
+       "applies": false,
+       "andrey_minus_empty": {
+        "paired": 20,
+        "mean": -0.3,
+        "bootstrap_95": [
+         -0.8,
+         0.3
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 20,
+        "mean": -0.15,
+        "bootstrap_95": [
+         -0.7,
+         0.5
+        ]
+       }
+      }
+     },
+     "effect_error": {
+      "paired": 20,
+      "mean_D": -0.0005,
+      "bootstrap_95": [
+       -0.0016,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "floor": {
+       "applies": false,
+       "andrey_minus_empty": {
+        "paired": 20,
+        "mean": 0.0156,
+        "bootstrap_95": [
+         -0.0006,
+         0.0391
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 20,
+        "mean": 0.0161,
+        "bootstrap_95": [
+         -0.0001,
+         0.0396
+        ]
+       }
+      }
+     }
+    }
+   },
+   {
+    "cell": "locpc-nonidentifiable@5000,v=200",
+    "kind": "nonidentifiable",
+    "family": "gaussian",
+    "d": 200,
+    "n": 5000,
+    "solutions": {
+     "andrey.locpc_cde": {
+      "fits": 20,
+      "verdict_error": 0.9,
+      "parents_error": 0.85,
+      "effect_error": 0.1044,
+      "tests_median": 3610.5,
+      "s_median": 0.1715
+     },
+     "locpc_cde.authors": {
+      "fits": 20,
+      "verdict_error": 1.0,
+      "parents_error": 0.9,
+      "effect_error": 0.0805,
+      "tests_median": 34227.0,
+      "s_median": 22.0703
+     },
+     "andrey.pc.adjustment": {
+      "fits": 20,
+      "verdict_error": 0.95,
+      "parents_error": 1.0,
+      "effect_error": 0.3804,
+      "tests_median": 96958.5,
+      "s_median": 0.5717
+     },
+     "baseline.adjust-none": {
+      "fits": 20,
+      "verdict_error": 1.0,
+      "parents_error": 1.0,
+      "effect_error": 0.007,
+      "tests_median": null,
+      "s_median": 0.0
+     }
+    },
+    "metrics": {
+     "verdict_error": {
+      "paired": 20,
+      "mean_D": -0.1,
+      "bootstrap_95": [
+       -0.25,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "floor": {
+       "applies": false,
+       "andrey_minus_empty": {
+        "paired": 20,
+        "mean": 0.9,
+        "bootstrap_95": [
+         0.75,
+         1.0
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 20,
+        "mean": 1.0,
+        "bootstrap_95": [
+         1.0,
+         1.0
+        ]
+       }
+      }
+     }
+    }
+   }
+  ],
+  "pooled_verdict_floor": [
+   {
+    "family": "gaussian",
+    "d": 200,
+    "andrey.locpc_cde": {
+     "pairs": 20,
+     "mean": -0.05,
+     "bootstrap_95": [
+      -0.125,
+      0.0
+     ],
+     "pass": false,
+     "verdict_error_mean": 0.45,
+     "tests_median": 3153.5,
+     "s_median": 0.1498
+    },
+    "locpc_cde.authors": {
+     "pairs": 20,
+     "mean": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "pass": false,
+     "verdict_error_mean": 0.5,
+     "tests_median": 3225.0,
+     "s_median": 1.9121
+    },
+    "andrey.pc.adjustment": {
+     "pairs": 20,
+     "mean": 0.45,
+     "bootstrap_95": [
+      0.375,
+      0.5
+     ],
+     "pass": false,
+     "verdict_error_mean": 0.95,
+     "tests_median": 97512.0,
+     "s_median": 0.5494
+    }
+   },
+   {
+    "family": "binary",
+    "d": 200,
+    "andrey.locpc_cde": {
+     "pairs": 20,
+     "mean": -0.2,
+     "bootstrap_95": [
+      -0.3,
+      -0.1
+     ],
+     "pass": true,
+     "verdict_error_mean": 0.3,
+     "tests_median": 1871.5,
+     "s_median": 1.0115
+    },
+    "locpc_cde.authors": {
+     "pairs": 20,
+     "mean": -0.15,
+     "bootstrap_95": [
+      -0.275,
+      -0.025
+     ],
+     "pass": true,
+     "verdict_error_mean": 0.35,
+     "tests_median": 2181.0,
+     "s_median": 30.242
+    },
+    "andrey.pc.adjustment": {
+     "pairs": 20,
+     "mean": -0.225,
+     "bootstrap_95": [
+      -0.35,
+      -0.1
+     ],
+     "pass": true,
+     "verdict_error_mean": 0.275,
+     "tests_median": 70673.5,
+     "s_median": 3.2153
+    }
+   }
+  ]
+ }
+}

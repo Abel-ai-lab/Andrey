@@ -11,13 +11,19 @@ import numpy as np
 
 from andrey.api._boundary import warn_past_boundary
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, Structure, StructureOutput
-from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS, SingularCorrelationError
+from andrey.core.ci import (
+    DISCRETE_INDEP_TESTS,
+    MIXED_INDEP_TESTS,
+    RANK_INDEP_TESTS,
+    SingularCorrelationError,
+)
 from andrey.core.ci_missing import EM, EM_METHODS, EM_SUPPORTED
 from andrey.core.knowledge import as_node, column_position, resolve
 from andrey.core.score import (
     DISCRETE_SCORES,
     LINEAR_SCORES,
     MIXED_SCORES,
+    RANK_SCORES,
     CopiedColumnsError,
     copies_error,
     copies_message,
@@ -44,6 +50,19 @@ TESTWISE_METHODS = (
     "gs",
     "fast_iamb",
     "mmpc",
+    "hiton_pc",
+    "hiton_mb",
+    "mmmb",
+    "pcmb",
+    "mb_by_mb",
+    "cmb",
+    "mmb_by_mmb",
+    "y_structures",
+    "ldp",
+    "ld3",
+    "ldecc",
+    "local_optimal_adjustment",
+    "locpc_cde",
 )
 TESTWISE_SERIES_METHODS = ("pcmci", "pcmciplus", "lpcmci")
 R = TypeVar("R")
@@ -291,8 +310,8 @@ def check_same_data(method: str, score_func: str, indep_test: str) -> None:
             f"{method}'s score and test must read the data alike: score_func='bdeu' or "
             "'discrete_bic' with indep_test 'chisq' or 'gsq' for categories, "
             "'degen_gauss' or 'cond_gauss' with 'degen_gauss' or "
-            "'cond_gauss' for mixed data, or 'bic' with a test of continuous "
-            f"data; got score_func={score_func!r}, indep_test={indep_test!r}"
+            "'cond_gauss' for mixed data, or 'bic' or 'normal_scores' with a test of "
+            f"continuous data; got score_func={score_func!r}, indep_test={indep_test!r}"
         )
 
 
@@ -594,6 +613,34 @@ def check_em(name: str, missing: str | None, score_func: str | None, env: object
         )
 
 
+def check_rank_env(
+    name: str, score_func: str | None, env: object, indep_test: str | None = None
+) -> None:
+    """Raise ``ValueError`` for a rank-based ``score_func`` or ``indep_test`` with an ``env``.
+
+    ``score_func="normal_scores"`` and ``indep_test="normal_scores"`` both read each column's normal
+    scores, ranked over every row. Pooled over environments that shift a variable, a column mixes
+    its environments' distributions, so its normal scores are no longer Gaussian, and neither the
+    linear-Gaussian BIC nor the partial correlation on them is the nonparanormal model's. Scores
+    ranked within each environment do not help: they center and scale every column in each
+    environment, so no column depends on the index.
+    """
+    if env is None:
+        return
+    if score_func in RANK_SCORES:
+        raise ValueError(
+            f'{name}: score_func="normal_scores" models one distribution through the ranks of each '
+            "column, so it takes no env: ranked over several environments, a column mixes their "
+            'distributions; fit each environment alone, or pass score_func="bic"'
+        )
+    if indep_test in RANK_INDEP_TESTS:
+        raise ValueError(
+            f'{name}: indep_test="normal_scores" models one distribution through the ranks of each '
+            "column, so it takes no env: ranked over several environments, a column mixes their "
+            'distributions; fit each environment alone, or pass indep_test="fisherz" or "kci"'
+        )
+
+
 def fit_missing(
     X: np.ndarray,
     missing: str | None,
@@ -653,6 +700,7 @@ def cpdag_search(
     """
     assert score_func is not None  # method_spec picks it from the column types
     check_em(name, missing, score_func, env)
+    check_rank_env(name, score_func, env)
     data, index = env_index(data, env, method=name)
     X, mask, labels, constraints = fit_inputs(
         data,

@@ -14,7 +14,11 @@ import networkx as nx
 import numpy as np
 import pytest
 
+import andrey
+from andrey.core import LATENT, OBSERVED, GraphStructure, ci
 from andrey.core.structure import ARROW, CIRCLE, TAIL
+from andrey.core.ties import tie_ranks
+from andrey.data.latent import DSepOracle, marginal
 
 fci_module = importlib.import_module("andrey.constraint.fci")
 remove_by_possible_dsep = fci_module._remove_by_possible_dsep
@@ -43,7 +47,7 @@ def _oracle_fci(monkeypatch, n_obs, edges, selection=(), removed=None, data=None
 
     data = np.zeros((10, n_obs)) if data is None else data
 
-    def make_test(name, X, categorical=None, seed=None):
+    def make_test(name, X, categorical=None, seed=None, degrees_of_freedom="mean"):
         """The d-separation test over ``X``, whose columns are ``data``'s in some order."""
         unused = list(range(n_obs))
         label = []
@@ -203,3 +207,61 @@ def test_voting_rules_under_exact_tests(monkeypatch, name, collider_rule):
     pag = _oracle_fci(monkeypatch, n_obs, edges, collider_rule=collider_rule, _ambiguous=ambiguous)
     assert bool(ambiguous) == (name in ORACLE_GRAPHS)
     np.testing.assert_array_equal(pag, _oracle_fci(monkeypatch, n_obs, edges))
+
+
+# A DAG over the observed nodes 0..7 and the hidden nodes 8..10.
+COVARIATE_EDGES = [
+    (8, 3), (8, 4), (8, 6), (9, 0), (9, 6), (9, 7), (0, 7), (1, 9), (1, 2), (1, 3), (1, 5),
+    (1, 6), (1, 7), (3, 2), (3, 4), (3, 7), (4, 7), (5, 10), (5, 6), (5, 7),
+]  # fmt: skip
+
+
+def _latent_dag(seed):
+    """A random DAG over 5 to 8 observed nodes ``0 .. d - 1`` and 1 to 3 hidden ones, each hidden
+    node a parent of two or three observed ones: ``(edges, d, n_nodes)``."""
+    rng = np.random.default_rng(seed)
+    d, hidden = int(rng.integers(5, 9)), int(rng.integers(1, 4))
+    order = rng.permutation(d)
+    edges = [
+        (int(order[i]), int(order[j]))
+        for i in range(d)
+        for j in range(i + 1, d)
+        if rng.random() < 2.0 / (d - 1)
+    ]
+    for node in range(d, d + hidden):
+        edges += [(node, int(c)) for c in rng.choice(d, int(rng.integers(2, 4)), replace=False)]
+    return edges, d, d + hidden
+
+
+def _true_pag(edges, d, n_nodes):
+    marks = np.zeros((n_nodes, n_nodes), dtype=np.int8)
+    for a, b in edges:
+        marks[a, b], marks[b, a] = TAIL, ARROW
+    types = np.array([OBSERVED] * d + [LATENT] * (n_nodes - d), dtype=np.int8)
+    graph = GraphStructure.from_numpy(marks, kind="dag", node_types=types)
+    return marginal(graph, "pag").to_numpy()
+
+
+@pytest.mark.parametrize("possible_dsep", ["order_free", "fast"])
+@pytest.mark.parametrize("seed", [None, *range(8)])
+def test_fci_under_a_registered_dsep_test_recovers_the_true_pag(monkeypatch, seed, possible_dsep):
+    """The oracle registered as ``register_indep_test`` documents it gives the true PAG.
+
+    The factory finds which variable each column it receives holds, so it answers for the right
+    variables on the columns in data order and in the possible-d-separation step's rank order. The
+    data's columns are not in rank order, so a factory that ignored them would drop edges.
+    """
+    edges, d, n_nodes = (COVARIATE_EDGES, 8, 11) if seed is None else _latent_dag(seed)
+    x = np.random.default_rng(0).standard_normal((40, d))
+    assert not np.array_equal(np.argsort(tie_ranks(x)), np.arange(d))
+    dag = nx.DiGraph(edges)
+    dag.add_nodes_from(range(n_nodes))
+
+    def factory(columns):
+        nodes = [next(j for j in range(d) if np.array_equal(c, x[:, j])) for c in columns.T]
+        return DSepOracle(dag, nodes=nodes)
+
+    monkeypatch.setitem(ci._CI_REGISTRY, "dsep", None)  # restored when the test ends
+    ci.register_indep_test("dsep", factory)
+    found = andrey.fci(x, indep_test="dsep", possible_dsep=possible_dsep).structure.to_numpy()
+    np.testing.assert_array_equal(found, _true_pag(edges, d, n_nodes))

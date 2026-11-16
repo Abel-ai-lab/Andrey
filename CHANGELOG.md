@@ -12,17 +12,137 @@ names its pull request.
 
 ### Added
 
-- `andrey.gs`, the Grow-Shrink Markov blanket learner (Margaritis and Thrun 2000), experimental:
-  the blanket of one target, or every variable's blanket joined into the CPDAG, skeleton, or moral
-  graph, with the arguments and metadata of `iamb`. It visits the other variables in one order,
-  the most dependent first, and adds each at once when a test finds it dependent given the blanket
-  so far, in passes until none joins, then shrinks the blanket in passes until none leaves.
-  ([#931])
-- `andrey.fast_iamb`, the Fast-IAMB Markov blanket learner (Yaramakala and Margaritis 2005),
-  experimental, with the arguments and metadata of `iamb`. Each round tests every variable outside
-  the blanket and adds those that test dependent together, the most dependent first, while a
-  categorical test's table holds more than five rows per cell, then shrinks the blanket once.
-  ([#935])
+- `andrey.locpc_cde`, LocPC-CDE (Loranchet and Assaad 2026), supported: whether the controlled
+  direct effect of a treatment on an outcome is identifiable, from a graph learned around the
+  outcome one hop at a time with PC's tests, and the outcome's parents as its adjustment set. The
+  answer is one record in `metadata["effects"]` with the paper's reason; the graph is the local
+  essential graph it learned. Against its authors' code on the paper's random graphs with 10 to 200
+  variables, linear-Gaussian and binary, at 5,000 rows, it was worse in no setting and better in 4
+  of 32. On pairs whose effect the CPDAG does not identify its verdict is wrong or undecided about as
+  often as the code's, so the constant answer "not identifiable" scores better there. ([#1000],
+  [#1031])
+- `andrey.gs`, the Grow-Shrink Markov blanket learner (Margaritis and Thrun 2000): the blanket of
+  one target, or every variable's blanket joined into the CPDAG, skeleton, or moral graph, with the
+  arguments and metadata of `iamb`. It visits the other variables in one order, the most dependent
+  first, and adds each at once when a test finds it dependent given the blanket so far, in passes
+  until none joins, then shrinks the blanket, starting again from the first member after each
+  removal. It is supported: against bnlearn's `gs` on four published networks and linear-Gaussian
+  graphs, every variable a target, its sets were better in 13 of 20 settings and worse in none. On
+  hepar2 they have more errors than the empty set, as those of `iamb` do. ([#931], [#993],
+  [#1009])
+- `andrey.fast_iamb`, the Fast-IAMB Markov blanket learner (Yaramakala and Margaritis 2005), with
+  the arguments and metadata of `iamb`. Each round tests every variable outside the blanket and adds
+  those that test dependent together, the most dependent first, while a categorical test's table
+  holds more than five rows per cell, then shrinks the blanket once. It is supported: against
+  bnlearn's `fast.iamb` on the same data, its sets were better in 10 of 20 settings and worse in 3,
+  and on hepar2 they have more errors than the empty set. It runs 42% to 73% of the tests of `iamb`
+  and is less accurate than `iamb` outside hepar2. ([#935], [#993])
+- `andrey.hiton_pc`, the semi-interleaved HITON-PC learner of parents and children (Aliferis et al.
+  2010), with the arguments and metadata of `mmpc` and `max_depth=3` by default. It orders the
+  candidates once by their unconditional test, tests each newcomer against the subsets of the
+  members before it, tests every member again once all have joined, and keeps a member only when the
+  target is in that member's own set. On categorical data a test runs only with at least five rows
+  per cell of its table. It is supported: against bnlearn's `si.hiton.pc` on the same networks and
+  graphs, its sets were better in 13 of 20 settings and worse in none, with fewer errors than the
+  empty set in every setting. ([#950], [#993])
+- `andrey.hiton_mb`, the semi-interleaved HITON-MB Markov blanket learner (Aliferis et al. 2010),
+  with the arguments and metadata of `iamb`, `max_depth=3` by default, and the
+  target's parents and children in `metadata["parents_and_children"]`. It runs `hiton_pc` for the
+  target and for each of its parents and children, then admits each child's other parent when a
+  test finds it dependent on the target given the set that separated the two and the common child.
+  On categorical data a spouse test, too, runs only with at least five rows per cell of its table.
+  It is supported: against the authors' HITON-MB on child, insurance, alarm, hailfinder, and pigs
+  at its paper's sizes, its sets were closer to the true ones in 11 of 13 settings and further in
+  2, at 5,000 rows on hailfinder and insurance, where its symmetry check drops members the authors'
+  code keeps. On hailfinder at 200 and 500 rows its sets have more errors than the empty set.
+  ([#957], [#1025])
+- `andrey.mmmb`, the MMMB Markov blanket learner (Tsamardinos, Aliferis, and Statnikov 2003) in its
+  authors' corrected form, with the arguments and metadata of `iamb` and the target's parents and
+  children in `metadata["parents_and_children"]`. It runs `mmpc`, with its symmetry check
+  (Tsamardinos, Brown, and Aliferis 2006), for the target and for each of its parents and children,
+  then admits a variable as a spouse when a test finds it dependent on the target given the set that
+  separated the two and a parent or child of the target whose own set holds the variable (Aliferis
+  et al. 2010). Its G-square test counts the degrees of freedom of Spirtes et al. by default
+  (`degrees_of_freedom="nonempty"`), as its paper's tests do. It is supported: against the authors'
+  MMMB on alarm, hailfinder, insurance, win95pts, and pigs at its paper's sizes, its sets were
+  closer to the true ones in 8 of 21 settings, as close in 3, and further in 10, on hailfinder from
+  500 rows, insurance at 5,000, and win95pts at every size, where its symmetry check, its reading of
+  a test with no degrees of freedom, and its spouses' separating sets differ from the authors' code,
+  which on hailfinder at 5,000 rows also runs a test only with at least five rows per cell. In every
+  setting its sets had fewer errors than the authors' code's. ([#965], [#1025], [#1038])
+- `andrey.pcmb`, the PCMB Markov blanket learner (Peña, Nilsson, Björkegren, and Tegnér 2007),
+  supported, with the arguments and metadata of `iamb`, `alpha=0.01` by default, the paper's
+  level, and the target's parents and children in `metadata["parents_and_children"]`. Its own
+  parents-and-children search, GetPCD, adds the candidate most dependent on the target and then
+  removes every member that a subset of the others separates from it, until no candidate is left;
+  a member stays only when the target is in that member's own set. It then admits each child's
+  other parent when a test finds it dependent on the target given the set that separated the two
+  and the common child. On categorical data a test runs only with at least five rows per degree of
+  freedom of its table, and the categorical tests take `degrees_of_freedom="nonempty"` by default,
+  the degrees of freedom of the G-square test its paper runs. The 0.18.0 release card sets its
+  results on samples of the Alarm and Pigs networks beside the published results of its paper.
+  ([#971], [#981], [#982])
+- `degrees_of_freedom`, an argument of every method that takes the categorical tests, `"chisq"` and
+  `"gsq"`, and of `ChiSquare`: `"mean"`, the default and the rule so far, is the mean of the
+  statistic when `y` is shuffled within each configuration of the conditioning set; `"nonempty"` is
+  `(r_x - 1) * (r_y - 1)` per configuration over the values present, each table's empty rows and
+  columns struck (Spirtes, Glymour, and Scheines 1993). The two differ only on sparse tables.
+  Passing it with another test raises `ValueError`. ([#981])
+- `andrey.y_structures`, Y-structures under selection bias (Versteeg, Zhang, and Mooij 2022),
+  supported: claims that one variable is a causal ancestor of another from a pattern of four
+  variables, sound when the rows were selected by a mechanism the variables affect, with hidden
+  common causes allowed. Each claim is a record in `metadata["effects"]` with the paper's score and
+  its patterns, and the graph has no edges; `extended=True` tests the extended Y-structure, and
+  `variables` limits the claims to pairs of the named columns. The benchmark lane of Y-structures
+  runs it beside the authors' code. On the datasets of the authors' simulation script, with and
+  without selection, both forms make the same claims as the authors' code on every dataset, so
+  they tie it on precision and average precision in all 12 settings, and the precision of their
+  claims is above the share of ancestral pairs in each. Under selection the tests' errors make many
+  claims wrong at 10,000 rows: on the random graphs with 16 variables, 35 of 65 claims were true,
+  and 133 of 475 with `extended=True`. ([#959], [#1016], [#1026])
+- The set-learner benchmark lane runs the authors' Causal Explorer beside `hiton_pc` and `hiton_mb`:
+  its HITON-PC and HITON-MB, and MMMB for `mmmb`, called through MATLAB in batch with
+  the same data, test, significance level, and largest conditioning set. `start_causal_explorer.sh`
+  fetches the public repository at a pinned commit; the arm is left out where MATLAB or the toolbox
+  is absent. ([#957])
+- `andrey.mb_by_mb`, MB-by-MB (Wang et al. 2014): the direct causes and direct
+  effects of one target, the edges the target has in the CPDAG with their directions, learned one
+  Markov blanket at a time outward from the target until no further blanket can direct one of
+  them. `metadata` lists the target's `parents`, `children`, and `undirected` neighbors, the
+  `blankets_learned`, and `n_tests`. Its blanket learner is IAMB's grow phase without the shrink,
+  as in the paper's runs (`blanket="iamb_forward"`, a new choice of the engine's learners).
+  `local_max_depth=5`, the cap of those runs, caps the local structures' tests alone; `max_depth`
+  caps every test, as in the other learners, and sets no cap by default. As in the paper, every
+  independence a test of the search finds is kept, a blanket learner's included, and such a pair
+  holds no edge. It is supported: at its paper's settings (Alarm and Hailfinder at 500 to 5,000
+  rows, a 45 x 45 chessboard), each answer took a small fraction of the tests of one global PC
+  fit and made fewer errors than the empty answer everywhere and than bnlearn's `pc.stable` on
+  Alarm and Hailfinder; Andrey's PC, at many times the tests, made fewer errors in some settings.
+  The 0.18.0 release card has the numbers and the trade-off. ([#956], [#1030])
+- `andrey.mmb_by_mmb`, MMB-by-MMB (Xie et al. 2024), supported: the direct causes and direct
+  effects of one target when unmeasured common causes may exist, the edges the target has in the PAG
+  with their marks, learned one Markov blanket at a time outward from the target until its marks are
+  decided or the paper's stop rules end the search. `metadata` lists the target's `parents`,
+  `children`, `bidirected` neighbors, and `undetermined` ones (a circle at either end), its
+  `markov_blanket`, the `blankets_learned`, and `n_tests`. Its blanket learner is total
+  conditioning, a test of each variable given all the others, as in the paper's runs
+  (`blanket="total_conditioning"`, a new choice of the engine's learners, which `mb_by_mb` also
+  takes); `alpha=0.01` and `local_max_depth=10` are its authors' settings, and total conditioning
+  tests each blanket at `alpha / (10 * floor(d / 10))` over `d >= 10` columns, as their code does.
+  With a partial-correlation test on complete data, total conditioning answers the tests of every
+  blanket a fit learns from one inverse of the correlation matrix. Where its authors' code goes
+  beyond the paper, the method follows it, with two safeguards that make the answer correct where
+  the paper's steps as written can be wrong: a v-structure joins the answer only when the variables
+  off the step confirm it from their own blankets, and the stop rules are read only once more
+  blankets have been learned than the target has neighbors. A pair at a step is tested against the
+  subsets of the smaller of the two ends' blankets, which decides it as the step's own blanket
+  does (Theorem 1 of the paper at either end, the limit Grow-Shrink and MBCS* put on the search),
+  so a variable with a wide blanket costs the tests of its neighbors' blankets instead of every
+  subset of its own. The benchmark lane of MMB-by-MMB runs it beside the authors' code. It is
+  supported: on the paper's four networks with hidden nodes, at 1,000 and 5,000 rows and the paper's
+  targets, its edges and marks were better than those of the authors' code in five of eight
+  settings and no worse in the rest, and it made fewer errors than the empty answer in all eight;
+  the 0.18.0 release card has the numbers. ([#966], [#980], [#994], [#1022], [#1024])
 - `iamb`, `inter_iamb`, and `mmpc` record the number of conditional-independence tests a fit
   evaluated in `metadata["n_tests"]`; their graphs do not change. ([#917])
 - `andrey.metrics.target_edge_scores` scores the edges at one target of a target-centered answer,
@@ -40,6 +160,11 @@ names its pull request.
   FCI on published networks as linear-Gaussian models with hidden nodes, and `y_structures_cpu.py`
   runs the authors' Y-structure code on models with a selection node. Each has its simulation, its
   scores, and the contract that the adapter of an Andrey method fills. ([#912])
+- The Y-structures benchmark lane draws the selection variables of a random graph by a rule,
+  `--rule`: `authors`, the default, as the authors' simulation script draws them, the first among
+  the colliders and their descendants and the others among all other nodes; `text`, the harder
+  setting, as the paper's text describes them, among the leaves of the colliders' descendants.
+  `y_structures_summary.py` judges Andrey's claims against the authors' code per setting. ([#1026])
 - Scores for the answers of local methods, which may leave a question open.
   `andrey.metrics.target_oracle` and `effect_oracle` give the answer a method's definition gives on
   the true graph: a target's Markov blanket, its parents and children, or its edges in the true
@@ -51,6 +176,94 @@ names its pull request.
   `pooled_answer_scores` apply it to targets, pairs, and claims. The benchmark harness adds the gate
   on the net score, paired risk on the queries two methods both answered, and risk-coverage
   tables. ([#932])
+- `GraphStructure.is_adjustment_set` says whether a set of covariates is an adjustment set for the
+  total effect of a treatment on an outcome, in a DAG, a CPDAG, or a MAG or PAG without selection
+  bias, by the generalized adjustment criterion of Perković et al. (2018).
+  `GraphStructure.optimal_adjustment_set` returns the adjustment set of Henckel, Perković and
+  Maathuis (2022) that gives the least-squares estimate its smallest asymptotic variance in a
+  linear model, in a DAG or a CPDAG. `andrey.metrics.adjustment_scores` scores one adjustment set
+  against a true graph: its validity, and its precision and recall against the optimal set.
+  ([#939])
+- A benchmark lane for the methods that answer for a treatment and an outcome. `adjustment_cpu.py`
+  runs the methods of the group as they ship, PC read at the pair, and two baselines that adjust
+  for nothing and for everything, beside the authors' code for LDECC, LDP, LD3, SNAP, and LOAD, on
+  models planted as each method's paper describes them: pretreatment covariates, the partition
+  graphs of LDP, sink outcomes, LDECC's covariates and mediators, identifiable and non-identifiable
+  direct effects, random graphs with a target pair, and the MAGIC-NIAB, SANGIOVESE, and MILDEW
+  networks. It scores the answers and the sets with `andrey.metrics`, and the effect each returned
+  set estimates, on a fresh sample, against the true effect; a method that gives no set is never
+  scored as the empty set. ([#964])
+- `andrey.ldp`, local discovery by partitioning (Maasch et al. 2024), experimental: a valid
+  adjustment set for the total effect of one `treatment` on one `outcome`, in a number of tests
+  quadratic in the number of columns. It labels every other column by its causal relation to the
+  pair from tests whose conditioning sets are the labels found before, and returns the confounders
+  as the adjustment set when its Z5 criterion passes, and no set otherwise. The answer is one record
+  in `metadata["effects"]`, `metadata["partition"]` lists the labels, and the graph has no edges.
+  The treatment-outcome benchmark lane runs it beside the authors' code. ([#970])
+- `andrey.ld3`, LD3 (Maasch et al. 2025), experimental: the parents of an outcome that has no
+  descendants among the columns, and whether the treatment is one of them (the structural direct
+  criterion), in a number of tests linear in the number of columns. The parents other than the
+  treatment are the adjustment set for the direct effect, and the answer is one record in
+  `metadata["effects"]`; `metadata["partition"]` lists the labels, and the graph holds the edges
+  into the outcome. It assumes every parent of the outcome is observed. The treatment-outcome
+  benchmark lane runs it beside the authors' code. ([#970])
+- `andrey.local_isa_ling`, local ISA-LiNG (Dai et al. 2024), supported: the weighted edges into a
+  target and into each of its children in a linear model with non-Gaussian noise whose graph may
+  hold cycles, from the target and its Markov blanket alone, as a weighted `digraph`. The blanket
+  is the support of a Lasso regression; a sparse ICA (Zhang and Chan 2006) and HSIC tests give the
+  independent subspaces, and every admissible assignment of them gives a model of the equivalence
+  class, listed in `metadata["equivalent_models"]` with the stable ones first. `acyclic=True`
+  peels sink columns instead, for a target and children on no cycle; when no column is a sink, it
+  takes the column with the fewest nonzero entries, as its authors' code does, so it always gives
+  one model. The benchmark lane of local ISA-LiNG runs it beside the authors' code on the paper's
+  simulations. It is supported for graphs with cycles, where it tied the authors' code with its
+  own blanket and with the true one and made fewer errors than the empty answer. Data without
+  cycles, small samples among them, are outside its claim: on DAGs global DirectLiNGAM read at the
+  target is more accurate and faster from 300 rows up. The 0.18.0 release card has the numbers.
+  ([#986], [#1032])
+- `andrey.cmb`, CMB (Gao and Ji 2015), supported: the direct causes and direct effects of one
+  target, without learning the whole graph. It learns the target's parents and children and Markov
+  blanket with a topology-based learner (`blanket="hiton_mb"`, the paper's, or `mmmb`, `pcmb`),
+  labels each neighbor from how its dependence on the others changes once the target is conditioned
+  on, retests an inconclusive pair given one member's blanket, and visits undecided neighbors in
+  turn, whose directions also direct the target's edges that close a triangle with them, by
+  acyclicity (Meek's rule R2). `alpha` defaults to 0.02, the level of the paper's runs. `metadata`
+  lists the target's `parents`, `children`, `undirected` neighbors, `markov_blanket`, the
+  `blankets_learned`, and `n_tests`. With exact tests every edge and direction it returns is the
+  CPDAG's, and some edges the CPDAG directs stay undirected. It is supported: on samples of the
+  Alarm network at 1,000 rows, its paper's setting, it made fewer errors at the target than global
+  PC read there and than the empty answer, on 20 datasets and again on 20 fresh ones; the 0.18.0
+  release card has the numbers. ([#995], [#1020])
+- `andrey.ldecc`, LDECC (Gupta et al. 2023), supported: the edges at one `treatment`, with their
+  directions, and the locally valid parent sets for its effect on one `outcome`, from its Markov
+  blanket (`blanket`, `"iamb"` by default) and the tests of the PC algorithm read as they come, with
+  eager collider checks that direct the treatment's parents. The step that finds the neighbors
+  tests each blanket member against subsets of the blanket. The graph is a CPDAG of the edges at the
+  treatment, and the answer is one record in `metadata["effects"]`. Against its authors' code on the
+  graphs of its paper's generator and on the MAGIC-NIAB network at 8,000 to 32,000 rows, it tied on
+  accuracy, recall, and effect error in all 8 settings, on 20 datasets and again on 20 fresh ones.
+  ([#991], [#1029])
+- `andrey.local_optimal_adjustment`, LOAD (Schubert, Claassen and Magliacane 2026), supported:
+  for two `variables` given in any order, finds whether one causes the other and the optimal
+  adjustment set for the total effect when it is identifiable, else the locally valid parent sets
+  of the treatment, from local structures learned one Markov blanket at a time, as MB-by-MB learns
+  them but each by the skeleton step of PC over the blanket, so the tests are exponential in the
+  degrees of the skeleton and not in the size of the blanket. It learns only the blankets the
+  answer needs. `metadata["effects"]` holds one record per direction, the graph the edges at the
+  two variables, and `metadata["blankets_learned"]` the variables whose blanket it learned. Against
+  its authors' code on its paper's random graphs with 100 to 1,000 variables and on pairs of the
+  MAGIC-NIAB network at 10,000 rows, its sets and effects tied in every setting, on 20 datasets or
+  again on 20 fresh ones. ([#1003], [#1011], [#1029])
+
+- `dagma` is supported, with its gap stated. Against its authors' package on its paper's simulation,
+  it made no more errors in any of the 24 settings with every column z-scored or any of the 18 on the
+  simulation's own units, and in 17 of the 18 with each variable divided by its standard deviation as
+  it is generated. On the simulation's own units it made fewer errors than the empty graph in all 18
+  settings, and on z-scored columns in none of the 24, as the package. Its result depends on the
+  data's scale (Reisach, Seiler and Weichwald 2021). The [0.18.0 release card][card-0180-dagma] has
+  the numbers and a check of `dagma` and `notears` on the Sachs data: on its 853 observational
+  measurements, four fits, default and `robust=True`, on raw and z-scored columns, made 13 or 14
+  errors against the empty graph's 17. ([#1043], [#1046])
 
 ### Changed
 
@@ -61,6 +274,170 @@ names its pull request.
   whole graph on 60 variables 3.7 to 4.6 times faster. Their graphs and `metadata["n_tests"]` do
   not change, bit for bit. Fits with the chi-square tests, and `mmpc` fits, take the same time as
   before. ([#927])
+- `iamb` and `inter_iamb` order the candidates of each grow step by their p-values to nine
+  significant digits, as `gs` and `fast_iamb` do, where they compared p-values rounded to nine
+  decimals, which tied every p-value below 5e-10 and left the choice to a rank computed from the
+  data. On categorical data their blankets can change for some targets, and so can the graphs of
+  `rsmax2` with `restrict="iamb"` or `"inter_iamb"`; results on continuous data do not change. On
+  five published networks at 500 to 10,000 rows, recall is higher in 18 of 42 comparisons and
+  pooled F1 is never lower. ([#969])
+
+- `ldecc` reads five steps as its authors' implementation does: two neighbors separated without the
+  treatment are parents only when they test dependent given that set and the treatment; a neighbor
+  is a child of an unshielded collider only when every set of neighbors that separates the spouse
+  from the treatment leaves it out and dependent on the spouse; a non-collider tests only the
+  undirected neighbors as children; an eager collider check with one neighbor marks parents only
+  when the other's minimal separator holds that neighbor and one more variable; and a parent set
+  checks the non-collider pairs among the undirected neighbors it adds. On the 25-node graphs of
+  Gupta et al. at 8,000 to 32,000 rows, the share of fits whose parent sets equal the true CPDAG's
+  rises from 0.16-0.25 to 0.38-0.42, and the answers under exact tests do not change. ([#1029])
+- `local_optimal_adjustment` directs an edge that two v-structures direct both ways as the
+  v-structure whose pair the tests separated most clearly asks, as `pc` orders its colliders, where
+  it left the edge undirected; the answer then reads the pair's relation from it. Under exact tests
+  no edge is disputed and the answers do not change; `mb_by_mb` and `mmb_by_mmb` do not change.
+  ([#1029])
+- The treatment-outcome benchmark lane counts the conditional-independence tests of its PC arm, PC
+  read at the pair, so its cost sits beside the methods'. ([#1031])
+- The documentation of `register_indep_test` and `DSepOracle` states that a registered test's
+  indices are column positions of the matrix its factory receives, and that the
+  possible-d-separation step of `fci`, `fci_jci`, and `gfci` builds its test again over the columns
+  in rank order: a test that does not read its matrix, such as an oracle by d-separation, finds
+  which variable each column holds, and `possible_dsep="fast"` keeps the data's order. The
+  environment settings and the configuration page no longer list `fci_jci` with `normal_scores`
+  among the parallel possible-d-separation searches; it does not offer that test. ([#1040])
+- A partial-correlation test asked one query at a time with two or more conditioning variables, as
+  `gs`, `ldecc`, and `locpc_cde` ask it, inverts the query's one submatrix directly, with the same
+  `np.linalg.inv` call and the same singularity bound, where it built an index grid and a stack of
+  one. At 5,000 rows, `locpc_cde` on 1,000 variables is 1.5 times faster, `gs` on 100 variables
+  1.4 times, and `ldecc` 1.1 times. Every output, `metadata["n_tests"]` included, is the same bit
+  for bit. ([#1035], [#1041])
+- The skeleton scans of `pc` and `fci` and the conditioning-set scans of the blanket learners,
+  `mb_by_mb`, and `local_optimal_adjustment` build each chunk of conditioning sets as the rows of
+  an int array from cached combination tables, where they built tuples and converted each chunk
+  back. At 5,000 rows and 1,000 variables, `mb_by_mb` at one target is 1.15 times faster,
+  `local_optimal_adjustment` 1.08 times, and `pc` 1.06 times. Every output, `metadata["n_tests"]`
+  included, is the same bit for bit. ([#1036], [#1042])
+
+- The Limitations of `notears` and `dagma` are one sentence: the result depends on the data's scale,
+  after Reisach, Seiler and Weichwald (2021), with a link to the release card. The registry and the
+  docstrings no longer say that the robust fit does not depend on the scale of the columns: its first
+  fit is least squares, and its penalty and threshold act on the weights in the data's units.
+  ([#1043], [#1046])
+
+### Fixed
+
+- `notears(robust=True)` and `dagma(robust=True)` minimize the Gaussian likelihood of the path of
+  Deng et al. (2024) without `-log|det(I - W)|`, as its authors' code does. The term is zero
+  for every DAG, so the graphs each step is judged by do not change, but its gradient is not zero
+  while a fit is cyclic, and it led the path to other graphs. On the paper's simulation with z-scored
+  columns and 20 datasets per setting, the CPDAG errors of `dagma(robust=True)` fell from 23.1, 44.2,
+  23.5, and 54.0 to 21.3, 40.0, 17.9, and 39.0 on Erdos-Renyi and scale-free graphs with 10 and 20
+  variables, against 20.1, 42.4, 18.1, and 39.4 for the path run with its authors' code, and those of
+  `notears(robust=True)` at 10 variables moved from 16.6 on z-scored and 13.2 on raw columns to 18.5
+  and 11.8, against 18.4 and 11.8. ([#1043], [#1046])
+- `indep_test="normal_scores"` takes data from one environment. It ranks each column over every
+  row its test reads, so over several environments a column mixed their distributions: on two
+  simulated environments a true independence given the environment index was rejected in up to 95%
+  of runs at level 0.05, and the invariance tests of `igsp` and `ut_igsp` reported a change where
+  none occurred in up to all runs. `cdnod`, `fci_jci`, `igsp`, `ut_igsp`, and `jpcmciplus` no longer
+  offer it; `gfci`, `boss_fci`, and `grasp_fci` raise a `ValueError` for it with an `env`, as for
+  `score_func="normal_scores"`; and the error for a choice a method does not offer says why.
+  ([#1037])
+- The treatment-outcome benchmark lane scores the effect error of the pair asked. For a method that
+  answers both directions of a pair, the summary reads the record for the treatment and the outcome
+  asked, not the last record of the fit, and a record that says the effect is zero estimates 0
+  instead of adjusting for the sets it lists. `--rescore` recomputes the errors of a stored run.
+  ([#988])
+- `"fisherz"` and `"normal_scores"` compute the upper tail of their p-value directly, and so do
+  the Fisher-aggregated HSIC test of `bottom_up_parce_lingam` and the Anderson-Darling p-value of
+  one value in `markov_check`. The subtraction `1 - cdf` they used was `0` below about `2e-16` and
+  off by up to a few percent near `1e-14`, so every strong dependence tied. A p-value above `1e-16`
+  is the same to rounding, and a strong dependence now keeps a positive p-value down to about
+  `1e-308`. On the recorded-output and recovery inputs, 60 of the 66 methods return the same output
+  bit for bit. The graph of `pcmb` changes in one fit, from a tie among p-values below `2e-16`;
+  the p-values and statistics in the metadata of `pcmci`, `pcmciplus`, `lpcmci`, and `jpcmciplus`
+  change; and the claim scores of `y_structures` are finite where they were infinite, with the same
+  claims. The uniformity statistic and p-value of `markov_check` change when a test's p-value was
+  `0`, and the stored outputs of its example notebook are refreshed. ([#1017])
+- The separating-set search of the local methods keeps a count of the conditioning sets it tests
+  and the best separating set, not a record of every set, so its memory no longer grows with the
+  number of sets. `mmb_by_mmb` tests a pair against every subset of a blanket of up to 10 members,
+  and a fit with a 36-member blanket ran out of memory at 64 GB; one call over the 6.9 million sets
+  of size 9 of 28 variables now peaks at about 115 MB instead of 3.5 GB. Answers and `n_tests` are
+  unchanged. ([#1019])
+- The treatment-outcome benchmark lane computes `valid` and F1 from the sets of the pair asked; a
+  method that answers both directions no longer counts the sets of the reverse one. ([#1029])
+- `mb_by_mb` puts no edge between a pair that a test of its search separated, a blanket learner's
+  test included, as the paper's search does. Such a pair could keep an edge, and a v-structure that
+  named it could direct a neighbor's other edge. On samples of the paper's networks the answers
+  change, mostly on Hailfinder, where the errors at the target fall in most settings. ([#1030])
+
+## [0.17.1] - 2026-11-12
+
+### Highlights
+
+- The homepage is half as long and shows one method per family, each timed against every package
+  that runs it. A new Methods page lists every method by the kind of data it reads and by family,
+  and the comparison with other packages is a docs page. ([#919], [#920])
+- A [standards page](https://andrey.abel.ai/docs/standards.html) lists what Andrey requires of
+  every method and how each requirement is checked. New tests fit every method with each column
+  rescaled by its own factor and require the same graph; the five methods whose published
+  algorithms read the units are marked in the registry. ([#904], [#910])
+- `score_func="normal_scores"`, experimental, scores each column's normal scores, so the score
+  searches and the hybrids keep their graph when a column goes through an increasing transform
+  such as a logarithm. ([#928])
+- The docs are easier to enter: a concepts guide states causal discovery formally, the examples
+  open with a numbered learning path, and the contributing guide walks from a fork to a merged pull
+  request. ([#904])
+
+### Added
+
+- `andrey.viz.Palette` has `amber_text`, the amber of a word set on the paper: darker in the light
+  theme, so display type keeps a 3:1 contrast. ([#919])
+- `MethodSpec.reads_units` marks the methods whose default fit reads the columns' units: `calm`,
+  `dagma`, `dynotears`, `ica_lingam`, and `notears`. The tests now fit every method on data with
+  each column rescaled by its own factor, with environments, interventions, mixed data, time series,
+  and panels, and require the same graph from every other method; the methods that read the data
+  only through `indep_test="normal_scores"` keep their graph under a strictly increasing transform
+  of each column, and those that take `"chisq"` or `"gsq"` under an order-preserving recoding of
+  each column's categories. ([#910])
+- A [standards page](https://andrey.abel.ai/docs/standards.html) lists what Andrey requires of
+  every method, how each requirement is checked, and where the exceptions are recorded. The
+  examples page opens with a numbered learning path through the notebooks, and the API reference
+  opens with the shape of the API; the details of `env` and `targets` moved to the
+  [getting-started guide](https://andrey.abel.ai/docs/guides/getting-started.html#environments-and-interventions).
+  ([#904])
+- A [concepts guide](https://andrey.abel.ai/docs/guides/concepts.html) states causal discovery
+  formally: the model, what the data identify, what each kind of graph claims, and which methods
+  fit which assumptions. It opens the learning path, and the quick-start notebook states its model
+  in one equation. ([#904])
+- `score_func="normal_scores"`, experimental, is the linear-Gaussian BIC on each column's normal
+  scores: the score of the nonparanormal model, for continuous data that are Gaussian only after an
+  unknown increasing transformation of each column. `ges`, `xges`, `hc`, `tabu`, `exact_search`,
+  `boss`, `grasp`, `gfci`, `boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take it. With
+  `indep_test="normal_scores"` as well, the test and the score read one model, and a strictly
+  increasing transformation of any column leaves the graph unchanged. Defaults do not change:
+  `indep_test="normal_scores"` alone keeps the default score. The score takes no `env` and no
+  `missing="em"`. ([#928])
+- The methods catalog, Methods in the navbar: "Start from your data" gives, for each kind of data,
+  the method to start with, the graph it returns, and how many methods of each family read it, and
+  every method is listed by family with the data it reads, the graph it returns, its status, and the
+  release cards that compare it. Each method's `--help --json` contract and its `andrey list` row
+  give `data_kinds`, the kinds of data it reads, which the registry derives from its tests and
+  scores, its `missing` argument, its inputs, and its result. ([#920])
+
+### Changed
+
+- The homepage is about half as long and names one method per family: the supported method compared
+  with the most packages, timed against every package on one axis, beside the outcome its release
+  card records. The newest four release cards, a table of the families by the kinds of data their
+  methods read, the Sachs example, a band for agents, and five next steps follow, and the install
+  line has a copy button. The comparison with causal-learn, Tetrad, pcalg, and bnlearn moved from
+  the homepage to its own [page](https://andrey.abel.ai/docs/comparison.html). ([#919])
+
+### Fixed
+
+- A page with math no longer scrolls sideways on a phone. ([#904])
 
 ## [0.17.0] - 2026-11-11
 
@@ -2254,6 +2631,7 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
+[0.17.1]: https://github.com/Abel-ai-lab/Andrey/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.14.0...v0.15.0
@@ -2530,6 +2908,50 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#1003]: https://github.com/Abel-ai-lab/Andrey/pull/1003
+[#1009]: https://github.com/Abel-ai-lab/Andrey/pull/1009
+[#1011]: https://github.com/Abel-ai-lab/Andrey/pull/1011
+[#1020]: https://github.com/Abel-ai-lab/Andrey/pull/1020
+[#1024]: https://github.com/Abel-ai-lab/Andrey/pull/1024
+[#1016]: https://github.com/Abel-ai-lab/Andrey/pull/1016
+[#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
+[#1022]: https://github.com/Abel-ai-lab/Andrey/pull/1022
+[#1026]: https://github.com/Abel-ai-lab/Andrey/pull/1026
+[#1029]: https://github.com/Abel-ai-lab/Andrey/pull/1029
+[#1019]: https://github.com/Abel-ai-lab/Andrey/pull/1019
+[#1025]: https://github.com/Abel-ai-lab/Andrey/pull/1025
+[#1030]: https://github.com/Abel-ai-lab/Andrey/pull/1030
+[#1031]: https://github.com/Abel-ai-lab/Andrey/pull/1031
+[#993]: https://github.com/Abel-ai-lab/Andrey/pull/993
+[#994]: https://github.com/Abel-ai-lab/Andrey/pull/994
+[#988]: https://github.com/Abel-ai-lab/Andrey/pull/988
+[#1000]: https://github.com/Abel-ai-lab/Andrey/pull/1000
+[#986]: https://github.com/Abel-ai-lab/Andrey/pull/986
+[#1032]: https://github.com/Abel-ai-lab/Andrey/pull/1032
+[#1037]: https://github.com/Abel-ai-lab/Andrey/pull/1037
+[#1038]: https://github.com/Abel-ai-lab/Andrey/pull/1038
+[#1040]: https://github.com/Abel-ai-lab/Andrey/pull/1040
+[#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
+[#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
+[#1035]: https://github.com/Abel-ai-lab/Andrey/pull/1035
+[#1041]: https://github.com/Abel-ai-lab/Andrey/pull/1041
+[#1036]: https://github.com/Abel-ai-lab/Andrey/pull/1036
+[#1042]: https://github.com/Abel-ai-lab/Andrey/pull/1042
+[#995]: https://github.com/Abel-ai-lab/Andrey/pull/995
+[#991]: https://github.com/Abel-ai-lab/Andrey/pull/991
+[#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
+[#981]: https://github.com/Abel-ai-lab/Andrey/pull/981
+[#971]: https://github.com/Abel-ai-lab/Andrey/pull/971
+[#969]: https://github.com/Abel-ai-lab/Andrey/pull/969
+[#970]: https://github.com/Abel-ai-lab/Andrey/pull/970
+[#980]: https://github.com/Abel-ai-lab/Andrey/pull/980
+[#966]: https://github.com/Abel-ai-lab/Andrey/pull/966
+[#965]: https://github.com/Abel-ai-lab/Andrey/pull/965
+[#964]: https://github.com/Abel-ai-lab/Andrey/pull/964
+[#959]: https://github.com/Abel-ai-lab/Andrey/pull/959
+[#956]: https://github.com/Abel-ai-lab/Andrey/pull/956
+[#957]: https://github.com/Abel-ai-lab/Andrey/pull/957
+[#950]: https://github.com/Abel-ai-lab/Andrey/pull/950
 [#935]: https://github.com/Abel-ai-lab/Andrey/pull/935
 [#931]: https://github.com/Abel-ai-lab/Andrey/pull/931
 [#927]: https://github.com/Abel-ai-lab/andrey/pull/927
@@ -2537,8 +2959,15 @@ First alpha release.
 [#915]: https://github.com/Abel-ai-lab/Andrey/pull/915
 [#912]: https://github.com/Abel-ai-lab/Andrey/pull/912
 [#932]: https://github.com/Abel-ai-lab/Andrey/pull/932
+[#910]: https://github.com/Abel-ai-lab/andrey/pull/910
+[#904]: https://github.com/Abel-ai-lab/andrey/pull/904
+[#928]: https://github.com/Abel-ai-lab/andrey/pull/928
+[#919]: https://github.com/Abel-ai-lab/andrey/pull/919
+[#939]: https://github.com/Abel-ai-lab/Andrey/pull/939
 [em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
 [kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
 [card-0170-dagma]: https://andrey.abel.ai/docs/benchmarks/0.17.0.html#dagma
+[card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
 [nd-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/notears-dagma.md
 [ages-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/ages.md
+[#920]: https://github.com/Abel-ai-lab/andrey/pull/920

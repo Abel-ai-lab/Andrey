@@ -37,6 +37,10 @@ STRUCTURES = ("moral", "skeleton", "cpdag")
 #: The test count of a target, or of a fit, that its solution does not report.
 NO_COUNT = -1
 
+#: The test count of a target its solution failed to answer: the lane leaves the target out of the
+#: fit's sets and scores, and lists it in the record's ``unanswered``.
+NO_ANSWER = -2
+
 # The arrowhead of Andrey's endpoint marks (mirrors contracts.py).
 _ARROW = 2
 
@@ -60,6 +64,18 @@ def pack_answer(
         packed[d] = np.asarray(counts, dtype=np.int64)
     packed[d + 1, 0] = NO_COUNT if total is None else int(total)
     return packed
+
+
+def widen_answer(native: np.ndarray, keep: np.ndarray, d: int) -> np.ndarray:
+    """The packed answer of a fit on the columns `keep` of `d`, on all `d`: a column left out joins
+    no set and has no test count, and the whole fit's count is kept."""
+    answer, counts, total = unpack_answer(native)
+    keep = np.asarray(keep, dtype=np.intp)
+    full = np.zeros((d, d), dtype=np.int64)
+    full[np.ix_(keep, keep)] = answer
+    full_counts = np.full(d, NO_COUNT, dtype=np.int64)
+    full_counts[keep] = counts
+    return pack_answer(full, full_counts, total)
 
 
 def unpack_answer(native: np.ndarray) -> tuple[np.ndarray, np.ndarray, int | None]:
