@@ -328,7 +328,7 @@ CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
   column, jnk, and the fit finds one of them with a wrong mark, as FCI does, so it makes as many
   errors as the empty answer. The empty answer's median errors are the last column's median
   number of edges in the PAG, 1.5 on the `latent_gauss_er` cells and 2 on ASIA. Identity fits the
-  same column, so it skips the column-order refits, as it does for ICP.
+  same column, so it skips the column-order refits.
 - **ASIA.** The 8-arc network of Lauritzen and Spiegelhalter (1988), sampled as a linear SCM with
   1,000 rows per seed. Its arcs are bnlearn's (`andrey.data.load_dataset("asia")`); the gate lists
   them in its own order, which fixes each seed's weights, and a test checks the two agree.
