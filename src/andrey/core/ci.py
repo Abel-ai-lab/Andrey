@@ -86,9 +86,10 @@ from typing import Any, Protocol, Self, cast, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
+from scipy.linalg import get_lapack_funcs
 from scipy.special import chdtrc, gammaln, ndtr, stdtr
 
-from . import categorical, stats
+from . import categorical, env, stats
 from .categorical import BATCH_CELLS, DENSE_MIN, DENSE_ROWS
 from .mixed import ConditionalGaussian, DegenerateGaussian
 from .score import copies_error, copies_message, copy_groups
@@ -113,6 +114,14 @@ SINGULAR_RTOL = 1e-12
 # How far the inverse bound in _invert_nonsingular stays above that threshold; the factor absorbs
 # the rounding of the computed inverse and of the eigenvalues.
 BOUND_MARGIN = 1e4
+# The smallest number of candidates times the block size, len(ys) * (|S| + 2), that
+# statistic_pvalues_given answers from one factor, unless ANDREY_SHARED_SCAN_MIN_WORK sets another.
+# On one core the factor is slower than the per-query inversions below a work of about 64 and faster
+# from 128 at every set size sampled (2 to 12).
+MIN_SHARED_FACTOR_WORK = 128
+# The LAPACK Cholesky factor and triangular solve of statistic_pvalues_given, called directly: on
+# the small scans it serves, the checks of scipy.linalg's wrappers would take most of the time.
+_POTRF, _TRTRS = get_lapack_funcs(("potrf", "trtrs"), (np.empty((1, 1)),))
 
 
 class SingularCorrelationError(ValueError):
@@ -163,7 +172,8 @@ class PartialCorrelationTest:
     separating-set search, and :meth:`batched_call` call with queries canonical as built, use
     identical partial-correlation, clip, and p-value arithmetic. Their p-values match exactly, so
     repeated queries take the same ``p > alpha`` decision across call paths, including at the
-    threshold.
+    threshold. :meth:`statistic_pvalues_given`, which answers the grow scans of IAMB and
+    Inter-IAMB from one factor, agrees with them up to rounding.
     """
 
     # The data's groups of copies, set by the first singular inversion.
@@ -387,6 +397,87 @@ class PartialCorrelationTest:
             r = -inv[:, 0, 1] / np.sqrt(np.abs(inv[:, 0, 0] * inv[:, 1, 1]))
         r = np.clip(r, -ONE_MINUS_EPS, ONE_MINUS_EPS)
         return r, np.asarray(self._pvalue(r, df))
+
+    def statistic_pvalues_given(
+        self, x: int, ys: Sequence[int], condition_set: Iterable[int]
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Partial correlations and p-values of ``x`` and each of ``ys`` given one conditioning set.
+
+        Entry ``i`` is :meth:`statistic_pvalue` of ``x`` and ``ys[i]`` given ``condition_set``, up
+        to rounding; a repeated column of the set counts once. For a set ``S`` of two or more
+        columns and two or more candidates whose ``len(ys) * (|S| + 2)`` reaches
+        ``MIN_SHARED_FACTOR_WORK`` (128, or the ``ANDREY_SHARED_SCAN_MIN_WORK`` that overrides it;
+        ``0`` factors every such scan), one Cholesky factor ``L`` of the set's correlation block
+        ``R_SS`` serves every candidate: with ``w_a = L^-1 R_Sa``, the Schur complement
+        ``P_ab = R_ab - w_a . w_b`` gives the partial correlation ``P_xy / sqrt(P_xx P_yy)``, where
+        :meth:`statistic_pvalue` inverts each ``[x, y, *S]`` block. The two agree to about ``1e-10``
+        relative in the p-value, so a p-value on a rounding boundary can differ in its ninth
+        significant digit, and a candidate's last bits can change with the other candidates of the
+        call. Every entry of the correlation matrix is read as ``corr[min, max]`` of its two
+        columns, so a matrix that is not exactly symmetric gives each pair one answer whichever
+        column is ``x``.
+
+        The other calls take :meth:`statistic_pvalues`, which answers or raises as it does: a
+        smaller set, fewer candidates, and any call with a block that the factor does not show to
+        be well inside the nonsingular range of :func:`_invert_nonsingular`, so that every block
+        the current rule calls singular, such as a candidate that copies ``x`` or a member of the
+        set, raises the same error. ``ys`` excludes ``x`` and the members of the set.
+        """
+        cols = np.asarray(ys, dtype=np.intp).reshape(-1)
+        cond = np.unique(np.fromiter(condition_set, dtype=np.intp))
+        min_work = env.SHARED_SCAN_MIN_WORK.read()
+        if min_work is None:
+            min_work = MIN_SHARED_FACTOR_WORK
+        if len(cond) >= 2 and len(cols) >= 2 and len(cols) * (len(cond) + 2) >= min_work:
+            df = self._degrees_of_freedom(len(cond))
+            r = self._schur_partial_correlations(int(x), cols, cond)
+            if r is not None:
+                r = np.clip(r, -ONE_MINUS_EPS, ONE_MINUS_EPS)
+                p = np.asarray(self._pvalue(r, df), dtype=np.float64)
+                return r, p
+        xs = np.full(len(cols), x, dtype=np.intp)
+        return self.statistic_pvalues(xs, cols, np.tile(cond, (len(cols), 1)))
+
+    def _schur_partial_correlations(
+        self, x: int, ys: np.ndarray, cond: np.ndarray
+    ) -> np.ndarray | None:
+        """The unclamped partial correlations of :meth:`statistic_pvalues_given` from the Schur
+        complements of the block ``R_SS`` of the sorted distinct set ``cond``, or ``None`` when a
+        block ``A = [x, y, *S]`` may not pass :func:`_invert_nonsingular`.
+
+        The inverse of ``A`` is ``diag(R_SS^-1, 0) + [V; -I] M^-1 [V; -I]^T``, with ``M`` the 2 x 2
+        Schur complement of ``x`` and ``y`` and ``V = R_SS^-1 R_S[x, y]``, whose squared norm is at
+        most ``2 g`` on a unit diagonal, where ``g = ||L^-1||_F^2 >= ||R_SS^-1||_2``. So
+        ``||A^-1||_2 <= g + (1 + 2 g) / lambda_min(M)``. Below ``1 / (BOUND_MARGIN * SINGULAR_RTOL *
+        k)``, with ``k = |S| + 2 >= lambda_max(A)``, every block has ``lambda_min > BOUND_MARGIN *
+        SINGULAR_RTOL * lambda_max`` and the eigenvalue test passes; a NaN fails the comparison.
+        """
+        corr = self._corr
+        size, n = len(cond), len(ys)
+        factor, info = _POTRF(corr[cond[:, None], cond], lower=0)  # the upper triangle; cond sorted
+        if info != 0:
+            return None
+        rhs = np.empty((size, n + 1 + size))
+        rhs[:, 0] = corr[np.minimum(cond, x), np.maximum(cond, x)]
+        rhs[:, 1 : n + 1] = corr[np.minimum(cond[:, None], ys), np.maximum(cond[:, None], ys)]
+        rhs[:, n + 1 :] = np.eye(size)
+        w, info = _TRTRS(factor, rhs, lower=0, trans=1)
+        if info != 0:
+            return None
+        g = np.einsum("ij,ij->", w[:, n + 1 :], w[:, n + 1 :])
+        squares = np.einsum("ij,ij->j", w[:, : n + 1], w[:, : n + 1])
+        pxx = corr[x, x] - squares[0]
+        pyy = corr[ys, ys] - squares[1:]
+        pxy = corr[np.minimum(x, ys), np.maximum(x, ys)] - np.einsum(
+            "i,ij->j", w[:, 0], w[:, 1 : n + 1]
+        )
+        smallest = 0.5 * (pxx + pyy) - np.hypot(0.5 * (pxx - pyy), pxy)  # lambda_min(M) per y
+        if not (smallest > 0.0).all():
+            return None
+        bound = g + (1.0 + 2.0 * g) / smallest
+        if not (bound < 1.0 / (BOUND_MARGIN * SINGULAR_RTOL * (size + 2))).all():
+            return None
+        return pxy / np.sqrt(pxx * pyy)
 
     def residual_statistic_pvalues(
         self, data: np.ndarray, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
