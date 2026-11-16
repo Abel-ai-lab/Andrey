@@ -7,7 +7,7 @@ the authors' code of the reference methods, on models planted as the method's ow
 them, and scores the answers against the truth the method's definition gives.
 
 The seven Andrey methods fill a table row each ([Adding a method](#adding-a-method)). LDECC, LOAD,
-and LocPC-CDE ran in the 0.18.0 campaign ([Results](#results)).
+LocPC-CDE, LDP, and LD3 ran in the 0.18.0 campaign ([Results](#results)).
 
 ## Data
 
@@ -103,13 +103,14 @@ answer.
 
 ## Results
 
-The 0.18.0 campaign ran LDECC, LOAD, and LocPC-CDE against their authors' code on 20 datasets per
+The 0.18.0 campaign ran LDECC, LOAD, LocPC-CDE, LDP, and LD3 against their authors' code on 20 datasets per
 cell, seeds 0-19, and again on seeds 20-39 for a cell worse on the first 20 or below its floor, each
 fit on one core with a cap of 1,800 s. A cell counts as worse when the paired 95% bootstrap interval
 of Andrey's error minus the authors' code's lies above 0 on both seed ranges. Andrey's PC read at the
 pair ran beside them with the same test and level. Every number, per cell and measure, is in
-`benchmarks/published/0.18.0/adjustment.json` (LDECC and LOAD) and
-`benchmarks/published/0.18.0/locpc-cde.json` (LocPC-CDE), and the release card has the tables.
+`benchmarks/published/0.18.0/adjustment.json` (LDECC and LOAD),
+`benchmarks/published/0.18.0/locpc-cde.json` (LocPC-CDE), and
+`benchmarks/published/0.18.0/ldp-ld3.json` (LDP and LD3), and the release card has the tables.
 
 - **LDECC** (`ldecc@8000` to `@32000`, `magic-niab@8000` to `@32000`; Fisher's z at
   `0.01 * 32000 / n`, as the authors' notebooks set it): a tie with the authors' code on accuracy,
@@ -139,7 +140,28 @@ pair ran beside them with the same test and level. Every number, per cell and me
   order of their names (at `v<=100`, these two explain 37 of 40 differing answers on linear-Gaussian
   data and 25 of 36 on binary data, and the G-square test's degrees of freedom 2 more). Eight fits of the authors' code that failed to start were rerun, and
   three that passed 1,800 s were rerun with a cap of 3,600 s.
-- **PC read at the pair** was never better than any of the three methods on both accuracy and cost.
+- **LDP** (`ldp@1000` to `@7500` with and without the effect, `ldp@5000,latent=True` with `B1`,
+  `Z1`, or `B1`, `Z4a`, `M1` hidden, Fisher's z at 0.01; `mildew@25000` to `@75000`, chi-square at
+  0.001): a tie with the authors' code on the valid-set loss (no set or a set that is not valid
+  counts 1) and the effect error in all 14 cells, on both seed ranges, and its effect error is below
+  the unadjusted regression's wherever it answers. Its answers are the code's on every dataset of
+  the Gaussian cells but the two where Andrey's Z5 criterion, which reads only instruments
+  independent of every confounder found, gives no set (one in each cell with `B1` hidden). At
+  `mildew@75000` Andrey answers on three datasets where the code does not, with sets that are not
+  valid: four Step 5 tests per dataset, on five conditioning variables of up to 95 categories,
+  decide differently, since the chi-square statistic is referred to its mean under a shuffle
+  (Andrey's default degrees of freedom) rather than to (r - 1)(c - 1) per configuration; with
+  `degrees_of_freedom="nonempty"` Andrey takes every one of the code's test decisions.
+- **LD3** (`ld3-dag@1000` to `@10000` with and without the direct effect, `ld3-dag@10000` with
+  `B1`, `Z4a`, or `M1` hidden, `ld3-er@5000,nodes=50` and `100`, `sangiovese@250` to `@1000`;
+  Fisher's z at 0.01): no cell is worse on the parents (exact and F1), the direct-effect error, or
+  the effect error. It is better on the exact parents at `ld3-dag@1000`, on the parents' F1 there,
+  at `nodes=50`, and at `sangiovese@250`, and on the effect error without the direct effect from
+  2,500 rows and at `nodes=50`. Without the direct effect its direct-effect error is 0.00 to 0.10
+  against the code's 0.90 to 1.00, since Andrey tests the treatment against the outcome given every
+  parent found; pooled with the twin cell of each size, it is below the better constant answer at
+  every size.
+- **PC read at the pair** was never better than any of the five methods on both accuracy and cost.
 
 ## References
 

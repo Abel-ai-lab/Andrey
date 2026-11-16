@@ -193,14 +193,18 @@ names its pull request.
   networks. It scores the answers and the sets with `andrey.metrics`, and the effect each returned
   set estimates, on a fresh sample, against the true effect; a method that gives no set is never
   scored as the empty set. ([#964])
-- `andrey.ldp`, local discovery by partitioning (Maasch et al. 2024), experimental: a valid
+- `andrey.ldp`, local discovery by partitioning (Maasch et al. 2024), supported: a valid
   adjustment set for the total effect of one `treatment` on one `outcome`, in a number of tests
   quadratic in the number of columns. It labels every other column by its causal relation to the
   pair from tests whose conditioning sets are the labels found before, and returns the confounders
-  as the adjustment set when its Z5 criterion passes, and no set otherwise. The answer is one record
-  in `metadata["effects"]`, `metadata["partition"]` lists the labels, and the graph has no edges.
-  The treatment-outcome benchmark lane runs it beside the authors' code. ([#970])
-- `andrey.ld3`, LD3 (Maasch et al. 2025), experimental: the parents of an outcome that has no
+  as the adjustment set when its Z5 criterion passes, and no set otherwise. The criterion reads only
+  the instruments independent of every confounder found (condition C2 read on the labels): with
+  exact tests on 24,000 random graphs that meet C1 and C2, every set it returned was valid. The
+  answer is one record in `metadata["effects"]`, `metadata["partition"]` lists the labels, and the
+  graph has no edges. Against its authors' code on its paper's partition graphs at 1,000 to 7,500
+  rows and the MILDEW network at 25,000 to 75,000 rows, it tied on the valid-set loss and the effect
+  error in all 14 settings, on 20 datasets and again on 20 fresh ones. ([#970], [#PRNUM])
+- `andrey.ld3`, LD3 (Maasch et al. 2025), supported: the parents of an outcome that has no
   descendants among the columns, and whether the treatment is one of them (the structural direct
   criterion), in a number of tests linear in the number of columns. The criterion tests the
   treatment against the outcome given every parent found, those independent of the treatment
@@ -208,8 +212,10 @@ names its pull request.
   path. The parents other than the treatment are the adjustment set for the direct effect, and the
   answer is one record in
   `metadata["effects"]`; `metadata["partition"]` lists the labels, and the graph holds the edges
-  into the outcome. It assumes every parent of the outcome is observed. The treatment-outcome
-  benchmark lane runs it beside the authors' code. ([#970])
+  into the outcome. It assumes every parent of the outcome is observed. Against its authors' code
+  on its paper's graph at 1,000 to 10,000 rows, random graphs with 50 and 100 nodes, and the
+  SANGIOVESE network, no setting was worse; it was better on the parents in 3 settings and on the
+  direct-effect answer without a direct effect at every size. ([#970], [#PRNUM])
 - `andrey.local_isa_ling`, local ISA-LiNG (Dai et al. 2024), supported: the weighted edges into a
   target and into each of its children in a linear model with non-Gaussian noise whose graph may
   hold cycles, from the target and its Markov blanket alone, as a weighted `digraph`. The blanket

@@ -1,0 +1,9814 @@
+{
+ "release": "0.18.0",
+ "generated": "2026-11-16",
+ "lane": "ldp-ld3",
+ "about": "LDP and LD3 against their authors' code on the models their papers plant, with global PC read at the pair beside them; the release summary's LDP and LD3 entries are built from it",
+ "build": "Andrey pre-release build of 16 November 2026 (the 0.18.0 release branch with ld3's direct criterion given every parent found and ldp's Z5 criterion read with the instruments independent of every confounder found, as merged in this change)",
+ "hardware": "AMD EPYC 7713 64-Core Processor, 1 core per fit, 1 BLAS thread; every arm of a cell ran in one job on shared nodes, so the times are indicative",
+ "packages": {
+  "LDP authors' code": "838f6e2 (Maasch et al.)",
+  "LD3 authors' code": "74b91cb (Maasch et al.)"
+ },
+ "parity_rule": "paired bootstrap",
+ "verdict_rule": "per cell (20 datasets, seeds 0-19, one treatment-outcome pair each): per dataset D = Andrey's error minus the authors' code's on the same data; worse when the 95% percentile-bootstrap interval of the mean D lies wholly above 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly below, a tie otherwise (a tie too when the two errors are equal on every dataset). A cell worse on seeds 0-19 on a measure is rerun on seeds 20-39 and is worse only when the fresh seeds agree. The floor: per dataset, the error minus the floor's (the empty adjustment set for valid_set_loss, parents_error, and effect_error; for LD3's direct_error the better constant answer over the 40 datasets of a size with and without the direct effect); it applies where the authors' code's interval lies wholly below 0, and a row then passes when Andrey's does too",
+ "error_metric": "valid_set_loss: 1 when LDP returns no adjustment set or a set that is not a valid adjustment set for the pair in the true DAG (hidden variables included), else 0; effect_error: the mean absolute error of the effect estimated with the returned set on a fresh sample, in standard deviations (a set-free answer has none); parents_error: 1 unless LD3's set is the outcome's true parents other than the treatment; direct_error: 1 when the answer's nonzero for the direct effect is not the truth's (an edge from the treatment to the outcome)",
+ "fit_protocol": "each fit in a fresh process on one core with one BLAS thread, no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. The same level on both arms: Fisher's z at 0.01 on the Gaussian cells (the papers' level) and Pearson's chi-square at 0.001 on MILDEW (LDP's Figure 6), where Andrey refers the statistic to its mean under a shuffle (its default degrees of freedom) and the authors' code to (r - 1)(c - 1) per configuration over the values present",
+ "seeds_note": "every cell holds 20 datasets, seeds 0-19, and 20 fresh datasets, seeds 20-39",
+ "cells_note": "ldp@<rows>[,effect=0]: LDP's 10-variable partition graph (its Figure 3), linear Gaussian, every coefficient 1 and the treatment's effect 2.75 (0 without the arc); ldp@5000,latent=True,hide=<nodes>: its 18-variable graph (Figure E.5), linear Gaussian, the named nodes hidden; mildew@<rows>: the MILDEW network's tables, treatment mikro_1, outcome meldug_2, dm_1 and foto_1 hidden; ld3-dag@<rows>[,effect=0][,hide=<node>]: LD3's 18-variable graph (its Figure D.1 with the authors' code's Z7 and Z8), linear Gaussian, direct effect 1.25 (0 without the arc), other coefficients uniform on [0.75, 1.1]; ld3-er@5000,nodes=<d>: random graphs with 1.5 d arcs whose outcome is the leaf with the most parents, a random parent the treatment; sangiovese@<rows>: the fitted SANGIOVESE network, treatment pH, outcome GrapeW (a sink); the columns in an order drawn from the seed",
+ "bootstrap": {
+  "resamples": 10000,
+  "interval": "percentile 95%",
+  "rng": "numpy default_rng(0)"
+ },
+ "pareto_note": "pareto: Andrey's method against global PC read at the pair (andrey.pc.adjustment) with the same test and level, effect error against seconds per fit; PC is better on both only when its paired interval lies wholly below Andrey's error and its median seconds are lower; an abstention has no effect error, so cells where PC abstains on most datasets pair fewer than 10",
+ "direct_floor": {
+  "ld3-dag@1000 first": {
+   "constant": "direct",
+   "constant_error": 0.5,
+   "andrey": 0.05,
+   "ref": 0.45,
+   "vs_constant": {
+    "paired": 40,
+    "mean_D": -0.45,
+    "bootstrap_95": [
+     -0.6,
+     -0.3
+    ],
+    "verdict": "better"
+   },
+   "ref_vs_constant": {
+    "paired": 40,
+    "mean_D": -0.05,
+    "bootstrap_95": [
+     -0.125,
+     0.0
+    ],
+    "verdict": "tie"
+   }
+  },
+  "ld3-dag@1000 rerun": {
+   "constant": "direct",
+   "constant_error": 0.5,
+   "andrey": 0.075,
+   "ref": 0.425,
+   "vs_constant": {
+    "paired": 40,
+    "mean_D": -0.425,
+    "bootstrap_95": [
+     -0.575,
+     -0.275
+    ],
+    "verdict": "better"
+   },
+   "ref_vs_constant": {
+    "paired": 40,
+    "mean_D": -0.075,
+    "bootstrap_95": [
+     -0.175,
+     0.0
+    ],
+    "verdict": "tie"
+   }
+  },
+  "ld3-dag@2500 first": {
+   "constant": "direct",
+   "constant_error": 0.5,
+   "andrey": 0.0,
+   "ref": 0.5,
+   "vs_constant": {
+    "paired": 40,
+    "mean_D": -0.5,
+    "bootstrap_95": [
+     -0.65,
+     -0.35
+    ],
+    "verdict": "better"
+   },
+   "ref_vs_constant": {
+    "paired": 40,
+    "mean_D": 0.0,
+    "bootstrap_95": [
+     0.0,
+     0.0
+    ],
+    "verdict": "tie"
+   }
+  },
+  "ld3-dag@2500 rerun": {
+   "constant": "direct",
+   "constant_error": 0.5,
+   "andrey": 0.05,
+   "ref": 0.5,
+   "vs_constant": {
+    "paired": 40,
+    "mean_D": -0.45,
+    "bootstrap_95": [
+     -0.6,
+     -0.3
+    ],
+    "verdict": "better"
+   },
+   "ref_vs_constant": {
+    "paired": 40,
+    "mean_D": 0.0,
+    "bootstrap_95": [
+     0.0,
+     0.0
+    ],
+    "verdict": "tie"
+   }
+  },
+  "ld3-dag@5000 first": {
+   "constant": "direct",
+   "constant_error": 0.5,
+   "andrey": 0.0,
+   "ref": 0.5,
+   "vs_constant": {
+    "paired": 40,
+    "mean_D": -0.5,
+    "bootstrap_95": [
+     -0.65,
+     -0.35
+    ],
+    "verdict": "better"
+   },
+   "ref_vs_constant": {
+    "paired": 40,
+    "mean_D": 0.0,
+    "bootstrap_95": [
+     0.0,
+     0.0
+    ],
+    "verdict": "tie"
+   }
+  },
+  "ld3-dag@5000 rerun": {
+   "constant": "direct",
+   "constant_error": 0.5,
+   "andrey": 0.0,
+   "ref": 0.5,
+   "vs_constant": {
+    "paired": 40,
+    "mean_D": -0.5,
+    "bootstrap_95": [
+     -0.65,
+     -0.35
+    ],
+    "verdict": "better"
+   },
+   "ref_vs_constant": {
+    "paired": 40,
+    "mean_D": 0.0,
+    "bootstrap_95": [
+     0.0,
+     0.0
+    ],
+    "verdict": "tie"
+   }
+  },
+  "ld3-dag@10000 first": {
+   "constant": "direct",
+   "constant_error": 0.5,
+   "andrey": 0.0,
+   "ref": 0.475,
+   "vs_constant": {
+    "paired": 40,
+    "mean_D": -0.5,
+    "bootstrap_95": [
+     -0.65,
+     -0.35
+    ],
+    "verdict": "better"
+   },
+   "ref_vs_constant": {
+    "paired": 40,
+    "mean_D": -0.025,
+    "bootstrap_95": [
+     -0.075,
+     0.0
+    ],
+    "verdict": "tie"
+   }
+  },
+  "ld3-dag@10000 rerun": {
+   "constant": "direct",
+   "constant_error": 0.5,
+   "andrey": 0.0,
+   "ref": 0.5,
+   "vs_constant": {
+    "paired": 40,
+    "mean_D": -0.5,
+    "bootstrap_95": [
+     -0.65,
+     -0.35
+    ],
+    "verdict": "better"
+   },
+   "ref_vs_constant": {
+    "paired": 40,
+    "mean_D": 0.0,
+    "bootstrap_95": [
+     0.0,
+     0.0
+    ],
+    "verdict": "tie"
+   }
+  }
+ },
+ "exact_tests": null,
+ "rows": [
+  {
+   "cell": "ldp@1000",
+   "method": "ldp",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "answered": {
+     "andrey": 0.9,
+     "ref": 0.9,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 18,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.1,
+     "ref": 0.1,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.005365553342040215,
+     "ref": 0.005365553342040215,
+     "vs_ref": {
+      "paired": 18,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.07855086364348557,
+     "zero": 0.8864521638996777,
+     "all": 0.7528731197594825,
+     "oracle": 0.009526986693521616,
+     "vs_none": {
+      "paired": 18,
+      "mean_D": -0.0729,
+      "bootstrap_95": [
+       -0.0746,
+       -0.071
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 18,
+      "mean_D": -0.8811,
+      "bootstrap_95": [
+       -0.8824,
+       -0.8797
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 18,
+      "mean_D": -0.0729,
+      "bootstrap_95": [
+       -0.0746,
+       -0.071
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 18,
+      "mean_D": -0.8811,
+      "bootstrap_95": [
+       -0.8824,
+       -0.8797
+      ],
+      "verdict": "better"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 40.0,
+     "ref": 51.0
+    },
+    "wall": {
+     "andrey": 0.00323154401849024,
+     "ref": 0.00962542905472219,
+     "pc": 0.477891085203737
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.49677851153761415,
+     "answered": 20,
+     "tests": 286.0,
+     "wall": 0.477891085203737,
+     "error_vs_andrey": {
+      "paired": 18,
+      "mean_D": 0.5151,
+      "bootstrap_95": [
+       0.3817,
+       0.6491
+      ],
+      "verdict": "worse"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "answered": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.006384101211085169,
+     "ref": 0.006384101211085169,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.079066632663462,
+     "zero": 0.8864521638996777,
+     "all": 0.7486074448131828,
+     "oracle": 0.011523297472051603,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.0727,
+      "bootstrap_95": [
+       -0.075,
+       -0.0702
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.8801,
+      "bootstrap_95": [
+       -0.8821,
+       -0.878
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.0727,
+      "bootstrap_95": [
+       -0.075,
+       -0.0702
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.8801,
+      "bootstrap_95": [
+       -0.8821,
+       -0.878
+      ],
+      "verdict": "better"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 40.0,
+     "ref": 51.0
+    },
+    "wall": {
+     "andrey": 0.0031848160142544657,
+     "ref": 0.009692685678601265,
+     "pc": 0.49001755588687956
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.435412891091355,
+     "answered": 20,
+     "tests": 286.0,
+     "wall": 0.49001755588687956,
+     "error_vs_andrey": {
+      "paired": 20,
+      "mean_D": 0.429,
+      "bootstrap_95": [
+       0.3354,
+       0.5506
+      ],
+      "verdict": "worse"
+     }
+    }
+   },
+   "pareto": {
+    "pc_effect_error_mean": 0.4968,
+    "andrey_effect_error_mean": 0.0054,
+    "pc_answered": 20,
+    "pc_minus_andrey": {
+     "paired": 18,
+     "mean_D": 0.5151,
+     "bootstrap_95": [
+      0.3817,
+      0.6491
+     ],
+     "verdict": "worse"
+    },
+    "andrey_tests_median": 40.0,
+    "pc_tests_median": 286.0,
+    "andrey_s_median": 0.0032,
+    "pc_s_median": 0.4779,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "ldp@2500",
+   "method": "ldp",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "answered": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.0027926883840178273,
+     "ref": 0.0027926883840178273,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0792423232697419,
+     "zero": 0.8864521638996777,
+     "all": 0.7513512289596237,
+     "oracle": 0.004112199866171196,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.0764,
+      "bootstrap_95": [
+       -0.0776,
+       -0.0752
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.8837,
+      "bootstrap_95": [
+       -0.8847,
+       -0.8826
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.0764,
+      "bootstrap_95": [
+       -0.0776,
+       -0.0752
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.8837,
+      "bootstrap_95": [
+       -0.8847,
+       -0.8826
+      ],
+      "verdict": "better"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 40.0,
+     "ref": 51.0
+    },
+    "wall": {
+     "andrey": 0.0032822606153786182,
+     "ref": 0.010976628167554736,
+     "pc": 0.49013673164881766
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.580340897453677,
+     "answered": 18,
+     "tests": 323.5,
+     "wall": 0.49013673164881766,
+     "error_vs_andrey": {
+      "paired": 18,
+      "mean_D": 0.5774,
+      "bootstrap_95": [
+       0.4439,
+       0.7118
+      ],
+      "verdict": "worse"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "answered": {
+     "andrey": 0.95,
+     "ref": 0.95,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 19,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.05,
+     "ref": 0.05,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.0030079747348963465,
+     "ref": 0.0030079747348963465,
+     "vs_ref": {
+      "paired": 19,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0789958259772932,
+     "zero": 0.8864521638996777,
+     "all": 0.7476518009424638,
+     "oracle": 0.005229123661232221,
+     "vs_none": {
+      "paired": 19,
+      "mean_D": -0.0761,
+      "bootstrap_95": [
+       -0.0774,
+       -0.0747
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 19,
+      "mean_D": -0.8834,
+      "bootstrap_95": [
+       -0.8845,
+       -0.8823
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 19,
+      "mean_D": -0.0761,
+      "bootstrap_95": [
+       -0.0774,
+       -0.0747
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 19,
+      "mean_D": -0.8834,
+      "bootstrap_95": [
+       -0.8845,
+       -0.8823
+      ],
+      "verdict": "better"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 40.0,
+     "ref": 51.0
+    },
+    "wall": {
+     "andrey": 0.0033297401387244463,
+     "ref": 0.010936472797766328,
+     "pc": 0.47465721727348864
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.49431214396261824,
+     "answered": 20,
+     "tests": 320.5,
+     "wall": 0.47465721727348864,
+     "error_vs_andrey": {
+      "paired": 19,
+      "mean_D": 0.4707,
+      "bootstrap_95": [
+       0.3441,
+       0.5979
+      ],
+      "verdict": "worse"
+     }
+    }
+   },
+   "pareto": {
+    "pc_effect_error_mean": 0.5803,
+    "andrey_effect_error_mean": 0.0028,
+    "pc_answered": 18,
+    "pc_minus_andrey": {
+     "paired": 18,
+     "mean_D": 0.5774,
+     "bootstrap_95": [
+      0.4439,
+      0.7118
+     ],
+     "verdict": "worse"
+    },
+    "andrey_tests_median": 40.0,
+    "pc_tests_median": 323.5,
+    "andrey_s_median": 0.0033,
+    "pc_s_median": 0.4901,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "ldp@5000,hide=B1+Z4a+M1,latent=True",
+   "method": "ldp",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "answered": {
+     "andrey": 0.55,
+     "ref": 0.6,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 11,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": NaN,
+     "ref": NaN,
+     "vs_ref": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    },
+    "error": {
+     "andrey": 0.003440130400313011,
+     "ref": 0.0033318353063022297,
+     "vs_ref": {
+      "paired": 11,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.13536434725761537,
+     "zero": 0.8456913721991486,
+     "all": 0.7731048323252204,
+     "oracle": 0.0027530513788076583,
+     "vs_none": {
+      "paired": 11,
+      "mean_D": -0.1321,
+      "bootstrap_95": [
+       -0.1333,
+       -0.131
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 11,
+      "mean_D": -0.8423,
+      "bootstrap_95": [
+       -0.8435,
+       -0.8411
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 12,
+      "mean_D": -0.1322,
+      "bootstrap_95": [
+       -0.1333,
+       -0.1312
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 12,
+      "mean_D": -0.8424,
+      "bootstrap_95": [
+       -0.8435,
+       -0.8412
+      ],
+      "verdict": "better"
+     }
+    },
+    "oracle_answered": NaN,
+    "tests": {
+     "andrey": 79.5,
+     "ref": 98.0
+    },
+    "wall": {
+     "andrey": 0.005792789626866579,
+     "ref": 0.015379820950329304,
+     "pc": NaN
+    },
+    "pc": {
+     "ok": 0,
+     "error": NaN,
+     "answered": 0,
+     "tests": NaN,
+     "wall": NaN,
+     "error_vs_andrey": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "answered": {
+     "andrey": 0.55,
+     "ref": 0.55,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 11,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": NaN,
+     "ref": NaN,
+     "vs_ref": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    },
+    "error": {
+     "andrey": 0.0020360739589067338,
+     "ref": 0.0020360739589067338,
+     "vs_ref": {
+      "paired": 11,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.13538655132201297,
+     "zero": 0.8456913721991486,
+     "all": 0.7764268164080776,
+     "oracle": 0.0029258752959563706,
+     "vs_none": {
+      "paired": 11,
+      "mean_D": -0.1334,
+      "bootstrap_95": [
+       -0.1342,
+       -0.1324
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 11,
+      "mean_D": -0.8437,
+      "bootstrap_95": [
+       -0.8446,
+       -0.8425
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 11,
+      "mean_D": -0.1334,
+      "bootstrap_95": [
+       -0.1342,
+       -0.1324
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 11,
+      "mean_D": -0.8437,
+      "bootstrap_95": [
+       -0.8446,
+       -0.8425
+      ],
+      "verdict": "better"
+     }
+    },
+    "oracle_answered": NaN,
+    "tests": {
+     "andrey": 81.0,
+     "ref": 98.0
+    },
+    "wall": {
+     "andrey": 0.005710093537345529,
+     "ref": 0.015354302478954196,
+     "pc": NaN
+    },
+    "pc": {
+     "ok": 0,
+     "error": NaN,
+     "answered": 0,
+     "tests": NaN,
+     "wall": NaN,
+     "error_vs_andrey": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    }
+   }
+  },
+  {
+   "cell": "mildew@25000",
+   "method": "ldp",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "answered": {
+     "andrey": 0.75,
+     "ref": 0.75,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 0.9333333333333333,
+     "ref": 0.9333333333333333,
+     "vs_ref": {
+      "paired": 15,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.25,
+     "ref": 0.25,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": NaN,
+     "ref": NaN,
+     "vs_ref": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "none": NaN,
+     "zero": NaN,
+     "all": NaN,
+     "oracle": NaN,
+     "vs_none": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "vs_zero": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "ref_vs_none": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "ref_vs_zero": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 113.5,
+     "ref": 145.0
+    },
+    "wall": {
+     "andrey": 0.06902562431059778,
+     "ref": 0.09681437816470861,
+     "pc": NaN
+    },
+    "pc": {
+     "ok": 0,
+     "error": NaN,
+     "answered": 0,
+     "tests": NaN,
+     "wall": NaN,
+     "error_vs_andrey": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "answered": {
+     "andrey": 0.7,
+     "ref": 0.7,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 14,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.3,
+     "ref": 0.3,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": NaN,
+     "ref": NaN,
+     "vs_ref": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "none": NaN,
+     "zero": NaN,
+     "all": NaN,
+     "oracle": NaN,
+     "vs_none": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "vs_zero": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "ref_vs_none": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "ref_vs_zero": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 110.0,
+     "ref": 141.0
+    },
+    "wall": {
+     "andrey": 0.06907936534844339,
+     "ref": 0.10091908532194793,
+     "pc": NaN
+    },
+    "pc": {
+     "ok": 0,
+     "error": NaN,
+     "answered": 0,
+     "tests": NaN,
+     "wall": NaN,
+     "error_vs_andrey": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    }
+   }
+  },
+  {
+   "cell": "mildew@50000",
+   "method": "ldp",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "answered": {
+     "andrey": 0.9,
+     "ref": 0.9,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 18,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.1,
+     "ref": 0.1,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": NaN,
+     "ref": NaN,
+     "vs_ref": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "none": NaN,
+     "zero": NaN,
+     "all": NaN,
+     "oracle": NaN,
+     "vs_none": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "vs_zero": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "ref_vs_none": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "ref_vs_zero": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 116.0,
+     "ref": 148.0
+    },
+    "wall": {
+     "andrey": 0.12167591252364218,
+     "ref": 0.18540392094291747,
+     "pc": NaN
+    },
+    "pc": {
+     "ok": 0,
+     "error": NaN,
+     "answered": 0,
+     "tests": NaN,
+     "wall": NaN,
+     "error_vs_andrey": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "answered": {
+     "andrey": 0.95,
+     "ref": 0.95,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 19,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.05,
+     "ref": 0.05,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": NaN,
+     "ref": NaN,
+     "vs_ref": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "none": NaN,
+     "zero": NaN,
+     "all": NaN,
+     "oracle": NaN,
+     "vs_none": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "vs_zero": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "ref_vs_none": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "ref_vs_zero": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 115.0,
+     "ref": 148.0
+    },
+    "wall": {
+     "andrey": 0.11511900456389412,
+     "ref": 0.18590958998538554,
+     "pc": NaN
+    },
+    "pc": {
+     "ok": 0,
+     "error": NaN,
+     "answered": 0,
+     "tests": NaN,
+     "wall": NaN,
+     "error_vs_andrey": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    }
+   }
+  },
+  {
+   "cell": "mildew@75000",
+   "method": "ldp",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "answered": {
+     "andrey": 0.95,
+     "ref": 0.85,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       0.0,
+       0.25
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 0.7894736842105263,
+     "ref": 0.8823529411764706,
+     "vs_ref": {
+      "paired": 17,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.05,
+     "ref": 0.15,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.1,
+      "bootstrap_95": [
+       -0.25,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": NaN,
+     "ref": NaN,
+     "vs_ref": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "none": NaN,
+     "zero": NaN,
+     "all": NaN,
+     "oracle": NaN,
+     "vs_none": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "vs_zero": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "ref_vs_none": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "ref_vs_zero": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 116.0,
+     "ref": 148.0
+    },
+    "wall": {
+     "andrey": 0.19283845741301775,
+     "ref": 0.23525110469199717,
+     "pc": NaN
+    },
+    "pc": {
+     "ok": 0,
+     "error": NaN,
+     "answered": 0,
+     "tests": NaN,
+     "wall": NaN,
+     "error_vs_andrey": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "answered": {
+     "andrey": 1.0,
+     "ref": 0.95,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 0.75,
+     "ref": 0.7894736842105263,
+     "vs_ref": {
+      "paired": 19,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.0,
+     "ref": 0.05,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": NaN,
+     "ref": NaN,
+     "vs_ref": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "none": NaN,
+     "zero": NaN,
+     "all": NaN,
+     "oracle": NaN,
+     "vs_none": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "vs_zero": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "ref_vs_none": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "ref_vs_zero": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 116.0,
+     "ref": 148.0
+    },
+    "wall": {
+     "andrey": 0.19067418546183035,
+     "ref": 0.23138182936236262,
+     "pc": NaN
+    },
+    "pc": {
+     "ok": 0,
+     "error": NaN,
+     "answered": 0,
+     "tests": NaN,
+     "wall": NaN,
+     "error_vs_andrey": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    }
+   }
+  },
+  {
+   "cell": "ld3-dag@1000",
+   "method": "ld3",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "parents_exact": {
+     "andrey": 0.85,
+     "ref": 0.4,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.45,
+      "bootstrap_95": [
+       0.25,
+       0.65
+      ],
+      "verdict": "better"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.9766666666666668,
+     "ref": 0.9168040293040294,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0599,
+      "bootstrap_95": [
+       0.0281,
+       0.0954
+      ],
+      "verdict": "better"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.35,
+     "ref": 1.2,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.85,
+      "bootstrap_95": [
+       -1.4,
+       -0.4
+      ],
+      "verdict": "better"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -6.65,
+      "bootstrap_95": [
+       -7.0,
+       -6.2
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.017910476850467524,
+     "ref": 0.018033297688906384,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.0001,
+      "bootstrap_95": [
+       -0.0023,
+       0.0019
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.5888733031482679,
+     "zero": 0.35298972579673416,
+     "all": 0.0118005172193822,
+     "oracle": 0.009743531372044497,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.571,
+      "bootstrap_95": [
+       -0.5854,
+       -0.5531
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3351,
+      "bootstrap_95": [
+       -0.3486,
+       -0.3193
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.5708,
+      "bootstrap_95": [
+       -0.5855,
+       -0.5531
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.335,
+      "bootstrap_95": [
+       -0.3483,
+       -0.3194
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 64.0,
+     "ref": 72.0
+    },
+    "wall": {
+     "andrey": 0.0037943071220070124,
+     "ref": 0.011818867409601808,
+     "pc": 0.42997008888050914
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.17395610873145112,
+     "answered": 5,
+     "tests": 1524.0,
+     "wall": 0.42997008888050914,
+     "error_vs_andrey": {
+      "paired": 5,
+      "verdict": "reported"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "parents_exact": {
+     "andrey": 0.85,
+     "ref": 0.45,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.4,
+      "bootstrap_95": [
+       0.2,
+       0.6
+      ],
+      "verdict": "better"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.9675,
+     "ref": 0.9305769230769231,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0369,
+      "bootstrap_95": [
+       0.0154,
+       0.0608
+      ],
+      "verdict": "better"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.5,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.5,
+      "bootstrap_95": [
+       -0.85,
+       -0.2
+      ],
+      "verdict": "better"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -6.5,
+      "bootstrap_95": [
+       -7.0,
+       -5.9
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.022630719936021764,
+     "ref": 0.023769472586463777,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.0011,
+      "bootstrap_95": [
+       -0.0037,
+       0.0008
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.5930043840351391,
+     "zero": 0.3508240104308226,
+     "all": 0.01441774045377101,
+     "oracle": 0.007792750003984858,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.5704,
+      "bootstrap_95": [
+       -0.5884,
+       -0.5494
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3282,
+      "bootstrap_95": [
+       -0.3438,
+       -0.3098
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.5692,
+      "bootstrap_95": [
+       -0.5871,
+       -0.5486
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3271,
+      "bootstrap_95": [
+       -0.3425,
+       -0.3088
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 64.0,
+     "ref": 72.0
+    },
+    "wall": {
+     "andrey": 0.0037495181895792484,
+     "ref": 0.011703915894031525,
+     "pc": 0.426606502616778
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.1058462197229298,
+     "answered": 3,
+     "tests": 1506.5,
+     "wall": 0.426606502616778,
+     "error_vs_andrey": {
+      "paired": 3,
+      "verdict": "reported"
+     }
+    }
+   },
+   "pareto": {
+    "pc_effect_error_mean": 0.174,
+    "andrey_effect_error_mean": 0.0179,
+    "pc_answered": 5,
+    "pc_minus_andrey": {
+     "paired": 5,
+     "mean_D": 0.1669,
+     "bootstrap_95": [
+      0.1293,
+      0.2087
+     ],
+     "verdict": "worse"
+    },
+    "andrey_tests_median": 64.0,
+    "pc_tests_median": 1524.0,
+    "andrey_s_median": 0.0038,
+    "pc_s_median": 0.43,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "ld3-dag@2500",
+   "method": "ld3",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "parents_exact": {
+     "andrey": 0.9,
+     "ref": 0.85,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.9933333333333334,
+     "ref": 0.9894871794871796,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0038,
+      "bootstrap_95": [
+       0.0,
+       0.0115
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.1,
+     "ref": 0.15,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -6.9,
+      "bootstrap_95": [
+       -7.0,
+       -6.75
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.006017262303570031,
+     "ref": 0.005881234213726621,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0001,
+      "bootstrap_95": [
+       0.0,
+       0.0004
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.5890794975560727,
+     "zero": 0.35298972579673416,
+     "all": 0.007230413361527558,
+     "oracle": 0.005896739527086694,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.5831,
+      "bootstrap_95": [
+       -0.5953,
+       -0.5711
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.347,
+      "bootstrap_95": [
+       -0.3567,
+       -0.3373
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.5832,
+      "bootstrap_95": [
+       -0.5955,
+       -0.5711
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3471,
+      "bootstrap_95": [
+       -0.3568,
+       -0.3375
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 65.0,
+     "ref": 74.0
+    },
+    "wall": {
+     "andrey": 0.007972437422722578,
+     "ref": 0.019305688561871648,
+     "pc": 0.7336123574059457
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.10659212478624827,
+     "answered": 5,
+     "tests": 2097.5,
+     "wall": 0.7336123574059457,
+     "error_vs_andrey": {
+      "paired": 5,
+      "verdict": "reported"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "parents_exact": {
+     "andrey": 0.95,
+     "ref": 0.95,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.99375,
+     "ref": 0.99375,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.1,
+     "ref": 0.1,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -6.9,
+      "bootstrap_95": [
+       -7.0,
+       -6.7
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.005773827636989526,
+     "ref": 0.005773827636989526,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.5935842052355798,
+     "zero": 0.3508240104308226,
+     "all": 0.01004037987705518,
+     "oracle": 0.005477758583774006,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.5878,
+      "bootstrap_95": [
+       -0.5967,
+       -0.5794
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3451,
+      "bootstrap_95": [
+       -0.3527,
+       -0.3367
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.5878,
+      "bootstrap_95": [
+       -0.5967,
+       -0.5794
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3451,
+      "bootstrap_95": [
+       -0.3527,
+       -0.3367
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 65.0,
+     "ref": 74.0
+    },
+    "wall": {
+     "andrey": 0.007384720491245389,
+     "ref": 0.01832858403213322,
+     "pc": 0.665450138039887
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.14267338416716746,
+     "answered": 2,
+     "tests": 1952.5,
+     "wall": 0.665450138039887,
+     "error_vs_andrey": {
+      "paired": 2,
+      "verdict": "reported"
+     }
+    }
+   },
+   "pareto": {
+    "pc_effect_error_mean": 0.1066,
+    "andrey_effect_error_mean": 0.006,
+    "pc_answered": 5,
+    "pc_minus_andrey": {
+     "paired": 5,
+     "mean_D": 0.1017,
+     "bootstrap_95": [
+      0.0593,
+      0.1329
+     ],
+     "verdict": "worse"
+    },
+    "andrey_tests_median": 65.0,
+    "pc_tests_median": 2097.5,
+    "andrey_s_median": 0.008,
+    "pc_s_median": 0.7336,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "ld3-dag@5000",
+   "method": "ld3",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "parents_exact": {
+     "andrey": 0.85,
+     "ref": 0.85,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.99,
+     "ref": 0.99,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.15,
+     "ref": 0.15,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -6.85,
+      "bootstrap_95": [
+       -7.0,
+       -6.7
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.004305006787957916,
+     "ref": 0.004305006787957916,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.5891456316642826,
+     "zero": 0.35298972579673416,
+     "all": 0.007760481071572364,
+     "oracle": 0.004022529144377488,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.5848,
+      "bootstrap_95": [
+       -0.5961,
+       -0.5736
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3487,
+      "bootstrap_95": [
+       -0.3592,
+       -0.3382
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.5848,
+      "bootstrap_95": [
+       -0.5961,
+       -0.5736
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3487,
+      "bootstrap_95": [
+       -0.3592,
+       -0.3382
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 66.0,
+     "ref": 76.0
+    },
+    "wall": {
+     "andrey": 0.005254246527329087,
+     "ref": 0.015200227964669466,
+     "pc": 0.5017860289663076
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.09734911219861149,
+     "answered": 7,
+     "tests": 2411.0,
+     "wall": 0.5017860289663076,
+     "error_vs_andrey": {
+      "paired": 7,
+      "verdict": "reported"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "parents_exact": {
+     "andrey": 0.95,
+     "ref": 0.95,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.9966666666666667,
+     "ref": 0.9966666666666667,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.05,
+     "ref": 0.05,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -6.95,
+      "bootstrap_95": [
+       -7.0,
+       -6.85
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.003894515268898402,
+     "ref": 0.003894515268898402,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.5936938240136395,
+     "zero": 0.3508240104308226,
+     "all": 0.005687812481217025,
+     "oracle": 0.003870142008668942,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.5898,
+      "bootstrap_95": [
+       -0.5988,
+       -0.5815
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3469,
+      "bootstrap_95": [
+       -0.3548,
+       -0.3388
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.5898,
+      "bootstrap_95": [
+       -0.5988,
+       -0.5815
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3469,
+      "bootstrap_95": [
+       -0.3548,
+       -0.3388
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 65.5,
+     "ref": 76.0
+    },
+    "wall": {
+     "andrey": 0.005230411421507597,
+     "ref": 0.014880840666592121,
+     "pc": 0.4975711975712329
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.1055476578415919,
+     "answered": 8,
+     "tests": 2285.0,
+     "wall": 0.4975711975712329,
+     "error_vs_andrey": {
+      "paired": 8,
+      "verdict": "reported"
+     }
+    }
+   },
+   "pareto": {
+    "pc_effect_error_mean": 0.0973,
+    "andrey_effect_error_mean": 0.0043,
+    "pc_answered": 7,
+    "pc_minus_andrey": {
+     "paired": 7,
+     "mean_D": 0.0941,
+     "bootstrap_95": [
+      0.0613,
+      0.1246
+     ],
+     "verdict": "worse"
+    },
+    "andrey_tests_median": 66.0,
+    "pc_tests_median": 2411.0,
+    "andrey_s_median": 0.0053,
+    "pc_s_median": 0.5018,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "ld3-dag@10000",
+   "method": "ld3",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "parents_exact": {
+     "andrey": 0.9,
+     "ref": 0.9,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.9933333333333334,
+     "ref": 0.9933333333333334,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.1,
+     "ref": 0.1,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -6.9,
+      "bootstrap_95": [
+       -7.0,
+       -6.75
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.0024589001792369087,
+     "ref": 0.0024589001792369087,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.5898110056852099,
+     "zero": 0.35298972579673416,
+     "all": 0.005342753385016749,
+     "oracle": 0.002453510326647959,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.5874,
+      "bootstrap_95": [
+       -0.5994,
+       -0.5756
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3505,
+      "bootstrap_95": [
+       -0.36,
+       -0.3409
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.5874,
+      "bootstrap_95": [
+       -0.5994,
+       -0.5756
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3505,
+      "bootstrap_95": [
+       -0.36,
+       -0.3409
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 66.0,
+     "ref": 76.0
+    },
+    "wall": {
+     "andrey": 0.007716753985732794,
+     "ref": 0.015281881438568234,
+     "pc": 0.5190472833346575
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.06826444876029464,
+     "answered": 12,
+     "tests": 2741.0,
+     "wall": 0.5190472833346575,
+     "error_vs_andrey": {
+      "paired": 12,
+      "mean_D": 0.0659,
+      "bootstrap_95": [
+       0.0336,
+       0.0995
+      ],
+      "verdict": "worse"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "parents_exact": {
+     "andrey": 0.95,
+     "ref": 0.95,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.9966666666666667,
+     "ref": 0.9966666666666667,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.05,
+     "ref": 0.05,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -6.95,
+      "bootstrap_95": [
+       -7.0,
+       -6.85
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.002380360602888737,
+     "ref": 0.002380360602888737,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.5935109095590688,
+     "zero": 0.3508240104308226,
+     "all": 0.004422065576890566,
+     "oracle": 0.0022979176881092996,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.5911,
+      "bootstrap_95": [
+       -0.6005,
+       -0.5823
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3484,
+      "bootstrap_95": [
+       -0.3558,
+       -0.3408
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.5911,
+      "bootstrap_95": [
+       -0.6005,
+       -0.5823
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3484,
+      "bootstrap_95": [
+       -0.3558,
+       -0.3408
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 66.0,
+     "ref": 76.0
+    },
+    "wall": {
+     "andrey": 0.007259802659973502,
+     "ref": 0.015500344103202224,
+     "pc": 0.4862677715718746
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.09160046504761461,
+     "answered": 15,
+     "tests": 2492.0,
+     "wall": 0.4862677715718746,
+     "error_vs_andrey": {
+      "paired": 15,
+      "mean_D": 0.0893,
+      "bootstrap_95": [
+       0.0632,
+       0.1146
+      ],
+      "verdict": "worse"
+     }
+    }
+   },
+   "pareto": {
+    "pc_effect_error_mean": 0.0683,
+    "andrey_effect_error_mean": 0.0025,
+    "pc_answered": 12,
+    "pc_minus_andrey": {
+     "paired": 12,
+     "mean_D": 0.0659,
+     "bootstrap_95": [
+      0.0336,
+      0.0995
+     ],
+     "verdict": "worse"
+    },
+    "andrey_tests_median": 66.0,
+    "pc_tests_median": 2741.0,
+    "andrey_s_median": 0.0077,
+    "pc_s_median": 0.519,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "ld3-dag@1000,effect=0",
+   "method": "ld3",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "parents_exact": {
+     "andrey": 0.85,
+     "ref": 0.8,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.9766666666666668,
+     "ref": 0.972820512820513,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0038,
+      "bootstrap_95": [
+       0.0,
+       0.0115
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.35,
+     "ref": 0.4,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -6.65,
+      "bootstrap_95": [
+       -7.0,
+       -6.2
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.1,
+     "ref": 0.9,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.8,
+      "bootstrap_95": [
+       -1.0,
+       -0.55
+      ],
+      "verdict": "better"
+     }
+    },
+    "error": {
+     "andrey": 0.013415547219779066,
+     "ref": 0.01794917645146702,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.0045,
+      "bootstrap_95": [
+       -0.0146,
+       0.0123
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.8679447848841919,
+     "zero": 0.0,
+     "all": 0.01600861969459312,
+     "oracle": 0.0,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.8545,
+      "bootstrap_95": [
+       -0.8741,
+       -0.8285
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": 0.0134,
+      "bootstrap_95": [
+       0.0,
+       0.0335
+      ],
+      "verdict": "tie"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.85,
+      "bootstrap_95": [
+       -0.8625,
+       -0.8347
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": 0.0179,
+      "bootstrap_95": [
+       0.0091,
+       0.0318
+      ],
+      "verdict": "worse"
+     }
+    },
+    "truth_direct": 0.0,
+    "tests": {
+     "andrey": 64.0,
+     "ref": 72.0
+    },
+    "wall": {
+     "andrey": 0.003899700997862965,
+     "ref": 0.013255308527732268,
+     "pc": 0.45587075050571
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.0,
+     "answered": 19,
+     "tests": 1742.0,
+     "wall": 0.45587075050571,
+     "error_vs_andrey": {
+      "paired": 19,
+      "mean_D": -0.0141,
+      "bootstrap_95": [
+       -0.0353,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "parents_exact": {
+     "andrey": 0.85,
+     "ref": 0.8,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       0.0,
+       0.15
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.9675,
+     "ref": 0.9636538461538461,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0038,
+      "bootstrap_95": [
+       0.0,
+       0.0115
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.5,
+     "ref": 0.55,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -6.5,
+      "bootstrap_95": [
+       -7.0,
+       -5.9
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.15,
+     "ref": 0.85,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.7,
+      "bootstrap_95": [
+       -1.0,
+       -0.4
+      ],
+      "verdict": "better"
+     }
+    },
+    "error": {
+     "andrey": 0.023475000069918726,
+     "ref": 0.007285638418688499,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0162,
+      "bootstrap_95": [
+       -0.0077,
+       0.0461
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.8734186108361778,
+     "zero": 0.0,
+     "all": 0.023072276793287473,
+     "oracle": 0.0,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.8499,
+      "bootstrap_95": [
+       -0.8738,
+       -0.8205
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": 0.0235,
+      "bootstrap_95": [
+       0.0,
+       0.0508
+      ],
+      "verdict": "tie"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.8661,
+      "bootstrap_95": [
+       -0.8746,
+       -0.857
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": 0.0073,
+      "bootstrap_95": [
+       0.0042,
+       0.0106
+      ],
+      "verdict": "worse"
+     }
+    },
+    "truth_direct": 0.0,
+    "tests": {
+     "andrey": 64.0,
+     "ref": 72.0
+    },
+    "wall": {
+     "andrey": 0.003687861986691132,
+     "ref": 0.012828095001168549,
+     "pc": 0.42825624652323313
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.0,
+     "answered": 20,
+     "tests": 1695.0,
+     "wall": 0.42825624652323313,
+     "error_vs_andrey": {
+      "paired": 20,
+      "mean_D": -0.0235,
+      "bootstrap_95": [
+       -0.0508,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    }
+   },
+   "pareto": {
+    "pc_effect_error_mean": 0.0,
+    "andrey_effect_error_mean": 0.0134,
+    "pc_answered": 19,
+    "pc_minus_andrey": {
+     "paired": 19,
+     "mean_D": -0.0141,
+     "bootstrap_95": [
+      -0.0353,
+      0.0
+     ],
+     "verdict": "tie"
+    },
+    "andrey_tests_median": 64.0,
+    "pc_tests_median": 1742.0,
+    "andrey_s_median": 0.0039,
+    "pc_s_median": 0.4559,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "ld3-dag@2500,effect=0",
+   "method": "ld3",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "parents_exact": {
+     "andrey": 0.9,
+     "ref": 0.9,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.9933333333333334,
+     "ref": 0.9933333333333334,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.1,
+     "ref": 0.1,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -6.9,
+      "bootstrap_95": [
+       -7.0,
+       -6.75
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -1.0,
+      "bootstrap_95": [
+       -1.0,
+       -1.0
+      ],
+      "verdict": "better"
+     }
+    },
+    "error": {
+     "andrey": 0.0,
+     "ref": 0.007636969068266571,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.0076,
+      "bootstrap_95": [
+       -0.0096,
+       -0.0056
+      ],
+      "verdict": "better"
+     },
+     "none": 0.8681529994128233,
+     "zero": 0.0,
+     "all": 0.010823062713692756,
+     "oracle": 0.0,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.8682,
+      "bootstrap_95": [
+       -0.8783,
+       -0.8569
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.8605,
+      "bootstrap_95": [
+       -0.8711,
+       -0.849
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": 0.0076,
+      "bootstrap_95": [
+       0.0056,
+       0.0096
+      ],
+      "verdict": "worse"
+     }
+    },
+    "truth_direct": 0.0,
+    "tests": {
+     "andrey": 65.0,
+     "ref": 74.0
+    },
+    "wall": {
+     "andrey": 0.004095858515938744,
+     "ref": 0.011673034518025815,
+     "pc": 0.48159152147127315
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.003788968436669401,
+     "answered": 18,
+     "tests": 2349.0,
+     "wall": 0.48159152147127315,
+     "error_vs_andrey": {
+      "paired": 18,
+      "mean_D": 0.0038,
+      "bootstrap_95": [
+       0.0,
+       0.01
+      ],
+      "verdict": "tie"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "parents_exact": {
+     "andrey": 0.95,
+     "ref": 0.95,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.99375,
+     "ref": 0.99375,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.1,
+     "ref": 0.1,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -6.9,
+      "bootstrap_95": [
+       -7.0,
+       -6.7
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.1,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.9,
+      "bootstrap_95": [
+       -1.0,
+       -0.75
+      ],
+      "verdict": "better"
+     }
+    },
+    "error": {
+     "andrey": 0.000977358463117131,
+     "ref": 0.007355334664520119,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.0064,
+      "bootstrap_95": [
+       -0.0083,
+       -0.0045
+      ],
+      "verdict": "better"
+     },
+     "none": 0.8744615775335793,
+     "zero": 0.0,
+     "all": 0.012830490812377946,
+     "oracle": 0.0,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.8735,
+      "bootstrap_95": [
+       -0.881,
+       -0.8659
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": 0.001,
+      "bootstrap_95": [
+       0.0,
+       0.0026
+      ],
+      "verdict": "tie"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.8671,
+      "bootstrap_95": [
+       -0.8743,
+       -0.8601
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": 0.0074,
+      "bootstrap_95": [
+       0.0055,
+       0.0091
+      ],
+      "verdict": "worse"
+     }
+    },
+    "truth_direct": 0.0,
+    "tests": {
+     "andrey": 65.0,
+     "ref": 74.0
+    },
+    "wall": {
+     "andrey": 0.004176966496743262,
+     "ref": 0.011705696961143985,
+     "pc": 0.42562694050138816
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.0,
+     "answered": 19,
+     "tests": 2302.0,
+     "wall": 0.42562694050138816,
+     "error_vs_andrey": {
+      "paired": 19,
+      "mean_D": -0.001,
+      "bootstrap_95": [
+       -0.0027,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    }
+   },
+   "pareto": {
+    "pc_effect_error_mean": 0.0038,
+    "andrey_effect_error_mean": 0.0,
+    "pc_answered": 18,
+    "pc_minus_andrey": {
+     "paired": 18,
+     "mean_D": 0.0038,
+     "bootstrap_95": [
+      0.0,
+      0.01
+     ],
+     "verdict": "tie"
+    },
+    "andrey_tests_median": 65.0,
+    "pc_tests_median": 2349.0,
+    "andrey_s_median": 0.0041,
+    "pc_s_median": 0.4816,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "ldp@5000",
+   "method": "ldp",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "answered": {
+     "andrey": 0.95,
+     "ref": 0.95,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 19,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.05,
+     "ref": 0.05,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.002113951558317097,
+     "ref": 0.002113951558317097,
+     "vs_ref": {
+      "paired": 19,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.07860498493470755,
+     "zero": 0.8864521638996777,
+     "all": 0.7474368489557162,
+     "oracle": 0.004250955434034526,
+     "vs_none": {
+      "paired": 19,
+      "mean_D": -0.0765,
+      "bootstrap_95": [
+       -0.0773,
+       -0.0758
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 19,
+      "mean_D": -0.8843,
+      "bootstrap_95": [
+       -0.8851,
+       -0.8835
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 19,
+      "mean_D": -0.0765,
+      "bootstrap_95": [
+       -0.0773,
+       -0.0758
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 19,
+      "mean_D": -0.8843,
+      "bootstrap_95": [
+       -0.8851,
+       -0.8835
+      ],
+      "verdict": "better"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 40.0,
+     "ref": 51.0
+    },
+    "wall": {
+     "andrey": 0.003475755453109741,
+     "ref": 0.008349641924723983,
+     "pc": 0.4151033475063741
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.7266579059316736,
+     "answered": 18,
+     "tests": 378.5,
+     "wall": 0.4151033475063741,
+     "error_vs_andrey": {
+      "paired": 17,
+      "mean_D": 0.7273,
+      "bootstrap_95": [
+       0.5905,
+       0.8423
+      ],
+      "verdict": "worse"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "answered": {
+     "andrey": 0.85,
+     "ref": 0.85,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 17,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.15,
+     "ref": 0.15,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.002333789821075715,
+     "ref": 0.002333789821075715,
+     "vs_ref": {
+      "paired": 17,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0785137131006638,
+     "zero": 0.8864521638996777,
+     "all": 0.7484029076555815,
+     "oracle": 0.0037167957559293362,
+     "vs_none": {
+      "paired": 17,
+      "mean_D": -0.0762,
+      "bootstrap_95": [
+       -0.077,
+       -0.0753
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 17,
+      "mean_D": -0.8841,
+      "bootstrap_95": [
+       -0.8849,
+       -0.8833
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 17,
+      "mean_D": -0.0762,
+      "bootstrap_95": [
+       -0.077,
+       -0.0753
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 17,
+      "mean_D": -0.8841,
+      "bootstrap_95": [
+       -0.8849,
+       -0.8833
+      ],
+      "verdict": "better"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 40.0,
+     "ref": 51.0
+    },
+    "wall": {
+     "andrey": 0.0037044715136289597,
+     "ref": 0.00834276876412332,
+     "pc": 0.4158841301687062
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.8119865530611643,
+     "answered": 19,
+     "tests": 404.0,
+     "wall": 0.4158841301687062,
+     "error_vs_andrey": {
+      "paired": 16,
+      "mean_D": 0.8026,
+      "bootstrap_95": [
+       0.7229,
+       0.8549
+      ],
+      "verdict": "worse"
+     }
+    }
+   },
+   "pareto": {
+    "pc_effect_error_mean": 0.7267,
+    "andrey_effect_error_mean": 0.0021,
+    "pc_answered": 18,
+    "pc_minus_andrey": {
+     "paired": 17,
+     "mean_D": 0.7273,
+     "bootstrap_95": [
+      0.5905,
+      0.8423
+     ],
+     "verdict": "worse"
+    },
+    "andrey_tests_median": 40.0,
+    "pc_tests_median": 378.5,
+    "andrey_s_median": 0.0035,
+    "pc_s_median": 0.4151,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "ld3-dag@5000,effect=0",
+   "method": "ld3",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "parents_exact": {
+     "andrey": 0.85,
+     "ref": 0.85,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.99,
+     "ref": 0.99,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.15,
+     "ref": 0.15,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -6.85,
+      "bootstrap_95": [
+       -7.0,
+       -6.7
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -1.0,
+      "bootstrap_95": [
+       -1.0,
+       -1.0
+      ],
+      "verdict": "better"
+     }
+    },
+    "error": {
+     "andrey": 0.0,
+     "ref": 0.005206437882493181,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.0052,
+      "bootstrap_95": [
+       -0.0071,
+       -0.0034
+      ],
+      "verdict": "better"
+     },
+     "none": 0.8688290945416519,
+     "zero": 0.0,
+     "all": 0.011183228561689438,
+     "oracle": 0.0,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.8688,
+      "bootstrap_95": [
+       -0.8786,
+       -0.8582
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.8636,
+      "bootstrap_95": [
+       -0.8725,
+       -0.854
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": 0.0052,
+      "bootstrap_95": [
+       0.0034,
+       0.0071
+      ],
+      "verdict": "worse"
+     }
+    },
+    "truth_direct": 0.0,
+    "tests": {
+     "andrey": 66.0,
+     "ref": 76.0
+    },
+    "wall": {
+     "andrey": 0.004614311503246427,
+     "ref": 0.012625235511222854,
+     "pc": 0.48153897002339363
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.0011999536491236519,
+     "answered": 17,
+     "tests": 2935.0,
+     "wall": 0.48153897002339363,
+     "error_vs_andrey": {
+      "paired": 17,
+      "mean_D": 0.0012,
+      "bootstrap_95": [
+       0.0,
+       0.0036
+      ],
+      "verdict": "tie"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "parents_exact": {
+     "andrey": 0.95,
+     "ref": 0.95,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.9966666666666667,
+     "ref": 0.9966666666666667,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.05,
+     "ref": 0.05,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -6.95,
+      "bootstrap_95": [
+       -7.0,
+       -6.85
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -1.0,
+      "bootstrap_95": [
+       -1.0,
+       -1.0
+      ],
+      "verdict": "better"
+     }
+    },
+    "error": {
+     "andrey": 0.0,
+     "ref": 0.0049921353359746274,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.005,
+      "bootstrap_95": [
+       -0.0063,
+       -0.0038
+      ],
+      "verdict": "better"
+     },
+     "none": 0.8748216848528931,
+     "zero": 0.0,
+     "all": 0.007676037613638045,
+     "oracle": 0.0,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.8748,
+      "bootstrap_95": [
+       -0.8817,
+       -0.8675
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.8698,
+      "bootstrap_95": [
+       -0.8765,
+       -0.8629
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": 0.005,
+      "bootstrap_95": [
+       0.0038,
+       0.0063
+      ],
+      "verdict": "worse"
+     }
+    },
+    "truth_direct": 0.0,
+    "tests": {
+     "andrey": 65.5,
+     "ref": 76.0
+    },
+    "wall": {
+     "andrey": 0.004657462995965034,
+     "ref": 0.01213693548925221,
+     "pc": 0.4321357870067004
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.0,
+     "answered": 20,
+     "tests": 2910.0,
+     "wall": 0.4321357870067004,
+     "error_vs_andrey": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    }
+   },
+   "pareto": {
+    "pc_effect_error_mean": 0.0012,
+    "andrey_effect_error_mean": 0.0,
+    "pc_answered": 17,
+    "pc_minus_andrey": {
+     "paired": 17,
+     "mean_D": 0.0012,
+     "bootstrap_95": [
+      0.0,
+      0.0036
+     ],
+     "verdict": "tie"
+    },
+    "andrey_tests_median": 66.0,
+    "pc_tests_median": 2935.0,
+    "andrey_s_median": 0.0046,
+    "pc_s_median": 0.4815,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "ld3-dag@10000,effect=0",
+   "method": "ld3",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "parents_exact": {
+     "andrey": 0.9,
+     "ref": 0.9,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.9933333333333334,
+     "ref": 0.9933333333333334,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.1,
+     "ref": 0.1,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -6.9,
+      "bootstrap_95": [
+       -7.0,
+       -6.75
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 0.95,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.95,
+      "bootstrap_95": [
+       -1.0,
+       -0.85
+      ],
+      "verdict": "better"
+     }
+    },
+    "error": {
+     "andrey": 0.0,
+     "ref": 0.003329701500877539,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.0033,
+      "bootstrap_95": [
+       -0.0047,
+       -0.0021
+      ],
+      "verdict": "better"
+     },
+     "none": 0.8700750479518007,
+     "zero": 0.0,
+     "all": 0.007922040022219483,
+     "oracle": 0.0,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.8701,
+      "bootstrap_95": [
+       -0.8792,
+       -0.8603
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.8667,
+      "bootstrap_95": [
+       -0.8761,
+       -0.8571
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": 0.0033,
+      "bootstrap_95": [
+       0.0021,
+       0.0047
+      ],
+      "verdict": "worse"
+     }
+    },
+    "truth_direct": 0.0,
+    "tests": {
+     "andrey": 66.0,
+     "ref": 76.0
+    },
+    "wall": {
+     "andrey": 0.007229521463159472,
+     "ref": 0.013701538497116417,
+     "pc": 0.5043598659976851
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.0,
+     "answered": 20,
+     "tests": 3261.5,
+     "wall": 0.5043598659976851,
+     "error_vs_andrey": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "parents_exact": {
+     "andrey": 0.95,
+     "ref": 0.95,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.9966666666666667,
+     "ref": 0.9966666666666667,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.05,
+     "ref": 0.05,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -6.95,
+      "bootstrap_95": [
+       -7.0,
+       -6.85
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -1.0,
+      "bootstrap_95": [
+       -1.0,
+       -1.0
+      ],
+      "verdict": "better"
+     }
+    },
+    "error": {
+     "andrey": 0.0,
+     "ref": 0.0035803050780452194,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.0036,
+      "bootstrap_95": [
+       -0.0047,
+       -0.0025
+      ],
+      "verdict": "better"
+     },
+     "none": 0.8743357471087974,
+     "zero": 0.0,
+     "all": 0.0066607361462043295,
+     "oracle": 0.0,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.8743,
+      "bootstrap_95": [
+       -0.8815,
+       -0.8668
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.8708,
+      "bootstrap_95": [
+       -0.8781,
+       -0.8633
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": 0.0036,
+      "bootstrap_95": [
+       0.0025,
+       0.0047
+      ],
+      "verdict": "worse"
+     }
+    },
+    "truth_direct": 0.0,
+    "tests": {
+     "andrey": 66.0,
+     "ref": 76.0
+    },
+    "wall": {
+     "andrey": 0.007314270973438397,
+     "ref": 0.013497197505785152,
+     "pc": 0.4550073735008482
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.0,
+     "answered": 18,
+     "tests": 3331.5,
+     "wall": 0.4550073735008482,
+     "error_vs_andrey": {
+      "paired": 18,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    }
+   },
+   "pareto": {
+    "pc_effect_error_mean": 0.0,
+    "andrey_effect_error_mean": 0.0,
+    "pc_answered": 20,
+    "pc_minus_andrey": {
+     "paired": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "verdict": "tie"
+    },
+    "andrey_tests_median": 66.0,
+    "pc_tests_median": 3261.5,
+    "andrey_s_median": 0.0072,
+    "pc_s_median": 0.5044,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "ld3-dag@10000,hide=B1",
+   "method": "ld3",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "parents_exact": {
+     "andrey": 0.95,
+     "ref": 0.95,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.9966666666666667,
+     "ref": 0.9966666666666667,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.05,
+     "ref": 0.05,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -6.95,
+      "bootstrap_95": [
+       -7.0,
+       -6.85
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.003938238260360968,
+     "ref": 0.003938238260360968,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.5890609092718261,
+     "zero": 0.35298972579673416,
+     "all": 0.004351279747679809,
+     "oracle": 0.003926688469813389,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.5851,
+      "bootstrap_95": [
+       -0.5969,
+       -0.5732
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3491,
+      "bootstrap_95": [
+       -0.3588,
+       -0.3391
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.5851,
+      "bootstrap_95": [
+       -0.5969,
+       -0.5732
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3491,
+      "bootstrap_95": [
+       -0.3588,
+       -0.3391
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 62.0,
+     "ref": 71.0
+    },
+    "wall": {
+     "andrey": 0.00708455202402547,
+     "ref": 0.013630749483127147,
+     "pc": NaN
+    },
+    "pc": {
+     "ok": 0,
+     "error": NaN,
+     "answered": 0,
+     "tests": NaN,
+     "wall": NaN,
+     "error_vs_andrey": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "parents_exact": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -7.0,
+      "bootstrap_95": [
+       -7.0,
+       -7.0
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.002153687051006256,
+     "ref": 0.002153687051006256,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.5934638362154551,
+     "zero": 0.35082401043082256,
+     "all": 0.004752713912371934,
+     "oracle": 0.002153687051006256,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.5913,
+      "bootstrap_95": [
+       -0.6007,
+       -0.5825
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3487,
+      "bootstrap_95": [
+       -0.3564,
+       -0.3406
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.5913,
+      "bootstrap_95": [
+       -0.6007,
+       -0.5825
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3487,
+      "bootstrap_95": [
+       -0.3564,
+       -0.3406
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 62.0,
+     "ref": 71.0
+    },
+    "wall": {
+     "andrey": 0.007093504478689283,
+     "ref": 0.01341521751601249,
+     "pc": NaN
+    },
+    "pc": {
+     "ok": 0,
+     "error": NaN,
+     "answered": 0,
+     "tests": NaN,
+     "wall": NaN,
+     "error_vs_andrey": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    }
+   }
+  },
+  {
+   "cell": "ld3-dag@10000,hide=Z4a",
+   "method": "ld3",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "parents_exact": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -7.0,
+      "bootstrap_95": [
+       -7.0,
+       -7.0
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.002900271543350594,
+     "ref": 0.002900271543350594,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.5895438006846744,
+     "zero": 0.35298972579673416,
+     "all": 0.0033826964548756442,
+     "oracle": 0.002900271543350594,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.5866,
+      "bootstrap_95": [
+       -0.5985,
+       -0.5749
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3501,
+      "bootstrap_95": [
+       -0.3595,
+       -0.3407
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.5866,
+      "bootstrap_95": [
+       -0.5985,
+       -0.5749
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3501,
+      "bootstrap_95": [
+       -0.3595,
+       -0.3407
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 61.0,
+     "ref": 71.0
+    },
+    "wall": {
+     "andrey": 0.006532906001666561,
+     "ref": 0.012560656032292172,
+     "pc": NaN
+    },
+    "pc": {
+     "ok": 0,
+     "error": NaN,
+     "answered": 0,
+     "tests": NaN,
+     "wall": NaN,
+     "error_vs_andrey": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "parents_exact": {
+     "andrey": 0.9,
+     "ref": 0.9,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.9933333333333334,
+     "ref": 0.9933333333333334,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.1,
+     "ref": 0.1,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -6.9,
+      "bootstrap_95": [
+       -7.0,
+       -6.75
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.0031765770012233243,
+     "ref": 0.0031765770012233243,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.593308717283964,
+     "zero": 0.35082401043082256,
+     "all": 0.005289431004359954,
+     "oracle": 0.003205205391601243,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.5901,
+      "bootstrap_95": [
+       -0.5996,
+       -0.5811
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3476,
+      "bootstrap_95": [
+       -0.355,
+       -0.3399
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.5901,
+      "bootstrap_95": [
+       -0.5996,
+       -0.5811
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3476,
+      "bootstrap_95": [
+       -0.355,
+       -0.3399
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 61.0,
+     "ref": 71.0
+    },
+    "wall": {
+     "andrey": 0.006369498500134796,
+     "ref": 0.013553714496083558,
+     "pc": NaN
+    },
+    "pc": {
+     "ok": 0,
+     "error": NaN,
+     "answered": 0,
+     "tests": NaN,
+     "wall": NaN,
+     "error_vs_andrey": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    }
+   }
+  },
+  {
+   "cell": "ld3-dag@10000,hide=M1",
+   "method": "ld3",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "parents_exact": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -7.0,
+      "bootstrap_95": [
+       -7.0,
+       -7.0
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.0023045987611585187,
+     "ref": 0.0023045987611585187,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.5894042029491826,
+     "zero": 0.35298972579673416,
+     "all": 0.003663470907433569,
+     "oracle": 0.0023045987611585187,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.5871,
+      "bootstrap_95": [
+       -0.5991,
+       -0.5753
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3507,
+      "bootstrap_95": [
+       -0.3602,
+       -0.3411
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.5871,
+      "bootstrap_95": [
+       -0.5991,
+       -0.5753
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3507,
+      "bootstrap_95": [
+       -0.3602,
+       -0.3411
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 62.0,
+     "ref": 71.0
+    },
+    "wall": {
+     "andrey": 0.006343301007291302,
+     "ref": 0.013974912028061226,
+     "pc": NaN
+    },
+    "pc": {
+     "ok": 0,
+     "error": NaN,
+     "answered": 0,
+     "tests": NaN,
+     "wall": NaN,
+     "error_vs_andrey": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "parents_exact": {
+     "andrey": 0.9,
+     "ref": 0.9,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.9933333333333334,
+     "ref": 0.9933333333333334,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.1,
+     "ref": 0.1,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 7.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -6.9,
+      "bootstrap_95": [
+       -7.0,
+       -6.75
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.0020246194811670893,
+     "ref": 0.0020246194811670893,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.5933572592033276,
+     "zero": 0.35082401043082256,
+     "all": 0.004592128140777868,
+     "oracle": 0.0019765255109730874,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.5913,
+      "bootstrap_95": [
+       -0.6009,
+       -0.5822
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3488,
+      "bootstrap_95": [
+       -0.3561,
+       -0.3412
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.5913,
+      "bootstrap_95": [
+       -0.6009,
+       -0.5822
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3488,
+      "bootstrap_95": [
+       -0.3561,
+       -0.3412
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 62.0,
+     "ref": 71.0
+    },
+    "wall": {
+     "andrey": 0.006270304002100602,
+     "ref": 0.014025192009285092,
+     "pc": NaN
+    },
+    "pc": {
+     "ok": 0,
+     "error": NaN,
+     "answered": 0,
+     "tests": NaN,
+     "wall": NaN,
+     "error_vs_andrey": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    }
+   }
+  },
+  {
+   "cell": "ld3-er@5000,nodes=50",
+   "method": "ld3",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "parents_exact": {
+     "andrey": 0.8,
+     "ref": 0.55,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.25,
+      "bootstrap_95": [
+       0.0,
+       0.5
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.9456682206682206,
+     "ref": 0.8109343674900951,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.1347,
+      "bootstrap_95": [
+       0.0499,
+       0.2296
+      ],
+      "verdict": "better"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.65,
+     "ref": 2.65,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -2.0,
+      "bootstrap_95": [
+       -3.7,
+       -0.55
+      ],
+      "verdict": "better"
+     },
+     "empty": 5.05,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -4.4,
+      "bootstrap_95": [
+       -5.2,
+       -3.4
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.007464196653672764,
+     "ref": 0.023784757162903507,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.0163,
+      "bootstrap_95": [
+       -0.0443,
+       -0.0
+      ],
+      "verdict": "better"
+     },
+     "none": 0.12778825753153705,
+     "zero": 0.3357565281262235,
+     "all": 0.009406145008574486,
+     "oracle": 0.0070629575928217265,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.1203,
+      "bootstrap_95": [
+       -0.1812,
+       -0.0646
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3283,
+      "bootstrap_95": [
+       -0.3828,
+       -0.2788
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.104,
+      "bootstrap_95": [
+       -0.1618,
+       -0.0528
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.312,
+      "bootstrap_95": [
+       -0.3676,
+       -0.2629
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 194.5,
+     "ref": 194.5
+    },
+    "wall": {
+     "andrey": 0.00840630754828453,
+     "ref": 0.029337820131331682,
+     "pc": 0.45376847265288234
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.03097135729691314,
+     "answered": 11,
+     "tests": 20579.0,
+     "wall": 0.45376847265288234,
+     "error_vs_andrey": {
+      "paired": 11,
+      "mean_D": 0.0229,
+      "bootstrap_95": [
+       -0.0018,
+       0.0678
+      ],
+      "verdict": "tie"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "parents_exact": {
+     "andrey": 0.8,
+     "ref": 0.8,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       -0.15,
+       0.15
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.9716450216450218,
+     "ref": 0.9636904761904763,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.008,
+      "bootstrap_95": [
+       -0.0136,
+       0.0375
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.3,
+     "ref": 0.35,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.3,
+       0.15
+      ],
+      "verdict": "tie"
+     },
+     "empty": 4.25,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -3.95,
+      "bootstrap_95": [
+       -4.4,
+       -3.55
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.005615783335926732,
+     "ref": 0.005381362314295172,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0002,
+      "bootstrap_95": [
+       0.0,
+       0.0007
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.1117588754896576,
+     "zero": 0.4171921143766208,
+     "all": 0.012115171927248284,
+     "oracle": 0.005644323191532753,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.1061,
+      "bootstrap_95": [
+       -0.1472,
+       -0.0665
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.4116,
+      "bootstrap_95": [
+       -0.4705,
+       -0.3576
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.1064,
+      "bootstrap_95": [
+       -0.1474,
+       -0.0668
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.4118,
+      "bootstrap_95": [
+       -0.4709,
+       -0.358
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 193.0,
+     "ref": 189.0
+    },
+    "wall": {
+     "andrey": 0.008352926233783364,
+     "ref": 0.03006260027177632,
+     "pc": 0.4467299678362906
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.0736571501822017,
+     "answered": 13,
+     "tests": 22880.0,
+     "wall": 0.4467299678362906,
+     "error_vs_andrey": {
+      "paired": 13,
+      "mean_D": 0.0683,
+      "bootstrap_95": [
+       0.0171,
+       0.1336
+      ],
+      "verdict": "worse"
+     }
+    }
+   },
+   "pareto": {
+    "pc_effect_error_mean": 0.031,
+    "andrey_effect_error_mean": 0.0075,
+    "pc_answered": 11,
+    "pc_minus_andrey": {
+     "paired": 11,
+     "mean_D": 0.0229,
+     "bootstrap_95": [
+      -0.0018,
+      0.0678
+     ],
+     "verdict": "tie"
+    },
+    "andrey_tests_median": 194.5,
+    "pc_tests_median": 20579.0,
+    "andrey_s_median": 0.0084,
+    "pc_s_median": 0.4538,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "ld3-er@5000,nodes=100",
+   "method": "ld3",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "parents_exact": {
+     "andrey": 0.7,
+     "ref": 0.6,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       0.0,
+       0.25
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.9496886446886448,
+     "ref": 0.9093879731379731,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0403,
+      "bootstrap_95": [
+       0.0,
+       0.0879
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.6,
+     "ref": 1.25,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.65,
+      "bootstrap_95": [
+       -1.45,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 5.25,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -4.65,
+      "bootstrap_95": [
+       -5.25,
+       -3.95
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.00654410840145152,
+     "ref": 0.007023564073664687,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.0005,
+      "bootstrap_95": [
+       -0.0013,
+       0.0001
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.07295577441408319,
+     "zero": 0.37280049830691375,
+     "all": 0.01073404115228706,
+     "oracle": 0.00625811082324663,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.0664,
+      "bootstrap_95": [
+       -0.1071,
+       -0.0304
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3663,
+      "bootstrap_95": [
+       -0.4151,
+       -0.3173
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.0659,
+      "bootstrap_95": [
+       -0.1068,
+       -0.0296
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3658,
+      "bootstrap_95": [
+       -0.4148,
+       -0.3164
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 371.0,
+     "ref": 350.5
+    },
+    "wall": {
+     "andrey": 0.015800762455910444,
+     "ref": 0.055941491620615125,
+     "pc": 0.49832364614121616
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.007102147416913668,
+     "answered": 15,
+     "tests": 76752.0,
+     "wall": 0.49832364614121616,
+     "error_vs_andrey": {
+      "paired": 15,
+      "mean_D": 0.0003,
+      "bootstrap_95": [
+       -0.0009,
+       0.0018
+      ],
+      "verdict": "tie"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "parents_exact": {
+     "andrey": 0.7,
+     "ref": 0.6,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.1,
+      "bootstrap_95": [
+       -0.1,
+       0.3
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.9597979797979799,
+     "ref": 0.9034393384393384,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0564,
+      "bootstrap_95": [
+       0.0029,
+       0.1142
+      ],
+      "verdict": "better"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.45,
+     "ref": 1.15,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.7,
+      "bootstrap_95": [
+       -1.45,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 4.9,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -4.45,
+      "bootstrap_95": [
+       -4.9,
+       -3.95
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.0053560027533366954,
+     "ref": 0.006002874045133664,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.0006,
+      "bootstrap_95": [
+       -0.0017,
+       0.0003
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.13471372669361983,
+     "zero": 0.3489287914504428,
+     "all": 0.007192644135769648,
+     "oracle": 0.005259249087546667,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.1294,
+      "bootstrap_95": [
+       -0.1928,
+       -0.0713
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3436,
+      "bootstrap_95": [
+       -0.395,
+       -0.2928
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.1287,
+      "bootstrap_95": [
+       -0.1921,
+       -0.0707
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.3429,
+      "bootstrap_95": [
+       -0.3939,
+       -0.2925
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 387.0,
+     "ref": 372.0
+    },
+    "wall": {
+     "andrey": 0.01717246789485216,
+     "ref": 0.06004565628245473,
+     "pc": 0.49294538609683514
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.10453992627817632,
+     "answered": 12,
+     "tests": 83270.0,
+     "wall": 0.49294538609683514,
+     "error_vs_andrey": {
+      "paired": 12,
+      "mean_D": 0.0997,
+      "bootstrap_95": [
+       0.0054,
+       0.2057
+      ],
+      "verdict": "worse"
+     }
+    }
+   },
+   "pareto": {
+    "pc_effect_error_mean": 0.0071,
+    "andrey_effect_error_mean": 0.0065,
+    "pc_answered": 15,
+    "pc_minus_andrey": {
+     "paired": 15,
+     "mean_D": 0.0003,
+     "bootstrap_95": [
+      -0.0009,
+      0.0018
+     ],
+     "verdict": "tie"
+    },
+    "andrey_tests_median": 371.0,
+    "pc_tests_median": 76752.0,
+    "andrey_s_median": 0.0158,
+    "pc_s_median": 0.4983,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "sangiovese@250",
+   "method": "ld3",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "parents_exact": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.7239531302031301,
+     "ref": 0.6762092074592074,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0477,
+      "bootstrap_95": [
+       0.0214,
+       0.0766
+      ],
+      "verdict": "better"
+     }
+    },
+    "set_errors": {
+     "andrey": 3.45,
+     "ref": 3.9,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.45,
+      "bootstrap_95": [
+       -0.7,
+       -0.2
+      ],
+      "verdict": "better"
+     },
+     "empty": 8.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -4.55,
+      "bootstrap_95": [
+       -4.9,
+       -4.25
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.45,
+     "ref": 0.6,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.15,
+      "bootstrap_95": [
+       -0.35,
+       0.05
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.16417622509793148,
+     "ref": 0.18359105517845925,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.0194,
+      "bootstrap_95": [
+       -0.0492,
+       0.0077
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.4712216684985351,
+     "zero": 0.21121663482962302,
+     "all": 0.07871425071648425,
+     "oracle": 0.0628011701059381,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.307,
+      "bootstrap_95": [
+       -0.35,
+       -0.2669
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.047,
+      "bootstrap_95": [
+       -0.0842,
+       -0.0131
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.2876,
+      "bootstrap_95": [
+       -0.3174,
+       -0.2567
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.0276,
+      "bootstrap_95": [
+       -0.0527,
+       -0.0061
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 49.0,
+     "ref": 61.0
+    },
+    "wall": {
+     "andrey": 0.0034289818722754717,
+     "ref": 0.009400310693308711,
+     "pc": 0.4310087396297604
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.21121663482962302,
+     "answered": 15,
+     "tests": 1164.5,
+     "wall": 0.4310087396297604,
+     "error_vs_andrey": {
+      "paired": 15,
+      "mean_D": 0.0498,
+      "bootstrap_95": [
+       0.0106,
+       0.0926
+      ],
+      "verdict": "worse"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "parents_exact": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.7547252747252747,
+     "ref": 0.7169963369963369,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0377,
+      "bootstrap_95": [
+       0.0154,
+       0.0608
+      ],
+      "verdict": "better"
+     }
+    },
+    "set_errors": {
+     "andrey": 3.15,
+     "ref": 3.5,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.35,
+      "bootstrap_95": [
+       -0.6,
+       -0.1
+      ],
+      "verdict": "better"
+     },
+     "empty": 8.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -4.85,
+      "bootstrap_95": [
+       -5.3,
+       -4.4
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.45,
+     "ref": 0.4,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       -0.2,
+       0.3
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.1418353494326755,
+     "ref": 0.15445439968665808,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.0126,
+      "bootstrap_95": [
+       -0.056,
+       0.0333
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.44055620121488587,
+     "zero": 0.21121663482962302,
+     "all": 0.08452213428885777,
+     "oracle": 0.05887860476225545,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.2987,
+      "bootstrap_95": [
+       -0.3376,
+       -0.2618
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.0694,
+      "bootstrap_95": [
+       -0.1001,
+       -0.0389
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.2861,
+      "bootstrap_95": [
+       -0.339,
+       -0.2347
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.0568,
+      "bootstrap_95": [
+       -0.0963,
+       -0.0186
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 49.0,
+     "ref": 61.0
+    },
+    "wall": {
+     "andrey": 0.0035474153701215982,
+     "ref": 0.009479515254497528,
+     "pc": 0.4232075384352356
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.21121663482962302,
+     "answered": 14,
+     "tests": 1108.5,
+     "wall": 0.4232075384352356,
+     "error_vs_andrey": {
+      "paired": 14,
+      "mean_D": 0.0704,
+      "bootstrap_95": [
+       0.0353,
+       0.1079
+      ],
+      "verdict": "worse"
+     }
+    }
+   },
+   "pareto": {
+    "pc_effect_error_mean": 0.2112,
+    "andrey_effect_error_mean": 0.1642,
+    "pc_answered": 15,
+    "pc_minus_andrey": {
+     "paired": 15,
+     "mean_D": 0.0498,
+     "bootstrap_95": [
+      0.0106,
+      0.0926
+     ],
+     "verdict": "worse"
+    },
+    "andrey_tests_median": 49.0,
+    "pc_tests_median": 1164.5,
+    "andrey_s_median": 0.0034,
+    "pc_s_median": 0.431,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "sangiovese@500",
+   "method": "ld3",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "parents_exact": {
+     "andrey": 0.05,
+     "ref": 0.05,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.89375,
+     "ref": 0.8928571428571429,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0009,
+      "bootstrap_95": [
+       -0.0088,
+       0.0114
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 1.5,
+     "ref": 1.5,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       -0.15,
+       0.15
+      ],
+      "verdict": "tie"
+     },
+     "empty": 8.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -6.5,
+      "bootstrap_95": [
+       -6.85,
+       -6.1
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.1,
+     "ref": 0.1,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.06483887939799741,
+     "ref": 0.06802170021174439,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.0032,
+      "bootstrap_95": [
+       -0.0095,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.45190808269681754,
+     "zero": 0.21121663482962302,
+     "all": 0.04899760789316476,
+     "oracle": 0.04711570143731454,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.3871,
+      "bootstrap_95": [
+       -0.415,
+       -0.3564
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.1464,
+      "bootstrap_95": [
+       -0.169,
+       -0.1188
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.3839,
+      "bootstrap_95": [
+       -0.4127,
+       -0.3524
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.1432,
+      "bootstrap_95": [
+       -0.1665,
+       -0.1154
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 49.0,
+     "ref": 61.0
+    },
+    "wall": {
+     "andrey": 0.0033354104962199926,
+     "ref": 0.009809576440602541,
+     "pc": 0.43210278754122555
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.21121663482962305,
+     "answered": 9,
+     "tests": 1661.5,
+     "wall": 0.43210278754122555,
+     "error_vs_andrey": {
+      "paired": 9,
+      "verdict": "reported"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "parents_exact": {
+     "andrey": 0.1,
+     "ref": 0.1,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.8601465201465203,
+     "ref": 0.8519413919413921,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0082,
+      "bootstrap_95": [
+       0.0,
+       0.0246
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 1.95,
+     "ref": 2.05,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.1,
+      "bootstrap_95": [
+       -0.3,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 8.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -6.05,
+      "bootstrap_95": [
+       -6.5,
+       -5.55
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.15,
+     "ref": 0.35,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.2,
+      "bootstrap_95": [
+       -0.4,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.06508838409413738,
+     "ref": 0.09692420352910783,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.0318,
+      "bootstrap_95": [
+       -0.0651,
+       -0.0006
+      ],
+      "verdict": "better"
+     },
+     "none": 0.4686352496518961,
+     "zero": 0.21121663482962302,
+     "all": 0.0383708136083604,
+     "oracle": 0.041527179010707016,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.4035,
+      "bootstrap_95": [
+       -0.445,
+       -0.3582
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.1461,
+      "bootstrap_95": [
+       -0.173,
+       -0.1148
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.3717,
+      "bootstrap_95": [
+       -0.4173,
+       -0.3243
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.1143,
+      "bootstrap_95": [
+       -0.151,
+       -0.076
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 49.0,
+     "ref": 61.0
+    },
+    "wall": {
+     "andrey": 0.0035321363247931004,
+     "ref": 0.010809631552547216,
+     "pc": 0.42316018394194543
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.21121663482962308,
+     "answered": 8,
+     "tests": 1653.5,
+     "wall": 0.42316018394194543,
+     "error_vs_andrey": {
+      "paired": 8,
+      "verdict": "reported"
+     }
+    }
+   },
+   "pareto": {
+    "pc_effect_error_mean": 0.2112,
+    "andrey_effect_error_mean": 0.0648,
+    "pc_answered": 9,
+    "pc_minus_andrey": {
+     "paired": 9,
+     "mean_D": 0.1483,
+     "bootstrap_95": [
+      0.104,
+      0.1818
+     ],
+     "verdict": "worse"
+    },
+    "andrey_tests_median": 49.0,
+    "pc_tests_median": 1661.5,
+    "andrey_s_median": 0.0033,
+    "pc_s_median": 0.4321,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "sangiovese@1000",
+   "method": "ld3",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "parents_exact": {
+     "andrey": 0.3,
+     "ref": 0.3,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.9364635854341736,
+     "ref": 0.9364635854341736,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.95,
+     "ref": 0.95,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 8.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -7.05,
+      "bootstrap_95": [
+       -7.35,
+       -6.7
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.027681313140306328,
+     "ref": 0.027681313140306328,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.447244323807584,
+     "zero": 0.21121663482962302,
+     "all": 0.03172543149135716,
+     "oracle": 0.02700750537154135,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.4196,
+      "bootstrap_95": [
+       -0.4329,
+       -0.4051
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.1835,
+      "bootstrap_95": [
+       -0.1917,
+       -0.1749
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.4196,
+      "bootstrap_95": [
+       -0.4329,
+       -0.4051
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.1835,
+      "bootstrap_95": [
+       -0.1917,
+       -0.1749
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 49.0,
+     "ref": 61.0
+    },
+    "wall": {
+     "andrey": 0.003631103551015258,
+     "ref": 0.01093303901143372,
+     "pc": 0.429761559702456
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.21121663482962302,
+     "answered": 3,
+     "tests": 2356.5,
+     "wall": 0.429761559702456,
+     "error_vs_andrey": {
+      "paired": 3,
+      "verdict": "reported"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "parents_exact": {
+     "andrey": 0.6,
+     "ref": 0.6,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "parents_f1": {
+     "andrey": 0.9695238095238097,
+     "ref": 0.9695238095238097,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "set_errors": {
+     "andrey": 0.45,
+     "ref": 0.45,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "empty": 8.0,
+     "vs_empty": {
+      "paired": 20,
+      "mean_D": -7.55,
+      "bootstrap_95": [
+       -7.8,
+       -7.3
+      ],
+      "verdict": "better"
+     }
+    },
+    "direct_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.03256605632180813,
+     "ref": 0.03256605632180813,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.447912447167889,
+     "zero": 0.21121663482962302,
+     "all": 0.031110450237697086,
+     "oracle": 0.030568163320842123,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.4153,
+      "bootstrap_95": [
+       -0.4319,
+       -0.3985
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.1787,
+      "bootstrap_95": [
+       -0.1859,
+       -0.1713
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.4153,
+      "bootstrap_95": [
+       -0.4319,
+       -0.3985
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.1787,
+      "bootstrap_95": [
+       -0.1859,
+       -0.1713
+      ],
+      "verdict": "better"
+     }
+    },
+    "truth_direct": 1.0,
+    "tests": {
+     "andrey": 49.0,
+     "ref": 61.0
+    },
+    "wall": {
+     "andrey": 0.003531290218234062,
+     "ref": 0.009553720708936453,
+     "pc": 0.4289371215272695
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.21121663482962302,
+     "answered": 3,
+     "tests": 2309.0,
+     "wall": 0.4289371215272695,
+     "error_vs_andrey": {
+      "paired": 3,
+      "verdict": "reported"
+     }
+    }
+   },
+   "pareto": {
+    "pc_effect_error_mean": 0.2112,
+    "andrey_effect_error_mean": 0.0277,
+    "pc_answered": 3,
+    "pc_minus_andrey": {
+     "paired": 3,
+     "mean_D": 0.1939,
+     "bootstrap_95": [
+      0.1745,
+      0.2051
+     ],
+     "verdict": "worse"
+    },
+    "andrey_tests_median": 49.0,
+    "pc_tests_median": 2356.5,
+    "andrey_s_median": 0.0036,
+    "pc_s_median": 0.4298,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "ldp@7500",
+   "method": "ldp",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "answered": {
+     "andrey": 0.95,
+     "ref": 0.95,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 19,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.05,
+     "ref": 0.05,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.001931282047192594,
+     "ref": 0.001931282047192594,
+     "vs_ref": {
+      "paired": 19,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.07897354627686437,
+     "zero": 0.8864521638996777,
+     "all": 0.7474485801452896,
+     "oracle": 0.002801423509632034,
+     "vs_none": {
+      "paired": 19,
+      "mean_D": -0.077,
+      "bootstrap_95": [
+       -0.0779,
+       -0.076
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 19,
+      "mean_D": -0.8845,
+      "bootstrap_95": [
+       -0.8852,
+       -0.8837
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 19,
+      "mean_D": -0.077,
+      "bootstrap_95": [
+       -0.0779,
+       -0.076
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 19,
+      "mean_D": -0.8845,
+      "bootstrap_95": [
+       -0.8852,
+       -0.8837
+      ],
+      "verdict": "better"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 40.0,
+     "ref": 51.0
+    },
+    "wall": {
+     "andrey": 0.0047331321984529495,
+     "ref": 0.008594271494075656,
+     "pc": 0.41869514319114387
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.7443368686550589,
+     "answered": 20,
+     "tests": 438.0,
+     "wall": 0.41869514319114387,
+     "error_vs_andrey": {
+      "paired": 19,
+      "mean_D": 0.7378,
+      "bootstrap_95": [
+       0.6342,
+       0.8216
+      ],
+      "verdict": "worse"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "answered": {
+     "andrey": 0.95,
+     "ref": 0.95,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 19,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.05,
+     "ref": 0.05,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.002458476035824807,
+     "ref": 0.002458476035824807,
+     "vs_ref": {
+      "paired": 19,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.07893375902562916,
+     "zero": 0.8864521638996777,
+     "all": 0.7507056569284896,
+     "oracle": 0.003327707830976001,
+     "vs_none": {
+      "paired": 19,
+      "mean_D": -0.0765,
+      "bootstrap_95": [
+       -0.0774,
+       -0.0755
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 19,
+      "mean_D": -0.884,
+      "bootstrap_95": [
+       -0.8847,
+       -0.8832
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 19,
+      "mean_D": -0.0765,
+      "bootstrap_95": [
+       -0.0774,
+       -0.0755
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 19,
+      "mean_D": -0.884,
+      "bootstrap_95": [
+       -0.8847,
+       -0.8832
+      ],
+      "verdict": "better"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 40.0,
+     "ref": 51.0
+    },
+    "wall": {
+     "andrey": 0.004728027619421482,
+     "ref": 0.008482285542413592,
+     "pc": 0.41850921837612987
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.8477015173676208,
+     "answered": 20,
+     "tests": 424.5,
+     "wall": 0.41850921837612987,
+     "error_vs_andrey": {
+      "paired": 19,
+      "mean_D": 0.8432,
+      "bootstrap_95": [
+       0.819,
+       0.8618
+      ],
+      "verdict": "worse"
+     }
+    }
+   },
+   "pareto": {
+    "pc_effect_error_mean": 0.7443,
+    "andrey_effect_error_mean": 0.0019,
+    "pc_answered": 20,
+    "pc_minus_andrey": {
+     "paired": 19,
+     "mean_D": 0.7378,
+     "bootstrap_95": [
+      0.6342,
+      0.8216
+     ],
+     "verdict": "worse"
+    },
+    "andrey_tests_median": 40.0,
+    "pc_tests_median": 438.0,
+    "andrey_s_median": 0.0047,
+    "pc_s_median": 0.4187,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "ldp@1000,effect=0",
+   "method": "ldp",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "answered": {
+     "andrey": 0.85,
+     "ref": 0.85,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 17,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.15,
+     "ref": 0.15,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.013611304413979978,
+     "ref": 0.013611304413979978,
+     "vs_ref": {
+      "paired": 17,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.18923605995175433,
+     "zero": 0.5773502691896258,
+     "all": 0.7802986083169015,
+     "oracle": 0.023462106388421732,
+     "vs_none": {
+      "paired": 17,
+      "mean_D": -0.1746,
+      "bootstrap_95": [
+       -0.1809,
+       -0.1679
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 17,
+      "mean_D": -0.5637,
+      "bootstrap_95": [
+       -0.5688,
+       -0.5584
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 17,
+      "mean_D": -0.1746,
+      "bootstrap_95": [
+       -0.1809,
+       -0.1679
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 17,
+      "mean_D": -0.5637,
+      "bootstrap_95": [
+       -0.5688,
+       -0.5584
+      ],
+      "verdict": "better"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 40.0,
+     "ref": 51.0
+    },
+    "wall": {
+     "andrey": 0.0036380249075591564,
+     "ref": 0.007971280720084906,
+     "pc": 0.41421694681048393
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.7428709197184807,
+     "answered": 9,
+     "tests": 382.0,
+     "wall": 0.41421694681048393,
+     "error_vs_andrey": {
+      "paired": 8,
+      "verdict": "reported"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "answered": {
+     "andrey": 0.95,
+     "ref": 0.95,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 19,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.05,
+     "ref": 0.05,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.014604180029662022,
+     "ref": 0.014604180029662022,
+     "vs_ref": {
+      "paired": 19,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.19636702742909812,
+     "zero": 0.5773502691896258,
+     "all": 0.7668410026252538,
+     "oracle": 0.025878659105476494,
+     "vs_none": {
+      "paired": 19,
+      "mean_D": -0.1811,
+      "bootstrap_95": [
+       -0.1896,
+       -0.1731
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 19,
+      "mean_D": -0.5627,
+      "bootstrap_95": [
+       -0.5684,
+       -0.5566
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 19,
+      "mean_D": -0.1811,
+      "bootstrap_95": [
+       -0.1896,
+       -0.1731
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 19,
+      "mean_D": -0.5627,
+      "bootstrap_95": [
+       -0.5684,
+       -0.5566
+      ],
+      "verdict": "better"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 40.0,
+     "ref": 51.0
+    },
+    "wall": {
+     "andrey": 0.003483133390545845,
+     "ref": 0.009360767202451825,
+     "pc": 0.4092335959430784
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.8598818676689576,
+     "answered": 6,
+     "tests": 366.0,
+     "wall": 0.4092335959430784,
+     "error_vs_andrey": {
+      "paired": 5,
+      "verdict": "reported"
+     }
+    }
+   },
+   "pareto": {
+    "pc_effect_error_mean": 0.7429,
+    "andrey_effect_error_mean": 0.0136,
+    "pc_answered": 9,
+    "pc_minus_andrey": {
+     "paired": 8,
+     "mean_D": 0.7124,
+     "bootstrap_95": [
+      0.5396,
+      0.8765
+     ],
+     "verdict": "worse"
+    },
+    "andrey_tests_median": 40.0,
+    "pc_tests_median": 382.0,
+    "andrey_s_median": 0.0036,
+    "pc_s_median": 0.4142,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "ldp@2500,effect=0",
+   "method": "ldp",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "answered": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.008971761531041483,
+     "ref": 0.008971761531041483,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.19554348517785436,
+     "zero": 0.5773502691896258,
+     "all": 0.7733945195166508,
+     "oracle": 0.010723497921306547,
+     "vs_none": {
+      "paired": 20,
+      "mean_D": -0.1866,
+      "bootstrap_95": [
+       -0.1903,
+       -0.1826
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 20,
+      "mean_D": -0.5684,
+      "bootstrap_95": [
+       -0.5711,
+       -0.5653
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 20,
+      "mean_D": -0.1866,
+      "bootstrap_95": [
+       -0.1903,
+       -0.1826
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 20,
+      "mean_D": -0.5684,
+      "bootstrap_95": [
+       -0.5711,
+       -0.5653
+      ],
+      "verdict": "better"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 40.0,
+     "ref": 51.0
+    },
+    "wall": {
+     "andrey": 0.004169655032455921,
+     "ref": 0.01186012802645564,
+     "pc": 0.5774856659118086
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.6726982694893608,
+     "answered": 14,
+     "tests": 382.0,
+     "wall": 0.5774856659118086,
+     "error_vs_andrey": {
+      "paired": 14,
+      "mean_D": 0.6642,
+      "bootstrap_95": [
+       0.5438,
+       0.7822
+      ],
+      "verdict": "worse"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "answered": {
+     "andrey": 0.95,
+     "ref": 0.95,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 19,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.05,
+     "ref": 0.05,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.010846927239223514,
+     "ref": 0.010846927239223514,
+     "vs_ref": {
+      "paired": 19,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.1937948958812099,
+     "zero": 0.5773502691896258,
+     "all": 0.7682024363352923,
+     "oracle": 0.012149476013230649,
+     "vs_none": {
+      "paired": 19,
+      "mean_D": -0.1837,
+      "bootstrap_95": [
+       -0.1888,
+       -0.1782
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 19,
+      "mean_D": -0.5665,
+      "bootstrap_95": [
+       -0.5693,
+       -0.5636
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 19,
+      "mean_D": -0.1837,
+      "bootstrap_95": [
+       -0.1888,
+       -0.1782
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 19,
+      "mean_D": -0.5665,
+      "bootstrap_95": [
+       -0.5693,
+       -0.5636
+      ],
+      "verdict": "better"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 40.0,
+     "ref": 51.0
+    },
+    "wall": {
+     "andrey": 0.0042611523531377316,
+     "ref": 0.012665237067267299,
+     "pc": 0.5968738212250173
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.7290937756486198,
+     "answered": 15,
+     "tests": 382.0,
+     "wall": 0.5968738212250173,
+     "error_vs_andrey": {
+      "paired": 15,
+      "mean_D": 0.7189,
+      "bootstrap_95": [
+       0.6133,
+       0.8106
+      ],
+      "verdict": "worse"
+     }
+    }
+   },
+   "pareto": {
+    "pc_effect_error_mean": 0.6727,
+    "andrey_effect_error_mean": 0.009,
+    "pc_answered": 14,
+    "pc_minus_andrey": {
+     "paired": 14,
+     "mean_D": 0.6642,
+     "bootstrap_95": [
+      0.5438,
+      0.7822
+     ],
+     "verdict": "worse"
+    },
+    "andrey_tests_median": 40.0,
+    "pc_tests_median": 382.0,
+    "andrey_s_median": 0.0042,
+    "pc_s_median": 0.5775,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "ldp@5000,effect=0",
+   "method": "ldp",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "answered": {
+     "andrey": 0.95,
+     "ref": 0.95,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 19,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.05,
+     "ref": 0.05,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.006503577917416596,
+     "ref": 0.006503577917416596,
+     "vs_ref": {
+      "paired": 19,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.1922305480331854,
+     "zero": 0.5773502691896258,
+     "all": 0.7681432380644295,
+     "oracle": 0.011093763284685625,
+     "vs_none": {
+      "paired": 19,
+      "mean_D": -0.1857,
+      "bootstrap_95": [
+       -0.1888,
+       -0.1823
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 19,
+      "mean_D": -0.5708,
+      "bootstrap_95": [
+       -0.573,
+       -0.5686
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 19,
+      "mean_D": -0.1857,
+      "bootstrap_95": [
+       -0.1888,
+       -0.1823
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 19,
+      "mean_D": -0.5708,
+      "bootstrap_95": [
+       -0.573,
+       -0.5686
+      ],
+      "verdict": "better"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 40.0,
+     "ref": 51.0
+    },
+    "wall": {
+     "andrey": 0.004484447417780757,
+     "ref": 0.009577248711138964,
+     "pc": 0.4478458932135254
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.4955622683510474,
+     "answered": 15,
+     "tests": 387.0,
+     "wall": 0.4478458932135254,
+     "error_vs_andrey": {
+      "paired": 14,
+      "mean_D": 0.5051,
+      "bootstrap_95": [
+       0.393,
+       0.6203
+      ],
+      "verdict": "worse"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "answered": {
+     "andrey": 0.85,
+     "ref": 0.85,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 17,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.15,
+     "ref": 0.15,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.007410783473424322,
+     "ref": 0.007410783473424322,
+     "vs_ref": {
+      "paired": 17,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.19062285326201814,
+     "zero": 0.5773502691896258,
+     "all": 0.7684755265099358,
+     "oracle": 0.008843259061991992,
+     "vs_none": {
+      "paired": 17,
+      "mean_D": -0.1833,
+      "bootstrap_95": [
+       -0.1864,
+       -0.1801
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 17,
+      "mean_D": -0.5699,
+      "bootstrap_95": [
+       -0.5718,
+       -0.5682
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 17,
+      "mean_D": -0.1833,
+      "bootstrap_95": [
+       -0.1864,
+       -0.1801
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 17,
+      "mean_D": -0.5699,
+      "bootstrap_95": [
+       -0.5718,
+       -0.5682
+      ],
+      "verdict": "better"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 40.0,
+     "ref": 51.0
+    },
+    "wall": {
+     "andrey": 0.00452585588209331,
+     "ref": 0.010038667125627398,
+     "pc": 0.4385063780937344
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.39304632852661436,
+     "answered": 17,
+     "tests": 387.0,
+     "wall": 0.4385063780937344,
+     "error_vs_andrey": {
+      "paired": 15,
+      "mean_D": 0.4039,
+      "bootstrap_95": [
+       0.3171,
+       0.5107
+      ],
+      "verdict": "worse"
+     }
+    }
+   },
+   "pareto": {
+    "pc_effect_error_mean": 0.4956,
+    "andrey_effect_error_mean": 0.0065,
+    "pc_answered": 15,
+    "pc_minus_andrey": {
+     "paired": 14,
+     "mean_D": 0.5051,
+     "bootstrap_95": [
+      0.393,
+      0.6203
+     ],
+     "verdict": "worse"
+    },
+    "andrey_tests_median": 40.0,
+    "pc_tests_median": 387.0,
+    "andrey_s_median": 0.0045,
+    "pc_s_median": 0.4478,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "ldp@7500,effect=0",
+   "method": "ldp",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "answered": {
+     "andrey": 0.95,
+     "ref": 0.95,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 19,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.05,
+     "ref": 0.05,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.006151761401540934,
+     "ref": 0.006151761401540934,
+     "vs_ref": {
+      "paired": 19,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.19429602430279533,
+     "zero": 0.5773502691896258,
+     "all": 0.7671101267452772,
+     "oracle": 0.006048822880281346,
+     "vs_none": {
+      "paired": 19,
+      "mean_D": -0.1881,
+      "bootstrap_95": [
+       -0.1904,
+       -0.1854
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 19,
+      "mean_D": -0.5712,
+      "bootstrap_95": [
+       -0.5728,
+       -0.5695
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 19,
+      "mean_D": -0.1881,
+      "bootstrap_95": [
+       -0.1904,
+       -0.1854
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 19,
+      "mean_D": -0.5712,
+      "bootstrap_95": [
+       -0.5728,
+       -0.5695
+      ],
+      "verdict": "better"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 40.0,
+     "ref": 51.0
+    },
+    "wall": {
+     "andrey": 0.004958238918334246,
+     "ref": 0.010180393001064658,
+     "pc": 0.4387618685141206
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.4051322892386144,
+     "answered": 11,
+     "tests": 387.0,
+     "wall": 0.4387618685141206,
+     "error_vs_andrey": {
+      "paired": 11,
+      "mean_D": 0.3997,
+      "bootstrap_95": [
+       0.3125,
+       0.4863
+      ],
+      "verdict": "worse"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "answered": {
+     "andrey": 0.95,
+     "ref": 0.95,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 19,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": 0.05,
+     "ref": 0.05,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "error": {
+     "andrey": 0.006699877887168748,
+     "ref": 0.006699877887168748,
+     "vs_ref": {
+      "paired": 19,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.19347220198583528,
+     "zero": 0.5773502691896258,
+     "all": 0.7712280168548683,
+     "oracle": 0.008391564408211954,
+     "vs_none": {
+      "paired": 19,
+      "mean_D": -0.1869,
+      "bootstrap_95": [
+       -0.1902,
+       -0.1833
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 19,
+      "mean_D": -0.5707,
+      "bootstrap_95": [
+       -0.5729,
+       -0.5682
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 19,
+      "mean_D": -0.1869,
+      "bootstrap_95": [
+       -0.1902,
+       -0.1833
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 19,
+      "mean_D": -0.5707,
+      "bootstrap_95": [
+       -0.5729,
+       -0.5682
+      ],
+      "verdict": "better"
+     }
+    },
+    "oracle_answered": 1.0,
+    "tests": {
+     "andrey": 40.0,
+     "ref": 51.0
+    },
+    "wall": {
+     "andrey": 0.004879916552454233,
+     "ref": 0.008990442845970392,
+     "pc": 0.4303520084358752
+    },
+    "pc": {
+     "ok": 20,
+     "error": 0.35428801782159436,
+     "answered": 14,
+     "tests": 387.0,
+     "wall": 0.4303520084358752,
+     "error_vs_andrey": {
+      "paired": 13,
+      "mean_D": 0.3542,
+      "bootstrap_95": [
+       0.2808,
+       0.4292
+      ],
+      "verdict": "worse"
+     }
+    }
+   },
+   "pareto": {
+    "pc_effect_error_mean": 0.4051,
+    "andrey_effect_error_mean": 0.0062,
+    "pc_answered": 11,
+    "pc_minus_andrey": {
+     "paired": 11,
+     "mean_D": 0.3997,
+     "bootstrap_95": [
+      0.3125,
+      0.4863
+     ],
+     "verdict": "worse"
+    },
+    "andrey_tests_median": 40.0,
+    "pc_tests_median": 387.0,
+    "andrey_s_median": 0.005,
+    "pc_s_median": 0.4388,
+    "pc_better_on_both": false
+   }
+  },
+  {
+   "cell": "ldp@5000,hide=B1,latent=True",
+   "method": "ldp",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "answered": {
+     "andrey": 0.7,
+     "ref": 0.75,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.15,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 14,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": NaN,
+     "ref": NaN,
+     "vs_ref": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    },
+    "error": {
+     "andrey": 0.0030847766780688506,
+     "ref": 0.0030361609614070564,
+     "vs_ref": {
+      "paired": 14,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.13518853280335896,
+     "zero": 0.8456913721991486,
+     "all": 0.7149084853971873,
+     "oracle": 0.0029264237810904315,
+     "vs_none": {
+      "paired": 14,
+      "mean_D": -0.1321,
+      "bootstrap_95": [
+       -0.1332,
+       -0.1309
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 14,
+      "mean_D": -0.8426,
+      "bootstrap_95": [
+       -0.8437,
+       -0.8414
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 15,
+      "mean_D": -0.1322,
+      "bootstrap_95": [
+       -0.1333,
+       -0.131
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 15,
+      "mean_D": -0.8427,
+      "bootstrap_95": [
+       -0.8437,
+       -0.8415
+      ],
+      "verdict": "better"
+     }
+    },
+    "oracle_answered": NaN,
+    "tests": {
+     "andrey": 111.0,
+     "ref": 131.0
+    },
+    "wall": {
+     "andrey": 0.006938790436834097,
+     "ref": 0.020140352193266153,
+     "pc": NaN
+    },
+    "pc": {
+     "ok": 0,
+     "error": NaN,
+     "answered": 0,
+     "tests": NaN,
+     "wall": NaN,
+     "error_vs_andrey": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "answered": {
+     "andrey": 0.7,
+     "ref": 0.7,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": 1.0,
+     "ref": 1.0,
+     "vs_ref": {
+      "paired": 14,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": NaN,
+     "ref": NaN,
+     "vs_ref": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    },
+    "error": {
+     "andrey": 0.00296092398566476,
+     "ref": 0.00296092398566476,
+     "vs_ref": {
+      "paired": 14,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "none": 0.1352648255999429,
+     "zero": 0.8456913721991486,
+     "all": 0.7134202903422698,
+     "oracle": 0.0030747217425813322,
+     "vs_none": {
+      "paired": 14,
+      "mean_D": -0.1323,
+      "bootstrap_95": [
+       -0.1337,
+       -0.1307
+      ],
+      "verdict": "better"
+     },
+     "vs_zero": {
+      "paired": 14,
+      "mean_D": -0.8427,
+      "bootstrap_95": [
+       -0.844,
+       -0.8411
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_none": {
+      "paired": 14,
+      "mean_D": -0.1323,
+      "bootstrap_95": [
+       -0.1337,
+       -0.1307
+      ],
+      "verdict": "better"
+     },
+     "ref_vs_zero": {
+      "paired": 14,
+      "mean_D": -0.8427,
+      "bootstrap_95": [
+       -0.844,
+       -0.8411
+      ],
+      "verdict": "better"
+     }
+    },
+    "oracle_answered": NaN,
+    "tests": {
+     "andrey": 108.0,
+     "ref": 128.0
+    },
+    "wall": {
+     "andrey": 0.006654459983110428,
+     "ref": 0.019841488916426897,
+     "pc": NaN
+    },
+    "pc": {
+     "ok": 0,
+     "error": NaN,
+     "answered": 0,
+     "tests": NaN,
+     "wall": NaN,
+     "error_vs_andrey": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    }
+   }
+  },
+  {
+   "cell": "ldp@5000,hide=Z1,latent=True",
+   "method": "ldp",
+   "first": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "answered": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": NaN,
+     "ref": NaN,
+     "vs_ref": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": NaN,
+     "ref": NaN,
+     "vs_ref": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    },
+    "error": {
+     "andrey": NaN,
+     "ref": NaN,
+     "vs_ref": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "none": 0.13535733247734444,
+     "zero": 0.8456913721991486,
+     "all": 0.746662584432469,
+     "oracle": NaN,
+     "vs_none": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "vs_zero": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "ref_vs_none": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "ref_vs_zero": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    },
+    "oracle_answered": NaN,
+    "tests": {
+     "andrey": 105.0,
+     "ref": 126.0
+    },
+    "wall": {
+     "andrey": 0.006081361789256334,
+     "ref": 0.017977716168388724,
+     "pc": NaN
+    },
+    "pc": {
+     "ok": 0,
+     "error": NaN,
+     "answered": 0,
+     "tests": NaN,
+     "wall": NaN,
+     "error_vs_andrey": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    }
+   },
+   "rerun": {
+    "fits": 20,
+    "andrey_ok": 20,
+    "ref_ok": 20,
+    "seeds": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39
+    ],
+    "answered": {
+     "andrey": 0.0,
+     "ref": 0.0,
+     "vs_ref": {
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     }
+    },
+    "valid": {
+     "andrey": NaN,
+     "ref": NaN,
+     "vs_ref": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "none": 0.0
+    },
+    "answer_error": {
+     "andrey": NaN,
+     "ref": NaN,
+     "vs_ref": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    },
+    "error": {
+     "andrey": NaN,
+     "ref": NaN,
+     "vs_ref": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "none": 0.13531201687856292,
+     "zero": 0.8456913721991486,
+     "all": 0.7470144988176608,
+     "oracle": NaN,
+     "vs_none": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "vs_zero": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "ref_vs_none": {
+      "paired": 0,
+      "verdict": "reported"
+     },
+     "ref_vs_zero": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    },
+    "oracle_answered": NaN,
+    "tests": {
+     "andrey": 103.5,
+     "ref": 124.0
+    },
+    "wall": {
+     "andrey": 0.006062712054699659,
+     "ref": 0.01868054852820933,
+     "pc": NaN
+    },
+    "pc": {
+     "ok": 0,
+     "error": NaN,
+     "answered": 0,
+     "tests": NaN,
+     "wall": NaN,
+     "error_vs_andrey": {
+      "paired": 0,
+      "verdict": "reported"
+     }
+    }
+   }
+  }
+ ]
+}
