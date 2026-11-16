@@ -127,3 +127,8 @@ def test_results_do_not_depend_on_the_workers(method):
 def test_a_bad_list_raises(target, message):
     with pytest.raises(ValueError, match=message):
         andrey.mmpc(_gaussian(), target=target)
+
+
+def test_bootstrap_takes_one_target():
+    with pytest.raises(ValueError, match="one target at a time"):
+        andrey.bootstrap("mmpc", _gaussian(), target=["x1", "x2"], n_resamples=2)

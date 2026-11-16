@@ -1335,6 +1335,10 @@ def build_job(
     within each environment.
     """
     kwargs = dict(kwargs)
+    if isinstance(kwargs.get("target"), list | tuple):
+        raise ValueError(
+            f"bootstrap: {spec.name} resamples one target at a time; pass target as one column"
+        )
     entry = next((i for i in spec.data.inputs[1:] if i.name == "env"), None)
     apart = False
     if entry is not None:

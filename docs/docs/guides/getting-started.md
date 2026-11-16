@@ -373,8 +373,7 @@ outs[0].metadata["parents_and_children"]
 ```
 
 Set `andrey.config(n_jobs=...)` to spread the targets over worker processes; the results do not
-change with the number of workers. Past a number of targets that grows with the number of
-variables, one whole graph costs less than the local answers.
+change with the number of workers.
 
 ### Environments and interventions
 
