@@ -214,8 +214,8 @@ class PartialCorrelationTest:
     matrix, so every query answers as it does without ``lazy``. A query given ``S`` reads the rows
     of ``S`` and of one of ``x`` and ``y``, and a search that tests a target against many
     candidates reads the target's row, not theirs. The queries that read every pair
-    (:meth:`marginal_pvalues`, :meth:`statistic_pvalues_given_rest`, :meth:`copies`,
-    :meth:`to_seed`) compute the whole matrix and keep it. A lazy test checks each row it computes
+    (:meth:`marginal_pvalues`, :meth:`statistic_pvalues_given_rest`, :meth:`to_seed`) compute the
+    whole matrix and keep it. A lazy test checks each row it computes
     for copied columns instead of the whole matrix up front: a computed row that shows a column
     repeating another up to scale and shift raises
     :class:`~andrey.core.score.CopiedColumnsError`; copies among columns whose rows are never
@@ -352,11 +352,14 @@ class PartialCorrelationTest:
         """The groups of data columns that repeat one another up to scale and shift.
 
         :func:`~andrey.core.score.copy_groups` of the test's correlation matrix, found once per
-        test; a single column's correlation is a scalar and has none. A lazy test computes the
-        whole matrix for it, and raises when it holds copies.
+        test; a single column's correlation is a scalar and has none. A lazy test finds none: a
+        row it computes that shows a copy raises :class:`~andrey.core.score.CopiedColumnsError`
+        instead, and copies among columns whose rows it never computes are not looked for.
         """
+        if self._lazy is not None:
+            return ()
         if not hasattr(self, "_copies"):
-            self._copies = copy_groups(np.atleast_2d(self._matrix()), self._n)
+            self._copies = copy_groups(np.atleast_2d(self._corr), self._n)
         return self._copies
 
     def _invert(self, stack: np.ndarray) -> np.ndarray:
