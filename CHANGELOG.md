@@ -264,6 +264,10 @@ names its pull request.
   the numbers and a check of `dagma` and `notears` on the Sachs data: on its 853 observational
   measurements, four fits, default and `robust=True`, on raw and z-scored columns, made 13 or 14
   errors against the empty graph's 17. ([#1043], [#1046])
+- An example notebook on missing values, `examples/missing_values.ipynb`: it removes values from
+  simulated data so that whether a value is missing depends on another variable, fits `pc` with its
+  default handling and with `missing="mvpc"` and `ges` with `missing="em"`, and scores each against
+  the true graph. ([#1059])
 
 ### Changed
 
@@ -3004,3 +3008,4 @@ First alpha release.
 [nd-page]: https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/notears-dagma.md
 [ages-page]: https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/ages.md
 [#920]: https://github.com/Abel-ai-lab/Andrey/pull/920
+[#1059]: https://github.com/Abel-ai-lab/Andrey/pull/1059
