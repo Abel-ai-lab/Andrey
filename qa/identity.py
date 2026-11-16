@@ -27,11 +27,11 @@ possible-d-sep search sent to the pool. Both report each refit whose answer diff
 fit. A different worker count must not change a bit, so any difference fails it. A column order
 fails the check only when a graph or a causal order differs (:data:`STRUCTURE`); the last bits of
 edge weights and metadata values, such as p-values, depend on the order a sum runs in, so a refit
-that differs only there is reported as information.
+whose values differ only by rounding (:data:`RTOL`) is reported as information.
 
     uv run python -m qa.identity -o before.json             # fit the corpus, write a manifest
     uv run python -m qa.identity --compare before.json after.json  # exit 1 on any difference
-    uv run python -m qa.identity --shuffle 3                # exit 1 if a column order changes a graph
+    uv run python -m qa.identity --shuffle 3                # exit 1 if an order changes a graph
     uv run python -m qa.identity GES GFCI --workers 4       # exit 1 if 4 workers change one
 """
 
@@ -42,6 +42,7 @@ import dataclasses
 import functools
 import hashlib
 import json
+import math
 import os
 import platform
 import struct
@@ -83,8 +84,8 @@ class Fit:
     and intervention indicators, MultiGroupDirectLiNGAM's groups; a column order moves each copy
     the same way. ``refit`` is set for the methods whose draws hold more than the variables, ICP,
     IGSP, FCI-JCI, and J-PCMCI+: ``refit(x, rng)`` draws a column order from ``rng``, fits the draw
-    with its columns in that order, moving the environments, targets, and contexts the call names
-    along with them, and returns the answer mapped back to the original columns
+    with its columns in that order, moving the targets and contexts the call names along with them
+    while each row's environment stays, and returns the answer mapped back to the original columns
     (:func:`unpermute`). ``shuffled`` is ``False`` for
     MB-by-MB, CMB, MMB-by-MMB, local ISA-LiNG, LDECC, LOAD, and LocPC-CDE, whose draws a column
     order does not apply to: the target of MB-by-MB, CMB, MMB-by-MMB, and local ISA-LiNG is the last
@@ -959,16 +960,54 @@ def row(method: str, dataset: str, seed: int, permutation: int, workers: int, ou
 STRUCTURE = ("graph", "kind", "edges", "ordering")
 #: The kinds of difference between a refit and the first fit, as :func:`run` reports them:
 #: ``"graph"``, a different graph; ``"structure"``, the same graphs and a different kind, edge
-#: marks, or causal order; ``"bits"``, only different bits in a refit on workers; ``"digits"``,
-#: only different bits in the edge weights or metadata of a refit on a column order. The last does
-#: not fail the check.
-FAILING = ("graph", "structure", "bits")
+#: marks, or causal order; ``"bits"``, only different bits in a refit on workers; ``"values"``,
+#: edge weights or metadata values of a column-order refit that differ by more than rounding;
+#: ``"digits"``, edge weights or metadata values of a column-order refit that differ by rounding
+#: only. The last does not fail the check.
+FAILING = ("graph", "structure", "bits", "values")
+#: The relative and absolute differences that count as rounding between two values.
+RTOL, ATOL = 1e-6, 1e-12
+
+
+def _close(a: Any, b: Any) -> bool:
+    """Whether ``a`` and ``b`` are the same values up to :data:`RTOL` and :data:`ATOL`: numbers and
+    arrays by closeness, NaN with NaN, anything else, such as text, by equality."""
+    if isinstance(a, Mapping) and isinstance(b, Mapping):
+        return a.keys() == b.keys() and all(_close(a[key], b[key]) for key in a)
+    if isinstance(a, np.ndarray) or isinstance(b, np.ndarray):
+        a, b = np.asarray(a), np.asarray(b)
+        numeric = a.dtype.kind in "fiu" and b.dtype.kind in "fiu"
+        if numeric:
+            return a.shape == b.shape and bool(np.allclose(a, b, RTOL, ATOL, equal_nan=True))
+        return _close(a.tolist(), b.tolist())
+    if isinstance(a, list | tuple) and isinstance(b, list | tuple):
+        return len(a) == len(b) and all(_close(x, y) for x, y in zip(a, b, strict=True))
+    real = (float, int, np.floating, np.integer)
+    if isinstance(a, real) and isinstance(b, real) and not isinstance(a, bool | np.bool_):
+        if isinstance(a, int | np.integer) and isinstance(b, int | np.integer):
+            return bool(a == b)
+        return math.isclose(a, b, rel_tol=RTOL, abs_tol=ATOL) or (math.isnan(a) and math.isnan(b))
+    return bool(a == b)
+
+
+def _rounded(first: Any, refit: Any) -> bool:
+    """Whether the edge weights, the lag weights, and the metadata of ``refit`` equal ``first``'s
+    up to rounding (:func:`_close`)."""
+    if isinstance(first, list):
+        return len(first) == len(refit) and all(_rounded(a, b) for a, b in zip(first, refit))
+    lags = [getattr(o.structure, "lag_weights", None) for o in (first, refit)]
+    return (
+        _close(first.weighted_adjacency, refit.weighted_adjacency)
+        and _close(lags[0], lags[1])
+        and _close(dict(first.metadata), dict(refit.metadata))
+    )
 
 
 def classify(first: Any, refit: Any, *, column_order: bool) -> tuple[str, list[str]] | None:
     """Return the kind of difference between ``refit`` and ``first`` and the names of the parts
     that differ (:func:`parts`), or ``None`` when no part differs; ``column_order`` is whether the
-    refit is on another column order, not on workers."""
+    refit is on another column order, not on workers. A column order's difference in weights or
+    metadata is ``"digits"`` when it is rounding and ``"values"`` when it is more."""
     a, b = parts(first), parts(refit)
     changed = sorted(name for name in a.keys() | b.keys() if a.get(name) != b.get(name))
     if not changed:
@@ -978,7 +1017,9 @@ def classify(first: Any, refit: Any, *, column_order: bool) -> tuple[str, list[s
         return "graph", changed
     if structural & set(STRUCTURE):
         return "structure", changed
-    return ("digits" if column_order else "bits"), changed
+    if not column_order:
+        return "bits", changed
+    return ("digits" if _rounded(first, refit) else "values"), changed
 
 
 def run(
@@ -1161,7 +1202,8 @@ LABELS = {
     "graph": "graph differs",
     "structure": "structure differs",
     "bits": "only bits differ",
-    "digits": "only the last bits of weights or metadata differ (not a failure)",
+    "values": "weights or metadata differ by more than rounding",
+    "digits": "weights or metadata differ by rounding only (not a failure)",
 }
 
 
@@ -1194,9 +1236,9 @@ def main(argv: list[str] | None = None) -> int:
     count = {kind: sum(k == kind for k, _ in findings) for kind in LABELS}
     print(
         f"\n{len(rows)} fits hashed. Of {refits} refits, {count['graph']} have a different graph, "
-        f"{count['structure']} a different structure, and {count['bits']} only different bits; "
-        f"{count['digits']} differ only in the last bits of weights or metadata under a column "
-        "order, which does not fail the check."
+        f"{count['structure']} a different structure, {count['values']} different values, and "
+        f"{count['bits']} only different bits; {count['digits']} differ only by rounding in their "
+        "weights or metadata under a column order, which does not fail the check."
     )
     return 1 if any(kind in FAILING for kind, _ in findings) else 0
 

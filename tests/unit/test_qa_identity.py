@@ -255,6 +255,12 @@ def test_the_last_bits_of_a_value_differ_under_a_column_order_without_failing() 
     assert "digits" not in identity.FAILING and "bits" in identity.FAILING
 
 
+def test_a_value_that_changes_by_more_than_rounding_fails_under_a_column_order() -> None:
+    kind, changed = identity.classify(_output(0.25), _output(0.9), column_order=True)
+    assert (kind, changed) == ("values", ["metadata.p_values"])
+    assert "values" in identity.FAILING
+
+
 def test_a_different_graph_or_causal_order_fails_under_a_column_order() -> None:
     first = _output(0.25, ordering=[0, 1, 2])
     kind, changed = identity.classify(_output(0.25, edge=False), first, column_order=True)
@@ -265,7 +271,8 @@ def test_a_different_graph_or_causal_order_fails_under_a_column_order() -> None:
 
 
 @pytest.mark.parametrize(
-    ("kind", "code"), [("digits", 0), ("bits", 1), ("structure", 1), ("graph", 1)]
+    ("kind", "code"),
+    [("digits", 0), ("bits", 1), ("values", 1), ("structure", 1), ("graph", 1)],
 )
 def test_the_exit_status_fails_on_a_structural_difference_and_reports_the_rest(
     kind, code, monkeypatch, capsys
