@@ -92,7 +92,7 @@ import numpy.typing as npt
 from scipy.linalg import get_lapack_funcs
 from scipy.special import chdtrc, gammaln, ndtr, stdtr
 
-from . import categorical, stats
+from . import categorical, env, stats
 from .categorical import BATCH_CELLS, DENSE_MIN, DENSE_ROWS
 from .mixed import ConditionalGaussian, DegenerateGaussian
 from .score import copies_error, copies_message, copy_groups
@@ -120,8 +120,10 @@ SINGULAR_RTOL = 1e-12
 # the rounding of the computed inverse and of the eigenvalues.
 BOUND_MARGIN = 1e4
 # The smallest number of candidates times the block size, len(ys) * (|S| + 2), that
-# statistic_pvalues_given answers from one factor; below it the per-query inversions are faster.
-SHARED_FACTOR_MIN = 128
+# statistic_pvalues_given answers from one factor, unless ANDREY_SHARED_SCAN_MIN_WORK sets another.
+# The factor's fixed cost is repaid from a work of about 40 (|S| = 12) to 70 (|S| = 2) on one core;
+# below it the per-query inversions are faster, and 128 is past every one of those break-evens.
+MIN_SHARED_FACTOR_WORK = 128
 # The LAPACK Cholesky factor and triangular solve of statistic_pvalues_given, called directly: on
 # the small scans it serves, the checks of scipy.linalg's wrappers would take most of the time.
 _POTRF, _TRTRS = get_lapack_funcs(("potrf", "trtrs"), (np.empty((1, 1)),))
@@ -498,17 +500,17 @@ class PartialCorrelationTest:
 
         Entry ``i`` is :meth:`statistic_pvalue` of ``x`` and ``ys[i]`` given ``condition_set``, up
         to rounding; a repeated column of the set counts once. For a set ``S`` of two or more
-        columns and enough candidates, two or more and ``len(ys) * (|S| + 2) >=
-        SHARED_FACTOR_MIN``, where it is the faster path, one Cholesky factor ``L`` of the set's
-        correlation block ``R_SS`` serves every candidate: with
-        ``w_a = L^-1 R_Sa``, the Schur complement ``P_ab = R_ab - w_a . w_b`` gives the partial
-        correlation ``P_xy / sqrt(P_xx P_yy)``, where :meth:`statistic_pvalue` inverts each
-        ``[x, y, *S]`` block. The two agree to about ``1e-10`` relative in the p-value, so a p-value
-        on a rounding boundary can differ in its ninth significant digit, and a candidate's last
-        bits can change with the other candidates of the call. Every entry of the correlation
-        matrix is read as ``corr[min, max]`` of its two columns, so a matrix that is not exactly
-        symmetric gives each pair one answer whichever column is ``x``. Each query counts as one
-        test.
+        columns and two or more candidates whose ``len(ys) * (|S| + 2)`` reaches
+        ``MIN_SHARED_FACTOR_WORK`` (128, or the ``ANDREY_SHARED_SCAN_MIN_WORK`` that overrides it;
+        ``0`` factors every such scan), one Cholesky factor ``L`` of the set's correlation block
+        ``R_SS`` serves every candidate: with ``w_a = L^-1 R_Sa``, the Schur complement
+        ``P_ab = R_ab - w_a . w_b`` gives the partial correlation ``P_xy / sqrt(P_xx P_yy)``, where
+        :meth:`statistic_pvalue` inverts each ``[x, y, *S]`` block. The two agree to about ``1e-10``
+        relative in the p-value, so a p-value on a rounding boundary can differ in its ninth
+        significant digit, and a candidate's last bits can change with the other candidates of the
+        call. Every entry of the correlation matrix is read as ``corr[min, max]`` of its two
+        columns, so a matrix that is not exactly symmetric gives each pair one answer whichever
+        column is ``x``. Each query counts as one test.
 
         The other calls take :meth:`statistic_pvalues`, which answers or raises as it does: a
         smaller set, fewer candidates, and any call with a block that the factor does not show to
@@ -518,7 +520,10 @@ class PartialCorrelationTest:
         """
         cols = np.asarray(ys, dtype=np.intp).reshape(-1)
         cond = np.unique(np.fromiter(condition_set, dtype=np.intp))
-        if len(cond) >= 2 and len(cols) >= 2 and len(cols) * (len(cond) + 2) >= SHARED_FACTOR_MIN:
+        min_work = env.SHARED_SCAN_MIN_WORK.read()
+        if min_work is None:
+            min_work = MIN_SHARED_FACTOR_WORK
+        if len(cond) >= 2 and len(cols) >= 2 and len(cols) * (len(cond) + 2) >= min_work:
             df = self._degrees_of_freedom(len(cond))
             r = self._schur_partial_correlations(int(x), cols, cond)
             if r is not None:

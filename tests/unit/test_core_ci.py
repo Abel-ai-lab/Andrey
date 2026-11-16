@@ -291,6 +291,21 @@ def test_a_shared_set_agrees_with_each_query_to_rounding(test_class, seed):
         assert ((p <= 0.05) == (want_p <= 0.05)).all()
 
 
+def test_a_shared_set_counts_a_repeated_column_once():
+    """A repeated column of the set gives the answers of the set without the repeat, as the
+    per-query path canonicalizes it."""
+    test = FisherZ(_forty_columns())
+    ys = [y for y in range(1, 40) if y not in (2, 3, 5)]
+    r, p = test.statistic_pvalues_given(0, ys, [5, 2, 3, 2, 5])
+    want_r, want_p = test.statistic_pvalues(
+        np.zeros(len(ys), dtype=int), np.array(ys), [[2, 3, 5]] * len(ys)
+    )
+    np.testing.assert_allclose(r, want_r, rtol=0.0, atol=1e-12)
+    np.testing.assert_allclose(p, want_p, rtol=1e-9, atol=0.0)
+    for y, got in zip(ys, p):
+        np.testing.assert_allclose(got, test(0, y, [5, 2, 3, 2, 5]), rtol=1e-9, atol=0.0)
+
+
 def _not_quite_symmetric(test_class, scale, seed=0):
     """A test over 60 columns whose correlation matrix has ``scale`` noise below the diagonal."""
     x = sample_scm(graph="erdos_renyi", d=60, n=300, seed=seed, density=3.0).data
@@ -340,7 +355,7 @@ def test_a_shared_set_gives_a_pair_one_answer_whichever_column_is_the_target():
 )
 def test_a_shared_set_too_small_to_factor_is_the_per_query_answer_bit_for_bit(ys, cond, data):
     """A set of fewer than two columns, a single candidate, or too few candidates for the factor
-    to pay (:data:`~andrey.core.ci.SHARED_FACTOR_MIN`) takes the per-query path."""
+    to pay (:data:`~andrey.core.ci.MIN_SHARED_FACTOR_WORK`) takes the per-query path."""
     test = FisherZ(data)
     r, p = test.statistic_pvalues_given(0, ys, cond)
     sets = np.array([cond] * len(ys), dtype=int).reshape(len(ys), len(cond))
@@ -348,19 +363,40 @@ def test_a_shared_set_too_small_to_factor_is_the_per_query_answer_bit_for_bit(ys
     assert r.tobytes() == want_r.tobytes() and p.tobytes() == want_p.tobytes()
 
 
-def test_a_shared_set_counts_a_repeated_column_once():
-    """A repeated column of the set gives the answers of the set without the repeat, as the
-    per-query path canonicalizes it."""
+def test_the_shared_scan_setting_moves_the_cutoff_in_both_directions(monkeypatch):
+    """``ANDREY_SHARED_SCAN_MIN_WORK`` sets the work from which a scan is answered from one factor:
+    ``0`` factors a scan the default leaves to the per-query path, and a huge value leaves a large
+    scan to it."""
     test = FisherZ(_forty_columns())
-    ys = [y for y in range(1, 40) if y not in (2, 3, 5)]
-    r, p = test.statistic_pvalues_given(0, ys, [5, 2, 3, 2, 5])
-    want_r, want_p = test.statistic_pvalues(
-        np.zeros(len(ys), dtype=int), np.array(ys), [[2, 3, 5]] * len(ys)
+    cond = [3, 4, 5]
+    every = [y for y in range(1, 40) if y not in cond]
+    small, large = every[:8], every  # work 40 and 180, either side of the default
+    factored = []
+    real = ci.PartialCorrelationTest._schur_partial_correlations
+    monkeypatch.setattr(
+        ci.PartialCorrelationTest,
+        "_schur_partial_correlations",
+        lambda *args: factored.append(len(args[2])) or real(*args),
     )
-    np.testing.assert_allclose(r, want_r, rtol=0.0, atol=1e-12)
-    np.testing.assert_allclose(p, want_p, rtol=1e-9, atol=0.0)
-    for y, got in zip(ys, p):
-        np.testing.assert_allclose(got, test(0, y, [5, 2, 3, 2, 5]), rtol=1e-9, atol=0.0)
+    for setting, scan, expected in [
+        (None, small, []),
+        ("0", small, [8]),
+        (None, large, [len(large)]),
+        (str(10**9), large, []),
+    ]:
+        factored.clear()
+        if setting is None:
+            monkeypatch.delenv("ANDREY_SHARED_SCAN_MIN_WORK", raising=False)
+        else:
+            monkeypatch.setenv("ANDREY_SHARED_SCAN_MIN_WORK", setting)
+        test.statistic_pvalues_given(0, scan, cond)
+        assert factored == expected, (setting, len(scan))
+
+
+def test_a_bad_shared_scan_setting_raises_naming_the_variable(monkeypatch):
+    monkeypatch.setenv("ANDREY_SHARED_SCAN_MIN_WORK", "many")
+    with pytest.raises(ValueError, match="ANDREY_SHARED_SCAN_MIN_WORK must be an integer"):
+        FisherZ(_forty_columns()).statistic_pvalues_given(0, [1, 2, 6], [3, 4, 5])
 
 
 def _forty_columns(copy=None):
