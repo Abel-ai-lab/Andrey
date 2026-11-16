@@ -103,8 +103,8 @@ answer.
 
 ## Results
 
-The 0.18.0 campaign ran LDECC, LOAD, LocPC-CDE, LDP, and LD3 against their authors' code on 20 datasets per
-cell, seeds 0-19, and again on seeds 20-39 for a cell worse on the first 20 or below its floor, each
+The 0.18.0 campaign ran LDECC, LOAD, LocPC-CDE, LDP, and LD3 against their authors' code on 20
+datasets per cell, seeds 0-19, and again on seeds 20-39 for a cell worse on the first 20 or below its floor, each
 fit on one core with a cap of 1,800 s. A cell counts as worse when the paired 95% bootstrap interval
 of Andrey's error minus the authors' code's lies above 0 on both seed ranges. Andrey's PC read at the
 pair ran beside them with the same test and level. Every number, per cell and measure, is in
@@ -157,8 +157,8 @@ pair ran beside them with the same test and level. Every number, per cell and me
   Fisher's z at 0.01): no cell is worse on the parents (exact and F1), the direct-effect error, or
   the effect error. It is better on the exact parents at `ld3-dag@1000`, on the parents' F1 there,
   at `nodes=50`, and at `sangiovese@250`, and on the effect error without the direct effect from
-  2,500 rows and at `nodes=50`. Without the direct effect its direct-effect error is 0.00 to 0.10
-  against the code's 0.90 to 1.00, since Andrey tests the treatment against the outcome given every
+  2,500 rows and at `nodes=50`. Without the direct effect its direct-effect error is 0.00 to 0.10,
+  since Andrey tests the treatment against the outcome given every
   parent found; pooled with the twin cell of each size, it is below the better constant answer at
   every size.
 - **PC read at the pair** was never better than any of the five methods on both accuracy and cost.

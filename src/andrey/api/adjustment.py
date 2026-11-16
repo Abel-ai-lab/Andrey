@@ -214,8 +214,8 @@ def ldp(
     ``A -> B -> W``, ``U -> B``, ``W -> X``, ``W -> Y``, ``U -> Y``, an instrument of ``X``, a
     cause of ``Y`` independent of ``X``, and no effect of ``X`` on ``Y``, ``A`` is labeled an
     instrument and ``W`` post-treatment, and ``B`` separates ``A`` from ``Y``. With exact tests on
-    24,000 random graphs that meet C1 and C2, the check removes the 10 invalid sets the criterion
-    over every instrument returns, and gives no set on 20 where that criterion gives a valid one.
+    24,000 random graphs that meet C1 and C2, every set it returned was valid, and the check left
+    30 of them without a set.
     Each query is tested once and its p-value kept. Where the algorithm is
     open, the authors' code decides: every candidate in such a collider is kept, Step 6's second
     pass covers ``Zmix`` alone, and ``Z7`` is ``Z5,7`` less the candidates. Only ``Z4``, ``Z7``,
