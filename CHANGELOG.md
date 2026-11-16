@@ -334,7 +334,7 @@ names its pull request.
   steps of `iamb`, `inter_iamb`, `fast_iamb`, `ldecc`, `mb_by_mb`, and `local_optimal_adjustment`
   ask it of a partial-correlation test, is answered from one Cholesky factor of the set's
   correlation block, where each candidate inverted its own submatrix. At 5,000 rows, `iamb` at one
-  target on 1,000 variables is 1.8 times faster, and `iamb`, `inter_iamb`, and `fast_iamb` on 100
+  target on 1,000 variables is 3.2 times faster, and `iamb`, `inter_iamb`, and `fast_iamb` on 100
   variables 1.3, 1.2, and 1.1 times. The p-values agree with the per-query answers to about 1e-10
   relative, not bit for bit: every graph and `metadata["n_tests"]` of the identity corpus is the
   same, and of 326,729 p-values compared, 4 differ in their ninth significant digit, values on a
