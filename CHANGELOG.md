@@ -203,7 +203,7 @@ names its pull request.
   answer is one record in `metadata["effects"]`, `metadata["partition"]` lists the labels, and the
   graph has no edges. Against its authors' code on its paper's partition graphs at 1,000 to 7,500
   rows and the MILDEW network at 25,000 to 75,000 rows, it tied on the valid-set loss and the effect
-  error in all 14 settings, on 20 datasets and again on 20 fresh ones. ([#970], [#PRNUM])
+  error in all 14 settings, on 20 datasets and again on 20 fresh ones. ([#970], [#1052])
 - `andrey.ld3`, LD3 (Maasch et al. 2025), supported: the parents of an outcome that has no
   descendants among the columns, and whether the treatment is one of them (the structural direct
   criterion), in a number of tests linear in the number of columns. The criterion tests the
@@ -215,7 +215,7 @@ names its pull request.
   into the outcome. It assumes every parent of the outcome is observed. Against its authors' code
   on its paper's graph at 1,000 to 10,000 rows, random graphs with 50 and 100 nodes, and the
   SANGIOVESE network, no setting was worse; it was better on the parents in 3 settings and on the
-  direct-effect answer without a direct effect at every size. ([#970], [#PRNUM])
+  direct-effect answer without a direct effect at every size. ([#970], [#1052])
 - `andrey.local_isa_ling`, local ISA-LiNG (Dai et al. 2024), supported: the weighted edges into a
   target and into each of its children in a linear model with non-Gaussian noise whose graph may
   hold cycles, from the target and its Markov blanket alone, as a weighted `digraph`. The blanket
@@ -2979,6 +2979,7 @@ First alpha release.
 [#1048]: https://github.com/Abel-ai-lab/Andrey/pull/1048
 [#1045]: https://github.com/Abel-ai-lab/Andrey/issues/1045
 [#1051]: https://github.com/Abel-ai-lab/Andrey/pull/1051
+[#1052]: https://github.com/Abel-ai-lab/Andrey/pull/1052
 [#995]: https://github.com/Abel-ai-lab/Andrey/pull/995
 [#991]: https://github.com/Abel-ai-lab/Andrey/pull/991
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982
