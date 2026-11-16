@@ -123,7 +123,7 @@ class LazyCorrelation:
 
     The rows equal :func:`correlation_matrix`'s bit for bit, and the matrix is exactly symmetric, so
     an entry ``[a, b]`` is read from whichever of the rows ``a`` and ``b`` is computed.
-    :meth:`entry` and :meth:`entries` compute one when neither is: the column asked about more
+    :meth:`entry` and :meth:`cover` compute one when neither is: the column asked about more
     often, so the row of a search's target serves its candidates. The centered columns, as large as
     the data, are made at the first read.
 
@@ -157,7 +157,10 @@ class LazyCorrelation:
             self._data = None
 
     def matrix(self) -> np.ndarray:
-        """The whole matrix, as :func:`correlation_matrix` computes it, checked for copies."""
+        """The whole matrix, as :func:`correlation_matrix` computes it, checked for copies: the
+        computed rows in column order once every row is computed, else computed whole."""
+        if self._count == self.d:
+            return self._rows[self._slot]
         self._center()
         full = _matrix(self._z, self._norm)
         self._check(full, np.arange(self.d))
@@ -193,7 +196,8 @@ class LazyCorrelation:
 
     def _store(self, block: np.ndarray, ids: np.ndarray) -> None:
         if self._count + len(ids) > len(self._rows):
-            grown = np.empty((max(2 * len(self._rows), self._count + len(ids)), self.d))
+            size = max(min(2 * len(self._rows), self.d), self._count + len(ids))
+            grown = np.empty((size, self.d))
             grown[: self._count] = self._rows[: self._count]
             self._rows = grown
         slots = np.arange(self._count, self._count + len(ids))
@@ -258,16 +262,34 @@ class LazyCorrelation:
             best = np.lexsort((ends, -self._asked[ends], -counts))[0]
             self.load((ends[best],))
 
-    def entries(self, a: npt.ArrayLike, b: npt.ArrayLike) -> np.ndarray:
-        """The entries ``[a, b]`` of the broadcast integer arrays ``a`` and ``b``, computing rows
-        (:meth:`cover`) where neither of a pair's rows is computed yet."""
-        a, b = np.broadcast_arrays(np.asarray(a, dtype=np.intp), np.asarray(b, dtype=np.intp))
-        same = a == b
-        if same.all():
-            self._center()
-            return self.unit[a]
-        self.cover(a.reshape(-1), b.reshape(-1))
+    def pairs(self, a: np.ndarray, b: np.ndarray) -> np.ndarray:
+        """The entries ``[a[k], b[k]]`` of distinct columns, each pair with one of its rows
+        computed (:meth:`cover`): read from the row of ``a[k]`` when it is computed, else from the
+        row of ``b[k]``."""
         sa = self._slot[a]
         own = sa >= 0
-        out = self._rows[np.maximum(np.where(own, sa, self._slot[b]), 0), np.where(own, b, a)]
-        return np.where(same, self.unit[a], out) if same.any() else out
+        return self._rows[np.where(own, sa, self._slot[b]), np.where(own, b, a)]
+
+    def read(self, a: np.ndarray | int, b: np.ndarray | int) -> np.ndarray:
+        """The entries ``[a, b]`` of the broadcast integer arrays ``a``, whose rows are computed,
+        and ``b``, read from the rows of ``a``."""
+        return self._rows[self._slot[a], b]
+
+    def squares(self, var: np.ndarray) -> np.ndarray:
+        """:meth:`square` of each row ``[x, y, *cond]`` of the ``(m, k)`` ``var``: the
+        ``(m, k, k)`` stack of submatrices, for rows whose ``cond`` rows are computed and whose
+        ``x`` or ``y`` row is."""
+        m, k = var.shape
+        q = np.arange(m)
+        slots = self._slot[var]
+        pivot = (slots[:, 0] < 0).astype(np.intp)
+        other = 1 - pivot
+        pick = slots[:, 1:].copy()
+        pick[:, 0] = slots[q, pivot]
+        sub = self._rows[pick[:, :, None], var[:, None, :]]
+        block = np.empty((m, k, k))
+        block[:, 2:] = sub[:, 1:]
+        block[q, pivot] = sub[:, 0]
+        block[q, other] = block[q, :, other]
+        block[q, other, other] = self.unit[var[q, other]]
+        return block

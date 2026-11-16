@@ -269,6 +269,15 @@ class PartialCorrelationTest:
             self._lazy = None
         return self._corr
 
+    def _still_lazy(self) -> LazyCorrelation | None:
+        """The lazy correlation while some row is not computed, else ``None``: once every row is,
+        the test keeps them as the whole matrix and reads it as a test built without ``lazy``."""
+        lazy = self._lazy
+        if lazy is not None and lazy.computed == lazy.d:
+            self._matrix()
+            return None
+        return lazy
+
     def correlation_rows(self) -> int:
         """The number of rows of the correlation matrix computed so far: every row unless lazy."""
         lazy = self._lazy
@@ -312,7 +321,7 @@ class PartialCorrelationTest:
         The arguments are canonical (see :func:`_canonical`). The result lies just inside
         ``(-1, 1)``.
         """
-        if self._lazy is not None:
+        if self._still_lazy() is not None:
             r = self._lazy_partial_correlation(x_int, y_int, cond)
             return (
                 -ONE_MINUS_EPS if r < -ONE_MINUS_EPS else ONE_MINUS_EPS if r > ONE_MINUS_EPS else r
@@ -497,29 +506,39 @@ class PartialCorrelationTest:
         """:meth:`statistic_pvalues` of canonical queries, ``lo[i] < hi[i]`` and each row of
         ``conds`` sorted."""
         df = self._degrees_of_freedom(conds.shape[1])
-        lazy = self._lazy
+        lazy = self._still_lazy()
         if lazy is None:
             corr = self._corr
 
-            def at(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+            def pair(a: np.ndarray, b: np.ndarray) -> np.ndarray:
                 return corr[a, b]
+
+            def given(a: np.ndarray, z: np.ndarray) -> np.ndarray:
+                return corr[a, z]
+
+            def stack(var: np.ndarray) -> np.ndarray:
+                return corr[var[:, :, None], var[:, None, :]]
         else:
             lazy.load(np.unique(conds))
             lazy.cover(lo, hi)
-            at = lazy.entries
+            pair, stack = lazy.pairs, lazy.squares
+
+            def given(a: np.ndarray, z: np.ndarray) -> np.ndarray:
+                return lazy.read(z, a)  # the rows of the conditioning set are computed
+
         if conds.shape[1] == 0:
-            r = at(lo, hi)
+            r = pair(lo, hi)
         elif conds.shape[1] == 1:
             z_idx = conds[:, 0]
-            rxz = at(lo, z_idx)
-            ryz = at(hi, z_idx)
-            r = (at(lo, hi) - rxz * ryz) / np.sqrt((1.0 - rxz * rxz) * (1.0 - ryz * ryz))
+            rxz = given(lo, z_idx)
+            ryz = given(hi, z_idx)
+            r = (pair(lo, hi) - rxz * ryz) / np.sqrt((1.0 - rxz * rxz) * (1.0 - ryz * ryz))
         else:
             var = np.empty((len(lo), 2 + conds.shape[1]), dtype=np.intp)
             var[:, 0] = lo
             var[:, 1] = hi
             var[:, 2:] = conds
-            inv = self._invert(at(var[:, :, None], var[:, None, :]))
+            inv = self._invert(stack(var))
             r = -inv[:, 0, 1] / np.sqrt(np.abs(inv[:, 0, 0] * inv[:, 1, 1]))
         r = np.clip(r, -ONE_MINUS_EPS, ONE_MINUS_EPS)
         p = np.asarray(self._pvalue(r, df))
@@ -616,7 +635,7 @@ class PartialCorrelationTest:
         k)``, with ``k = |S| + 2 >= lambda_max(A)``, every block has ``lambda_min > BOUND_MARGIN *
         SINGULAR_RTOL * lambda_max`` and the eigenvalue test passes; a NaN fails the comparison.
         """
-        lazy = self._lazy
+        lazy = self._still_lazy()
         if lazy is None:
             corr = self._corr
 
@@ -624,7 +643,7 @@ class PartialCorrelationTest:
                 return corr[np.minimum(a, b), np.maximum(a, b)]
         else:
             lazy.load(np.append(cond, x))
-            at = lazy.entries
+            at = lazy.read  # every first argument below is x or in cond, whose rows are computed
         size, n = len(cond), len(ys)
         factor, info = _POTRF(at(cond[:, None], cond), lower=0)  # the upper triangle; cond sorted
         if info != 0:
@@ -639,7 +658,7 @@ class PartialCorrelationTest:
         g = np.einsum("ij,ij->", w[:, n + 1 :], w[:, n + 1 :])
         squares = np.einsum("ij,ij->j", w[:, : n + 1], w[:, : n + 1])
         pxx = at(x, x) - squares[0]
-        pyy = at(ys, ys) - squares[1:]
+        pyy = (corr[ys, ys] if lazy is None else lazy.unit[ys]) - squares[1:]
         pxy = at(x, ys) - np.einsum("i,ij->j", w[:, 0], w[:, 1 : n + 1])
         smallest = 0.5 * (pxx + pyy) - np.hypot(0.5 * (pxx - pyy), pxy)  # lambda_min(M) per y
         if not (smallest > 0.0).all():

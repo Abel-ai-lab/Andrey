@@ -44,7 +44,11 @@ def test_rows_equal_the_whole_matrix_bit_for_bit_in_any_layout(n, d):
         for v in rng.permutation(d)[:5]:
             assert np.array_equal(lazy.rows([v])[0], full[v])
         a, b = rng.integers(0, d, 400), rng.integers(0, d, 400)
-        assert np.array_equal(lazy.entries(a, b), full[a, b])
+        a, b = a[a != b], b[a != b]
+        lazy.cover(a, b)
+        assert np.array_equal(lazy.pairs(a, b), full[a, b])
+        assert np.array_equal(lazy.matrix(), full)
+        lazy.load(np.arange(d))
         assert np.array_equal(lazy.matrix(), full)
 
 
