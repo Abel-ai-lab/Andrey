@@ -25,9 +25,10 @@ columns, and maps each answer back to the original columns before hashing it;
 ``N`` workers, with every GES pass, every skeleton pass of conditioning size two or more, and every
 possible-d-sep search sent to the pool. Both report each refit whose answer differs from the first
 fit. A different worker count must not change a bit, so any difference fails it. A column order
-fails the check only when a graph or a causal order differs (:data:`STRUCTURE`); the last bits of
-edge weights and metadata values, such as p-values, depend on the order a sum runs in, so a refit
-whose values differ only by rounding (:data:`RTOL`) is reported as information.
+fails the check when a graph or a causal order differs (:data:`STRUCTURE`) or when an edge weight or
+metadata value differs by more than rounding (:data:`RTOL`). The last bits of such values, such as
+p-values, depend on the order a sum runs in, so a refit that differs only by rounding is reported as
+information.
 
     uv run python -m qa.identity -o before.json             # fit the corpus, write a manifest
     uv run python -m qa.identity --compare before.json after.json  # exit 1 on any difference
