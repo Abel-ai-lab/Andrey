@@ -90,6 +90,9 @@ columns, is a linear function of other columns. Copies of one variable cannot be
 one column per group and read its edges as the group's; no option drops or merges the copies for
 you. Every method that takes `indep_test`, with a partial-correlation test, `"fisherz"` or
 `"student_t"`, rejects copies the same way before any test runs, and so do `icp` and `dynotears`.
+The local methods, which compute only the rows of the correlation matrix their search reads
+(`ANDREY_LAZY_CORRELATION`), reject copies that a computed row shows, when the search reads it;
+copies among columns whose rows are never computed do not raise.
 `pcmci`, `pcmciplus`, and `lpcmci` with those tests also reject a series that repeats another up to
 `2 * tau_max` steps back and name its lagged value, such as `'a' at lag 1 repeats 'd'`. `cam`,
 `resit`, `score_matching`, `nogam`, and `camuv` reject copies the same way, and a column of fewer

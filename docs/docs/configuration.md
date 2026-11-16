@@ -89,6 +89,17 @@ forkserver, as on Linux from Python 3.14; otherwise it keeps the default.
 
 ## Scan dispatch
 
+- `ANDREY_LAZY_CORRELATION`: with `fisherz`, `student_t`, or `normal_scores` on complete data, the
+  local methods (the blanket learners, `mb_by_mb`, `mmb_by_mmb`, `cmb`, `ldecc`,
+  `local_optimal_adjustment`, `locpc_cde`, `ldp`, `ld3`, and `y_structures`) use lazy correlation:
+  each row of the correlation matrix is computed when a test first reads it and kept, instead of
+  the whole matrix before the search. A search at one target reads the rows of the variables it
+  conditions on, so at 2,000 rows and 16,000 variables `iamb` at one target starts in under a
+  second where the whole matrix takes 20 seconds and 2 GB. The rows equal the whole matrix's bit
+  for bit, so the answers are the same. The check for copied columns runs on the rows computed: a
+  copy raises when a row that shows it is computed, and copies among columns whose rows are never
+  computed do not raise. The default is on; `0` computes the whole matrix and checks every column
+  before the search.
 - `ANDREY_SHARED_SCAN_MIN_WORK`: with `fisherz`, `student_t`, or `normal_scores` on complete data,
   a blanket learner's scan of two or more candidates against one conditioning set of two or more
   variables is answered from one Cholesky factor of the set's correlation block only when its

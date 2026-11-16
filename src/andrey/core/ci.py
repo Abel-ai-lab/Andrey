@@ -94,6 +94,7 @@ from scipy.special import chdtrc, gammaln, ndtr, stdtr
 
 from . import categorical, env, stats
 from .categorical import BATCH_CELLS, DENSE_MIN, DENSE_ROWS
+from .correlation import LazyCorrelation
 from .mixed import ConditionalGaussian, DegenerateGaussian
 from .score import copies_error, copies_message, copy_groups
 
@@ -206,7 +207,19 @@ class CITest(Protocol):
 class PartialCorrelationTest:
     """Base of the partial-correlation tests; a subclass maps ``(r, df)`` to a p-value.
 
-    ``__init__`` records the sample size and precomputes the full column correlation matrix once.
+    ``__init__`` records the sample size and computes the column correlation matrix once
+    (:func:`~andrey.core.correlation.correlation_matrix`). With ``lazy``, it computes none up front:
+    a row of the matrix is computed when a query first reads it and kept
+    (:class:`~andrey.core.correlation.LazyCorrelation`), equal bit for bit to the row of the whole
+    matrix, so every query answers as it does without ``lazy``. A query given ``S`` reads the rows
+    of ``S`` and of one of ``x`` and ``y``, and a search that tests a target against many
+    candidates reads the target's row, not theirs. The queries that read every pair
+    (:meth:`marginal_pvalues`, :meth:`statistic_pvalues_given_rest`, :meth:`copies`,
+    :meth:`to_seed`) compute the whole matrix and keep it. A lazy test checks each row it computes
+    for copied columns instead of the whole matrix up front: a computed row that shows a column
+    repeating another up to scale and shift raises
+    :class:`~andrey.core.score.CopiedColumnsError`; copies among columns whose rows are never
+    computed do not raise.
     Each call forms the partial correlation ``r`` of ``x`` and ``y`` given the conditioning set --
     directly (``|S| == 0``), by the first-order closed form (``|S| == 1``), or by inverting the
     ``[x, y, *S]`` correlation submatrix (``|S| >= 2``) -- clamps it just inside ``(-1, 1)``, and
@@ -235,11 +248,31 @@ class PartialCorrelationTest:
     # The inverse of the whole correlation matrix, None when it is singular, set by the first
     # statistic_pvalues_given_rest call.
     _inverse: np.ndarray | None
+    # The correlation matrix, or the rows computed so far while lazy; set by __init__ or from_corr.
+    _corr: np.ndarray
+    _lazy: LazyCorrelation | None = None
 
-    def __init__(self, data: np.ndarray) -> None:
+    def __init__(self, data: np.ndarray, *, lazy: bool = False) -> None:
         arr = stats.checked_matrix(data, "run a partial-correlation test")
         self._n: int = arr.shape[0]
-        self._corr: np.ndarray = np.asarray(stats.corrcoef(arr, rowvar=False), dtype=np.float64)
+        if lazy:
+            self._lazy = LazyCorrelation(arr)
+        else:
+            self._corr = np.asarray(stats.corrcoef(arr, rowvar=False), dtype=np.float64)
+
+    def _matrix(self) -> np.ndarray:
+        """The whole correlation matrix; a lazy test computes it here, checked for copies, and
+        keeps it, so later queries read it."""
+        lazy = self._lazy
+        if lazy is not None:
+            self._corr = lazy.matrix()
+            self._lazy = None
+        return self._corr
+
+    def correlation_rows(self) -> int:
+        """The number of rows of the correlation matrix computed so far: every row unless lazy."""
+        lazy = self._lazy
+        return np.atleast_2d(self._corr).shape[0] if lazy is None else lazy.computed
 
     def _degrees_of_freedom(self, size: int) -> int:
         """The degrees of freedom of a test given ``size`` conditioners; raises when unusable."""
@@ -279,6 +312,11 @@ class PartialCorrelationTest:
         The arguments are canonical (see :func:`_canonical`). The result lies just inside
         ``(-1, 1)``.
         """
+        if self._lazy is not None:
+            r = self._lazy_partial_correlation(x_int, y_int, cond)
+            return (
+                -ONE_MINUS_EPS if r < -ONE_MINUS_EPS else ONE_MINUS_EPS if r > ONE_MINUS_EPS else r
+            )
         corr = self._corr
         if not cond:
             r = float(corr[x_int, y_int])  # marginal correlation; no inversion
@@ -294,14 +332,31 @@ class PartialCorrelationTest:
             r = -inv.item(0, 1) / math.sqrt(abs(inv.item(0, 0) * inv.item(1, 1)))
         return -ONE_MINUS_EPS if r < -ONE_MINUS_EPS else ONE_MINUS_EPS if r > ONE_MINUS_EPS else r
 
+    def _lazy_partial_correlation(self, x: int, y: int, cond: list[int]) -> float:
+        """:meth:`_partial_correlation`, unclamped, from the rows of ``cond`` and of ``x`` or
+        ``y``, with the same values and arithmetic."""
+        lazy = cast("LazyCorrelation", self._lazy)
+        if not cond:
+            return lazy.entry(x, y)
+        lazy.need(cond)
+        if len(cond) == 1:
+            z_idx = cond[0]
+            rxy = lazy.entry(x, y)
+            rxz = lazy.entry(x, z_idx)
+            ryz = lazy.entry(y, z_idx)
+            return (rxy - rxz * ryz) / math.sqrt((1.0 - rxz * rxz) * (1.0 - ryz * ryz))
+        inv = self._invert_one(lazy.square(x, y, cond))
+        return -inv.item(0, 1) / math.sqrt(abs(inv.item(0, 0) * inv.item(1, 1)))
+
     def copies(self) -> tuple[tuple[int, ...], ...]:
         """The groups of data columns that repeat one another up to scale and shift.
 
         :func:`~andrey.core.score.copy_groups` of the test's correlation matrix, found once per
-        test; a single column's correlation is a scalar and has none.
+        test; a single column's correlation is a scalar and has none. A lazy test computes the
+        whole matrix for it, and raises when it holds copies.
         """
         if not hasattr(self, "_copies"):
-            self._copies = copy_groups(np.atleast_2d(self._corr), self._n)
+            self._copies = copy_groups(np.atleast_2d(self._matrix()), self._n)
         return self._copies
 
     def _invert(self, stack: np.ndarray) -> np.ndarray:
@@ -439,20 +494,29 @@ class PartialCorrelationTest:
         """:meth:`statistic_pvalues` of canonical queries, ``lo[i] < hi[i]`` and each row of
         ``conds`` sorted."""
         df = self._degrees_of_freedom(conds.shape[1])
-        corr = self._corr
+        lazy = self._lazy
+        if lazy is None:
+            corr = self._corr
+
+            def at(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+                return corr[a, b]
+        else:
+            lazy.load(np.unique(conds))
+            lazy.cover(lo, hi)
+            at = lazy.entries
         if conds.shape[1] == 0:
-            r = corr[lo, hi]
+            r = at(lo, hi)
         elif conds.shape[1] == 1:
             z_idx = conds[:, 0]
-            rxz = corr[lo, z_idx]
-            ryz = corr[hi, z_idx]
-            r = (corr[lo, hi] - rxz * ryz) / np.sqrt((1.0 - rxz * rxz) * (1.0 - ryz * ryz))
+            rxz = at(lo, z_idx)
+            ryz = at(hi, z_idx)
+            r = (at(lo, hi) - rxz * ryz) / np.sqrt((1.0 - rxz * rxz) * (1.0 - ryz * ryz))
         else:
             var = np.empty((len(lo), 2 + conds.shape[1]), dtype=np.intp)
             var[:, 0] = lo
             var[:, 1] = hi
             var[:, 2:] = conds
-            inv = self._invert(corr[var[:, :, None], var[:, None, :]])
+            inv = self._invert(at(var[:, :, None], var[:, None, :]))
             r = -inv[:, 0, 1] / np.sqrt(np.abs(inv[:, 0, 0] * inv[:, 1, 1]))
         r = np.clip(r, -ONE_MINUS_EPS, ONE_MINUS_EPS)
         p = np.asarray(self._pvalue(r, df))
@@ -472,11 +536,12 @@ class PartialCorrelationTest:
         where it raises.
         """
         ys = [int(y) for y in ys]
-        d = np.atleast_2d(self._corr).shape[0]
+        corr = np.atleast_2d(self._matrix())
+        d = corr.shape[0]
         df = self._degrees_of_freedom(d - 2)
         if not hasattr(self, "_inverse"):
             try:
-                self._inverse = _invert_nonsingular(np.atleast_2d(self._corr)[None])[0]
+                self._inverse = _invert_nonsingular(corr[None])[0]
             except (ValueError, np.linalg.LinAlgError):
                 self._inverse = None
         inv = self._inverse
@@ -548,25 +613,31 @@ class PartialCorrelationTest:
         k)``, with ``k = |S| + 2 >= lambda_max(A)``, every block has ``lambda_min > BOUND_MARGIN *
         SINGULAR_RTOL * lambda_max`` and the eigenvalue test passes; a NaN fails the comparison.
         """
-        corr = self._corr
+        lazy = self._lazy
+        if lazy is None:
+            corr = self._corr
+
+            def at(a: npt.ArrayLike, b: npt.ArrayLike) -> np.ndarray:
+                return corr[np.minimum(a, b), np.maximum(a, b)]
+        else:
+            lazy.load(np.append(cond, x))
+            at = lazy.entries
         size, n = len(cond), len(ys)
-        factor, info = _POTRF(corr[cond[:, None], cond], lower=0)  # the upper triangle; cond sorted
+        factor, info = _POTRF(at(cond[:, None], cond), lower=0)  # the upper triangle; cond sorted
         if info != 0:
             return None
         rhs = np.empty((size, n + 1 + size))
-        rhs[:, 0] = corr[np.minimum(cond, x), np.maximum(cond, x)]
-        rhs[:, 1 : n + 1] = corr[np.minimum(cond[:, None], ys), np.maximum(cond[:, None], ys)]
+        rhs[:, 0] = at(cond, x)
+        rhs[:, 1 : n + 1] = at(cond[:, None], ys)
         rhs[:, n + 1 :] = np.eye(size)
         w, info = _TRTRS(factor, rhs, lower=0, trans=1)
         if info != 0:
             return None
         g = np.einsum("ij,ij->", w[:, n + 1 :], w[:, n + 1 :])
         squares = np.einsum("ij,ij->j", w[:, : n + 1], w[:, : n + 1])
-        pxx = corr[x, x] - squares[0]
-        pyy = corr[ys, ys] - squares[1:]
-        pxy = corr[np.minimum(x, ys), np.maximum(x, ys)] - np.einsum(
-            "i,ij->j", w[:, 0], w[:, 1 : n + 1]
-        )
+        pxx = at(x, x) - squares[0]
+        pyy = at(ys, ys) - squares[1:]
+        pxy = at(x, ys) - np.einsum("i,ij->j", w[:, 0], w[:, 1 : n + 1])
         smallest = 0.5 * (pxx + pyy) - np.hypot(0.5 * (pxx - pyy), pxy)  # lambda_min(M) per y
         if not (smallest > 0.0).all():
             return None
@@ -630,7 +701,7 @@ class PartialCorrelationTest:
         correlation matrix. The diagonal is self-correlation and is not meaningful.
         """
         df = self._degrees_of_freedom(0)
-        r = np.clip(self._corr, -ONE_MINUS_EPS, ONE_MINUS_EPS)
+        r = np.clip(self._matrix(), -ONE_MINUS_EPS, ONE_MINUS_EPS)
         p = np.asarray(self._pvalue(r, df))
         d = p.shape[0] if p.ndim else 1
         count_tests(d * (d - 1) // 2)
@@ -668,7 +739,7 @@ class PartialCorrelationTest:
         The parallel skeleton search seeds workers with this rather than pickling the whole test:
         a worker rebuilds an equivalent test over the parent's exact correlation bytes.
         """
-        return self._corr, self._n
+        return self._matrix(), self._n
 
 
 class FisherZ(PartialCorrelationTest):
@@ -996,12 +1067,12 @@ class NormalScores(FisherZ):
     refuse it with an ``env``, as they refuse the rank-based score.
     """
 
-    def __init__(self, data: np.ndarray) -> None:
+    def __init__(self, data: np.ndarray, *, lazy: bool = False) -> None:
         arr = np.asarray(data, dtype=np.float64)
         scores = arr
         if arr.ndim == 2 and np.isfinite(arr).all():
             scores = stats.normal_scores(arr)
-        super().__init__(scores)
+        super().__init__(scores, lazy=lazy)
 
 
 #: The degrees-of-freedom rules of :class:`ChiSquare`: ``"mean"``, the null mean of the statistic,
@@ -2096,6 +2167,7 @@ def make_indep_test(
     categorical: npt.ArrayLike | None = None,
     seed: int | None = None,
     degrees_of_freedom: str = "mean",
+    lazy: bool = False,
     **options: Any,
 ) -> CITest:
     """Construct the registered ``indep_test`` ``name`` over ``data``.
@@ -2111,6 +2183,12 @@ def make_indep_test(
     :class:`PartialCorrelationTest` raises :class:`~andrey.core.score.CopiedColumnsError`, naming
     every group of :meth:`~PartialCorrelationTest.copies`, when ``data`` holds columns that repeat
     others up to scale and shift: its tests cannot tell such columns apart.
+
+    ``lazy`` builds a shipped partial-correlation test (``"fisherz"``, ``"student_t"``,
+    ``"normal_scores"``) on complete data with lazy correlation, unless ``ANDREY_LAZY_CORRELATION``
+    is ``0``: each row of its correlation matrix is computed when a query first reads it, with the
+    same values as the whole matrix, and the copied-column check runs on the rows computed, so it
+    raises when a query reads one, not here. The other tests ignore it.
 
     ``data`` holding ``NaN`` gives a :class:`~andrey.core.ci_missing.TestwiseDeletion` of the test
     instead: each query reads only the rows observed in all of its columns, and raises where a
@@ -2135,6 +2213,12 @@ def make_indep_test(
         return testwise_deletion(name, factory, data, categorical, options, mixed=mixed)
     if mixed:
         return factory(data, categorical, **options)
+    if (
+        lazy
+        and factory in (FisherZ, StudentT, NormalScores)
+        and env.LAZY_CORRELATION.read() is not False
+    ):
+        return factory(data, lazy=True, **options)
     test = factory(data, **options)
     if isinstance(test, PartialCorrelationTest) and test.copies():
         raise copies_error(test.copies())
