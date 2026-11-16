@@ -135,7 +135,8 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         default="1",
         effect=(
             "Lazy correlation for the local methods (the blanket learners, MB-by-MB, MMB-by-MMB, "
-            "CMB, LDECC, LOAD, LocPC-CDE, LDP, LD3, Y-structures) with `fisherz`, `student_t`, or "
+            "CMB, LDECC, LOAD, LocPC-CDE, LDP, LD3, Y-structures, and the restrict phase of MMHC "
+            "and RSMAX2) with `fisherz`, `student_t`, or "
             "`normal_scores` on complete data: each row of the correlation matrix is computed when "
             "a test first reads it and kept, instead of the whole matrix up front. The rows equal "
             "the whole matrix's bit for bit, so the answers do not change. The check for copied "
