@@ -219,7 +219,9 @@ class PartialCorrelationTest:
     for copied columns instead of the whole matrix up front: a computed row that shows a column
     repeating another up to scale and shift raises
     :class:`~andrey.core.score.CopiedColumnsError`; copies among columns whose rows are never
-    computed do not raise.
+    computed do not raise. Rows are computed on NumPy: when the backend selection
+    (:func:`~andrey.core.stats.corrcoef_device`) picks a GPU for the data, ``lazy`` is ignored and
+    the whole matrix is computed there.
     Each call forms the partial correlation ``r`` of ``x`` and ``y`` given the conditioning set --
     directly (``|S| == 0``), by the first-order closed form (``|S| == 1``), or by inverting the
     ``[x, y, *S]`` correlation submatrix (``|S| >= 2``) -- clamps it just inside ``(-1, 1)``, and
@@ -255,7 +257,7 @@ class PartialCorrelationTest:
     def __init__(self, data: np.ndarray, *, lazy: bool = False) -> None:
         arr = stats.checked_matrix(data, "run a partial-correlation test")
         self._n: int = arr.shape[0]
-        if lazy:
+        if lazy and stats.corrcoef_device(arr.size, record=False) == "numpy":
             self._lazy = LazyCorrelation(arr)
         else:
             self._corr = np.asarray(stats.corrcoef(arr, rowvar=False), dtype=np.float64)
@@ -2210,7 +2212,8 @@ def make_indep_test(
     ``"normal_scores"``) on complete data with lazy correlation, unless ``ANDREY_LAZY_CORRELATION``
     is ``0``: each row of its correlation matrix is computed when a query first reads it, with the
     same values as the whole matrix, and the copied-column check runs on the rows computed, so it
-    raises when a query reads one, not here. The other tests ignore it.
+    raises when a query reads one, not here. The other tests ignore it, and so does a backend
+    selection that puts the correlation matrix on a GPU (:func:`~andrey.core.stats.corrcoef`).
 
     ``data`` holding ``NaN`` gives a :class:`~andrey.core.ci_missing.TestwiseDeletion` of the test
     instead: each query reads only the rows observed in all of its columns, and raises where a
@@ -2235,13 +2238,12 @@ def make_indep_test(
         return testwise_deletion(name, factory, data, categorical, options, mixed=mixed)
     if mixed:
         return factory(data, categorical, **options)
-    if (
+    lazily = (
         lazy
         and factory in (FisherZ, StudentT, NormalScores)
         and env.LAZY_CORRELATION.read() is not False
-    ):
-        return factory(data, lazy=True, **options)
-    test = factory(data, **options)
+    )
+    test = factory(data, lazy=True, **options) if lazily else factory(data, **options)
     if isinstance(test, PartialCorrelationTest) and test.copies():
         raise copies_error(test.copies())
     return test

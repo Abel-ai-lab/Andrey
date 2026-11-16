@@ -2,8 +2,9 @@
 
 The whole matrix and a lazily computed row come from the same block products, so they agree bit for
 bit whatever the data's memory layout and the BLAS thread count; a lazy partial-correlation test
-answers every query path as the test over the whole matrix does; a local search reads few rows; and the
-copied-column check runs on the rows computed.
+answers every query path as the test over the whole matrix does; a local search reads few rows; the
+copied-column check runs on the rows computed; and a backend that selects a device takes the whole
+matrix.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from threadpoolctl import threadpool_info, threadpool_limits
 
 import andrey
 from andrey.constraint.blanket import local_search
-from andrey.core import backend, ci
+from andrey.core import backend, ci, stats
 from andrey.core.ci import FisherZ, NormalScores, StudentT
 from andrey.core.correlation import BLOCK, LazyCorrelation, correlation_matrix
 from andrey.core.score import CopiedColumnsError
@@ -181,3 +182,29 @@ def test_the_entries_do_not_depend_on_the_blas_threads(n):
     for lazy in (lazy_one, lazy_several, pinned):
         lazy.load(np.arange(X.shape[1]))
         assert np.array_equal(lazy.matrix(), one)
+
+
+def test_a_lazy_test_follows_a_backend_that_selects_a_device(monkeypatch):
+    X = _data(100, 40, seed=8)
+    d = X.shape[1]
+    picks, asked = [], []
+    monkeypatch.setattr(backend, "resolve", lambda *a, **kw: picks.append(kw["op"]) or "cuda")
+
+    def whole(data, rowvar=True):
+        asked.append((data.shape, rowvar))
+        return correlation_matrix(data)
+
+    monkeypatch.setattr(stats, "corrcoef", whole)
+    for test_class in (FisherZ, StudentT, NormalScores):
+        test = test_class(X, lazy=True)
+        assert test.correlation_rows() == d
+        assert test(0, 1, [2]) == test_class(X)(0, 1, [2])
+    assert asked == [(X.shape, False)] * 3 * 2
+    assert picks == [None] * 3  # asked without counting a corrcoef dispatch; whole() counts it
+    assert ci.make_indep_test("fisherz", X, lazy=True).correlation_rows() == d
+    copied = X.copy()
+    copied[:, 7] = 2.0 * copied[:, 3] - 1.0
+    with pytest.raises(CopiedColumnsError, match="7 repeats 3"):
+        ci.make_indep_test("fisherz", copied, lazy=True)
+    monkeypatch.setattr(backend, "resolve", lambda *a, **kw: "numpy")
+    assert ci.make_indep_test("fisherz", X, lazy=True).correlation_rows() == 0
