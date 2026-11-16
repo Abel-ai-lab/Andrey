@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 
 from andrey.core import backend, env, stats
+from andrey.core.correlation import correlation_matrix
 from andrey.core.stats import corrcoef, cov, entropy
 
 
@@ -43,9 +44,12 @@ def test_cov_equals_numpy_exactly(force_numpy, data):
     assert np.array_equal(cov(data, ddof=0), np.cov(data, ddof=0))
 
 
-def test_corrcoef_equals_numpy_exactly(force_numpy, data):
-    assert np.array_equal(corrcoef(data), np.corrcoef(data))
-    assert np.array_equal(corrcoef(data.T, rowvar=False), np.corrcoef(data.T, rowvar=False))
+def test_corrcoef_is_the_tiled_matrix(force_numpy, data):
+    full = corrcoef(data)
+    assert np.array_equal(full, correlation_matrix(data.T))
+    assert np.array_equal(corrcoef(data.T, rowvar=False), full)
+    assert np.array_equal(full, full.T) and np.array_equal(np.diag(full), np.ones(len(full)))
+    np.testing.assert_allclose(full, np.corrcoef(data), rtol=0, atol=1e-14)
 
 
 def test_entropy_numpy_reference(force_numpy, standardized):

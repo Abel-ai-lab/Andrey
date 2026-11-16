@@ -1,12 +1,15 @@
 """The sample correlation matrix of a data set's columns, computed tile by tile, whole or lazily.
 
 Every entry comes from one fixed computation, so the whole matrix and a row computed alone agree
-bit for bit. :func:`standardized` centers each column and scales it to unit norm, on a contiguous
+bit for bit. :func:`centered` centers each column and finds its Euclidean norm, on a contiguous
 copy whose rows are the columns, so the result does not depend on the data's memory layout. The
 columns fall into tiles of ``TILE`` consecutive positions, and the entries between tiles ``i <= j``
-are one product of their standardized columns, ``Z_i @ Z_j.T``, on one BLAS thread, clipped to
-``[-1, 1]``; the entries of tiles ``j < i`` are the transpose of tile ``(j, i)``, and a tile with
-itself keeps its upper triangle, mirrored, so the matrix is exactly symmetric. The diagonal is
+are one product of their centered columns, ``C_i @ C_j.T``, on one BLAS thread, divided by the
+products of the norms and clipped to ``[-1, 1]``; the entries of tiles ``j < i`` are the transpose
+of tile ``(j, i)``, and a tile with itself keeps its upper triangle, mirrored, so the matrix is
+exactly symmetric. Dividing after the sums keeps an exact sum exact: on data whose sums of products
+round nowhere, such as small integers in a power-of-two number of rows, two columns that hold the
+same values in another row order correlate equally with a third column. The diagonal is
 exactly ``1``, or ``NaN`` for a column whose values are all equal. :func:`correlation_matrix` gives
 the whole matrix; :class:`LazyCorrelation` computes the rows of one tile when a row of it is first
 read and keeps them, the same products in the same order, so its rows equal those of
@@ -27,7 +30,7 @@ import numpy.typing as npt
 from . import backend
 from .score import ZERO_RESIDUAL, copies_error
 
-__all__ = ["TILE", "LazyCorrelation", "correlation_matrix", "standardized"]
+__all__ = ["TILE", "LazyCorrelation", "centered", "correlation_matrix"]
 
 #: The number of consecutive columns in one tile. A lazily read row computes the rows of its tile:
 #: on one AMD EPYC 7713 core, 0.11 s at 2,000 rows and 16,000 columns (0.18 s with 64), while the
@@ -35,48 +38,50 @@ __all__ = ["TILE", "LazyCorrelation", "correlation_matrix", "standardized"]
 TILE = 32
 
 
-def standardized(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """The columns of the ``(n, d)`` ``data`` centered and scaled to unit norm, and the diagonal.
+def centered(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """The columns of the ``(n, d)`` ``data`` less their means, and their Euclidean norms.
 
-    Returns the ``(d, n)`` C-contiguous array whose row ``j`` is column ``j`` less its mean and
-    divided by its Euclidean norm, and the ``(d,)`` diagonal of the correlation matrix: ``1``, or
-    ``NaN`` for a column whose centered values are all zero. Each row's sums run along that
-    contiguous row, so the values depend only on the column's own values.
+    Returns the ``(d, n)`` C-contiguous array whose row ``j`` is column ``j`` less its mean, and
+    the ``(d,)`` norms of those rows. Each row's sums run along that contiguous row, so the values
+    depend only on the column's own values.
     """
-    z = np.array(np.asarray(data, dtype=np.float64).T, order="C")
-    d, n = z.shape
-    z -= (z.sum(axis=1) / n)[:, None]
+    c = np.array(np.asarray(data, dtype=np.float64).T, order="C")
+    d, n = c.shape
+    c -= (c.sum(axis=1) / n)[:, None]
     norm = np.empty(d)
     for start in range(0, d, TILE):
-        block = z[start : start + TILE]
+        block = c[start : start + TILE]
         norm[start : start + TILE] = np.sqrt((block * block).sum(axis=1))
-    z /= norm[:, None]
-    return z, np.where(norm > 0.0, 1.0, np.nan)
+    return c, norm
 
 
-def _tile(z: np.ndarray, unit: np.ndarray, i: int, j: int) -> np.ndarray:
-    """The entries between tiles ``i <= j`` of the standardized columns ``z``, clipped to
-    ``[-1, 1]``; tile ``i`` with itself is its upper triangle mirrored, diagonal ``unit``."""
-    rows = z[i * TILE : (i + 1) * TILE]
+def _tile(c: np.ndarray, norm: np.ndarray, i: int, j: int) -> np.ndarray:
+    """The correlations between tiles ``i <= j`` of the centered columns ``c`` with norms
+    ``norm``, clipped to ``[-1, 1]``; tile ``i`` with itself is its upper triangle mirrored, with
+    the unit diagonal (``NaN`` for a zero norm)."""
+    span_i, span_j = slice(i * TILE, (i + 1) * TILE), slice(j * TILE, (j + 1) * TILE)
+    rows = c[span_i]
     if i == j:
         product = rows @ rows.T
         product = np.triu(product, 1)
         product += product.T
-        np.fill_diagonal(product, unit[i * TILE : (i + 1) * TILE])
     else:
-        product = rows @ z[j * TILE : (j + 1) * TILE].T
+        product = rows @ c[span_j].T
+    product /= np.multiply.outer(norm[span_i], norm[span_j])
+    if i == j:
+        np.fill_diagonal(product, np.where(norm[span_i] > 0.0, 1.0, np.nan))
     return np.clip(product, -1.0, 1.0, out=product)
 
 
-def _matrix(z: np.ndarray, unit: np.ndarray) -> np.ndarray:
-    """The whole correlation matrix of the standardized columns ``z``, tile by tile."""
-    d = z.shape[0]
+def _matrix(c: np.ndarray, norm: np.ndarray) -> np.ndarray:
+    """The whole correlation matrix of the centered columns ``c`` with norms ``norm``."""
+    d = c.shape[0]
     tiles = -(-d // TILE)
     out = np.empty((d, d))
     with backend.one_blas_thread():
         for i in range(tiles):
             for j in range(i, tiles):
-                product = _tile(z, unit, i, j)
+                product = _tile(c, norm, i, j)
                 out[i * TILE : (i + 1) * TILE, j * TILE : (j + 1) * TILE] = product
                 if j > i:
                     out[j * TILE : (j + 1) * TILE, i * TILE : (i + 1) * TILE] = product.T
@@ -86,11 +91,11 @@ def _matrix(z: np.ndarray, unit: np.ndarray) -> np.ndarray:
 def correlation_matrix(data: np.ndarray) -> np.ndarray:
     """The ``(d, d)`` sample correlation matrix of the columns of the ``(n, d)`` ``data``.
 
-    Computed tile by tile from :func:`standardized` columns as the module describes: exactly
+    Computed tile by tile from :func:`centered` columns as the module describes: exactly
     symmetric, its diagonal ``1`` (``NaN`` for a constant column), its entries clipped to
     ``[-1, 1]``, and each row equal bit for bit to the row :class:`LazyCorrelation` computes.
     """
-    return _matrix(*standardized(data))
+    return _matrix(*centered(data))
 
 
 def _groups(pairs: Sequence[tuple[int, int]]) -> tuple[tuple[int, ...], ...]:
@@ -119,8 +124,8 @@ class LazyCorrelation:
     The rows equal :func:`correlation_matrix`'s bit for bit, and the matrix is exactly symmetric, so
     an entry ``[a, b]`` is read from whichever of the rows ``a`` and ``b`` is computed.
     :meth:`entry` and :meth:`entries` compute one when neither is: the column asked about more
-    often, so the row of a search's target serves its candidates. The standardized columns, as
-    large as the data, are made at the first read.
+    often, so the row of a search's target serves its candidates. The centered columns, as large as
+    the data, are made at the first read.
 
     Each computed tile is checked for columns that repeat another up to scale and shift, as
     :func:`~andrey.core.score.copy_groups` defines them: a copy shown by a computed row raises
@@ -132,6 +137,7 @@ class LazyCorrelation:
         self._data: np.ndarray | None = data
         self.n, self.d = data.shape
         self._z = np.empty((0, 0))
+        self._norm = np.empty(0)
         self.unit = np.empty(0)
         self._slot = np.full(self.d, -1, dtype=np.intp)  # each column's row in _rows, -1 if none
         self._slots = [-1] * self.d  # the same, for scalar reads
@@ -144,15 +150,16 @@ class LazyCorrelation:
         """The number of rows computed so far."""
         return self._count
 
-    def _standardize(self) -> None:
+    def _center(self) -> None:
         if self._data is not None:
-            self._z, self.unit = standardized(self._data)
+            self._z, self._norm = centered(self._data)
+            self.unit = np.where(self._norm > 0.0, 1.0, np.nan)
             self._data = None
 
     def matrix(self) -> np.ndarray:
         """The whole matrix, as :func:`correlation_matrix` computes it, checked for copies."""
-        self._standardize()
-        full = _matrix(self._z, self.unit)
+        self._center()
+        full = _matrix(self._z, self._norm)
         self._check(full, np.arange(self.d))
         return full
 
@@ -172,14 +179,14 @@ class LazyCorrelation:
         missing = cols[self._slot[cols] < 0]
         if not len(missing):
             return
-        self._standardize()
+        self._center()
         tiles = -(-self.d // TILE)
         with backend.one_blas_thread():
             for i in np.unique(missing // TILE).tolist():
                 ids = np.arange(i * TILE, min(self.d, (i + 1) * TILE))
                 block = np.empty((len(ids), self.d))
                 for j in range(tiles):
-                    tile = _tile(self._z, self.unit, *((i, j) if j >= i else (j, i)))
+                    tile = _tile(self._z, self._norm, *((i, j) if j >= i else (j, i)))
                     block[:, j * TILE : (j + 1) * TILE] = tile if j >= i else tile.T
                 self._check(block, ids)
                 self._store(block, ids)
@@ -257,7 +264,7 @@ class LazyCorrelation:
         a, b = np.broadcast_arrays(np.asarray(a, dtype=np.intp), np.asarray(b, dtype=np.intp))
         same = a == b
         if same.all():
-            self._standardize()
+            self._center()
             return self.unit[a]
         self.cover(a.reshape(-1), b.reshape(-1))
         sa = self._slot[a]
