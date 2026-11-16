@@ -356,7 +356,7 @@ names its pull request.
   their visits, about 6 GB at 16,000 variables. The check for copied columns runs on the rows
   computed: a copy raises when a row that shows it is computed, and copies among columns whose rows
   are never computed no longer raise. `ANDREY_LAZY_CORRELATION=0` computes the whole matrix and
-  checks every column before the search. ([#1050], [#PR])
+  checks every column before the search. ([#1050], [#1053])
 - The correlation matrix of `fisherz`, `student_t`, and `normal_scores` is computed in tiles of 32
   columns on one BLAS thread, the same products whether a row is computed alone or with the whole
   matrix, so a lazily computed row equals the whole matrix's bit for bit; the matrix is exactly
@@ -365,7 +365,7 @@ names its pull request.
   before. The correlations change in their last bits, once: every graph that Andrey's identity
   checks record is the same, 2,484 of 4.2 million partial-correlation p-values differ in their ninth
   significant digit and none crosses 0.05, and the two recorded baselines whose values move are
-  captured again for that change alone. ([#1050], [#PR])
+  captured again for that change alone. ([#1050], [#1053])
 - The causal-order search of `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and
   `longitudinal_lingam` with `measure="pwling"` stops scoring a candidate once its partial score,
   a sum of nonnegative terms, shows it can be neither picked nor tied, and scores every other
@@ -2992,6 +2992,7 @@ First alpha release.
 [#1047]: https://github.com/Abel-ai-lab/Andrey/pull/1047
 [#1048]: https://github.com/Abel-ai-lab/Andrey/pull/1048
 [#1050]: https://github.com/Abel-ai-lab/Andrey/issues/1050
+[#1053]: https://github.com/Abel-ai-lab/Andrey/pull/1053
 [#1045]: https://github.com/Abel-ai-lab/Andrey/issues/1045
 [#1051]: https://github.com/Abel-ai-lab/Andrey/pull/1051
 [#995]: https://github.com/Abel-ai-lab/Andrey/pull/995
