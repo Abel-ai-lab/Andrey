@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   indexnow:
-    if: github.repository == 'Abel-ai-lab/andrey'
+    if: github.repository == 'Abel-ai-lab/Andrey'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:

@@ -53,7 +53,7 @@ def test_the_package_description_shows_the_images_at_the_release_tag():
     for rule in hook["substitutions"]:
         replacement = rule["replacement"].replace("$HFPR_VERSION", andrey.__version__)
         readme = re.sub(rule["pattern"], replacement, readme)
-    tag = f"https://raw.githubusercontent.com/Abel-ai-lab/andrey/v{andrey.__version__}/"
+    tag = f"https://raw.githubusercontent.com/Abel-ai-lab/Andrey/v{andrey.__version__}/"
     targets = readme_targets(readme)
     assert all(t.startswith("https://") for t in targets)
     images = [t.removeprefix(tag) for t in targets if t.startswith(tag)]

@@ -10,11 +10,11 @@ banner links the website's homepage. -->
     src="https://img.shields.io/pypi/v/andrey-core?label=PyPI&amp;color=3b5bdb"></a>
   <a href="https://pepy.tech/projects/andrey-core"><img alt="PyPI downloads"
     src="https://img.shields.io/pepy/dt/andrey-core?label=downloads&amp;color=3b5bdb"></a>
-  <a href="https://github.com/Abel-ai-lab/andrey/actions/workflows/ci.yml"><img alt="CI status"
-    src="https://img.shields.io/github/actions/workflow/status/Abel-ai-lab/andrey/ci.yml?branch=main&amp;label=CI"></a>
+  <a href="https://github.com/Abel-ai-lab/Andrey/actions/workflows/ci.yml"><img alt="CI status"
+    src="https://img.shields.io/github/actions/workflow/status/Abel-ai-lab/Andrey/ci.yml?branch=main&amp;label=CI"></a>
   <img alt="Python 3.11, 3.12, 3.13, 3.14"
     src="https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-3b5bdb">
-  <a href="https://github.com/Abel-ai-lab/andrey/blob/main/LICENSE"><img alt="License: Apache 2.0"
+  <a href="https://github.com/Abel-ai-lab/Andrey/blob/main/LICENSE"><img alt="License: Apache 2.0"
     src="https://img.shields.io/badge/license-Apache%202.0-3b5bdb"></a>
 </p>
 
@@ -61,7 +61,7 @@ You install andrey-core and then `import andrey`.
 - **Optional extras**: `andrey-core[torch]` for GPUs and CALM, `andrey-core[viz]` for charts and
   graph layouts
 - **From GitHub**, the latest release:
-  `uv add "andrey-core @ git+https://github.com/Abel-ai-lab/andrey@main"`
+  `uv add "andrey-core @ git+https://github.com/Abel-ai-lab/Andrey@main"`
 - **[Installation guide](https://andrey.abel.ai/docs/guides/getting-started.html#install)**: the
   extras, a PyTorch build for your GPU, and building Andrey from source
 
@@ -180,7 +180,7 @@ supported; macOS and Windows install and run on the CPU, with no guarantee yet
 ## Citing, license, contributing
 
 If you use Andrey in your work, please cite it, or use the
-[citation file](https://github.com/Abel-ai-lab/andrey/blob/main/CITATION.cff):
+[citation file](https://github.com/Abel-ai-lab/Andrey/blob/main/CITATION.cff):
 
 ```bibtex
 @software{andrey,
@@ -193,9 +193,9 @@ If you use Andrey in your work, please cite it, or use the
 ```
 
 Andrey is released under the
-[Apache License 2.0](https://github.com/Abel-ai-lab/andrey/blob/main/LICENSE). Bug reports and pull
-requests are welcome in the [issue tracker](https://github.com/Abel-ai-lab/andrey/issues); the
-[contributing guide](https://github.com/Abel-ai-lab/andrey/blob/main/CONTRIBUTING.md) explains how
+[Apache License 2.0](https://github.com/Abel-ai-lab/Andrey/blob/main/LICENSE). Bug reports and pull
+requests are welcome in the [issue tracker](https://github.com/Abel-ai-lab/Andrey/issues); the
+[contributing guide](https://github.com/Abel-ai-lab/Andrey/blob/main/CONTRIBUTING.md) explains how
 to set up a development environment.
 
 Andrey is inspired by
