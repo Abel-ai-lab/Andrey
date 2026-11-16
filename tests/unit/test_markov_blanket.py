@@ -335,6 +335,42 @@ def test_the_tie_ranks_are_computed_on_the_first_read(monkeypatch: pytest.Monkey
     assert len(calls) == 1
 
 
+def test_wide_data_computes_the_tie_ranks_of_the_columns_read(monkeypatch: pytest.MonkeyPatch):
+    """With more columns than rows, reading a few columns' ranks computes only theirs, in the order
+    of their tie ranks; iterating reads every column, in the same order."""
+    x = np.random.default_rng(1).standard_normal((20, 60))
+    real, calls = blanket.tie_ranks, []
+    monkeypatch.setattr(blanket, "tie_ranks", lambda *args: calls.append(args) or real(*args))
+    want = real(x)
+    search = local_search(x, alpha=0.05, indep_test="fisherz")
+    columns = [5, 40, 12, 33, 0]
+    assert sorted(columns, key=search.ranks.__getitem__) == sorted(columns, key=want.__getitem__)
+    np.testing.assert_array_equal(np.argsort(list(search.ranks)), np.argsort(want))
+    assert not calls
+
+
+@pytest.mark.parametrize("method", ["mmb_by_mmb", "local_optimal_adjustment", "ldecc"])
+def test_wide_data_answers_follow_the_tie_ranks(method, monkeypatch: pytest.MonkeyPatch):
+    """A method that orders its visits by the tie ranks gives the same answer on more columns than
+    rows whether it reads the ranks of the columns it compares or of every column."""
+    rng = np.random.default_rng(3)
+    x = rng.standard_normal((40, 60))
+    for j in range(1, 60):  # each column depends on the one before it
+        x[:, j] += rng.uniform(0.5, 1.0) * x[:, j - 1]
+    fit = {
+        "mmb_by_mmb": lambda: andrey.mmb_by_mmb(x, target=30, blanket="iamb", alpha=0.05),
+        "local_optimal_adjustment": lambda: andrey.local_optimal_adjustment(
+            x, variables=[30, 31], alpha=0.05
+        ),
+        "ldecc": lambda: andrey.ldecc(x, treatment=30, outcome=31, alpha=0.05),
+    }[method]
+    got = fit()
+    monkeypatch.setattr(blanket.TieKeys, "applies", staticmethod(lambda *args: False))
+    want = fit()
+    assert got.structure == want.structure
+    assert got.metadata == want.metadata
+
+
 @pytest.mark.parametrize("seed", range(4))
 def test_mmpc_finds_the_true_parents_and_children_under_an_oracle(seed):
     oracle = _oracle(seed)

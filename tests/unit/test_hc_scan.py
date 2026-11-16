@@ -19,7 +19,7 @@ import pytest
 import andrey
 from andrey.core.score import BICScore, make_score
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, add_deltas, remove_deltas
-from andrey.core.ties import EPS_IMPROVE, KEY_DP, tie_ranks
+from andrey.core.ties import EPS_IMPROVE, KEY_DP, TieKeys, tie_ranks
 from andrey.search.hc import MoveScanner, _key_after, apply_move, hc
 from andrey.search.tabu import tabu
 from qa import identity
@@ -200,6 +200,36 @@ def test_tie_ranks_move_with_the_columns() -> None:
     near = x[:, [2, 2]] + np.column_stack([np.zeros(50), 1e-11 * np.sin(np.arange(50))])
     for data, order in ((copies, [1, 0]), (swapped, [1, 0, 2]), (near, [1, 0])):
         np.testing.assert_array_equal(tie_ranks(data[:, order]), tie_ranks(data)[order])
+
+
+def _wide(kind: str) -> np.ndarray:
+    """More columns than rows: Gaussian, few distinct values (many columns with equal relations),
+    copies in other units, in the other sign, reversed, constant, and nudged, or missing values."""
+    rng = np.random.default_rng(7)
+    x = _data(7, 12, 300)
+    if kind == "few values":
+        x = rng.integers(0, 3, (12, 300)).astype(np.float64)
+    elif kind == "copies":
+        x[:, 1], x[:, 2], x[:, 3] = 2 * x[:, 0] + 5, -x[:, 0], x[::-1, 0]
+        x[:, 4], x[:, 5] = 1.0, 3.0
+        x[:, 6] = x[:, 0] + 1e-13 * np.arange(12)
+    elif kind == "missing":
+        x[rng.random(x.shape) < 0.1] = np.nan
+    return x
+
+
+@pytest.mark.parametrize("kind", ["gaussian", "few values", "copies", "missing"])
+@pytest.mark.parametrize("read", ["one at a time", "all at once"])
+def test_tie_keys_order_the_columns_as_the_tie_ranks(kind, read) -> None:
+    """Each column's key, read alone or with every other, orders the columns as the tie ranks do,
+    and no two columns share a key."""
+    x = _wide(kind)
+    keys = TieKeys(x)
+    if read == "all at once":
+        keys.fill(range(300))
+    order = sorted(range(300), key=keys.__getitem__)
+    np.testing.assert_array_equal(order, np.argsort(tie_ranks(x)))
+    assert len(set(keys.values())) == 300
 
 
 def test_tie_ranks_stay_importable_from_hc() -> None:
