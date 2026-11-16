@@ -97,6 +97,10 @@ forkserver, as on Linux from Python 3.14; otherwise it keeps the default.
   Linux on one core, where the factor was slower below about 64 and faster from 128 for every set
   size sampled. The two paths agree to about 1e-10 relative in the p-value; the per-query path is
   the exact one, and `0` factors every such scan.
+- `ANDREY_LINGAM_PRUNE_MIN_WORK`: a step of the `pwling` order search (DirectLiNGAM and the methods
+  built on it) stops scoring a candidate that can no longer be picked only when its rows times
+  ordered pairs of candidates reach this value (default `100000`, about the break-even on one core
+  of an AMD EPYC 7713); the order is the same bit for bit either way, and `0` prunes every step.
 
 ## GPU dispatch
 

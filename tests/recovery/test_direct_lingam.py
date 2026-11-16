@@ -103,7 +103,7 @@ def _check_every_step(monkeypatch: pytest.MonkeyPatch) -> list[int]:
     Returns a list that receives, per call, the number of candidates that stopped early.
     """
     calls: list[int] = []
-    monkeypatch.setattr(pwling, "_MIN_PRUNED_VALUES", 0)
+    monkeypatch.setenv("ANDREY_LINGAM_PRUNE_MIN_WORK", "0")
     monkeypatch.setattr(pwling, "pruned_scores", _counted(pwling.pruned_scores, calls))
     return calls
 
@@ -236,3 +236,20 @@ def test_pruned_scores_keep_every_multi_group_pick(with_precedence: bool, monkey
     calls = _check_every_step(monkeypatch)
     andrey.multi_group_direct_lingam(groups, knowledge=knowledge)
     assert len(calls) >= 4 and sum(calls) > 0
+
+
+def test_prune_min_work_sets_the_pruned_steps(monkeypatch):
+    """``ANDREY_LINGAM_PRUNE_MIN_WORK`` decides which steps prune; neither changes a score read."""
+    X = _random_linear_sem(seed=8, n=300, d=8, noise="uniform")
+    U = list(range(8))
+    full = pwling.score_candidates(X, U)
+    monkeypatch.delenv("ANDREY_LINGAM_PRUNE_MIN_WORK", raising=False)
+    assert 300 * 8 * 7 < pwling.MIN_PRUNE_WORK
+    assert pwling.pruned_scores([X], U).tobytes() == full.tobytes()
+    monkeypatch.setenv("ANDREY_LINGAM_PRUNE_MIN_WORK", "0")
+    pruned = pwling.pruned_scores([X], U)
+    assert pruned.tobytes() != full.tobytes()
+    assert pwling.pick(pruned, U, tie_ranks(X)) == pwling.pick(full, U, tie_ranks(X))
+    monkeypatch.setenv("ANDREY_LINGAM_PRUNE_MIN_WORK", "many")
+    with pytest.raises(ValueError, match="ANDREY_LINGAM_PRUNE_MIN_WORK must be an integer"):
+        pwling.pruned_scores([X], U)

@@ -15,7 +15,7 @@ from collections.abc import Callable
 
 import numpy as np
 
-from andrey.core import stats
+from andrey.core import env, stats
 from andrey.core.ties import tie_ranks
 
 #: The measures a DirectLiNGAM order search takes, in the order the facades list them.
@@ -41,11 +41,11 @@ COPY_TOL = 1e-12
 # and ``cosh(u)`` overflows only past ``|u| = 710``.
 _SAFE_RESIDUAL = 1e-6
 _MAX_ROWS = 500_000
-# :func:`pruned_scores` pays fixed costs per round, so it prunes a step only when the full
-# computation takes the entropies of at least this many values (rows times ordered pairs of
-# candidates). On one core it breaks even at 60,000 to 80,000: 300 rows at 17 candidates, 1,000 at
-# 9, and 3,000 at 5.
-_MIN_PRUNED_VALUES = 100_000
+#: :func:`pruned_scores` pays fixed costs per round, so it prunes a step only when the full
+#: computation takes the entropies of at least this many values (rows times ordered pairs of
+#: candidates), unless ``ANDREY_LINGAM_PRUNE_MIN_WORK`` sets another. On one core of an AMD EPYC
+#: 7713 it breaks even at 60,000 to 80,000: 300 rows at 17 candidates, 1,000 at 9, 3,000 at 5.
+MIN_PRUNE_WORK = 100_000
 
 
 def compute_residual(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -117,14 +117,16 @@ def pruned_scores(
     in batches as wide as one row of :func:`score_candidates`. Candidates and their pairs go in
     descending ``hint`` (a column's score at the last step; unknown columns first), so the likely
     pick completes first; the order changes how many entropies are computed, never the result. A
-    step takes the full computation when it has fewer than ``_MIN_PRUNED_VALUES`` values, when its
+    step takes the full computation when it has fewer than ``MIN_PRUNE_WORK`` values, when its
     entropy batches would run on a torch device, when a pair of columns is within
     ``_SAFE_RESIDUAL`` of a copy, when an entropy is not finite, or when a group has ``_MAX_ROWS``
     rows or more.
     """
     m = len(U)
     width = (m - 1) // 2  # pairs per entropy call, as wide as one row of score_candidates
-    small = sum(len(X) for X in groups) * m * (m - 1) < _MIN_PRUNED_VALUES
+    min_work = env.LINGAM_PRUNE_MIN_WORK.read()
+    min_work = MIN_PRUNE_WORK if min_work is None else min_work
+    small = sum(len(X) for X in groups) * m * (m - 1) < min_work
     if width < 1 or small or any(stats.entropy_device(len(X) * (m - 1)) != "numpy" for X in groups):
         return _full_scores(groups, U, weights)
     parts = []
