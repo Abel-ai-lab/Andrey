@@ -7,8 +7,10 @@ paper's values where the class's defaults differ: the edge screen's Welch tests 
 paper's Sect. 3.3 and Appendix B; the class's ``das_cutoff`` defaults to its ``alpha``) and CAM
 pruning at ``0.001``, the cutoff of the SCORE experiments the paper follows (the class's default
 is ``0.05``). The screen keeps at most ``max_parents = 20`` candidates per variable, the paper's
-``K``, and the class's ``min_parents = 5`` largest entries without a test. The Stein estimators run
-at ``eta_G = eta_H = 0.001``. The data go in as a data frame of ``float64`` columns.
+``K``, and the class's ``min_parents = 5`` largest entries without a test (the class ranks the
+leaf's own diagonal entry too, so it usually keeps four predecessors untested where Andrey keeps
+five). The Stein estimators run at ``eta_G = eta_H = 0.001``. The data go in as a data frame of
+``float64`` columns.
 
 The code estimates the score's Jacobian once, on all the variables, and ranks the absolute median
 of each entry; the paper's Algorithm 1 reads each leaf's row at the step that removes it and ranks
