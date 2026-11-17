@@ -26,9 +26,9 @@ columns, and maps each answer back to the original columns before hashing it;
 possible-d-sep search sent to the pool. Both report each refit whose answer differs from the first
 fit. A different worker count must not change a bit, so any difference fails it. A column order
 fails the check when a graph or a causal order differs (:data:`STRUCTURE`) or when an edge weight or
-metadata value differs by more than rounding (:data:`RTOL`). The last bits of such values, such as
-p-values, depend on the order a sum runs in, so a refit that differs only by rounding is reported as
-information.
+metadata value differs by more than rounding (:data:`RTOL`, or :data:`ATOL` near zero). The last
+bits of such values, such as p-values, depend on the order a sum runs in, so a refit that differs
+only by rounding is reported as information.
 
     uv run python -m qa.identity -o before.json             # fit the corpus, write a manifest
     uv run python -m qa.identity --compare before.json after.json  # exit 1 on any difference
@@ -987,8 +987,11 @@ def _close(a: Any, b: Any) -> bool:
         return _close(a.tolist(), b.tolist())
     if isinstance(a, list | tuple) and isinstance(b, list | tuple):
         return len(a) == len(b) and all(_close(x, y) for x, y in zip(a, b, strict=True))
+    truth = bool | np.bool_
+    if isinstance(a, truth) or isinstance(b, truth):  # True and 1 are not the same value
+        return isinstance(a, truth) and isinstance(b, truth) and bool(a) == bool(b)
     real = (float, int, np.floating, np.integer)
-    if isinstance(a, real) and isinstance(b, real) and not isinstance(a, bool | np.bool_):
+    if isinstance(a, real) and isinstance(b, real):
         if isinstance(a, int | np.integer) or isinstance(b, int | np.integer):
             return isinstance(a, int | np.integer) and isinstance(b, int | np.integer) and a == b
         return math.isclose(a, b, rel_tol=RTOL, abs_tol=ATOL) or (math.isnan(a) and math.isnan(b))

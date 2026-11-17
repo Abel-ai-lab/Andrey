@@ -277,6 +277,17 @@ def test_an_integer_that_becomes_a_float_is_not_rounding() -> None:
     )
 
 
+def test_a_boolean_that_becomes_a_number_is_not_rounding() -> None:
+    def output(flag: object) -> StructureOutput:
+        graph = GraphStructure.from_numpy(np.zeros((2, 2), dtype=np.int8), kind="dag")
+        return StructureOutput.new(graph, metadata={"flag": flag})
+
+    for first, refit in ((True, 1), (1, True), (False, 0), (True, 1.0)):
+        kind, changed = identity.classify(output(first), output(refit), column_order=True)
+        assert (kind, changed) == ("values", ["metadata.flag"])
+    assert identity.classify(output(True), output(True), column_order=True) is None
+
+
 def test_a_time_series_weights_differ_by_rounding_or_more() -> None:
     def output(lag, time=None, lags=(1,)):
         structure = SimpleNamespace(
