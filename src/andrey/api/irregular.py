@@ -743,12 +743,13 @@ def skewd(
 
     **Limitations.** Not benchmarked yet. The paper measures it on skewed location-scale pairs of
     1,000 rows and on established pair benchmarks [1]_. A fit at the defaults runs about 490
-    CMA-ES searches in each direction, ``tuning_iter`` times the 8 folds and 9 final starts, and
-    takes tens of minutes per pair; ``tuning_iter`` sets most of that cost. Each HSIC test builds matrices with one row and one column per sample.
-    The skew-normal's skewness lies within about -1 and 1, so noise more skewed than that is
-    misspecified, and the likelihood criterion assumes Gaussian marginals of the standardized
-    variables [1]_. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    CMA-ES searches in each direction, 8 folds for each of the ``tuning_iter`` penalty settings and
+    9 final starts, and takes tens of minutes per pair; ``tuning_iter`` sets most of that cost. Each
+    HSIC test builds matrices with one row and one column per sample. The skew-normal's skewness
+    lies within about -1 and 1, so noise more skewed than that is misspecified, and the likelihood
+    criterion assumes Gaussian marginals of the standardized variables [1]_. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
