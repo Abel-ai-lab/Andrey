@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from andrey.api._method import method_spec
+from andrey.core.backend import one_blas_thread
 from andrey.core.ci_missing import rows_metadata
 from andrey.core.knowledge import Knowledge, resolve
 
@@ -21,11 +22,13 @@ from ._adapt import (
     column_labels,
     column_namer,
     data_matrix,
+    structure_output,
     with_labels,
 )
 from ._irregular import (
     adapt_bottom_up_parce,
     adapt_rcd,
+    empty_pair_dag,
     likelihood_output,
     pairwise_output,
 )
@@ -36,6 +39,9 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
     from andrey.core import StructureOutput
+
+#: Fewest rows CPCM fits: more than the 10 coefficients of one parameter's spline and intercept.
+CPCM_MIN_ROWS = 20
 
 
 def _complete_pairs(
@@ -620,6 +626,175 @@ def loci(
         labels=labels,
         extra=extra,
     )
+
+
+@method_spec("cpcm")
+def cpcm(
+    data: npt.ArrayLike,
+    *,
+    alpha: float | None = None,
+    family: str | list[str] = "gaussian",
+    seed: int | None = None,
+) -> StructureOutput:
+    """Test the direction of a variable pair with CPCM, a conditionally parametric causal model.
+
+    CPCM [1]_ models the effect given its cause by a known parametric family whose parameters are
+    smooth functions of the cause, such as a Gaussian whose mean and scale change with it, an
+    exponential or Pareto law whose rate does, or a Poisson count. In each direction it fits the
+    family and maps each value through the fitted distribution function; that residual is
+    independent of the cause only in the causal direction, which an HSIC test [2]_ checks.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, 2)
+        The two variables, one per column: column 0 is ``x`` and column 1 is ``y``. Coerced to
+        ``float64``. A DataFrame's column names become the structure's ``labels``.
+    alpha : float or None, default=None
+        ``None`` chooses the direction with the larger p-value, or with the smaller test statistic
+        when the p-values are equal (the paper's forced estimate). A significance level such as
+        ``0.05`` gives no edge when the two columns test independent at that level, and otherwise
+        draws an edge only when exactly one direction's p-value exceeds it (the paper's
+        conservative estimate). See Notes.
+    family : str or list of str, default="gaussian"
+        The family of each variable given the other, one name for both columns or a list of two
+        names, one per column: ``"gaussian"`` (mean and scale change with the cause),
+        ``"gaussian_fixed_scale"`` (the mean alone), ``"exponential"``, ``"pareto"`` (scale 1,
+        values of at least 1), ``"poisson"``, ``"gamma"`` (mean and shape), ``"gamma_fixed_shape"``
+        (the mean alone), ``"gumbel"`` (location and scale), ``"gumbel_fixed_scale"`` (the
+        location alone), or ``"negative_binomial"`` (the mean, one size for all rows). See
+        **Families.** in Notes.
+    seed : int or None, default=None
+        ``None`` is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset, so a fit
+        repeats. Seed for the random draws of the count families, ``"poisson"`` and
+        ``"negative_binomial"``; the other families draw nothing.
+
+    Returns
+    -------
+    StructureOutput
+        Contains a two-node :class:`~andrey.core.GraphStructure` of kind ``dag`` with the chosen
+        edge, or no edge. ``metadata["algorithm"]`` is ``"cpcm"``. ``metadata["p_values"]`` holds
+        the p-value of the test of ``y``'s residual against ``x`` (``x -> y``) under ``"forward"``
+        and of ``x``'s residual against ``y`` under ``"backward"``; ``metadata["statistics"]``
+        holds the HSIC statistics of the same two tests, each divided by its mean under
+        independence, under the same keys.
+        ``metadata["independence_p_value"]`` is the p-value of the test that ``x`` and ``y`` are
+        independent, and ``metadata["families"]`` the family of each column.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` does not have 2
+        columns, if ``family`` names an unknown family or does not give one name per column, or if
+        a column holds a value outside its family's support, such as a non-integer under
+        ``"poisson"`` or a value below 1 under ``"pareto"``.
+
+    Notes
+    -----
+    **When to use.** CPCM decides the direction between two variables observed i.i.d. when the
+    effect given its cause follows a known parametric family, with no hidden common cause of the
+    two [1]_. The direction is identifiable outside special cases tied to the family's sufficient
+    statistics: under the Gaussian family with mean ``mu(x)`` and scale ``sigma(x)``, unless
+    ``1 / sigma^2`` is quadratic and ``mu / sigma^2`` linear in the cause with a matching cause
+    density; under a one-parameter exponential family, unless the parameter is linear in the
+    sufficient statistic [1]_. It is designed for effects whose whole distribution, not only the
+    mean and spread, changes with the cause, such as counts, positive or heavy-tailed effects, and
+    for mixed pairs where each column gets its own family. For an effect with additive noise use
+    :func:`~andrey.anm`; for more than two variables, :func:`~andrey.cpcm_graph`.
+
+    In each direction the effect's family is fitted on the cause and each value mapped through its
+    fitted distribution function, ``eps = F(y; theta(x))``. A count family's function is
+    randomized between its steps, ``F(y - 1) + u f(y)`` with ``u`` uniform, so the residual is
+    continuous. The residual is tested against the proposed cause by the gamma HSIC test with
+    Gaussian kernels whose bandwidth is the median heuristic over all rows [2]_ [3]_. With
+    ``alpha=None`` the larger p-value, compared through their logarithms, names the direction, and
+    on equal p-values the smaller statistic, with no edge when those are equal too. With a level,
+    the pair is first tested for independence, which gives no edge, and an edge is drawn only when
+    exactly one direction's residual tests independent; both or neither give no edge, which the
+    paper reads as an unidentifiable pair or a family that fits neither way [1]_.
+
+    **Families.** Each parameter is a smooth function of the cause through the family's usual
+    link: the identity for a Gaussian or Gumbel location, the logarithm for a scale, a mean, a
+    rate, or a shape. ``"pareto"`` is the Pareto law of scale 1, whose logarithm is exponential,
+    so its column must hold values of at least 1; the paper calls ``"gamma_fixed_shape"`` the gamma
+    family with a fixed scale, the scale of its fitting software, which is one over the shape. The
+    paper advises families with the same number of parameters in both directions, since the more
+    flexible one fits either way more often [1]_. A family applies to the column when it is the
+    effect; the cause's own distribution is not modeled.
+
+    **Estimation.** Each parameter is a constant plus a rank-10 thin plate regression spline of
+    the cause, as in [1]_, or indicators when the cause holds at most 9 distinct values, as in the
+    authors' code. The coefficients maximize the log-likelihood penalized by the spline's
+    wiggliness, and the smoothing parameter of each spline maximizes the Laplace approximate
+    marginal likelihood [4]_, the estimator the paper cites. The fit draws no random numbers except
+    a count family's uniforms, which follow ``seed`` and the column's values.
+
+    **Units.** Under ``"gaussian"``, ``"gaussian_fixed_scale"``, ``"gumbel"``, and
+    ``"gumbel_fixed_scale"`` the result does not depend on the units or the origin of either
+    column. Under ``"exponential"`` and the gamma families it does not depend on their units but
+    does on their origin, which the support fixes. ``"pareto"`` reads the units, since its scale is
+    fixed at 1, and the count families read whole numbers, so a rescaled count column fails the
+    support check. The cause's units never matter: its spline is the same in any unit.
+
+    **Limitations.** Not benchmarked yet. Each HSIC test builds matrices with one row and one
+    column per sample, so time and memory grow with the square of ``n_samples``. The family must be
+    chosen: the paper's rule that picks one from each column's support, and its sequential choice
+    between one- and two-parameter families, are not offered. Missing values are not accepted.
+
+    References
+    ----------
+    .. [1] Bodik, J., and Chavez-Demoulin, V. (2025). Identifiability of causal graphs under
+       non-additive conditionally parametric causal models. JMLR 26(264), 1-55.
+    .. [2] Gretton, A., Fukumizu, K., Teo, C. H., Song, L., Scholkopf, B., and Smola, A. J. (2008).
+       A kernel statistical test of independence. NeurIPS 20, 585-592.
+    .. [3] Pfister, N., Buhlmann, P., Scholkopf, B., and Peters, J. (2018). Kernel-based tests for
+       joint independence. JRSS-B 80(1), 5-31.
+    .. [4] Wood, S. N., Pya, N., and Safken, B. (2016). Smoothing parameter and model selection for
+       general smooth models. JASA 111(516), 1548-1563.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import cpcm
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.normal(0, 1.4, 400)
+    >>> y = rng.poisson(np.exp(1 + np.sin(2 * x)))
+    >>> out = cpcm(np.column_stack([x, y]), family=["gaussian_fixed_scale", "poisson"])
+    >>> out.structure.oriented_edges()
+    [(0, 1, 'directed')]
+    """
+    from andrey.fcm.cpcm import Residuals, pair_tests, resolve_families
+
+    if np.ndim(data) != 2 or np.shape(data)[1] != 2:
+        raise ValueError(
+            f"cpcm expects an (n_samples, 2) table of two variables, got {np.shape(data)}"
+        )
+    X = data_matrix(data, method="cpcm", min_rows=CPCM_MIN_ROWS)
+    labels = column_labels(data)
+    families = resolve_families(family, X, "cpcm", column_namer(labels))
+    assert seed is not None  # method_spec resolves it
+    with one_blas_thread():
+        log_p, statistics, log_p_independent = pair_tests(Residuals(X, families, seed))
+    p_independent = math.exp(log_p_independent)
+    out = pairwise_output(
+        math.exp(log_p[0]),
+        math.exp(log_p[1]),
+        stat_forward=statistics[0],
+        stat_backward=statistics[1],
+        log_p=log_p,
+        alpha=alpha,
+        labels=labels,
+        extra={
+            "independence_p_value": p_independent,
+            "families": [f.name for f in families],
+        },
+    )
+    if alpha is not None and p_independent > alpha:
+        return structure_output(empty_pair_dag(), labels=labels, metadata=out.metadata)
+    return out
 
 
 @method_spec("rcd")

@@ -93,6 +93,11 @@ def _pair_dag(direction: int) -> GraphStructure:
     return GraphStructure.from_numpy(M, kind="dag")
 
 
+def empty_pair_dag() -> GraphStructure:
+    """Return the two-node ``dag`` with no edge."""
+    return _pair_dag(0)
+
+
 def likelihood_output(
     forward: float,
     backward: float,

@@ -28,6 +28,8 @@ from .api import (
     camuv,
     cdnod,
     cmb,
+    cpcm,
+    cpcm_graph,
     dagma,
     direct_lingam,
     dynotears,
@@ -186,6 +188,7 @@ __all__ = [
     "local_isa_ling",
     "cam",
     "resit",
+    "cpcm_graph",
     "score_matching",
     "nogam",
     # Latent-variable structure - observed indicators plus discovered latents in causal order.
@@ -205,6 +208,7 @@ __all__ = [
     "anm",
     "pnl",
     "loci",
+    "cpcm",
     # Hidden common causes: a PAG over the observed variables.
     "rcd",
     "bottom_up_parce_lingam",
