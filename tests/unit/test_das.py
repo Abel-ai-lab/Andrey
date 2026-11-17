@@ -57,13 +57,13 @@ def test_the_chain_is_found_with_score_matchings_order(chain_fit):
 
 
 def test_two_variables_keep_their_edge():
-    """The only predecessor is also the reference; the untested largest means keep it."""
+    """The only predecessor is also the reference; the untested largest medians keep it."""
     out = _fit(_chain()[:, :2])
     assert _edges(out) == {(0, 1)}
 
 
 def test_the_screen_drops_tested_non_parents_before_the_pruning():
-    """Of the sink's eight predecessors, the five largest means pass untested, so ``alpha`` near 1
+    """Of the sink's eight predecessors, the five largest medians pass untested, so ``alpha`` near 1
     keeps them; the Welch tests drop the other three, which no ``alpha`` brings back."""
     X = _star()
     loose = _fit(X, alpha=0.999999)
