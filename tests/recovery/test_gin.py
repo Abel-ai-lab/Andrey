@@ -9,6 +9,7 @@ import pytest
 
 import andrey
 from andrey.core import LATENT, OBSERVED, GraphStructure, StructureOutput
+from andrey.core.ties import tie_ranks
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.harness import assert_recorded_output
 
@@ -65,6 +66,60 @@ def test_gin_finds_the_same_latents_for_reversed_columns() -> None:
     assert sorted(back(reversed_out["unordered"])) == sorted(out["unordered"])
 
 
+def _latent_model(seed: int, hidden_weight: float, n_samples: int) -> np.ndarray:
+    """Three latents, each the hidden cause times a weight near ``hidden_weight`` plus uniform
+    noise, measured by three indicators each, the columns in an order drawn from ``seed``. A
+    strong hidden cause leaves no latent a root, so the latents stay unordered."""
+    rng = np.random.default_rng(seed)
+    hidden = rng.uniform(-1.0, 1.0, n_samples)
+    weights = hidden_weight + rng.uniform(-0.5, 0.5, 3)
+    latents = weights * hidden[:, None] + rng.uniform(-1.0, 1.0, (n_samples, 3))
+    loadings = rng.uniform(0.7, 1.3, 9) * rng.choice([-1.0, 1.0], 9)
+    x = np.repeat(latents, 3, axis=1) * loadings + 0.3 * rng.uniform(-1.0, 1.0, (n_samples, 9))
+    return x[:, rng.permutation(9)]
+
+
+def _marks_moved_back(data: np.ndarray, order: np.ndarray) -> np.ndarray:
+    """GIN's marks on the columns of ``data`` in ``order``, each observed node moved back to its
+    column and the latents left in place."""
+    marks = andrey.gin(data[:, order]).structure.to_numpy()
+    back = np.concatenate([np.argsort(order), np.arange(len(order), len(marks))])
+    return marks[np.ix_(back, back)]
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        pytest.param(datagen.generate("measurement_hidden_cause_6v"), id="hidden_cause_6v"),
+        pytest.param(_latent_model(1, 1.0, 500), id="ordered_9v"),
+        pytest.param(_latent_model(1, 2.0, 800), id="unordered_9v"),
+    ],
+)
+def test_gin_graph_relabels_under_every_column_order(data: np.ndarray) -> None:
+    """Reordering the columns moves the observed nodes and changes nothing else: the latents keep
+    their numbering, the ordered ones by the order and the unordered ones by their lowest-ranked
+    column."""
+    d = data.shape[1]
+    orders = [np.arange(d)[::-1], *(np.random.default_rng([d, k]).permutation(d) for k in range(3))]
+    want = _marks_moved_back(data, np.arange(d))
+    for order in orders:
+        np.testing.assert_array_equal(_marks_moved_back(data, order), want)
+
+
+def test_gin_numbers_unordered_latents_by_position_under_the_position_tie_break() -> None:
+    """Under ``tie_break="position"`` the unordered latents follow their smallest column index, so
+    putting the other cluster's columns first renumbers them."""
+    data = datagen.generate("measurement_hidden_cause_6v")
+    out = andrey.gin(data).metadata
+    assert out["cluster_order"] == [] and len(out["unordered"]) == 2
+    first, second = out["unordered"]
+    with andrey.config(tie_break="position"):
+        marks = [
+            _marks_moved_back(data, np.array(order)) for order in (first + second, second + first)
+        ]
+    assert (marks[0] != marks[1]).any()
+
+
 def test_gin_matches_its_recorded_output(fit) -> None:
     _, out = fit
     assert_recorded_output(out, "GIN", case=_CASE)
@@ -98,10 +153,12 @@ def test_gin_leaves_latents_unordered_when_no_root_passes() -> None:
     """Two latents share a hidden cause, so neither is a root and the order stays empty."""
     case = "measurement_hidden_cause_6v"
     planted = datagen.clusters(case)
-    out = andrey.gin(datagen.generate(case))
+    data = datagen.generate(case)
+    out = andrey.gin(data)
     assert {frozenset(c) for c in out.metadata["clusters"]} == {frozenset(c) for c in planted}
     assert out.metadata["cluster_order"] == []
-    unordered = sorted(planted, key=min)  # by smallest member, as GIN lists them
+    ranks = tie_ranks(data)
+    unordered = sorted(planted, key=lambda c: ranks[c].min())  # by lowest-ranked column
     assert out.metadata["unordered"] == unordered
     latent_edges = [(6, child, "directed") for child in unordered[0]]
     latent_edges += [(7, child, "directed") for child in unordered[1]]
