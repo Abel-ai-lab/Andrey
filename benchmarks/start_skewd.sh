@@ -2,15 +2,15 @@
 # Fetches the authors' SkewD code and builds the environment it runs in, the reference of the
 # SkewD lane.
 #
-#   benchmarks/start_skewd.sh    # prints the exports that point a run at the environment
+#   benchmarks/start_skewd.sh    # then: skewd_pairs.py, with the exports this script prints
 #
 # SkewD is causality-lab/skewd at the commit below (MIT). The benchmark runs it unmodified as a
 # measurement reference and copies none of it: the script checks out its `src` package and its
-# skew-noise data sets under `$ANDREY_BENCH_SKEWD` (default `benchmarks/.skewd`), and a run imports
-# them from there. requirements-skewd.txt pins every package of the environment,
+# skew-noise data sets under `$ANDREY_BENCH_SKEWD` (default `benchmarks/.skewd`), and the adapter
+# imports them from there. requirements-skewd.txt pins every package of the environment,
 # `.venv-skewd`: the code asks for NumPy 1, `cmaes`, and `scikit-optimize`, and its graph version
-# runs causal-learn's PC. The environment imports none of Andrey. Export what the script prints
-# before running the code.
+# runs causal-learn's PC. The environment imports none of Andrey; the driver scores the results in
+# bench-env. Export what it prints before running skewd_pairs.py.
 
 set -euo pipefail
 
@@ -60,4 +60,5 @@ PY
 
 printf 'export ANDREY_BENCH_SKEWD_PYTHON=%q\n' "$VENV/bin/python"
 printf 'export ANDREY_BENCH_SKEWD=%q\n' "$DEST"
+echo ">> next: benchmarks/skewd_pairs.py, run with the exports above"
 echo ">> done"
