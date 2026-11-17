@@ -5,7 +5,8 @@ it in a cache directory, so later loads need no network. The cache directory is 
 when given, else ``ANDREY_DATA_DIR``, else ``$XDG_CACHE_HOME/andrey`` (``~/.cache/andrey`` when
 ``XDG_CACHE_HOME`` is unset). Without network access, put the file at the path the error names.
 
-``sachs`` is measured data. ``asia``, ``child``, ``insurance``, ``alarm``, ``hepar2``, ``andes``,
+``sachs`` is measured data, and ``tuebingen`` is a collection of measured cause-effect pairs, each
+with its reference direction. ``asia``, ``child``, ``insurance``, ``alarm``, ``hepar2``, ``andes``,
 and ``diabetes`` are published Bayesian-network structures from the bnlearn repository; their data
 are simulated on the graph by a seeded linear-Gaussian model or, with ``discrete=True``, sampled
 from the networks' own conditional probability tables, and their columns come in an order drawn
@@ -13,22 +14,25 @@ from the seed.
 
 >>> from andrey.data import list_datasets
 >>> list_datasets()
-('sachs', 'asia', 'child', 'insurance', 'alarm', 'hepar2', 'andes', 'diabetes')
+('sachs', 'tuebingen', 'asia', 'child', 'insurance', 'alarm', 'hepar2', 'andes', 'diabetes')
 """
 
 from __future__ import annotations
 
+import dataclasses
 import gzip
 import hashlib
+import io
 import numbers
 import os
 import re
 import urllib.request
 import uuid
-from collections.abc import Callable
+import zipfile
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, overload
 
 import numpy as np
 
@@ -40,7 +44,7 @@ from .discrete import forward_sample
 from .graphs import FixedDAG
 from .scm import NOISE, SCM, column_order, component_rng
 
-__all__ = ["RealDataset", "list_datasets", "load_dataset"]
+__all__ = ["CausePair", "CausePairs", "RealDataset", "list_datasets", "load_dataset"]
 
 
 @dataclass(frozen=True)
@@ -99,10 +103,92 @@ class Remote:
     filename: str
     sources: tuple[str, ...]
     sha256: str
-    read: Callable[[bytes], Contents]
+    read: Callable[[bytes], Contents | CausePairs]
     description: str
     #: The file holds measurements; otherwise the data are simulated on its graph.
     measured: bool = False
+
+
+@dataclass(frozen=True)
+class CausePair(RealDataset):
+    """One pair of the Tübingen collection: a :class:`RealDataset` and what the collection records.
+
+    ``data``, ``graph``, ``feature_names``, and ``description`` are those of
+    :class:`RealDataset`; ``description`` is the pair's own description file, which gives its
+    variables, units, source, and the reason for its reference direction. ``env``, ``targets``, and
+    ``conditions`` are ``None``.
+
+    Attributes
+    ----------
+    name : str
+        The pair's name in the collection, ``"pair0001"`` to ``"pair0108"``.
+    weight : float
+        The collection's weight for the pair. The pairs from one source share weights that sum to
+        1, so a weighted average over pairs does not count a source once per pair; ``0`` marks a
+        pair the collection leaves out of such averages. Use it as the weight of the pair's
+        correct-or-not outcome.
+    cause, effect : tuple of str
+        The columns of the cause and of the effect, by name. A univariate pair has one each, named
+        ``"x"`` and ``"y"`` after the first and the second variable of its files, in the order of
+        the file: the cause is ``"x"`` in some pairs and ``"y"`` in others. A multivariate pair
+        names its columns ``x1, x2, ...`` and ``y1, y2, ...``.
+    multivariate : bool
+        Whether the cause or the effect has more than one column. The collection states only that
+        the cause block acts on the effect block, so ``graph`` of a multivariate pair has an arc
+        from each cause column to each effect column and says nothing about the columns inside a
+        block. Methods that decide the direction between two columns read the other pairs.
+    """
+
+    name: str = ""
+    weight: float = 0.0
+    cause: tuple[str, ...] = ()
+    effect: tuple[str, ...] = ()
+
+    @property
+    def multivariate(self) -> bool:
+        """Whether the cause or the effect has more than one column."""
+        return len(self.cause) > 1 or len(self.effect) > 1
+
+
+@dataclass(frozen=True)
+class CausePairs:
+    """The pairs of the Tübingen collection, in the collection's order.
+
+    Iterating gives each :class:`CausePair`; ``len`` is their number, an integer indexes by
+    position, and a name such as ``"pair0042"`` indexes by name.
+
+    Attributes
+    ----------
+    pairs : tuple of CausePair
+        Every pair of the collection, the multivariate ones and those with weight 0 included.
+    description : str
+        The collection: source, terms, and how to cite it.
+    """
+
+    pairs: tuple[CausePair, ...]
+    description: str
+
+    def __len__(self) -> int:
+        """Return the number of pairs."""
+        return len(self.pairs)
+
+    def __iter__(self) -> Iterator[CausePair]:
+        """Iterate the pairs in the collection's order."""
+        return iter(self.pairs)
+
+    def __getitem__(self, key: int | str) -> CausePair:
+        """Return the pair at a position, or the pair of a name such as ``"pair0042"``."""
+        if isinstance(key, str):
+            for pair in self.pairs:
+                if pair.name == key:
+                    return pair
+            raise KeyError(f"no pair named {key!r}")
+        return self.pairs[key]
+
+    @property
+    def weights(self) -> np.ndarray:
+        """The pairs' weights, in the order of the pairs, as a float64 array."""
+        return np.array([pair.weight for pair in self.pairs], dtype=np.float64)
 
 
 #: The 11 measured proteins and phospholipids, in the file's column order.
@@ -392,6 +478,74 @@ def _bnlearn(name: str, sha256: str, summary: str, cite: str) -> Remote:
     )
 
 
+_TUEBINGEN_DESCRIPTION = """\
+Mooij, Peters, Janzing, Zscheischler, and Schoelkopf (2016): the Tuebingen cause-effect pairs, 108
+pairs of measurements of two variables (or two blocks of variables) from many fields, each with a
+reference direction from the knowledge of the variables' meaning. Each pair is a ``CausePair``; its
+``weight`` is the collection's, which gives the pairs of one source weights that sum to 1.
+
+Source: https://webdav.tuebingen.mpg.de/cause-effect/ (pairs.zip). The collection states no license,
+and its pairs come from other collections (pairs 1 to 41 from the UCI Machine Learning Repository,
+others from UNdata, Yahoo, and more) that have their own terms, so Andrey does not redistribute it:
+the first load downloads the archive from the Max Planck Institute's server and checks its SHA-256.
+Cite: J. M. Mooij, J. Peters, D. Janzing, J. Zscheischler, B. Schoelkopf. Distinguishing cause from
+effect using observational data: methods and benchmarks. Journal of Machine Learning Research
+17(32):1-102, 2016, and the sources of the pairs you use.
+"""
+
+
+def _read_pairs(raw: bytes) -> CausePairs:
+    """Read the collection's archive: ``pairmeta.txt``, then each pair's data and description.
+
+    A pair's metadata line gives its number, the first and last columns of its cause and of its
+    effect (counted from 1), and its weight. The cause and effect blocks must tile the file's
+    first columns without a gap; any column after them is not part of the pair and is dropped.
+    """
+    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+        meta = archive.read("pairmeta.txt").decode("ascii").splitlines()
+        pairs = []
+        for line in (m for m in meta if m.strip()):
+            fields = line.split()
+            if len(fields) != 6:
+                raise ValueError(f"the Tuebingen metadata line {line!r} does not have 6 fields")
+            number, cause_first, cause_last, effect_first, effect_last = (
+                int(f) for f in fields[:5]
+            )
+            weight = float(fields[5])
+            stem = f"pair{number:04d}"
+            # The block that starts at column 1 is x, the other y: the files' own naming.
+            cause_is_x = cause_first == 1
+            cause_cols, effect_cols = (cause_first, cause_last), (effect_first, effect_last)
+            x, y = (cause_cols, effect_cols) if cause_is_x else (effect_cols, cause_cols)
+            if not (x[0] == 1 <= x[1] and x[1] + 1 == y[0] <= y[1]) or not 0 <= weight <= 1:
+                raise ValueError(f"the Tuebingen metadata line {line!r} is not a pair's layout")
+            table = np.loadtxt(io.BytesIO(archive.read(f"{stem}.txt")), dtype=np.float64, ndmin=2)
+            values = table[:, : y[1]]
+            if values.shape[1] != y[1] or not np.isfinite(values).all():
+                raise ValueError(f"{stem} has fewer columns than its metadata or a missing value")
+            x_names, y_names = (
+                tuple(f"{block}{j + 1}" if last > first else block for j in range(last - first + 1))
+                for block, (first, last) in (("x", x), ("y", y))
+            )
+            names = x_names + y_names
+            cause, effect = (x_names, y_names) if cause_is_x else (y_names, x_names)
+            arcs = tuple((c, e) for c in cause for e in effect)
+            description = archive.read(f"{stem}_des.txt").decode("latin-1")
+            pairs.append(
+                CausePair(
+                    values,
+                    _graph(Contents(names, arcs, None)),
+                    names,
+                    description,
+                    name=stem,
+                    weight=weight,
+                    cause=cause,
+                    effect=effect,
+                )
+            )
+    return CausePairs(tuple(pairs), _TUEBINGEN_DESCRIPTION)
+
+
 DATASETS: dict[str, Remote] = {
     "sachs": Remote(
         filename="sachs.2005.continuous.txt",
@@ -402,6 +556,14 @@ DATASETS: dict[str, Remote] = {
         sha256="a488589b0f021b2a261ff2c696a908c6823051b0d98693e0fa0e78bb12097063",
         read=_read_sachs,
         description=_SACHS_DESCRIPTION,
+        measured=True,
+    ),
+    "tuebingen": Remote(
+        filename="pairs.zip",
+        sources=("https://webdav.tuebingen.mpg.de/cause-effect/pairs.zip",),
+        sha256="c1bc9cd212b2ed1bc18c87d59761052478983623e3f2c4b4166260fa0a23fb11",
+        read=_read_pairs,
+        description=_TUEBINGEN_DESCRIPTION,
         measured=True,
     ),
     "asia": _bnlearn(
@@ -483,7 +645,7 @@ def list_datasets() -> tuple[str, ...]:
     --------
     >>> from andrey.data import list_datasets
     >>> list_datasets()
-    ('sachs', 'asia', 'child', 'insurance', 'alarm', 'hepar2', 'andes', 'diabetes')
+    ('sachs', 'tuebingen', 'asia', 'child', 'insurance', 'alarm', 'hepar2', 'andes', 'diabetes')
     """
     return tuple(DATASETS)
 
@@ -540,6 +702,21 @@ def _download(remote: Remote, target: Path, cached: bool) -> bytes:
     )
 
 
+@overload
+def load_dataset(
+    name: Literal["tuebingen"],
+    *,
+    n: int | None = None,
+    seed: int | None = None,
+    discrete: bool = False,
+    conditions: bool = False,
+    shuffle: bool = True,
+    as_frame: bool = True,
+    data_home: str | os.PathLike[str] | None = None,
+) -> CausePairs: ...
+
+
+@overload
 def load_dataset(
     name: str,
     *,
@@ -550,8 +727,24 @@ def load_dataset(
     shuffle: bool = True,
     as_frame: bool = True,
     data_home: str | os.PathLike[str] | None = None,
-) -> RealDataset:
+) -> RealDataset: ...
+
+
+def load_dataset(
+    name: str,
+    *,
+    n: int | None = None,
+    seed: int | None = None,
+    discrete: bool = False,
+    conditions: bool = False,
+    shuffle: bool = True,
+    as_frame: bool = True,
+    data_home: str | os.PathLike[str] | None = None,
+) -> RealDataset | CausePairs:
     """Load a real dataset, or a published network with data simulated on it, and its graph.
+
+    ``"tuebingen"`` loads a collection of cause-effect pairs: a :class:`CausePairs` of
+    :class:`CausePair` datasets, one per pair, instead of one :class:`RealDataset`.
 
     The first load downloads the dataset's file and keeps it in the cache directory; later loads
     read the cached copy and need no network. Every load checks the file's SHA-256, so a changed
@@ -565,6 +758,13 @@ def load_dataset(
         - ``"sachs"``: the protein-signaling measurements of Sachs et al. (2005) [1]_, 853
           observational cells by 11 proteins and phospholipids, with the 17-arc consensus
           network.
+        - ``"tuebingen"``: the Tübingen cause-effect pairs of Mooij et al. (2016) [3]_, 108 pairs
+          of measurements of two variables, or two blocks of variables, each with the direction of
+          its cause and effect. Each pair has a weight, which gives the pairs of one source weights
+          that sum to 1, for an average over the collection. Six pairs have a block of several
+          columns and are marked ``multivariate``; five of them have weight 0. The collection
+          states no license and its pairs come from other collections with their own terms, so
+          the archive is downloaded from the original server and not mirrored.
         - ``"asia"`` (8 variables, 8 arcs), ``"child"`` (20, 25), ``"insurance"`` (27, 52),
           ``"alarm"`` (37, 46), ``"hepar2"`` (70, 123), ``"andes"`` (223, 338), and
           ``"diabetes"`` (413, 602): published Bayesian networks [2]_. The graph is the
@@ -607,10 +807,15 @@ def load_dataset(
 
     Returns
     -------
-    RealDataset
+    RealDataset or CausePairs
         ``data``, ``graph`` (the reference DAG over the same names), ``feature_names``, and
         ``description``, which gives the source and the citation. With ``conditions=True``, also
-        ``env``, ``targets``, and ``conditions``; otherwise all three are ``None``.
+        ``env``, ``targets``, and ``conditions``; otherwise all three are ``None``. For
+        ``"tuebingen"``, a :class:`CausePairs`: iterate it for the pairs, each a
+        :class:`RealDataset` of ``data`` with the columns ``"x"`` and ``"y"``, the two-node
+        ``graph`` of its reference direction, and ``name``, ``weight``, ``cause``, ``effect``,
+        and ``multivariate``. Loading all pairs reads one cached archive; ``as_frame=False``
+        gives each ``data`` as an array.
 
     Raises
     ------
@@ -638,6 +843,9 @@ def load_dataset(
        networks derived from multiparameter single-cell data. Science 308(5721):523-529, 2005.
     .. [2] M. Scutari. The bnlearn Bayesian network repository,
        https://www.bnlearn.com/bnrepository. The same files are mirrored in pgmpy/example_models.
+    .. [3] J. M. Mooij, J. Peters, D. Janzing, J. Zscheischler, B. Schoelkopf. Distinguishing cause
+       from effect using observational data: methods and benchmarks. Journal of Machine Learning
+       Research 17(32):1-102, 2016.
 
     Examples
     --------
@@ -654,6 +862,12 @@ def load_dataset(
     >>> asia = load_dataset("asia", n=5000, discrete=True)  # doctest: +SKIP
     >>> asia.data["either"].cat.categories.tolist()  # doctest: +SKIP
     ['yes', 'no']
+    >>> pairs = load_dataset("tuebingen")  # doctest: +SKIP
+    >>> pair = pairs["pair0001"]  # doctest: +SKIP
+    >>> pair.data.shape, pair.cause, pair.effect, pair.weight  # doctest: +SKIP
+    ((349, 2), ('x',), ('y',), 0.166)
+    >>> len(pairs), sum(not p.multivariate for p in pairs)  # doctest: +SKIP
+    (108, 102)
     """
     if name not in DATASETS:
         raise ValueError(f"unknown dataset {name!r}; choose one of {list_datasets()}")
@@ -674,6 +888,8 @@ def load_dataset(
     if hashlib.sha256(raw).hexdigest() != remote.sha256:
         raw = _download(remote, target, cached)
     contents = remote.read(raw)
+    if isinstance(contents, CausePairs):
+        return _framed(contents) if as_frame else contents
     description = remote.description
     values = contents.values
     states = None
@@ -729,6 +945,19 @@ def load_dataset(
     names = tuple(name for name, _, _ in SACHS_CONDITIONS)
     return RealDataset(
         data, _graph(contents), contents.nodes, description, contents.env, targets, names
+    )
+
+
+def _framed(pairs: CausePairs) -> CausePairs:
+    """Return ``pairs`` with each pair's observations as a DataFrame named by its columns."""
+    import pandas as pd
+
+    return dataclasses.replace(
+        pairs,
+        pairs=tuple(
+            dataclasses.replace(p, data=pd.DataFrame(p.data, columns=list(p.feature_names)))
+            for p in pairs
+        ),
     )
 
 
