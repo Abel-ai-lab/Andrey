@@ -231,9 +231,10 @@ again; a new kind of use takes a new value.
 
 Each release has a release card, `docs/benchmarks/<release>.md`: its benchmarks, the methods it adds
 or promotes, their known limits, and how to rerun the measurements, from the summary it links,
-`benchmarks/published/<label>/summary.json`. Like a post, a released card's text and its summary never
-change; new measurements go into the next release's card. A card's figures are finished HTML files
-in `docs/benchmarks/<release>/`, included with `{raw} html`, so later code never redraws them.
+`benchmarks/published/<label>/summary.json`. Like a post, a released card's text and its summary
+never change; new measurements go into the next release's card. A card's figures are finished HTML
+files in `docs/benchmarks/<release>/`, included with `{raw} html`, so later code never redraws
+them.
 
 Every card sets `ai` and `ai_tools` as a post does ("The blog"). Its last paragraph opens with one
 fixed sentence on its numbers, "Every number we measured for this card comes from a recorded run of
