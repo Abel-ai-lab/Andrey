@@ -290,6 +290,12 @@ names its pull request.
   simulated data so that whether a value is missing depends on another variable, fits `pc` with its
   default handling and with `missing="mvpc"` and `ges` with `missing="em"`, and scores each against
   the true graph. ([#1059])
+- `andrey.load_dataset("tuebingen")` loads the Tübingen cause-effect pairs (Mooij et al. 2016) as a
+  `CausePairs` collection of 108 pairs. Each pair is a dataset with its two columns, the two-node
+  graph of its reference direction, its weight (pairs from one source share weights that sum to 1),
+  and its `cause` and `effect` columns; the six pairs with a block of several columns (52 to 55,
+  71, 105) are marked `multivariate`. The collection states no license, so Andrey downloads the
+  archive from the original server, checks its SHA-256, and does not redistribute it. ([#1084])
 
 ### Changed
 
@@ -469,6 +475,11 @@ names its pull request.
 - `gin` numbers the latents it leaves unordered by their clusters' lowest-ranked column, as the rest
   of its search runs, instead of by their smallest column index, so a new column order relabels the
   graph and no longer renumbers them. Its clusters and causal order do not change. ([#1067])
+- `das` ranks the columns that knowledge forbids as parents with the others in its edge screen and
+  never keeps them, so the screen's reference can be a column known to have a zero entry instead of
+  the weakest allowed one. Correct forbidden edges no longer remove a true parent that the same
+  data gives without them. Its docstrings state that the five candidates kept without a test are
+  the value of the authors' code's `min_parents`, which usually keeps four ([#1088]).
 
 ## [0.17.1] - 2026-11-12
 
@@ -3084,4 +3095,6 @@ First alpha release.
 [#1055]: https://github.com/Abel-ai-lab/Andrey/pull/1055
 [#1067]: https://github.com/Abel-ai-lab/Andrey/pull/1067
 [#1082]: https://github.com/Abel-ai-lab/Andrey/pull/1082
+[#1084]: https://github.com/Abel-ai-lab/Andrey/pull/1084
 [#1085]: https://github.com/Abel-ai-lab/Andrey/pull/1085
+[#1088]: https://github.com/Abel-ai-lab/Andrey/pull/1088
