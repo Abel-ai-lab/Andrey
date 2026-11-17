@@ -2635,13 +2635,13 @@ _add(
         output=OutputSpec(
             structure_type="graph",
             graph_kind="dag",
-            metadata=("candidates", "fits"),
             doc="DAG of the class with the largest likelihood; metadata candidates is the number "
             "of DAGs scored and fits the number of conditional models fitted.",
         ),
         accel="numpy",
         status="experimental",
         column_order="relabels",
+        tie_break=True,
         params=(
             concept_param(
                 "alpha", doc="Significance level of PC's conditional-independence tests."
@@ -2649,8 +2649,14 @@ _add(
             concept_param(
                 "indep_test",
                 default="kci",
-                doc="PC's conditional-independence test; kci, the kernel test, is the paper's. "
-                + _OTHER_TESTS,
+                choices=tuple(t for t in CONTINUOUS_INDEP_TESTS if t in UNRANKED_TESTS),
+                doc="PC's conditional-independence test, one of continuous data and not "
+                "normal_scores, as the likelihood stage reads the values: fisherz = Fisher's "
+                "z-transform of the partial correlation; student_t = its Student-t form; for "
+                "nonlinear effects, each far slower per test: kci = kernel test, the authors' "
+                "choice; rcot = its random-feature approximation; cmiknn = nearest-neighbor "
+                "conditional mutual information; gpdc = Gaussian-process regression and distance "
+                "correlation. null picks fisherz.",
             ),
             ParamSpec(
                 name="tuning_iter",
@@ -4242,6 +4248,8 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "lpcmci": ("links", "p_values", "statistics", "parents", "conflicts"),
     **dict.fromkeys(("anm", "pnl"), ("p_values", "statistics")),
     "loci": ("log_likelihoods", "p_values", "statistics"),
+    "skewd": ("log_likelihoods", "p_values", "statistics"),
+    "skewd_mv": ("candidates", "fits"),
     "gin": ("clusters", "cluster_order", "unordered"),
     "rcd": ("confounded_pairs",),
     "bottom_up_parce_lingam": ("partial_order",),

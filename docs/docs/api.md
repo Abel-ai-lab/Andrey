@@ -110,8 +110,9 @@ single column gives a one-node graph.
 `local_optimal_adjustment`, `locpc_cde`, `pcmci`, `pcmciplus`, and `lpcmci` accept missing values, a
 `NaN` cell, pandas' `NA`, or an empty, `NA`, or `N/A` field of a CSV file: each
 conditional-independence test reads only the rows where all of its variables are observed (test-wise
-deletion), and so do the pair tests `anm`, `pnl`, `loci`, and `skewd`, which read the rows where both columns
-are observed; `metadata["rows_tested"]` gives the fewest (`min`) and the median rows a test read.
+deletion), and so do the pair tests `anm`, `pnl`, `loci`, and `skewd`, which read the rows where
+both columns are observed; `metadata["rows_tested"]` gives the fewest (`min`) and the median rows a
+test read.
 Their argument `missing` names the handling: `"testwise"` is test-wise deletion, and `None`, the
 default, picks the method's default handling, `"testwise"`; `metadata["missing"]` records the one a
 fit used. `pc` also takes `missing="mvpc"`: Missing-Value PC (Tu et al., 2019) finds the parents of
@@ -151,11 +152,12 @@ before the fit, and a test with fewer rows than it needs, `|S| + 3` for `"fisher
 the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` ([Conditional-independence
 tests](#conditional-independence-tests)). `None`, the default, picks from the declared column types,
 `"fisherz"` for continuous data. `jpcmciplus` takes the continuous and nonlinear tests, as its
-dummies enter a test as numeric columns. `pcmci`, `pcmciplus`, `jpcmciplus`, and `lpcmci` run each
-test on the lagged values of the series, and order the candidate conditions by the test's statistic,
-as tigramite does: the partial correlation, the chi-square statistic, the likelihood ratio, CMIknn's
-conditional mutual information estimate, or GPDC's distance correlation. A test you register that
-reports only p-values is ordered by its p-value, smallest first.
+dummies enter a test as numeric columns. `skewd_mv` takes them without `"normal_scores"`, as its
+likelihood stage reads the values, and its default is `"kci"`. `pcmci`, `pcmciplus`, `jpcmciplus`,
+and `lpcmci` run each test on the lagged values of the series, and order the candidate conditions by
+the test's statistic, as tigramite does: the partial correlation, the chi-square statistic, the
+likelihood ratio, CMIknn's conditional mutual information estimate, or GPDC's distance correlation.
+A test you register that reports only p-values is ordered by its p-value, smallest first.
 
 % concept: degrees_of_freedom
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
@@ -356,13 +358,14 @@ tests then orient can put more arrowheads at a node.
 `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
 `mmhc`, `rsmax2`, `y_structures`, `ldp`, `ld3`, `ldecc`, `local_optimal_adjustment`, `locpc_cde`,
 `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, `tabu`,
-`calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random
-draws. `None`, the default, is the configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh
-random one, so a call repeats exactly. Apart from `boss_fci` and `grasp_fci`, whose BOSS or GRaSP
-phase visits the variables in a random order on every fit, the methods that test independence draw
-random numbers only under `indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `pc` also with
-`missing="mvpc"` on data with missing values, `igsp` and `ut_igsp` also with `n_starts` above 1, and
-`hc` and `tabu` only with `n_starts` above 1; otherwise `seed` changes nothing, and
+`calm`, `ica_lingam`, `skewd`, and `skewd_mv` take `seed`, a whole number from 0 to 2**32 - 1 that
+fixes their random draws. `None`, the default, is the configured seed, `ANDREY_SEED` or 0 when it is
+unset, not a fresh random one, so a call repeats exactly. Apart from `boss_fci` and `grasp_fci`,
+whose BOSS or GRaSP phase visits the variables in a random order on every fit, the methods that test
+independence draw random numbers only under `indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `pc` also
+with `missing="mvpc"` on data with missing values, `igsp` and `ut_igsp` also with `n_starts` above
+1, and `hc` and `tabu` only with `n_starts` above 1; `skewd` and `skewd_mv` draw in every fit, in
+their Bayesian optimization and CMA-ES, whatever test PC runs. Otherwise `seed` changes nothing, and
 `metadata["seed"]` is not set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every
 other method is deterministic and takes no seed.
 
@@ -867,7 +870,7 @@ model in each direction, the location and the log scale smooth functions of the 
 the shape one number, with penalties chosen by Bayesian optimization of a cross-validated
 likelihood, then decides by an HSIC test of the scaled residual against the cause
 (`criterion="independence"`, the default) or by the larger likelihood (`criterion="likelihood"`).
-At the defaults a pair takes minutes. It is experimental until its comparison with the authors' code
+At the defaults a pair takes tens of minutes. It is experimental until its comparison with the authors' code
 is published.
 
 SkewD-MV, {py:func}`~andrey.skewd_mv`, is the graph version: it learns the Markov equivalence class

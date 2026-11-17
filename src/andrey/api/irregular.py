@@ -662,11 +662,13 @@ def skewd(
         The most iterations, at least 1, of the expectation conditional maximization that refines
         each direction's fit.
     seed : int or None, default=None
-        Seed of the random draws of the optimization. ``None`` is the configured seed,
-        ``ANDREY_SEED`` or 0 when it is unset, not a fresh random one, so a fit repeats.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed of the random draws of the optimization.
     missing : {"testwise"} or None, default=None
-        How missing values (``NaN``) are handled. ``"testwise"`` keeps the rows where both columns
-        are observed. ``None`` picks the method's default, ``"testwise"``.
+        How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
+        reads only the rows where all of its variables are observed. ``None`` picks the method's
+        default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
+        handling used. See **Missing values.** in Notes.
 
     Returns
     -------
@@ -677,15 +679,16 @@ def skewd(
         ``y`` under ``"backward"``. Under ``criterion="independence"``, ``metadata["p_values"]``
         and ``metadata["statistics"]`` hold each direction's HSIC p-value and statistic, divided
         by its mean under independence, under the same keys.
+        ``metadata["seed"]`` is the seed used.
 
     Raises
     ------
     TypeError
-        If an argument has the wrong type; the message names the method, the argument, what it
-        accepts, and the value.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value.
     ValueError
-        If an argument lies outside its range or is not one of its choices, if ``data`` does not
-        have 2 columns, or if ``alpha`` is not ``None`` under ``criterion="likelihood"``.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value.
 
     Warns
     -----
@@ -694,7 +697,8 @@ def skewd(
     SearchLimitWarning
         When a direction's refinement stops at ``max_iter`` rather than on its own rule.
     DataTypeWarning
-        When a column holds at most 10 distinct whole numbers and so may hold category codes.
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
 
     Notes
     -----
@@ -731,13 +735,20 @@ def skewd(
     edge. Both directions draw their random numbers from the same ``seed``, so swapping the
     columns swaps the fits.
 
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits read only the rows
+    where both columns are observed, which for a pair are the rows test-wise deletion keeps;
+    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. When values are
+    missing completely at random, those rows are a random sample of all rows. Fewer than 2 such
+    rows, or a column constant on them, raises ``ValueError``.
+
     **Limitations.** Not benchmarked yet. The paper measures it on skewed location-scale pairs of
-    1,000 rows and on established pair benchmarks [1]_. A fit at the defaults runs several
-    thousand CMA-ES searches in each direction and takes minutes per pair; ``tuning_iter`` sets
-    most of that cost. Each HSIC test builds matrices with one row and one column per sample.
+    1,000 rows and on established pair benchmarks [1]_. A fit at the defaults runs about 490
+    CMA-ES searches in each direction, ``tuning_iter`` times the 8 folds and 9 final starts, and
+    takes tens of minutes per pair; ``tuning_iter`` sets most of that cost. Each HSIC test builds matrices with one row and one column per sample.
     The skew-normal's skewness lies within about -1 and 1, so noise more skewed than that is
     misspecified, and the likelihood criterion assumes Gaussian marginals of the standardized
-    variables [1]_.
+    variables [1]_. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -758,7 +769,8 @@ def skewd(
     >>> x = rng.standard_normal(300)
     >>> noise = skewnorm.rvs(5, size=300, random_state=rng)
     >>> y = np.tanh(2 * x) + x + (0.4 + 0.2 * np.tanh(x)) * noise
-    >>> out = skewd(np.column_stack([x, y]), criterion="likelihood", tuning_iter=2, max_iter=50)
+    >>> data = np.column_stack([x, y])
+    >>> out = skewd(data, criterion="likelihood", tuning_iter=2, max_iter=50, seed=0)
     >>> out.structure.oriented_edges()
     [(0, 1, 'directed')]
     """
@@ -771,6 +783,7 @@ def skewd(
     from andrey.core.warning_policy import warn_search_limit
     from andrey.fcm.skewd import Budget, fit
 
+    assert seed is not None  # method_spec resolves it
     X, labels, rows = _pair_matrix("skewd", data, standardize=True)
     x, y = X[:, :1], X[:, 1:]
     budget = Budget(

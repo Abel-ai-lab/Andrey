@@ -170,8 +170,10 @@ _POOLED_RANKS = (
 #: The methods that take a conditional-independence test.
 TESTED = (
     *(*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp", "y_structures"),
-    *("ldp", "ld3", "ldecc", "local_optimal_adjustment", "locpc_cde"),
+    *("ldp", "ld3", "ldecc", "local_optimal_adjustment", "locpc_cde", "skewd_mv"),
 )
+#: The tested methods that read continuous data only, so take the tests of continuous data.
+CONTINUOUS_TESTED = ("jpcmciplus", "skewd_mv")
 #: The methods with no edge to name in knowledge, ICP, whose tests take none, and the methods that
 #: take none yet.
 NO_KNOWLEDGE = (
@@ -484,6 +486,15 @@ _CONCEPTS = (
                 "tests of continuous data, but not normal_scores, which ranks each column over the "
                 "rows of every dataset and so mixes their distributions.",
             ),
+            Deviation(
+                method="skewd_mv",
+                name="indep_test",
+                default="kci",
+                choices=tuple(t for t in CONTINUOUS_INDEP_TESTS if t in UNRANKED_TESTS),
+                reason="Its likelihood stage models continuous values, so it takes the tests of "
+                "continuous data, but not normal_scores, which would make its skeleton blind to "
+                "monotone changes the likelihood stage reads; the authors' code runs PC with kci.",
+            ),
         ),
     ),
     Concept(
@@ -505,7 +516,7 @@ _CONCEPTS = (
             choices=DEGREES_OF_FREEDOM,
         ),
         fragment="degrees of freedom",
-        suitable=tuple(m for m in TESTED if m != "jpcmciplus"),
+        suitable=tuple(m for m in TESTED if m not in CONTINUOUS_TESTED),
         others_exempt="Takes no categorical conditional-independence test.",
         deviations=(
             Deviation(

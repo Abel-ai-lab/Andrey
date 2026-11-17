@@ -1463,9 +1463,10 @@ def skewd_mv(
         become the structure's ``labels``.
     alpha : float, default=0.05
         Significance level of PC's conditional-independence tests, in ``(0, 1)``.
-    indep_test : str or None, default="kci"
-        PC's conditional-independence test, any that :func:`~andrey.pc` takes; the default is the
-        kernel test of the paper [3]_. ``None`` is PC's own default.
+    indep_test : {"fisherz", "student_t", "kci", "rcot", "cmiknn", "gpdc"} or None, default="kci"
+        PC's conditional-independence test, a test of continuous data as in :func:`~andrey.pc`, but
+        not ``"normal_scores"``: the likelihood stage reads the values, which ranks would hide. The
+        default is the kernel test [3]_, the authors' choice. ``None`` picks ``"fisherz"``.
     tuning_iter : int, default=20
         The penalty settings, at least 1, that the Bayesian optimization scores by
         cross-validation for each conditional model; the first half, rounded up, are Latin
@@ -1478,9 +1479,9 @@ def skewd_mv(
         to list more of them (``ValueError``); 100 is the order up to which the paper expects the
         method to apply [1]_. ``None`` sets no cap, and the call can then run for days.
     seed : int or None, default=None
-        Seed of PC's randomized tests and of the random draws of each fit. ``None`` is the
-        configured seed, ``ANDREY_SEED`` or 0 when it is unset, not a fresh random one, so a fit
-        repeats.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed of PC's randomized tests and of the random
+        draws of each fit.
 
     Returns
     -------
@@ -1488,20 +1489,24 @@ def skewd_mv(
         Contains a :class:`~andrey.core.GraphStructure` of kind ``dag``.
         ``metadata["algorithm"]`` is ``"skewd_mv"``, ``metadata["candidates"]`` the number of DAGs
         in the class, and ``metadata["fits"]`` the number of conditional models fitted.
+        ``metadata["indep_test"]`` names the test the fit used and ``metadata["seed"]`` the seed.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
     TypeError
-        If an argument has the wrong type; the message names the method, the argument, what it
-        accepts, and the value.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value.
     ValueError
-        If an argument lies outside its range or is not one of its choices, if PC's graph orients
-        a directed cycle, so no DAG has its directed edges, or if the DAGs of the class need more
-        than ``max_fits`` conditional models; the message gives how many were found and the
-        setting that raises the cap.
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value.
 
     Warns
     -----
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
     ExperimentalWarning
         On the first call in a process: the method is not benchmarked yet.
     SearchLimitWarning
@@ -1532,7 +1537,12 @@ def skewd_mv(
     the largest sum, the first on a tie, which is the DAG of the class with the largest sum. The
     defaults, 20 candidates of the Bayesian optimization and 3,000 iterations, are those of the
     paper's runs. The columns are fitted in the order of their values' ranks, so the DAG does not
-    depend on the column order.
+    depend on the column order; ties follow ``andrey.config.tie_break``.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
+    its variables, so a row with a missing value has no place in it. Drop the incomplete rows
+    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Not benchmarked yet. The paper measures it on skew-normal location-scale
     graphs of 6 and 10 variables with 1,000 rows [1]_. Its cost grows with the number of distinct
@@ -1540,7 +1550,8 @@ def skewd_mv(
     takes minutes at the defaults; it refuses a class that needs more than 100 (``max_fits``),
     where the paper counts parent-child configurations and expects the method to apply while they
     are in the order of 100. An edge PC misses or misorients stays wrong: the likelihood only
-    chooses among the class's DAGs.
+    chooses among the class's DAGs. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1559,7 +1570,8 @@ def skewd_mv(
     >>> x = rng.standard_normal(300)
     >>> y = np.tanh(2 * x) + (0.4 + 0.2 * np.tanh(x)) * rng.standard_normal(300)
     >>> z = y + 0.5 * rng.standard_normal(300)
-    >>> out = skewd_mv(np.column_stack([x, y, z]), indep_test="fisherz", tuning_iter=1, max_iter=20)
+    >>> data = np.column_stack([x, y, z])
+    >>> out = skewd_mv(data, indep_test="fisherz", tuning_iter=1, max_iter=20, seed=0)
     >>> out.structure.kind, out.metadata["candidates"]
     ('dag', 3)
     """
@@ -1573,7 +1585,10 @@ def skewd_mv(
     order = np.argsort(tie_ranks(X), kind="stable")
     X = X[:, order]
     X = (X - X.mean(axis=0)) / X.std(axis=0)
-    marks = pc(X, alpha=alpha, indep_test=indep_test, seed=seed).structure.to_numpy()
+    assert seed is not None  # method_spec resolves it
+    skeleton = pc(X, alpha=alpha, indep_test=indep_test, seed=seed).structure
+    assert isinstance(skeleton, GraphStructure)
+    marks = skeleton.to_numpy()
     components, best, fits = class_candidates(marks, max_fits)
     budget = Budget(
         knots=8, folds=5, tuning_iter=tuning_iter, initial=-(-tuning_iter // 2), max_iter=max_iter
