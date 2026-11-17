@@ -24,6 +24,7 @@ REPO="$(git rev-parse --show-toplevel)"
 LOGS="${ANDREY_BENCH_TEST_LOGS:-$REPO/benchmarks/.test-logs}"
 mkdir -p "$LOGS"
 LOGS="$(cd "$LOGS" && pwd)"  # a relative path names the caller's directory, not the repository
+[[ -z "${ANDREY_BENCH_TEST_LOGS:-}" ]] || export ANDREY_BENCH_TEST_LOGS="$LOGS"
 SUMMARY="$LOGS/summary.txt"
 : > "$LOGS/env.sh"
 : > "$SUMMARY"
@@ -41,7 +42,6 @@ apply_exports() {
         name="${BASH_REMATCH[1]}"
         [[ -n "${!name:-}" ]] && continue
         eval "$line"
-        echo "$line" >> "$LOGS/env.sh"
     done
 }
 
@@ -64,6 +64,9 @@ step() {
 R_OPTIONAL=""
 [[ -n $ANDREY_BENCH_REQUIRE_R ]] || R_OPTIONAL=1
 step start
+# The build under test's environment; later start scripts validate with it.
+[[ -n "${ANDREY_BENCH_PYTHON:-}" ]] || ANDREY_BENCH_PYTHON="$REPO/benchmarks/.venv-bench/bin/python"
+export ANDREY_BENCH_PYTHON
 step start_r "$R_OPTIONAL"
 for script in benchmarks/start_*.sh; do
     name="$(basename "$script" .sh)"
@@ -83,14 +86,6 @@ if ! command -v module > /dev/null && [[ -f /usr/share/lmod/lmod/init/bash ]]; t
 fi
 R_ENV="$(bash benchmarks/start_r.sh --env)"
 eval "$R_ENV" >> "$LOGS/start_r_env.log" 2>&1
-if command -v Rscript > /dev/null; then  # env.sh repeats the R setup for a rerun
-    {
-        echo 'if ! command -v module > /dev/null && [[ -f /usr/share/lmod/lmod/init/bash ]]; then'
-        echo '    source /usr/share/lmod/lmod/init/bash'
-        echo 'fi'
-        echo "$R_ENV"
-    } >> "$LOGS/env.sh"
-fi
 set -u
 
 # The environments whose start script prints no export are where the README puts them.
@@ -100,15 +95,26 @@ for lane in XGES:xges TIGRAMITE:tigramite LINGAM:lingam LINGAM_TS:lingam-ts CAUS
     python="$REPO/benchmarks/.venv-${lane#*:}/bin/python"
     if [[ -z "${!name:-}" && -e $python ]]; then
         export "$name=$python"
-        echo "export $name=$python" >> "$LOGS/env.sh"
     fi
 done
 
 # CAM and RESIT fit in the same environment as the build under test.
-[[ -n "${ANDREY_BENCH_PYTHON:-}" ]] || export ANDREY_BENCH_PYTHON="$REPO/benchmarks/.venv-bench/bin/python"
 export ANDREY_BENCH_CAM_PYTHON="${ANDREY_BENCH_CAM_PYTHON:-$ANDREY_BENCH_PYTHON}"
 export ANDREY_BENCH_RESIT_PYTHON="${ANDREY_BENCH_RESIT_PYTHON:-$ANDREY_BENCH_PYTHON}"
-export ANDREY_BENCH_PYTHON
+
+# env.sh holds the R setup, when R is there, and every harness variable of the run, so a rerun in a
+# fresh shell sees what the tests saw.
+{
+    if command -v Rscript > /dev/null; then
+        echo 'if ! command -v module > /dev/null && [[ -f /usr/share/lmod/lmod/init/bash ]]; then'
+        echo '    source /usr/share/lmod/lmod/init/bash'
+        echo 'fi'
+        echo "$R_ENV"
+    fi
+    for name in $(env | grep -oE '^ANDREY_BENCH_[A-Z0-9_]+' | sort); do
+        printf 'export %s=%q\n' "$name" "${!name}"
+    done
+} > "$LOGS/env.sh"
 
 {
     echo "-- variables (a path that does not exist is flagged MISSING)"
