@@ -2141,6 +2141,12 @@ _CI_REGISTRY: dict[str, Callable[..., CITest]] = {
 }
 
 
+def is_partial_correlation_test(name: str) -> bool:
+    """Whether the test registered as ``name`` is a shipped partial-correlation test, whose degrees
+    of freedom are the rows less the size of the conditioning set and a constant."""
+    return _CI_REGISTRY.get(name) in (FisherZ, StudentT, NormalScores)
+
+
 def register_indep_test(name: str, factory: Callable[[np.ndarray], CITest]) -> None:
     """Register a :class:`CITest` factory under ``name`` for selection via ``indep_test``.
 

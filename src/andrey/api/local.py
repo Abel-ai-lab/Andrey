@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from andrey.api._adapt import (
+    check_total_conditioning_rows,
     copies_named,
     fit_inputs,
     label_of,
@@ -222,8 +223,10 @@ def mb_by_mb(
         method, the argument, what it accepts, and the value. Also if ``target`` is ``None`` or
         names a column ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as
         for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats
-        another up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists.
+        another up to scale and shift. With ``blanket="total_conditioning"``, a partial-correlation
+        test, and no ``max_depth`` below ``d - 2``, also if ``data`` has fewer than ``d + 2`` rows
+        with every variable observed, ``d`` its number of columns. Also if ``knowledge`` names a
+        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
     NotImplementedError
         If ``knowledge`` holds ``required_paths`` or ``forbidden_paths``; the message names the
         methods that honor them.
@@ -294,8 +297,11 @@ def mb_by_mb(
     tests without the cap. Under the default ``local_max_depth=5``, a pair that only a larger set
     separates keeps its edge. The default blanket learner never drops a variable it added, so a
     large sample, in which more variables test dependent, gives larger blankets, and each test of
-    the blanket learner conditions on the whole set so far. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    the blanket learner conditions on the whole set so far. ``"total_conditioning"`` with a
+    partial-correlation test needs at least two more rows than variables, rows with every variable
+    observed, and raises ``ValueError`` below that. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------
@@ -335,6 +341,7 @@ def mb_by_mb(
     d = X.shape[1]
     targets = target_columns(target, labels, d, "mb_by_mb")
     t = target_column(target, labels, d, "mb_by_mb") if targets is None else -1
+    check_total_conditioning_rows(X, blanket, indep_test, method="mb_by_mb", max_depth=max_depth)
     name = label_of(labels)
     answer = partial(_sequential_edges, blanket, MB_BY_MB, local_max_depth)
 
@@ -519,9 +526,10 @@ def mmb_by_mmb(
         method, the argument, what it accepts, and the value. Also if ``target`` is ``None`` or
         names a column ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as
         for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats
-        another up to scale and shift, or, with ``"total_conditioning"``, if ``data`` has too few
-        rows for a test given all the other variables. Also if ``knowledge`` names a column
-        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        another up to scale and shift. With ``blanket="total_conditioning"``, a partial-correlation
+        test, and no ``max_depth`` below ``d - 2``, also if ``data`` has fewer than ``d + 2`` rows
+        with every variable observed, ``d`` its number of columns. Also if ``knowledge`` names a
+        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
     NotImplementedError
         If ``knowledge`` holds ``required_paths`` or ``forbidden_paths``; the message names the
         methods that honor them.
@@ -607,9 +615,11 @@ def mmb_by_mmb(
     answer's in all eight; the
     `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#mmb-by-mmb>`_ has the
     numbers. Two adjacent variables that both have very wide blankets can still take long.
-    ``"total_conditioning"`` needs more rows than variables and continuous data with linear
-    effects; on other data, choose another learner. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    ``"total_conditioning"`` needs continuous data with linear effects, and with a
+    partial-correlation test at least two more rows than variables, rows with every variable
+    observed, or it raises ``ValueError``; on other data or with fewer rows, choose another learner.
+    The numbers are a reference, not a hard limit: they change with the data generator, the density,
+    the method's settings, and the machine.
 
     References
     ----------
@@ -653,6 +663,7 @@ def mmb_by_mmb(
     d = X.shape[1]
     targets = target_columns(target, labels, d, "mmb_by_mmb")
     t = target_column(target, labels, d, "mmb_by_mmb") if targets is None else -1
+    check_total_conditioning_rows(X, blanket, indep_test, method="mmb_by_mmb", max_depth=max_depth)
     name = label_of(labels)
     answer = partial(_sequential_edges, blanket, MMB_BY_MMB, local_max_depth)
 
