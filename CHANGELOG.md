@@ -389,6 +389,10 @@ names its pull request.
   2.4 times faster, and `multi_group_direct_lingam` on three groups of 1,000 rows and 30 variables
   1.4 times. Every order, graph, and weight is the same bit for bit. Steps with fewer rows times ordered pairs of candidates than
   `ANDREY_LINGAM_PRUNE_MIN_WORK` (default `100000`) score every candidate. ([#1045], [#1051])
+- `qa/identity.py --shuffle` also refits ICP, IGSP, FCI-JCI, and J-PCMCI+, moving each one's
+  targets and contexts with the columns. It exits 1 on a column order when a graph or a causal order
+  changes or a weight or metadata value changes by more than rounding, and lists a difference of
+  rounding alone, such as the p-values of ICP and J-PCMCI+, as information. ([#1055])
 
 ### Fixed
 
@@ -3047,3 +3051,4 @@ First alpha release.
 [ages-page]: https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/ages.md
 [#920]: https://github.com/Abel-ai-lab/Andrey/pull/920
 [#1059]: https://github.com/Abel-ai-lab/Andrey/pull/1059
+[#1055]: https://github.com/Abel-ai-lab/Andrey/pull/1055
