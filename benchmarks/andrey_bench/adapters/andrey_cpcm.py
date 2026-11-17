@@ -21,6 +21,9 @@ from typing import Any, Mapping, Sequence
 
 import numpy as np
 
+# The family of the warm-up fits: it takes any real column and is the cheapest to fit.
+WARM_FAMILY = "gaussian_fixed_scale"
+
 
 def _andrey_version() -> str:
     """The installed Andrey version (distribution metadata, else the module attribute)."""
@@ -78,10 +81,14 @@ class AndreyCPCM:
         self.name = f"andrey.cpcm.{label}.numpy"
 
     def setup(self) -> None:
-        """Fit a tiny pair before timing, so lazy imports and the warning stay out of the fit."""
+        """Fit a tiny pair before timing, so lazy imports and the warning stay out of the fit.
+
+        The pair is fitted in the Gaussian family, which takes any real column, so the warm-up
+        holds for every family of the solution; all families share the same modules.
+        """
         from andrey_bench.adapters.fcm_warm import tiny_table
 
-        self.fit(tiny_table()[:, :2], self.params())
+        fit_pair(tiny_table()[:, :2], WARM_FAMILY, self.seed)
 
     def params(self) -> dict[str, Any]:
         """The family, the seed, and ``alpha=None``: the larger p-value, or no level at all."""
@@ -110,11 +117,13 @@ class AndreyCPCMGraph(AndreyCPCM):
         self.name = self.name.replace("andrey.cpcm.", "andrey.cpcm_graph.", 1)
 
     def setup(self) -> None:
-        """Fit a tiny table before timing, so lazy imports and the warning stay out of the fit."""
+        """Fit a tiny table before timing, so lazy imports and the warning stay out of the fit.
+
+        The table holds negative values, so the fit uses the Gaussian family whatever the solution's.
+        """
         from andrey_bench.adapters.fcm_warm import tiny_table
 
-        family = self.family if isinstance(self.family, str) else self.family[0]
-        fit_graph(tiny_table(), family, self.edge_penalty, self.seed)
+        fit_graph(tiny_table(), WARM_FAMILY, self.edge_penalty, self.seed)
 
     def params(self) -> dict[str, Any]:
         """The family, the per-edge penalty, and the seed."""

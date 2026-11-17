@@ -673,8 +673,11 @@ def cpcm_graph(
     from andrey.fcm.cpcm import Residuals, resolve_families, search
     from andrey.fcm.cpcm import score as cpcm_score
 
-    X = data_matrix(data, method="cpcm_graph", min_rows=4 * np.shape(data)[1] + 12)
+    X = data_matrix(data, method="cpcm_graph")
     labels = column_labels(data)
+    min_rows = 4 * X.shape[1] + 12
+    if X.shape[0] < min_rows:
+        raise ValueError(f"data needs at least {min_rows} rows (samples), got {X.shape[0]}")
     if X.shape[1] < 2:
         raise ValueError(f"cpcm_graph needs at least 2 columns, got {X.shape[1]}")
     families = resolve_families(family, X, "cpcm_graph", column_namer(labels))

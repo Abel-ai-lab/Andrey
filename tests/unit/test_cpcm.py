@@ -92,6 +92,16 @@ def test_an_unknown_family_or_a_list_of_the_wrong_length_fails_fast():
         cpcm(np.column_stack([_pair(), _pair(1)]))
 
 
+def test_the_graph_method_checks_the_table_shape_and_its_row_minimum():
+    rng = np.random.default_rng(0)
+    with pytest.raises(ValueError, match="2-D"):
+        cpcm_graph(rng.normal(size=60))
+    with pytest.raises(ValueError, match="2-D"):
+        cpcm_graph(3.0)
+    with pytest.raises(ValueError, match="at least 24 rows .*got 23"):
+        cpcm_graph(rng.normal(size=(23, 3)), family="gaussian_fixed_scale")
+
+
 def test_swapping_the_columns_mirrors_the_answer():
     first, second = cpcm(_pair()), cpcm(_pair()[:, ::-1])
     assert first.structure.oriented_edges() == [(0, 1, "directed")]
