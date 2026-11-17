@@ -208,3 +208,16 @@ def test_a_lazy_test_follows_a_backend_that_selects_a_device(monkeypatch):
         ci.make_indep_test("fisherz", copied, lazy=True)
     monkeypatch.setattr(backend, "resolve", lambda *a, **kw: "numpy")
     assert ci.make_indep_test("fisherz", X, lazy=True).correlation_rows() == 0
+
+
+def test_rows_computed_in_any_order_keep_their_values_as_the_store_grows():
+    d = 3 * BLOCK + 40
+    x = np.random.default_rng(5).standard_normal((60, d))
+    whole = correlation_matrix(x)
+    lazy = LazyCorrelation(x)
+    for block in (2, 0, 3, 1):
+        column = block * BLOCK + 3
+        assert np.array_equal(lazy.rows([column]), whole[[column]])
+        assert lazy.entry(column, 7) == whole[column, 7]
+    assert lazy.computed == d
+    assert np.array_equal(lazy.rows(np.arange(d)), whole)
