@@ -738,8 +738,8 @@ def skewd(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits read only the rows
     where both columns are observed, which for a pair are the rows test-wise deletion keeps;
     ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. When values are
-    missing completely at random, those rows are a random sample of all rows. Fewer than 2 such
-    rows, or a column constant on them, raises ``ValueError``.
+    missing completely at random, those rows are a random sample of all rows. Fewer than 8 such
+    rows (one for each cross-validation fold), or a column constant on them, raises ``ValueError``.
 
     **Limitations.** Not benchmarked yet. The paper measures it on skewed location-scale pairs of
     1,000 rows and on established pair benchmarks [1]_. A fit at the defaults runs about 490
@@ -794,6 +794,11 @@ def skewd(
         initial=-(-2 * tuning_iter // 3),
         max_iter=max_iter,
     )
+    if X.shape[0] < budget.folds:
+        raise ValueError(
+            f"skewd needs at least {budget.folds} rows where both columns are observed, one for "
+            f"each cross-validation fold, got {X.shape[0]}"
+        )
     forward, backward = fit(x, y[:, 0], budget, seed), fit(y, x[:, 0], budget, seed)
     if not (forward.converged and backward.converged):
         warn_search_limit("skewd", "max_iter", max_iter, "ECM iterations")

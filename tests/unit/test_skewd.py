@@ -202,3 +202,21 @@ def test_skewd_mv_reads_no_units_ignores_column_order_and_repeats():
     assert scaled.structure.oriented_edges() == first.structure.oriented_edges()
     reordered = skewd_mv(data[["z", "x", "y"]], **SHORT_GRAPH)
     assert sorted(reordered.structure.oriented_edges()) == sorted(first.structure.oriented_edges())
+
+
+def test_skewd_needs_a_complete_row_for_each_cross_validation_fold():
+    with pytest.raises(ValueError, match="at least 8 rows"):
+        skewd(_pair(7), **SHORT_PAIR)
+    data = _pair(20)
+    data[:13, 0] = np.nan  # 7 rows where both columns are observed
+    with pytest.raises(ValueError, match="at least 8 rows"):
+        skewd(data, **SHORT_PAIR)
+
+
+def test_skewd_mv_reads_columns_whose_moments_overflow():
+    # Every value is near 1e308 in magnitude, so a plain mean or variance overflows.
+    data = pd.DataFrame(_chain(), columns=["x", "y", "z"])
+    huge = skewd_mv((data + 4.0) * 1e307, **SHORT_GRAPH)
+    assert (
+        huge.structure.oriented_edges() == skewd_mv(data, **SHORT_GRAPH).structure.oriented_edges()
+    )

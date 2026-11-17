@@ -362,6 +362,8 @@ def _ecm(
             psi_next = np.linalg.solve(lhs, rhs)
         except np.linalg.LinAlgError:
             psi_next = np.linalg.lstsq(lhs, rhs, rcond=None)[0]
+        # CM-step 1 updates psi and the shape together, the shape from the residual at the
+        # current psi (Section 4); only the scale's step reads the new psi.
         shape = float((residual * weight) @ v / ((residual * weight) @ residual))
         shape = float(np.clip(shape, -SHAPE_BOUND, SHAPE_BOUND))
         psi = psi_next

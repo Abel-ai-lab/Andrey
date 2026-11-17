@@ -1584,6 +1584,7 @@ def skewd_mv(
     labels = column_labels(data)
     order = np.argsort(tie_ranks(X), kind="stable")
     X = X[:, order]
+    X = X / np.abs(X).max(axis=0)  # divide first, so tiny or huge units cannot overflow the moments
     X = (X - X.mean(axis=0)) / X.std(axis=0)
     assert seed is not None  # method_spec resolves it
     skeleton = pc(X, alpha=alpha, indep_test=indep_test, seed=seed).structure
