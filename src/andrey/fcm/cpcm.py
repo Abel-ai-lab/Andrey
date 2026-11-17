@@ -37,7 +37,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy import optimize, special, stats
 
-from andrey.core.independence import dhsic_gram, dhsic_log_p
+from andrey.core.independence import dhsic_gram, dhsic_log_p, within_one
 from andrey.core.ties import EPS_IMPROVE, tie_key
 from andrey.fcm.gam import tp_basis
 
@@ -52,9 +52,24 @@ _LOG_SP_RANGE = 20.0
 _NEWTON_TOL = 1e-11
 _MAX_NEWTON = 100
 _FD_STEP = 1e-3
+#: Lower bound of a fitted log scale that varies with the parents, on the column the fit reads:
+#: the Gaussian standard deviation stays above 0.01 of the column's and the Gumbel scale above
+#: ``exp(-7)`` of it, and the gamma dispersion above ``exp(-7)``. These are the values of the
+#: location-scale families in the paper's software; without a bound the likelihood has no maximum,
+#: since it grows without limit as the scale shrinks at a row the location fits exactly.
+LOG_SCALE_FLOOR = {"gaussian": math.log(0.01), "gumbel": -7.0, "gamma": -7.0}
+#: Upper bound of the negative binomial family's log size (a size of about 163,000). The likelihood
+#: is flat in the size beyond it, where the family is its Poisson limit for the means counts take,
+#: and its terms lose their digits to cancellation from a log size of about 20; a size at the bound
+#: is read as the Poisson limit.
+NB_LOG_SIZE_MAX = 12.0
 #: L-BFGS-B stops once every projected gradient component of the LAML is below this; the
 #: central differences carry an error of about 1e-5 from the Newton tolerance.
 _LAML_GTOL = 1e-4
+#: A Hessian is indefinite if, with its diagonal brought to 1, an eigenvalue is below minus this.
+_INDEFINITE = 1e-8
+#: A point is a minimum only if a Newton step from it lowers the objective by less than this share.
+_UNFINISHED = 1e-7
 
 Derivs = tuple[float, list[np.ndarray], list[list[np.ndarray]]]
 
@@ -70,7 +85,8 @@ class Family:
     ``y``, randomized by the uniforms ``u`` for a count family. ``rescale``, set for a
     location-scale or scale family, maps ``y`` to the column the fit and the distribution function
     read: the family's probability transform is the same on it, so the result does not depend on
-    the units and the fit does not depend on their size.
+    the units and the fit does not depend on their size. ``upper`` bounds a ``"constant"`` second
+    predictor from above.
     """
 
     name: str
@@ -83,6 +99,7 @@ class Family:
     outside: Callable[[np.ndarray], np.ndarray]
     counts: bool = False
     rescale: Callable[[np.ndarray], np.ndarray] | None = None
+    upper: float = math.inf
 
 
 def _gaussian_derivs(y: np.ndarray, etas: list[np.ndarray]) -> Derivs:
@@ -105,6 +122,23 @@ def _gumbel_derivs(y: np.ndarray, etas: list[np.ndarray]) -> Derivs:
         [-(1.0 - ez) * inv, 1.0 - z * (1.0 - ez)],
         [[ez * inv * inv, h12], [h12, z * (1.0 - ez + z * ez)]],
     )
+
+
+def _floored(derivs: Callable[[np.ndarray, list[np.ndarray]], Derivs], floor: float) -> Callable:
+    """``derivs`` with its log scale read as ``log(exp(eta) + exp(floor))``, which stays above
+    ``floor`` and nears ``eta`` away from it; the derivatives follow by the chain rule."""
+
+    def floored(y: np.ndarray, etas: list[np.ndarray]) -> Derivs:
+        nll, g, h = derivs(y, [etas[0], np.logaddexp(etas[1], floor)])
+        d1 = special.expit(etas[1] - floor)
+        h12 = h[0][1] * d1
+        return (
+            nll,
+            [g[0], g[1] * d1],
+            [[h[0][0], h12], [h12, h[1][1] * d1 * d1 + g[1] * d1 * (1 - d1)]],
+        )
+
+    return floored
 
 
 def _exponential_derivs(y: np.ndarray, etas: list[np.ndarray]) -> Derivs:
@@ -176,6 +210,8 @@ def _poisson_cdf(y: np.ndarray, etas: list[np.ndarray], u: np.ndarray | None) ->
 def _negative_binomial_cdf(
     y: np.ndarray, etas: list[np.ndarray], u: np.ndarray | None
 ) -> np.ndarray:
+    if etas[1][0] >= NB_LOG_SIZE_MAX:
+        return _poisson_cdf(y, etas[:1], u)
     m, t = np.exp(etas[0]), np.exp(etas[1])
     p = t / (t + m)
     return _randomized(stats.nbinom.cdf(y - 1.0, t, p), stats.nbinom.pmf(y, t, p), u)
@@ -191,12 +227,14 @@ def _not_whole(y: np.ndarray) -> np.ndarray:
 
 def _standardized(y: np.ndarray) -> np.ndarray:
     """``y`` centered and divided by its standard deviation (location-scale families)."""
+    y = within_one(y)[0]
     spread = float(np.std(y))
     return (y - np.mean(y)) / (spread if spread > 0 else 1.0)
 
 
 def _over_mean(y: np.ndarray) -> np.ndarray:
     """``y`` divided by its mean (scale families)."""
+    y = within_one(y)[0]
     mean = float(np.mean(y))
     return y / (mean if mean > 0 else 1.0)
 
@@ -235,8 +273,23 @@ def _families() -> dict[str, Family]:
     nonnegative = lambda y: ~np.isfinite(y) | (y < 0)  # noqa: E731
     at_least_one = lambda y: ~np.isfinite(y) | (y < 1)  # noqa: E731
     real = "real numbers"
+
+    def floored(name: str, start: Callable, derivs: Callable, cdf: Callable) -> tuple:
+        floor = LOG_SCALE_FLOOR[name]
+
+        def floored_start(y: np.ndarray) -> list[float]:
+            first, log_scale = start(y)
+            return [first, math.log(max(math.exp(log_scale) - math.exp(floor), math.exp(floor)))]
+
+        return (
+            floored_start,
+            _floored(derivs, floor),
+            lambda y, e, u: cdf(y, [e[0], np.logaddexp(e[1], floor)], u),
+        )
+
     out = [
-        Family("gaussian", real, 2, "smooth", gaussian_start, _gaussian_derivs, gaussian_cdf,
+        Family("gaussian", real, 2, "smooth",
+               *floored("gaussian", gaussian_start, _gaussian_derivs, gaussian_cdf),
                _not_finite, rescale=_standardized),
         Family("gaussian_fixed_scale", real, 2, "constant", gaussian_start, _gaussian_derivs,
                gaussian_cdf, _not_finite, rescale=_standardized),
@@ -248,17 +301,19 @@ def _families() -> dict[str, Family]:
         Family("poisson", "counts (whole numbers of at least 0)", 1, "",
                lambda y: _count_start(y)[:1], _poisson_derivs, _poisson_cdf, _not_whole,
                counts=True),
-        Family("gamma", "positive numbers", 2, "smooth", _gamma_start, _gamma_derivs, gamma_cdf,
+        Family("gamma", "positive numbers", 2, "smooth",
+               *floored("gamma", _gamma_start, _gamma_derivs, gamma_cdf),
                positive, rescale=_over_mean),
         Family("gamma_fixed_shape", "positive numbers", 2, "constant", _gamma_start,
                _gamma_derivs, gamma_cdf, positive, rescale=_over_mean),
-        Family("gumbel", real, 2, "smooth", _gumbel_start, _gumbel_derivs, gumbel_cdf,
+        Family("gumbel", real, 2, "smooth",
+               *floored("gumbel", _gumbel_start, _gumbel_derivs, gumbel_cdf),
                _not_finite, rescale=_standardized),
         Family("gumbel_fixed_scale", real, 2, "constant", _gumbel_start, _gumbel_derivs,
                gumbel_cdf, _not_finite, rescale=_standardized),
         Family("negative_binomial", "counts (whole numbers of at least 0)", 2, "constant",
                _count_start, _negative_binomial_derivs, _negative_binomial_cdf, _not_whole,
-               counts=True),
+               counts=True, upper=NB_LOG_SIZE_MAX),
     ]  # fmt: skip
     return {f.name: f for f in out}
 
@@ -344,6 +399,10 @@ def fit(y: np.ndarray, terms: list[_Term], family: Family) -> list[np.ndarray]:
     smoothing parameters minimize its Laplace approximate marginal likelihood (Wood, Pya, and
     Safken 2016) by L-BFGS-B with central-difference gradients, each within 20 of its start, which
     puts its penalty on the scale of its Hessian block and so moves with the units.
+
+    Raises ``ValueError`` where the fit has no maximum to find: as many unpenalized coefficients
+    as rows, a scale fitted per parent value on rows that hold one value, or a search that ends
+    away from a minimum of the penalized likelihood.
     """
     n = y.size
     full = np.hstack([np.ones((n, 1)), *(t.X for t in terms)])
@@ -369,12 +428,23 @@ def fit(y: np.ndarray, terms: list[_Term], family: Family) -> list[np.ndarray]:
             if t.S is not None:
                 penalties.append((slice(col, col + width), t.S, t.rank))
             col += width
+    if family.second == "smooth" and penalties:
+        for t in terms:
+            if t.S is None:
+                level = t.X @ np.arange(1.0, t.X.shape[1] + 1)
+                if any(np.ptp(y[level == v]) == 0 for v in np.unique(level)):
+                    raise ValueError(
+                        f"family {family.name!r} fits a scale for each value of a parent of at "
+                        f"most {MAX_LEVELS} values, but the column holds one value on the rows of "
+                        "one of them, where no scale can be fitted beside a smooth parent; use more "
+                        "rows, or a family whose second parameter is constant"
+                    )
     beta = np.zeros(offsets[-1])
     for j, value in enumerate(family.start(y)[: family.predictors]):
         beta[offsets[j]] = value
-    model = _Model(y, designs, offsets, penalties, family)
+    model = _Model(y, designs, offsets, penalties, family, beta)
     if not penalties:
-        return model.etas(model.newton(beta, np.zeros(0)))
+        return model.etas(_fitted(model, beta, np.zeros(0)))
     rho = model.start_rho(beta)
     state = {"beta": model.newton(beta, rho)}
 
@@ -398,7 +468,17 @@ def fit(y: np.ndarray, terms: list[_Term], family: Family) -> list[np.ndarray]:
         bounds=[(r - _LOG_SP_RANGE, r + _LOG_SP_RANGE) for r in rho],
         options={"gtol": _LAML_GTOL},
     )
-    return model.etas(model.newton(state["beta"], result.x))
+    return model.etas(_fitted(model, state["beta"], result.x))
+
+
+def _fitted(model: _Model, beta: np.ndarray, rho: np.ndarray) -> np.ndarray:
+    found = model.minimum(beta, rho)
+    if found is None:
+        raise ValueError(
+            f"the fit of family {model.family.name!r} on the parents stopped away from a minimum "
+            "of its penalized likelihood; use more rows, or a family with fewer fitted parameters"
+        )
+    return found[0]
 
 
 class _Model:
@@ -411,9 +491,13 @@ class _Model:
         offsets: np.ndarray,
         penalties: list[tuple[slice, np.ndarray, int]],
         family: Family,
+        start: np.ndarray,
     ) -> None:
-        self.y, self.designs, self.offsets = y, designs, offsets
+        self.y, self.designs, self.offsets, self.start = y, designs, offsets, start
         self.penalties, self.family = penalties, family
+        self.upper = np.full(offsets[-1], math.inf)
+        if family.second == "constant":
+            self.upper[offsets[1]] = family.upper
 
     def etas(self, beta: np.ndarray) -> list[np.ndarray]:
         o = self.offsets
@@ -440,16 +524,24 @@ class _Model:
         return nll + 0.5 * float(beta @ S @ beta), grad, H
 
     def newton(self, beta: np.ndarray, rho: np.ndarray) -> np.ndarray:
-        """Minimize the penalized objective from ``beta`` by damped Newton steps."""
+        """Minimize the penalized objective from ``beta`` by damped Newton steps.
+
+        A step stops at a coefficient's upper bound, and a coefficient at its bound stays there
+        while the objective still falls beyond it. A trial point counts only with a finite value,
+        gradient, and Hessian.
+        """
         S = self.penalty(rho)
         value, grad, H = self.evaluate(beta, S)
         for _ in range(_MAX_NEWTON):
-            step = -_solve_pd(H, grad)
+            free = self.free(beta, grad)
+            step = np.zeros(beta.size)
+            step[free] = -_solve_pd(H[np.ix_(free, free)], grad[free])
             for _ in range(60):
-                trial = beta + step
+                trial = np.minimum(beta + step, self.upper)
                 with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
                     new_value, new_grad, new_H = self.evaluate(trial, S)
-                if math.isfinite(new_value) and new_value <= value + 1e-12 * abs(value):
+                finite = np.isfinite(new_value) and np.isfinite(new_grad).all()
+                if finite and np.isfinite(new_H).all() and new_value <= value + 1e-12 * abs(value):
                     break
                 step *= 0.5
             else:
@@ -462,12 +554,40 @@ class _Model:
 
     def laml(self, rho: np.ndarray, beta: np.ndarray) -> tuple[float, np.ndarray]:
         """The negative Laplace approximate marginal likelihood at ``rho``, up to a constant."""
-        beta = self.newton(beta, rho)
-        S = self.penalty(rho)
-        value, _, H = self.evaluate(beta, S)
-        logdet = float(np.sum(np.log(np.maximum(np.linalg.eigvalsh(H), 1e-300))))
+        found = self.minimum(beta, rho)
+        if found is None:
+            return math.inf, beta
+        fitted, value, eigenvalues = found
+        logdet = float(np.sum(np.log(np.maximum(eigenvalues, 1e-300))))
         ranks = np.array([rank for _, _, rank in self.penalties], dtype=np.float64)
-        return value - 0.5 * float(ranks @ rho) + 0.5 * logdet, beta
+        return value - 0.5 * float(ranks @ rho) + 0.5 * logdet, fitted
+
+    def free(self, beta: np.ndarray, grad: np.ndarray) -> np.ndarray:
+        """The coefficients that move: all but one at its upper bound that the gradient holds
+        there. A held coefficient is a constant of the fit, outside its Laplace determinant."""
+        return ~((beta >= self.upper) & (grad < 0))
+
+    def minimum(
+        self, beta: np.ndarray, rho: np.ndarray
+    ) -> tuple[np.ndarray, float, np.ndarray] | None:
+        """A minimum of the penalized objective: its coefficients, value, and Hessian eigenvalues.
+
+        :meth:`newton` runs from ``beta`` and, where it stops on a slope (a Hessian with a negative
+        eigenvalue beyond rounding, or a Newton step that would still lower the objective), again
+        from the fit's starting coefficients. ``None`` where both stop on a slope.
+        """
+        for start in (beta, self.start):
+            fitted = self.newton(start, rho)
+            value, grad, H = self.evaluate(fitted, self.penalty(rho))
+            free = self.free(fitted, grad)
+            H, grad = H[np.ix_(free, free)], grad[free]
+            unit = 1.0 / np.sqrt(_diagonal(H))
+            left = 0.5 * float(grad @ _solve_pd(H, grad))
+            if np.linalg.eigvalsh(H * unit[:, None] * unit)[0] >= -_INDEFINITE and (
+                left <= _UNFINISHED * (1.0 + abs(value))
+            ):
+                return fitted, value, np.linalg.eigvalsh(H)
+        return None
 
     def start_rho(self, beta: np.ndarray) -> np.ndarray:
         """Log smoothing parameters that put each penalty on the scale of its Hessian block."""
@@ -479,15 +599,25 @@ class _Model:
         return np.array(rho)
 
 
+def _diagonal(H: np.ndarray) -> np.ndarray:
+    """The size of each diagonal entry of ``H``, at least ``1e-12`` of the largest."""
+    size = np.abs(np.diag(H))
+    return np.maximum(size, max(1e-12 * float(size.max()), 1e-300))
+
+
 def _solve_pd(H: np.ndarray, g: np.ndarray) -> np.ndarray:
-    """Solve ``H x = g``, adding a multiple of the identity until ``H`` is positive definite."""
+    """Solve ``H x = g``, adding a multiple of ``H``'s diagonal size until it is positive definite.
+
+    The shift follows each coefficient's own scale, so a large penalty on one block does not hold
+    back a coefficient outside it.
+    """
     shift = 0.0
-    scale = max(float(np.abs(np.diag(H)).max()), 1e-12)
+    diagonal = np.diag(_diagonal(H))
     for _ in range(40):
         try:
-            factor = np.linalg.cholesky(H + shift * np.eye(H.shape[0]))
+            factor = np.linalg.cholesky(H + shift * diagonal)
         except np.linalg.LinAlgError:
-            shift = max(2.0 * shift, 1e-10 * scale)
+            shift = max(2.0 * shift, 1e-10)
             continue
         return np.linalg.solve(factor.T, np.linalg.solve(factor, g))
     return np.linalg.lstsq(H, g, rcond=None)[0]

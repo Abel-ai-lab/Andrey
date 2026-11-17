@@ -517,6 +517,22 @@ def _log_upper_gamma(a: float, x: float) -> float:
     return math.nan
 
 
+def within_one(
+    values: np.ndarray, *, each_column: bool = False
+) -> tuple[np.ndarray, int | np.ndarray]:
+    """Return ``values`` divided by a power of two that brings them within ``[-1, 1]``.
+
+    The power is the second item.
+
+    The division is exact, so sums and squares that follow keep their digits and neither overflow
+    for values near the largest float nor vanish for values near the smallest. ``each_column``
+    takes one power per column of a matrix, where the default is one for all values.
+    """
+    largest = np.abs(values).max(axis=0) if each_column else np.abs(values).max(initial=0.0)
+    power = np.frexp(largest)[1]
+    return np.ldexp(values, -power), power
+
+
 def dhsic_gram(column: np.ndarray, *, standardize: bool = False) -> np.ndarray:
     """Return the Gaussian gram of one variable for :func:`dhsic_log_p`.
 
@@ -526,18 +542,20 @@ def dhsic_gram(column: np.ndarray, *, standardize: bool = False) -> np.ndarray:
     is ``exp(-d^2 / (2 w^2))`` with ``w = sqrt(0.5 m)``, ``m`` the upper median of the squared
     distances over all pairs of rows, ties included, and ``w = 0.001`` when ``m`` is ``0``, the
     rule of Pfister et al. (2018), whose software reads a random subsample of 1,000 rows where this
-    reads every row.
+    reads every row. The distances are formed on :func:`within_one`'s values, so the gram is the
+    same in any units.
     """
-    col = _as_columns(column)
+    col, power = within_one(_as_columns(column), each_column=standardize)
     col = col - col.mean(axis=0)
     if standardize:
         sd = col.std(axis=0)
         col = col / np.where(sd > 0, sd, 1.0)
+        power = 0
     sq = np.maximum(_sq_dists(col), 0.0)
     upper = _upper(sq)
     middle = upper.size // 2
     m = float(np.partition(upper, middle)[middle]) if upper.size else 0.0
-    width = math.sqrt(0.5 * m) if m > 0 else 0.001
+    width = math.sqrt(0.5 * m) if m > 0 else math.ldexp(0.001, -int(power))
     sq *= -1.0 / (2.0 * width * width)
     return np.exp(sq, out=sq)
 
