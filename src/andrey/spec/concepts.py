@@ -237,6 +237,7 @@ _CONCEPTS = (
             "skewd_mv",
             "score_matching",
             "nogam",
+            "das",
             "camuv",
             "icp",
             "igsp",
@@ -367,6 +368,14 @@ _CONCEPTS = (
                 "experiments (Montagna et al. 2023, Section 6).",
             ),
             Deviation(
+                method="das",
+                name="alpha",
+                default=0.001,
+                reason="0.001 is the cutoff of the pruning tests in the published experiments the "
+                "method's paper follows (Rolland et al. 2022, Section 4.1); its own paper states "
+                "none.",
+            ),
+            Deviation(
                 method="camuv",
                 name="alpha",
                 default=0.01,
@@ -437,6 +446,7 @@ _CONCEPTS = (
                 "cam",
                 "score_matching",
                 "nogam",
+                "das",
             ),
             *_exempt(
                 "It tests the invariance of regressions across environments, invariance_test.",
@@ -781,6 +791,7 @@ _CONCEPTS = (
                 "resit",
                 "score_matching",
                 "nogam",
+                "das",
                 *CONTINUOUS,
                 *LINGAM,
                 "granger",
@@ -893,7 +904,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="parents",
-        suitable=(*SCORE_SEARCHES, "cam", "gnies", "icp"),
+        suitable=(*SCORE_SEARCHES, "cam", "das", "gnies", "icp"),
         exempt=(
             *_exempt(
                 "Reads the parents from the nonzero entries of the demixing matrix.",
@@ -961,6 +972,15 @@ _CONCEPTS = (
                 "sets no cap.",
                 "igsp",
                 "ut_igsp",
+            ),
+        ),
+        deviations=(
+            Deviation(
+                method="das",
+                name="max_parents",
+                default=20,
+                reason="20 is the paper's cap K on the candidate parents its edge screen keeps "
+                "(Montagna et al. 2023, Section 4).",
             ),
         ),
     ),
@@ -1044,6 +1064,7 @@ _CONCEPTS = (
                 "resit",
                 "score_matching",
                 "nogam",
+                "das",
                 "direct_lingam",
                 "multi_group_direct_lingam",
                 "varma_lingam",
@@ -1413,6 +1434,7 @@ _CONCEPTS = (
                 "skewd_mv",
                 "score_matching",
                 "nogam",
+                "das",
                 *LINGAM,
                 "gin",
                 "rcd",
@@ -1615,7 +1637,7 @@ _CONCEPTS = (
             *_exempt(
                 "Its regressions fit smooth functions of continuous causes, which an environment "
                 "label is not.",
-                *("cam", "resit", "score_matching", "nogam", "camuv", "anm", "pnl", "loci"),
+                *("cam", "resit", "score_matching", "nogam", "das", "camuv", "anm", "pnl", "loci"),
                 *("skewd", "skewd_mv"),
             ),
         ),

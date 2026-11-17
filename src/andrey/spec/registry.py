@@ -2759,6 +2759,51 @@ _add(
     )
 )
 
+_add(
+    MethodSpec(
+        name="das",
+        family="functional",
+        summary="DAS for nonlinear effects with additive Gaussian noise, at scale: SCORE's causal "
+        "order from the leaf up, then each leaf's candidate parents screened by Welch tests on its "
+        "row of the same Stein estimate of the score's Jacobian, at most max_parents of them, and "
+        "only those pruned by smooth-term tests. Returns a DAG and a causal order. Deterministic; "
+        "no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            has_ordering=True,
+            doc="DAG after the screen and the pruning; ordering is the causal order of the leaf "
+            "search.",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "alpha",
+                default=0.001,
+                doc="Significance level of the pruning test: a candidate parent stays when its "
+                "smooth term's p-value is at most alpha. 0.001 is the cutoff of the SCORE "
+                "experiments the paper follows.",
+            ),
+            concept_param(
+                "max_parents",
+                default=20,
+                doc="A cap on every node's parents, at least 0: the edge screen keeps at most "
+                "max_parents candidate parents per variable, required edges included. 20 is the "
+                "paper's value. null sets no cap.",
+            ),
+        ),
+        references=(
+            "Montagna et al. 2023",
+            "Rolland et al. 2022",
+            "Buhlmann, Peters & Ernest 2014",
+        ),
+    )
+)
+
 # --- temporal family ------------------------------------------------------------------------------
 
 _add(
@@ -3894,6 +3939,10 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "pairs outside the allowed set are in no pruning fit and never in the result; the score "
     "estimate and the residual regressions still read every remaining variable. The pruning never "
     "removes a required edge.",
+    "das": "A variable is the next leaf only when no remaining variable is in a later tier or is "
+    "the effect of a required edge out of it. Forbidden edges, edges into an earlier tier, and "
+    "pairs outside the allowed set are never candidates; the score estimate still reads every "
+    "remaining variable. A required edge is a candidate that the pruning never removes.",
     "direct_lingam": _ORDER_RULE + _REGRESSION_RULE,
     "ica_lingam": "The order search reads every forbidden edge's unmixing weight as 0. "
     + _ORDER_RULE

@@ -16,7 +16,7 @@ from .adjustment import ld3, ldecc, ldp, local_optimal_adjustment, locpc_cde
 from .blanket import fast_iamb, gs, hiton_mb, hiton_pc, iamb, inter_iamb, mmmb, mmpc, pcmb
 from .constraint import cdnod, fci, fci_jci, gfci, icp, pc, y_structures
 from .continuous import dagma, notears
-from .fcm import cam, camuv, nogam, resit, score_matching, skewd_mv
+from .fcm import cam, camuv, das, nogam, resit, score_matching, skewd_mv
 from .hybrid import mmhc, rsmax2
 from .irregular import anm, bottom_up_parce_lingam, loci, pnl, rcd, skewd
 from .latent import gin
@@ -95,6 +95,7 @@ __all__ = [
     "skewd_mv",
     "score_matching",
     "nogam",
+    "das",
     # temporal family
     "varma_lingam",
     "longitudinal_lingam",
