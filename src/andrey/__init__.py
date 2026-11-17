@@ -79,6 +79,8 @@ from .api import (
     resit,
     rsmax2,
     score_matching,
+    skewd,
+    skewd_mv,
     tabu,
     ut_igsp,
     varma_lingam,
@@ -186,6 +188,7 @@ __all__ = [
     "local_isa_ling",
     "cam",
     "resit",
+    "skewd_mv",
     "score_matching",
     "nogam",
     # Latent-variable structure - observed indicators plus discovered latents in causal order.
@@ -205,6 +208,7 @@ __all__ = [
     "anm",
     "pnl",
     "loci",
+    "skewd",
     # Hidden common causes: a PAG over the observed variables.
     "rcd",
     "bottom_up_parce_lingam",

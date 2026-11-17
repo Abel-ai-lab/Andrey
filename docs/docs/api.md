@@ -109,7 +109,7 @@ single column gives a one-node graph.
 `local_optimal_adjustment`, `locpc_cde`, `pcmci`, `pcmciplus`, and `lpcmci` accept missing values, a
 `NaN` cell, pandas' `NA`, or an empty, `NA`, or `N/A` field of a CSV file: each
 conditional-independence test reads only the rows where all of its variables are observed (test-wise
-deletion), and so do the pair tests `anm`, `pnl`, and `loci`, which read the rows where both columns
+deletion), and so do the pair tests `anm`, `pnl`, `loci`, and `skewd`, which read the rows where both columns
 are observed; `metadata["rows_tested"]` gives the fewest (`min`) and the median rows a test read.
 Their argument `missing` names the handling: `"testwise"` is test-wise deletion, and `None`, the
 default, picks the method's default handling, `"testwise"`; `metadata["missing"]` records the one a
@@ -833,6 +833,8 @@ in a process.
 
    ldp
    ld3
+   skewd
+   skewd_mv
 ```
 
 LDP, local discovery by partitioning (Maasch et al. 2024), answers for one `treatment` and
@@ -847,6 +849,22 @@ columns: it finds the parents of the outcome and whether the treatment is one of
 structural direct criterion), with the other parents as the adjustment set for the direct effect, in
 `metadata["effects"]`. Its graph holds the edges into the outcome, and `metadata["partition"]` the
 labels. It is experimental until its comparison with the authors' code is published.
+
+SkewD (Klippert and Marx 2026), {py:func}`~andrey.skewd`, decides the direction of a variable pair
+whose noise is skewed, in the location-scale model of LOCI with a skew-normal noise. It fits the
+model in each direction, the location and the log scale smooth functions of the proposed cause and
+the shape one number, with penalties chosen by Bayesian optimization of a cross-validated
+likelihood, then decides by an HSIC test of the scaled residual against the cause
+(`criterion="independence"`, the default) or by the larger likelihood (`criterion="likelihood"`).
+At the defaults a pair takes minutes. It is experimental until its comparison with the authors' code
+is published.
+
+SkewD-MV, {py:func}`~andrey.skewd_mv`, is the graph version: it learns the Markov equivalence class
+with PC and returns the DAG of the class whose skew-normal location-scale models, one per variable
+given its parents, have the largest likelihood. It suits a few variables: it fits one model per
+distinct parent set the class allows, and `max_fits` (100 by default, the order up to which the
+paper expects it to apply) makes it refuse a class that needs more, before it fits any. It is
+experimental until its comparison with the authors' code is published.
 
 A method becomes supported once it has:
 

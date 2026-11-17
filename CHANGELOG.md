@@ -12,6 +12,15 @@ names its pull request.
 
 ### Added
 
+- `andrey.skewd` and `andrey.skewd_mv`, SkewD and SkewD-MV (Klippert and Marx 2026), experimental:
+  the direction of a variable pair, and a DAG, in a location-scale model whose noise is skewed,
+  `y = f(pa) + g(pa) n` with skew-normal `n`. `skewd` fits the model in each direction, with
+  penalties chosen by Bayesian optimization of a cross-validated likelihood, and decides by an HSIC
+  test of the scaled residual against the cause (`criterion="independence"`, the default) or by the
+  larger likelihood (`criterion="likelihood"`). `skewd_mv` learns the Markov equivalence class with
+  PC and returns its DAG with the largest likelihood; it lists the class's DAGs one at a time and
+  stops with an error once they need more than `max_fits` conditional models (100, the order up to
+  which the paper expects it to apply), before it fits any. Not benchmarked yet. ([#1079])
 - `target` takes a list of columns on every method that takes one (`iamb`, `inter_iamb`, `gs`,
   `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
   `icp`, `local_isa_ling`): one call returns one result per target, each equal to a call for that
@@ -3070,3 +3079,4 @@ First alpha release.
 [#1059]: https://github.com/Abel-ai-lab/Andrey/pull/1059
 [#1055]: https://github.com/Abel-ai-lab/Andrey/pull/1055
 [#1067]: https://github.com/Abel-ai-lab/Andrey/pull/1067
+[#1079]: https://github.com/Abel-ai-lab/Andrey/pull/1079

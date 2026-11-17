@@ -547,6 +547,8 @@ PROSE_NAMES = {
     "anm": "ANM",
     "pnl": "PNL",
     "loci": "LOCI",
+    "skewd": "SkewD",
+    "skewd_mv": "SkewD-MV",
     "gin": "GIN",
     "rcd": "RCD",
     "bottom_up_parce_lingam": "BottomUpParceLiNGAM",

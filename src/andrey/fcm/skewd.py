@@ -1,0 +1,531 @@
+"""Skew-normal location-scale fit of SkewD: one effect given its parents.
+
+SkewD (Klippert and Marx 2026) models an effect ``y`` given its parents ``x`` as skew-normal,
+``y | x ~ SN(f(x), g(x), lambda)``, with the density ``2 / g phi(r) Phi(lambda r)`` at
+``r = (y - f(x)) / g(x)``. The location ``f = N psi`` and the log variance ``log g^2 = Z rho`` are
+additive B-splines of the parents (Eq. 3, Appendix A.2); one shape ``lambda`` holds for every row,
+and ``lambda = 0`` is the Gaussian. The estimate maximizes the log-likelihood less second-order
+difference penalties on each parent's spline coefficients, ``alpha_t`` on the location's and
+``kappa_t`` on the log variance's (Eq. 4), by Algorithm 1:
+
+1. Bayesian optimization chooses the penalties: each candidate's score is the held-out
+   log-likelihood, without penalty, of a k-fold cross-validation (Appendix B.1).
+2. CMA-ES (Hansen 2016) maximizes the penalized log-likelihood at the chosen penalties from
+   several starts: least squares with ``rho = 0`` and ``lambda`` the effect's sample skewness, and
+   each fold's estimate at those penalties.
+3. Expectation conditional maximization (ECM, Section 4) refines the best of them: the E-step's
+   moments of the latent truncated normal, a closed-form step in ``(psi, lambda)``, then the
+   maximum over ``rho`` of the expected penalized log-likelihood. That function is concave in
+   ``rho``, ``-sum z_i' rho - sum c_i exp(-z_i' rho) / 2 - rho' M rho / 2`` with
+   ``c_i = E[(V_i - lambda a_i)^2] + a_i^2 >= 0``, so L-BFGS-B within the bounds reaches its
+   maximum; the authors' code takes CMA-ES steps there.
+
+References
+----------
+Klippert and Marx (2026). Skewness-robust causal discovery in location-scale noise models. ICML.
+
+Hansen (2016). The CMA evolution strategy: a tutorial. arXiv:1604.00772.
+
+Eilers and Marx (1996). Flexible smoothing with B-splines and penalties. Statistical Science 11(2).
+
+Ferreira, Zeller, and Garcia (2023). Heteroscedastic partially linear model under skew-normal
+distribution. Journal of Applied Statistics 50(6).
+"""
+
+from __future__ import annotations
+
+import math
+import warnings
+from collections.abc import Iterator
+from dataclasses import dataclass
+
+import numpy as np
+from scipy.optimize import minimize
+from scipy.special import log_ndtr
+from scipy.stats import qmc
+from sklearn.exceptions import ConvergenceWarning
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import ConstantKernel, Matern, WhiteKernel
+from sklearn.model_selection import KFold
+from sklearn.preprocessing import SplineTransformer
+
+#: The scale spline's knots and both splines' degree (the authors' code: 5 knots, degree 3, so
+#: ``p~ = 7`` columns per parent, Appendix B.1). Each spline extends linearly past the data's range.
+SCALE_KNOTS = 5
+DEGREE = 3
+#: The bounds on each log-variance coefficient and on the shape (Appendix B.1).
+RHO_BOUNDS = (-10.0, 5.0)
+SHAPE_BOUND = 25.0
+#: The range of each log penalty that the Bayesian optimization searches (the authors' code).
+LOG_PENALTY_BOUNDS = (-4.0, 4.0)
+#: CMA-ES: the population, the first step size, and the most generations (Appendix B.1).
+POPULATION = 100
+STEP_SIZE = 1.0
+GENERATIONS = 5000
+#: Both CMA-ES and ECM stop once the parameters move less than ``TOLERANCE`` in L2 norm over
+#: ``WINDOW`` iterations (Appendix B.1, Section 4).
+WINDOW = 25
+TOLERANCE = 1e-6
+#: The expected-improvement margin and the random candidates the acquisition is maximized over.
+EI_MARGIN = 0.01
+EI_CANDIDATES = 10_000
+
+_LOG_NORM = math.log(2.0) - 0.5 * math.log(2.0 * math.pi)
+
+
+@dataclass(frozen=True)
+class Budget:
+    """The settings of one fit: the location spline's knots, the cross-validation folds, the
+    penalty settings the Bayesian optimization scores and how many of them start it at Latin
+    hypercube points, and the most ECM iterations."""
+
+    knots: int
+    folds: int
+    tuning_iter: int
+    initial: int
+    max_iter: int
+
+
+@dataclass(frozen=True)
+class Fit:
+    """One fitted skew-normal model: its mean log-likelihood over the rows, its scaled residual
+    ``(y - f(x)) / g(x)``, and whether ECM stopped on its own rule."""
+
+    log_likelihood: float
+    residual: np.ndarray
+    converged: bool
+
+
+@dataclass(frozen=True)
+class _Design:
+    location: np.ndarray  # N, (n, q)
+    scale: np.ndarray  # Z, (n, p)
+    location_penalty: np.ndarray  # second-order difference penalty of one parent's location block
+    scale_penalty: np.ndarray
+    parents: int
+
+    def penalties(self, log_penalties: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """The block-diagonal penalty matrices ``K_alpha`` and ``M_kappa`` of Appendix A.2."""
+        alpha, kappa = np.exp(log_penalties[: self.parents]), np.exp(log_penalties[self.parents :])
+        return (
+            np.kron(np.diag(alpha), self.location_penalty),
+            np.kron(np.diag(kappa), self.scale_penalty),
+        )
+
+
+def _difference_penalty(columns: int) -> np.ndarray:
+    difference = np.diff(np.eye(columns), n=2, axis=0)
+    return difference.T @ difference
+
+
+def _design(parents: np.ndarray, knots: int) -> _Design:
+    def basis(n_knots: int) -> np.ndarray:
+        return np.hstack(
+            [
+                SplineTransformer(
+                    n_knots=n_knots, degree=DEGREE, extrapolation="linear"
+                ).fit_transform(parents[:, [t]])
+                for t in range(parents.shape[1])
+            ]
+        )
+
+    location, scale = basis(knots), basis(SCALE_KNOTS)
+    s = parents.shape[1]
+    return _Design(
+        location,
+        scale,
+        _difference_penalty(location.shape[1] // s),
+        _difference_penalty(scale.shape[1] // s),
+        s,
+    )
+
+
+def _row_log_likelihoods(
+    theta: np.ndarray, location: np.ndarray, scale: np.ndarray, effect: np.ndarray
+) -> np.ndarray:
+    """Each row's skew-normal log density, one column per parameter vector in ``theta`` (m, d)."""
+    q, p = location.shape[1], scale.shape[1]
+    log_variance = scale @ theta[:, q : q + p].T
+    r = (effect[:, None] - location @ theta[:, :q].T) * np.exp(-0.5 * log_variance)
+    return _LOG_NORM - 0.5 * log_variance - 0.5 * r**2 + log_ndtr(theta[:, -1] * r)
+
+
+def _penalized_nll(
+    theta: np.ndarray,
+    location: np.ndarray,
+    scale: np.ndarray,
+    effect: np.ndarray,
+    k_alpha: np.ndarray,
+    m_kappa: np.ndarray,
+) -> np.ndarray:
+    """The negative log-likelihood plus the penalties (Eq. 4) of each row of ``theta`` (m, d)."""
+    q, p = location.shape[1], scale.shape[1]
+    psi, rho = theta[:, :q], theta[:, q : q + p]
+    value = -_row_log_likelihoods(theta, location, scale, effect).sum(axis=0)
+    value += 0.5 * np.einsum("mi,ij,mj->m", psi, k_alpha, psi)
+    value += 0.5 * np.einsum("mi,ij,mj->m", rho, m_kappa, rho)
+    return np.where(np.isfinite(value), value, np.inf)
+
+
+def _bounds(q: int, p: int) -> tuple[np.ndarray, np.ndarray]:
+    lower = np.concatenate([np.full(q, -np.inf), np.full(p, RHO_BOUNDS[0]), [-SHAPE_BOUND]])
+    upper = np.concatenate([np.full(q, np.inf), np.full(p, RHO_BOUNDS[1]), [SHAPE_BOUND]])
+    return lower, upper
+
+
+def _cma_es(
+    objective, start: np.ndarray, lower: np.ndarray, upper: np.ndarray, rng: np.random.Generator
+) -> tuple[np.ndarray, float]:
+    """Minimize ``objective`` (rows of candidates -> values) by CMA-ES from ``start``.
+
+    The (mu/mu_w, lambda) strategy with the default weights and learning rates of Hansen (2016),
+    the population :data:`POPULATION`, and the step size :data:`STEP_SIZE`. A candidate outside the
+    bounds is moved to the nearest point inside them, and the update reads the moved candidate.
+    It stops after :data:`GENERATIONS` generations, once the best point moved less than
+    :data:`TOLERANCE` over :data:`WINDOW` generations, or once the steps fall below rounding.
+    """
+    dim = start.size
+    mu = POPULATION // 2
+    weights = np.log(mu + 0.5) - np.log(np.arange(1, mu + 1))
+    weights /= weights.sum()
+    mueff = 1.0 / float(weights @ weights)
+    cc = (4 + mueff / dim) / (dim + 4 + 2 * mueff / dim)
+    cs = (mueff + 2) / (dim + mueff + 5)
+    c1 = 2 / ((dim + 1.3) ** 2 + mueff)
+    cmu = min(1 - c1, 2 * (mueff - 2 + 1 / mueff) / ((dim + 2) ** 2 + mueff))
+    damps = 1 + 2 * max(0.0, math.sqrt((mueff - 1) / (dim + 1)) - 1) + cs
+    chi = math.sqrt(dim) * (1 - 1 / (4 * dim) + 1 / (21 * dim**2))
+    mean = np.clip(start, lower, upper)
+    sigma = STEP_SIZE
+    cov, basis, scales = np.eye(dim), np.eye(dim), np.ones(dim)
+    path_c, path_s = np.zeros(dim), np.zeros(dim)
+    best, best_value = mean.copy(), float(objective(mean[None, :])[0])
+    history = [best]
+    for generation in range(GENERATIONS):
+        steps = rng.standard_normal((POPULATION, dim)) @ (basis * scales).T
+        candidates = np.clip(mean + sigma * steps, lower, upper)
+        steps = (candidates - mean) / sigma
+        values = objective(candidates)
+        order = np.argsort(values, kind="stable")
+        if values[order[0]] < best_value:
+            best, best_value = candidates[order[0]].copy(), float(values[order[0]])
+        chosen = steps[order[:mu]]
+        step = weights @ chosen
+        mean = mean + sigma * step
+        inverse_root = (basis / scales) @ basis.T
+        path_s = (1 - cs) * path_s + math.sqrt(cs * (2 - cs) * mueff) * (inverse_root @ step)
+        norm_s = float(np.linalg.norm(path_s))
+        hsig = norm_s / math.sqrt(1 - (1 - cs) ** (2 * (generation + 1))) / chi < 1.4 + 2 / (
+            dim + 1
+        )
+        path_c = (1 - cc) * path_c + hsig * math.sqrt(cc * (2 - cc) * mueff) * step
+        cov = (
+            (1 - c1 - cmu) * cov
+            + c1 * (np.outer(path_c, path_c) + (1 - hsig) * cc * (2 - cc) * cov)
+            + cmu * (chosen.T * weights) @ chosen
+        )
+        sigma *= math.exp((cs / damps) * (norm_s / chi - 1))
+        cov = (cov + cov.T) / 2
+        eigen, basis = np.linalg.eigh(cov)
+        scales = np.sqrt(np.maximum(eigen, 1e-300))
+        history.append(best)
+        if generation >= WINDOW and np.linalg.norm(best - history[-1 - WINDOW]) < TOLERANCE:
+            break
+        if not math.isfinite(sigma) or sigma * scales.max() < 1e-12:
+            break
+    return best, best_value
+
+
+def _start(location: np.ndarray, scale: np.ndarray, effect: np.ndarray) -> np.ndarray:
+    """Least squares for the location, ``rho = 0``, and the effect's sample skewness as the shape
+    (the authors' code)."""
+    psi = np.linalg.lstsq(location, effect, rcond=None)[0]
+    centered = effect - effect.mean()
+    skewness = float(np.mean(centered**3) / np.mean(centered**2) ** 1.5)
+    return np.concatenate([psi, np.zeros(scale.shape[1]), [np.clip(skewness, -25, 25)]])
+
+
+def _heuristic(
+    design: _Design,
+    rows: np.ndarray,
+    effect: np.ndarray,
+    log_penalties: np.ndarray,
+    starts: list[np.ndarray],
+    rng: np.random.Generator,
+) -> tuple[np.ndarray, float]:
+    """The best CMA-ES estimate on ``rows`` over ``starts`` (the least-squares start first)."""
+    location, scale, y = design.location[rows], design.scale[rows], effect[rows]
+    k_alpha, m_kappa = design.penalties(log_penalties)
+    lower, upper = _bounds(location.shape[1], scale.shape[1])
+
+    def objective(theta: np.ndarray) -> np.ndarray:
+        return _penalized_nll(theta, location, scale, y, k_alpha, m_kappa)
+
+    found = [
+        _cma_es(objective, s, lower, upper, rng) for s in [_start(location, scale, y), *starts]
+    ]
+    return min(found, key=lambda f: f[1])
+
+
+def _tune(
+    design: _Design, effect: np.ndarray, budget: Budget, rng: np.random.Generator
+) -> tuple[np.ndarray, list[np.ndarray]]:
+    """The log penalties with the best cross-validated held-out log-likelihood, and each fold's
+    estimate at them.
+
+    The first ``budget.initial`` candidates are Latin hypercube points over
+    :data:`LOG_PENALTY_BOUNDS`; each later one maximizes the expected improvement over a Gaussian
+    process of the scores so far, among :data:`EI_CANDIDATES` uniform points. Every candidate
+    reads the same folds.
+    """
+    dim = 2 * design.parents
+    low, high = LOG_PENALTY_BOUNDS
+    folds = list(
+        KFold(budget.folds, shuffle=True, random_state=int(rng.integers(2**31))).split(effect)
+    )
+    points: list[np.ndarray] = []
+    scores: list[float] = []
+    estimates: list[list[np.ndarray]] = []
+
+    def score(log_penalties: np.ndarray) -> None:
+        held_out, fold_estimates = 0.0, []
+        for train, test in folds:
+            theta, _ = _heuristic(design, train, effect, log_penalties, [], rng)
+            rows = _row_log_likelihoods(
+                theta[None, :], design.location[test], design.scale[test], effect[test]
+            )
+            held_out -= float(rows.sum())
+            fold_estimates.append(theta)
+        points.append(log_penalties)
+        scores.append(held_out / len(folds))
+        estimates.append(fold_estimates)
+
+    sampler = qmc.LatinHypercube(d=dim, seed=int(rng.integers(2**31)))
+    for point in qmc.scale(sampler.random(budget.initial), [low] * dim, [high] * dim):
+        score(point)
+    kernel = (
+        ConstantKernel(1.0, (0.01, 1000.0)) * Matern(np.ones(dim), (0.01, 100.0), nu=2.5)
+        + WhiteKernel()
+    )
+    for _ in range(budget.tuning_iter - budget.initial):
+        process = GaussianProcessRegressor(
+            kernel, normalize_y=True, n_restarts_optimizer=2, random_state=int(rng.integers(2**31))
+        )
+        values = np.array(scores)
+        finite = np.isfinite(values)
+        with warnings.catch_warnings():
+            # A kernel parameter at its bound only shapes the acquisition, not the fit.
+            warnings.simplefilter("ignore", ConvergenceWarning)
+            process.fit(np.array(points)[finite], values[finite])
+        candidates = rng.uniform(low, high, size=(EI_CANDIDATES, dim))
+        mean, sd = process.predict(candidates, return_std=True)
+        gain = values[finite].min() - mean - EI_MARGIN
+        z = gain / np.maximum(sd, 1e-12)
+        improvement = gain * _ndtr(z) + sd * np.exp(-0.5 * z**2) / math.sqrt(2 * math.pi)
+        score(candidates[int(np.argmax(improvement))])
+    best = int(np.argmin(scores))
+    return points[best], estimates[best]
+
+
+def _ndtr(z: np.ndarray) -> np.ndarray:
+    return np.exp(log_ndtr(z))
+
+
+def _ecm(
+    design: _Design,
+    effect: np.ndarray,
+    theta: np.ndarray,
+    log_penalties: np.ndarray,
+    max_iter: int,
+) -> tuple[np.ndarray, bool]:
+    """Refine ``theta`` by ECM (Section 4) for at most ``max_iter`` iterations; return it and
+    whether it stopped on the paper's rule."""
+    location, scale = design.location, design.scale
+    q, p = location.shape[1], scale.shape[1]
+    k_alpha, m_kappa = design.penalties(log_penalties)
+    bounds = [RHO_BOUNDS] * p
+    psi, rho, shape = theta[:q].copy(), theta[q : q + p].copy(), float(theta[-1])
+    history = [theta.copy()]
+    for _ in range(max_iter):
+        residual = effect - location @ psi
+        variance = np.exp(scale @ rho)
+        sd = np.sqrt(variance)
+        u = shape * residual / sd
+        ratio = np.exp(-0.5 * u**2 - 0.5 * math.log(2 * math.pi) - log_ndtr(u))  # phi / Phi
+        v = shape * residual + sd * ratio
+        v2 = (shape * residual) ** 2 + variance + shape * sd * residual * ratio
+        weight = 1.0 / variance
+        shrink = 1.0 + shape**2
+        lhs = location.T @ (location * weight[:, None]) + k_alpha / shrink
+        rhs = location.T @ (weight * (effect - shape / shrink * v))
+        try:
+            psi_next = np.linalg.solve(lhs, rhs)
+        except np.linalg.LinAlgError:
+            psi_next = np.linalg.lstsq(lhs, rhs, rcond=None)[0]
+        shape = float((residual * weight) @ v / ((residual * weight) @ residual))
+        shape = float(np.clip(shape, -SHAPE_BOUND, SHAPE_BOUND))
+        psi = psi_next
+        a = effect - location @ psi
+        c = v2 - 2 * shape * a * v + (1 + shape**2) * a**2
+
+        def negative_q(r: np.ndarray, c=c) -> tuple[float, np.ndarray]:
+            eta = scale @ r
+            spread = c * np.exp(-eta)
+            value = eta.sum() + 0.5 * spread.sum() + 0.5 * r @ m_kappa @ r
+            gradient = scale.T @ (1.0 - 0.5 * spread) + m_kappa @ r
+            return float(value), gradient
+
+        rho = minimize(negative_q, rho, jac=True, method="L-BFGS-B", bounds=bounds).x
+        history.append(np.concatenate([psi, rho, [shape]]))
+        if len(history) > WINDOW and np.linalg.norm(history[-1] - history[-1 - WINDOW]) < TOLERANCE:
+            return history[-1], True
+    return history[-1], False
+
+
+def fit(parents: np.ndarray, effect: np.ndarray, budget: Budget, seed: int) -> Fit:
+    """Fit the skew-normal location-scale model of ``effect`` given ``parents`` by Algorithm 1.
+
+    ``parents`` is ``(n, s)`` and ``effect`` ``(n,)``, both standardized by the caller. The fit
+    draws its random numbers from ``seed`` alone, so the same data and seed give the same fit.
+    """
+    rng = np.random.default_rng(seed)
+    design = _design(parents, budget.knots)
+    log_penalties, fold_estimates = _tune(design, effect, budget, rng)
+    every = np.arange(effect.size)
+    theta, _ = _heuristic(design, every, effect, log_penalties, fold_estimates, rng)
+    theta, converged = _ecm(design, effect, theta, log_penalties, budget.max_iter)
+    q, p = design.location.shape[1], design.scale.shape[1]
+    rows = _row_log_likelihoods(theta[None, :], design.location, design.scale, effect)[:, 0]
+    residual = (effect - design.location @ theta[:q]) * np.exp(
+        -0.5 * design.scale @ theta[q : q + p]
+    )
+    return Fit(float(rows.mean()), residual, converged)
+
+
+def class_members(marks: np.ndarray, *, collider_check: bool = True) -> Iterator[np.ndarray]:
+    """Yield each DAG that orients the edges a graph leaves without one direction, as 0/1
+    adjacencies.
+
+    ``marks`` holds Andrey's endpoint marks (``marks[i, j]`` the mark at ``i`` on the edge
+    ``i-j``): a directed edge keeps its direction, and an undirected or bidirected one takes either.
+    A DAG qualifies when it is acyclic and, with ``collider_check``, makes no collider ``a -> c <-
+    b`` of nonadjacent ``a`` and ``b`` that the graph does not already hold, so for a CPDAG the DAGs
+    are the members of its Markov equivalence class. The edges are oriented one at a time in
+    column order and a partial orientation that already breaks a condition is dropped, so the DAGs
+    come one at a time and a caller that stops reading stops the search.
+    """
+    d = marks.shape[0]
+    adjacent = (marks != 0) & (marks.T != 0)
+    fixed = (marks == 1) & (marks.T == 2)  # tail at i, arrow at j: i -> j
+    free = [
+        (i, j)
+        for i in range(d)
+        for j in range(i + 1, d)
+        if adjacent[i, j] and not (fixed[i, j] or fixed[j, i])
+    ]
+
+    def reaches(dag: np.ndarray, source: int, target: int) -> bool:
+        seen, stack = {source}, [source]
+        while stack:
+            for nxt in np.flatnonzero(dag[stack.pop()]):
+                if nxt == target:
+                    return True
+                if nxt not in seen:
+                    seen.add(int(nxt))
+                    stack.append(int(nxt))
+        return False
+
+    def new_collider(dag: np.ndarray, head: int, tail: int) -> bool:
+        others = np.flatnonzero(dag[:, head])
+        return any(o != tail and not adjacent[o, tail] for o in others)
+
+    def extend(k: int, dag: np.ndarray) -> Iterator[np.ndarray]:
+        if k == len(free):
+            yield dag.copy()
+            return
+        for tail, head in (free[k], free[k][::-1]):
+            if reaches(dag, head, tail) or (collider_check and new_collider(dag, head, tail)):
+                continue
+            dag[tail, head] = 1
+            yield from extend(k + 1, dag)
+            dag[tail, head] = 0
+
+    # Each free edge is checked against every parent its head has when it is oriented, so a
+    # collider of two fixed edges, the graph's own, is the only one never checked.
+    yield from extend(0, fixed.astype(np.int8))
+
+
+def _acyclic(adjacency: np.ndarray) -> bool:
+    reach = adjacency.astype(bool)
+    for k in range(len(reach)):
+        reach |= reach[:, k, None] & reach[None, k, :]
+    return not np.diagonal(reach).any()
+
+
+def class_candidates(
+    marks: np.ndarray, max_fits: int | None
+) -> tuple[list[tuple[list[int], list[np.ndarray]]], np.ndarray, list[tuple[int, tuple[int, ...]]]]:
+    """The class's directed part, its undirected components with their DAGs, and the conditional
+    models they need.
+
+    The undirected edges of ``marks`` fall into connected components, and the class's DAGs are every
+    combination of one orientation of each component, so each component is listed on its own: its
+    nodes and the DAGs (0/1 adjacencies that hold the directed edges too) that orient its edges
+    with no directed cycle and no new collider, or, when none does, as conflicting colliders can
+    leave, every acyclic orientation of them. The first array holds the directed edges alone, the
+    DAG of a class with no undirected edge. A conditional model is a node of a component with at
+    least one parent, fitted given a parent set. The DAGs of a component are listed one at a time,
+    and the listing stops with a ``ValueError`` as soon as the components together need more than
+    ``max_fits`` conditional models (``None`` sets no cap), so a class too large to score is never
+    listed in full. A directed cycle among the directed edges also raises ``ValueError``.
+    """
+    d = marks.shape[0]
+    adjacent = (marks != 0) & (marks.T != 0)
+    fixed = (marks == 1) & (marks.T == 2)
+    base = fixed.astype(np.int8)
+    if not _acyclic(base):
+        raise ValueError("skewd_mv: PC's graph orients a directed cycle, so no DAG keeps its edges")
+    undirected = adjacent & ~fixed & ~fixed.T
+    seen = np.zeros(d, dtype=bool)
+    groups: list[list[int]] = []
+    for start in range(d):
+        if seen[start] or not undirected[start].any():
+            continue
+        stack, group = [start], []
+        seen[start] = True
+        while stack:
+            node = stack.pop()
+            group.append(node)
+            for other in np.flatnonzero(undirected[node] & ~seen):
+                seen[other] = True
+                stack.append(int(other))
+        groups.append(sorted(group))
+    fits: set[tuple[int, tuple[int, ...]]] = set()
+    components: list[tuple[list[int], list[np.ndarray]]] = []
+    for group in groups:
+        elsewhere = undirected.copy()  # the other components' edges leave this listing
+        elsewhere[np.ix_(group, group)] = False
+        part = marks.copy()
+        part[elsewhere] = 0
+        for collider_check in (True, False):
+            members: list[np.ndarray] = []
+            for dag in class_members(part, collider_check=collider_check):
+                members.append(dag)
+                for y in group:
+                    parents = tuple(np.flatnonzero(dag[:, y]).tolist())
+                    if parents:
+                        fits.add((y, parents))
+                if max_fits is not None and len(fits) > max_fits:
+                    raise ValueError(
+                        f"skewd_mv: the equivalence class of the data needs more than {max_fits} "
+                        f"conditional models (the listing stopped after {len(members)} DAGs of "
+                        "one component); raise max_fits, or set it to None, to fit them all"
+                    )
+            if members:
+                break
+        if not members:
+            raise ValueError(
+                "skewd_mv: PC's graph orients a directed cycle, so no DAG keeps its edges"
+            )
+        components.append((group, members))
+    return components, base, sorted(fits)

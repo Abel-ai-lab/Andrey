@@ -622,6 +622,189 @@ def loci(
     )
 
 
+@method_spec("skewd")
+def skewd(
+    data: npt.ArrayLike,
+    *,
+    alpha: float | None = None,
+    criterion: str = "independence",
+    tuning_iter: int = 60,
+    max_iter: int = 5000,
+    seed: int | None = None,
+    missing: str | None = None,
+) -> StructureOutput:
+    """Test the direction of a variable pair with SkewD, the skew-normal location-scale model.
+
+    SkewD [1]_ fits ``y = f(x) + g(x) n`` in each direction with skew-normal noise ``n``, which
+    includes the Gaussian, by a penalized likelihood over B-spline features of the cause. Either an
+    HSIC test [2]_ of the scaled residual against the proposed cause or the two likelihoods
+    determine the edge, as for :func:`~andrey.loci`.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, 2)
+        The two variables, one per column: column 0 is ``x`` and column 1 is ``y``. Coerced to
+        ``float64``. A DataFrame's column names become the structure's ``labels``.
+    alpha : float or None, default=None
+        Under ``criterion="independence"``: ``None`` chooses the direction with the larger p-value,
+        or with the smaller test statistic when the p-values are equal; a significance level such
+        as ``0.05`` draws an edge only when exactly one p-value exceeds it. Must be ``None`` under
+        ``criterion="likelihood"``.
+    criterion : {"independence", "likelihood"}, default="independence"
+        ``"independence"`` tests whether each direction's scaled residual is independent of its
+        proposed cause (SkewD-IT); ``"likelihood"`` chooses the direction whose model has the
+        larger likelihood (SkewD-LL). See Notes.
+    tuning_iter : int, default=60
+        The penalty settings, at least 1, that the Bayesian optimization scores by
+        cross-validation in each direction; the first two thirds, rounded up, are Latin hypercube
+        points. See Notes.
+    max_iter : int, default=5000
+        The most iterations, at least 1, of the expectation conditional maximization that refines
+        each direction's fit.
+    seed : int or None, default=None
+        Seed of the random draws of the optimization. ``None`` is the configured seed,
+        ``ANDREY_SEED`` or 0 when it is unset, not a fresh random one, so a fit repeats.
+    missing : {"testwise"} or None, default=None
+        How missing values (``NaN``) are handled. ``"testwise"`` keeps the rows where both columns
+        are observed. ``None`` picks the method's default, ``"testwise"``.
+
+    Returns
+    -------
+    StructureOutput
+        Contains a two-node :class:`~andrey.core.GraphStructure` of kind ``dag`` with the chosen
+        edge, or no edge. ``metadata["algorithm"]`` is ``"skewd"``. ``metadata["log_likelihoods"]``
+        holds the mean log-likelihood of ``y`` given ``x`` under ``"forward"`` and of ``x`` given
+        ``y`` under ``"backward"``. Under ``criterion="independence"``, ``metadata["p_values"]``
+        and ``metadata["statistics"]`` hold each direction's HSIC p-value and statistic, divided
+        by its mean under independence, under the same keys.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type; the message names the method, the argument, what it
+        accepts, and the value.
+    ValueError
+        If an argument lies outside its range or is not one of its choices, if ``data`` does not
+        have 2 columns, or if ``alpha`` is not ``None`` under ``criterion="likelihood"``.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method is not benchmarked yet.
+    SearchLimitWarning
+        When a direction's refinement stops at ``max_iter`` rather than on its own rule.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes.
+
+    Notes
+    -----
+    **When to use.** SkewD decides the direction between two continuous variables observed i.i.d.,
+    under the location-scale noise model ``y = f(x) + g(x) n`` with ``g > 0``, the noise ``n``
+    independent of the cause ``x``, and no hidden common cause of the two [1]_. It is designed for
+    pairs whose noise is skewed, where a model with symmetric noise such as :func:`~andrey.loci`
+    can misjudge the scale and the direction; with symmetric noise its model reduces to
+    :func:`~andrey.loci`'s Gaussian one. The paper finds the likelihood criterion the more
+    accurate on skewed location-scale pairs and the independence criterion the more robust across
+    other benchmarks, so the independence criterion is the default.
+
+    In each direction, the effect given the cause is skew-normal with location ``f``, scale ``g``,
+    and one shape ``lambda`` for every row; ``f`` is a cubic B-spline of 12 knots (14 columns) and
+    ``log g^2`` one of 5 knots (7 columns), each extended linearly past the data's range [1]_.
+    The estimate maximizes the log-likelihood less a second-order difference penalty on each
+    spline's coefficients [3]_, in three steps [1]_: Bayesian optimization chooses the two
+    penalties, each candidate scored by the held-out log-likelihood of an 8-fold
+    cross-validation, ``tuning_iter`` candidates with a Gaussian-process model of the scores and
+    the expected improvement; CMA-ES [4]_, with a population of 100, maximizes the penalized
+    likelihood from least squares and from each fold's estimate; and expectation conditional
+    maximization refines the best of them until the parameters move less than ``1e-6`` over 25
+    iterations, or for ``max_iter`` iterations. The defaults, 60 candidates and 5,000 iterations,
+    are those of the paper's runs. Each column is standardized first, as in [1]_, so the result
+    does not depend on the units of either variable; the Gaussian marginals of the two
+    standardized causes are then equal, so the likelihoods compare the two conditional models.
+
+    With ``criterion="independence"`` (SkewD-IT), each direction's scaled residual
+    ``(y - f(x)) / g(x)`` is tested against the proposed cause with the HSIC test of
+    :func:`~andrey.loci`: Gaussian kernels, each bandwidth the median distance between the rows,
+    and a gamma approximation of the null distribution [2]_. The larger p-value decides, as the
+    paper says, and ``alpha`` acts as for :func:`~andrey.loci`. With ``criterion="likelihood"``
+    (SkewD-LL), the direction with the larger mean log-likelihood decides, and equal ones give no
+    edge. Both directions draw their random numbers from the same ``seed``, so swapping the
+    columns swaps the fits.
+
+    **Limitations.** Not benchmarked yet. The paper measures it on skewed location-scale pairs of
+    1,000 rows and on established pair benchmarks [1]_. A fit at the defaults runs several
+    thousand CMA-ES searches in each direction and takes minutes per pair; ``tuning_iter`` sets
+    most of that cost. Each HSIC test builds matrices with one row and one column per sample.
+    The skew-normal's skewness lies within about -1 and 1, so noise more skewed than that is
+    misspecified, and the likelihood criterion assumes Gaussian marginals of the standardized
+    variables [1]_.
+
+    References
+    ----------
+    .. [1] Klippert, D., and Marx, A. (2026). Skewness-robust causal discovery in location-scale
+       noise models. ICML, PMLR 306.
+    .. [2] Gretton, A., Fukumizu, K., Teo, C. H., Song, L., Scholkopf, B., and Smola, A. J. (2008).
+       A kernel statistical test of independence. NeurIPS 20, 585-592.
+    .. [3] Eilers, P. H. C., and Marx, B. D. (1996). Flexible smoothing with B-splines and
+       penalties. Statistical Science 11(2), 89-121.
+    .. [4] Hansen, N. (2016). The CMA evolution strategy: a tutorial. arXiv:1604.00772.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from scipy.stats import skewnorm
+    >>> from andrey import skewd
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(300)
+    >>> noise = skewnorm.rvs(5, size=300, random_state=rng)
+    >>> y = np.tanh(2 * x) + x + (0.4 + 0.2 * np.tanh(x)) * noise
+    >>> out = skewd(np.column_stack([x, y]), criterion="likelihood", tuning_iter=2, max_iter=50)
+    >>> out.structure.oriented_edges()
+    [(0, 1, 'directed')]
+    """
+    if criterion == "likelihood" and alpha is not None:
+        raise ValueError(
+            f"skewd: alpha must be None under criterion='likelihood', which compares two "
+            f"likelihoods and no p-values, got {alpha!r}"
+        )
+    from andrey.core.independence import hsic_median_statistic_log_p
+    from andrey.core.warning_policy import warn_search_limit
+    from andrey.fcm.skewd import Budget, fit
+
+    X, labels, rows = _pair_matrix("skewd", data, standardize=True)
+    x, y = X[:, :1], X[:, 1:]
+    budget = Budget(
+        knots=12,
+        folds=8,
+        tuning_iter=tuning_iter,
+        initial=-(-2 * tuning_iter // 3),
+        max_iter=max_iter,
+    )
+    forward, backward = fit(x, y[:, 0], budget, seed), fit(y, x[:, 0], budget, seed)
+    if not (forward.converged and backward.converged):
+        warn_search_limit("skewd", "max_iter", max_iter, "ECM iterations")
+    extra = {
+        "log_likelihoods": {"forward": forward.log_likelihood, "backward": backward.log_likelihood},
+        **rows,
+    }
+    if criterion == "likelihood":
+        return likelihood_output(
+            forward.log_likelihood, backward.log_likelihood, labels=labels, extra=extra
+        )
+    stat_forward, log_p_forward = hsic_median_statistic_log_p(x[:, 0], forward.residual)
+    stat_backward, log_p_backward = hsic_median_statistic_log_p(y[:, 0], backward.residual)
+    return pairwise_output(
+        math.exp(log_p_forward),
+        math.exp(log_p_backward),
+        stat_forward=stat_forward,
+        stat_backward=stat_backward,
+        log_p=(log_p_forward, log_p_backward),
+        alpha=alpha,
+        labels=labels,
+        extra=extra,
+    )
+
+
 @method_spec("rcd")
 def rcd(
     data: npt.ArrayLike,

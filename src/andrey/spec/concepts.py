@@ -175,7 +175,20 @@ TESTED = (
 #: The methods with no edge to name in knowledge, ICP, whose tests take none, and the methods that
 #: take none yet.
 NO_KNOWLEDGE = (
-    *("gin", "anm", "pnl", "loci", "icp", "ages", "y_structures", "ldp", "ld3", "ldecc"),
+    *(
+        "gin",
+        "anm",
+        "pnl",
+        "loci",
+        "skewd",
+        "skewd_mv",
+        "icp",
+        "ages",
+        "y_structures",
+        "ldp",
+        "ld3",
+        "ldecc",
+    ),
     "local_isa_ling",
     "local_optimal_adjustment",
 )
@@ -190,6 +203,8 @@ CAPPED_LOOPS = (
     "ica_lingam",
     "varma_lingam",
     "dynotears",
+    "skewd",
+    "skewd_mv",
 )
 #: Every method, in ``andrey.api.__all__`` order.
 ALL_METHODS: tuple[str, ...] = tuple(api.__all__)
@@ -218,6 +233,8 @@ _CONCEPTS = (
             *RESIDUAL,
             "cam",
             "resit",
+            "skewd",
+            "skewd_mv",
             "score_matching",
             "nogam",
             "camuv",
@@ -326,7 +343,7 @@ _CONCEPTS = (
                     fragment="p-value",
                     reason="None decides without a level: the direction with the larger p-value.",
                 )
-                for m in ("anm", "pnl", "loci")
+                for m in ("anm", "pnl", "loci", "skewd")
             ),
             Deviation(
                 method="cam",
@@ -402,6 +419,7 @@ _CONCEPTS = (
                 "It tests the independence of residuals as part of its own model.",
                 *RESIDUAL,
                 "resit",
+                "skewd",
                 "camuv",
             ),
             *_exempt(
@@ -772,7 +790,9 @@ _CONCEPTS = (
                 "anm",
                 "pnl",
                 "loci",
+                "skewd",
             ),
+            *_exempt("Runs PC at no depth limit, as its paper does.", "skewd_mv"),
             *_exempt(
                 "No conditional-independence tests; max_parents caps the sets it tests.", "icp"
             ),
@@ -922,6 +942,8 @@ _CONCEPTS = (
                 "granger",
                 *RESIDUAL,
                 "resit",
+                "skewd",
+                "skewd_mv",
             ),
             *_exempt(
                 "An order search with no search over parent sets: the pruning starts from every "
@@ -1004,6 +1026,8 @@ _CONCEPTS = (
             "ldecc",
             "local_optimal_adjustment",
             "locpc_cde",
+            "skewd",
+            "skewd_mv",
         ),
         exempt=(
             *_exempt(
@@ -1210,8 +1234,10 @@ _CONCEPTS = (
             ),
             *_exempt("Its edges run from latent variables, which Knowledge cannot name.", "gin"),
             *_exempt(
-                "Two variables: knowledge of the edge would be the answer.", "anm", "pnl", "loci"
+                "Two variables: knowledge of the edge would be the answer.",
+                *("anm", "pnl", "loci", "skewd"),
             ),
+            *_exempt("Its paper gives no rule for background knowledge.", "skewd_mv"),
             *_exempt(
                 "Its tests read each set of the target's predictors as the data give it; no "
                 "knowledge of edges enters an invariance test.",
@@ -1357,6 +1383,7 @@ _CONCEPTS = (
             "anm",
             "pnl",
             "loci",
+            "skewd",
             *EM_METHODS,
             "local_optimal_adjustment",
         ),
@@ -1383,6 +1410,7 @@ _CONCEPTS = (
                 "A score or a regression reads every column.",
                 "cam",
                 "resit",
+                "skewd_mv",
                 "score_matching",
                 "nogam",
                 *LINGAM,
@@ -1588,6 +1616,7 @@ _CONCEPTS = (
                 "Its regressions fit smooth functions of continuous causes, which an environment "
                 "label is not.",
                 *("cam", "resit", "score_matching", "nogam", "camuv", "anm", "pnl", "loci"),
+                *("skewd", "skewd_mv"),
             ),
         ),
     ),
