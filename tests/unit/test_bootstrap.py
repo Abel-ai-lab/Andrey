@@ -307,6 +307,23 @@ def test_fci_resamples_that_are_not_pags_do_not_become_the_averaged_graph():
     out.structure.m_separated(0, 4, [])  # a graph query runs on the averaged graph
 
 
+def test_the_pag_the_check_rejects_holds_an_almost_directed_cycle_from_test_errors():
+    ds = andrey.data.sample_scm(d=8, n=1000, seed=16, density=3.0)
+    marks = andrey.fci(ds.data).structure.to_numpy()
+    assert not is_valid(GraphStructure.from_numpy(marks, kind="pag"))
+    # The marks contradict each other, whatever MAG is built from them: a tail at a on a directed
+    # path to b makes a an ancestor of b in every MAG of the class, and a <-> b says it is not.
+    reach = ((marks == TAIL) & (marks.T == ARROW)).astype(int)
+    for _ in range(len(marks)):
+        reach = reach | ((reach @ reach) > 0)
+    assert ((marks == ARROW) & (marks.T == ARROW) & (reach > 0)).any()
+    # The test results are at fault, not the rules: the d-separation oracle's PAG of the true graph
+    # is valid, and the learned skeleton lacks edges of the true graph.
+    assert is_valid(ds.graph.to_pag())
+    truth = ds.graph.to_numpy() != 0
+    assert (truth & ~((marks != 0) | (marks.T != 0))).any()
+
+
 @pytest.mark.parametrize("seed", range(4))
 def test_the_nearest_fit_has_the_least_mean_shd_to_the_fits(seed):
     fits = random_fits("pag", seed, count=12)
