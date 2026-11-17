@@ -87,7 +87,7 @@ a local file system to silence the warning. `andrey.data.generate`, which is dep
 working in 0.16.0, starts its workers the same way when your Python's default start method is the
 forkserver, as on Linux from Python 3.14; otherwise it keeps the default.
 
-## Scan dispatch
+## LiNGAM order search
 
 - `ANDREY_LINGAM_PRUNE_MIN_WORK`: a step of the `pwling` order search (DirectLiNGAM and the methods
   built on it) stops scoring a candidate that can no longer be picked only when its rows times

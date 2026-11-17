@@ -26,19 +26,18 @@ names its pull request.
   which variable each column holds, and `possible_dsep="fast"` keeps the data's order. The
   environment settings and the configuration page no longer list `fci_jci` with `normal_scores`
   among the parallel possible-d-separation searches; it does not offer that test. ([#1040])
-- A partial-correlation test asked one query at a time with two or more conditioning variables, as
-  `gs`, `ldecc`, and `locpc_cde` ask it, inverts the query's one submatrix directly, with the same
-  `np.linalg.inv` call and the same singularity bound, where it built an index grid and a stack of
-  one. At 5,000 rows, `locpc_cde` on 1,000 variables is 1.5 times faster, `gs` on 100 variables
-  1.4 times, and `ldecc` 1.1 times. Every output, `metadata["n_tests"]` included, is the same bit
+- A partial-correlation test asked one query at a time with two or more conditioning variables
+  inverts the query's one submatrix directly, with the same `np.linalg.inv` call and the same
+  singularity bound, where it built an index grid and a stack of one. Every output is the same bit
   for bit. ([#1035], [#1041])
 - The causal-order search of `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and
   `longitudinal_lingam` with `measure="pwling"` stops scoring a candidate once its partial score,
   a sum of nonnegative terms, shows it can be neither picked nor tied, and scores every other
   candidate in full. `direct_lingam` on 50 variables at 2,500 rows and on 70 at 3,500 is 2.0 and
   2.4 times faster, and `multi_group_direct_lingam` on three groups of 1,000 rows and 30 variables
-  1.4 times. Every order, graph, and weight is the same bit for bit. Steps with fewer rows times ordered pairs of candidates than
-  `ANDREY_LINGAM_PRUNE_MIN_WORK` (default `100000`) score every candidate. ([#1045], [#1051])
+  1.4 times. Every order, graph, and weight is the same bit for bit. Steps with fewer rows times
+  ordered pairs of candidates than `ANDREY_LINGAM_PRUNE_MIN_WORK` (default `100000`) score every
+  candidate. ([#1045], [#1051])
 - `qa/identity.py --shuffle` also refits ICP, IGSP, FCI-JCI, and J-PCMCI+, moving each one's
   targets and contexts with the columns. It exits 1 on a column order when a graph or a causal order
   changes or a weight or metadata value changes by more than rounding, and lists a difference of
@@ -51,12 +50,11 @@ names its pull request.
   one value in `markov_check`. The subtraction `1 - cdf` they used was `0` below about `2e-16` and
   off by up to a few percent near `1e-14`, so every strong dependence tied. A p-value above `1e-16`
   is the same to rounding, and a strong dependence now keeps a positive p-value down to about
-  `1e-308`. On the recorded-output and recovery inputs, 60 of the 66 methods return the same output
-  bit for bit. The graph of `pcmb` changes in one fit, from a tie among p-values below `2e-16`;
-  the p-values and statistics in the metadata of `pcmci`, `pcmciplus`, `lpcmci`, and `jpcmciplus`
-  change; and the claim scores of `y_structures` are finite where they were infinite, with the same
-  claims. The uniformity statistic and p-value of `markov_check` change when a test's p-value was
-  `0`, and the stored outputs of its example notebook are refreshed. ([#1017])
+  `1e-308`. On the recorded-output and recovery inputs, every method but four returns the same
+  output bit for bit: the p-values and statistics in the metadata of `pcmci`, `pcmciplus`,
+  `lpcmci`, and `jpcmciplus` change, and their graphs do not. The uniformity statistic and p-value
+  of `markov_check` change when a test's p-value was `0`, and the stored outputs of its example
+  notebook are refreshed. ([#1017])
 - `indep_test="normal_scores"` takes data from one environment. It ranks each column over every
   row its test reads, so over several environments a column mixed their distributions: on two
   simulated environments a true independence given the environment index was rejected in up to 95%
