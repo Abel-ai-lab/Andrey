@@ -416,9 +416,9 @@ names its pull request.
 - The set learners, `mb_by_mb`, `mmb_by_mmb`, `cmb`, `local_optimal_adjustment`, `ldp`, `ld3`, and
   `ldecc` build their answer from the edges the search found, where they filled a `d x d` array of
   marks first, and the lazy correlation rows grow in place. At 16,000 variables and 2,000 rows,
-  `local_optimal_adjustment` takes 0.76 GB instead of 1.9 GB (16 s instead of 25 s), the
-  `mmb_by_mmb` search 2.1 GB instead of 2.7 GB, and the step that builds one target's answer 1 MB
-  instead of 0.7 to 2.2 GB. Every graph, set, and `metadata["n_tests"]` is the same bit for bit.
+  `local_optimal_adjustment` takes 0.76 GB instead of 1.9 GB (16 s instead of 25 s), and the step
+  that builds one target's answer 1 MB instead of 0.7 to 2.2 GB. Every graph, set, and
+  `metadata["n_tests"]` is the same bit for bit.
   ([#1086])
 
 ### Fixed
