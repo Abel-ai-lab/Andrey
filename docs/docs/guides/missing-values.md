@@ -52,7 +52,7 @@ The methods that take each value:
 |---|---|---|
 | `"testwise"` | [Test-wise deletion](#test-wise-deletion): each test reads the rows where its variables are observed | {{ missing_names }}, where it is the default |
 | `"mvpc"` | [Missing-Value PC](#missing-value-pc): tests again the edges that the reason for the gaps could have kept | `pc`, with `indep_test="fisherz"` or `"student_t"` |
-| `"em"` | [Structural EM](#structural-em): the search runs on the expected covariance of the data | {{ em_names }}, with `score_func="bic"` and no `env` |
+| `"em"` | [Structural EM](#structural-em): the search runs on the expected covariance of the data | {{ em_names }}, with `score_func="bic"` and no `env` where the search takes them |
 
 Three limits apply to the first table:
 
@@ -176,8 +176,9 @@ em.metadata["em"]["log_likelihood"][-1]
 ```
 
 EM is sound when values are missing completely at random or at random. When whether a value is
-missing depends on missing values, it has no guarantee. `missing="em"` takes only
-`score_func="bic"` and no `env`, and a row with no observed value is dropped first.
+missing depends on missing values, it has no guarantee. Where a search takes a `score_func` or an
+`env`, `missing="em"` takes only `"bic"` and no `env`. A row with no observed value is dropped
+first.
 
 `missing="em"` is supported in {{ em_supported_names }}, where no setting we measured was less
 accurate than a reference implementation on the first datasets and again on fresh ones. In
