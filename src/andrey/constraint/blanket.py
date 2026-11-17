@@ -1100,11 +1100,17 @@ def _ranked_test(
     seed: int | None,
     degrees_of_freedom: str,
 ) -> tuple[CITest, Sequence[int]]:
-    """The ``indep_test`` test, seeded by ``seed``, with ``degrees_of_freedom``, over ``X`` and
-    each column's :func:`~andrey.core.ties.tie_ranks` (:class:`LazyTieRanks`), the columns the
-    test reads as categories ranked as categories (:func:`~andrey.core.ties.tie_mask`)."""
+    """The ``indep_test`` test, seeded by ``seed``, with ``degrees_of_freedom``, over ``X``, with
+    lazy correlation where it applies, and each column's :func:`~andrey.core.ties.tie_ranks`
+    (:class:`LazyTieRanks`), the columns the test reads as categories ranked as categories
+    (:func:`~andrey.core.ties.tie_mask`)."""
     test = make_indep_test(
-        indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
+        indep_test,
+        X,
+        categorical=categorical,
+        seed=seed,
+        degrees_of_freedom=degrees_of_freedom,
+        lazy=True,
     )
     return test, LazyTieRanks(X, tie_mask(indep_test, categorical, X.shape[1]))
 
@@ -1833,13 +1839,20 @@ def local_search(
     (:func:`~andrey.core.ties.tie_mask`) has as many levels as distinct observed values. With
     ``ranked=False``, the ranks are the column positions and ``andrey.config.tie_break`` is not
     read: for a caller that asks the tests only through :meth:`~LocalSearch.scan` and never picks
-    between tied candidates.
+    between tied candidates. A partial-correlation test on complete data computes its correlation
+    rows lazily (:func:`~andrey.core.ci.make_indep_test`): a search reads the rows of its targets
+    and conditioning sets, not the whole matrix.
     """
     if ranked:
         test, ranks = _ranked_test(X, indep_test, categorical, seed, degrees_of_freedom)
     else:
         test = make_indep_test(
-            indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
+            indep_test,
+            X,
+            categorical=categorical,
+            seed=seed,
+            degrees_of_freedom=degrees_of_freedom,
+            lazy=True,
         )
         ranks = list(range(X.shape[1]))
     mask = tie_mask(indep_test, categorical, X.shape[1])
