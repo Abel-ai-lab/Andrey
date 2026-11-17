@@ -16,6 +16,10 @@ names its pull request.
   simulated data so that whether a value is missing depends on another variable, fits `pc` with its
   default handling and with `missing="mvpc"` and `ges` with `missing="em"`, and scores each against
   the true graph. ([#1059])
+- `andrey.das`, DAS (Montagna et al. 2023), experimental: SCORE's causal order, then each leaf's
+  candidate parents screened by Welch tests on its row of the same Stein estimate of the score's
+  Jacobian, at most `max_parents=20` per variable, and CAM's smooth-term tests on those candidates
+  only, so the pruning no longer fits every variable before a node in the order ([#1082]).
 
 ### Changed
 
@@ -2627,3 +2631,4 @@ First alpha release.
 [#1055]: https://github.com/Abel-ai-lab/Andrey/pull/1055
 [#1067]: https://github.com/Abel-ai-lab/Andrey/pull/1067
 [#1070]: https://github.com/Abel-ai-lab/Andrey/pull/1070
+[#1082]: https://github.com/Abel-ai-lab/Andrey/pull/1082

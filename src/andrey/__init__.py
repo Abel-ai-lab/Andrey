@@ -28,6 +28,7 @@ from .api import (
     camuv,
     cdnod,
     dagma,
+    das,
     direct_lingam,
     dynotears,
     exact_search,
@@ -156,6 +157,7 @@ __all__ = [
     "resit",
     "score_matching",
     "nogam",
+    "das",
     # Latent-variable structure - observed indicators plus discovered latents in causal order.
     "gin",
     # Multi-output: one StructureOutput per group (shared order, per-group weights).

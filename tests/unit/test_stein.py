@@ -74,6 +74,31 @@ def test_a_rescaled_sample_rescales_the_estimates(gaussian):
     )
 
 
+def test_a_row_of_the_jacobian_holds_the_diagonal_and_reads_the_precision():
+    """A Gaussian's log density has the Hessian ``-P``, its precision, at every point: a row's
+    median follows ``-P``'s row, and its own entry is the diagonal estimate's."""
+    cov = np.array([[1.0, 0.5, 0.2], [0.5, 1.0, 0.3], [0.2, 0.3, 1.0]])
+    X = np.random.default_rng(1).multivariate_normal(np.zeros(3), cov, size=1000)
+    estimate = stein.jacobian(X)
+    precision = np.linalg.inv(cov)
+    bulk = (np.abs(X) < 2).all(axis=1)
+    for j in range(3):
+        row = estimate.row(j)
+        np.testing.assert_allclose(row[:, j], estimate.diagonal[:, j], rtol=1e-6, atol=1e-8)
+        np.testing.assert_allclose(np.median(row[bulk], axis=0), -precision[j], atol=0.3)
+    np.testing.assert_array_equal(estimate.diagonal, stein.jacobian_diagonal(X))
+
+
+def test_a_row_follows_the_columns_and_the_units(gaussian):
+    """Reordered columns reorder a row, and in units ``c`` times larger it is ``1 / c^2``."""
+    X = gaussian[0][:200]
+    base = stein.jacobian(X).row(0)
+    np.testing.assert_allclose(
+        stein.jacobian(X[:, ::-1]).row(1), base[:, ::-1], rtol=1e-6, atol=1e-8
+    )
+    np.testing.assert_allclose(stein.jacobian(8.0 * X).row(0), base / 64.0, rtol=1e-6, atol=1e-8)
+
+
 def test_equal_rows_leave_no_bandwidth():
     X = np.zeros((6, 2))
     X[0] = 1.0

@@ -9,6 +9,8 @@ Every solution fits the same datasets in the same run:
     andrey.score_matching.order.numpy
     andrey.nogam.numpy,                         Andrey's NoGAM
     andrey.nogam.order.numpy
+    dodiscover.das                              the authors' DAS (Montagna et al. 2023, CLeaR)
+    andrey.das.numpy                            Andrey's DAS
     andrey.cam.numpy, andrey.cam.order.numpy    Andrey's cam, shown beside every cell
     causaldisco.r2_sort_regress,                R2-SortnRegress (Reisach et al. 2023), the
     causaldisco.r2_sort.order                   sortability control
@@ -23,7 +25,8 @@ process, noise variances uniform on [0.4, 0.8], ``n = 1000`` rows, Erdos-Renyi g
 edges (``--densities er1``) or ``4 d`` (``er4``). The regimes ``score_paper``, ``score_paper_laplace``,
 and ``score_paper_gumbel`` are the papers' raw scale, which reproduces their numbers; the
 ``_standardized`` and ``_rescaled`` regimes are the decision cells. SCORE's claim is Gaussian noise
-at ``d = 10, 20, 50``, NoGAM's any noise at ``d = 10, 20``.
+at ``d = 10, 20, 50``, NoGAM's any noise at ``d = 10, 20``, and DAS's Gaussian noise at ``d = 10``
+to ``1000``.
 
 ``--oracle`` runs the oracle arm instead of the solutions (``andrey_bench.score_oracle``): SCORE's
 leaf rule on the exact Hessian of the true model, on the additive-noise regimes ``anm_er``,
@@ -63,6 +66,7 @@ from pathlib import Path
 
 from andrey_bench import datasets, memcap, rundir, score_oracle
 from andrey_bench.adapters.andrey_cam import AndreyCAM, AndreyCAMOrder
+from andrey_bench.adapters.andrey_das import AndreyDAS
 from andrey_bench.adapters.andrey_nogam import AndreyNoGAM, AndreyNoGAMOrder
 from andrey_bench.adapters.andrey_score_matching import (
     AndreyScoreMatching,
@@ -70,6 +74,7 @@ from andrey_bench.adapters.andrey_score_matching import (
 )
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
 from andrey_bench.adapters.causaldisco_r2sort import CausalDiscoR2Sort, CausalDiscoR2SortnRegress
+from andrey_bench.adapters.dodiscover_das import DodiscoverDAS
 from andrey_bench.adapters.dodiscover_nogam import DodiscoverNoGAM, DodiscoverNoGAMOrder
 from andrey_bench.adapters.rolland_score import RollandSCORE, RollandSCOREOrder, code_dir
 from andrey_bench.datasets import DatasetKey
@@ -86,6 +91,8 @@ SOLUTIONS = [
     AndreyScoreMatchingOrder(),
     AndreyNoGAM(),
     AndreyNoGAMOrder(),
+    DodiscoverDAS(),
+    AndreyDAS(),
     AndreyCAM(),
     AndreyCAMOrder(),
     CausalDiscoR2SortnRegress(),
