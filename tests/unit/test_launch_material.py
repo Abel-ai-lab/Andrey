@@ -18,6 +18,8 @@ README = ROOT / "README.md"
 IMAGES = ".github/readme"
 SUMMARY = ROOT / "benchmarks/published/0.1.0/summary.json"
 POSTS = ROOT / "docs" / "blog"
+CARDS = ROOT / "docs" / "docs" / "benchmarks"
+AI_USE = {"none", "edited", "drafted"}
 CONF = (ROOT / "docs" / "conf.py").read_text()
 
 
@@ -99,6 +101,20 @@ def test_every_post_is_dated_once_and_names_its_version():
         assert "{{" not in body, post.name
         for path in re.findall(r"(?::file:|\{literalinclude\}) (\S+)", body):
             assert path.startswith(f"{meta['version']}/") and (POSTS / path).is_file(), path
+
+
+def test_every_post_and_card_states_how_ai_was_used():
+    # Every post and every release card sets `ai` and, unless it is `none`, `ai_tools`. conf.py
+    # writes the statement from them, so no page types its own.
+    posts = [p for p in POSTS.glob("*.md") if front_matter(p).get("blogpost") == "true"]
+    cards = [c for c in CARDS.glob("*.md") if re.fullmatch(r"\d+\.\d+\.\d+", c.stem)]
+    assert posts and cards
+    for page in posts + cards:
+        meta = front_matter(page)
+        assert meta.get("ai") in AI_USE, page.name
+        assert bool(meta.get("ai_tools")) == (meta["ai"] != "none"), page.name
+        text = page.read_text()
+        assert "ai-statement" not in text and not re.search(r"^\W*AI statement", text, re.M)
 
 
 def test_the_benchmark_explorer_address_redirects_to_the_release_cards():
