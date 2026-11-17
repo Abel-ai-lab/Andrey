@@ -587,7 +587,7 @@ def _coerce(raw: str, param: ParamSpec) -> object:
         return _targets_value(raw, param.name)
     value, quoted = _unquote(raw)
     if quoted:  # a quoted value is a literal string -- only a str param can accept one
-        if param.type != "str":
+        if param.type not in ("str", "str_or_list"):
             raise CliError(
                 "bad_value", f"{param.name} is a {param.type}, not a quoted string", EXIT_USAGE
             )
@@ -638,8 +638,13 @@ def _coerce(raw: str, param: ParamSpec) -> object:
                 expected_shape="[int, int]",
             )
         return pair
-    if kind == "str_list":
-        return tuple(_bracket_items(value, param.name))
+    if kind == "str_list" or (kind == "str_or_list" and value.startswith("[")):
+        items = tuple(_bracket_items(value, param.name))
+        if kind == "str_or_list" and not items:
+            raise CliError(
+                "bad_value", f"{param.name} expects one value or a list like [a,b]", EXIT_USAGE
+            )
+        return items
     return _current_choice(value, param)
 
 
@@ -710,8 +715,9 @@ def _targets_object(value: object, name: str) -> dict:
 
 def _validate_config_value(value: object, param: ParamSpec) -> object:
     """A `--config` value is already typed (YAML/JSON): take it as the param's type without parsing
-    a string, for :func:`_checked` to check. A str or str_list must hold strings, which
-    ``ParamSpec.check`` leaves to the method. Returns tuples for int_pair / str_list."""
+    a string, for :func:`_checked` to check. A str, str_list, or str_or_list must hold strings,
+    which ``ParamSpec.check`` leaves to the method. Returns tuples for int_pair / str_list /
+    str_or_list."""
     if value is None:
         if param.nullable:
             return None
@@ -724,12 +730,12 @@ def _validate_config_value(value: object, param: ParamSpec) -> object:
         if isinstance(value, str):
             return _targets_value(value, param.name)
         return _targets_object(value, param.name)
-    if param.type == "str" and isinstance(value, str):
+    if param.type in ("str", "str_or_list") and isinstance(value, str):
         return _current_choice(value, param)
     strings = isinstance(value, (list, tuple)) and all(isinstance(i, str) for i in value)
-    if param.type == "str_list" and strings:
+    if strings and (param.type == "str_list" or (param.type == "str_or_list" and value)):
         return tuple(value)
-    if param.type in ("str", "str_list"):
+    if param.type in ("str", "str_list", "str_or_list"):
         raise CliError(
             "bad_value", f"{param.name} in --config is not a valid {param.type}", EXIT_USAGE
         )
