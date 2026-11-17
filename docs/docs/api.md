@@ -513,12 +513,14 @@ variable.
    multi_group_direct_lingam
    cam
    resit
+   cpcm_graph
    score_matching
    nogam
    camuv
    anm
    pnl
    loci
+   cpcm
    rcd
    bottom_up_parce_lingam
    gin
@@ -658,6 +660,18 @@ proposed cause, and decides either by an HSIC test of the scaled residual agains
 (`criterion="independence"`, the default) or by the larger likelihood (`criterion="likelihood"`),
 which suits Gaussian noise. The [0.16.0](benchmarks/0.16.0.md#loci) release card measures both
 against the authors' code.
+
+CPCM, conditionally parametric causal models (Bodik and Chavez-Demoulin 2025), experimental,
+models each variable given its parents by a parametric family whose parameters are smooth functions
+of the parents: Gaussian with mean and scale (the default), Gaussian with the mean alone,
+exponential, Pareto, Poisson, gamma, Gumbel, or negative binomial, one family for every column or
+one per column. Each variable's values mapped through its fitted distribution function are
+independent of its causes only in the causal direction. {py:func}`~andrey.cpcm` decides a pair by an
+HSIC test of that residual in each direction; {py:func}`~andrey.cpcm_graph` returns the DAG whose
+residuals a dHSIC test finds most jointly independent, with a penalty of 2 per edge, by exact search
+up to 4 variables and RESIT's order with greedy edge removal above; the paper claims graphs of 5
+variables. A column outside its family's support, such as a non-integer under `"poisson"`, raises
+`ValueError`. Neither is benchmarked yet.
 
 IAMB, Inter-IAMB, GS, and Fast-IAMB learn a variable's Markov blanket, and MMPC and HITON-PC its
 parents and children, given as `target`; without one, they join a pair when each is in the other's

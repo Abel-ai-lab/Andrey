@@ -12,6 +12,15 @@ names its pull request.
 
 ### Added
 
+- `andrey.cpcm` and `andrey.cpcm_graph`, CPCM (Bodik and Chavez-Demoulin 2025), experimental:
+  conditionally parametric causal models, where each variable given its parents follows a chosen
+  family whose parameters are smooth functions of the parents (`family`: `"gaussian"`, the default,
+  with mean and scale, `"gaussian_fixed_scale"`, `"exponential"`, `"pareto"`, `"poisson"`,
+  `"gamma"`, `"gamma_fixed_shape"`, `"gumbel"`, `"gumbel_fixed_scale"`, `"negative_binomial"`, one
+  for every column or one per column). `cpcm` decides a pair by the paper's residual independence
+  tests, `cpcm_graph` returns the DAG of lowest penalized dHSIC score (`edge_penalty=2`) by exact
+  search up to 4 variables and RESIT-greedy search above. A column outside its family's support
+  raises `ValueError` ([#CPCM_PR]).
 - `target` takes a list of columns on every method that takes one (`iamb`, `inter_iamb`, `gs`,
   `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
   `icp`, `local_isa_ling`): one call returns one result per target, each equal to a call for that
