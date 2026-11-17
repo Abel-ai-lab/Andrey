@@ -162,6 +162,8 @@ def test_str_or_list_choices_hold_for_one_value_and_for_each_item(nullable):
     for bad in (3, ["a", 3]):
         with pytest.raises(TypeError, match="names must be one of"):
             param.check(bad, "method")
+    with pytest.raises(ValueError, match="a str_or_list parameter takes no choice aliases"):
+        ParamSpec(**{**param.model_dump(), "choice_aliases": (("c", "a"),)})
     entry = _param_schema(param)
     assert "enum" not in entry  # a list is none of the choices
     assert entry["anyOf"] == [

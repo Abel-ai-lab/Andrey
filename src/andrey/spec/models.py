@@ -120,6 +120,9 @@ class ParamSpec(Spec):
     def _check_aliases(self) -> ParamSpec:
         if self.name in self.aliases:
             raise ValueError(f"{self.name}: a parameter is not its own alias")
+        if self.type == "str_or_list" and self.choice_aliases:
+            # A former value is mapped for one string; nothing maps the items of a list.
+            raise ValueError(f"{self.name}: a str_or_list parameter takes no choice aliases")
         for old, new in self.choice_aliases:
             if not self.choices or new not in self.choices or old in self.choices:
                 raise ValueError(f"{self.name}: choice alias {old!r} -> {new!r} is not a rename")
