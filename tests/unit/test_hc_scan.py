@@ -12,11 +12,13 @@ from __future__ import annotations
 
 import itertools
 import math
+import pickle
 
 import numpy as np
 import pytest
 
 import andrey
+from andrey.constraint.blanket import LazyTieRanks
 from andrey.core.score import BICScore, make_score
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, add_deltas, remove_deltas
 from andrey.core.ties import EPS_IMPROVE, KEY_DP, TieKeys, tie_ranks
@@ -243,6 +245,17 @@ def test_tie_keys_read_one_eighth_of_the_columns_alone_before_computing_every_on
     keys[300]
     assert len(keys) == 2400
     order = sorted(range(2400), key=keys.__getitem__)
+    np.testing.assert_array_equal(order, np.argsort(tie_ranks(x)))
+
+
+def test_tie_keys_cross_a_process_boundary() -> None:
+    """A search sent to a worker process takes the keys it has computed, and the copy reads the
+    same order as the tie ranks."""
+    x = _wide("gaussian")
+    ranks = LazyTieRanks(x, np.zeros(300, dtype=bool))
+    ranks[5]
+    copy = pickle.loads(pickle.dumps(ranks))
+    order = sorted(range(300), key=copy.__getitem__)
     np.testing.assert_array_equal(order, np.argsort(tie_ranks(x)))
 
 
