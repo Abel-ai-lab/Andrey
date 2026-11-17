@@ -64,14 +64,16 @@ whose Reproduce table lists the driver.
 | [VARMA-LiNGAM and longitudinal LiNGAM](comparisons/lingam-time-series.md) | `lingam_ts.py` | VARMA-LiNGAM, LongitudinalLiNGAM | lingam | 0.5.0, 0.9.0 |
 | [DYNOTEARS](comparisons/dynotears.md) | `dynotears_ts.py` | DYNOTEARS | CausalNex | 0.14.0 |
 | [Cross-link F1 of a time-series run](comparisons/cross-link-f1.md) | `rescore_cross_links.py`, `rescore_window_pag.py` | rescores a finished run | | |
+| Tübingen cause-effect pairs | `tuebingen_pairs.py`, `tuebingen_summary.py` | `anm`, `pnl`, `loci` (both criteria), and `resit` on the real pairs of `load_dataset("tuebingen")` | the authors' code of QCCD, HECI, and GRCI | |
 | Public datasets | `public_datasets.py` | every method on Sachs and the bnlearn networks | every package | 0.1.0 |
 | [Dispatch thresholds](comparisons/dispatch-thresholds.md) | | Andrey's own execution paths | | |
 
 `start.sh` builds the benchmark environment; `start_r.sh`, `start_cam_r.sh`, `start_resit_r.sh`,
 `start_mvpc_r.sh`, `start_sbcd_r.sh`, `start_missdag.sh`, `start_mmb.sh`, `start_xges.sh`,
 `start_tigramite.sh`, `start_lingam.sh`, `start_lingam_ts.sh`, `start_causalnex.sh`,
-`start_utigsp.sh`, `start_loci.sh`, `start_skewd.sh`, `start_stein.sh`, and `start_notears.sh` build
-the separate environments some comparisons need ([setup](README.md#setup)).
+`start_utigsp.sh`, `start_loci.sh`, `start_skewd.sh`, `start_stein.sh`, `start_notears.sh`,
+`start_qccd.sh`, `start_heci.sh`, and `start_grci.sh` build the separate environments some
+comparisons need ([setup](README.md#setup)).
 
 ## Release cards
 
