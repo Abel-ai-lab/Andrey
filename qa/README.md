@@ -409,6 +409,11 @@ median SHD over the draws is:
 - below the empty graph's median SHD;
 - within the method's tolerance of its baseline, in either direction.
 
+A binary score (LDP's) is judged in both checks by the sum over the draws, the number of draws that
+score 1, since the median of ten such draws is 0, a half, or 1 and moves only when five change. Its
+baseline is recorded as `total_shd`, and its tolerance, in draws, is the number that may differ on
+another host.
+
 `quality_baselines.json` holds the baselines, and in its `tolerances` block every tolerance with the
 reason for its size. A median better than the baseline by more than the tolerance also fails, so an
 intended change is recorded by a recapture. Every fit runs on the numpy backend with one worker and

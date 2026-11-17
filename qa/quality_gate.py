@@ -11,7 +11,8 @@ the tolerance of its recorded baseline; a method that estimates a set of variabl
 variable's parents, counts its false and missed members instead (:func:`set_errors`), and one that
 answers the edges at a single variable counts the errors at that variable alone, or in its local
 structure (:func:`local_errors`), and one that answers adjustment sets for a treatment and an
-outcome counts one error for a draw where it returns no set or a set that is not valid.
+outcome counts one error for a draw where it returns no set or a set that is not valid and is
+judged by the errors summed over the draws, since the median of a 0 or 1 score cannot move far.
 ``quality_baselines.json`` holds the baselines and, in one block, every tolerance with the reason
 for its size. Before any fit, the gate runs :mod:`qa.reference_parity` over the published
 benchmark summaries as a soft gate: it prints the rows where Andrey makes more errors than the
@@ -842,6 +843,10 @@ Target = Literal[
     "adjustment",
 ]
 SERIES_TARGETS = ("lagged", "window", "window_edges", "cross_links", "lagged_edges")
+#: Targets scored 0 or 1 on each draw. The median of such a cell is 0, a half, or 1, so a baseline
+#: within one of it rejects nothing: the cell is judged by the draws with an error, summed, which
+#: moves by one for each draw that changes.
+BINARY_TARGETS = ("adjustment",)
 
 
 @dataclass(frozen=True)
@@ -1404,7 +1409,11 @@ def empty_estimate(draw: Draw, target: Target) -> Any:
 
 @dataclass
 class CellResult:
-    """One method on one dataset: the SHD of each draw and of the empty graph, and both checks."""
+    """One method on one dataset: the SHD of each draw and of the empty graph, and both checks.
+
+    The cell is judged by the median over the draws, or, for a binary score
+    (:data:`BINARY_TARGETS`), by the sum over the draws, ``statistic`` ``"total"``.
+    """
 
     method: str
     dataset: str
@@ -1413,6 +1422,7 @@ class CellResult:
     baseline: float | None
     tolerance: float | None
     seconds: float = 0.0
+    statistic: str = "median"
 
     @property
     def median(self) -> float:
@@ -1423,18 +1433,27 @@ class CellResult:
         return float(statistics.median(self.empty_shd))
 
     @property
+    def score(self) -> float:
+        """The cell's value: the median over the draws, or the sum for a binary score."""
+        return float(sum(self.shd)) if self.statistic == "total" else self.median
+
+    @property
+    def empty_score(self) -> float:
+        """The empty graph's value under the same statistic."""
+        return float(sum(self.empty_shd)) if self.statistic == "total" else self.empty_median
+
+    @property
     def failures(self) -> list[str]:
         out = []
-        if not self.median < self.empty_median:
-            out.append(
-                f"median SHD {self.median:g} is not below the empty graph's {self.empty_median:g}"
-            )
+        name = "total errors" if self.statistic == "total" else "median SHD"
+        if not self.score < self.empty_score:
+            out.append(f"{name} {self.score:g} is not below the empty graph's {self.empty_score:g}")
         if self.baseline is None or self.tolerance is None:
             out.append("no recorded baseline")
-        elif abs(self.median - self.baseline) > self.tolerance:
-            gap = self.median - self.baseline
+        elif abs(self.score - self.baseline) > self.tolerance:
+            gap = self.score - self.baseline
             out.append(
-                f"median SHD {self.median:g} is {abs(gap):g} {'above' if gap > 0 else 'below'} "
+                f"{name} {self.score:g} is {abs(gap):g} {'above' if gap > 0 else 'below'} "
                 f"the baseline {self.baseline:g} (tolerance {self.tolerance:g})"
                 + ("" if gap > 0 else "; recapture if the change is intended")
             )
@@ -1453,9 +1472,16 @@ class CellResult:
         verdict = verdict or ("PASS" if self.passed else "FAIL")
         return (
             f"[{verdict}] {self.method:12s} {self.dataset:20s} "
-            f"SHD {self.median:5g}  empty {self.empty_median:5g}  baseline {baseline:9s} "
+            f"{'sum' if self.statistic == 'total' else 'SHD'} {self.score:5g}  "
+            f"empty {self.empty_score:5g}  baseline {baseline:9s} "
             f"{self.seconds:6.1f} s"
         )
+
+
+def statistic_of(target: Target) -> str:
+    """Return ``"total"`` for a binary score and ``"median"`` otherwise; the baseline and the
+    tolerance of a cell are recorded as ``<statistic>_shd``."""
+    return "total" if target in BINARY_TARGETS else "median"
 
 
 def recorded() -> dict:
@@ -1490,14 +1516,16 @@ def evaluate(method: str, dataset: str, fit: Callable[[Draw], object] | None = N
             empties.append(shd(empty, truth, spec.target))
     ledger = recorded()
     cell = ledger["baselines"].get(method, {}).get(dataset, {})
+    statistic = statistic_of(spec.target)
     return CellResult(
         method=method,
         dataset=dataset,
         shd=shds,
         empty_shd=empties,
-        baseline=cell.get("median_shd"),
-        tolerance=ledger["tolerances"].get(method, {}).get("median_shd"),
+        baseline=cell.get(f"{statistic}_shd"),
+        tolerance=ledger["tolerances"].get(method, {}).get(f"{statistic}_shd"),
         seconds=time.perf_counter() - start,
+        statistic=statistic,
     )
 
 
@@ -1587,8 +1615,8 @@ def capture(results: list[CellResult]) -> None:
         baselines[method] = {}
     for r in results:
         baselines[r.method][r.dataset] = {
-            "median_shd": r.median,
-            "empty_median_shd": r.empty_median,
+            f"{r.statistic}_shd": r.score,
+            f"empty_{r.statistic}_shd": r.empty_score,
             "shd": r.shd,
         }
     everything["supported"]["baselines"] = {m: baselines[m] for m in CHECKS if m in baselines}
@@ -1625,7 +1653,10 @@ def main(argv: list[str] | None = None) -> int:
         ap.error(f"unknown methods {unknown}; known: {list(CHECKS)}")
 
     parity_failed = 0 if args.capture else reference_parity.main()
-    print("\nQuality gate: median SHD over each dataset's draws, against the known graph.\n")
+    print(
+        "\nQuality gate: median SHD over each dataset's draws (the sum for a binary score), "
+        "against the known graph.\n"
+    )
     results = []
     for result in run_cells(cells(args.methods or None), args.jobs):
         results.append(result)

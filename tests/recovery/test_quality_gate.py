@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import gzip
 import importlib
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -19,7 +20,9 @@ from qa import quality_gate as qg
 def test_every_cell_has_a_baseline_and_every_method_a_tolerance() -> None:
     ledger = qg.recorded()
     assert set(ledger["tolerances"]) == set(qg.CHECKS)
-    assert all(t["median_shd"] >= 1 and t["reason"] for t in ledger["tolerances"].values())
+    for method, tolerance in ledger["tolerances"].items():
+        statistic = qg.statistic_of(qg.CHECKS[method].target)
+        assert tolerance[f"{statistic}_shd"] >= 1 and tolerance["reason"], method
     assert {m: set(ledger["baselines"][m]) for m in qg.CHECKS} == {
         m: set(qg.CHECKS[m].datasets) for m in qg.CHECKS
     }
@@ -184,6 +187,44 @@ def test_tolerance_is_two_sided() -> None:
     assert cell(4).passed and cell(6).passed
     assert not cell(3).passed and not cell(7).passed
     assert qg.CellResult("PC", "x", shd=[5], empty_shd=[5], baseline=5, tolerance=1).failures
+
+
+def abstains_on_first(draws: int) -> Callable[[qg.Draw], object]:
+    """LDP's fit returning no set on the first ``draws`` draws and the treatment's parents, a
+    valid set, on the others."""
+    seen: list[qg.Draw] = []
+
+    def fit(draw: qg.Draw) -> list[set[int]]:
+        seen.append(draw)
+        if len(seen) <= draws:
+            return []
+        return [qg.parents_of(qg.target_truth(draw.truth, "adjustment"), 0)]
+
+    return fit
+
+
+@pytest.mark.parametrize(("abstaining", "passes"), [(0, True), (1, True), (2, False), (4, False)])
+def test_ldp_is_judged_by_the_draws_it_gets_wrong(abstaining: int, passes: bool) -> None:
+    """A binary score moves the median of ten draws only when five change, so the cell is judged by
+    the draws that score 1: one borderline draw passes, a second does not."""
+    result = qg.evaluate("LDP", "ldp_figure3_n5000", fit=abstains_on_first(abstaining))
+    assert result.statistic == "total" and result.score == sum(result.shd) == abstaining
+    assert result.passed is passes
+    if abstaining == 4:
+        assert result.median < result.empty_median  # the median alone would accept it
+
+
+def test_ldp_rejects_half_the_draws_wrong_and_all_of_them() -> None:
+    half = qg.evaluate("LDP", "ldp_figure3_n5000", fit=abstains_on_first(5))
+    assert half.median == 0.5 < half.empty_median and not half.passed
+    every = qg.evaluate("LDP", "ldp_figure3_n5000", fit=abstains_on_first(10))
+    assert any("empty graph" in f for f in every.failures)
+
+
+def test_only_a_binary_score_is_judged_by_its_sum() -> None:
+    assert {m for m, spec in qg.CHECKS.items() if qg.statistic_of(spec.target) == "total"} == {
+        "LDP"
+    }
 
 
 def test_the_slowest_cells_are_cells_of_the_gate_and_start_first() -> None:
