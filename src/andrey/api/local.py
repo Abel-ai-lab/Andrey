@@ -16,6 +16,7 @@ import numpy as np
 
 from andrey.api._adapt import (
     copies_named,
+    edge_structure,
     fit_inputs,
     label_of,
     structure_output,
@@ -25,10 +26,9 @@ from andrey.api._method import method_spec
 from andrey.core import ARROW, TAIL, GraphStructure, backend
 from andrey.core.ci import counting_tests
 from andrey.core.ci_missing import rows_tested
-from andrey.core.orient import to_structure
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Iterable, Mapping, Sequence
 
     import numpy.typing as npt
 
@@ -37,13 +37,16 @@ if TYPE_CHECKING:
     from andrey.constraint.sequential import Rules
     from andrey.core import StructureOutput
     from andrey.core.knowledge import Knowledge
+    from andrey.core.structure import Kind
 
 
-def _edge_sets(star: np.ndarray, t: int) -> dict[str, list[int]]:
-    """Return the target's parents, children, and undirected neighbors in ``star``, by position."""
+def _edge_sets(edges: Iterable[tuple[int, int, int]]) -> dict[str, list[int]]:
+    """Return the target's parents, children, and undirected neighbors among ``edges``, by position.
+
+    Each edge is ``(neighbor, mark at the target, mark at the neighbor)``, ascending by neighbor.
+    """
     sets: dict[str, list[int]] = {"parents": [], "children": [], "undirected": []}
-    for j in np.flatnonzero(star[t]).tolist():
-        near, far = star[t, j], star[j, t]
+    for j, near, far in edges:
         if near == ARROW and far == TAIL:
             sets["parents"].append(j)
         elif near == TAIL and far == ARROW:
@@ -57,8 +60,9 @@ def _edge_sets(star: np.ndarray, t: int) -> dict[str, list[int]]:
 class _Edges:
     """The edges at a target as a sequential search found them.
 
-    ``marks`` holds each neighbor's mark at the target and at itself, ``blanket`` the target's
-    Markov blanket, and ``learned`` the variables whose blankets the search learned.
+    ``marks`` holds each neighbor's mark at the target and at itself, ascending by neighbor,
+    ``blanket`` the target's Markov blanket, and ``learned`` the variables whose blankets the search
+    learned.
     """
 
     marks: list[tuple[int, int, int]]
@@ -77,16 +81,15 @@ def _sequential_edges(
 
     result = sequential(search, t, blanket, rules, local_depth=local_depth)
     network = result.network
-    marks = [(v, network.mark(t, v), network.mark(v, t)) for v in network.neighbors(t)]
-    return _Edges(marks, list(result.cache.blankets[t]), list(result.learned))
+    return _Edges(network.edges_at(t), list(result.cache.blankets[t]), list(result.learned))
 
 
-def _star(edges: _Edges, t: int, d: int) -> np.ndarray:
-    """Return the marks over all ``d`` variables of the edges at ``t`` alone."""
-    out = np.zeros((d, d), dtype=np.int8)
-    for v, at_t, at_v in edges.marks:
-        out[t, v], out[v, t] = at_t, at_v
-    return out
+def _star(marks: Iterable[tuple[int, int, int]], t: int, d: int, kind: Kind) -> GraphStructure:
+    """Return the structure over all ``d`` variables of the edges at ``t`` alone.
+
+    The edges are the ``(neighbor, mark at t, mark at the neighbor)`` of :func:`_edge_sets`.
+    """
+    return edge_structure(d, [(t, v, near, far) for v, near, far in marks], kind=kind)
 
 
 def _cmb_codes(blanket: str, decided: np.ndarray | None, search: LocalSearch, t: int) -> CMBResult:
@@ -339,11 +342,10 @@ def mb_by_mb(
     answer = partial(_sequential_edges, blanket, MB_BY_MB, local_max_depth)
 
     def output(t: int, edges: _Edges, n: int, rows: Mapping[int, int]) -> StructureOutput:
-        star = _star(edges, t, d)
-        metadata = target_metadata(t, _edge_sets(star, t), name)
+        metadata = target_metadata(t, _edge_sets(edges.marks), name)
         metadata["blankets_learned"] = [name(x) for x in edges.learned]
         metadata |= fit_metadata(mask, data, rows, n)
-        return structure_output(to_structure(star, kind="cpdag"), labels=labels, metadata=metadata)
+        return structure_output(_star(edges.marks, t, d, "cpdag"), labels=labels, metadata=metadata)
 
     with copies_named(labels):
         search = local_search(
@@ -364,10 +366,11 @@ def mb_by_mb(
     return [output(t, *answer_) for t, answer_ in zip(targets, found, strict=True)]
 
 
-def _pag_sets(star: np.ndarray, t: int) -> dict[str, list[int]]:
-    """Return the target's parents, children, bidirected, and undetermined neighbors in ``star``.
+def _pag_sets(edges: Iterable[tuple[int, int, int]]) -> dict[str, list[int]]:
+    """Return the target's parents, children, bidirected, and undetermined neighbors in ``edges``.
 
-    The PAG's edges at the target fall in one each, by position.
+    The PAG's edges at the target fall in one each, by position; the edges are those of
+    :func:`_edge_sets`.
     """
     sets: dict[str, list[int]] = {
         "parents": [],
@@ -375,8 +378,7 @@ def _pag_sets(star: np.ndarray, t: int) -> dict[str, list[int]]:
         "bidirected": [],
         "undetermined": [],
     }
-    for j in np.flatnonzero(star[t]).tolist():
-        near, far = star[t, j], star[j, t]
+    for j, near, far in edges:
         if near == ARROW and far == ARROW:
             sets["bidirected"].append(j)
         elif near == ARROW and far == TAIL:
@@ -657,14 +659,11 @@ def mmb_by_mmb(
     answer = partial(_sequential_edges, blanket, MMB_BY_MMB, local_max_depth)
 
     def output(t: int, edges: _Edges, n: int, rows: Mapping[int, int]) -> StructureOutput:
-        star = _star(edges, t, d)
-        sets = {"markov_blanket": edges.blanket, **_pag_sets(star, t)}
+        sets = {"markov_blanket": edges.blanket, **_pag_sets(edges.marks)}
         metadata = target_metadata(t, sets, name)
         metadata["blankets_learned"] = [name(x) for x in edges.learned]
         metadata |= fit_metadata(mask, data, rows, n)
-        return structure_output(
-            GraphStructure.from_numpy(star, kind="pag"), labels=labels, metadata=metadata
-        )
+        return structure_output(_star(edges.marks, t, d, "pag"), labels=labels, metadata=metadata)
 
     with copies_named(labels):
         search = local_search(
@@ -917,15 +916,15 @@ def cmb(
     answer = partial(_cmb_codes, blanket, decided)
 
     def output(t: int, result: CMBResult, n: int, rows: Mapping[int, int]) -> StructureOutput:
-        star = np.zeros((d, d), dtype=np.int8)
-        for x, code in result.codes.items():
-            star[t, x] = ARROW if code == PARENT else TAIL
-            star[x, t] = ARROW if code == CHILD else TAIL
-        sets = {"markov_blanket": result.blanket, **_edge_sets(star, t)}
+        marks = [
+            (x, ARROW if code == PARENT else TAIL, ARROW if code == CHILD else TAIL)
+            for x, code in sorted(result.codes.items())
+        ]
+        sets = {"markov_blanket": result.blanket, **_edge_sets(marks)}
         metadata = target_metadata(t, sets, name)
         metadata["blankets_learned"] = [name(x) for x in result.learned]
         metadata |= fit_metadata(mask, data, rows, n)
-        return structure_output(to_structure(star, kind="cpdag"), labels=labels, metadata=metadata)
+        return structure_output(_star(marks, t, d, "cpdag"), labels=labels, metadata=metadata)
 
     with copies_named(labels):
         search = local_search(

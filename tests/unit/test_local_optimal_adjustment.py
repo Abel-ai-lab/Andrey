@@ -83,6 +83,33 @@ def test_the_graph_holds_the_edges_at_the_two_variables_alone():
     assert marks[x].any() and marks[y].any()
 
 
+def test_the_edges_are_the_matrix_union_of_the_two_runs():
+    """``Result.edges`` lists what the union of the two variables' edges over all columns holds."""
+    from andrey.constraint.blanket import local_search
+    from andrey.constraint.local_optimal_adjustment import _union, local_optimal_adjustment
+    from andrey.constraint.sequential import LOAD, Cache, sequential
+    from andrey.core import NULL
+
+    X = _frame().to_numpy()
+    d = X.shape[1]
+    search = local_search(X, alpha=0.01, indep_test="fisherz")
+    x, y = search.ordered({v: 0.0 for v in (4, 6)})
+    with search.pinned():
+        result = local_optimal_adjustment(search, (x, y))
+        cache, stars = Cache(), []
+        for v in (x, y):
+            star = np.zeros((d, d), dtype=np.int8)
+            for u, near, far in sequential(search, v, "gs", LOAD, cache).network.edges_at(v):
+                star[v, u], star[u, v] = near, far
+            stars.append(star)
+    union = _union(*stars)
+    expected = [
+        (i, j, int(union[i, j]), int(union[j, i]))
+        for i, j in np.argwhere(np.triu(union != NULL, 1)).tolist()
+    ]
+    assert expected and result.edges == expected
+
+
 def test_the_answer_does_not_depend_on_the_column_order():
     df = _frame(1)
     out = andrey.local_optimal_adjustment(df, variables=["x", "y"])

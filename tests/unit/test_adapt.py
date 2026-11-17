@@ -7,6 +7,7 @@ import pytest
 
 from andrey.api import _adapt
 from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput
+from andrey.core.orient import to_structure
 
 # --- json_safe -----------------------------------------------------------------
 
@@ -25,6 +26,75 @@ def test_json_safe_rejects_unserializable():
         _adapt.json_safe(object())
     with pytest.raises(TypeError):
         _adapt.json_safe({"s": {1, 2}})  # a set has no JSON-safe form
+
+
+# --- edge_structure ------------------------------------------------------------
+
+
+def _same_store(a: GraphStructure, b: GraphStructure) -> bool:
+    return (
+        a == b
+        and a._layout == b._layout
+        and np.array_equal(a._indptr, b._indptr)
+        and np.array_equal(a._indices, b._indices)
+        and np.array_equal(a._marks, b._marks)
+    )
+
+
+@pytest.mark.parametrize("kind", ["cpdag", "pag", "dag", "undirected"])
+def test_edge_structure_equals_the_structure_of_the_matrix_it_fills(kind):
+    rng = np.random.default_rng(3)
+    marks = {
+        "cpdag": [(TAIL, ARROW), (ARROW, TAIL), (TAIL, TAIL)],
+        "pag": [(TAIL, ARROW), (ARROW, ARROW), (CIRCLE, ARROW), (CIRCLE, CIRCLE), (TAIL, TAIL)],
+        "dag": [(TAIL, ARROW), (ARROW, TAIL)],
+        "undirected": [(TAIL, TAIL)],
+    }[kind]
+    for d, k in [(1, 0), (2, 1), (9, 0), (9, 5), (40, 12), (40, 40)]:
+        pairs = rng.permutation([(i, j) for i in range(d) for j in range(i + 1, d)])[:k]
+        edges = []
+        for i, j in pairs.tolist():
+            at_i, at_j = marks[rng.integers(len(marks))]
+            edges.append((i, j, at_i, at_j) if rng.random() < 0.5 else (j, i, at_j, at_i))
+        dense = np.zeros((d, d), dtype=np.int8)
+        for i, j, at_i, at_j in edges:
+            dense[i, j], dense[j, i] = at_i, at_j
+        built = _adapt.edge_structure(d, edges, kind=kind)
+        assert _same_store(built, GraphStructure.from_numpy(dense, kind=kind))
+        if kind != "pag":
+            assert _same_store(built, to_structure(dense, kind=kind))
+
+
+def test_edge_structure_builds_no_matrix_over_all_nodes():
+    import tracemalloc
+
+    d = 50_000  # a (d, d) int8 matrix is 2.5 GB
+    tracemalloc.start()
+    try:
+        built = _adapt.edge_structure(
+            d, [(7, v, TAIL, ARROW) for v in (3, 9, 49_999)], kind="cpdag"
+        )
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+    assert built.n_nodes == d and len(built.to_edges()) == 3
+    assert peak < 50_000_000
+
+
+@pytest.mark.parametrize(
+    ("edges", "kind", "error"),
+    [
+        ([(1, 1, TAIL, TAIL)], "cpdag", ValueError),
+        ([(0, 1, TAIL, ARROW), (1, 0, ARROW, TAIL)], "cpdag", ValueError),
+        ([(0, 1, CIRCLE, ARROW)], "cpdag", ValueError),
+        ([(0, 1, 0, ARROW)], "pag", ValueError),
+        ([(0, 4, TAIL, ARROW)], "cpdag", IndexError),
+        ([(-1, 2, TAIL, ARROW)], "cpdag", IndexError),
+    ],
+)
+def test_edge_structure_refuses_what_the_matrix_refuses(edges, kind, error):
+    with pytest.raises(error):
+        _adapt.edge_structure(4, edges, kind=kind)
 
 
 # --- structure_output ----------------------------------------------------------
