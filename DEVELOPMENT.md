@@ -1,9 +1,9 @@
 # Development
 
-How the code fits together, the common changes, how a method is tested, and how a release is put
-together. [`CONTRIBUTING.md`](CONTRIBUTING.md) walks a contributor from a fork to a pull request,
-[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) the website, and [`AGENTS.md`](AGENTS.md) the
-repository's conventions.
+How the code fits together, the common changes, how a method is tested, how a release is put
+together, and how AI tools are used. [`CONTRIBUTING.md`](CONTRIBUTING.md) walks a contributor from
+a fork to a pull request, [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) the website, and
+[`AGENTS.md`](AGENTS.md) the repository's conventions.
 
 ## Repository layout
 
@@ -463,6 +463,52 @@ that changed:
 ```shell
 uv run --group docs python scripts/refresh_intersphinx.py
 ```
+
+## AI tools
+
+Using AI tools to write code, tests, and docs is fully acceptable, and much of Andrey is written
+that way under its maintainers' direction and review. One policy covers maintainers and
+contributors:
+
+- **Same rules, same gates.** A change written with a tool follows [`AGENTS.md`](AGENTS.md) and
+  this file, passes every check CI runs and, for a method, every rung of
+  [Test a method](#test-a-method), and goes through an issue, a pull request, and review
+  ([Releases, labels, and the changelog](#releases-labels-and-the-changelog)). No rule is relaxed
+  for it, and none is added.
+- **A person answers for it.** Whoever opens the pull request, or directs the agent that opens it,
+  is its author: that person has reviewed the change, can explain it in review, and has the right
+  to contribute it under the Apache License 2.0. Code a tool reproduces from another project is
+  copied code and keeps that project's license notice.
+- **Use is recorded.** A commit a tool wrote ends with a `Co-Authored-By` trailer that names the
+  model, and the pull request names the tool, under "How it was checked" or in the tool's own
+  "Generated with" line. The record helps the reviewer; it asks no permission. Completion and
+  spelling or grammar checks need none.
+- **Numbers and references are never generated.** A benchmark number comes from a recorded run, and
+  a reference is cited only after a person has opened it.
+- **Blog posts and release cards end with an AI statement.** It says how AI tools were used to
+  write the page, as a conference asks of a paper's authors. The author sets `ai` (`none`,
+  `edited`, or `drafted`) and `ai_tools` in the front matter, and the site writes the sentence
+  ([The blog](docs/DEVELOPMENT.md#the-blog)). Every post dated 2026-11-17 or later and every card
+  from 0.18.0 on has one.
+
+Not acceptable: a change nobody reviewed, a number or a reference a model made up, a test or a gate
+weakened so that a change passes, and a post or a card whose statement is missing or untrue. A
+maintainer may close a pull request that shows one of these without a full review.
+
+These rules follow published ones. The
+[LLVM AI tool policy](https://llvm.org/docs/AIToolPolicy.html) and the
+[Python developer's guide](https://devguide.python.org/getting-started/ai-tools/) hold the person
+who submits a change responsible for it, and the guide rules out altering a test to make it pass.
+[statsmodels](https://www.statsmodels.org/devel/dev/ai-policy.html) holds every contribution to the
+same bar, [pandas](https://pandas.pydata.org/docs/dev/development/contributing.html) asks for the
+tool and its model, and the
+[Apache Software Foundation](https://www.apache.org/legal/generative-tooling.html) suggests the
+commit trailer. The AI statement follows the
+[ICLR 2027 policy for authors](https://iclr.cc/Conferences/2027/AIPolicyForAuthors) and
+[Elsevier's declaration](https://www.elsevier.com/about/policies-and-standards/generative-ai-policies-for-journals):
+what the tools did, that the authors reviewed it, and who is responsible. Some projects, such as
+[NumPy](https://numpy.org/devdocs/dev/ai_policy.html), do not accept a pull request that an agent
+writes and opens; Andrey accepts one when a person directs the agent and answers for the result.
 
 ## Command-line interface
 

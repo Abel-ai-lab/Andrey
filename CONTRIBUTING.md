@@ -105,6 +105,9 @@ If two release branches are listed, use the one with the higher version, or ask 
   and may change without notice; do not import them from outside the package.
 - Code, data, and assets copied from another project keep their license notice, as
   `site/brand/fonts/OFL.txt` does for the site's fonts.
+- AI tools are welcome. A change written with one meets the same rules and checks as any other.
+  Review it yourself, be ready to explain it, and say under **How it was checked** which tool you
+  used ([AI tools](https://github.com/Abel-ai-lab/Andrey/blob/main/DEVELOPMENT.md#ai-tools)).
 
 [`DEVELOPMENT.md`](https://github.com/Abel-ai-lab/Andrey/blob/main/DEVELOPMENT.md#common-changes)
 has a recipe for each common change.
