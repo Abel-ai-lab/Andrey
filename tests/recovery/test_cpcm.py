@@ -74,6 +74,21 @@ def test_cpcm_names_the_direction_of_pairs_from_each_family(family):
     assert right >= 10
 
 
+def test_the_negative_binomial_family_reads_poisson_counts_as_its_limit():
+    # Poisson counts are the negative binomial's limit of infinite size, where its likelihood is
+    # flat: the direction holds and the forward residual stays independent of the cause.
+    right = rejected = 0
+    for seed in range(100, 112):
+        rng = np.random.default_rng(seed)
+        x = rng.normal(size=300)
+        table = np.column_stack([x, rng.poisson(np.exp(1 + np.sin(2 * x))).astype(float)])
+        out = cpcm(table, family=["gaussian_fixed_scale", "negative_binomial"], seed=0)
+        right += out.structure.oriented_edges() == [(0, 1, "directed")]
+        rejected += out.metadata["p_values"]["forward"] < 0.01
+    assert right >= 11
+    assert rejected <= 1
+
+
 def test_cpcm_matches_the_recorded_output():
     assert_recorded_output(cpcm(datagen.generate("lsnm_pair")), "CPCM", case="lsnm_pair")
 

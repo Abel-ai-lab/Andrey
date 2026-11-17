@@ -35,7 +35,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
-from scipy import optimize, special, stats
+from scipy import special, stats
 
 from andrey.core.independence import dhsic_gram, dhsic_log_p, within_one
 from andrey.core.ties import EPS_IMPROVE, tie_key
@@ -49,9 +49,13 @@ MAX_LEVELS = 9
 EXACT_MAX = 4
 #: Half-width of the log smoothing parameters' range around their start, which follows the units.
 _LOG_SP_RANGE = 20.0
+#: The search over the log smoothing parameters moves by a step that halves from the first of
+#: these to the second, so every point it reads lies on one lattice around the start.
+_SP_STEPS = (4.0, 1.0 / 16.0)
+#: A point of that search replaces the best one only if its LAML is lower by more than this share.
+_LAML_GAIN = 1e-6
 _NEWTON_TOL = 1e-11
 _MAX_NEWTON = 100
-_FD_STEP = 1e-3
 #: Lower bound of a fitted log scale that varies with the parents, on the column the fit reads:
 #: the Gaussian standard deviation stays above 0.01 of the column's and the Gumbel scale above
 #: ``exp(-7)`` of it, and the gamma dispersion above ``exp(-7)``. These are the values of the
@@ -63,9 +67,6 @@ LOG_SCALE_FLOOR = {"gaussian": math.log(0.01), "gumbel": -7.0, "gamma": -7.0}
 #: and its terms lose their digits to cancellation from a log size of about 20; a size at the bound
 #: is read as the Poisson limit.
 NB_LOG_SIZE_MAX = 12.0
-#: L-BFGS-B stops once every projected gradient component of the LAML is below this; the
-#: central differences carry an error of about 1e-5 from the Newton tolerance.
-_LAML_GTOL = 1e-4
 #: A Hessian is indefinite if, with its diagonal brought to 1, an eigenvalue is below minus this.
 _INDEFINITE = 1e-8
 #: A point is a minimum only if a Newton step from it lowers the objective by less than this share.
@@ -100,6 +101,12 @@ class Family:
     counts: bool = False
     rescale: Callable[[np.ndarray], np.ndarray] | None = None
     upper: float = math.inf
+
+    @property
+    def reads_units(self) -> bool:
+        """Whether the column's units are part of the family: it fixes a scale (counts step by
+        1, the Pareto law starts at 1), so the same column in other units is another model."""
+        return self.rescale is None
 
 
 def _gaussian_derivs(y: np.ndarray, etas: list[np.ndarray]) -> Derivs:
@@ -274,7 +281,9 @@ def _families() -> dict[str, Family]:
     at_least_one = lambda y: ~np.isfinite(y) | (y < 1)  # noqa: E731
     real = "real numbers"
 
-    def floored(name: str, start: Callable, derivs: Callable, cdf: Callable) -> tuple:
+    def floored(
+        name: str, start: Callable, derivs: Callable, cdf: Callable
+    ) -> tuple[Callable, Callable, Callable]:
         floor = LOG_SCALE_FLOOR[name]
 
         def floored_start(y: np.ndarray) -> list[float]:
@@ -397,8 +406,7 @@ def fit(y: np.ndarray, terms: list[_Term], family: Family) -> list[np.ndarray]:
     Each smooth linear predictor has an intercept and every term's columns; a constant one has the
     intercept alone. The coefficients minimize the penalized negative log-likelihood, and the log
     smoothing parameters minimize its Laplace approximate marginal likelihood (Wood, Pya, and
-    Safken 2016) by L-BFGS-B with central-difference gradients, each within 20 of its start, which
-    puts its penalty on the scale of its Hessian block and so moves with the units.
+    Safken 2016) over a lattice around their start (:func:`_search`).
 
     Raises ``ValueError`` where the fit has no maximum to find: as many unpenalized coefficients
     as rows, a scale fitted per parent value on rows that hold one value, or a search that ends
@@ -436,49 +444,58 @@ def fit(y: np.ndarray, terms: list[_Term], family: Family) -> list[np.ndarray]:
                     raise ValueError(
                         f"family {family.name!r} fits a scale for each value of a parent of at "
                         f"most {MAX_LEVELS} values, but the column holds one value on the rows of "
-                        "one of them, where no scale can be fitted beside a smooth parent; use more "
-                        "rows, or a family whose second parameter is constant"
+                        "one of them, where no scale can be fitted beside a smooth parent; use "
+                        "more rows, or a family whose second parameter is constant"
                     )
     beta = np.zeros(offsets[-1])
     for j, value in enumerate(family.start(y)[: family.predictors]):
         beta[offsets[j]] = value
     model = _Model(y, designs, offsets, penalties, family, beta)
-    if not penalties:
-        return model.etas(_fitted(model, beta, np.zeros(0)))
-    rho = model.start_rho(beta)
-    state = {"beta": model.newton(beta, rho)}
-
-    def laml(r: np.ndarray) -> float:
-        value, state["beta"] = model.laml(r, state["beta"])
-        return value
-
-    def grad(r: np.ndarray) -> np.ndarray:
-        out = np.empty(r.size)
-        for i in range(r.size):
-            step = np.zeros(r.size)
-            step[i] = _FD_STEP
-            out[i] = (laml(r + step) - laml(r - step)) / (2 * _FD_STEP)
-        return out
-
-    result = optimize.minimize(
-        laml,
-        rho,
-        jac=grad,
-        method="L-BFGS-B",
-        bounds=[(r - _LOG_SP_RANGE, r + _LOG_SP_RANGE) for r in rho],
-        options={"gtol": _LAML_GTOL},
-    )
-    return model.etas(_fitted(model, state["beta"], result.x))
-
-
-def _fitted(model: _Model, beta: np.ndarray, rho: np.ndarray) -> np.ndarray:
-    found = model.minimum(beta, rho)
-    if found is None:
+    fitted = _search(model) if penalties else model.laml(np.zeros(0))[1]
+    if fitted is None:
         raise ValueError(
-            f"the fit of family {model.family.name!r} on the parents stopped away from a minimum "
-            "of its penalized likelihood; use more rows, or a family with fewer fitted parameters"
+            f"the fit of family {family.name!r} on the parents stopped away from a minimum of its "
+            "penalized likelihood; use more rows, or a family with fewer fitted parameters"
         )
-    return found[0]
+    return model.etas(fitted)
+
+
+def _search(model: _Model) -> np.ndarray | None:
+    """The coefficients at the log smoothing parameters of lowest LAML, by a compass search.
+
+    The search starts where each penalty is on the scale of its Hessian block, which moves with
+    the units, and tries one step up and down in each parameter in turn, taking a point that
+    lowers the LAML and halving the step once none does, from 4 down to 1/16 and within 20 of
+    the start. Every LAML is fitted from the same starting coefficients, so it depends on its
+    point alone, and the points lie on a fixed lattice around the start: a change of the table
+    within rounding (a column in other units) moves the result within rounding too, where a
+    gradient search on the LAML's narrow dips, which form where the Hessian is close to
+    singular, does not. ``None`` where no point has a fit.
+    """
+    start = model.start_rho(model.start)
+    unit = _SP_STEPS[1]
+    reach = round(_LOG_SP_RANGE / unit)
+    seen: dict[tuple[int, ...], tuple[float, np.ndarray | None]] = {}
+
+    def laml(point: tuple[int, ...]) -> float:
+        if point not in seen:
+            seen[point] = model.laml(start + unit * np.array(point))
+        return seen[point][0]
+
+    point = (0,) * start.size
+    best = laml(point)
+    step = round(_SP_STEPS[0] / unit)
+    while step >= 1:
+        moved = False
+        for i in range(start.size):
+            for move in (step, -step):
+                trial = (*point[:i], point[i] + move, *point[i + 1 :])
+                gain = _LAML_GAIN * (1.0 + abs(best)) if math.isfinite(best) else 0.0
+                if abs(trial[i]) <= reach and laml(trial) < best - gain:
+                    point, best, moved = trial, laml(trial), True
+        if not moved:
+            step //= 2
+    return seen[point][1]
 
 
 class _Model:
@@ -528,10 +545,12 @@ class _Model:
 
         A step stops at a coefficient's upper bound, and a coefficient at its bound stays there
         while the objective still falls beyond it. A trial point counts only with a finite value,
-        gradient, and Hessian.
+        gradient, and Hessian. The steps end with the second in a row that lowers the objective by
+        less than the tolerance, which brings the coefficients to rounding at a minimum.
         """
         S = self.penalty(rho)
         value, grad, H = self.evaluate(beta, S)
+        settled = False
         for _ in range(_MAX_NEWTON):
             free = self.free(beta, grad)
             step = np.zeros(beta.size)
@@ -548,15 +567,18 @@ class _Model:
                 break
             done = value - new_value <= _NEWTON_TOL * (1.0 + abs(value))
             beta, value, grad, H = trial, new_value, new_grad, new_H
-            if done:
+            if done and settled:
                 break
+            settled = done
         return beta
 
-    def laml(self, rho: np.ndarray, beta: np.ndarray) -> tuple[float, np.ndarray]:
-        """The negative Laplace approximate marginal likelihood at ``rho``, up to a constant."""
-        found = self.minimum(beta, rho)
+    def laml(self, rho: np.ndarray) -> tuple[float, np.ndarray | None]:
+        """The negative Laplace approximate marginal likelihood at ``rho``, up to a constant, and
+        the coefficients fitted there from the starting ones; infinite where they are no minimum.
+        """
+        found = self.minimum(rho)
         if found is None:
-            return math.inf, beta
+            return math.inf, None
         fitted, value, eigenvalues = found
         logdet = float(np.sum(np.log(np.maximum(eigenvalues, 1e-300))))
         ranks = np.array([rank for _, _, rank in self.penalties], dtype=np.float64)
@@ -567,27 +589,27 @@ class _Model:
         there. A held coefficient is a constant of the fit, outside its Laplace determinant."""
         return ~((beta >= self.upper) & (grad < 0))
 
-    def minimum(
-        self, beta: np.ndarray, rho: np.ndarray
-    ) -> tuple[np.ndarray, float, np.ndarray] | None:
+    def minimum(self, rho: np.ndarray) -> tuple[np.ndarray, float, np.ndarray] | None:
         """A minimum of the penalized objective: its coefficients, value, and Hessian eigenvalues.
 
-        :meth:`newton` runs from ``beta`` and, where it stops on a slope (a Hessian with a negative
-        eigenvalue beyond rounding, or a Newton step that would still lower the objective), again
-        from the fit's starting coefficients. ``None`` where both stop on a slope.
+        :meth:`newton` runs from the fit's starting coefficients. ``None`` where it stops on a
+        slope (a Hessian with a negative eigenvalue beyond rounding, or a Newton step that would
+        still lower the objective) or where the objective is not finite.
         """
-        for start in (beta, self.start):
-            fitted = self.newton(start, rho)
+        fitted = self.newton(self.start, rho)
+        with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
             value, grad, H = self.evaluate(fitted, self.penalty(rho))
-            free = self.free(fitted, grad)
-            H, grad = H[np.ix_(free, free)], grad[free]
-            unit = 1.0 / np.sqrt(_diagonal(H))
-            left = 0.5 * float(grad @ _solve_pd(H, grad))
-            if np.linalg.eigvalsh(H * unit[:, None] * unit)[0] >= -_INDEFINITE and (
-                left <= _UNFINISHED * (1.0 + abs(value))
-            ):
-                return fitted, value, np.linalg.eigvalsh(H)
-        return None
+        if not (np.isfinite(value) and np.isfinite(grad).all() and np.isfinite(H).all()):
+            return None
+        free = self.free(fitted, grad)
+        H, grad = H[np.ix_(free, free)], grad[free]
+        unit = 1.0 / np.sqrt(_diagonal(H))
+        left = 0.5 * float(grad @ _solve_pd(H, grad))
+        if np.linalg.eigvalsh(H * unit[:, None] * unit)[0] < -_INDEFINITE or (
+            left > _UNFINISHED * (1.0 + abs(value))
+        ):
+            return None
+        return fitted, value, np.linalg.eigvalsh(H)
 
     def start_rho(self, beta: np.ndarray) -> np.ndarray:
         """Log smoothing parameters that put each penalty on the scale of its Hessian block."""

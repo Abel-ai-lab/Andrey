@@ -739,15 +739,23 @@ def cpcm(
     the cause, as in [1]_, or indicators when the cause holds at most 9 distinct values, as in the
     authors' code. The coefficients maximize the log-likelihood penalized by the spline's
     wiggliness, and the smoothing parameter of each spline maximizes the Laplace approximate
-    marginal likelihood [4]_, the estimator the paper cites. The fit draws no random numbers except
-    a count family's uniforms, which follow ``seed`` and the column's values.
+    marginal likelihood [4]_, the estimator the paper cites, over a lattice of steps of 1/16 in
+    its logarithm around a start that follows the data. A scale fitted as a function of the cause
+    stays above a floor, without which the likelihood has no maximum where the location fits a row
+    exactly: 0.01 of the column's standard deviation under ``"gaussian"``, ``exp(-7)`` of it under
+    ``"gumbel"``, and a dispersion of ``exp(-7)`` under ``"gamma"``. The size of
+    ``"negative_binomial"`` is at most ``exp(12)``, where the family is read as its Poisson limit:
+    the likelihood is flat in a larger size. A fit that ends away from a maximum raises
+    ``ValueError``. The fit draws no random numbers except a count family's uniforms, which follow
+    ``seed`` and the column's values.
 
-    **Units.** Under ``"gaussian"``, ``"gaussian_fixed_scale"``, ``"gumbel"``, and
-    ``"gumbel_fixed_scale"`` the result does not depend on the units or the origin of either
-    column. Under ``"exponential"`` and the gamma families it does not depend on their units but
-    does on their origin, which the support fixes. ``"pareto"`` reads the units, since its scale is
-    fixed at 1, and the count families read whole numbers, so a rescaled count column fails the
-    support check. The cause's units never matter: its spline is the same in any unit.
+    **Units.** A column in other units stays in the Gaussian, Gumbel, exponential, and gamma
+    families, so under them the result is the same in any units, to rounding. The Gaussian and
+    Gumbel families do not depend on the column's origin either; the exponential and gamma
+    families do, since their support starts at 0. ``"pareto"``, whose scale is fixed at 1, and
+    the count families, whose values step by 1, read the units: the same column in other units is
+    another model there, or fails the support check. The cause's units never matter: its spline is
+    the same in any unit.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     both columns, so a row with a missing value has no place in it. Drop the incomplete rows first,

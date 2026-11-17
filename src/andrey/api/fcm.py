@@ -630,8 +630,8 @@ def cpcm_graph(
     The columns are read in rank order, so the result does not depend on their order.
 
     **Units.** As for :func:`~andrey.cpcm`: the result does not depend on any column's units under
-    the Gaussian and Gumbel families, nor on its units under the exponential and gamma families,
-    which do read its origin; ``"pareto"`` reads the units and the count families whole numbers.
+    the Gaussian, Gumbel, exponential, and gamma families, of which the last two read its origin;
+    ``"pareto"`` and the count families read the units, since they fix a scale.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows
