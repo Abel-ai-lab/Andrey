@@ -52,12 +52,13 @@ difference and `--shuffle` on a difference beyond rounding:
   stays with its row. MB-by-MB, CMB, MMB-by-MMB, local ISA-LiNG, LDP, LD3, LDECC, LOAD, and
   LocPC-CDE are not refit: the target of MB-by-MB, CMB, MMB-by-MMB, and local ISA-LiNG is the last
   variable, LDP's, LD3's, and LocPC-CDE's treatment and outcome are the first and the last, and
-  LDECC's treatment and outcome and LOAD's two variables are the last and the first. A column
-  order fails the check when a graph, a graph's kind, or the causal order differs, or when an edge weight or metadata value differs by
-  more than rounding (a relative `1e-6`, or an absolute `1e-12` near zero); a boolean that becomes a
-  number or an integer that becomes a float differs. A difference of rounding alone, such as the
-  p-values of ICP and J-PCMCI+, which differ by about `1e-14` because their regressions sum in the
-  order of the columns, is listed as information and does not change the exit status.
+  LDECC's treatment and outcome and LOAD's two variables are the last and the first. A column order
+  fails the check when a graph, a graph's kind, or the causal order differs, or when an edge weight
+  or metadata value differs by more than rounding (a relative `1e-6`, or an absolute `1e-12` near
+  zero); a boolean that becomes a number or an integer that becomes a float differs. A difference of
+  rounding alone, such as the p-values of ICP and J-PCMCI+, which differ by about `1e-14` because
+  their regressions sum in the order of the columns, is listed as information and does not change
+  the exit status.
 - `--workers N` refits PC, FCI, FCI-JCI, GFCI, CD-NOD, RSMAX2 (with PC's skeleton), GES, and PNL
   on `N` workers, with every GES pass, every skeleton pass of conditioning size two or more, and
   every possible-d-sep search sent to the worker pool.
