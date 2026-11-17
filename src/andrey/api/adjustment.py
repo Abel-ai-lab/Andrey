@@ -18,6 +18,7 @@ import numpy as np
 
 from andrey.api._adapt import (
     categorical_metadata,
+    check_total_conditioning_rows,
     copies_named,
     fit_inputs,
     label_of,
@@ -654,7 +655,10 @@ def ldecc(
         method, the argument, what it accepts, and the value. Also if ``treatment`` or ``outcome``
         is missing or names a column ``data`` lacks, or both name one column; or if ``data`` or
         ``categorical`` does not suit the test, as for :func:`~andrey.pc`. With ``"fisherz"`` or
-        ``"student_t"``, also if a column repeats another up to scale and shift.
+        ``"student_t"``, also if a column repeats another up to scale and shift. With
+        ``blanket="total_conditioning"``, a partial-correlation test, and no ``max_depth`` below
+        ``d - 2``, also if ``data`` has fewer than ``d + 2`` rows with every variable observed,
+        ``d`` its number of columns.
 
     Warns
     -----
@@ -728,8 +732,10 @@ def ldecc(
     algorithm's tests run over every pair, as many as learning the whole skeleton, and the sets
     number up to two to the power of the undirected neighbors. A fit ran a median of 500 to 570
     tests, in under a tenth of a second, on the 25-node graphs, and 72,000 to 166,000 tests, in 4 to
-    11 seconds, on MAGIC-NIAB (44 nodes). The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    11 seconds, on MAGIC-NIAB (44 nodes). ``"total_conditioning"`` with a partial-correlation test
+    needs at least two more rows than variables, rows with every variable observed, and raises
+    ``ValueError`` below that. The numbers are a reference, not a hard limit: they change with the
+    data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -774,6 +780,7 @@ def ldecc(
     )
     d = X.shape[1]
     x, y = pair_columns(treatment, outcome, labels, d, "ldecc")
+    check_total_conditioning_rows(X, blanket, indep_test, method="ldecc", max_depth=max_depth)
     with copies_named(labels), rows_tested() as rows, counting_tests() as tests:
         search = local_search(
             X,
@@ -915,6 +922,8 @@ def local_optimal_adjustment(
         does not name exactly two different columns, or names a column ``data`` lacks; or if
         ``data`` or ``categorical`` does not suit the test, as for :func:`~andrey.pc`. With
         ``"fisherz"`` or ``"student_t"``, also if a column repeats another up to scale and shift.
+        With ``blanket="total_conditioning"`` and a partial-correlation test, also if ``data`` has
+        fewer than ``d + 2`` rows with every variable observed, ``d`` its number of columns.
 
     Warns
     -----
@@ -988,8 +997,10 @@ def local_optimal_adjustment(
     numbers. Each local structure tests a pair against the subsets of the neighbors of its ends with
     no cap, so a variable with many neighbors costs many tests, and the parent sets of a treatment
     grow with the subsets of its undirected neighbors. A fit ran a median of 1,300 to 14,000 tests,
-    in under 3 seconds, on those graphs. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    in under 3 seconds, on those graphs. ``"total_conditioning"`` with a partial-correlation test
+    needs at least two more rows than variables, rows with every variable observed, and raises
+    ``ValueError`` below that. The numbers are a reference, not a hard limit: they change with the
+    data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1045,6 +1056,7 @@ def local_optimal_adjustment(
     a, b = variable_columns(variables, labels, d, method, minimum=2, maximum=2)
     assert variables is not None  # variable_columns raises on None
     first = column_position(as_node(list(variables)[0], method), labels, d, method)
+    check_total_conditioning_rows(X, blanket, indep_test, method=method)
     with copies_named(labels), rows_tested() as rows, counting_tests() as tests:
         search = local_search(
             X,

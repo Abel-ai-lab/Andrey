@@ -2119,6 +2119,9 @@ SHIPPED_INDEP_TESTS: tuple[str, ...] = (
     *NONLINEAR_INDEP_TESTS,
 )
 DISCRETE_INDEP_TESTS: tuple[str, ...] = ("chisq", "gsq")
+#: The shipped partial-correlation tests, whose degrees of freedom are the rows less the size of the
+#: conditioning set and a constant.
+PARTIAL_CORRELATION_TESTS: tuple[str, ...] = ("fisherz", "student_t", "normal_scores")
 #: The rank-based tests, which rank each column over every row they read; a method whose tests
 #: always read several environments does not offer them, as the ranks would mix the environments.
 RANK_INDEP_TESTS: tuple[str, ...] = ("normal_scores",)

@@ -14,6 +14,7 @@ from andrey.core import ARROW, NULL, TAIL, GraphStructure, Structure, StructureO
 from andrey.core.ci import (
     DISCRETE_INDEP_TESTS,
     MIXED_INDEP_TESTS,
+    PARTIAL_CORRELATION_TESTS,
     RANK_INDEP_TESTS,
     SingularCorrelationError,
 )
@@ -517,6 +518,36 @@ def fit_inputs(
     )
     labels = column_labels(data)
     return X, mask, labels, resolve(knowledge, X.shape[1], labels, method=method)
+
+
+def check_total_conditioning_rows(
+    X: np.ndarray, blanket: str, indep_test: str, *, method: str, max_depth: int | None = None
+) -> None:
+    """Raise ``ValueError`` when total conditioning with a partial-correlation test lacks rows.
+
+    Each test of the ``"total_conditioning"`` learner conditions on the other ``d - 2`` variables,
+    so it reads the rows where every variable is observed. Fisher-Z has a positive degree of
+    freedom from ``|S| + 4`` rows, ``d + 2``, and Student-t from one row fewer; the bound
+    ``d + 2`` serves every test of :data:`~andrey.core.ci.PARTIAL_CORRELATION_TESTS`. With
+    ``max_depth`` below ``d - 2`` no test runs, so no rows are needed. Any other ``blanket`` or
+    ``indep_test`` returns without a check: another test has its own requirement.
+    """
+    d = X.shape[1]
+    if (
+        blanket != "total_conditioning"
+        or indep_test not in PARTIAL_CORRELATION_TESTS
+        or (max_depth is not None and d - 2 > max_depth)
+    ):
+        return
+    rows = int((~np.isnan(X).any(axis=1)).sum())
+    if rows < d + 2:
+        observed = "" if rows == X.shape[0] else f" ({X.shape[0]} rows in all)"
+        raise ValueError(
+            f"{method}: blanket='total_conditioning' conditions every test on all the other "
+            f"variables, so with indep_test={indep_test!r} it needs at least d + 2 = {d + 2} rows "
+            f"with every variable observed, got {rows}{observed}; pass another blanket learner, "
+            "such as blanket='iamb'"
+        )
 
 
 def env_index(
