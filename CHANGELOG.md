@@ -400,7 +400,7 @@ names its pull request.
   variable, so it ranks all of them in about the same time and 0.7 GB where it took 6.1 GB. At 1,000
   rows and 100,000 variables, where the ranks needed an 80 GB array, `local_optimal_adjustment` at
   one target takes 9 minutes. Every output, `metadata["n_tests"]` included, is the same bit for bit.
-  ([#1060], [#PR])
+  ([#1060], [#1071])
 - `qa/identity.py --shuffle` also refits ICP, IGSP, FCI-JCI, and J-PCMCI+, moving each one's
   targets and contexts with the columns. It exits 1 on a column order when a graph or a causal order
   changes or a weight or metadata value changes by more than rounding, and lists a difference of
@@ -3029,7 +3029,7 @@ First alpha release.
 [#1050]: https://github.com/Abel-ai-lab/Andrey/issues/1050
 [#1053]: https://github.com/Abel-ai-lab/Andrey/pull/1053
 [#1060]: https://github.com/Abel-ai-lab/Andrey/issues/1060
-[#PR]: https://github.com/Abel-ai-lab/Andrey/pull/PR
+[#1071]: https://github.com/Abel-ai-lab/Andrey/pull/1071
 [#1045]: https://github.com/Abel-ai-lab/Andrey/issues/1045
 [#1051]: https://github.com/Abel-ai-lab/Andrey/pull/1051
 [#1058]: https://github.com/Abel-ai-lab/Andrey/pull/1058
