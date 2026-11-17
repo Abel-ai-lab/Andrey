@@ -2656,6 +2656,7 @@ _add(
         accel="numpy",
         status="experimental",
         column_order="relabels",
+        tie_break=True,
         params=(
             ParamSpec(
                 name="family",
@@ -4235,6 +4236,8 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "lpcmci": ("links", "p_values", "statistics", "parents", "conflicts"),
     **dict.fromkeys(("anm", "pnl"), ("p_values", "statistics")),
     "loci": ("log_likelihoods", "p_values", "statistics"),
+    "cpcm": ("p_values", "statistics", "independence_p_value", "families"),
+    "cpcm_graph": ("p_value", "score", "search", "families"),
     "gin": ("clusters", "cluster_order", "unordered"),
     "rcd": ("confounded_pairs",),
     "bottom_up_parce_lingam": ("partial_order",),

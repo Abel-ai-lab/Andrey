@@ -572,9 +572,9 @@ def cpcm_graph(
         Added to the score per edge, at least ``0``. ``2`` is the paper's value. A larger penalty
         keeps fewer edges.
     seed : int or None, default=None
-        ``None`` is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset, so a fit
-        repeats. Seed for the random draws of the count families, ``"poisson"`` and
-        ``"negative_binomial"``; the other families draw nothing.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of the count families,
+        ``"poisson"`` and ``"negative_binomial"``; the other families draw nothing.
 
     Returns
     -------
@@ -583,6 +583,8 @@ def cpcm_graph(
         is ``"cpcm_graph"``, ``metadata["p_value"]`` the p-value of the joint independence test of
         the returned DAG's residuals, ``metadata["score"]`` its score, ``metadata["search"]``
         ``"exact"`` or ``"greedy"``, and ``metadata["families"]`` the family of each column.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -592,9 +594,19 @@ def cpcm_graph(
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
         method, the argument, what it accepts, and the value. Also if ``data`` has fewer than 2
-        columns, if ``family`` names an unknown family or does not give one name per column, or if
-        a column holds a value outside its family's support, such as a non-integer under
-        ``"poisson"`` or a value below 1 under ``"pareto"``.
+        columns, holds ``NaN`` or ``inf``, or has fewer than ``4 d + 12`` rows for ``d`` columns,
+        if ``family`` names an unknown family or does not give one name per column, or if a column
+        holds a value outside its family's support, such as a non-integer under ``"poisson"`` or
+        a value below 1 under ``"pareto"``.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method is not supported (see Limitations), and its
+        API may change without deprecation.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
 
     Notes
     -----
@@ -621,13 +633,19 @@ def cpcm_graph(
     the Gaussian and Gumbel families, nor on its units under the exponential and gamma families,
     which do read its origin; ``"pareto"`` reads the units and the count families whole numbers.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
+    its variables, so a row with a missing value has no place in it. Drop the incomplete rows
+    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** Not benchmarked yet. The paper claims graphs of 5 variables and measures the
     exact search as feasible to 4 variables; the residual fits grow with the number of parents and
     the greedy search refits a variable for each parent set it tries. Each test builds matrices with
     one row and one column per sample, and every distinct residual's matrix is kept for the fit, so
     memory grows with the square of ``n_samples``. The family must be chosen: the paper's choice of
     a family from each column's support, and its sequential choice between one- and two-parameter
-    families, are not offered. Missing values are not accepted.
+    families, are not offered. The numbers are a reference, not a hard limit: they change with the
+    data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -647,7 +665,7 @@ def cpcm_graph(
     >>> y = rng.exponential(1 + x**2)
     >>> z = rng.exponential(1 + np.sqrt(y))
     >>> family = ["gaussian_fixed_scale", "exponential", "exponential"]
-    >>> out = cpcm_graph(np.column_stack([x, y, z]), family=family)
+    >>> out = cpcm_graph(np.column_stack([x, y, z]), family=family, seed=0)
     >>> out.structure.oriented_edges()
     [(0, 1, 'directed'), (1, 2, 'directed')]
     """

@@ -16,6 +16,7 @@ SHORT = {
     "calm": {"max_iter": 1, "subproblem_iter": 20},
     "varma_lingam": {"max_iter": 1},
     "jpcmciplus": {"time_dummy": False},
+    "cpcm_graph": {"family": "gaussian_fixed_scale"},
 }
 
 

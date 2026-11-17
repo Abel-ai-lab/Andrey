@@ -356,7 +356,7 @@ tests then orient can put more arrowheads at a node.
 `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
 `mmhc`, `rsmax2`, `y_structures`, `ldp`, `ld3`, `ldecc`, `local_optimal_adjustment`, `locpc_cde`,
 `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, `tabu`,
-`calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random
+`calm`, `ica_lingam`, `cpcm`, and `cpcm_graph` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random
 draws. `None`, the default, is the configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh
 random one, so a call repeats exactly. Apart from `boss_fci` and `grasp_fci`, whose BOSS or GRaSP
 phase visits the variables in a random order on every fit, the methods that test independence draw

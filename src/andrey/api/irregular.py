@@ -664,9 +664,9 @@ def cpcm(
         location alone), or ``"negative_binomial"`` (the mean, one size for all rows). See
         **Families.** in Notes.
     seed : int or None, default=None
-        ``None`` is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset, so a fit
-        repeats. Seed for the random draws of the count families, ``"poisson"`` and
-        ``"negative_binomial"``; the other families draw nothing.
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of the count families,
+        ``"poisson"`` and ``"negative_binomial"``; the other families draw nothing.
 
     Returns
     -------
@@ -688,9 +688,19 @@ def cpcm(
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
         method, the argument, what it accepts, and the value. Also if ``data`` does not have 2
-        columns, if ``family`` names an unknown family or does not give one name per column, or if
-        a column holds a value outside its family's support, such as a non-integer under
-        ``"poisson"`` or a value below 1 under ``"pareto"``.
+        columns, holds ``NaN`` or ``inf``, or has fewer than 20 rows, if ``family`` names an
+        unknown family or does not give one name per column, or if a column holds a value outside
+        its family's support, such as a non-integer under ``"poisson"`` or a value below 1 under
+        ``"pareto"``.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method is not supported (see Limitations), and its
+        API may change without deprecation.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
 
     Notes
     -----
@@ -739,10 +749,17 @@ def cpcm(
     fixed at 1, and the count families read whole numbers, so a rescaled count column fails the
     support check. The cause's units never matter: its spline is the same in any unit.
 
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
+    both columns, so a row with a missing value has no place in it. Drop the incomplete rows first,
+    which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
+
     **Limitations.** Not benchmarked yet. Each HSIC test builds matrices with one row and one
     column per sample, so time and memory grow with the square of ``n_samples``. The family must be
     chosen: the paper's rule that picks one from each column's support, and its sequential choice
-    between one- and two-parameter families, are not offered. Missing values are not accepted.
+    between one- and two-parameter families, are not offered. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------
@@ -762,7 +779,8 @@ def cpcm(
     >>> rng = np.random.default_rng(0)
     >>> x = rng.normal(0, 1.4, 400)
     >>> y = rng.poisson(np.exp(1 + np.sin(2 * x)))
-    >>> out = cpcm(np.column_stack([x, y]), family=["gaussian_fixed_scale", "poisson"])
+    >>> family = ["gaussian_fixed_scale", "poisson"]
+    >>> out = cpcm(np.column_stack([x, y]), family=family, seed=0)
     >>> out.structure.oriented_edges()
     [(0, 1, 'directed')]
     """

@@ -103,12 +103,13 @@ def test_swapping_the_columns_mirrors_the_answer():
 def test_location_scale_families_read_no_units_and_no_origin():
     table = _pair()
     first = cpcm(table)
-    moved = cpcm(table * np.array([1e-3, 250.0]) + np.array([40.0, -7.0]))
-    assert moved.structure.oriented_edges() == first.structure.oriented_edges()
-    np.testing.assert_allclose(
-        list(moved.metadata["p_values"].values()), list(first.metadata["p_values"].values()),
-        rtol=1e-3,
-    )  # fmt: skip
+    for factors in ([1e-3, 250.0], [2.0**-3, 2.0**15], [2.0**-20, 2.0**-20]):
+        moved = cpcm(table * np.array(factors) + np.array([40.0, -7.0]))
+        assert moved.structure.oriented_edges() == first.structure.oriented_edges()
+        np.testing.assert_allclose(
+            list(moved.metadata["p_values"].values()), list(first.metadata["p_values"].values()),
+            rtol=1e-3,
+        )  # fmt: skip
 
 
 def test_the_exponential_family_reads_no_units_and_pareto_reads_them():

@@ -66,7 +66,10 @@ class Family:
     ``"constant"`` (one fitted value for all rows). ``derivs(y, etas)`` returns the negative
     log-likelihood's sum, its first derivatives per predictor, and its second derivatives per
     pair of predictors, each per row. ``cdf(y, etas, u)`` is the fitted distribution function at
-    ``y``, randomized by the uniforms ``u`` for a count family.
+    ``y``, randomized by the uniforms ``u`` for a count family. ``rescale``, set for a
+    location-scale or scale family, maps ``y`` to the column the fit and the distribution function
+    read: the family's probability transform is the same on it, so the result does not depend on
+    the units and the fit does not depend on their size.
     """
 
     name: str
@@ -78,6 +81,7 @@ class Family:
     cdf: Callable[[np.ndarray, list[np.ndarray], np.ndarray | None], np.ndarray]
     outside: Callable[[np.ndarray], np.ndarray]
     counts: bool = False
+    rescale: Callable[[np.ndarray], np.ndarray] | None = None
 
 
 def _gaussian_derivs(y: np.ndarray, etas: list[np.ndarray]) -> Derivs:
@@ -184,6 +188,18 @@ def _not_whole(y: np.ndarray) -> np.ndarray:
     return ~np.isfinite(y) | (y < 0) | (y != np.floor(y))
 
 
+def _standardized(y: np.ndarray) -> np.ndarray:
+    """``y`` centered and divided by its standard deviation (location-scale families)."""
+    spread = float(np.std(y))
+    return (y - np.mean(y)) / (spread if spread > 0 else 1.0)
+
+
+def _over_mean(y: np.ndarray) -> np.ndarray:
+    """``y`` divided by its mean (scale families)."""
+    mean = float(np.mean(y))
+    return y / (mean if mean > 0 else 1.0)
+
+
 def _scale_start(y: np.ndarray) -> float:
     return math.log(max(float(np.std(y)), 1e-8))
 
@@ -220,11 +236,11 @@ def _families() -> dict[str, Family]:
     real = "real numbers"
     out = [
         Family("gaussian", real, 2, "smooth", gaussian_start, _gaussian_derivs, gaussian_cdf,
-               _not_finite),
+               _not_finite, rescale=_standardized),
         Family("gaussian_fixed_scale", real, 2, "constant", gaussian_start, _gaussian_derivs,
-               gaussian_cdf, _not_finite),
+               gaussian_cdf, _not_finite, rescale=_standardized),
         Family("exponential", "non-negative numbers", 1, "", lambda y: [math.log(np.mean(y))],
-               _exponential_derivs, exponential_cdf, nonnegative),
+               _exponential_derivs, exponential_cdf, nonnegative, rescale=_over_mean),
         Family("pareto", "numbers of at least 1 (a Pareto law of scale 1)", 1, "",
                lambda y: [math.log(max(float(np.mean(np.log(y))), 1e-8))], _pareto_derivs,
                pareto_cdf, at_least_one),
@@ -232,13 +248,13 @@ def _families() -> dict[str, Family]:
                lambda y: _count_start(y)[:1], _poisson_derivs, _poisson_cdf, _not_whole,
                counts=True),
         Family("gamma", "positive numbers", 2, "smooth", _gamma_start, _gamma_derivs, gamma_cdf,
-               positive),
+               positive, rescale=_over_mean),
         Family("gamma_fixed_shape", "positive numbers", 2, "constant", _gamma_start,
-               _gamma_derivs, gamma_cdf, positive),
+               _gamma_derivs, gamma_cdf, positive, rescale=_over_mean),
         Family("gumbel", real, 2, "smooth", _gumbel_start, _gumbel_derivs, gumbel_cdf,
-               _not_finite),
+               _not_finite, rescale=_standardized),
         Family("gumbel_fixed_scale", real, 2, "constant", _gumbel_start, _gumbel_derivs,
-               gumbel_cdf, _not_finite),
+               gumbel_cdf, _not_finite, rescale=_standardized),
         Family("negative_binomial", "counts (whole numbers of at least 0)", 2, "constant",
                _count_start, _negative_binomial_derivs, _negative_binomial_cdf, _not_whole,
                counts=True),
@@ -302,9 +318,10 @@ class Residuals:
                 self._residuals[key] = self.X[:, j]
             else:
                 family = self.families[j]
-                etas = fit(self.X[:, j], [self.term(k) for k in key[1]], family)
+                y = self.X[:, j] if family.rescale is None else family.rescale(self.X[:, j])
+                etas = fit(y, [self.term(k) for k in key[1]], family)
                 u = self.uniforms(j) if family.counts else None
-                self._residuals[key] = family.cdf(self.X[:, j], etas, u)
+                self._residuals[key] = family.cdf(y, etas, u)
         return self._residuals[key]
 
     def gram(self, j: int, parents: tuple[int, ...]) -> np.ndarray:
@@ -574,10 +591,14 @@ def resolve_families(
     """One :class:`Family` per column of ``X`` from ``family``; check each column's support.
 
     ``family`` is one name for every column or a list of one name per column. ``name(j)`` names
-    column ``j`` in messages. Raises ``ValueError`` for an unknown name, a list of the wrong
-    length, or a column with a value outside its family's support, or a count column whose mean is
-    0.
+    column ``j`` in messages. Raises ``TypeError`` for a value that is neither a name nor a list
+    of names, and ``ValueError`` for an unknown name, a list of the wrong length, a column with a
+    value outside its family's support, or a count column whose mean is 0.
     """
+    if not isinstance(family, str) and not (
+        isinstance(family, (list, tuple)) and all(isinstance(f, str) for f in family)
+    ):
+        raise TypeError(f"{method}: family must be a name or a list of names, got {family!r}")
     names = [family] * X.shape[1] if isinstance(family, str) else list(family)
     if len(names) != X.shape[1]:
         raise ValueError(

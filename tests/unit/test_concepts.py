@@ -396,6 +396,8 @@ UNIT_CASES = {
     "anm": "anm_pair_cubic",
     "pnl": "anm_pair_cubic",
     "loci": "lsnm_pair",
+    "cpcm": "lsnm_pair",
+    "cpcm_graph": "lsnm_pair",
     "cam": "nonmonotone_4v",
     "resit": "nonmonotone_4v",
     "score_matching": "rational_chain_4v",

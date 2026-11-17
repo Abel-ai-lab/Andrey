@@ -178,6 +178,8 @@ NO_KNOWLEDGE = (
     *("gin", "anm", "pnl", "loci", "icp", "ages", "y_structures", "ldp", "ld3", "ldecc"),
     "local_isa_ling",
     "local_optimal_adjustment",
+    "cpcm",
+    "cpcm_graph",
 )
 #: The methods whose main loop a cap can stop early.
 CAPPED_LOOPS = (
@@ -222,6 +224,7 @@ _CONCEPTS = (
             "nogam",
             "das",
             "camuv",
+            "cpcm",
             "icp",
             "igsp",
             "ut_igsp",
@@ -235,6 +238,11 @@ _CONCEPTS = (
         ),
         exempt=(
             *_exempt("A score search: no test decides an edge.", *PURE_SCORE, "gnies", "ages"),
+            *_exempt(
+                "Its score is the p-value of the residuals' joint independence test plus a "
+                "penalty per edge: no test at a level decides an edge.",
+                "cpcm_graph",
+            ),
             *_exempt("Continuous optimization: no test decides an edge.", *CONTINUOUS, "dynotears"),
             *_exempt(
                 "Its edges come from the gated likelihood; its moral-graph screen is a step "
@@ -327,7 +335,7 @@ _CONCEPTS = (
                     fragment="p-value",
                     reason="None decides without a level: the direction with the larger p-value.",
                 )
-                for m in ("anm", "pnl", "loci")
+                for m in ("anm", "pnl", "loci", "cpcm")
             ),
             Deviation(
                 method="cam",
@@ -412,6 +420,8 @@ _CONCEPTS = (
                 *RESIDUAL,
                 "resit",
                 "camuv",
+                "cpcm",
+                "cpcm_graph",
             ),
             *_exempt(
                 "No conditional-independence test.",
@@ -783,6 +793,8 @@ _CONCEPTS = (
                 "anm",
                 "pnl",
                 "loci",
+                "cpcm",
+                "cpcm_graph",
             ),
             *_exempt(
                 "No conditional-independence tests; max_parents caps the sets it tests.", "icp"
@@ -933,6 +945,12 @@ _CONCEPTS = (
                 "granger",
                 *RESIDUAL,
                 "resit",
+                "cpcm",
+            ),
+            *_exempt(
+                "Its search scores every DAG, or removes edges from the complete DAG of a causal "
+                "order, and sets no cap on a node's parents.",
+                "cpcm_graph",
             ),
             *_exempt(
                 "An order search with no search over parent sets: the pruning starts from every "
@@ -1024,6 +1042,8 @@ _CONCEPTS = (
             "ldecc",
             "local_optimal_adjustment",
             "locpc_cde",
+            "cpcm",
+            "cpcm_graph",
         ),
         exempt=(
             *_exempt(
@@ -1231,7 +1251,13 @@ _CONCEPTS = (
             ),
             *_exempt("Its edges run from latent variables, which Knowledge cannot name.", "gin"),
             *_exempt(
-                "Two variables: knowledge of the edge would be the answer.", "anm", "pnl", "loci"
+                "Two variables: knowledge of the edge would be the answer.",
+                *("anm", "pnl", "loci", "cpcm"),
+            ),
+            *_exempt(
+                "The paper gives no rule for background knowledge: its search scores every DAG, "
+                "or removes edges from the complete DAG of a causal order.",
+                "cpcm_graph",
             ),
             *_exempt(
                 "Its tests read each set of the target's predictors as the data give it; no "
@@ -1272,7 +1298,7 @@ _CONCEPTS = (
                     if m
                     not in (
                         *("icp", "ages", "y_structures", "ldp", "ld3", "ldecc", "local_isa_ling"),
-                        "local_optimal_adjustment",
+                        *("local_optimal_adjustment", "cpcm_graph"),
                     )
                 ),
             ),
@@ -1286,6 +1312,7 @@ _CONCEPTS = (
                 "ldecc",
                 "local_isa_ling",
                 "local_optimal_adjustment",
+                "cpcm_graph",
             ),
         ),
     ),
@@ -1407,6 +1434,8 @@ _CONCEPTS = (
                 "score_matching",
                 "nogam",
                 "das",
+                "cpcm",
+                "cpcm_graph",
                 *LINGAM,
                 "gin",
                 "rcd",
@@ -1610,6 +1639,7 @@ _CONCEPTS = (
                 "Its regressions fit smooth functions of continuous causes, which an environment "
                 "label is not.",
                 *("cam", "resit", "score_matching", "nogam", "das", "camuv", "anm", "pnl", "loci"),
+                *("cpcm", "cpcm_graph"),
             ),
         ),
     ),
