@@ -211,8 +211,9 @@ names its pull request.
   exact tests on 24,000 random graphs that meet C1 and C2, every set it returned was valid. The
   answer is one record in `metadata["effects"]`, `metadata["partition"]` lists the labels, and the
   graph has no edges. Against its authors' code on its paper's partition graphs at 1,000 to 7,500
-  rows and the MILDEW network at 25,000 to 75,000 rows, it tied on the valid-set loss and the effect
-  error in all 14 settings, on 20 datasets and again on 20 fresh ones. ([#970], [#1052])
+  rows and the MILDEW network at 25,000 to 75,000 rows, it tied on the valid-set loss in all 14
+  settings and on the effect error in the 10 where both returned a set and an effect error is
+  scored, on 20 datasets and again on 20 fresh ones. ([#970], [#1052])
 - `andrey.ld3`, LD3 (Maasch et al. 2025), supported: the parents of an outcome that has no
   descendants among the columns, and whether the treatment is one of them (the structural direct
   criterion), in a number of tests linear in the number of columns. The criterion tests the

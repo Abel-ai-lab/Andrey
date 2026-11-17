@@ -143,8 +143,10 @@ pair ran beside them with the same test and level. Every number, per cell and me
 - **LDP** (`ldp@1000` to `@7500` with and without the effect, `ldp@5000,latent=True` with `B1`,
   `Z1`, or `B1`, `Z4a`, `M1` hidden, Fisher's z at 0.01; `mildew@25000` to `@75000`, chi-square at
   0.001): a tie with the authors' code on the valid-set loss (no set or a set that is not valid
-  counts 1) and the effect error in all 14 cells, on both seed ranges, and its effect error is below
-  the unadjusted regression's wherever it answers. Its answers are the code's on every dataset of
+  counts 1) in all 14 cells, and on the effect error in the 10 cells where both returned a set and
+  an effect error is scored (the three MILDEW cells are categorical, and neither side returned a
+  set with `Z1` hidden), on both seed ranges; its effect error is below the unadjusted
+  regression's wherever it answers. Its answers are the code's on every dataset of
   the Gaussian cells but the two where Andrey's Z5 criterion, which reads only instruments
   independent of every confounder found, gives no set (one in each cell with `B1` hidden). At
   `mildew@75000` Andrey answers on three datasets where the code does not, with sets that are not
