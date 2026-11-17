@@ -102,6 +102,37 @@ def test_the_graph_method_checks_the_table_shape_and_its_row_minimum():
         cpcm_graph(rng.normal(size=(23, 3)), family="gaussian_fixed_scale")
 
 
+def test_the_seed_is_recorded_only_for_a_count_family(monkeypatch):
+    rng = np.random.default_rng(0)
+    x = rng.normal(size=80)
+    gaussian = np.column_stack([x, x**2 + rng.normal(size=80)])
+    counts = np.column_stack([x, rng.poisson(np.exp(0.5 * x)).astype(float)])
+    assert "seed" not in cpcm(gaussian, seed=3).metadata
+    assert cpcm(counts, family=["gaussian", "poisson"], seed=3).metadata["seed"] == 3
+    monkeypatch.setenv("ANDREY_SEED", "11")
+    assert cpcm(counts, family=["gaussian", "poisson"]).metadata["seed"] == 11
+    three = np.column_stack([counts, rng.poisson(3.0, 80).astype(float)])
+    assert (
+        cpcm_graph(three, family=["gaussian_fixed_scale", "poisson", "poisson"], seed=3).metadata[
+            "seed"
+        ]
+        == 3
+    )
+    assert (
+        "seed"
+        not in cpcm_graph(
+            np.column_stack([gaussian, x + rng.normal(size=80)]), family="gaussian_fixed_scale"
+        ).metadata
+    )
+
+
+def test_a_fit_with_as_many_unpenalized_coefficients_as_rows_fails_fast():
+    rng = np.random.default_rng(0)
+    table = rng.integers(0, 9, size=(32, 5)).astype(float) + rng.uniform(0, 0.01, (32, 1))
+    with pytest.raises(ValueError, match="unpenalized coefficients"):
+        cpcm_graph(np.round(table), family="gaussian_fixed_scale")
+
+
 def test_swapping_the_columns_mirrors_the_answer():
     first, second = cpcm(_pair()), cpcm(_pair()[:, ::-1])
     assert first.structure.oriented_edges() == [(0, 1, "directed")]

@@ -362,7 +362,8 @@ unset, not a fresh random one, so a call repeats exactly. Apart from `boss_fci` 
 whose BOSS or GRaSP phase visits the variables in a random order on every fit, the methods that test
 independence draw random numbers only under `indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `pc` also
 with `missing="mvpc"` on data with missing values, `igsp` and `ut_igsp` also with `n_starts` above
-1, and `hc` and `tabu` only with `n_starts` above 1; otherwise `seed` changes nothing, and
+1, `hc` and `tabu` only with `n_starts` above 1, and `cpcm` and `cpcm_graph` only for a column under
+`family="poisson"` or `"negative_binomial"`; otherwise `seed` changes nothing, and
 `metadata["seed"]` is not set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every
 other method is deterministic and takes no seed.
 

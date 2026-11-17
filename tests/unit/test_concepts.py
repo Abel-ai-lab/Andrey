@@ -792,7 +792,12 @@ RANDOMIZED = {
 }
 
 
-@pytest.mark.parametrize("method", SEEDED)
+#: The seeded methods that draw random numbers only under a family of counts, which the shared
+#: frame cannot hold; ``tests/unit/test_cpcm.py`` checks their seeds.
+COUNT_SEEDED = ("cpcm", "cpcm_graph")
+
+
+@pytest.mark.parametrize("method", [m for m in SEEDED if m not in COUNT_SEEDED])
 def test_a_seeded_fit_records_its_seed(method, monkeypatch):
     seed = tagged(CONCEPTS["seed"], method).name  # ty: ignore[possibly-missing-attribute]
     settings = {**SHORT.get(method, {}), **RANDOMIZED.get(method, {})}

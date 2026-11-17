@@ -454,9 +454,10 @@ def draws_random_numbers(spec: MethodSpec, arguments: dict[str, Any]) -> bool:
     after the first, with ``n_starts`` above 1, unless it also takes a ``score_func``: then a
     search over variable orders, visited in a random order, runs before the tests (``boss_fci``,
     ``grasp_fci``), and it always does. A method with ``n_perturbations`` draws them only for the
-    random changes before a later start, with ``n_starts`` above 1; every other seeded method
-    always does. ``pc``'s ``missing="mvpc"`` draws them only on data with missing values, which
-    this check does not read: ``pc`` records its seed itself when the correction ran.
+    random changes before a later start, with ``n_starts`` above 1; a method with a ``family``
+    draws them only for a count family (the randomized probability transform); every other seeded
+    method always does. ``pc``'s ``missing="mvpc"`` draws them only on data with missing values,
+    which this check does not read: ``pc`` records its seed itself when the correction ran.
     """
     test = next((p for p in spec.params if p.name == "indep_test"), None)
     starts = next((p for p in spec.params if p.name == "n_starts"), None)
@@ -466,6 +467,13 @@ def draws_random_numbers(spec: MethodSpec, arguments: dict[str, Any]) -> bool:
         return later or arguments.get("indep_test", test.default) in STOCHASTIC_INDEP_TESTS
     if any(p.concept == "n_perturbations" for p in spec.params):
         return later
+    family = next((p for p in spec.params if p.name == "family"), None)
+    if family is not None:
+        from andrey.fcm.cpcm import FAMILIES
+
+        named = arguments.get("family", family.default)
+        names = named if isinstance(named, (list, tuple)) else [named]
+        return any(FAMILIES[n].counts for n in names if isinstance(n, str) and n in FAMILIES)
     return True
 
 

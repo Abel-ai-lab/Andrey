@@ -38,6 +38,7 @@ import numpy as np
 from scipy import optimize, special, stats
 
 from andrey.core.independence import dhsic_gram, dhsic_log_p
+from andrey.core.ties import EPS_IMPROVE, tie_key
 from andrey.fcm.gam import tp_basis
 
 #: Basis rank of every smooth before its sum-to-zero constraint, mgcv's default for ``s(x)``.
@@ -346,6 +347,13 @@ def fit(y: np.ndarray, terms: list[_Term], family: Family) -> list[np.ndarray]:
     """
     n = y.size
     full = np.hstack([np.ones((n, 1)), *(t.X for t in terms)])
+    free = 1 + sum(t.X.shape[1] for t in terms if t.S is None)
+    if free >= n:
+        raise ValueError(
+            f"a fit on the parents has {free} unpenalized coefficients for {n} rows: a parent of "
+            f"at most {MAX_LEVELS} values adds one for each value but the first, so use more rows "
+            "or fewer columns"
+        )
     designs = [full]
     if family.predictors == 2:
         designs.append(full if family.second == "smooth" else np.ones((n, 1)))
@@ -543,7 +551,7 @@ def search(
         best, best_score = None, math.inf
         for dag in all_dags(d):
             value = score(res, dag, edge_penalty)
-            if value < best_score:
+            if tie_key(value) < tie_key(best_score):
                 best, best_score = dag, value
         assert best is not None
         return best, None, res.log_p(best)
@@ -559,8 +567,8 @@ def search(
                 trials.append((score(res, trial, edge_penalty), trial))
         if not trials:
             break
-        value, trial = min(trials, key=lambda item: item[0])
-        if value >= current:
+        value, trial = min(trials, key=lambda item: tie_key(item[0]))
+        if value >= current - EPS_IMPROVE:
             break
         parents, current = trial, value
     return parents, order, res.log_p(parents)
@@ -578,7 +586,7 @@ def _resit_order(res: Residuals) -> list[int]:
             rest = tuple(u for u in remaining if u != v)
             grams = [res.gram(v, rest), dhsic_gram(res.X[:, rest], standardize=True)]
             log_p = dhsic_log_p(grams)[1]
-            if log_p > best_log_p:
+            if tie_key(log_p) > tie_key(best_log_p):
                 best, best_log_p = v, log_p
         order.insert(0, best)
         remaining.remove(best)
