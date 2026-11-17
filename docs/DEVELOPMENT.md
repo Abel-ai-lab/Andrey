@@ -219,13 +219,13 @@ on any other value:
 
 The statement covers what is on the page: its text, the code it shows, and its figures, with the
 code that drew them. It does not cover spelling or grammar checks, code completion, search, the
-research the post reports, or the cover art, which is the project's. `ai_tools` may say what a tool
-did, such as `<tool> (the code of figure 2)`. The author sets the highest value that applies to the
-post as published, a maintainer's edits included, and a guest author's value changes only with the
-guest's agreement. A post set to `none` is edited by hand: an agent changes only its front matter
-and markup, and proposes any change of wording to the author. With several authors the sentence
-reads "The authors ... are". The sentences never change, since later builds render earlier posts
-again; a new kind of use takes a new value.
+research the post reports, or the cover art, which [the brand page](docs/brand.md) covers.
+`ai_tools` may say what a tool did, such as `<tool> (the code of figure 2)`. The author sets the
+highest value that applies to the post as published, a maintainer's edits included, and a guest
+author's value changes only with the guest's agreement. A post set to `none` is edited by hand: an
+agent changes only its front matter and markup, and proposes any change of wording to the author.
+With several authors the sentence reads "The authors ... are". The sentences never change, since
+later builds render earlier posts again; a new kind of use takes a new value.
 
 ## The release cards
 
