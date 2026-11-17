@@ -398,6 +398,15 @@ any other branch, or from a release branch whose `pyproject.toml` version is not
 `release/<x.y.z>.post<n>`, fixes the site or the docs of the release on `main`: the check also
 fails one that changes anything under `src/` or whose `main` is not at `<x.y.z>`. The release pull
 request runs the quality gate (`qa/README.md`), also required, once for the whole release.
+
+At each release's freeze the benchmark harness's own tests run too, outside CI: CI runs only the two
+endpoint-conversion files of `benchmarks/tests`, and the rest, which need the harness environments,
+drift when nothing runs them. `benchmarks/run_tests.sh` builds every environment (the
+`benchmarks/start*.sh` scripts), runs `benchmarks/tests` in them with R required, and exits 1 on a
+failed build or test; it takes the Tetrad jars and a JDK from `ANDREY_BENCH_TETRAD_JAR`,
+`ANDREY_BENCH_TETRAD_GIN_JAR`, and `ANDREY_BENCH_JAVA`. The freeze report states the result and
+lists every skipped test with its reason; a failure fixes the lane's test or its harness, and a
+failed build is named as an environment failure.
 Dependabot's version updates target the active release branch (`target-branch` in
 `.github/dependabot.yml`), which each release moves to the next one.
 

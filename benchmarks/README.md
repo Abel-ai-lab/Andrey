@@ -239,6 +239,12 @@ cd benchmarks && .venv-bench/bin/python -m pytest tests/ -q
 The first command should end with `table: 4 rows` and `errors: 0`. The second checks the harness
 against known answers.
 
+`benchmarks/run_tests.sh` runs the whole suite as a release does: it builds every environment the
+`start*.sh` scripts make, requires R, and runs `benchmarks/tests` in them. It reads the Tetrad jars
+and a JDK from `ANDREY_BENCH_TETRAD_JAR`, `ANDREY_BENCH_TETRAD_GIN_JAR`, and `ANDREY_BENCH_JAVA`,
+and writes a summary of the builds, the variables, the failures, and every skip to
+`benchmarks/.test-logs/summary.txt` (`$ANDREY_BENCH_TEST_LOGS` names another folder).
+
 ## Writing a benchmark
 
 Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in

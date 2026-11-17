@@ -73,3 +73,5 @@ docs/_static/graph-types-*.html
 .ipynb_checkpoints/
 apps/live-discovery/brand/
 apps/live-discovery/data/
+# The logs and summary benchmarks/run_tests.sh writes, one run's worth.
+benchmarks/.test-logs/
