@@ -1058,6 +1058,7 @@ name.
 | Name | Variables | Edges | Data |
 |---|---|---|---|
 | `sachs` | 11 | 17 | Measured: 853 observational cells, or 7,466 in nine conditions (Sachs et al., 2005) |
+| `tuebingen` | 2 per pair | 1 per pair | Measured: 108 cause-effect pairs, each with its direction and weight (Mooij et al., 2016) |
 | `asia` | 8 | 8 | Simulated on the published network (bnlearn) |
 | `child` | 20 | 25 | Simulated on the published network (bnlearn) |
 | `insurance` | 27 | 52 | Simulated on the published network (bnlearn) |
@@ -1097,6 +1098,27 @@ rows = np.isin(pooled.env, list(known))
 andrey.gies(pooled.data[rows], pooled.env[rows], targets=known)
 ```
 
+`load_dataset("tuebingen")` loads the Tübingen cause-effect pairs (Mooij et al., 2016) as a
+collection: iterating it gives 108 pairs, each a dataset with the two columns `x` and `y` in the
+file's order, the two-node `graph` of its reference direction (the cause is `x` in some pairs and
+`y` in others), and its `name`, `weight`, `cause`, and `effect`. The collection gives the pairs of
+one source weights that sum to 1, so weigh each pair's outcome by its `weight` when you average
+over pairs. Six pairs (52 to 55, 71, and 105) have a block of several columns, marked
+`multivariate`; five of them have weight 0. The other 102 are the two-column pairs the pairwise
+methods (`anm`, `pnl`, `loci`) read. The collection states no license, and its pairs come from
+other collections with their own terms, so Andrey does not redistribute it: the first load downloads
+the archive from its original server and checks its SHA-256, and a changed archive is refused:
+
+```python
+pairs = load_dataset("tuebingen")
+usable = [p for p in pairs if not p.multivariate and p.weight > 0]
+correct = [
+    andrey.anm(p.data, alpha=None).structure.oriented_edges() == p.graph.oriented_edges()
+    for p in usable
+]
+accuracy = np.average(correct, weights=[p.weight for p in usable])
+```
+
 ```{eval-rst}
 .. currentmodule:: andrey.data
 
@@ -1107,6 +1129,8 @@ andrey.gies(pooled.data[rows], pooled.env[rows], targets=known)
    load_dataset
    list_datasets
    RealDataset
+   CausePairs
+   CausePair
 ```
 
 ### Simulators

@@ -20,6 +20,12 @@ names its pull request.
   candidate parents screened by Welch tests on its row of the same Stein estimate of the score's
   Jacobian, at most `max_parents=20` per variable, and CAM's smooth-term tests on those candidates
   only, so the pruning no longer fits every variable before a node in the order ([#1082]).
+- `andrey.load_dataset("tuebingen")` loads the Tübingen cause-effect pairs (Mooij et al. 2016) as a
+  `CausePairs` collection of 108 pairs. Each pair is a dataset with its two columns, the two-node
+  graph of its reference direction, its weight (pairs from one source share weights that sum to 1),
+  and its `cause` and `effect` columns; the six pairs with a block of several columns (52 to 55,
+  71, 105) are marked `multivariate`. The collection states no license, so Andrey downloads the
+  archive from the original server, checks its SHA-256, and does not redistribute it. ([#1084])
 
 ### Changed
 
@@ -2632,3 +2638,4 @@ First alpha release.
 [#1067]: https://github.com/Abel-ai-lab/Andrey/pull/1067
 [#1070]: https://github.com/Abel-ai-lab/Andrey/pull/1070
 [#1082]: https://github.com/Abel-ai-lab/Andrey/pull/1082
+[#1084]: https://github.com/Abel-ai-lab/Andrey/pull/1084
