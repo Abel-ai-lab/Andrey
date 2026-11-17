@@ -426,7 +426,7 @@ names its pull request.
   does not accept missing values names the guide in its error. The example notebook adds values
   missing not at random, FCI, categorical data, and a time series. The Limitations of `pc` with
   `missing="mvpc"` and of the searches that take `missing="em"` are a few sentences and a link to
-  the release card, and those of `fci` name the 0.11.0 card that measured missing values. ([#PR])
+  the release card, and those of `fci` name the 0.11.0 card that measured missing values. ([#1096])
 
 ### Fixed
 
@@ -3107,3 +3107,4 @@ First alpha release.
 [#1070]: https://github.com/Abel-ai-lab/Andrey/pull/1070
 [#1081]: https://github.com/Abel-ai-lab/Andrey/pull/1081
 [#1086]: https://github.com/Abel-ai-lab/Andrey/pull/1086
+[#1096]: https://github.com/Abel-ai-lab/Andrey/pull/1096
