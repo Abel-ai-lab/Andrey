@@ -47,9 +47,11 @@ from .scm import NOISE, SCM, column_order, component_rng
 __all__ = ["CausePair", "CausePairs", "RealDataset", "list_datasets", "load_dataset"]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class RealDataset:
     """A dataset from :func:`load_dataset`: its observations and the graph they are scored against.
+
+    Datasets compare and hash by identity, so ``in``, ``index``, and sets work on them.
 
     Attributes
     ----------
@@ -109,7 +111,7 @@ class Remote:
     measured: bool = False
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class CausePair(RealDataset):
     """One pair of the Tübingen collection: a :class:`RealDataset` and what the collection records.
 
@@ -495,6 +497,14 @@ effect using observational data: methods and benchmarks. Journal of Machine Lear
 """
 
 
+def _decode_description(raw: bytes) -> str:
+    """Decode a pair's description file: UTF-8, or Latin-1 for the files that are not UTF-8."""
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return raw.decode("latin-1")
+
+
 def _read_pairs(raw: bytes) -> CausePairs:
     """Read the collection's archive: ``pairmeta.txt``, then each pair's data and description.
 
@@ -531,7 +541,7 @@ def _read_pairs(raw: bytes) -> CausePairs:
             names = x_names + y_names
             cause, effect = (x_names, y_names) if cause_is_x else (y_names, x_names)
             arcs = tuple((c, e) for c in cause for e in effect)
-            description = archive.read(f"{stem}_des.txt").decode("latin-1")
+            description = _decode_description(archive.read(f"{stem}_des.txt"))
             pairs.append(
                 CausePair(
                     values,

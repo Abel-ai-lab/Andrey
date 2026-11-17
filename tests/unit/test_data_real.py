@@ -517,6 +517,23 @@ def test_the_tuebingen_pairs_carry_direction_weight_and_blocks(offline_datasets)
         pairs["pair0099"]
 
 
+def test_a_description_is_read_as_utf8_or_as_latin1(offline_datasets):
+    pairs = load_dataset("tuebingen")
+    for pair in pairs:  # the odd pairs' files are UTF-8, the even pairs' Latin-1
+        assert "10\u00b0C" in pair.description and "\u00c2" not in pair.description
+
+
+def test_pairs_and_datasets_compare_and_hash_by_identity(offline_datasets):
+    for as_frame in (True, False):
+        pairs = load_dataset("tuebingen", as_frame=as_frame)
+        assert all(pair in pairs for pair in pairs)
+        assert [pairs.pairs.index(pair) for pair in pairs] == list(range(6))
+        assert pairs[1] != pairs[2] and pairs[1] == pairs["pair0002"]
+        assert len({*pairs}) == 6 and [p for p in pairs if p not in (pairs[0],)] == [*pairs][1:]
+    sachs = load_dataset("sachs")
+    assert sachs in [sachs] and sachs != load_dataset("sachs") and len({sachs}) == 1
+
+
 def test_tuebingen_data_follow_the_files_and_the_array_matches_the_frame(offline_datasets):
     frames, arrays = load_dataset("tuebingen"), load_dataset("tuebingen", as_frame=False)
     assert all(isinstance(a.data, np.ndarray) and a.data.dtype == np.float64 for a in arrays)

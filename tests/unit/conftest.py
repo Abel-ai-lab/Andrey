@@ -11,7 +11,8 @@ def tuebingen_archive(meta: str | None = None) -> bytes:
     Six pairs: two from one source (weights 0.5, tab- and space-separated, one line with trailing
     blanks); a pair whose cause is the second column; a pair with a third column the metadata
     does not use; a multivariate pair with weight 0, whose cause block is the second; and one with
-    weight 0.5, whose cause block is the first. ``meta`` replaces the metadata file.
+    weight 0.5, whose cause block is the first. The descriptions of the odd pairs are UTF-8 and
+    those of the even pairs Latin-1, as in the real archive. ``meta`` replaces the metadata file.
     """
     import io
     import zipfile
@@ -46,9 +47,8 @@ def tuebingen_archive(meta: str | None = None) -> bytes:
             sep = "\t" if k % 2 else "  "
             lines = [sep.join(f"{v:.6g}" for v in row) + ("  " if k == 2 else "") for row in table]
             archive.writestr(f"pair{k:04d}.txt", "\n".join(lines) + "\n")
-            archive.writestr(
-                f"pair{k:04d}_des.txt", f"Information for pair{k:04d}\n10\xb0C\n".encode("latin-1")
-            )
+            text = f"Information for pair{k:04d}\n10\xb0C\n"
+            archive.writestr(f"pair{k:04d}_des.txt", text.encode("utf-8" if k % 2 else "latin-1"))
     return out.getvalue()
 
 
