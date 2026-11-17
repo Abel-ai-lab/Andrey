@@ -545,14 +545,22 @@ def dhsic_gram(column: np.ndarray, *, standardize: bool = False) -> np.ndarray:
     ``0``, as for a column whose rows are mostly tied, ``w`` is 0.001 of the rows' root mean square
     distance from their mean: the 0.001 of that software for a column of unit standard deviation,
     and the same kernel in any other units. The distances are formed on :func:`within_one`'s
-    values, so the gram is the same in any units.
+    values, so the gram is the same in any units, and a matrix's are summed over its columns'
+    squared differences, so two equal rows are at distance exactly ``0`` and ``m`` is ``0`` when
+    most pairs of rows are equal.
     """
     col = within_one(_as_columns(column), each_column=standardize)[0]
     col = col - col.mean(axis=0)
     if standardize:
         sd = col.std(axis=0)
         col = col / np.where(sd > 0, sd, 1.0)
-    sq = np.maximum(_sq_dists(col), 0.0)
+    if col.shape[1] == 1:
+        sq = np.maximum(_sq_dists(col), 0.0)
+    else:
+        sq = np.zeros((col.shape[0], col.shape[0]))
+        for values in col.T:
+            difference = values[:, None] - values[None, :]
+            sq += difference * difference
     upper = _upper(sq)
     middle = upper.size // 2
     m = float(np.partition(upper, middle)[middle]) if upper.size else 0.0

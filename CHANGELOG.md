@@ -299,6 +299,10 @@ names its pull request.
 
 ### Changed
 
+- The pairwise methods that pick the direction with the larger p-value or likelihood (`anm`,
+  `pnl`, `loci`, `cpcm` with `alpha=None`) count values that differ only past 9 decimal places as
+  equal, the tie rule of every other method: two directions that mirror each other give no edge
+  in any units ([#1085]).
 - `iamb` and `inter_iamb` test the candidates of each grow step in one call with a
   partial-correlation test. With Fisher-z, one grow step is 12 to 47 times faster on 400 to 12,800
   variables with blankets of 2 to 10 members. A fit at one target is 1.3 to 4.2 times faster on

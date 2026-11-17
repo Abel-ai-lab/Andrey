@@ -597,7 +597,9 @@ def cpcm_graph(
         columns, holds ``NaN`` or ``inf``, or has fewer than ``4 d + 12`` rows for ``d`` columns,
         if ``family`` names an unknown family or does not give one name per column, or if a column
         holds a value outside its family's support, such as a non-integer under ``"poisson"`` or
-        a value below 1 under ``"pareto"``.
+        a value below 1 under ``"pareto"``. Also if a column's residual on a set of parents the
+        search reads is the same on every row, as when the column is an exact function of them,
+        or if a fit ends away from a maximum; the message names the columns.
 
     Warns
     -----
@@ -631,7 +633,8 @@ def cpcm_graph(
 
     **Units.** As for :func:`~andrey.cpcm`: the result does not depend on any column's units under
     the Gaussian, Gumbel, exponential, and gamma families, of which the last two read its origin;
-    ``"pareto"`` and the count families read the units, since they fix a scale.
+    ``"pareto"`` and the count families read the units, since they fix a scale. The exception
+    stated there, for ``"gaussian"`` and ``"gumbel"`` fits with several maxima, holds here too.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows
@@ -642,7 +645,10 @@ def cpcm_graph(
     exact search as feasible to 4 variables; the residual fits grow with the number of parents and
     the greedy search refits a variable for each parent set it tries. Each test builds matrices with
     one row and one column per sample, and every distinct residual's matrix is kept for the fit, so
-    memory grows with the square of ``n_samples``. The family must be chosen: the paper's choice of
+    memory grows with the square of ``n_samples``. Under the count families the rank-10 spline
+    must follow the mean to within the counts' own noise, which it does for means up to a few
+    hundred: from means of a few thousand that vary strongly with the parents, the true graph's
+    test rejects too. The family must be chosen: the paper's choice of
     a family from each column's support, and its sequential choice between one- and two-parameter
     families, are not offered. The numbers are a reference, not a hard limit: they change with the
     data generator, the density, the method's settings, and the machine.
@@ -680,11 +686,18 @@ def cpcm_graph(
         raise ValueError(f"data needs at least {min_rows} rows (samples), got {X.shape[0]}")
     if X.shape[1] < 2:
         raise ValueError(f"cpcm_graph needs at least 2 columns, got {X.shape[1]}")
-    families = resolve_families(family, X, "cpcm_graph", column_namer(labels))
+    name = column_namer(labels)
+    families = resolve_families(family, X, "cpcm_graph", name)
     assert seed is not None  # method_spec resolves it
     # The fit runs on the columns in rank order, so no step reads their positions.
     order = np.argsort(tie_ranks(X), kind="stable")
-    res = Residuals(X[:, order], [families[j] for j in order], seed)
+    res = Residuals(
+        X[:, order],
+        [families[j] for j in order],
+        seed,
+        method="cpcm_graph",
+        name=lambda j: name(int(order[j])),
+    )
     with one_blas_thread():
         parents, _, log_p = search(res, edge_penalty)
         value = cpcm_score(res, parents, edge_penalty)

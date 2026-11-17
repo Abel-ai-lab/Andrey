@@ -8,7 +8,7 @@ import pytest
 from andrey.api.fcm import cpcm_graph
 from andrey.api.irregular import cpcm
 from andrey.core.independence import dhsic_gram, dhsic_log_p
-from andrey.fcm.cpcm import FAMILIES, LOG_SCALE_FLOOR, _term, all_dags, fit
+from andrey.fcm.cpcm import FAMILIES, LOG_SCALE_FLOOR, _log_size_bound, _term, all_dags, fit
 
 SUPPORT = {
     "gaussian": "real",
@@ -267,14 +267,94 @@ def test_a_row_the_location_fits_alone_keeps_its_scale_above_the_floor():
     assert all(0.0 < p <= 1.0 for p in out.metadata["p_values"].values())
 
 
-def test_a_parent_value_seen_once_beside_a_smooth_parent_fails_fast():
+def _rare_value_table(seed: int) -> np.ndarray:
+    """A count parent whose largest value is seen once, a smooth parent, and their effect."""
+    rng = np.random.default_rng(seed)
+    count = np.minimum(rng.poisson(1.0, size=200), 3).astype(float)
+    count[int(np.argmax(count))] = 4.0
+    x = rng.normal(size=200)
+    noise = rng.normal(size=200)
+    return np.column_stack([count, x, np.sin(x) + 0.5 * count + 0.5 * np.exp(0.3 * x) * noise])
+
+
+def test_a_parent_value_seen_once_beside_a_smooth_parent_takes_the_reference_scale():
+    table = _rare_value_table(0)
+    assert np.sum(table[:, 0] == 4.0) == 1
+    effect = FAMILIES["gaussian"].rescale(table[:, 2])
+    _, log_scale = fit(effect, [_term(table[:, 0]), _term(table[:, 1])], FAMILIES["gaussian"])
+    assert log_scale[table[:, 0] == 4.0][0] > LOG_SCALE_FLOOR["gaussian"] + 1.0
+    out = cpcm_graph(table, family=["poisson", "gaussian", "gaussian"], seed=0)
+    assert out.structure.oriented_edges() == [(0, 2, "directed"), (1, 2, "directed")]
+
+
+def test_a_column_that_is_an_exact_function_of_the_other_fails_fast():
+    rng = np.random.default_rng(0)
+    x = rng.integers(0, 6, size=100).astype(float)
+    table = np.column_stack([x, (x >= 3).astype(float)])
+    for scaled in (table, table * np.array([1.0, 3.7]), table * np.array([3.7, 1.0])):
+        with pytest.raises(ValueError, match="cpcm: column 1 on 0"):
+            cpcm(scaled)
+        with pytest.raises(ValueError, match="cpcm: column 1 on 0"):
+            cpcm(scaled, alpha=0.05)
+        with pytest.raises(ValueError, match="cpcm_graph: column"):
+            cpcm_graph(scaled, seed=0)
+    with pytest.raises(ValueError, match="the residual is the same on every row"):
+        cpcm(table + np.array([1.0, 1.0]), family="exponential")
+
+
+def test_two_directions_that_mirror_each_other_give_no_edge_in_any_units():
+    # A symmetric two-by-two table: both directions have the same p-value and statistic, up to
+    # the last digits, which differ with the units.
     rng = np.random.default_rng(3)
-    levels = np.sort(rng.integers(0, 3, size=200)).astype(float)
-    levels[-1] = 3.0
-    smooth = rng.normal(size=200)
-    effect = FAMILIES["gaussian"].rescale(levels + np.sin(smooth) + rng.normal(size=200))
-    with pytest.raises(ValueError, match="holds one value on the rows of one of them"):
-        fit(effect, [_term(levels), _term(smooth)], FAMILIES["gaussian"])
+    b = rng.integers(0, 2, size=100).astype(float)
+    y = (b + rng.normal(size=100) > 0.5).astype(float)
+    assert np.sum((b == 0) & (y == 1)) == np.sum((b == 1) & (y == 0))
+    for factor in (1.0, 3.7, 0.37, 1e3):
+        out = cpcm(np.column_stack([b, y * factor]))
+        assert out.structure.oriented_edges() == []
+
+
+#: Factors that round, on the cause, the effect, and both.
+ROUNDING_FACTORS = ((3.0, 1.0), (1.0, 3.0), (1e6, 1.0), (1.0, 1e-6), (3.7, 3.7), (3.7, 1e-6))
+
+
+#: The families whose penalized likelihood can have several maxima on heavy-tailed columns, where
+#: rounding can change the one a fit reaches (the exception their Units paragraph states).
+SEVERAL_MAXIMA = ("gaussian", "gumbel")
+
+
+@pytest.mark.parametrize(
+    "name", [n for n, f in FAMILIES.items() if not f.reads_units and n not in SEVERAL_MAXIMA]
+)
+@pytest.mark.parametrize("seed", [9, 63, 64])
+def test_a_heavy_tailed_table_gives_the_same_answer_in_any_units(name, seed):
+    # Positive columns with a lognormal ratio: the fits are ill-conditioned, with coefficients in
+    # the thousands, and the two smooths' penalties differ by many orders of magnitude.
+    rng = np.random.default_rng(seed)
+    x = rng.normal(size=40)
+    table = np.column_stack([np.exp(x), rng.lognormal(0.0, 1.5, size=40) * np.exp(x)])
+    first = cpcm(table, family=name)
+    for factors in ROUNDING_FACTORS:
+        _assert_same_in_units(first, cpcm(table * np.array(factors), family=name), 3.7)
+
+
+def test_rows_that_are_equal_in_every_column_are_at_distance_zero():
+    rng = np.random.default_rng(8)
+    X = rng.poisson(0.1, size=(200, 3)).astype(float)
+    same = (X[:, None, :] == X[None, :, :]).all(axis=2)
+    assert same.mean() > 0.5
+    gram = dhsic_gram(X, standardize=True)
+    assert np.all(gram[same] == 1.0)
+    assert np.all(gram[~same] < 1e-6)  # the width for a zero median distance
+    moved = dhsic_gram(X * np.array([3.7e5, 1e-9, 12.0]), standardize=True)
+    np.testing.assert_allclose(moved, gram, rtol=1e-9, atol=1e-12)
+
+
+def test_the_negative_binomial_size_bound_follows_the_counts():
+    small, large = np.array([0.0, 3.0, 40.0]), np.array([0.0, 3.0, 2e6])
+    assert _log_size_bound(small) == 12.0
+    assert _log_size_bound(large) == pytest.approx(math.log(2e6) + 5.0)
+    assert _log_size_bound(np.array([1e12])) == 20.0
 
 
 def test_the_graph_method_gives_the_same_answer_in_extreme_units():

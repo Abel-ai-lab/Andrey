@@ -89,6 +89,35 @@ def test_the_negative_binomial_family_reads_poisson_counts_as_its_limit():
     assert rejected <= 1
 
 
+@pytest.mark.parametrize("family", ["poisson", "negative_binomial"])
+def test_the_count_families_hold_for_means_in_the_hundreds(family):
+    # The working range of the rank-10 mean: counts with means up to about 740.
+    rejected = 0
+    for seed in range(100, 106):
+        rng = np.random.default_rng(seed)
+        x = rng.normal(size=300)
+        table = np.column_stack([x, rng.poisson(100.0 * np.exp(1.0 + np.sin(2.0 * x)))])
+        out = cpcm(table, family=["gaussian_fixed_scale", family], seed=0)
+        assert out.structure.oriented_edges() == [(0, 1, "directed")]
+        rejected += out.metadata["p_values"]["forward"] < 0.01
+    assert rejected <= 1
+
+
+def test_overdispersed_counts_with_large_means_keep_their_family():
+    # A size of exp(12.5) at means near 1e5: 1.4 times the Poisson variance, which a size bound
+    # that did not follow the counts would read as Poisson.
+    kept = 0
+    for seed in range(6):
+        rng = np.random.default_rng(seed)
+        x = rng.uniform(-1.0, 1.0, size=300)
+        mean = 1e5 * np.exp(2.0 * x)
+        size = np.exp(12.5)
+        table = np.column_stack([x, rng.negative_binomial(size, size / (size + mean))])
+        out = cpcm(table, family=["gaussian_fixed_scale", "negative_binomial"], alpha=0.05, seed=0)
+        kept += out.structure.oriented_edges() == [(0, 1, "directed")]
+    assert kept >= 5
+
+
 def test_cpcm_matches_the_recorded_output():
     assert_recorded_output(cpcm(datagen.generate("lsnm_pair")), "CPCM", case="lsnm_pair")
 

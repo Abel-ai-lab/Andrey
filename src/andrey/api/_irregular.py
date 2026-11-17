@@ -21,6 +21,7 @@ from typing import Any
 import numpy as np
 
 from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput
+from andrey.core.ties import tie_key
 
 from ._adapt import structure_output
 from ._marks import marks_from_signed
@@ -72,13 +73,17 @@ def _direction(
 
     With ``alpha=None``, choose the direction with the larger p-value, which ``pval_*`` may give as
     its logarithm. Equal p-values, given both test statistics, choose the direction with the
-    smaller statistic, the weaker dependence; equal or missing statistics give no edge. Otherwise,
-    choose a direction only when its p-value exceeds ``alpha`` and the other does not.
+    smaller statistic, the weaker dependence; equal or missing statistics give no edge. Values that
+    differ only in their last digits are equal (:func:`andrey.core.ties.tie_key`), so two directions
+    that mirror each other give no edge in any units. Otherwise, choose a direction only when its
+    p-value exceeds ``alpha`` and the other does not.
     """
     if alpha is None:
-        forward, backward = pval_forward > pval_backward, pval_backward > pval_forward
-        if pval_forward == pval_backward and stat_forward is not None and stat_backward is not None:
-            forward, backward = stat_forward < stat_backward, stat_backward < stat_forward
+        p_forward, p_backward = tie_key(pval_forward), tie_key(pval_backward)
+        forward, backward = p_forward > p_backward, p_backward > p_forward
+        if p_forward == p_backward and stat_forward is not None and stat_backward is not None:
+            s_forward, s_backward = tie_key(stat_forward), tie_key(stat_backward)
+            forward, backward = s_forward < s_backward, s_backward < s_forward
     else:
         forward, backward = pval_forward > alpha, pval_backward > alpha
     return 1 if forward and not backward else -1 if backward and not forward else 0

@@ -691,7 +691,9 @@ def cpcm(
         columns, holds ``NaN`` or ``inf``, or has fewer than 20 rows, if ``family`` names an
         unknown family or does not give one name per column, or if a column holds a value outside
         its family's support, such as a non-integer under ``"poisson"`` or a value below 1 under
-        ``"pareto"``.
+        ``"pareto"``. Also if a column's residual is the same on every row, as when the column is
+        an exact function of the other, or if a fit ends away from a maximum; the message names
+        the columns.
 
     Warns
     -----
@@ -744,13 +746,18 @@ def cpcm(
     stays above a floor, without which the likelihood has no maximum where the location fits a row
     exactly: 0.01 of the column's standard deviation under ``"gaussian"``, ``exp(-7)`` of it under
     ``"gumbel"``, and a dispersion of ``exp(-7)`` under ``"gamma"``. The size of
-    ``"negative_binomial"`` is at most ``exp(12)``, where the family is read as its Poisson limit:
-    the likelihood is flat in a larger size. A fit that ends away from a maximum raises
-    ``ValueError``. The fit draws no random numbers except a count family's uniforms, which follow
+    ``"negative_binomial"`` is at most ``exp(5)`` times the column's largest count, and between
+    ``exp(12)`` and ``exp(20)``; a size at that bound is read as the Poisson limit, whose variance
+    is then within 1 part in 148. A fit that ends away from a maximum, or at a point where the
+    coefficients are not determined to working precision, raises ``ValueError``. The fit draws
+    no random numbers except a count family's uniforms, which follow
     ``seed`` and the column's values.
 
     **Units.** A column in other units stays in the Gaussian, Gumbel, exponential, and gamma
-    families, so under them the result is the same in any units, to rounding. The Gaussian and
+    families, so under them the result is the same in any units, to rounding, with one exception:
+    where the penalized likelihood of ``"gaussian"`` or ``"gumbel"`` has several maxima, as it can
+    on heavy-tailed columns, rounding can change the one a fit reaches and so a p-value. The
+    Gaussian and
     Gumbel families do not depend on the column's origin either; the exponential and gamma
     families do, since their support starts at 0. ``"pareto"``, whose scale is fixed at 1, and
     the count families, whose values step by 1, read the units: the same column in other units is
@@ -763,7 +770,11 @@ def cpcm(
     :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Not benchmarked yet. Each HSIC test builds matrices with one row and one
-    column per sample, so time and memory grow with the square of ``n_samples``. The family must be
+    column per sample, so time and memory grow with the square of ``n_samples``. Under the count
+    families the rank-10 spline must follow the mean to within the counts' own noise, about
+    ``1 / sqrt(mean)`` of it, which it does for means up to a few hundred: from means of a few
+    thousand that vary strongly with the cause, the true direction's test rejects too. The
+    family must be
     chosen: the paper's rule that picks one from each column's support, and its sequential choice
     between one- and two-parameter families, are not offered. The numbers are a reference, not a
     hard limit: they change with the data generator, the density, the method's settings, and the
@@ -800,10 +811,12 @@ def cpcm(
         )
     X = data_matrix(data, method="cpcm", min_rows=CPCM_MIN_ROWS)
     labels = column_labels(data)
-    families = resolve_families(family, X, "cpcm", column_namer(labels))
+    name = column_namer(labels)
+    families = resolve_families(family, X, "cpcm", name)
     assert seed is not None  # method_spec resolves it
     with one_blas_thread():
-        log_p, statistics, log_p_independent = pair_tests(Residuals(X, families, seed))
+        res = Residuals(X, families, seed, method="cpcm", name=name)
+        log_p, statistics, log_p_independent = pair_tests(res)
     p_independent = math.exp(log_p_independent)
     out = pairwise_output(
         math.exp(log_p[0]),

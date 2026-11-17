@@ -62,13 +62,20 @@ _MAX_NEWTON = 100
 #: location-scale families in the paper's software; without a bound the likelihood has no maximum,
 #: since it grows without limit as the scale shrinks at a row the location fits exactly.
 LOG_SCALE_FLOOR = {"gaussian": math.log(0.01), "gumbel": -7.0, "gamma": -7.0}
-#: Upper bound of the negative binomial family's log size (a size of about 163,000). The likelihood
-#: is flat in the size beyond it, where the family is its Poisson limit for the means counts take,
-#: and its terms lose their digits to cancellation from a log size of about 20; a size at the bound
-#: is read as the Poisson limit.
-NB_LOG_SIZE_MAX = 12.0
-#: A Hessian is indefinite if, with its diagonal brought to 1, an eigenvalue is below minus this.
-_INDEFINITE = 1e-8
+#: Bounds of the upper bound of the negative binomial family's log size, which follows the counts
+#: (:func:`_log_size_bound`): at least 12 (a size of about 163,000), and at most 20, from where
+#: the likelihood's terms lose their digits to cancellation.
+NB_LOG_SIZE_MAX = (12.0, 20.0)
+#: The bound is the log of the largest count plus this, so a size at the bound is ``exp(5)`` times
+#: every count or more and the family is within 1 part in 148 of its Poisson limit's variance.
+NB_LOG_SIZE_OVER_MAX = 5.0
+#: A Hessian is singular to working precision if, with its diagonal brought to 1, an eigenvalue is
+#: below this. The coefficients and the log determinant at such a point follow the table's last
+#: digits (their rounding error is the machine's divided by that eigenvalue), so its LAML is not a
+#: number two runs agree on, and the point has no fit.
+_SINGULAR = 1e-8
+#: A residual, a probability, is the same on every row if its values lie within this of each other.
+_CONSTANT = 1e-9
 #: A point is a minimum only if a Newton step from it lowers the objective by less than this share.
 _UNFINISHED = 1e-7
 
@@ -86,8 +93,8 @@ class Family:
     ``y``, randomized by the uniforms ``u`` for a count family. ``rescale``, set for a
     location-scale or scale family, maps ``y`` to the column the fit and the distribution function
     read: the family's probability transform is the same on it, so the result does not depend on
-    the units and the fit does not depend on their size. ``upper`` bounds a ``"constant"`` second
-    predictor from above.
+    the units and the fit does not depend on their size. ``upper(y)`` bounds a ``"constant"``
+    second predictor from above.
     """
 
     name: str
@@ -100,7 +107,7 @@ class Family:
     outside: Callable[[np.ndarray], np.ndarray]
     counts: bool = False
     rescale: Callable[[np.ndarray], np.ndarray] | None = None
-    upper: float = math.inf
+    upper: Callable[[np.ndarray], float] | None = None
 
     @property
     def reads_units(self) -> bool:
@@ -217,11 +224,23 @@ def _poisson_cdf(y: np.ndarray, etas: list[np.ndarray], u: np.ndarray | None) ->
 def _negative_binomial_cdf(
     y: np.ndarray, etas: list[np.ndarray], u: np.ndarray | None
 ) -> np.ndarray:
-    if etas[1][0] >= NB_LOG_SIZE_MAX:
+    if etas[1][0] >= _log_size_bound(y):
         return _poisson_cdf(y, etas[:1], u)
     m, t = np.exp(etas[0]), np.exp(etas[1])
     p = t / (t + m)
     return _randomized(stats.nbinom.cdf(y - 1.0, t, p), stats.nbinom.pmf(y, t, p), u)
+
+
+def _log_size_bound(y: np.ndarray) -> float:
+    """Upper bound of the negative binomial log size fitted to the counts ``y``.
+
+    The likelihood is flat in the size only once the size is far above the counts: the variance
+    is ``1 + mean / size`` times the Poisson's, so a fixed bound would read overdispersed counts
+    with large means as Poisson. The bound therefore follows the largest count, and a fit that
+    ends on it is read as the Poisson limit, which it then is to within that margin.
+    """
+    low, high = NB_LOG_SIZE_MAX
+    return min(high, max(low, math.log(max(float(np.max(y)), 1.0)) + NB_LOG_SIZE_OVER_MAX))
 
 
 def _not_finite(y: np.ndarray) -> np.ndarray:
@@ -322,7 +341,7 @@ def _families() -> dict[str, Family]:
                gumbel_cdf, _not_finite, rescale=_standardized),
         Family("negative_binomial", "counts (whole numbers of at least 0)", 2, "constant",
                _count_start, _negative_binomial_derivs, _negative_binomial_cdf, _not_whole,
-               counts=True, upper=NB_LOG_SIZE_MAX),
+               counts=True, upper=_log_size_bound),
     ]  # fmt: skip
     return {f.name: f for f in out}
 
@@ -356,12 +375,23 @@ class Residuals:
     the probability transform of a column under its family fitted on a parent set; a variable
     without parents is its own residual. A count family's uniforms are drawn once per column from
     ``seed`` and the column's values, so the draws follow the column whatever its position.
+    ``method`` and ``name(j)`` name the method and column ``j`` in messages. A fit that fails, or
+    a residual that is the same on every row, raises ``ValueError`` with both.
     """
 
-    def __init__(self, X: np.ndarray, families: list[Family], seed: int) -> None:
+    def __init__(
+        self,
+        X: np.ndarray,
+        families: list[Family],
+        seed: int,
+        *,
+        method: str = "cpcm",
+        name: Callable[[int], str] = str,
+    ) -> None:
         self.X = X
         self.families = families
         self.seed = seed
+        self.method, self.name = method, name
         self._terms: dict[int, _Term] = {}
         self._residuals: dict[tuple[int, tuple[int, ...]], np.ndarray] = {}
         self._grams: dict[tuple[int, tuple[int, ...]], np.ndarray] = {}
@@ -384,9 +414,22 @@ class Residuals:
             else:
                 family = self.families[j]
                 y = self.X[:, j] if family.rescale is None else family.rescale(self.X[:, j])
-                etas = fit(y, [self.term(k) for k in key[1]], family)
+                on = f"{self.method}: column {self.name(j)} on " + ", ".join(
+                    self.name(k) for k in key[1]
+                )
+                try:
+                    etas = fit(y, [self.term(k) for k in key[1]], family)
+                except ValueError as error:
+                    raise ValueError(f"{on}: {error}") from None
                 u = self.uniforms(j) if family.counts else None
-                self._residuals[key] = family.cdf(y, etas, u)
+                residual = family.cdf(y, etas, u)
+                if not np.ptp(residual) > _CONSTANT:
+                    raise ValueError(
+                        f"{on}: under family {family.name!r} the residual is the same on every "
+                        "row, as when the column is an exact function of those columns, so no "
+                        "independence test can read it; drop one of the columns"
+                    )
+                self._residuals[key] = residual
         return self._residuals[key]
 
     def gram(self, j: int, parents: tuple[int, ...]) -> np.ndarray:
@@ -404,16 +447,16 @@ def fit(y: np.ndarray, terms: list[_Term], family: Family) -> list[np.ndarray]:
     """Fit ``family`` to ``y`` on the parents' ``terms``; return each linear predictor per row.
 
     Each smooth linear predictor has an intercept and every term's columns; a constant one has the
-    intercept alone. The coefficients minimize the penalized negative log-likelihood, and the log
+    intercept alone. Beside a smooth parent, a second predictor leaves out the indicator of a
+    parent value on whose rows ``y`` holds one value (:func:`_varying`). The coefficients
+    minimize the penalized negative log-likelihood, and the log
     smoothing parameters minimize its Laplace approximate marginal likelihood (Wood, Pya, and
     Safken 2016) over a lattice around their start (:func:`_search`).
 
     Raises ``ValueError`` where the fit has no maximum to find: as many unpenalized coefficients
-    as rows, a scale fitted per parent value on rows that hold one value, or a search that ends
-    away from a minimum of the penalized likelihood.
+    as rows, or a search that ends away from a minimum of the penalized likelihood.
     """
     n = y.size
-    full = np.hstack([np.ones((n, 1)), *(t.X for t in terms)])
     free = 1 + sum(t.X.shape[1] for t in terms if t.S is None)
     if free >= n:
         raise ValueError(
@@ -421,32 +464,24 @@ def fit(y: np.ndarray, terms: list[_Term], family: Family) -> list[np.ndarray]:
             f"at most {MAX_LEVELS} values adds one for each value but the first, so use more rows "
             "or fewer columns"
         )
-    designs = [full]
+    layouts: list[list[_Term]] = [terms]
     if family.predictors == 2:
-        designs.append(full if family.second == "smooth" else np.ones((n, 1)))
+        layouts.append([])
+        if family.second == "smooth":
+            smooth = any(t.S is not None for t in terms)
+            layouts[1] = [_Term(_varying(t.X, y), None, 0) if smooth and t.S is None else t
+                          for t in terms]  # fmt: skip
+    designs = [np.hstack([np.ones((n, 1)), *(t.X for t in layout)]) for layout in layouts]
     sizes = [B.shape[1] for B in designs]
     offsets = np.concatenate([[0], np.cumsum(sizes)])
     penalties: list[tuple[slice, np.ndarray, int]] = []
-    for j, B in enumerate(designs):
-        if B.shape[1] == 1:
-            continue
+    for j, layout in enumerate(layouts):
         col = offsets[j] + 1
-        for t in terms:
+        for t in layout:
             width = t.X.shape[1]
             if t.S is not None:
                 penalties.append((slice(col, col + width), t.S, t.rank))
             col += width
-    if family.second == "smooth" and penalties:
-        for t in terms:
-            if t.S is None:
-                level = t.X @ np.arange(1.0, t.X.shape[1] + 1)
-                if any(np.ptp(y[level == v]) == 0 for v in np.unique(level)):
-                    raise ValueError(
-                        f"family {family.name!r} fits a scale for each value of a parent of at "
-                        f"most {MAX_LEVELS} values, but the column holds one value on the rows of "
-                        "one of them, where no scale can be fitted beside a smooth parent; use "
-                        "more rows, or a family whose second parameter is constant"
-                    )
     beta = np.zeros(offsets[-1])
     for j, value in enumerate(family.start(y)[: family.predictors]):
         beta[offsets[j]] = value
@@ -458,6 +493,20 @@ def fit(y: np.ndarray, terms: list[_Term], family: Family) -> list[np.ndarray]:
             "penalized likelihood; use more rows, or a family with fewer fitted parameters"
         )
     return model.etas(fitted)
+
+
+def _varying(indicators: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """The indicator columns of a second predictor, a scale or shape, beside a smooth parent.
+
+    ``indicators`` holds one column per value of a parent but its first. The rows of a value on
+    which ``y`` holds one value, such as a value seen once, say nothing about a scale: the location
+    fits them exactly, and a scale of their own would shrink without limit. Those values take the
+    scale of the first value on whose rows ``y`` varies, which is the reference of the columns
+    returned; when ``y`` varies on every value's rows the columns are ``indicators``.
+    """
+    level = indicators @ np.arange(1.0, indicators.shape[1] + 1)
+    varying = [v for v in np.unique(level) if np.ptp(y[level == v]) > 0]
+    return (level[:, None] == np.array(varying[1:])[None, :]).astype(np.float64)
 
 
 def _search(model: _Model) -> np.ndarray | None:
@@ -513,8 +562,8 @@ class _Model:
         self.y, self.designs, self.offsets, self.start = y, designs, offsets, start
         self.penalties, self.family = penalties, family
         self.upper = np.full(offsets[-1], math.inf)
-        if family.second == "constant":
-            self.upper[offsets[1]] = family.upper
+        if family.upper is not None:
+            self.upper[offsets[1]] = family.upper(y)
 
     def etas(self, beta: np.ndarray) -> list[np.ndarray]:
         o = self.offsets
@@ -579,8 +628,7 @@ class _Model:
         found = self.minimum(rho)
         if found is None:
             return math.inf, None
-        fitted, value, eigenvalues = found
-        logdet = float(np.sum(np.log(np.maximum(eigenvalues, 1e-300))))
+        fitted, value, logdet = found
         ranks = np.array([rank for _, _, rank in self.penalties], dtype=np.float64)
         return value - 0.5 * float(ranks @ rho) + 0.5 * logdet, fitted
 
@@ -589,12 +637,16 @@ class _Model:
         there. A held coefficient is a constant of the fit, outside its Laplace determinant."""
         return ~((beta >= self.upper) & (grad < 0))
 
-    def minimum(self, rho: np.ndarray) -> tuple[np.ndarray, float, np.ndarray] | None:
-        """A minimum of the penalized objective: its coefficients, value, and Hessian eigenvalues.
+    def minimum(self, rho: np.ndarray) -> tuple[np.ndarray, float, float] | None:
+        """A minimum of the penalized objective: coefficients, value, Hessian log determinant.
 
-        :meth:`newton` runs from the fit's starting coefficients. ``None`` where it stops on a
-        slope (a Hessian with a negative eigenvalue beyond rounding, or a Newton step that would
-        still lower the objective) or where the objective is not finite.
+        :meth:`newton` runs from the fit's starting coefficients. ``None`` where it stops away
+        from a minimum that two runs agree on (a Hessian that is singular to working precision or
+        has a negative eigenvalue, or a Newton step that would still lower the objective) or where
+        the objective is not finite. The log determinant is taken from the Hessian with its
+        diagonal brought to 1, plus the diagonal's logarithms: the penalties of two smooths can
+        differ by many orders of magnitude, and the small eigenvalues of the Hessian as it stands
+        would carry the rounding error of its largest entries.
         """
         fitted = self.newton(self.start, rho)
         with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
@@ -605,11 +657,10 @@ class _Model:
         H, grad = H[np.ix_(free, free)], grad[free]
         unit = 1.0 / np.sqrt(_diagonal(H))
         left = 0.5 * float(grad @ _solve_pd(H, grad))
-        if np.linalg.eigvalsh(H * unit[:, None] * unit)[0] < -_INDEFINITE or (
-            left > _UNFINISHED * (1.0 + abs(value))
-        ):
+        eigenvalues = np.linalg.eigvalsh(H * unit[:, None] * unit)
+        if eigenvalues[0] < _SINGULAR or left > _UNFINISHED * (1.0 + abs(value)):
             return None
-        return fitted, value, np.linalg.eigvalsh(H)
+        return fitted, value, float(np.sum(np.log(eigenvalues)) - 2.0 * np.sum(np.log(unit)))
 
     def start_rho(self, beta: np.ndarray) -> np.ndarray:
         """Log smoothing parameters that put each penalty on the scale of its Hessian block."""
