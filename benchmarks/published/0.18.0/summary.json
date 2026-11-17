@@ -26384,7 +26384,7 @@
    "claim": "in",
    "metric": "valid_set_loss",
    "error_metric": "valid_set_loss: 1 when LDP returns no adjustment set or a set that is not a valid adjustment set for the pair in the true DAG (hidden variables included), else 0; effect_error: the mean absolute error of the effect estimated with the returned set on a fresh sample, in standard deviations (a set-free answer has none); parents_error: 1 unless LD3's set is the outcome's true parents other than the treatment; direct_error: 1 when the answer's nonzero for the direct effect is not the truth's (an edge from the treatment to the outcome)",
-   "complete": false,
+   "complete": true,
    "rows": [
     {
      "d": 10,
@@ -26392,9 +26392,9 @@
      "network": "ldp",
      "alpha": 0.01,
      "seeds": 20,
-     "paired": 18,
-     "andrey_valid_set_loss_mean": 0.0,
-     "comparator_valid_set_loss_mean": 0.0,
+     "paired": 20,
+     "andrey_valid_set_loss_mean": 0.1,
+     "comparator_valid_set_loss_mean": 0.1,
      "mean_D": 0.0,
      "bootstrap_95": [
       0.0,
@@ -26411,19 +26411,19 @@
       "applies": true,
       "pass": true,
       "andrey_minus_empty": {
-       "paired": 18,
-       "mean": -1.0,
+       "paired": 20,
+       "mean": -0.9,
        "bootstrap_95": [
         -1.0,
-        -1.0
+        -0.75
        ]
       },
       "reference_minus_empty": {
-       "paired": 18,
-       "mean": -1.0,
+       "paired": 20,
+       "mean": -0.9,
        "bootstrap_95": [
         -1.0,
-        -1.0
+        -0.75
        ]
       }
      },
@@ -26487,13 +26487,13 @@
      "hide": "B1+Z4a+M1",
      "alpha": 0.01,
      "seeds": 20,
-     "paired": 11,
-     "andrey_valid_set_loss_mean": 0.0,
-     "comparator_valid_set_loss_mean": 0.0,
-     "mean_D": 0.0,
+     "paired": 20,
+     "andrey_valid_set_loss_mean": 0.45,
+     "comparator_valid_set_loss_mean": 0.4,
+     "mean_D": 0.05,
      "bootstrap_95": [
       0.0,
-      0.0
+      0.15
      ],
      "above_zero": false,
      "verdict": "tie",
@@ -26506,19 +26506,19 @@
       "applies": true,
       "pass": true,
       "andrey_minus_empty": {
-       "paired": 11,
-       "mean": -1.0,
+       "paired": 20,
+       "mean": -0.55,
        "bootstrap_95": [
-        -1.0,
-        -1.0
+        -0.75,
+        -0.35
        ]
       },
       "reference_minus_empty": {
-       "paired": 12,
-       "mean": -1.0,
+       "paired": 20,
+       "mean": -0.6,
        "bootstrap_95": [
-        -1.0,
-        -1.0
+        -0.8,
+        -0.4
        ]
       }
      },
@@ -26534,9 +26534,9 @@
      "network": "mildew",
      "alpha": 0.001,
      "seeds": 20,
-     "paired": 15,
-     "andrey_valid_set_loss_mean": 0.0667,
-     "comparator_valid_set_loss_mean": 0.0667,
+     "paired": 20,
+     "andrey_valid_set_loss_mean": 0.3,
+     "comparator_valid_set_loss_mean": 0.3,
      "mean_D": 0.0,
      "bootstrap_95": [
       0.0,
@@ -26553,19 +26553,19 @@
       "applies": true,
       "pass": true,
       "andrey_minus_empty": {
-       "paired": 15,
-       "mean": -0.9333,
+       "paired": 20,
+       "mean": -0.7,
        "bootstrap_95": [
-        -1.0,
-        -0.8
+        -0.9,
+        -0.5
        ]
       },
       "reference_minus_empty": {
-       "paired": 15,
-       "mean": -0.9333,
+       "paired": 20,
+       "mean": -0.7,
        "bootstrap_95": [
-        -1.0,
-        -0.8
+        -0.9,
+        -0.5
        ]
       }
      },
@@ -26581,9 +26581,9 @@
      "network": "mildew",
      "alpha": 0.001,
      "seeds": 20,
-     "paired": 18,
-     "andrey_valid_set_loss_mean": 0.0,
-     "comparator_valid_set_loss_mean": 0.0,
+     "paired": 20,
+     "andrey_valid_set_loss_mean": 0.1,
+     "comparator_valid_set_loss_mean": 0.1,
      "mean_D": 0.0,
      "bootstrap_95": [
       0.0,
@@ -26600,19 +26600,19 @@
       "applies": true,
       "pass": true,
       "andrey_minus_empty": {
-       "paired": 18,
-       "mean": -1.0,
+       "paired": 20,
+       "mean": -0.9,
        "bootstrap_95": [
         -1.0,
-        -1.0
+        -0.75
        ]
       },
       "reference_minus_empty": {
-       "paired": 18,
-       "mean": -1.0,
+       "paired": 20,
+       "mean": -0.9,
        "bootstrap_95": [
         -1.0,
-        -1.0
+        -0.75
        ]
       }
      },
@@ -26628,9 +26628,9 @@
      "network": "mildew",
      "alpha": 0.001,
      "seeds": 20,
-     "paired": 17,
-     "andrey_valid_set_loss_mean": 0.1176,
-     "comparator_valid_set_loss_mean": 0.1176,
+     "paired": 20,
+     "andrey_valid_set_loss_mean": 0.25,
+     "comparator_valid_set_loss_mean": 0.25,
      "mean_D": 0.0,
      "bootstrap_95": [
       0.0,
@@ -26647,19 +26647,19 @@
       "applies": true,
       "pass": true,
       "andrey_minus_empty": {
-       "paired": 19,
-       "mean": -0.7895,
+       "paired": 20,
+       "mean": -0.75,
        "bootstrap_95": [
-        -0.9474,
-        -0.5789
+        -0.9,
+        -0.55
        ]
       },
       "reference_minus_empty": {
-       "paired": 17,
-       "mean": -0.8824,
+       "paired": 20,
+       "mean": -0.75,
        "bootstrap_95": [
-        -1.0,
-        -0.7059
+        -0.9,
+        -0.55
        ]
       }
      },
@@ -26675,9 +26675,9 @@
      "network": "ldp",
      "alpha": 0.01,
      "seeds": 20,
-     "paired": 19,
-     "andrey_valid_set_loss_mean": 0.0,
-     "comparator_valid_set_loss_mean": 0.0,
+     "paired": 20,
+     "andrey_valid_set_loss_mean": 0.05,
+     "comparator_valid_set_loss_mean": 0.05,
      "mean_D": 0.0,
      "bootstrap_95": [
       0.0,
@@ -26694,19 +26694,19 @@
       "applies": true,
       "pass": true,
       "andrey_minus_empty": {
-       "paired": 19,
-       "mean": -1.0,
+       "paired": 20,
+       "mean": -0.95,
        "bootstrap_95": [
         -1.0,
-        -1.0
+        -0.85
        ]
       },
       "reference_minus_empty": {
-       "paired": 19,
-       "mean": -1.0,
+       "paired": 20,
+       "mean": -0.95,
        "bootstrap_95": [
         -1.0,
-        -1.0
+        -0.85
        ]
       }
      },
@@ -26722,9 +26722,9 @@
      "network": "ldp",
      "alpha": 0.01,
      "seeds": 20,
-     "paired": 19,
-     "andrey_valid_set_loss_mean": 0.0,
-     "comparator_valid_set_loss_mean": 0.0,
+     "paired": 20,
+     "andrey_valid_set_loss_mean": 0.05,
+     "comparator_valid_set_loss_mean": 0.05,
      "mean_D": 0.0,
      "bootstrap_95": [
       0.0,
@@ -26741,19 +26741,19 @@
       "applies": true,
       "pass": true,
       "andrey_minus_empty": {
-       "paired": 19,
-       "mean": -1.0,
+       "paired": 20,
+       "mean": -0.95,
        "bootstrap_95": [
         -1.0,
-        -1.0
+        -0.85
        ]
       },
       "reference_minus_empty": {
-       "paired": 19,
-       "mean": -1.0,
+       "paired": 20,
+       "mean": -0.95,
        "bootstrap_95": [
         -1.0,
-        -1.0
+        -0.85
        ]
       }
      },
@@ -26770,9 +26770,9 @@
      "effect": "0",
      "alpha": 0.01,
      "seeds": 20,
-     "paired": 17,
-     "andrey_valid_set_loss_mean": 0.0,
-     "comparator_valid_set_loss_mean": 0.0,
+     "paired": 20,
+     "andrey_valid_set_loss_mean": 0.15,
+     "comparator_valid_set_loss_mean": 0.15,
      "mean_D": 0.0,
      "bootstrap_95": [
       0.0,
@@ -26789,19 +26789,19 @@
       "applies": true,
       "pass": true,
       "andrey_minus_empty": {
-       "paired": 17,
-       "mean": -1.0,
+       "paired": 20,
+       "mean": -0.85,
        "bootstrap_95": [
         -1.0,
-        -1.0
+        -0.7
        ]
       },
       "reference_minus_empty": {
-       "paired": 17,
-       "mean": -1.0,
+       "paired": 20,
+       "mean": -0.85,
        "bootstrap_95": [
         -1.0,
-        -1.0
+        -0.7
        ]
       }
      },
@@ -26866,9 +26866,9 @@
      "effect": "0",
      "alpha": 0.01,
      "seeds": 20,
-     "paired": 19,
-     "andrey_valid_set_loss_mean": 0.0,
-     "comparator_valid_set_loss_mean": 0.0,
+     "paired": 20,
+     "andrey_valid_set_loss_mean": 0.05,
+     "comparator_valid_set_loss_mean": 0.05,
      "mean_D": 0.0,
      "bootstrap_95": [
       0.0,
@@ -26885,19 +26885,19 @@
       "applies": true,
       "pass": true,
       "andrey_minus_empty": {
-       "paired": 19,
-       "mean": -1.0,
+       "paired": 20,
+       "mean": -0.95,
        "bootstrap_95": [
         -1.0,
-        -1.0
+        -0.85
        ]
       },
       "reference_minus_empty": {
-       "paired": 19,
-       "mean": -1.0,
+       "paired": 20,
+       "mean": -0.95,
        "bootstrap_95": [
         -1.0,
-        -1.0
+        -0.85
        ]
       }
      },
@@ -26914,9 +26914,9 @@
      "effect": "0",
      "alpha": 0.01,
      "seeds": 20,
-     "paired": 19,
-     "andrey_valid_set_loss_mean": 0.0,
-     "comparator_valid_set_loss_mean": 0.0,
+     "paired": 20,
+     "andrey_valid_set_loss_mean": 0.05,
+     "comparator_valid_set_loss_mean": 0.05,
      "mean_D": 0.0,
      "bootstrap_95": [
       0.0,
@@ -26933,19 +26933,19 @@
       "applies": true,
       "pass": true,
       "andrey_minus_empty": {
-       "paired": 19,
-       "mean": -1.0,
+       "paired": 20,
+       "mean": -0.95,
        "bootstrap_95": [
         -1.0,
-        -1.0
+        -0.85
        ]
       },
       "reference_minus_empty": {
-       "paired": 19,
-       "mean": -1.0,
+       "paired": 20,
+       "mean": -0.95,
        "bootstrap_95": [
         -1.0,
-        -1.0
+        -0.85
        ]
       }
      },
@@ -26962,13 +26962,13 @@
      "hide": "B1",
      "alpha": 0.01,
      "seeds": 20,
-     "paired": 14,
-     "andrey_valid_set_loss_mean": 0.0,
-     "comparator_valid_set_loss_mean": 0.0,
-     "mean_D": 0.0,
+     "paired": 20,
+     "andrey_valid_set_loss_mean": 0.3,
+     "comparator_valid_set_loss_mean": 0.25,
+     "mean_D": 0.05,
      "bootstrap_95": [
       0.0,
-      0.0
+      0.15
      ],
      "above_zero": false,
      "verdict": "tie",
@@ -26981,19 +26981,19 @@
       "applies": true,
       "pass": true,
       "andrey_minus_empty": {
-       "paired": 14,
-       "mean": -1.0,
+       "paired": 20,
+       "mean": -0.7,
        "bootstrap_95": [
-        -1.0,
-        -1.0
+        -0.9,
+        -0.5
        ]
       },
       "reference_minus_empty": {
-       "paired": 15,
-       "mean": -1.0,
+       "paired": 20,
+       "mean": -0.75,
        "bootstrap_95": [
-        -1.0,
-        -1.0
+        -0.9,
+        -0.55
        ]
       }
      },
@@ -27010,9 +27010,9 @@
      "hide": "Z1",
      "alpha": 0.01,
      "seeds": 20,
-     "paired": 0,
-     "andrey_valid_set_loss_mean": null,
-     "comparator_valid_set_loss_mean": null,
+     "paired": 20,
+     "andrey_valid_set_loss_mean": 1.0,
+     "comparator_valid_set_loss_mean": 1.0,
      "mean_D": 0.0,
      "bootstrap_95": [
       0.0,
@@ -27028,7 +27028,7 @@
      "floor": {
       "applies": false,
       "andrey_minus_empty": {
-       "paired": 0,
+       "paired": 20,
        "mean": 0.0,
        "bootstrap_95": [
         0.0,
@@ -27036,7 +27036,7 @@
        ]
       },
       "reference_minus_empty": {
-       "paired": 0,
+       "paired": 20,
        "mean": 0.0,
        "bootstrap_95": [
         0.0,

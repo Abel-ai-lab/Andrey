@@ -259,11 +259,11 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.1,
+     "ref": 0.1,
      "vs_ref": {
-      "paired": 18,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -271,7 +271,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.1,
@@ -405,9 +405,9 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.0,
+     "ref": 0.0,
      "vs_ref": {
       "paired": 20,
       "mean_D": 0.0,
@@ -417,7 +417,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.0,
@@ -574,9 +574,9 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.0,
+     "ref": 0.0,
      "vs_ref": {
       "paired": 20,
       "mean_D": 0.0,
@@ -586,7 +586,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.0,
@@ -720,11 +720,11 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.05,
+     "ref": 0.05,
      "vs_ref": {
-      "paired": 19,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -732,7 +732,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.05,
@@ -889,19 +889,19 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.45,
+     "ref": 0.4,
      "vs_ref": {
-      "paired": 11,
-      "mean_D": 0.0,
+      "paired": 20,
+      "mean_D": 0.05,
       "bootstrap_95": [
        0.0,
-       0.0
+       0.15
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": NaN,
@@ -1025,11 +1025,11 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.45,
+     "ref": 0.45,
      "vs_ref": {
-      "paired": 11,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -1037,7 +1037,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": NaN,
@@ -1165,11 +1165,11 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 0.9333333333333333,
-     "ref": 0.9333333333333333,
+    "valid_set_loss": {
+     "andrey": 0.3,
+     "ref": 0.3,
      "vs_ref": {
-      "paired": 15,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -1177,7 +1177,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.25,
@@ -1281,11 +1281,11 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.3,
+     "ref": 0.3,
      "vs_ref": {
-      "paired": 14,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -1293,7 +1293,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.3,
@@ -1401,11 +1401,11 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.1,
+     "ref": 0.1,
      "vs_ref": {
-      "paired": 18,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -1413,7 +1413,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.1,
@@ -1517,11 +1517,11 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.05,
+     "ref": 0.05,
      "vs_ref": {
-      "paired": 19,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -1529,7 +1529,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.05,
@@ -1637,11 +1637,11 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 0.7894736842105263,
-     "ref": 0.8823529411764706,
+    "valid_set_loss": {
+     "andrey": 0.25,
+     "ref": 0.25,
      "vs_ref": {
-      "paired": 17,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -1649,7 +1649,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.05,
@@ -1753,11 +1753,11 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 0.75,
-     "ref": 0.7894736842105263,
+    "valid_set_loss": {
+     "andrey": 0.25,
+     "ref": 0.25,
      "vs_ref": {
-      "paired": 19,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -1765,7 +1765,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.0,
@@ -3997,11 +3997,11 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.05,
+     "ref": 0.05,
      "vs_ref": {
-      "paired": 19,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -4009,7 +4009,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.05,
@@ -4143,11 +4143,11 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.15,
+     "ref": 0.15,
      "vs_ref": {
-      "paired": 17,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -4155,7 +4155,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.15,
@@ -7795,11 +7795,11 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.05,
+     "ref": 0.05,
      "vs_ref": {
-      "paired": 19,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -7807,7 +7807,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.05,
@@ -7941,11 +7941,11 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.05,
+     "ref": 0.05,
      "vs_ref": {
-      "paired": 19,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -7953,7 +7953,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.05,
@@ -8110,11 +8110,11 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.15,
+     "ref": 0.15,
      "vs_ref": {
-      "paired": 17,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -8122,7 +8122,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.15,
@@ -8251,11 +8251,11 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.05,
+     "ref": 0.05,
      "vs_ref": {
-      "paired": 19,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -8263,7 +8263,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.05,
@@ -8415,9 +8415,9 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.0,
+     "ref": 0.0,
      "vs_ref": {
       "paired": 20,
       "mean_D": 0.0,
@@ -8427,7 +8427,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.0,
@@ -8561,11 +8561,11 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.05,
+     "ref": 0.05,
      "vs_ref": {
-      "paired": 19,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -8573,7 +8573,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.05,
@@ -8730,11 +8730,11 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.05,
+     "ref": 0.05,
      "vs_ref": {
-      "paired": 19,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -8742,7 +8742,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.05,
@@ -8876,11 +8876,11 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.15,
+     "ref": 0.15,
      "vs_ref": {
-      "paired": 17,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -8888,7 +8888,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.15,
@@ -9045,11 +9045,11 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.05,
+     "ref": 0.05,
      "vs_ref": {
-      "paired": 19,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -9057,7 +9057,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.05,
@@ -9191,11 +9191,11 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.05,
+     "ref": 0.05,
      "vs_ref": {
-      "paired": 19,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -9203,7 +9203,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": 0.05,
@@ -9360,19 +9360,19 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.3,
+     "ref": 0.25,
      "vs_ref": {
-      "paired": 14,
-      "mean_D": 0.0,
+      "paired": 20,
+      "mean_D": 0.05,
       "bootstrap_95": [
        0.0,
-       0.0
+       0.15
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": NaN,
@@ -9496,11 +9496,11 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": 1.0,
-     "ref": 1.0,
+    "valid_set_loss": {
+     "andrey": 0.3,
+     "ref": 0.3,
      "vs_ref": {
-      "paired": 14,
+      "paired": 20,
       "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
@@ -9508,7 +9508,7 @@
       ],
       "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": NaN,
@@ -9636,14 +9636,19 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": NaN,
-     "ref": NaN,
+    "valid_set_loss": {
+     "andrey": 1.0,
+     "ref": 1.0,
      "vs_ref": {
-      "paired": 0,
-      "verdict": "reported"
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": NaN,
@@ -9742,14 +9747,19 @@
       "verdict": "tie"
      }
     },
-    "valid": {
-     "andrey": NaN,
-     "ref": NaN,
+    "valid_set_loss": {
+     "andrey": 1.0,
+     "ref": 1.0,
      "vs_ref": {
-      "paired": 0,
-      "verdict": "reported"
+      "paired": 20,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
      },
-     "none": 0.0
+     "none": 1.0
     },
     "answer_error": {
      "andrey": NaN,
