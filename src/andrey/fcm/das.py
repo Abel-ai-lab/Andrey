@@ -11,9 +11,10 @@ value is positive exactly at the parents. The method runs three phases:
 2. **Edge screen** (the paper's Algorithm 1). At the step that picks leaf ``l``, the remaining
    variables are ``l`` and the variables before it in the order, so ``l`` is a leaf of their
    joint density, and row ``l`` of the same step's estimate gives the entries the lemma reads.
-   The mean absolute entry over the rows ranks the variables before ``l``; the ``K + 1`` largest
-   are kept, the smallest of them is the reference, and each of the others stays when a one-sided
-   Welch test of equal means against the reference's has a p-value at most :data:`LEVEL`.
+   The absolute median of the entry over the rows ranks the variables before ``l``; the ``K + 1``
+   largest are kept, the smallest of them is the reference, and each of the others stays when a
+   one-sided Welch test of equal means of the absolute entries against the reference's has a
+   p-value at most :data:`LEVEL`.
 3. **Pruning.** The DAG of the screened edges is pruned by the smooth-term tests of CAM,
    :func:`andrey.fcm.pruning.prune`, at most ``K`` candidate parents per fit instead of every
    variable before it in the order.
@@ -24,14 +25,15 @@ The choices the paper leaves open, and where its text and the authors' code diff
   paper's experiments; its text keeps an edge at a p-value "<= 0.01".
 - The pruning cutoff :data:`ALPHA` is ``0.001``. The paper states none and follows the experiments
   of Rolland et al. (2022), whose cutoff it is.
-- The ``MIN_PARENTS`` largest means stay without a test. The paper has no such step; ``5`` is the
+- The ``MIN_PARENTS`` largest medians stay without a test. The paper has no such step; ``5`` is the
   authors' code's. Without it the reference is a parent whenever every variable before the leaf
   is one, and the smallest of them is never kept: a chain of two variables would have no edge.
-- The authors' code estimates the Jacobian once, on all the variables, and ranks the absolute
-  median entry. The paper's lemma reads the leaf's row in the joint density of the variables
-  left at its step, and ranks the mean absolute entry, as here.
+- The ranking is the absolute median of the entries, as in the authors' code; the paper's text
+  states the mean of their absolute values.
+- The authors' code estimates the Jacobian once, on all the variables. The paper's lemma reads the
+  leaf's row in the joint density of the variables left at its step, as here.
 - A test whose two samples are both constant has no p-value, and its edge is not kept.
-- The means are compared rounded to ``KEY_DP`` decimal places, as the leaf search compares its
+- The medians are compared rounded to ``KEY_DP`` decimal places, as the leaf search compares its
   variances; a tie goes to the earlier column.
 
 The fit draws no random numbers.
@@ -72,34 +74,35 @@ K = 10
 MAX_PARENTS = 20
 #: Level of the screen's Welch tests.
 LEVEL = 0.01
-#: The largest means the screen keeps without a test (the authors' code).
+#: The largest medians the screen keeps without a test (the authors' code).
 MIN_PARENTS = 5
 
 
-def screen(magnitudes: np.ndarray, slots: int | None) -> list[int]:
-    """Pick a leaf's candidate parents from the absolute entries of its Jacobian row.
+def screen(entries: np.ndarray, slots: int | None) -> list[int]:
+    """Pick a leaf's candidate parents from the entries of its Jacobian row.
 
     Parameters
     ----------
-    magnitudes : np.ndarray
-        ``(n, m)`` absolute entries of the leaf's row at the rows, one column per variable before
-        the leaf that may be a parent.
+    entries : np.ndarray
+        ``(n, m)`` entries of the leaf's row at the rows, one column per variable before the leaf
+        that may be a parent.
     slots : int or None
         Most columns to keep, the paper's ``K``; ``None`` keeps any number.
 
     Returns
     -------
     list[int]
-        The kept columns, largest mean first.
+        The kept columns, largest absolute median first.
     """
-    m = magnitudes.shape[1]
-    means = magnitudes.mean(axis=0)
-    ranked = sorted(range(m), key=lambda k: (-tie_key(float(means[k])), k))
+    m = entries.shape[1]
+    magnitudes = np.abs(entries)
+    medians = np.abs(np.median(entries, axis=0))
+    ranked = sorted(range(m), key=lambda k: (-tie_key(float(medians[k])), k))
     top = ranked if slots is None else ranked[: slots + 1]
     if not top:
         return []
     reference = top[-1]
-    # The reference stands for a zero mean, so it is never kept when it lies beyond the slots.
+    # The reference stands for a zero entry, so it is never kept when it lies beyond the slots.
     beyond = slots is not None and len(top) > slots
     kept = []
     for rank, k in enumerate(top):
@@ -163,11 +166,11 @@ def das(
         if not pool:
             return
         row = step["estimate"].row(remaining.index(leaf))
-        magnitudes = np.abs(row[:, [position for position, _ in pool]])
+        entries = row[:, [position for position, _ in pool]]
         slots = (
             None if max_parents is None else max(max_parents - int(candidates[:, leaf].sum()), 0)
         )
-        kept = screen(magnitudes, slots)
+        kept = screen(entries, slots)
         candidates[[pool[i][1] for i in kept], leaf] = True
         _log.debug("leaf %d: %d of %d kept", leaf, len(kept), len(pool))
 

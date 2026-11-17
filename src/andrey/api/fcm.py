@@ -1058,25 +1058,26 @@ def das(
        whose entry varies least is the next leaf, and the estimate is made again on the others.
     2. *Edge screen.* At the step that picks a leaf, the variables left are the leaf and those
        before it in the order, so the leaf has no children among them, and the leaf's row of the
-       step's estimate gives ``d^2 log p / d x_l d x_j`` at every row. The mean absolute entry
-       ranks the variables before the leaf. The ``max_parents + 1`` largest are kept and the
-       smallest of them is the reference, standing for a zero mean; each of the others stays as a
-       candidate parent when a one-sided Welch test of equal means against the reference's gives
-       a p-value at most ``0.01``, the paper's level.
+       step's estimate gives ``d^2 log p / d x_l d x_j`` at every row. The absolute median of the
+       entry ranks the variables before the leaf. The ``max_parents + 1`` largest are kept and
+       the smallest of them is the reference, standing for a zero entry; each of the others stays
+       as a candidate parent when a one-sided Welch test of equal means of the absolute entries
+       against the reference's gives a p-value at most ``0.01``, the paper's level.
     3. *Pruning.* Each variable is fit on its candidate parents, an additive model of penalized
        thin plate regression splines with ten basis functions per parent and smoothing chosen by
        GCV [4]_, as in :func:`~andrey.score_matching`, and a candidate stays when its smooth term's
        p-value is at most ``alpha`` [3]_.
 
     The choices the paper leaves open. It states no pruning cutoff and follows the experiments of
-    [2]_, whose cutoff ``0.001`` is the default. The five largest means stay without a test, as
+    [2]_, whose cutoff ``0.001`` is the default. The five largest medians stay without a test, as
     in the code published with the paper: the paper's screen never keeps the reference, so
     without them a variable all of whose predecessors are parents would lose the weakest one, and
-    a chain of two variables would have no edge. That code estimates the Jacobian once on all the
-    variables and ranks the absolute median entry; DAS here reads each leaf's row at the step that
-    removes it and ranks the mean absolute entry, as the paper's Algorithm 1 states. A test whose
-    two samples are both constant keeps no edge. The estimator's ridge term and bandwidth are
-    those of :func:`~andrey.score_matching`, whose Notes state them.
+    a chain of two variables would have no edge. The ranking follows that code, the absolute
+    median of the entries, where the paper states the mean of their absolute values. That code
+    estimates the Jacobian once on all the variables; DAS here reads each leaf's row at the step
+    that removes it, as the paper's Algorithm 1 does. A test whose two samples are both constant
+    keeps no edge. The estimator's ridge term and bandwidth are those of
+    :func:`~andrey.score_matching`, whose Notes state them.
 
     The order search reads the columns centered and divided by their standard deviations, as
     :func:`~andrey.score_matching` does, so rescaling or shifting a column changes no step; the
@@ -1084,7 +1085,7 @@ def das(
     experiments run on the columns as simulated. The fit draws no random numbers and runs on one
     BLAS thread.
 
-    **Ties.** The variances and the means are compared rounded to 9 decimal places, as
+    **Ties.** The variances and the medians are compared rounded to 9 decimal places, as
     :func:`~andrey.hc` compares its score changes per row, so two values that differ only in
     their rounding tie. A tie goes to the variable with the lower rank computed from the data, as
     for :func:`~andrey.hc`; the fit runs on the columns in that rank order, so the result does not

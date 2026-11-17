@@ -84,30 +84,43 @@ def test_exact_rows_keep_every_parent_and_drop_every_tested_non_parent():
     """The exact row of an additive model is ``f'(x_j) / sigma^2`` at a parent and 0 elsewhere:
     the parents pass, the zero columns past the untested five fail against the zero reference."""
     rng = np.random.default_rng(0)
-    magnitudes = np.zeros((300, 12))
+    entries = np.zeros((300, 12))
     for j in (2, 7, 9):
-        magnitudes[:, j] = np.abs(np.cos(rng.standard_normal(300))) + 0.1
-    kept = screen(magnitudes, 20)
-    # The five largest means: the three parents, then zeros 0 and 1 by column order.
+        entries[:, j] = np.abs(np.cos(rng.standard_normal(300))) + 0.1
+    kept = screen(entries, 20)
+    # The five largest medians: the three parents, then zeros 0 and 1 by column order.
     assert sorted(kept) == [0, 1, 2, 7, 9]
-    assert kept[:3] == sorted((2, 7, 9), key=lambda j: -magnitudes[:, j].mean())
+    assert kept[:3] == sorted((2, 7, 9), key=lambda j: -np.median(entries[:, j]))
+
+
+def test_the_screen_ranks_by_the_absolute_median_of_the_entries():
+    """Column 0 has rare large entries and column 1 a sign that alternates: both have a larger mean
+    absolute entry than column 2's steady 0.3, and a zero median, so column 2 ranks first."""
+    n = 200
+    entries = np.zeros((n, 3))
+    entries[::20, 0] = 10.0
+    entries[:, 1] = np.where(np.arange(n) % 2 == 0, 1.0, -1.0)
+    entries[:, 2] = 0.3
+    assert np.abs(entries).mean(axis=0) == pytest.approx([0.5, 1.0, 0.3])
+    assert screen(entries, 1) == [2]
+    assert screen(entries, 2) == [2, 0]
 
 
 def test_the_reference_beyond_the_slots_is_never_kept():
     rng = np.random.default_rng(1)
-    magnitudes = np.abs(rng.standard_normal((200, 4))) + np.arange(4, 0, -1)
-    assert screen(magnitudes, 3) == [0, 1, 2]
-    assert screen(magnitudes, None) == [0, 1, 2, 3]
-    assert screen(magnitudes, 0) == []
+    entries = np.abs(rng.standard_normal((200, 4))) + np.arange(4, 0, -1)
+    assert screen(entries, 3) == [0, 1, 2]
+    assert screen(entries, None) == [0, 1, 2, 3]
+    assert screen(entries, 0) == []
     assert screen(np.zeros((10, 0)), 5) == []
 
 
 def test_a_tested_column_stays_when_its_mean_is_clearly_above_the_references():
     rng = np.random.default_rng(2)
-    magnitudes = np.abs(rng.standard_normal((400, 8))) * 0.01
-    magnitudes[:, :MIN_PARENTS] += 5.0
-    magnitudes[:, 6] += 1.0
-    assert sorted(screen(magnitudes, 20)) == [0, 1, 2, 3, 4, 6]
+    entries = np.abs(rng.standard_normal((400, 8))) * 0.01
+    entries[:, :MIN_PARENTS] += 5.0
+    entries[:, 6] += 1.0
+    assert sorted(screen(entries, 20)) == [0, 1, 2, 3, 4, 6]
 
 
 def test_on_leaf_sees_each_step_before_its_leaf_leaves():
