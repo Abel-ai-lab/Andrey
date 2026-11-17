@@ -9,6 +9,7 @@ accept ``NaN``; every other method raises a ``ValueError`` that names it.
 from __future__ import annotations
 
 import json
+import re
 import warnings
 
 import numpy as np
@@ -527,6 +528,18 @@ def test_the_refusal_lists_every_supported_method_but_the_pair_tests():
 
     tables = [name for name in SUPPORTED if REGISTRY[name].family != "pairwise"]
     assert [*TESTWISE_METHODS, *TESTWISE_SERIES_METHODS] == tables
+
+
+def test_the_refusal_names_a_guide_page_of_the_docs():
+    from pathlib import Path
+
+    from andrey.api._adapt import MISSING_GUIDE
+
+    site, page = MISSING_GUIDE.split("/docs/", 1)
+    source = Path(__file__).parents[2] / "docs" / "docs" / page.replace(".html", ".md")
+    assert site == "https://andrey.abel.ai" and source.is_file()
+    with pytest.raises(ValueError, match=re.escape(MISSING_GUIDE)):
+        andrey.direct_lingam(_gaps(np.random.default_rng(0).uniform(size=(50, 3)), 0.1))
 
 
 @pytest.mark.parametrize("name", ["anm", "pnl", "loci"])

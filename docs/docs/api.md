@@ -140,7 +140,7 @@ before the fit, and a test with fewer rows than it needs, `|S| + 3` for `"fisher
 (`"fisherz"`, `"student_t"`, or `"normal_scores"`), the `"total_conditioning"` blanket learner needs
 `d + 2` rows with every variable observed and raises before the fit without them. `cdnod` and
 `fci_jci` need a complete `env`. Every other method raises a `ValueError` that names it and says
-what to do instead, as [Missing values](guides/getting-started.md#missing-values) describes; each
+what to do instead, as the [Missing values](guides/missing-values.md) guide describes; each
 method's Notes say why.
 
 % concept: indep_test

@@ -88,6 +88,8 @@ FILL_STEPS = (
     f"{_listed(TESTWISE_SERIES_METHODS)}, whose tests delete rows per test"
 )
 DROP_UNITS = "drop the units that hold one from every dataset of {name}"
+#: The guide a refusal of missing values names: which handling fits which data.
+MISSING_GUIDE = "https://andrey.abel.ai/docs/guides/missing-values.html"
 
 
 def fit_by_em(method: str | None) -> str:
@@ -256,7 +258,7 @@ def _refusal(method: str | None, name: str, where: str, fix: str = DROP_ROWS) ->
     base = name.split("[")[0]
     return (
         f"{who} does not accept missing values, and {name} {where}; {fix.format(name=base)} (see "
-        "Missing values in the getting-started guide)"
+        f"the Missing values guide, {MISSING_GUIDE})"
     )
 
 
