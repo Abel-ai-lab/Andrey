@@ -173,6 +173,26 @@ class Scripted:
         return None, np.array([1.0 if k in self.independent else 0.0 for k in keys])
 
 
+def test_a_query_is_asked_once_whatever_the_order_of_its_pair_and_set():
+    """The memo keeps a p-value for the pair and the conditioning set as sets: the test is asked
+    once, with the set in the order of its first ask, and a later ask passes on only what is new,
+    in its order."""
+    search = Scripted(5, set())
+    asked = []
+    scan = search.scan
+    search.scan = lambda a, bs, cond=(): (
+        asked.append((a, list(bs), tuple(cond))) or scan(a, bs, cond)
+    )
+    tests = engine.Tests(search)
+    assert not tests.independent(0, 1, (3, 2))
+    assert not tests.independent(1, 0, (2, 3))
+    tests.ask(1, [0, 4, 2], (3, 2))
+    tests.ask(0, [1])
+    tests.ask(1, [0])
+    assert tests.independent(1, 0, ()) is False
+    assert asked == [(0, [1], (3, 2)), (1, [4, 2], (3, 2)), (0, [1], ())]
+
+
 def test_uc_children_needs_every_neighbor_separator_of_the_spouse_to_agree():
     """Fig. 4's UCChildren as the authors' code reads it: the spouse ``3`` is separated from the
     treatment ``0`` by ``{1}`` and by ``{2}``; ``2`` is in the second, so it is not a child,

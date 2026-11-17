@@ -405,6 +405,14 @@ names its pull request.
   targets and contexts with the columns. It exits 1 on a column order when a graph or a causal order
   changes or a weight or metadata value changes by more than rounding, and lists a difference of
   rounding alone, such as the p-values of ICP and J-PCMCI+, as information. ([#1055])
+- `ldecc` keeps the p-values of its queries by conditioning set, built once per call, and ranks each
+  node's neighbors once per pass, where it built a sorted key for every lookup and sorted a node's
+  neighbors for every pair. A fit at 5,000 rows takes 0.25 s instead of 0.34 s on 100 variables
+  and 9.3 s instead of 51 s on 1,000 (a sparse banded graph, 40% less memory). `indep_test="kci"`
+  keeps the kernel of each column for the queries without a conditioning set (up to 256 MB, as its
+  other matrix caches do), so `pc`, `fci`, and `cdnod` are 1.02 to 1.4 times faster on 8 to 20
+  variables at 200 to 1,000 rows, most at few rows and many variables. Every graph, p-value, and
+  `metadata["n_tests"]` is the same bit for bit. ([#1072], [#1073])
 
 ### Fixed
 
@@ -3073,4 +3081,6 @@ First alpha release.
 [#1059]: https://github.com/Abel-ai-lab/Andrey/pull/1059
 [#1055]: https://github.com/Abel-ai-lab/Andrey/pull/1055
 [#1067]: https://github.com/Abel-ai-lab/Andrey/pull/1067
+[#1072]: https://github.com/Abel-ai-lab/Andrey/issues/1072
+[#1073]: https://github.com/Abel-ai-lab/Andrey/pull/1073
 [#1070]: https://github.com/Abel-ai-lab/Andrey/pull/1070
