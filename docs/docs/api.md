@@ -136,10 +136,12 @@ reference implementation exists to compare them with; the benchmark reports thei
 baselines. A value a method does not list raises a `ValueError` that names the values it takes. A
 column with no observed value, or a constant one over its observed values, raises a `ValueError`
 before the fit, and a test with fewer rows than it needs, `|S| + 3` for `"fisherz"` and
-`"student_t"` and 2 for the other tests, raises one during it. With one of those tests, the
-`"total_conditioning"` blanket learner needs `d + 2` rows with every variable observed and raises
-before the fit without them. `cdnod` and `fci_jci` need a complete `env`. Every other method raises a `ValueError` that names it and says what to do instead, as
-[Missing values](guides/getting-started.md#missing-values) describes; each method's Notes say why.
+`"student_t"` and 2 for the other tests, raises one during it. With a partial-correlation test
+(`"fisherz"`, `"student_t"`, or `"normal_scores"`), the `"total_conditioning"` blanket learner needs
+`d + 2` rows with every variable observed and raises before the fit without them. `cdnod` and
+`fci_jci` need a complete `env`. Every other method raises a `ValueError` that names it and says
+what to do instead, as [Missing values](guides/getting-started.md#missing-values) describes; each
+method's Notes say why.
 
 % concept: indep_test
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
