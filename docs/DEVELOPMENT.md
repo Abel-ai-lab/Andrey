@@ -208,7 +208,8 @@ not measure names the release that did, such as "in the 0.4.0 benchmarks".
 A post dated 2026-11-17 or later states how AI tools were used to write it. Its front matter sets
 `ai`, and `ai_tools` (each tool, with its model or version) unless `ai` is `none`; each value
 stays on its key's line. `_ai_statement` in `conf.py` writes the statement as the post's last
-paragraph, under the closing links, and the build fails on any other value:
+paragraph, under the closing links, on its page and in the feed's full text, and the build fails
+on any other value:
 
 | `ai` | The author sets it when | The post ends with |
 |---|---|---|

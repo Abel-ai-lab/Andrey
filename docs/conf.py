@@ -1437,21 +1437,28 @@ AI_USE = {
 }
 
 
-def _ai_statement(app, doctree, docname) -> None:  # noqa: ANN001
+def _ai_statement(app, doctree) -> None:  # noqa: ANN001
     """End a post or a release card with its AI statement, written from the ``ai`` and ``ai_tools``
     of its front matter, so that every page words it the same way. A card's statement opens with
-    where its numbers come from. A page without ``ai`` gets no statement."""
+    where its numbers come from. A page without ``ai`` gets no statement.
+
+    The statement is added when the page is read, before ABlog keeps its copy of a post, so the
+    feed's full text ends with it too. Sphinx has not collected the front matter by then, so it is
+    read from the page, where ``author`` is a node of its own.
+    """
+    docname = app.env.docname
     card = re.fullmatch(r"docs/benchmarks/\d+\.\d+\.\d+", docname)
-    meta = app.env.metadata.get(docname, {})
-    if app.builder.format != "html" or "ai" not in meta or not (card or docname in _blog(app)):
+    info = next(doctree.findall(nodes.docinfo), nodes.docinfo())
+    meta = {field[0].astext(): field[1].astext() for field in info.findall(nodes.field)}
+    if "ai" not in meta or not (card or "blogpost" in meta):
         return
-    use, tools = str(meta["ai"]), str(meta.get("ai_tools") or "").strip()
+    use, tools = meta["ai"], meta.get("ai_tools", "").strip()
     if use not in AI_USE or bool(tools) != (use != "none"):
         raise ConfigError(
             f"{docname}: `ai` is none, edited, or drafted, and `ai_tools` names the tools unless "
             "it is none"
         )
-    several = bool(card) or len(_blog(app)[docname].author or ()) > 1
+    several = bool(card) or any("," in author.astext() for author in info.findall(nodes.author))
     who = "We" if card else "The authors" if several else "The author"
     text = AI_USE[use].format(
         page="card" if card else "post",
@@ -1771,6 +1778,7 @@ def setup(app) -> None:  # noqa: ANN001 -- Sphinx extension entry point
     app.connect("doctree-read", _notebook_thumbnail)
     # Before ABlog keeps its copy of a post for the feed (the default priority, 500).
     app.connect("doctree-read", _moved_links, priority=400)
+    app.connect("doctree-read", _ai_statement, priority=400)
     app.connect("html-page-context", _page_assets)
     app.connect("html-page-context", _docs_sidebar)
     app.connect("html-collect-pages", _moved_pages)
@@ -1778,7 +1786,6 @@ def setup(app) -> None:  # noqa: ANN001 -- Sphinx extension entry point
     app.connect("build-finished", _trim_icon_rules)
     app.connect("build-finished", _version_assets)
     app.connect("doctree-resolved", _post_byline)
-    app.connect("doctree-resolved", _ai_statement)
     app.connect("doctree-resolved", _summary_headers)
     app.connect("doctree-resolved", _short_cells)
     app.connect("doctree-resolved", _comparison_tables)

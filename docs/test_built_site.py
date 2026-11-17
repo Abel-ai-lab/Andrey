@@ -522,17 +522,20 @@ def test_every_post_shows_its_cover_and_byline_under_its_title(html):
 
 def test_a_page_ends_with_one_ai_statement_exactly_when_it_sets_ai(html):
     # conf.py writes the statement from the front matter's `ai`, as the last paragraph of a post or
-    # a release card: only the blog's links to the next and previous posts follow it.
-    stated = 0
+    # a release card: only the blog's links to the next and previous posts follow it. The feed
+    # carries each post's full text, statement included.
+    stated = []
     for source in [*(DOCS / "blog").glob("*.md"), *(DOCS / "docs" / "benchmarks").glob("*.md")]:
         built = html / source.relative_to(DOCS).with_suffix(".html")
         parts = built.read_text(encoding="utf-8").split('<p class="ai-statement">')
         assert len(parts) - 1 == ("ai" in _front_matter(source)), source.name
         if len(parts) == 2:
-            stated += 1
+            stated.append(source.parent.name)
             after = parts[1].split("</article>")[0]
             assert not re.search(r"<(p|ul|ol|table|h\d)\b", after), source.name
     assert stated
+    feed = (html / "blog" / "atom.xml").read_text(encoding="utf-8")
+    assert feed.count("ai-statement") == stated.count("blog")
 
 
 def test_every_site_address_in_the_readme_and_package_metadata_is_built(html):
