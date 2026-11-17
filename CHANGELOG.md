@@ -65,6 +65,9 @@ names its pull request.
   offer it; `gfci`, `boss_fci`, and `grasp_fci` raise a `ValueError` for it with an `env`, as for
   `score_func="normal_scores"`; and the error for a choice a method does not offer says why.
   ([#1037])
+- `gin` numbers the latents it leaves unordered by their clusters' lowest-ranked column, as the rest
+  of its search runs, instead of by their smallest column index, so a new column order relabels the
+  graph and no longer renumbers them. Its clusters and causal order do not change. ([#1067])
 
 ## [0.17.1] - 2026-11-12
 
@@ -2621,3 +2624,4 @@ First alpha release.
 [#1051]: https://github.com/Abel-ai-lab/Andrey/pull/1051
 [#1059]: https://github.com/Abel-ai-lab/Andrey/pull/1059
 [#1055]: https://github.com/Abel-ai-lab/Andrey/pull/1055
+[#1067]: https://github.com/Abel-ai-lab/Andrey/pull/1067
