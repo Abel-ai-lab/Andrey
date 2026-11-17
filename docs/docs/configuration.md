@@ -98,9 +98,11 @@ forkserver, as on Linux from Python 3.14; otherwise it keeps the default.
   target reads the rows of the variables it conditions on: at 2,000 rows and 16,000 variables,
   `iamb` at one target takes 2.1 seconds and 0.4 GB in all, where the whole matrix took 18 seconds
   and 8 GB before the first test. A block of 256 rows takes 33 MB at 16,000 variables.
-  `mmb_by_mmb`, `ldecc`, and `local_optimal_adjustment` still rank every column's ties to order
-  their visits, in memory that grows with the square of the number of variables: about 6 GB at
-  16,000. The rows equal the whole matrix's bit for bit, so the answers are the same. The check for
+  `mmb_by_mmb`, `ldecc`, and `local_optimal_adjustment` order their visits by the columns' tie
+  ranks: on continuous data with 2 to 4,096 rows and more variables than rows they compute the
+  ranks of the columns a search compares, and otherwise they rank every column, in memory that
+  grows with the square of the number of variables: about 6 GB at 16,000. The rows equal the whole
+  matrix's bit for bit, so the answers are the same. The check for
   copied columns runs on the rows computed: a copy raises when a row that shows it is computed, and
   copies among columns whose rows are never computed do not raise. A backend that puts the
   correlation matrix on a GPU (`ANDREY_BACKEND`) computes the whole matrix there. The default is

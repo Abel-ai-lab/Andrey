@@ -170,13 +170,29 @@ class ColumnView:
         return self.test(int(c[x]), int(c[y]), [int(c[v]) for v in condition_set])
 
 
+class ColumnRanks(Sequence[int]):
+    """Tie ranks read over a subset of their columns, as :class:`ColumnView` reads a test: item
+    ``k`` is ``ranks[columns[k]]``, read when asked, so the view reads only the ranks a search
+    compares."""
+
+    def __init__(self, ranks: Sequence[int], columns: Sequence[int]) -> None:
+        self.ranks = ranks
+        self.columns = columns
+
+    def __len__(self) -> int:
+        return len(self.columns)
+
+    def __getitem__(self, k: Any) -> Any:
+        return self.ranks[self.columns[k]]
+
+
 def column_search(search: LocalSearch, columns: Sequence[int]) -> LocalSearch:
     """A :class:`~andrey.constraint.blanket.LocalSearch` over ``columns`` of ``search``'s test, the
     same level, cap, and ranks, so a choice between tied candidates goes as in ``search``."""
     levels = None if search.levels is None else search.levels[list(columns)]
     return LocalSearch(
         ColumnView(search.test, columns),
-        [search.ranks[k] for k in columns],
+        ColumnRanks(search.ranks, columns),
         search.alpha,
         max_depth=search.max_depth,
         levels=levels,
