@@ -744,7 +744,9 @@ deletion in 12 settings, on two sets of datasets each. The
 
 A test needs enough rows where its variables are observed: `|S| + 3` for `fisherz` and `student_t`,
 with `|S|` the size of its conditioning set, and 2 for the other tests. A test with fewer rows
-raises a `ValueError` that says so. Drop the columns with the most missing values, or cap the
+raises a `ValueError` that says so. The `total_conditioning` blanket learner, the default of
+`mmb_by_mmb`, conditions every test on all the other variables, so with one of those tests it needs
+`d + 2` rows with every variable observed and raises before the fit without them. Drop the columns with the most missing values, or cap the
 conditioning sets with `max_depth` (`max_p_global` in LPCMCI and the same-step phases of PCMCI+). A
 column with no observed value, or with one value throughout, raises before the fit, and so does
 infinity, which is not a missing value. CD-NOD needs a complete `env`.

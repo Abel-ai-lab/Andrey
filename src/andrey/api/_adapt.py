@@ -14,9 +14,9 @@ from andrey.core import ARROW, NULL, TAIL, GraphStructure, Structure, StructureO
 from andrey.core.ci import (
     DISCRETE_INDEP_TESTS,
     MIXED_INDEP_TESTS,
-    PARTIAL_CORRELATION_TESTS,
     RANK_INDEP_TESTS,
     SingularCorrelationError,
+    is_partial_correlation_test,
 )
 from andrey.core.ci_missing import EM, EM_METHODS, EM_SUPPORTED
 from andrey.core.knowledge import as_node, column_position, resolve
@@ -528,14 +528,15 @@ def check_total_conditioning_rows(
     Each test of the ``"total_conditioning"`` learner conditions on the other ``d - 2`` variables,
     so it reads the rows where every variable is observed. Fisher-Z has a positive degree of
     freedom from ``|S| + 4`` rows, ``d + 2``, and Student-t from one row fewer; the bound
-    ``d + 2`` serves every test of :data:`~andrey.core.ci.PARTIAL_CORRELATION_TESTS`. With
-    ``max_depth`` below ``d - 2`` no test runs, so no rows are needed. Any other ``blanket`` or
+    ``d + 2`` serves every shipped partial-correlation test. With ``max_depth`` below ``d - 2``, or
+    fewer than two columns, no test runs, so no rows are needed. Any other ``blanket`` or
     ``indep_test`` returns without a check: another test has its own requirement.
     """
     d = X.shape[1]
     if (
         blanket != "total_conditioning"
-        or indep_test not in PARTIAL_CORRELATION_TESTS
+        or d < 2
+        or not is_partial_correlation_test(indep_test)
         or (max_depth is not None and d - 2 > max_depth)
     ):
         return

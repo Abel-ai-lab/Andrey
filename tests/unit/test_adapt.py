@@ -7,7 +7,7 @@ import pytest
 
 import andrey
 from andrey.api import _adapt
-from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput
+from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput, ci
 
 # --- json_safe -----------------------------------------------------------------
 
@@ -128,3 +128,16 @@ def test_another_blanket_learner_runs_with_fewer_rows_than_variables():
     x = _noise(8, 12)
     andrey.mmb_by_mmb(x, target=0, blanket="iamb")
     andrey.mb_by_mb(x, target=0)
+
+
+def test_total_conditioning_on_one_column_runs_no_test_and_needs_no_rows():
+    out = andrey.mmb_by_mmb(_noise(2, 1), target=0)
+    assert out.metadata["markov_blanket"] == []
+
+
+def test_a_replaced_test_name_is_not_asked_for_rows(monkeypatch):
+    x = _noise(5, 12)
+    with pytest.raises(ValueError, match="d \\+ 2"):
+        _adapt.check_total_conditioning_rows(x, "total_conditioning", "fisherz", method="m")
+    monkeypatch.setitem(ci._CI_REGISTRY, "fisherz", lambda data: None)
+    _adapt.check_total_conditioning_rows(x, "total_conditioning", "fisherz", method="m")
