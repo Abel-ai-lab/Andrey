@@ -36,9 +36,12 @@ InputKind = Literal[
     "context",  # an auxiliary input aligned to the data rows: one value per row (env)
 ]
 # Hyperparameter value types -- map to a JSON-schema type and a CLI option.
+# str_or_list: one column, or a list of them (``target``): a list asks for one answer per column.
 # knowledge: an object with required/forbidden/allowed edge lists and tiers (andrey.Knowledge).
 # targets: an object mapping each environment's label to its intervened variables (gies).
-ParamType = Literal["float", "int", "str", "bool", "int_pair", "str_list", "knowledge", "targets"]
+ParamType = Literal[
+    "float", "int", "str", "bool", "int_pair", "str_list", "str_or_list", "knowledge", "targets"
+]
 
 EnvGroup = Literal["backend", "reproducibility", "determinism", "data"]
 # The kinds of data a method reads (MethodSpec.data_kinds), in the order the pages list them:
@@ -145,16 +148,16 @@ class ParamSpec(Spec):
         Checks the type, the bounds, and the choices: an int is an ``int`` or a NumPy integer, not
         a ``bool``; a float is any real number but ``NaN`` and infinity; a bool is ``True`` or
         ``False``. ``None`` passes when the parameter is nullable. Column labels or positions,
-        which only the data can check, pass unchanged: a ``str_list``, a ``knowledge``, a
-        ``targets``, and a ``str`` without choices. ``choices`` replaces the spec's choices when
-        the accepted values change at run time. The message names ``method``, the parameter, what
-        it accepts (:meth:`accepted`), and the value.
+        which only the data can check, pass unchanged: a ``str_list``, a ``str_or_list``, a
+        ``knowledge``, a ``targets``, and a ``str`` without choices. ``choices`` replaces the
+        spec's choices when the accepted values change at run time. The message names ``method``,
+        the parameter, what it accepts (:meth:`accepted`), and the value.
         """
         if choices is not None:
             return self.model_copy(update={"choices": choices}).check(value, method)
         if value is None and self.nullable:
             return None
-        if self.type in ("str_list", "knowledge", "targets") or (
+        if self.type in ("str_list", "str_or_list", "knowledge", "targets") or (
             self.type == "str" and not self.choices
         ):
             return value

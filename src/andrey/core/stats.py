@@ -446,9 +446,13 @@ def cov(X: np.ndarray, *, rowvar: bool = True, ddof: int = 1) -> np.ndarray:
     return backend.to_numpy(torch.cov(t, correction=ddof))
 
 
-def corrcoef(X: np.ndarray, *, rowvar: bool = True) -> np.ndarray:
-    """Pearson correlation matrix, matching ``np.corrcoef(X, rowvar=rowvar)``."""
-    X = np.asarray(X, dtype=np.float64)
+def corrcoef_device(size: int, *, record: bool = True) -> str:
+    """The device :func:`corrcoef` runs a matrix of ``size`` values (``n_samples * d``) on.
+
+    ``"numpy"`` or a torch device. A one-shot op: under automatic selection only an accelerator
+    already live takes it, and a pinned backend takes every matrix. ``record=False`` asks without
+    counting a ``corrcoef`` call in :func:`~andrey.core.backend.dispatch_stats`.
+    """
     thr = _resolve_thresholds(
         "corrcoef",
         env.COV_GPU_THRESHOLD,
@@ -459,9 +463,26 @@ def corrcoef(X: np.ndarray, *, rowvar: bool = True) -> np.ndarray:
         amortized=False,
     )
     # One-shot, like cov: FisherZ computes its correlation matrix once per fit.
-    dev = backend.resolve(X.size, thr, op="corrcoef")
+    return backend.resolve(size, thr, op="corrcoef" if record else None)
+
+
+def corrcoef(X: np.ndarray, *, rowvar: bool = True) -> np.ndarray:
+    """Pearson correlation matrix of the rows of ``X``, or of its columns when ``rowvar`` is false.
+
+    On numpy a matrix of two or more variables is
+    :func:`~andrey.core.correlation.correlation_matrix`, computed block by block with an exactly
+    symmetric result and a unit diagonal; it agrees with ``np.corrcoef`` up to rounding. Any other
+    input, one variable or an array that is not 2-D, is ``np.corrcoef(X, rowvar=rowvar)``. On a
+    GPU it is ``torch.corrcoef``, which agrees with both up to rounding.
+    """
+    X = np.asarray(X, dtype=np.float64)
+    dev = corrcoef_device(X.size)
     if dev == "numpy":
-        return np.corrcoef(X, rowvar=rowvar)
+        if X.ndim != 2 or X.shape[0 if rowvar else 1] < 2:
+            return np.corrcoef(X, rowvar=rowvar)
+        from .correlation import correlation_matrix
+
+        return correlation_matrix(X.T if rowvar else X)
     torch = backend.torch()
     t = backend.as_tensor(X if rowvar else X.T, dev)
     return backend.to_numpy(torch.corrcoef(t))

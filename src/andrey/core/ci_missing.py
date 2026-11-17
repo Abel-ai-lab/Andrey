@@ -132,6 +132,14 @@ def rows_tested() -> Generator[Counter[int]]:
         _ROWS.reset(token)
 
 
+def count_rows(rows: Mapping[int, int]) -> None:
+    """Add ``rows``, a finished :func:`rows_tested` count, to the running block's, if one is
+    running: a search step that counted its own tests passes them to the block around it."""
+    counter = _ROWS.get()
+    if counter is not None:
+        counter.update(rows)
+
+
 def rows_metadata(counter: Mapping[int, int]) -> dict[str, dict[str, float]]:
     """Return ``{"rows_tested": {"min": ..., "median": ...}}`` for ``counter``; ``{}`` when empty.
 

@@ -131,6 +131,25 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         group="backend",
     ),
     EnvVarSpec(
+        name="ANDREY_LAZY_CORRELATION",
+        values="1/true/yes/on or 0/false/no/off",
+        default="1",
+        effect=(
+            "Lazy correlation for the local methods (the blanket learners, MB-by-MB, MMB-by-MMB, "
+            "CMB, LDECC, LOAD, LocPC-CDE, LDP, LD3, Y-structures, and the restrict phase of MMHC "
+            "and RSMAX2) with `fisherz`, `student_t`, or "
+            "`normal_scores` on complete data: the rows of the correlation matrix are computed, "
+            "256 at a time, when a test first reads one and kept, instead of the whole matrix up "
+            "front. The rows equal the whole matrix's bit for bit, so the answers do not change. "
+            "A backend that puts the matrix on a GPU computes the whole matrix there. The check "
+            "for copied columns then runs on the rows computed: a copy raises when a computed row "
+            "shows it, "
+            "and copies among columns whose rows are never computed do not raise. `0` computes "
+            "the whole matrix and checks it for copies before the search."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
         name="ANDREY_SHARED_SCAN_MIN_WORK",
         values="integer (candidates times block size per scan)",
         default=str(MIN_SHARED_FACTOR_WORK),

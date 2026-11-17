@@ -9,22 +9,17 @@ for the blankets, the moral graph.
 
 from __future__ import annotations
 
+from functools import partial
 from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.api._adapt import (
-    categorical_metadata,
-    copies_named,
-    fit_inputs,
-    label_of,
-    structure_output,
-)
-from andrey.api._local import target_metadata
+from andrey.api._adapt import copies_named, fit_inputs, label_of, structure_output
+from andrey.api._local import fit_metadata, target_columns, target_metadata
 from andrey.api._method import method_spec
-from andrey.core import NULL, TAIL
+from andrey.core import NULL, TAIL, backend
 from andrey.core.ci import counting_tests
-from andrey.core.ci_missing import rows_metadata, rows_tested
+from andrey.core.ci_missing import rows_tested
 from andrey.core.knowledge import Knowledge, as_node, column_position
 from andrey.core.orient import to_structure
 
@@ -33,6 +28,7 @@ if TYPE_CHECKING:
 
     import numpy.typing as npt
 
+    from andrey.constraint.blanket import LocalSearch
     from andrey.core import StructureOutput
 
 
@@ -40,7 +36,7 @@ def fit_blanket(
     method: str,
     data: npt.ArrayLike,
     *,
-    target: str | int | None,
+    target: str | int | Sequence[str | int] | None,
     structure: str,
     alpha: float,
     indep_test: str | None,
@@ -49,8 +45,12 @@ def fit_blanket(
     seed: int | None,
     max_depth: int | None,
     knowledge: Knowledge | None,
-) -> StructureOutput:
-    """Check the settings, run the search, and wrap the graph ``structure`` names or the sets."""
+) -> StructureOutput | list[StructureOutput]:
+    """Check the settings, run the search, and wrap the graph ``structure`` names or the sets.
+
+    A list of targets gives one result for each, in its order.
+    """
+    from andrey.constraint._parallel_targets import answers
     from andrey.constraint.blanket import local_search, local_structure
     from andrey.spec.concepts import BLANKET_STRUCTURES
 
@@ -59,7 +59,12 @@ def fit_blanket(
         data, "indep_test", indep_test, categorical, knowledge, method=method, missing=True
     )
     d = X.shape[1]
-    t = None if target is None else column_position(as_node(target, "target"), labels, d, "target")
+    targets = target_columns(target, labels, d, method)
+    t = (
+        None
+        if target is None or targets is not None
+        else column_position(as_node(target, "target"), labels, d, "target")
+    )
     settings = {
         "alpha": alpha,
         "indep_test": indep_test,
@@ -69,42 +74,73 @@ def fit_blanket(
         "max_depth": max_depth,
         "constraints": constraints,
     }
+    if targets is not None:
+        with copies_named(labels):
+            found = answers(
+                local_search(X, **settings),  # ty: ignore[invalid-argument-type]
+                partial(_target_sets, method),
+                targets,
+                backend.worker_count(),
+            )
+        outs = []
+        for x, ((pc, mb), n, rows) in zip(targets, found, strict=True):
+            marks, metadata = _target_answer(x, pc, mb, d, labels)
+            metadata |= fit_metadata(mask, data, rows, n)
+            outs.append(
+                structure_output(
+                    to_structure(marks, kind="undirected"), labels=labels, metadata=metadata
+                )
+            )
+        return outs
     metadata: dict[str, object] = {}
     kind = BLANKET_STRUCTURES[structure] if t is None else "undirected"
     with copies_named(labels), rows_tested() as rows, counting_tests() as tests:
         if t is None:
             marks = local_structure(X, method, structure, **settings)
         else:
-            search = local_search(
-                X,
-                alpha=alpha,
-                indep_test=indep_test,
-                degrees_of_freedom=degrees_of_freedom,
-                categorical=mask,
-                seed=seed,
-                max_depth=max_depth,
-                constraints=constraints,
-            )
+            search = local_search(X, **settings)  # ty: ignore[invalid-argument-type]
             with search.pinned():
-                pc, mb, _ = search.local(method, t)
-            sets = {"markov_blanket": mb, "parents_and_children": pc}
-            members = mb if mb is not None else pc
-            assert members is not None  # every learner learns one of the two
-            adjacent = np.zeros((d, d), dtype=bool)
-            adjacent[t, members] = adjacent[members, t] = True
-            marks = np.where(adjacent, TAIL, NULL).astype(np.int8)
-            metadata |= target_metadata(
-                t, {k: v for k, v in sets.items() if v is not None}, label_of(labels)
-            )
-    metadata |= categorical_metadata(mask, data) | rows_metadata(rows) | {"n_tests": tests.n}
+                pc, mb = _target_sets(method, search, t)
+            marks, metadata = _target_answer(t, pc, mb, d, labels)
+    metadata |= fit_metadata(mask, data, rows, tests.n)
     return structure_output(to_structure(marks, kind=kind), labels=labels, metadata=metadata)
+
+
+def _target_sets(
+    method: str, search: LocalSearch, t: int
+) -> tuple[list[int] | None, list[int] | None]:
+    """Return ``t``'s parents and children and its Markov blanket by the learner ``method``.
+
+    Each is ``None`` when the learner does not learn it.
+    """
+    pc, mb, _ = search.local(method, t)
+    return pc, mb
+
+
+def _target_answer(
+    t: int, pc: list[int] | None, mb: list[int] | None, d: int, labels: tuple[str, ...] | None
+) -> tuple[np.ndarray, dict[str, object]]:
+    """Return the answer for ``t`` as endpoint marks and metadata.
+
+    The marks are an undirected graph joining ``t`` to each member of its set; the metadata names
+    ``t`` and lists the sets.
+    """
+    sets = {"markov_blanket": mb, "parents_and_children": pc}
+    members = mb if mb is not None else pc
+    assert members is not None  # every learner learns one of the two
+    adjacent = np.zeros((d, d), dtype=bool)
+    adjacent[t, members] = adjacent[members, t] = True
+    marks = np.where(adjacent, TAIL, NULL).astype(np.int8)
+    return marks, target_metadata(
+        t, {k: v for k, v in sets.items() if v is not None}, label_of(labels)
+    )
 
 
 @method_spec("iamb")
 def iamb(
     data: npt.ArrayLike,
     *,
-    target: str | int | None = None,
+    target: str | int | Sequence[str | int] | None = None,
     structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
@@ -114,7 +150,7 @@ def iamb(
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
-) -> StructureOutput:
+) -> StructureOutput | list[StructureOutput]:
     """Learn a CPDAG, or one variable's Markov blanket, with incremental association (IAMB).
 
     A variable's Markov blanket is the smallest set of other variables given which it is
@@ -128,10 +164,12 @@ def iamb(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    target : str, int, or None, default=None
+    target : str, int, list of them, or None, default=None
         The variable whose set to learn: a column label (a string) or a 0-based position (an
-        integer). ``None`` learns every variable's set and keeps a pair when each variable is in
-        the other's set.
+        integer). A list of them learns each one's set with one search, which makes a step two
+        targets share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
+        ``indep_test``. ``None`` learns every variable's set and keeps a pair when each variable is
+        in the other's set.
     structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
@@ -200,8 +238,10 @@ def iamb(
 
     Returns
     -------
-    StructureOutput
-        Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
+    StructureOutput or list of StructureOutput
+        With a list of targets, a list holding each target's result, in its order, as that target
+        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
+        target's result counts. Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
         :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
         cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
         and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
@@ -385,7 +425,7 @@ def iamb(
 def inter_iamb(
     data: npt.ArrayLike,
     *,
-    target: str | int | None = None,
+    target: str | int | Sequence[str | int] | None = None,
     structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
@@ -395,7 +435,7 @@ def inter_iamb(
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
-) -> StructureOutput:
+) -> StructureOutput | list[StructureOutput]:
     """Learn a CPDAG, or one variable's Markov blanket, with interleaved IAMB (Inter-IAMB).
 
     Inter-IAMB [1]_ is IAMB with its shrink step after every addition, so a member that becomes
@@ -408,10 +448,12 @@ def inter_iamb(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    target : str, int, or None, default=None
+    target : str, int, list of them, or None, default=None
         The variable whose set to learn: a column label (a string) or a 0-based position (an
-        integer). ``None`` learns every variable's set and keeps a pair when each variable is in
-        the other's set.
+        integer). A list of them learns each one's set with one search, which makes a step two
+        targets share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
+        ``indep_test``. ``None`` learns every variable's set and keeps a pair when each variable is
+        in the other's set.
     structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
@@ -480,8 +522,10 @@ def inter_iamb(
 
     Returns
     -------
-    StructureOutput
-        Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
+    StructureOutput or list of StructureOutput
+        With a list of targets, a list holding each target's result, in its order, as that target
+        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
+        target's result counts. Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
         :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
         cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
         and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
@@ -661,7 +705,7 @@ def inter_iamb(
 def gs(
     data: npt.ArrayLike,
     *,
-    target: str | int | None = None,
+    target: str | int | Sequence[str | int] | None = None,
     structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
@@ -671,7 +715,7 @@ def gs(
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
-) -> StructureOutput:
+) -> StructureOutput | list[StructureOutput]:
     """Learn a CPDAG, or one variable's Markov blanket, with Grow-Shrink (GS).
 
     A variable's Markov blanket is the smallest set of other variables given which it is
@@ -686,10 +730,12 @@ def gs(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    target : str, int, or None, default=None
+    target : str, int, list of them, or None, default=None
         The variable whose set to learn: a column label (a string) or a 0-based position (an
-        integer). ``None`` learns every variable's set and keeps a pair when each variable is in
-        the other's set.
+        integer). A list of them learns each one's set with one search, which makes a step two
+        targets share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
+        ``indep_test``. ``None`` learns every variable's set and keeps a pair when each variable is
+        in the other's set.
     structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
@@ -758,8 +804,10 @@ def gs(
 
     Returns
     -------
-    StructureOutput
-        Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
+    StructureOutput or list of StructureOutput
+        With a list of targets, a list holding each target's result, in its order, as that target
+        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
+        target's result counts. Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
         :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
         cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
         and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
@@ -936,7 +984,7 @@ def gs(
 def fast_iamb(
     data: npt.ArrayLike,
     *,
-    target: str | int | None = None,
+    target: str | int | Sequence[str | int] | None = None,
     structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
@@ -946,7 +994,7 @@ def fast_iamb(
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
-) -> StructureOutput:
+) -> StructureOutput | list[StructureOutput]:
     """Learn a CPDAG, or one variable's Markov blanket, with Fast-IAMB.
 
     A variable's Markov blanket is the smallest set of other variables given which it is
@@ -961,10 +1009,12 @@ def fast_iamb(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    target : str, int, or None, default=None
+    target : str, int, list of them, or None, default=None
         The variable whose set to learn: a column label (a string) or a 0-based position (an
-        integer). ``None`` learns every variable's set and keeps a pair when each variable is in
-        the other's set.
+        integer). A list of them learns each one's set with one search, which makes a step two
+        targets share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
+        ``indep_test``. ``None`` learns every variable's set and keeps a pair when each variable is
+        in the other's set.
     structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
@@ -1034,8 +1084,10 @@ def fast_iamb(
 
     Returns
     -------
-    StructureOutput
-        Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
+    StructureOutput or list of StructureOutput
+        With a list of targets, a list holding each target's result, in its order, as that target
+        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
+        target's result counts. Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
         :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
         cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
         and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
@@ -1216,7 +1268,7 @@ def fast_iamb(
 def mmpc(
     data: npt.ArrayLike,
     *,
-    target: str | int | None = None,
+    target: str | int | Sequence[str | int] | None = None,
     structure: str = "skeleton",
     alpha: float = 0.05,
     indep_test: str | None = None,
@@ -1226,7 +1278,7 @@ def mmpc(
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
-) -> StructureOutput:
+) -> StructureOutput | list[StructureOutput]:
     """Learn a skeleton, or one variable's parents and children, with MMPC.
 
     Max-min parents and children (MMPC) [1]_ finds the variables adjacent to a target in the causal
@@ -1240,10 +1292,12 @@ def mmpc(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    target : str, int, or None, default=None
+    target : str, int, list of them, or None, default=None
         The variable whose set to learn: a column label (a string) or a 0-based position (an
-        integer). ``None`` learns every variable's set and keeps a pair when each variable is in
-        the other's set.
+        integer). A list of them learns each one's set with one search, which makes a step two
+        targets share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
+        ``indep_test``. ``None`` learns every variable's set and keeps a pair when each variable is
+        in the other's set.
     structure : {"skeleton", "cpdag"}, default="skeleton"
         The graph returned when ``target`` is ``None``. ``"skeleton"``: the adjacencies with no
         directions, each variable joined to its parents and children, the graph the sets give.
@@ -1309,8 +1363,11 @@ def mmpc(
 
     Returns
     -------
-    StructureOutput
-        Without ``target``, wraps the graph ``structure`` names: an ``undirected``
+    StructureOutput or list of StructureOutput
+        With a list of targets, a list holding each target's result, in its order, as that target
+        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
+        target's result counts. Without ``target``, wraps the graph ``structure`` names: an
+        ``undirected``
         :class:`~andrey.core.GraphStructure` for ``"skeleton"``, whose edges have no arrowhead and
         join each pair in each other's set, or a ``cpdag`` one for ``"cpdag"``, whose undirected
         edges the tests cannot orient. With ``target``, an ``undirected`` one whose edges join
@@ -1498,7 +1555,7 @@ def mmpc(
 def hiton_pc(
     data: npt.ArrayLike,
     *,
-    target: str | int | None = None,
+    target: str | int | Sequence[str | int] | None = None,
     structure: str = "skeleton",
     alpha: float = 0.05,
     indep_test: str | None = None,
@@ -1508,7 +1565,7 @@ def hiton_pc(
     seed: int | None = None,
     max_depth: int | None = 3,
     knowledge: Knowledge | None = None,
-) -> StructureOutput:
+) -> StructureOutput | list[StructureOutput]:
     """Learn a skeleton, or one variable's parents and children, with HITON-PC.
 
     Semi-interleaved HITON-PC [1]_ finds the variables adjacent to a target in the causal graph, its
@@ -1521,10 +1578,12 @@ def hiton_pc(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    target : str, int, or None, default=None
+    target : str, int, list of them, or None, default=None
         The variable whose set to learn: a column label (a string) or a 0-based position (an
-        integer). ``None`` learns every variable's set and keeps a pair when each variable is in
-        the other's set.
+        integer). A list of them learns each one's set with one search, which makes a step two
+        targets share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
+        ``indep_test``. ``None`` learns every variable's set and keeps a pair when each variable is
+        in the other's set.
     structure : {"skeleton", "cpdag"}, default="skeleton"
         The graph returned when ``target`` is ``None``. ``"skeleton"``: the adjacencies with no
         directions, each variable joined to its parents and children, the graph the sets give.
@@ -1592,8 +1651,11 @@ def hiton_pc(
 
     Returns
     -------
-    StructureOutput
-        Without ``target``, wraps the graph ``structure`` names: an ``undirected``
+    StructureOutput or list of StructureOutput
+        With a list of targets, a list holding each target's result, in its order, as that target
+        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
+        target's result counts. Without ``target``, wraps the graph ``structure`` names: an
+        ``undirected``
         :class:`~andrey.core.GraphStructure` for ``"skeleton"``, whose edges have no arrowhead and
         join each pair in each other's set, or a ``cpdag`` one for ``"cpdag"``, whose undirected
         edges the tests cannot orient. With ``target``, an ``undirected`` one whose edges join
@@ -1774,7 +1836,7 @@ def hiton_pc(
 def hiton_mb(
     data: npt.ArrayLike,
     *,
-    target: str | int | None = None,
+    target: str | int | Sequence[str | int] | None = None,
     structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
@@ -1784,7 +1846,7 @@ def hiton_mb(
     seed: int | None = None,
     max_depth: int | None = 3,
     knowledge: Knowledge | None = None,
-) -> StructureOutput:
+) -> StructureOutput | list[StructureOutput]:
     """Learn a CPDAG, or one variable's Markov blanket, with HITON-MB.
 
     A variable's Markov blanket is the smallest set of other variables given which it is
@@ -1800,10 +1862,12 @@ def hiton_mb(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    target : str, int, or None, default=None
+    target : str, int, list of them, or None, default=None
         The variable whose set to learn: a column label (a string) or a 0-based position (an
-        integer). ``None`` learns every variable's set and keeps a pair when each variable is in
-        the other's set.
+        integer). A list of them learns each one's set with one search, which makes a step two
+        targets share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
+        ``indep_test``. ``None`` learns every variable's set and keeps a pair when each variable is
+        in the other's set.
     structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
@@ -1874,8 +1938,10 @@ def hiton_mb(
 
     Returns
     -------
-    StructureOutput
-        Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
+    StructureOutput or list of StructureOutput
+        With a list of targets, a list holding each target's result, in its order, as that target
+        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
+        target's result counts. Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
         :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
         cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
         and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
@@ -2057,7 +2123,7 @@ def hiton_mb(
 def mmmb(
     data: npt.ArrayLike,
     *,
-    target: str | int | None = None,
+    target: str | int | Sequence[str | int] | None = None,
     structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
@@ -2067,7 +2133,7 @@ def mmmb(
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
-) -> StructureOutput:
+) -> StructureOutput | list[StructureOutput]:
     """Learn a CPDAG, or one variable's Markov blanket, with MMMB.
 
     A variable's Markov blanket is the smallest set of other variables given which it is
@@ -2084,10 +2150,12 @@ def mmmb(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    target : str, int, or None, default=None
+    target : str, int, list of them, or None, default=None
         The variable whose set to learn: a column label (a string) or a 0-based position (an
-        integer). ``None`` learns every variable's set and keeps a pair when each variable is in
-        the other's set.
+        integer). A list of them learns each one's set with one search, which makes a step two
+        targets share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
+        ``indep_test``. ``None`` learns every variable's set and keeps a pair when each variable is
+        in the other's set.
     structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
@@ -2158,8 +2226,10 @@ def mmmb(
 
     Returns
     -------
-    StructureOutput
-        Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
+    StructureOutput or list of StructureOutput
+        With a list of targets, a list holding each target's result, in its order, as that target
+        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
+        target's result counts. Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
         :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
         cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
         and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
@@ -2345,7 +2415,7 @@ def mmmb(
 def pcmb(
     data: npt.ArrayLike,
     *,
-    target: str | int | None = None,
+    target: str | int | Sequence[str | int] | None = None,
     structure: str = "cpdag",
     alpha: float = 0.01,
     indep_test: str | None = None,
@@ -2355,7 +2425,7 @@ def pcmb(
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
-) -> StructureOutput:
+) -> StructureOutput | list[StructureOutput]:
     """Learn a CPDAG, or one variable's Markov blanket, with PCMB.
 
     A variable's Markov blanket is the smallest set of other variables given which it is
@@ -2372,10 +2442,12 @@ def pcmb(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    target : str, int, or None, default=None
+    target : str, int, list of them, or None, default=None
         The variable whose set to learn: a column label (a string) or a 0-based position (an
-        integer). ``None`` learns every variable's set and keeps a pair when each variable is in
-        the other's set.
+        integer). A list of them learns each one's set with one search, which makes a step two
+        targets share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
+        ``indep_test``. ``None`` learns every variable's set and keeps a pair when each variable is
+        in the other's set.
     structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
@@ -2446,8 +2518,10 @@ def pcmb(
 
     Returns
     -------
-    StructureOutput
-        Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
+    StructureOutput or list of StructureOutput
+        With a list of targets, a list holding each target's result, in its order, as that target
+        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
+        target's result counts. Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
         :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
         cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
         and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each

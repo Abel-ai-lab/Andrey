@@ -8,29 +8,33 @@ decides.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from functools import partial
 from typing import TYPE_CHECKING
 
 import numpy as np
 
 from andrey.api._adapt import (
-    categorical_metadata,
     copies_named,
     fit_inputs,
     label_of,
     structure_output,
 )
-from andrey.api._local import target_column, target_metadata
+from andrey.api._local import fit_metadata, target_column, target_columns, target_metadata
 from andrey.api._method import method_spec
-from andrey.core import ARROW, TAIL, GraphStructure
+from andrey.core import ARROW, TAIL, GraphStructure, backend
 from andrey.core.ci import counting_tests
-from andrey.core.ci_missing import rows_metadata, rows_tested
+from andrey.core.ci_missing import rows_tested
 from andrey.core.orient import to_structure
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
     import numpy.typing as npt
 
+    from andrey.constraint.blanket import LocalSearch
+    from andrey.constraint.cmb import CMBResult
+    from andrey.constraint.sequential import Rules
     from andrey.core import StructureOutput
     from andrey.core.knowledge import Knowledge
 
@@ -49,11 +53,54 @@ def _edge_sets(star: np.ndarray, t: int) -> dict[str, list[int]]:
     return sets
 
 
+@dataclass(frozen=True)
+class _Edges:
+    """The edges at a target as a sequential search found them.
+
+    ``marks`` holds each neighbor's mark at the target and at itself, ``blanket`` the target's
+    Markov blanket, and ``learned`` the variables whose blankets the search learned.
+    """
+
+    marks: list[tuple[int, int, int]]
+    blanket: list[int]
+    learned: list[int]
+
+
+def _sequential_edges(
+    blanket: str, rules: Rules, local_depth: int | None, search: LocalSearch, t: int
+) -> _Edges:
+    """Return ``t``'s edges by :func:`~andrey.constraint.sequential.sequential` with ``rules``.
+
+    The run keeps its blankets and local structures in a cache of its own.
+    """
+    from andrey.constraint.sequential import sequential
+
+    result = sequential(search, t, blanket, rules, local_depth=local_depth)
+    network = result.network
+    marks = [(v, network.mark(t, v), network.mark(v, t)) for v in network.neighbors(t)]
+    return _Edges(marks, list(result.cache.blankets[t]), list(result.learned))
+
+
+def _star(edges: _Edges, t: int, d: int) -> np.ndarray:
+    """Return the marks over all ``d`` variables of the edges at ``t`` alone."""
+    out = np.zeros((d, d), dtype=np.int8)
+    for v, at_t, at_v in edges.marks:
+        out[t, v], out[v, t] = at_t, at_v
+    return out
+
+
+def _cmb_codes(blanket: str, decided: np.ndarray | None, search: LocalSearch, t: int) -> CMBResult:
+    """Return ``t``'s identities by :func:`~andrey.constraint.cmb.cmb`."""
+    from andrey.constraint.cmb import cmb as identities
+
+    return identities(search, t, blanket, decided=decided)
+
+
 @method_spec("mb_by_mb")
 def mb_by_mb(
     data: npt.ArrayLike,
     *,
-    target: str | int | None = None,
+    target: str | int | Sequence[str | int] | None = None,
     blanket: str = "iamb_forward",
     alpha: float = 0.05,
     indep_test: str | None = None,
@@ -64,7 +111,7 @@ def mb_by_mb(
     max_depth: int | None = None,
     local_max_depth: int | None = 5,
     knowledge: Knowledge | None = None,
-) -> StructureOutput:
+) -> StructureOutput | list[StructureOutput]:
     """Learn the edges at one variable and their directions, its CPDAG's, with MB-by-MB.
 
     MB-by-MB [1]_ finds the direct causes and the direct effects of a target without learning the
@@ -78,9 +125,11 @@ def mb_by_mb(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    target : str, int, or None, default=None
+    target : str, int, list of them, or None, default=None
         Required: the variable to answer for, a column label (a string) or a 0-based position (an
-        integer). ``None`` raises ``ValueError``.
+        integer). A list of them answers each one with one search, which makes a step two targets
+        share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
+        ``indep_test``. ``None`` raises ``ValueError``.
     blanket : str, default="iamb_forward"
         The Markov blanket learner run for each variable the search visits: ``"iamb_forward"``,
         IAMB's grow phase without its shrink, the learner of the paper's runs [1]_, which keeps a
@@ -142,8 +191,11 @@ def mb_by_mb(
 
     Returns
     -------
-    StructureOutput
-        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` over every column holding only the
+    StructureOutput or list of StructureOutput
+        With a list of targets, a list holding each target's result, in its order, as that target
+        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
+        target's result counts. Otherwise, wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`
+        over every column holding only the
         edges at ``target``: ``x -> target`` for a direct cause, ``target -> x`` for a direct
         effect, and ``x - target`` where the CPDAG leaves the direction undecided. An absent edge
         away from the target means nothing. ``metadata["target"]`` names the target, and
@@ -272,17 +324,28 @@ def mb_by_mb(
     >>> out.metadata["parents"], out.metadata["children"]
     ([0, 1], [])
     """
+    from andrey.constraint._parallel_targets import answers
     from andrey.constraint.blanket import local_search
-    from andrey.constraint.sequential import MB_BY_MB, sequential
+    from andrey.constraint.sequential import MB_BY_MB
 
     assert indep_test is not None  # method_spec picks it from the column types
     X, mask, labels, constraints = fit_inputs(
         data, "indep_test", indep_test, categorical, knowledge, method="mb_by_mb", missing=True
     )
     d = X.shape[1]
-    t = target_column(target, labels, d, "mb_by_mb")
+    targets = target_columns(target, labels, d, "mb_by_mb")
+    t = target_column(target, labels, d, "mb_by_mb") if targets is None else -1
     name = label_of(labels)
-    with copies_named(labels), rows_tested() as rows, counting_tests() as tests:
+    answer = partial(_sequential_edges, blanket, MB_BY_MB, local_max_depth)
+
+    def output(t: int, edges: _Edges, n: int, rows: Mapping[int, int]) -> StructureOutput:
+        star = _star(edges, t, d)
+        metadata = target_metadata(t, _edge_sets(star, t), name)
+        metadata["blankets_learned"] = [name(x) for x in edges.learned]
+        metadata |= fit_metadata(mask, data, rows, n)
+        return structure_output(to_structure(star, kind="cpdag"), labels=labels, metadata=metadata)
+
+    with copies_named(labels):
         search = local_search(
             X,
             alpha=alpha,
@@ -293,12 +356,12 @@ def mb_by_mb(
             max_depth=max_depth,
             constraints=constraints,
         )
-        result = sequential(search, t, blanket, MB_BY_MB, local_depth=local_max_depth)
-    star = result.network.star(t, d)
-    metadata = target_metadata(t, _edge_sets(star, t), name)
-    metadata["blankets_learned"] = [name(x) for x in result.learned]
-    metadata |= categorical_metadata(mask, data) | rows_metadata(rows) | {"n_tests": tests.n}
-    return structure_output(to_structure(star, kind="cpdag"), labels=labels, metadata=metadata)
+        if targets is None:
+            with rows_tested() as rows, counting_tests() as tests:
+                edges = answer(search, t)
+            return output(t, edges, tests.n, rows)
+        found = answers(search, answer, targets, backend.worker_count())
+    return [output(t, *answer_) for t, answer_ in zip(targets, found, strict=True)]
 
 
 def _pag_sets(star: np.ndarray, t: int) -> dict[str, list[int]]:
@@ -329,7 +392,7 @@ def _pag_sets(star: np.ndarray, t: int) -> dict[str, list[int]]:
 def mmb_by_mmb(
     data: npt.ArrayLike,
     *,
-    target: str | int | None = None,
+    target: str | int | Sequence[str | int] | None = None,
     blanket: str = "total_conditioning",
     alpha: float = 0.01,
     indep_test: str | None = None,
@@ -340,7 +403,7 @@ def mmb_by_mmb(
     max_depth: int | None = None,
     local_max_depth: int | None = 10,
     knowledge: Knowledge | None = None,
-) -> StructureOutput:
+) -> StructureOutput | list[StructureOutput]:
     """Learn the edges at one variable and their marks, its PAG's, with MMB-by-MMB.
 
     MMB-by-MMB [1]_ finds the direct causes and the direct effects of a target when unmeasured
@@ -356,9 +419,11 @@ def mmb_by_mmb(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    target : str, int, or None, default=None
+    target : str, int, list of them, or None, default=None
         Required: the variable to answer for, a column label (a string) or a 0-based position (an
-        integer). ``None`` raises ``ValueError``.
+        integer). A list of them answers each one with one search, which makes a step two targets
+        share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
+        ``indep_test``. ``None`` raises ``ValueError``.
     blanket : str, default="total_conditioning"
         The Markov blanket learner run for each variable the search visits:
         ``"total_conditioning"``, the paper's [1]_, keeps each variable the test finds dependent
@@ -420,8 +485,11 @@ def mmb_by_mmb(
 
     Returns
     -------
-    StructureOutput
-        Wraps a ``pag`` :class:`~andrey.core.GraphStructure` over every column holding only the
+    StructureOutput or list of StructureOutput
+        With a list of targets, a list holding each target's result, in its order, as that target
+        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
+        target's result counts. Otherwise, wraps a ``pag`` :class:`~andrey.core.GraphStructure`
+        over every column holding only the
         edges at ``target``, with their marks: ``x -> target`` for a direct cause, ``target -> x``
         for a direct effect, ``x <-> target`` where a hidden common cause joins them and neither
         causes the other, and a circle where the PAG leaves the mark undecided. An absent edge
@@ -574,17 +642,31 @@ def mmb_by_mmb(
     >>> out.metadata["children"], out.metadata["undetermined"]
     ([3], [0, 1])
     """
+    from andrey.constraint._parallel_targets import answers
     from andrey.constraint.blanket import local_search
-    from andrey.constraint.sequential import MMB_BY_MMB, sequential
+    from andrey.constraint.sequential import MMB_BY_MMB
 
     assert indep_test is not None  # method_spec picks it from the column types
     X, mask, labels, constraints = fit_inputs(
         data, "indep_test", indep_test, categorical, knowledge, method="mmb_by_mmb", missing=True
     )
     d = X.shape[1]
-    t = target_column(target, labels, d, "mmb_by_mmb")
+    targets = target_columns(target, labels, d, "mmb_by_mmb")
+    t = target_column(target, labels, d, "mmb_by_mmb") if targets is None else -1
     name = label_of(labels)
-    with copies_named(labels), rows_tested() as rows, counting_tests() as tests:
+    answer = partial(_sequential_edges, blanket, MMB_BY_MMB, local_max_depth)
+
+    def output(t: int, edges: _Edges, n: int, rows: Mapping[int, int]) -> StructureOutput:
+        star = _star(edges, t, d)
+        sets = {"markov_blanket": edges.blanket, **_pag_sets(star, t)}
+        metadata = target_metadata(t, sets, name)
+        metadata["blankets_learned"] = [name(x) for x in edges.learned]
+        metadata |= fit_metadata(mask, data, rows, n)
+        return structure_output(
+            GraphStructure.from_numpy(star, kind="pag"), labels=labels, metadata=metadata
+        )
+
+    with copies_named(labels):
         search = local_search(
             X,
             alpha=alpha,
@@ -596,22 +678,19 @@ def mmb_by_mmb(
             max_depth=max_depth,
             constraints=constraints,
         )
-        result = sequential(search, t, blanket, MMB_BY_MMB, local_depth=local_max_depth)
-    star = result.network.star(t, d)
-    sets = {"markov_blanket": result.cache.blankets[t], **_pag_sets(star, t)}
-    metadata = target_metadata(t, sets, name)
-    metadata["blankets_learned"] = [name(x) for x in result.learned]
-    metadata |= categorical_metadata(mask, data) | rows_metadata(rows) | {"n_tests": tests.n}
-    return structure_output(
-        GraphStructure.from_numpy(star, kind="pag"), labels=labels, metadata=metadata
-    )
+        if targets is None:
+            with rows_tested() as rows, counting_tests() as tests:
+                edges = answer(search, t)
+            return output(t, edges, tests.n, rows)
+        found = answers(search, answer, targets, backend.worker_count())
+    return [output(t, *answer_) for t, answer_ in zip(targets, found, strict=True)]
 
 
 @method_spec("cmb")
 def cmb(
     data: npt.ArrayLike,
     *,
-    target: str | int | None = None,
+    target: str | int | Sequence[str | int] | None = None,
     blanket: str = "hiton_mb",
     alpha: float = 0.02,
     indep_test: str | None = None,
@@ -621,7 +700,7 @@ def cmb(
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
-) -> StructureOutput:
+) -> StructureOutput | list[StructureOutput]:
     """Learn the edges at one variable and their directions with CMB.
 
     CMB (Causal Markov Blanket discovery) [1]_ finds the direct causes and the direct effects of a
@@ -636,9 +715,11 @@ def cmb(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    target : str, int, or None, default=None
+    target : str, int, list of them, or None, default=None
         Required: the variable to answer for, a column label (a string) or a 0-based position (an
-        integer). ``None`` raises ``ValueError``.
+        integer). A list of them answers each one with one search, which makes a step two targets
+        share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
+        ``indep_test``. ``None`` raises ``ValueError``.
     blanket : {"hiton_mb", "mmmb", "pcmb"}, default="hiton_mb"
         The Markov blanket learner run for each variable CMB visits: :func:`~andrey.hiton_mb`, the
         learner of the paper's runs [1]_, :func:`~andrey.mmmb`, or :func:`~andrey.pcmb`. CMB reads
@@ -690,8 +771,11 @@ def cmb(
 
     Returns
     -------
-    StructureOutput
-        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` over every column holding only the
+    StructureOutput or list of StructureOutput
+        With a list of targets, a list holding each target's result, in its order, as that target
+        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
+        target's result counts. Otherwise, wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`
+        over every column holding only the
         edges at ``target``: ``x -> target`` for a direct cause, ``target -> x`` for a direct
         effect, and ``x - target`` where the direction is left undecided. An absent edge away from
         the target means nothing. ``metadata["target"]`` names the target, and
@@ -817,18 +901,33 @@ def cmb(
     >>> out.metadata["parents"], out.metadata["children"]
     ([0, 1], [])
     """
+    from andrey.constraint._parallel_targets import answers
     from andrey.constraint.blanket import local_search
     from andrey.constraint.cmb import CHILD, PARENT
-    from andrey.constraint.cmb import cmb as identities
 
     assert indep_test is not None  # method_spec picks it from the column types
     X, mask, labels, constraints = fit_inputs(
         data, "indep_test", indep_test, categorical, knowledge, method="cmb", missing=True
     )
     d = X.shape[1]
-    t = target_column(target, labels, d, "cmb")
+    targets = target_columns(target, labels, d, "cmb")
+    t = target_column(target, labels, d, "cmb") if targets is None else -1
     name = label_of(labels)
-    with copies_named(labels), rows_tested() as rows, counting_tests() as tests:
+    decided = None if constraints is None else constraints.decided()
+    answer = partial(_cmb_codes, blanket, decided)
+
+    def output(t: int, result: CMBResult, n: int, rows: Mapping[int, int]) -> StructureOutput:
+        star = np.zeros((d, d), dtype=np.int8)
+        for x, code in result.codes.items():
+            star[t, x] = ARROW if code == PARENT else TAIL
+            star[x, t] = ARROW if code == CHILD else TAIL
+        sets = {"markov_blanket": result.blanket, **_edge_sets(star, t)}
+        metadata = target_metadata(t, sets, name)
+        metadata["blankets_learned"] = [name(x) for x in result.learned]
+        metadata |= fit_metadata(mask, data, rows, n)
+        return structure_output(to_structure(star, kind="cpdag"), labels=labels, metadata=metadata)
+
+    with copies_named(labels):
         search = local_search(
             X,
             alpha=alpha,
@@ -839,14 +938,9 @@ def cmb(
             max_depth=max_depth,
             constraints=constraints,
         )
-        decided = None if constraints is None else constraints.decided()
-        result = identities(search, t, blanket, decided=decided)
-    star = np.zeros((d, d), dtype=np.int8)
-    for x, code in result.codes.items():
-        star[t, x] = ARROW if code == PARENT else TAIL
-        star[x, t] = ARROW if code == CHILD else TAIL
-    sets = {"markov_blanket": result.blanket, **_edge_sets(star, t)}
-    metadata = target_metadata(t, sets, name)
-    metadata["blankets_learned"] = [name(x) for x in result.learned]
-    metadata |= categorical_metadata(mask, data) | rows_metadata(rows) | {"n_tests": tests.n}
-    return structure_output(to_structure(star, kind="cpdag"), labels=labels, metadata=metadata)
+        if targets is None:
+            with rows_tested() as rows, counting_tests() as tests:
+                result = answer(search, t)
+            return output(t, result, tests.n, rows)
+        found = answers(search, answer, targets, backend.worker_count())
+    return [output(t, *answer_) for t, answer_ in zip(targets, found, strict=True)]
