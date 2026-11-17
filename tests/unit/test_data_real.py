@@ -1,7 +1,8 @@
 """``andrey.data.load_dataset`` downloads once, checks the SHA-256, caches, and falls back in order.
 
 The ``offline_datasets`` fixture replaces the network: it serves Sachs's 853 observational rows,
-the published experimental Sachs file, and the published ASIA, CHILD, and INSURANCE networks.
+the published experimental Sachs file, the published ASIA, CHILD, and INSURANCE networks, and a
+synthetic archive of six Tuebingen pairs.
 """
 
 from __future__ import annotations
@@ -34,6 +35,7 @@ def test_sachs_is_the_observational_rows_and_the_consensus_network(offline_datas
     assert "Science 308" in sachs.description
     assert list_datasets() == (
         "sachs",
+        "tuebingen",
         "asia",
         "child",
         "insurance",
@@ -488,3 +490,90 @@ def test_a_published_network_column_order_says_nothing_of_the_causal_order(offli
     bound = 4 / np.sqrt(len(seeds) * 7)
     assert abs(np.mean([_asia_correlation(s, True) for s in seeds])) < bound
     assert _asia_correlation(0, False) > bound
+
+
+def test_the_tuebingen_pairs_carry_direction_weight_and_blocks(offline_datasets):
+    pairs = load_dataset("tuebingen")
+    assert len(pairs) == 6 and [p.name for p in pairs] == [f"pair{k:04d}" for k in range(1, 7)]
+    np.testing.assert_array_equal(pairs.weights, [0.5, 0.5, 1, 0.3333, 0, 0.5])
+    # A block of several columns marks a pair multivariate whatever its weight.
+    assert [p.multivariate for p in pairs] == [False] * 4 + [True] * 2
+    for pair in pairs:
+        assert list(pair.data.columns) == list(pair.feature_names) == list(pair.graph.labels)
+        arcs = {(a, b) for a, b, kind in pair.graph.oriented_edges() if kind == "directed"}
+        assert arcs == {(c, e) for c in pair.cause for e in pair.effect}
+        assert pair.env is None and pair.targets is None and pair.conditions is None
+    assert (pairs[0].cause, pairs[0].effect) == (("x",), ("y",))
+    assert (pairs[2].cause, pairs[2].effect) == (("y",), ("x",))
+    # The metadata's columns decide the pair: the third column of pair 4 is not read.
+    assert pairs["pair0004"].data.shape == (40, 2)
+    assert pairs[4].feature_names == ("x1", "x2", "y1", "y2")
+    assert (pairs[4].cause, pairs[4].effect) == (("y1", "y2"), ("x1", "x2"))
+    assert (pairs[5].cause, pairs[5].effect) == (("x1", "x2", "x3"), ("y",))
+    assert pairs[5].graph.kind == "dag" and len(pairs[5].graph.oriented_edges()) == 3
+    assert "\u00b0C" in pairs[0].description and "pair0001" in pairs[0].description
+    assert "Mooij" in pairs.description
+    with pytest.raises(KeyError, match="pair0099"):
+        pairs["pair0099"]
+
+
+def test_a_description_is_read_as_utf8_or_as_latin1(offline_datasets):
+    pairs = load_dataset("tuebingen")
+    for pair in pairs:  # the odd pairs' files are UTF-8, the even pairs' Latin-1
+        assert "10\u00b0C" in pair.description and "\u00c2" not in pair.description
+
+
+def test_pairs_and_datasets_compare_and_hash_by_identity(offline_datasets):
+    for as_frame in (True, False):
+        pairs = load_dataset("tuebingen", as_frame=as_frame)
+        assert all(pair in pairs for pair in pairs)
+        assert [pairs.pairs.index(pair) for pair in pairs] == list(range(6))
+        assert pairs[1] != pairs[2] and pairs[1] == pairs["pair0002"]
+        assert len({*pairs}) == 6 and [p for p in pairs if p not in (pairs[0],)] == [*pairs][1:]
+    sachs = load_dataset("sachs")
+    assert sachs in [sachs] and sachs != load_dataset("sachs") and len({sachs}) == 1
+
+
+def test_tuebingen_data_follow_the_files_and_the_array_matches_the_frame(offline_datasets):
+    frames, arrays = load_dataset("tuebingen"), load_dataset("tuebingen", as_frame=False)
+    assert all(isinstance(a.data, np.ndarray) and a.data.dtype == np.float64 for a in arrays)
+    for frame, array in zip(frames, arrays, strict=True):
+        np.testing.assert_array_equal(frame.data.to_numpy(), array.data)
+        assert frame.graph == array.graph and frame.weight == array.weight
+    # Tabs, spaces, and trailing blanks all read as the same numbers, in the files' column order.
+    cause = np.random.default_rng(0).uniform(-2, 2, 40)
+    for k in (0, 1, 3):
+        np.testing.assert_allclose(arrays[k].data[:, 0], cause, rtol=1e-5)
+    np.testing.assert_allclose(arrays[2].data[:, 1], cause, rtol=1e-5)
+
+
+def test_tuebingen_downloads_once_and_validates_before_it_fetches(offline_datasets, tmp_path):
+    load_dataset("tuebingen")
+    load_dataset("tuebingen")
+    assert offline_datasets == list(real.DATASETS["tuebingen"].sources)
+    assert (tmp_path / "cache" / "tuebingen" / "pairs.zip").is_file()
+    for bad in ({"n": 100}, {"seed": 1}, {"discrete": True}):
+        with pytest.raises(ValueError, match="measured"):
+            load_dataset("tuebingen", data_home=tmp_path / "other", **bad)
+    assert not (tmp_path / "other").exists()
+
+
+@pytest.mark.parametrize(
+    "meta",
+    [
+        "0001 1 1 2 2 0.5\n0002 1 2 2 2 0.5\n",  # the blocks overlap
+        "0001 1 1 3 3 0.5\n",  # a column between them belongs to neither
+        "0001 2 2 3 3 0.5\n",  # neither starts at the first column
+        "0001 1 1 2 2 1.5\n",  # a weight above 1
+        "0001 1 1 2\n",  # a missing field
+    ],
+)
+def test_a_tuebingen_layout_that_is_not_a_pair_is_refused(make_tuebingen_archive, meta):
+    with pytest.raises(ValueError, match="Tuebingen metadata line"):
+        real._read_pairs(make_tuebingen_archive(meta))
+
+
+def test_a_pair_with_a_missing_value_is_refused(make_tuebingen_archive):
+    meta = "0004 1 2 3 3 0.5\n"  # pair 4's third column holds NaN
+    with pytest.raises(ValueError, match="missing value"):
+        real._read_pairs(make_tuebingen_archive(meta))

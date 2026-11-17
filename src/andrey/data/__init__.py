@@ -2,7 +2,8 @@
 
 :func:`load_dataset` returns a real dataset, or data simulated on a published network, with its
 reference graph; it downloads the file on first use, checks its SHA-256, and caches it in
-``ANDREY_DATA_DIR`` or ``~/.cache/andrey``. :func:`list_datasets` names them. A structural causal
+``ANDREY_DATA_DIR`` or ``~/.cache/andrey``. :func:`list_datasets` names them; ``"tuebingen"`` loads
+the cause-effect pairs of Mooij et al. (2016) as :class:`CausePairs`. A structural causal
 model built from a ``graph``, a ``functional`` form, and ``noise`` samples synthetic data with its
 true graph:
 
@@ -47,7 +48,7 @@ from .discrete import sample_discrete
 from .generate import Ensemble, generate
 from .mixed import sample_mixed
 from .qa import FaithfulnessScreen
-from .real import RealDataset, list_datasets, load_dataset
+from .real import CausePair, CausePairs, RealDataset, list_datasets, load_dataset
 from .scm import SCM, sample_scm
 
 __all__ = [
@@ -66,6 +67,8 @@ __all__ = [
     "SCMParams",
     "FaithfulnessScreen",
     "RealDataset",
+    "CausePair",
+    "CausePairs",
     "list_datasets",
     "load_dataset",
     "graphs",
