@@ -341,13 +341,14 @@ details.
 
 % concept: max_parents
 `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, `rsmax2`,
-`gfci`, `boss_fci`, `grasp_fci`, `cam`, and `icp` take `max_parents`, a cap on every node's parents:
-no DAG the returned graph represents gives a node more than that many parents. `None`, the default,
-sets no cap. `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, and the score phase of `mmhc` and
-`rsmax2` take no move past the cap, `boss` and `grasp` grow no parent set past it, `exact_search`
-scores only the parent sets within it, and `cam`'s order search adds no edge past it. `icp` tests
-only the sets of at most that many variables, and its guarantee then needs the target to have no
-more parents. `gfci`, `boss_fci`, and `grasp_fci` cap their GES, BOSS, or GRaSP phase; the PAG their
+`gfci`, `boss_fci`, `grasp_fci`, `cam`, `das`, and `icp` take `max_parents`, a cap on every node's
+parents: no DAG the returned graph represents gives a node more than that many parents. `None`, the
+default, sets no cap, except in `das`, whose default is its paper's 20. `ges`, `gies`, `gnies`,
+`xges`, `hc`, `tabu`, and the score phase of `mmhc` and `rsmax2` take no move past the cap, `boss`
+and `grasp` grow no parent set past it, `exact_search` scores only the parent sets within it,
+`cam`'s order search adds no edge past it, and `das`'s edge screen keeps no candidate past it.
+`icp` tests only the sets of at most that many variables, and its guarantee then needs the target
+to have no more parents. `gfci`, `boss_fci`, and `grasp_fci` cap their GES, BOSS, or GRaSP phase; the PAG their
 tests then orient can put more arrowheads at a node.
 
 % concept: seed

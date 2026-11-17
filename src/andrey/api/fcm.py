@@ -1031,6 +1031,9 @@ def das(
 
     Warns
     -----
+    ExperimentalWarning
+        On the first call in a process: the method is not supported (see Limitations), and its
+        API may change without deprecation.
     DataTypeWarning
         When a column holds at most 10 distinct whole numbers and so may hold category codes, which
         the fit reads as numbers. Each message warns once per process.
@@ -1094,18 +1097,25 @@ def das(
     first, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** DAS is not benchmarked yet. It inherits the limits of SCORE's order, which
-    :func:`~andrey.score_matching` measures: on standardized columns the order puts fewer true
-    edges of a sparse graph in the true direction than on the columns as simulated; where links
-    have a strong linear part, so that variance builds up along the order, it can do no better
-    than a random order; and the leaf rule is exact only for Gaussian noise (under Gumbel noise
-    an exact estimate already makes wrong steps). An edge the order reverses cannot be recovered
-    by the screen, and the screen can drop a true parent whose entries are small next to the
-    reference's, which the pruning cannot add back. Each step factors a matrix with one row and
-    one column per sample, so the order search's time grows with the cube of ``n_samples`` and
-    its memory with the square; the screen adds one solve per step. Binary columns, and any
-    column with fewer than 3 distinct values, are not supported: the pruning fits a smooth term
-    of each parent, and such a column raises ``ValueError`` before the fit.
+    **Limitations.** DAS is not benchmarked yet: no campaign has compared its graph with the code
+    published with the paper or with other methods. Its causal order is SCORE's, computed by the
+    same code, so the order's measured limits, which :func:`~andrey.score_matching` states in full,
+    are its own. The order search reads standardized columns, where it orders fewer edges of a
+    sparse graph correctly: on ten graphs of 10 variables with as many edges as variables, it put
+    99% of the true edges in the true direction on the columns as simulated and 80% on
+    standardized columns. Where links have a strong linear part, so that variance builds up along
+    the order, it did no better than a random order (41% to 53% of the true edges on links
+    ``z + sin z``). The leaf rule is exact only for Gaussian noise: applied to the exact Hessian of
+    additive-noise models of 10 and 20 variables, it made at least three wrong steps in each of 40
+    datasets with Gumbel noise and none in 80 with Gaussian or Laplace noise. An edge the order
+    reverses cannot be recovered, and the screen can drop a true parent whose entries are small
+    next to the reference's, which the pruning cannot add back. Each step factors a matrix with one
+    row and one column per sample, so the order search's time grows with the cube of
+    ``n_samples`` and its memory with the square; the screen adds one solve per step. Binary
+    columns, and any column with fewer than 3 distinct values, are not supported: the pruning fits
+    a smooth term of each parent, and such a column raises ``ValueError`` before the fit. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density,
+    the method's settings, and the machine.
 
     References
     ----------
