@@ -96,10 +96,11 @@ The local methods, which compute only the rows of the correlation matrix their s
 copies among columns whose rows are never computed do not raise.
 `pcmci`, `pcmciplus`, and `lpcmci` with those tests also reject a series that repeats another up to
 `2 * tau_max` steps back and name its lagged value, such as `'a' at lag 1 repeats 'd'`. `cam`,
-`resit`, `score_matching`, `nogam`, and `camuv` reject copies the same way, and a column of fewer
-than 3 distinct values, such as a binary one, on which no smooth term can be fit; `resit`,
-`score_matching`, `nogam`, and `camuv` also need at least twice as many rows as columns, and `camuv`
-rejects a column that is a linear function of other columns, such as a total, as the BIC methods do.
+`resit`, `score_matching`, `nogam`, `das`, and `camuv` reject copies the same way, and a column of
+fewer than 3 distinct values, such as a binary one, on which no smooth term can be fit; `resit`,
+`score_matching`, `nogam`, and `camuv` also need at least twice as many rows as columns (`das`
+twice as many as `max_parents + 1`), and `camuv` rejects a column that is a linear function of
+other columns, such as a total, as the BIC methods do.
 Other data raises a `ValueError` that names the argument and, for a bad cell, its row and column. A
 single column gives a one-node graph.
 
@@ -174,7 +175,7 @@ another test raises a `ValueError`.
 `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
 `locpc_cde`, `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`,
 `igsp`, `ut_igsp`, `exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`,
-`nogam`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`,
+`nogam`, `das`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`,
 `longitudinal_lingam`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`,
 `bottom_up_parce_lingam`, and `camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
 and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's `knowledge`
@@ -833,6 +834,7 @@ in a process.
 
    ldp
    ld3
+   das
 ```
 
 LDP, local discovery by partitioning (Maasch et al. 2024), answers for one `treatment` and
@@ -847,6 +849,14 @@ columns: it finds the parents of the outcome and whether the treatment is one of
 structural direct criterion), with the other parents as the adjustment set for the direct effect, in
 `metadata["effects"]`. Its graph holds the edges into the outcome, and `metadata["partition"]` the
 labels. It is experimental until its comparison with the authors' code is published.
+
+DAS (Montagna et al. 2023), {py:func}`~andrey.das`, finds SCORE's causal order with the same Stein
+estimator and then reads the edges from it: for a leaf, the second derivative of the log density in
+the leaf and another variable is zero at every point unless that variable is a parent. Each leaf
+keeps the variables before it whose derivatives are clearly above zero, at most `max_parents=20`
+of them by Welch tests at 0.01, and CAM's smooth-term tests at `alpha=0.001` prune only those, so
+its pruning does not grow with every variable before a node in the order. It returns a DAG and
+SCORE's causal order. It is experimental until its comparison with the authors' code is published.
 
 A method becomes supported once it has:
 
