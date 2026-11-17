@@ -131,6 +131,17 @@ def test_the_result_follows_the_columns_in_any_order_and_units(chain_fit):
     assert [moved.columns[j] for j in out.ordering] == ["a", "b", "c"]
 
 
+def test_the_screen_follows_the_columns_in_any_order_and_units():
+    """With eight predecessors of the sink the Welch tests run, and give the same graph over the
+    variables under a new column order and new units."""
+    pd = pytest.importorskip("pandas")
+    frame = pd.DataFrame(_star(), columns=[f"v{j}" for j in range(9)])
+    columns = ["v8", "v3", "v0", "v6", "v1", "v7", "v2", "v5", "v4"]
+    scales = 2.0 ** np.arange(-4, 5)
+    moved = frame[columns] * scales + np.arange(9)
+    assert _named(_fit(moved)) == _named(_fit(frame))
+
+
 def test_a_rerun_repeats():
     X = _star()
     first, second = _fit(X), _fit(X)

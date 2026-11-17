@@ -1105,17 +1105,16 @@ def das(
     99% of the true edges in the true direction on the columns as simulated and 80% on
     standardized columns. Where links have a strong linear part, so that variance builds up along
     the order, it did no better than a random order (41% to 53% of the true edges on links
-    ``z + sin z``). The leaf rule is exact only for Gaussian noise: applied to the exact Hessian of
-    additive-noise models of 10 and 20 variables, it made at least three wrong steps in each of 40
-    datasets with Gumbel noise and none in 80 with Gaussian or Laplace noise. An edge the order
-    reverses cannot be recovered, and the screen can drop a true parent whose entries are small
-    next to the reference's, which the pruning cannot add back. Each step factors a matrix with one
-    row and one column per sample, so the order search's time grows with the cube of
-    ``n_samples`` and its memory with the square; the screen adds one solve per step. Binary
-    columns, and any column with fewer than 3 distinct values, are not supported: the pruning fits
-    a smooth term of each parent, and such a column raises ``ValueError`` before the fit. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density,
-    the method's settings, and the machine.
+    ``z + sin z``). The leaf rule is exact only for Gaussian noise: under other noise, such as
+    Gumbel noise, a leaf's entry changes with its residual, and :func:`~andrey.nogam` and
+    :func:`~andrey.resit` drop that assumption. An edge the order reverses cannot be recovered,
+    and the screen can drop a true parent whose entries are small next to the reference's, which
+    the pruning cannot add back. Each step factors a matrix with one row and one column per
+    sample, so the order search's time grows with the cube of ``n_samples`` and its memory with
+    the square; the screen adds one solve per step. Binary columns, and any column with fewer than
+    3 distinct values, are not supported: the pruning fits a smooth term of each parent, and such
+    a column raises ``ValueError`` before the fit. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
