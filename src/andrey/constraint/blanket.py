@@ -74,6 +74,7 @@ from andrey.core.knowledge import Constraints, orient
 from andrey.core.orient import meek
 from andrey.core.ties import (
     KEY_DP,
+    TieKeys,
     resolve_collider_order,
     resolve_in_column_order,
     tie_mask,
@@ -1116,21 +1117,28 @@ def _ranked_test(
 
 
 class LazyTieRanks(Sequence[int]):
-    """The :func:`~andrey.core.ties.tie_ranks` of the columns of ``X``, those ``mask`` marks ranked
-    as categories, computed when a rank is first read, so a search that never compares tied
-    candidates skips their cost. ``andrey.config.tie_break`` and the BLAS thread limits are read
-    when the object is made: the ranks' products are exact integers on any number of threads, so a
-    first read inside a search's one-thread block (:meth:`LocalSearch.pinned`) computes them on the
-    threads of the moment the object was made, with the same result. A copy made in another
-    process (pickling) computes them under that process's limits."""
+    """Integers that order the columns of ``X`` as their :func:`~andrey.core.ties.tie_ranks` do,
+    those ``mask`` marks ranked as categories, computed when first read, so a search that never
+    compares tied candidates skips their cost.
+
+    Where :class:`~andrey.core.ties.TieKeys` applies (continuous columns, more of them than rows),
+    they are its keys, computed for the columns read, so a search that compares a few columns reads
+    no others; iterating computes every column at once. Elsewhere they are the ranks, all computed
+    at the first read. ``andrey.config.tie_break`` and the BLAS thread limits are read when the
+    object is made: the ranks' products are exact integers on any number of threads, so a read
+    inside a search's one-thread block (:meth:`LocalSearch.pinned`) computes them on the threads of
+    the moment the object was made, with the same result. A copy made in another process (pickling)
+    computes them under that process's limits."""
 
     def __init__(self, X: np.ndarray, mask: np.ndarray) -> None:
         self._d = X.shape[1]
         self._data: tuple[np.ndarray, np.ndarray] | None = (X, mask)
-        self._ranks: list[int] | None = None
+        self._ranks: list[int] | TieKeys | None = None
         self._threads = backend.thread_limits_now()
         if backend.config.tie_break == "position":
             self._ranks, self._data = list(range(self._d)), None
+        elif TieKeys.applies(X, mask):
+            self._ranks, self._data = TieKeys(X), None
 
     def __len__(self) -> int:
         return self._d
@@ -1140,7 +1148,16 @@ class LazyTieRanks(Sequence[int]):
             assert self._data is not None
             with self._threads():
                 self._ranks, self._data = tie_ranks(*self._data).tolist(), None
+        if isinstance(self._ranks, TieKeys) and i not in self._ranks:
+            with self._threads():
+                return self._ranks[i]
         return self._ranks[i]
+
+    def __iter__(self) -> Iterator[int]:
+        if isinstance(self._ranks, TieKeys):
+            with self._threads():
+                self._ranks.fill(range(self._d))
+        return super().__iter__()
 
     def __getstate__(self) -> dict[str, Any]:
         """The ranks, or the data to compute them from, without the thread limits: a copy in
