@@ -231,7 +231,7 @@ again; a new kind of use takes a new value.
 
 Each release has a release card, `docs/benchmarks/<release>.md`: its benchmarks, the methods it adds
 or promotes, their known limits, and how to rerun the measurements, from the summary it links,
-`benchmarks/published/<label>/summary.json`. Like a post, a released card and its summary never
+`benchmarks/published/<label>/summary.json`. Like a post, a released card's text and its summary never
 change; new measurements go into the next release's card. A card's figures are finished HTML files
 in `docs/benchmarks/<release>/`, included with `{raw} html`, so later code never redraws them.
 
