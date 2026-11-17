@@ -79,6 +79,11 @@ names its pull request.
 - The reference-parity check names a row by its network, effect, hidden nodes, node count, and
   number of series beside its size, so rows of one size that differ only there no longer share a
   key, and it fails two failing rows of one comparison that still do. ([#1070])
+- `das` ranks the columns that knowledge forbids as parents with the others in its edge screen and
+  never keeps them, so the screen's reference can be a column known to have a zero entry instead of
+  the weakest allowed one. Correct forbidden edges no longer remove a true parent that the same
+  data gives without them. Its docstrings state that the five candidates kept without a test are
+  the value of the authors' code's `min_parents`, which usually keeps four ([#1088]).
 
 ## [0.17.1] - 2026-11-12
 
@@ -2639,3 +2644,4 @@ First alpha release.
 [#1070]: https://github.com/Abel-ai-lab/Andrey/pull/1070
 [#1082]: https://github.com/Abel-ai-lab/Andrey/pull/1082
 [#1084]: https://github.com/Abel-ai-lab/Andrey/pull/1084
+[#1088]: https://github.com/Abel-ai-lab/Andrey/pull/1088
