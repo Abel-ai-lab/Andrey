@@ -132,11 +132,6 @@ class CausePair(RealDataset):
         ``"x"`` and ``"y"`` after the first and the second variable of its files, in the order of
         the file: the cause is ``"x"`` in some pairs and ``"y"`` in others. A multivariate pair
         names its columns ``x1, x2, ...`` and ``y1, y2, ...``.
-    multivariate : bool
-        Whether the cause or the effect has more than one column. The collection states only that
-        the cause block acts on the effect block, so ``graph`` of a multivariate pair has an arc
-        from each cause column to each effect column and says nothing about the columns inside a
-        block. Methods that decide the direction between two columns read the other pairs.
     """
 
     name: str = ""
@@ -146,7 +141,13 @@ class CausePair(RealDataset):
 
     @property
     def multivariate(self) -> bool:
-        """Whether the cause or the effect has more than one column."""
+        """Whether the cause or the effect has more than one column.
+
+        The collection states only that the cause block acts on the effect block, so ``graph`` of a
+        multivariate pair has an arc from each cause column to each effect column and says nothing
+        about the columns inside a block. Methods that decide the direction between two columns read
+        the other pairs.
+        """
         return len(self.cause) > 1 or len(self.effect) > 1
 
 
