@@ -163,9 +163,11 @@ published measurement is ICA-LiNGAM's, on six BLAS kernels, in the same guide.
 
 Before a release merges, `qa/identity.py` fits every supported method on the release and on the
 release before it, on complete data with default arguments, and compares the outputs bit for bit.
-The quality gate and the reference comparisons run on the same code.
+The quality gate and the reference comparisons run on the same code. The tests of the benchmark
+harness that produces the comparisons (`benchmarks/tests`) run on it too, in the harness's own
+environments, since continuous integration runs only some of them.
 
-| Release | Outputs against the release before | Quality gate | Reference comparisons |
-|---|---|---|---|
-| 0.17.1 | 49 methods, 1,963 outputs, none changed | 145 checks, 0 failed | 2,971 rows, 0 failed |
-| 0.17.0 | 45 methods, 1,819 outputs, none changed; 4 methods new | 145 checks, 0 failed | 2,971 rows, 0 failed |
+| Release | Outputs against the release before | Quality gate | Reference comparisons | Harness tests |
+|---|---|---|---|---|
+| 0.17.1 | 49 methods, 1,963 outputs, none changed | 145 checks, 0 failed | 2,971 rows, 0 failed | 1,519 passed, 0 failed, 20 skipped |
+| 0.17.0 | 45 methods, 1,819 outputs, none changed; 4 methods new | 145 checks, 0 failed | 2,971 rows, 0 failed | 1,519 passed, 0 failed, 20 skipped |
