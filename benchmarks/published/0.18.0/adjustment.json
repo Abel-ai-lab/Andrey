@@ -10,7 +10,7 @@
   "LOAD authors' code": "7febfc6 (Schubert, Claassen, and Magliacane)"
  },
  "parity_rule": "paired bootstrap",
- "verdict_rule": "per cell (20 datasets, seeds 0-19, one treatment-outcome pair each): per dataset D = Andrey's error minus the authors' code's on the same data; worse when the 95% percentile-bootstrap interval of the mean D lies wholly above 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly below, a tie otherwise. A cell worse on seeds 0-19 on a measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree. The floor: per dataset, the error minus the empty adjustment set's (for LOAD's set, the set's missing plus extra members against the empty set's); it applies where the authors' code's interval lies wholly below 0, and a row then passes when Andrey's does too",
+ "verdict_rule": "per cell (20 datasets, seeds 0-19, one treatment-outcome pair each): per dataset D = Andrey's error minus the authors' code's on the same data; worse when the 95% percentile-bootstrap interval of the mean D lies wholly above 0 (10,000 resamples of the datasets, default_rng(0)), better when wholly below, a tie otherwise. A cell worse on seeds 0-19 on a measure was rerun on seeds 20-39 and is worse only when the fresh seeds agree. The floor: per dataset, the error minus the empty adjustment set's (for LOAD's set, the set's missing plus extra members against the empty set's, an answer with no set counting as the empty set); it applies where the authors' code's interval lies wholly below 0, and a row then passes when Andrey's does too",
  "error_metric": "LDECC: family_error, 1 when the parent sets returned are not the family of the treatment's parent sets the true CPDAG allows; recall_loss, 1 when the treatment's true parents are not among them; hausdorff_mse, the squared Hausdorff distance of the effects estimated with the sets from the population effects of the family, in standard deviations; effect_error, the mean absolute error of the estimated effects on a fresh sample. LOAD: set_f1_loss, 1 minus the F1 of the returned set against the optimal adjustment set for the pair asked (no set counts F1 0); effect_error as for LDECC",
  "fit_protocol": "each fit in a fresh process on one core with one BLAS thread, no warm-up, a cap of 1,800 s per fit, past which a fit is a timeout and never scored; no fit failed or timed out. Fisher's z at the authors' levels: LDECC 0.01 x 32,000 / rows (its notebooks), LOAD 0.01; both arms uncapped in tests (LDECC's paper capped its runs at 7,000 tests)",
  "seeds_note": "every cell holds 20 datasets, seeds 0-19, and 20 fresh datasets, seeds 20-39",
@@ -838,11 +838,11 @@
        ]
       },
       "reference_minus_empty": {
-       "paired": 19,
-       "mean": -2.2632,
+       "paired": 20,
+       "mean": -2.15,
        "bootstrap_95": [
-        -2.9474,
-        -1.6316
+        -2.85,
+        -1.5
        ]
       }
      },
@@ -1020,19 +1020,19 @@
       "applies": true,
       "pass": true,
       "andrey_minus_empty": {
-       "paired": 18,
-       "mean": -5.5556,
+       "paired": 20,
+       "mean": -5.0,
        "bootstrap_95": [
-        -6.8333,
-        -4.1111
+        -6.4,
+        -3.5
        ]
       },
       "reference_minus_empty": {
-       "paired": 19,
-       "mean": -6.5789,
+       "paired": 20,
+       "mean": -6.25,
        "bootstrap_95": [
-        -7.4211,
-        -5.7895
+        -7.2,
+        -5.2
        ]
       }
      },
@@ -2944,19 +2944,19 @@
       "applies": true,
       "pass": true,
       "andrey_minus_empty": {
-       "paired": 18,
-       "mean": -2.1667,
+       "paired": 20,
+       "mean": -1.925,
        "bootstrap_95": [
-        -2.9444,
-        -1.4444
+        -2.7,
+        -1.25
        ]
       },
       "reference_minus_empty": {
-       "paired": 18,
-       "mean": -2.1667,
+       "paired": 20,
+       "mean": -1.95,
        "bootstrap_95": [
-        -2.9444,
-        -1.4444
+        -2.7,
+        -1.3
        ]
       }
      },
