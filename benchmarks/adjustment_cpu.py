@@ -35,6 +35,7 @@ import json
 import socket
 import statistics
 import time
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -480,12 +481,28 @@ def valid_set_loss(fit: dict) -> float | None:
     a set that is not valid in the true DAG (hidden variables included), else 0.
 
     An abstention is an error, so a comparison of two solutions pairs every dataset both finished.
-    ``None`` is a fit that did not finish; it has no answer to score.
+    ``None`` is a fit that did not finish and one that asks for another estimand than the total
+    effect, whose sets the scorer does not check for validity.
     """
-    if fit["status"] != "ok":
+    if fit["status"] != "ok" or fit["estimand"] != "total":
         return None
     sets = asked_sets(fit)
     return float(not sets or not all(s["valid"] for s in sets))
+
+
+def member_errors(fit: dict, optimal: Iterable[int]) -> float | None:
+    """The missing plus extra members of a fit's sets for the pair asked, against ``optimal``, the
+    pair's optimal adjustment set in the true DAG: the mean over the returned sets.
+
+    A fit that returns no set counts as the empty set, whose errors are the size of ``optimal``, so
+    comparing a fit with the empty set pairs every dataset. ``None`` is a fit that did not finish.
+    """
+    if fit["status"] != "ok":
+        return None
+    record = asked_record(fit)
+    truth = set(optimal)
+    sets = record["adjustment_sets"] if record else []
+    return statistics.mean([len(truth ^ set(s)) for s in sets] or [len(truth)])
 
 
 def summarize(records: list[dict]) -> list[dict[str, Any]]:
@@ -497,7 +514,7 @@ def summarize(records: list[dict]) -> list[dict[str, Any]]:
     returned sets that satisfy the adjustment criterion and ``f1`` the mean F1 of a returned set
     against the optimal set (total effects, no hidden variables), over the sets of the record for
     the pair asked (:func:`asked_sets`); ``valid_set_loss`` is the mean of :func:`valid_set_loss`
-    over the finished fits, so an abstention counts as an error.
+    over the finished total-effect fits, so an abstention counts as an error.
     ``error`` is the mean effect error of the record for the pair asked (:func:`asked_error`) over
     the fits that have one, and ``empty`` the unadjusted regression's on the same fits; ``paired``
     is their paired comparison (:func:`andrey_bench.pairing.compare`, ``better`` when the
@@ -538,7 +555,9 @@ def summarize(records: list[dict]) -> list[dict[str, Any]]:
                         k: sum(a[k] for a in adjustment) for k in ("correct", "wrong", "incomplete")
                     },
                     "valid": _mean([float(s["valid"]) for s in sets]),
-                    "valid_set_loss": _mean([valid_set_loss(r) for r in ok]),
+                    "valid_set_loss": _mean(
+                        [v for r in ok if (v := valid_set_loss(r)) is not None]
+                    ),
                     "f1": _mean([s.get("f1", float("nan")) for s in sets]),
                     "error": _mean(list(errors.values())),
                     "empty": _mean([e for _, e in paired]),

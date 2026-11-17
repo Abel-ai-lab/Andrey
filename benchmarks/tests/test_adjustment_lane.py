@@ -863,6 +863,7 @@ def _stored_fit(solution, answer, errors, *, seed=0, treatment=3, outcome=7):
         "pair": 0,
         "treatment": treatment,
         "outcome": outcome,
+        "estimand": "total",
         "solution": solution,
         "status": "ok",
         "wall_s": 0.1,
@@ -967,6 +968,33 @@ def test_an_abstention_is_an_error_of_one_in_the_valid_set_loss_and_pairs_with_t
 def test_a_fit_that_did_not_finish_has_no_valid_set_loss():
     assert adjustment_cpu.valid_set_loss(_scored_fit(0, True, status="timeout")) is None
     assert adjustment_cpu.valid_set_loss(_scored_fit(0, None, status="timeout")) is None
+
+
+def test_a_direct_effect_fit_has_no_valid_set_loss():
+    """The scorer checks the validity of total-effect sets only, so a direct fit is not a failure."""
+    fit = {**_scored_fit(0, None), "estimand": "direct"}
+    assert adjustment_cpu.valid_set_loss(fit) is None
+    (row,) = adjustment_cpu.summarize([fit])
+    assert np.isnan(row["valid_set_loss"])
+
+
+def test_a_fit_with_no_set_has_the_empty_sets_member_errors_and_pairs_with_the_empty_set():
+    from andrey_bench import pairing
+
+    optimal = {1, 2, 3}
+    wrong = _stored_fit("stand-in.both", [_answer(3, 7, sets=[[1, 2, 4]])], {(3, 7): None})
+    none = _stored_fit("stand-in.both", [_answer(3, 7)], {(3, 7): None})
+    two = _stored_fit("stand-in.both", [_answer(3, 7, sets=[[1, 2, 3], [1]])], {(3, 7): None})
+    assert adjustment_cpu.member_errors(wrong, optimal) == 2  # 3 missing, 4 extra
+    assert adjustment_cpu.member_errors(none, optimal) == len(optimal)  # the empty set's
+    assert adjustment_cpu.member_errors(two, optimal) == 1  # the mean over the sets
+    assert adjustment_cpu.member_errors({**wrong, "status": "timeout"}, optimal) is None
+    # Over 20 datasets the fit with no set on one of them still pairs it, as no better than the empty set.
+    mine = [adjustment_cpu.member_errors(f, optimal) for f in [wrong] * 19 + [none]]
+    empty = [len(optimal)] * 20
+    c = pairing.compare(mine, empty)
+    assert c["paired"] == 20 and None not in mine
+    assert [m - e for m, e in zip(mine, empty)][-1] == 0
 
 
 def test_a_fit_whose_asked_record_abstains_has_no_error_and_is_not_answered():
