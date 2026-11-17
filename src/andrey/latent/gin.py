@@ -23,7 +23,8 @@ columns, so ``omega`` comes from the correlation block and does not depend on th
 (:func:`_surrogate`).
 
 The search runs on the columns sorted by :func:`~andrey.core.ties.tie_ranks`, a rank computed from
-the data, so every column order of the same data gives the same clusters and order.
+the data, so every column order of the same data gives the same clusters and order, and lists the
+unordered clusters, which number their latents, by their lowest-ranked column.
 
 Each column's HSIC kernel matrix is built once per fit and reused by every test, so a fit holds one
 ``n x n`` matrix per column for ``n`` rows.
@@ -54,7 +55,8 @@ class GINResult:
     ``clusters`` groups the observed-variable indices by shared latent parent, in disjoint groups
     that can leave variables out, listed by smallest member. ``causal_order`` lists the clusters
     whose latents were ordered, from the earliest latent to the latest, and ``unordered`` the rest,
-    by smallest member: every latent in ``causal_order`` comes before every unordered one.
+    by their lowest-ranked column (:func:`~andrey.core.ties.tie_ranks`): every latent in
+    ``causal_order`` comes before every unordered one.
     """
 
     clusters: list[list[int]]
@@ -213,7 +215,8 @@ def _order_clusters(
     """Order clusters from the earliest latent by peeling roots; return ``(ordered, unordered)``.
 
     The peeling stops at the first step where no candidate passes, and the clusters left then are
-    returned unordered, sorted by smallest member.
+    returned unordered, sorted by smallest member: :func:`gin` passes the columns sorted by
+    :func:`~andrey.core.ties.tie_ranks`, so that member is the cluster's lowest-ranked column.
     """
     pending = [list(cluster) for cluster in clusters]
     ordered: list[list[int]] = []
@@ -233,12 +236,13 @@ def gin(data: np.ndarray, *, alpha: float = 0.05) -> GINResult:
     then the root at each ordering step. Returns a :class:`GINResult` whose ``clusters`` group
     observed variables by latent parent, disjointly, whose ``causal_order`` lists the ordered
     clusters from the earliest latent, and whose ``unordered`` lists the clusters left when no root
-    passed.
+    passed, by their lowest-ranked column.
 
     The search runs on the columns sorted by :func:`~andrey.core.ties.tie_ranks`, so it orders its
-    groups and members, and breaks its ties, by each column's data rather than its position. The
-    sorted data are the same bytes for every column order, so reordering the columns of ``data``
-    relabels the result and changes nothing else, unless two columns are identical. The columns are
+    groups and members, breaks its ties, and lists the unordered clusters by each column's data
+    rather than its position. The sorted data are the same bytes for every column order, so
+    reordering the columns of ``data`` relabels the result and changes nothing else, unless two
+    columns are identical. The columns are
     centered, and the surrogates are built from standardized columns (:func:`_surrogate`).
     """
     data = np.asarray(data, dtype=np.float64)
@@ -257,7 +261,7 @@ def gin(data: np.ndarray, *, alpha: float = 0.05) -> GINResult:
     return GINResult(
         clusters=sorted(columns(clusters), key=min),
         causal_order=columns(ordered),
-        unordered=sorted(columns(unordered), key=min),
+        unordered=columns(unordered),
     )
 
 
