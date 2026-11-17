@@ -219,14 +219,15 @@ class Result:
     """One run of :func:`local_optimal_adjustment`.
 
     ``answers`` holds one :class:`Answer` per ordered pair.
-    ``marks`` holds the edges at the two variables as their own runs grew them, over every column.
+    ``edges`` holds the edges at the two variables as their own runs grew them, each as ``(i, j,
+    mark at i, mark at j)`` with ``i < j``, by ascending ``(i, j)``.
     ``learned`` lists the variables whose blanket the search learned, in order, Step 4's included
     (over its columns, named by position in the data). ``possible_descendants`` holds Step 3's
     answer, ``None`` when the search stopped before it.
     """
 
     answers: list[Answer]
-    marks: np.ndarray
+    edges: list[tuple[int, int, int, int]]
     learned: list[int]
     possible_descendants: list[int] | None
 
@@ -249,6 +250,27 @@ def _union(first: np.ndarray, second: np.ndarray) -> np.ndarray:
     return undirect_conflicts(marks)
 
 
+def _union_edges(
+    first: Network, x: int, second: Network, y: int
+) -> list[tuple[int, int, int, int]]:
+    """The edges at ``x`` in ``first`` and at ``y`` in ``second``, united (:func:`_union`) over the
+    variables they touch, as :attr:`Result.edges` lists them."""
+    nodes = sorted({x, y, *first.neighbors(x), *second.neighbors(y)})
+    place = {v: i for i, v in enumerate(nodes)}
+
+    def star(network: Network, target: int) -> np.ndarray:
+        out = np.zeros((len(nodes), len(nodes)), dtype=np.int8)
+        for v, near, far in network.edges_at(target):
+            out[place[target], place[v]], out[place[v], place[target]] = near, far
+        return out
+
+    marks = _union(star(first, x), star(second, y))
+    return [
+        (nodes[i], nodes[j], int(marks[i, j]), int(marks[j, i]))
+        for i, j in np.argwhere(np.triu(marks != NULL, 1)).tolist()
+    ]
+
+
 def local_optimal_adjustment(
     search: LocalSearch, pair: tuple[int, int], blanket: str = "gs"
 ) -> Result:
@@ -264,10 +286,10 @@ def local_optimal_adjustment(
     runs = {v: sequential(search, v, blanket, LOAD, cache) for v in (x, y)}
     learned = [v for r in runs.values() for v in r.learned]
     graph = {v: r.network for v, r in runs.items()}
-    marks = _union(graph[x].star(x, d), graph[y].star(y, d))
+    edges = _union_edges(graph[x], x, graph[y], y)
 
     def result(answers: list[Answer], possde: list[int] | None = None) -> Result:
-        return Result(answers, marks, learned, possde)
+        return Result(answers, edges, learned, possde)
 
     # Step 1: the relation of the two variables (Algorithm 1).
     if explicit_ancestor(search, x, y, graph[x]):

@@ -74,6 +74,14 @@ def _search(dag: nx.DiGraph, ranks=None, max_depth=None) -> LocalSearch:
     )
 
 
+def _dense_star(network, target, d):
+    """The marks over ``d`` variables of the edges at ``target`` alone, as a matrix."""
+    out = np.zeros((d, d), dtype=np.int8)
+    for v, near, far in network.edges_at(target):
+        out[target, v], out[v, target] = near, far
+    return out
+
+
 def _star(marks: np.ndarray, t: int) -> np.ndarray:
     out = np.zeros_like(marks)
     out[t], out[:, t] = marks[t], marks[:, t]
@@ -124,7 +132,7 @@ def test_the_cpdag_rules_give_the_true_cpdag_at_every_target(rules, seed, d):
     truth, adjacency = _cpdag(dag), nx.to_numpy_array(dag, nodelist=range(d))
     for target in range(d):
         result = sequential(_search(dag, _ranks(seed, d)), target, "iamb", rules)
-        answer = result.network.star(target, d)
+        answer = _dense_star(result.network, target, d)
         assert np.array_equal(answer, _star(truth, target)), target
         assert np.array_equal(answer, target_oracle(adjacency, target, "cpdag").to_numpy())
 
@@ -140,7 +148,7 @@ def test_the_pag_rules_give_the_true_pag_at_every_target(seed, d, hidden, mediat
     hidden_nodes = range(d, d + hidden)
     for target in range(d):
         result = sequential(_search(dag, _ranks(seed, d)), target, "iamb", MMB_R1_R2)
-        answer = result.network.star(target, d)
+        answer = _dense_star(result.network, target, d)
         assert np.array_equal(answer, _star(truth, target)), target
         oracle = target_oracle(adjacency, target, "pag", latent=hidden_nodes).to_numpy()
         assert np.array_equal(answer, oracle), target
@@ -158,7 +166,7 @@ def test_r3_stops_at_an_arrowhead_before_the_pag_decides_the_circle_unless_it_wa
     assert len(guarded.done) == 4
     full = sequential(_search(dag), 1, "iamb", MMB_R1_R2)
     for result in (guarded, full):
-        assert np.array_equal(result.network.star(1, 6), _star(_pag(dag, 6), 1))
+        assert np.array_equal(_dense_star(result.network, 1, 6), _star(_pag(dag, 6), 1))
 
 
 # ---- the papers' examples ------------------------------------------------------------------------
@@ -182,7 +190,7 @@ def test_mb_by_mb_stops_at_a_directed_edge_with_the_target_edges_undirected():
     result = sequential(_search(_dag(revised, 7)), 0, "iamb", MB_BY_MB)
     assert result.done == [0, 1, 2]
     expected = _star(_cpdag(_dag(revised, 7)), 0)
-    assert np.array_equal(result.network.star(0, 7), expected)
+    assert np.array_equal(_dense_star(result.network, 0, 7), expected)
     assert expected[0, 1] == expected[1, 0] == TAIL  # the class leaves 1 - T - 2 undirected
 
 
@@ -218,7 +226,7 @@ def test_mb_by_mb_puts_no_edge_between_a_pair_a_test_separated():
 
     result = run(MB_BY_MB)
     assert result.cache.blankets[1] == [2] and result.cache.sepsets[0, 1] == (2,)
-    assert not result.network.star(0, 3).any()
+    assert not _dense_star(result.network, 0, 3).any()
     kept = run(replace(MB_BY_MB, drop_separated=False))
     assert kept.network.mark(0, 1) == TAIL and kept.network.mark(1, 0) == TAIL
 
@@ -254,7 +262,7 @@ def test_mmb_by_mmb_walks_example_4(rules):
     assert (net.mark(_V[4], _V[5]), net.mark(_V[5], _V[4])) == (TAIL, ARROW)  # V4 -> V5
     assert (net.mark(_V[5], _V[10]), net.mark(_V[10], _V[5])) == (TAIL, ARROW)  # V5 -> V10
     assert (net.mark(_V[5], _V[8]), net.mark(_V[8], _V[5])) == (ARROW, ARROW)  # V5 <-> V8
-    assert np.array_equal(net.star(_V[5], 10), _star(_pag(dag, 10), _V[5]))
+    assert np.array_equal(_dense_star(net, _V[5], 10), _star(_pag(dag, 10), _V[5]))
 
 
 # ---- the steps alone -----------------------------------------------------------------------------
@@ -337,7 +345,9 @@ def test_the_smaller_blanket_keeps_the_answer_of_the_node_blanket_at_every_targe
     truth = _pag(dag, d)
     for target in range(d):
         stars = [
-            sequential(_search(dag, _ranks(seed, d)), target, "iamb", rules).network.star(target, d)
+            _dense_star(
+                sequential(_search(dag, _ranks(seed, d)), target, "iamb", rules).network, target, d
+            )
             for rules in (MMB_BY_MMB, replace(MMB_BY_MMB, local="pc"))
         ]
         assert np.array_equal(*stars), target
@@ -376,7 +386,7 @@ def test_the_collider_check_drops_a_v_structure_the_smaller_blanket_brings_in():
     assert (1, 7, 2) in local.colliders
     truth = _pag(dag, 11)
     result = sequential(_search(dag), 1, "iamb", MMB_BY_MMB)
-    assert np.array_equal(result.network.star(1, 11), _star(truth, 1))
+    assert np.array_equal(_dense_star(result.network, 1, 11), _star(truth, 1))
 
 
 def test_the_smaller_blanket_falls_back_to_the_node_blanket():
@@ -530,7 +540,9 @@ def test_a_cache_carried_across_targets_changes_no_answer_and_learns_each_blanke
     for target in range(d):
         shared = sequential(search, target, "iamb", rules, cache)
         fresh = sequential(_search(dag, list(range(d))), target, "iamb", rules)
-        assert np.array_equal(shared.network.star(target, d), fresh.network.star(target, d))
+        assert np.array_equal(
+            _dense_star(shared.network, target, d), _dense_star(fresh.network, target, d)
+        )
         assert shared.cache is cache and set(shared.learned) <= set(fresh.done)
         learned += shared.learned
     assert len(learned) == len(set(learned)) == len(cache.blankets)
@@ -551,7 +563,7 @@ def test_the_counts_are_the_tests_computed_and_the_blankets_learned():
 
 def _answer(x: np.ndarray, target: int, rules: Rules) -> np.ndarray:
     search = local_search(x, alpha=0.05, indep_test="fisherz")
-    return sequential(search, target, "iamb", rules).network.star(target, x.shape[1])
+    return _dense_star(sequential(search, target, "iamb", rules).network, target, x.shape[1])
 
 
 @pytest.mark.parametrize("rules", [MB_BY_MB, LOAD, MMB_BY_MMB], ids=["mb_by_mb", "load", "mmb"])

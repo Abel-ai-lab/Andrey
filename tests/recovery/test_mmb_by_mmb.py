@@ -64,7 +64,9 @@ def test_every_target_of_61_graphs_under_exact_tests():
         hidden = range(d, dag.number_of_nodes())
         for t in range(d):
             search = LocalSearch(DSepOracle(dag), list(range(d)), 0.05)
-            answer = sequential(search, t, "iamb", MMB_BY_MMB).network.star(t, d)
+            answer = np.zeros((d, d), dtype=np.int8)
+            for v, near, far in sequential(search, t, "iamb", MMB_BY_MMB).network.edges_at(t):
+                answer[t, v], answer[v, t] = near, far
             truth = target_oracle(adjacency, t, "pag", latent=hidden).to_numpy()
             targets += 1
             if np.array_equal(answer, truth):

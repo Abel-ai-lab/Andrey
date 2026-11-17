@@ -273,18 +273,11 @@ class Network:
             return []
         return [self.nodes[j] for j in np.flatnonzero(self.marks[i]).tolist()]
 
-    def dense(self, d: int) -> np.ndarray:
-        """The marks over all ``d`` variables."""
-        out = np.zeros((d, d), dtype=np.int8)
-        out[np.ix_(self.nodes, self.nodes)] = self.marks
-        return out
-
-    def star(self, target: int, d: int) -> np.ndarray:
-        """The marks over all ``d`` variables of the edges at ``target`` alone."""
-        out = np.zeros((d, d), dtype=np.int8)
-        for v in self.neighbors(target):
-            out[target, v], out[v, target] = self.mark(target, v), self.mark(v, target)
-        return out
+    def edges_at(self, target: int) -> list[tuple[int, int, int]]:
+        """The edges at ``target`` as ``(v, mark at target, mark at v)``, by ascending ``v``."""
+        return [
+            (v, self.mark(target, v), self.mark(v, target)) for v in sorted(self.neighbors(target))
+        ]
 
     def local(self, nodes: Sequence[int]) -> LocalGraph:
         """The substructure over ``nodes``: its pairs, and as colliders the unshielded triples whose

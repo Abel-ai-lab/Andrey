@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 import numpy as np
 
 from andrey.api._boundary import warn_past_boundary
-from andrey.core import ARROW, NULL, TAIL, GraphStructure, Structure, StructureOutput
+from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, Structure, StructureOutput
 from andrey.core.ci import (
     DISCRETE_INDEP_TESTS,
     MIXED_INDEP_TESTS,
@@ -31,12 +31,14 @@ from andrey.core.score import (
 )
 from andrey.core.structure import EDGE_TYPES, column_labels, relabel
 from andrey.core.warning_policy import DataTypeWarning, warn_once
+from andrey.data.graphs import csr_from_endpoints
 
 if TYPE_CHECKING:
     import numpy.typing as npt
 
     from andrey.core.knowledge import Constraints, Knowledge
     from andrey.core.output import JSONValue
+    from andrey.core.structure import Kind
 
 
 #: The methods that accept missing values, by deleting rows per test, named by the refusal of
@@ -1027,6 +1029,39 @@ def flag(value: object, name: str) -> bool:
     if not isinstance(value, (bool, np.bool_)):
         raise TypeError(f"{name} must be True or False, got {type(value).__name__}")
     return bool(value)
+
+
+def edge_structure(
+    d: int, edges: Iterable[tuple[int, int, int, int]], *, kind: Kind
+) -> GraphStructure:
+    """Build a ``kind`` structure over ``d`` nodes from the endpoint marks of its edges.
+
+    Each edge is ``(i, j, mark_i, mark_j)``: the mark at ``i`` and at ``j`` on the edge ``i - j``,
+    ``TAIL`` or ``ARROW``, or ``CIRCLE`` for a ``"pag"``. The structure is the one
+    :func:`~andrey.core.orient.to_structure` makes of the matrix these edges fill, built from the
+    edges alone, so a graph with few edges never takes a ``(d, d)`` matrix.
+
+    Raises
+    ------
+    ValueError
+        If an edge is a self-loop or repeats a pair, or a mark is not one of the kind's.
+    IndexError
+        If an edge names a node outside ``range(d)``.
+    """
+    listed = np.asarray(list(edges), dtype=np.int64).reshape(-1, 4)
+    i, j, at_i, at_j = listed.T
+    marks = (TAIL, ARROW, CIRCLE) if kind == "pag" else (TAIL, ARROW)
+    if ((listed[:, :2] < 0) | (listed[:, :2] >= d)).any():
+        raise IndexError(f"an edge names a node outside range({d})")
+    if (i == j).any():
+        raise ValueError("adjacency must have a zero diagonal (no self-loops)")
+    if not (np.isin(at_i, marks).all() and np.isin(at_j, marks).all()):
+        raise ValueError(f"marks of a {kind!r} edge must be in {marks}")
+    if len(np.unique(np.minimum(i, j) * d + np.maximum(i, j))) < len(listed):
+        raise ValueError("an edge repeats a pair")
+    return csr_from_endpoints(
+        np.concatenate((i, j)), np.concatenate((j, i)), np.concatenate((at_i, at_j)), d, kind=kind
+    )
 
 
 def dag_from_adjacency(adjacency: npt.ArrayLike) -> GraphStructure:

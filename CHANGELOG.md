@@ -413,6 +413,13 @@ names its pull request.
   other matrix caches do), so `pc`, `fci`, and `cdnod` are 1.02 to 1.4 times faster on 8 to 20
   variables at 200 to 1,000 rows, most at few rows and many variables. Every graph, p-value, and
   `metadata["n_tests"]` is the same bit for bit. ([#1072], [#1073])
+- The set learners, `mb_by_mb`, `mmb_by_mmb`, `cmb`, `local_optimal_adjustment`, `ldp`, `ld3`, and
+  `ldecc` build their answer from the edges the search found, where they filled a `d x d` array of
+  marks first, and the lazy correlation rows grow in place. At 16,000 variables and 2,000 rows,
+  `local_optimal_adjustment` takes 0.76 GB instead of 1.9 GB (16 s instead of 25 s), and the step
+  that builds one target's answer 1 MB instead of 0.7 to 2.2 GB. Every graph, set, and
+  `metadata["n_tests"]` is the same bit for bit.
+  ([#1086])
 
 ### Fixed
 
@@ -3092,3 +3099,4 @@ First alpha release.
 [#1073]: https://github.com/Abel-ai-lab/Andrey/pull/1073
 [#1070]: https://github.com/Abel-ai-lab/Andrey/pull/1070
 [#1081]: https://github.com/Abel-ai-lab/Andrey/pull/1081
+[#1086]: https://github.com/Abel-ai-lab/Andrey/pull/1086

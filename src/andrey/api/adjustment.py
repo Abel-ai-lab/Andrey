@@ -14,12 +14,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import numpy as np
-
 from andrey.api._adapt import (
     categorical_metadata,
     check_total_conditioning_rows,
     copies_named,
+    edge_structure,
     fit_inputs,
     label_of,
     structure_output,
@@ -268,7 +267,6 @@ def ldp(
     >>> out.metadata["effects"][0]["adjustment_sets"]
     [['c']]
     """
-    from andrey.api._adapt import dag_from_adjacency
     from andrey.core.effects import effect_record
 
     assert indep_test is not None  # method_spec picks it from the column types
@@ -284,9 +282,8 @@ def ldp(
         set_kind="valid" if result.valid else None,
         name=name,
     )
-    adjacency = np.zeros((d, d), dtype=np.int8)
     return structure_output(
-        dag_from_adjacency(adjacency), labels=labels, metadata={"effects": [record], **metadata}
+        edge_structure(d, [], kind="dag"), labels=labels, metadata={"effects": [record], **metadata}
     )
 
 
@@ -477,7 +474,7 @@ def ld3(
     >>> record["nonzero"], record["adjustment_sets"]
     (False, [['c', 'p', 'm']])
     """
-    from andrey.api._adapt import dag_from_adjacency
+    from andrey.core import ARROW, TAIL
     from andrey.core.effects import effect_record
 
     assert indep_test is not None  # method_spec picks it from the column types
@@ -493,12 +490,12 @@ def ld3(
         set_kind="parents_of_outcome",
         name=name,
     )
-    adjacency = np.zeros((d, d), dtype=np.int8)
-    adjacency[result.parents, y] = 1
-    if result.direct:
-        adjacency[x, y] = 1
+    causes = {*result.parents, *([x] if result.direct else [])}
+    edges = [(v, y, TAIL, ARROW) for v in sorted(causes)]
     return structure_output(
-        dag_from_adjacency(adjacency), labels=labels, metadata={"effects": [record], **metadata}
+        edge_structure(d, edges, kind="dag"),
+        labels=labels,
+        metadata={"effects": [record], **metadata},
     )
 
 
@@ -772,7 +769,6 @@ def ldecc(
     from andrey.constraint.ldecc import ldecc as engine
     from andrey.core import ARROW, TAIL
     from andrey.core.ci import counting_tests
-    from andrey.core.orient import to_structure
 
     assert indep_test is not None  # method_spec picks it from the column types
     X, mask, labels, _ = fit_inputs(
@@ -794,18 +790,19 @@ def ldecc(
         with search.pinned():
             result = engine(search, x, blanket=blanket, check=check)
     name = label_of(labels)
-    star = np.zeros((d, d), dtype=np.int8)
-    for v in result.neighbors:
-        near = ARROW if v in result.parents else TAIL
-        far = ARROW if v in result.children else TAIL
-        star[x, v], star[v, x] = near, far
+    edges = [
+        (x, v, ARROW if v in result.parents else TAIL, ARROW if v in result.children else TAIL)
+        for v in result.neighbors
+    ]
     metadata = {
         "effects": [_ldecc_record(result, x, y, name)],
         **categorical_metadata(mask, data),
         **rows_metadata(rows),
         "n_tests": tests.n,
     }
-    return structure_output(to_structure(star, kind="cpdag"), labels=labels, metadata=metadata)
+    return structure_output(
+        edge_structure(d, edges, kind="cpdag"), labels=labels, metadata=metadata
+    )
 
 
 @method_spec("local_optimal_adjustment")
@@ -1045,7 +1042,6 @@ def local_optimal_adjustment(
     from andrey.core.ci import counting_tests
     from andrey.core.effects import effect_record
     from andrey.core.knowledge import as_node, column_position
-    from andrey.core.orient import to_structure
 
     assert indep_test is not None  # method_spec picks it from the column types
     method = "local_optimal_adjustment"
@@ -1090,7 +1086,7 @@ def local_optimal_adjustment(
         "n_tests": tests.n,
     }
     return structure_output(
-        to_structure(result.marks, kind="cpdag"), labels=labels, metadata=metadata
+        edge_structure(d, result.edges, kind="cpdag"), labels=labels, metadata=metadata
     )
 
 
