@@ -379,78 +379,32 @@ def pc(
     variables. The median fit at 40 variables took 0.38 s with ``"degen_gauss"``, 0.42 s with
     ``"cond_gauss"``, and 0.18 s with either categorical test, on 4 cores.
     ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet; their tests run
-    them on up to 8 variables. With missing values, measured on simulated linear-Gaussian data on
-    one core with a cap of 30 minutes per fit, at ``alpha=0.01`` unless another level is named. In
-    the setting of Tu et al. [13]_ (random DAGs with 20 variables, 10 of them with missing values,
-    or with 50 and 16; 100 to 10,000 rows; one parent per indicator, always observed or with missing
-    values itself), the mean errors of ``missing="mvpc"`` stayed below the empty graph's in all 32
-    settings. They were below those of ``"testwise"`` in 10 of the 16 settings with such a mask and
-    tied in 6, and tied in the 16 controls with as many values missing completely at random: at 50
-    variables and 10,000 rows, 5.1 against 14.3 with observed parents and 7.4 against 14.9 with
-    parents that have missing values, in a median of 2.5 s. At 100 rows, 7 of 1,600 fits raised
-    because a test had fewer rows than it needs, as with ``"testwise"``. On Erdos-Renyi graphs of 10
-    to 100 variables (mean degree 2 or 4; 500, 2,000, or 10,000 rows; 10 to 30% of the values
-    missing), with one observed parent per indicator, ``"mvpc"`` had fewer errors than
-    ``"testwise"`` in 14 of 72 settings, and in 28 at ``alpha=0.05``, and more in none. The
-    correction does not help where there is nothing to correct or where an indicator has many weak
-    parents. With values missing completely at random it tied in 136 of 144 settings over both
-    levels, and no setting where it was behind repeated on fresh seeds. Under a logistic mask that
-    gives an indicator many weak parents, up to 30 at 100 variables, it tied in 125 of the 141
-    settings judged and was behind ``"testwise"`` in 12, in 3 of them on fresh seeds too, all with
-    100 variables and 30% missing: at mean degree 2 and 10,000 rows by 3.1 errors on the 11 of 20
-    datasets that finished, both times, and at mean degree 4 with 2,000 and 10,000 rows by 1.8 and
-    2.65 errors and then by 3.5. With one parent per indicator that has missing values itself, it
-    had fewer errors in 12 of 144 settings and more in 24, in 9 of them on fresh seeds too (3 at
-    ``alpha=0.01`` and 6 at ``alpha=0.05``): all 9 with 50 or 100 variables and 20 or 30% missing,
-    by 0.55 to 2.3 errors on the first seeds and 0.7 to 3.55 on the fresh ones, in settings where
-    ``"testwise"`` made 11 to 128; in the 12 settings that repeated, over both masks, ``"testwise"``
-    is the better choice. Traced under the quantile mask at 50 variables (mean degree 2, 30%
-    missing, 500 rows at ``alpha=0.05`` and 2,000 at 0.01) and at 100 (mean degree 4, 20% missing,
-    2,000 rows, ``alpha=0.05``), the loss is edges the correction removes, not orientation: 21 of
-    its 24 and 21 of its 25 changes at 50 variables, and 90 of its 121 at 100, removed a true edge.
-    One cause is the rows: when the parents of the indicators have missing values themselves, ``W``,
-    the indicator parents a corrected test reads, closed under the parents of their own indicators,
-    held a median of 7 to 8 columns at 50 variables, and there a corrected test read a median of 13%
-    and 19% of the rows the test-wise test read; a true edge it removed was tested on a median of 22
-    and 41 rows where the test-wise test read about 245 and 965. The other is Step 3, which re-tests
-    a pair that shares an indicator and no adjacent variable, and falsely detected indicator parents
-    make such pairs: 44 of 79 and 13 of 57 re-tested pairs at 50 variables, all true edges, of which
-    the correction removed 16 and 8 (at 100 variables, 99 of 331, 94 of them true edges, of which
-    the correction removed 28); the code published with the paper corrects a pair only when it
-    shares an adjacent variable, so it corrects fewer pairs, and it still removes true edges (12 and
-    16 at 50 variables, against 21 and 21 here). Both follow the paper: its experiments with values
-    missing not at random use masks where ``W`` closes after one level, and it names the general
-    case and does not run it [13]_.
-    The correction holds when no missingness indicator causes a
-    variable, every independence in the observed rows also holds in the missing ones, no indicator
-    is a deterministic function of others, and no value causes its own missingness (self-masking)
-    [13]_; the data cannot check these, and a violation voids the correction. PermC also needs
-    linear-Gaussian variables and the paper's two conditions: (i) given ``W``, the indicators of
-    ``x``, ``y``, ``S``, and ``W`` are independent of ``x``, ``y``, and ``S``; and (ii) conditioning
-    on the indicators of ``W`` leaves the tested relation unchanged, so ``x`` and ``y`` are
-    d-separated given ``S`` exactly when they are given ``S`` and those indicators. Condition (ii)
-    fails when the indicator of a variable in ``W`` is a common effect of ``x`` and ``y``, or a
-    descendant of one, as in their Figure 1c: ``x`` and ``y`` are then dependent on the rows where
-    ``W`` is observed, the corrected test keeps the extra edge, and more rows make that more likely.
-    The density-ratio correction the paper gives for these cases is not implemented. A corrected
-    test with too few rows is answered by the test-wise test (see **Missing-Value PC.**), so its
-    pair is not corrected: of the 14,323 fits that returned on the Erdos-Renyi graphs, 962 held such
-    a test, nearly all under masks where most columns have missing values, and
-    ``metadata["corrected_edges"]["uncorrected"]`` lists the pairs. Step 2 runs one skeleton search
-    per variable with missing values, and its cost grows with the parents an indicator has: under
-    the logistic mask at mean degree 2 with 100 variables and 10,000 rows, 77 of 120 fits ran past
-    the 30 minute cap in that search, on data where the fit with ``"testwise"`` took 3.3 s (median).
-    ``max_depth`` bounds the search. With true ``required_paths`` or ``forbidden_paths`` on 5 to 30%
-    of the variable pairs of simulated linear-Gaussian data (10 to 50 variables, mean degree 2 or 4,
-    500 or 2,000 rows), its result was no farther from the true DAG than without them in any
-    setting. The claims direct edges of the graph the search found, as their rules take the class as
-    given: of the edges they directed, 5.8% with required paths and 10.9% with forbidden paths
-    pointed against the true DAG, each in a fit whose graph had an edge missing or extra or a
-    collider wrong. A required path says less than a required edge and directs less: it cannot
-    restore an edge the search left out, and on simulated data a required edge, which also states
-    that the pair is adjacent, lowered the errors more. A known edge belongs in ``required``. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    them on up to 8 variables. With ``missing="mvpc"``, the correction holds when no missingness
+    indicator causes a variable, every independence in the observed rows also holds in the missing
+    ones, no indicator is a deterministic function of others, and no value causes its own
+    missingness (self-masking) [13]_; the data cannot check these conditions. PermC also needs
+    linear-Gaussian variables, and it keeps an extra edge when the indicator of a variable it
+    conditions on is a common effect of the tested pair, as in the paper's Figure 1c; the paper's
+    density-ratio correction for that case is not implemented. In the paper's setting (20 or 50
+    variables, one parent per indicator), it had fewer errors than ``"testwise"`` in 10 of the 16
+    settings with values missing for a reason and more in none. It does not help when every
+    indicator depends weakly on many variables, and its search for those parents can then run for a
+    long time; ``max_depth`` bounds the search. With 50 or 100 variables and 20 or 30% of the values
+    missing, it had 0.7 to 3.6 more errors than ``"testwise"`` in 12 settings: the correction
+    removes true edges there, because a corrected test reads far fewer rows when the parents of the
+    indicators have missing values themselves, and because falsely detected indicator parents make
+    it test true edges again. Use ``"testwise"`` in those settings. The `0.16.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.16.0.html#what-we-measured-on-missing-data>`_ has the
+    numbers. With true ``required_paths`` or ``forbidden_paths`` on 5 to 30% of the variable pairs
+    of simulated linear-Gaussian data (10 to 50 variables, mean degree 2 or 4, 500 or 2,000 rows),
+    its result was no farther from the true DAG than without them in any setting. The claims direct
+    edges of the graph the search found, as their rules take the class as given: of the edges they
+    directed, 5.8% with required paths and 10.9% with forbidden paths pointed against the true DAG,
+    each in a fit whose graph had an edge missing or extra or a collider wrong. A required path says
+    less than a required edge and directs less: it cannot restore an edge the search left out, and
+    on simulated data a required edge, which also states that the pair is adjacent, lowered the
+    errors more. A known edge belongs in ``required``. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -872,13 +826,18 @@ def fci(
     and leaves its circles, so on graphs with many circle-circle edges it can miss an undirected
     cycle. With the mixed-data tests, it is experimental and not benchmarked yet; its tests run it
     on 5 variables with 3,000 rows. ``collider_rule="conservative"`` and ``"majority"`` are not
-    benchmarked yet; their tests run them on up to 8 variables. Missing values are not benchmarked
-    yet; the tests run them on up to 20 variables with up to a fifth of the values missing
-    completely at random. A required path says less than a required edge and directs less: it cannot
-    restore an edge the search left out, and on simulated data a required edge, which also states
-    that the pair is adjacent, lowered the errors more. A known edge belongs in ``required``. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    benchmarked yet; their tests run them on up to 8 variables. With missing values, measured with
+    ``"fisherz"`` and ``"student_t"`` on simulated linear-Gaussian data with 10 to 30% of the values
+    missing completely at random and with one pattern missing at random: its median endpoint errors
+    stayed near those on the complete data and were never significantly above those after deleting
+    every incomplete row; the
+    `0.11.0 release card <https://andrey.abel.ai/docs/benchmarks/0.11.0.html#missing-values>`_ has
+    the numbers. Values missing not at random and the other tests are not benchmarked with missing
+    values yet. A required path says less than a required edge and directs less: it cannot restore
+    an edge the search left out, and on simulated data a required edge, which also states that the
+    pair is adjacent, lowered the errors more. A known edge belongs in ``required``. The numbers are
+    a reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
