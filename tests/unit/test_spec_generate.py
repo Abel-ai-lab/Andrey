@@ -15,7 +15,7 @@ from andrey.spec import (
     render_skill,
     to_json_schema,
 )
-from andrey.spec.generate import _param_schema
+from andrey.spec.generate import _example_token, _param_schema, grammar_default
 from andrey.spec.models import ParamSpec
 
 _SPEC_NAMES = sorted(REGISTRY)
@@ -73,7 +73,11 @@ def test_method_schema_matches_spec(name):
         assert types_of(entry) == expected_types
         if p.choices:
             expected = [*p.choices, None] if p.nullable else list(p.choices)
-            assert entry["enum"] == expected
+            if p.type == "str_or_list":
+                assert entry["anyOf"][0] == {"enum": expected}
+                assert entry["items"]["enum"] == list(p.choices)
+            else:
+                assert entry["enum"] == expected
 
     assert schema["status"] == spec.status
     assert schema["data_kinds"] == list(spec.data_kinds)
@@ -136,3 +140,40 @@ def test_str_or_list_is_one_string_or_a_list_of_at_least_one(nullable):
     assert entry["default"] == default
     for value in ("a", ["a", "b"], ("a", "b")):
         assert param.check(value, "method") is value
+
+
+@pytest.mark.parametrize("nullable", [False, True])
+def test_str_or_list_choices_hold_for_one_value_and_for_each_item(nullable):
+    """With choices, one value is a choice and a list holds at least one, each a choice: the
+    check raises otherwise, and the schema says the same."""
+    param = ParamSpec(
+        name="names",
+        type="str_or_list",
+        default="a",
+        doc="",
+        choices=("a", "b"),
+        nullable=nullable,
+    )
+    for value in ("a", ["a", "b"], ("b",)):
+        assert param.check(value, "method") is value
+    for bad in ("c", ["a", "c"], []):
+        with pytest.raises(ValueError, match="names must be one of 'a', 'b', or a list of them"):
+            param.check(bad, "method")
+    for bad in (3, ["a", 3]):
+        with pytest.raises(TypeError, match="names must be one of"):
+            param.check(bad, "method")
+    entry = _param_schema(param)
+    assert "enum" not in entry  # a list is none of the choices
+    assert entry["anyOf"] == [
+        {"enum": ["a", "b", *([None] if nullable else [])]},
+        {"type": "array"},
+    ]
+    assert entry["items"] == {"type": "string", "enum": ["a", "b"]} and entry["minItems"] == 1
+
+
+def test_a_str_or_list_default_reads_back_in_the_parameter_grammar():
+    """A string default is written bare and a list default as a quoted bracket list."""
+    one = ParamSpec(name="names", type="str_or_list", default="a", doc="")
+    several = ParamSpec(name="names", type="str_or_list", default=("a", "b"), doc="")
+    assert (grammar_default(one), _example_token(one)) == ("a", "names=a")
+    assert (grammar_default(several), _example_token(several)) == ("[a,b]", "'names=[a,b]'")

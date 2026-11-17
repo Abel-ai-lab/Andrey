@@ -336,9 +336,11 @@ def test_a_str_or_list_value_is_one_string_or_a_bracket_list():
     assert _validate_config_value("a", param) == "a"
     assert _validate_config_value(["a", "b"], param) == ("a", "b")
     assert _validate_config_value(None, param) is None
-    for bad in (3, ["a", 3]):
+    for bad in (3, ["a", 3], []):
         with pytest.raises(CliError, match="names in --config is not a valid str_or_list"):
             _validate_config_value(bad, param)
+    with pytest.raises(CliError, match=r"names expects one value or a list like \[a,b\]"):
+        _coerce("[]", param)
 
 
 def test_coerce_quoted_is_literal_string():
