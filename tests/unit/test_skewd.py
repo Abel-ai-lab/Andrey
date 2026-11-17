@@ -223,6 +223,17 @@ def test_skewd_mv_reads_columns_whose_moments_overflow():
     )
 
 
+def test_skewd_mv_breaks_ties_without_overflowing_on_two_huge_columns():
+    # The tie ranks standardize the raw columns they compare: values near 1e308 overflow the sums.
+    data = pd.DataFrame(_chain(), columns=["x", "y", "z"])[["x", "y"]]
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        huge = skewd_mv((data + 4.0) * 1e307, **SHORT_GRAPH)
+    assert (
+        huge.structure.oriented_edges() == skewd_mv(data, **SHORT_GRAPH).structure.oriented_edges()
+    )
+
+
 def _orient(base: np.ndarray, *edges: tuple[int, int]) -> np.ndarray:
     dag = base.copy()
     for i, j in edges:

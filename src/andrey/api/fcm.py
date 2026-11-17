@@ -1585,9 +1585,9 @@ def skewd_mv(
 
     X = data_matrix(data, method="skewd_mv", min_rows=MIN_ROWS)
     labels = column_labels(data)
+    X = X / np.abs(X).max(axis=0)  # divide first, so tiny or huge units cannot overflow the moments
     order = np.argsort(tie_ranks(X), kind="stable")
     X = X[:, order]
-    X = X / np.abs(X).max(axis=0)  # divide first, so tiny or huge units cannot overflow the moments
     X = (X - X.mean(axis=0)) / X.std(axis=0)
     assert seed is not None  # method_spec resolves it
     skeleton = pc(X, alpha=alpha, indep_test=indep_test, seed=seed).structure
