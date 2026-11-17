@@ -68,6 +68,8 @@ _JSON_TYPES: dict[str, dict] = {
     "bool": {"type": "boolean"},
     "int_pair": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2},
     "str_list": {"type": "array", "items": {"type": "string"}},
+    # One string, or a list of at least one.
+    "str_or_list": {"type": ["string", "array"], "items": {"type": "string"}, "minItems": 1},
     "knowledge": {
         "type": "object",
         "properties": {
@@ -113,8 +115,9 @@ def _param_schema(p: ParamSpec) -> dict:
     schema = dict(_JSON_TYPES[p.type])
     if p.choices:  # a nullable choice param must admit null as a valid enum member (its default)
         schema["enum"] = [*p.choices, None] if p.nullable else list(p.choices)
-    if p.nullable and isinstance(schema.get("type"), str):
-        schema["type"] = [schema["type"], "null"]
+    if p.nullable:
+        kinds = schema["type"]
+        schema["type"] = [*([kinds] if isinstance(kinds, str) else kinds), "null"]
     schema["default"] = list(p.default) if isinstance(p.default, tuple) else p.default
     number = schema  # JSON Schema applies a bound to a number only, so a pair's go on its items
     if p.type == "int_pair":

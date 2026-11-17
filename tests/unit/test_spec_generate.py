@@ -15,6 +15,8 @@ from andrey.spec import (
     render_skill,
     to_json_schema,
 )
+from andrey.spec.generate import _param_schema
+from andrey.spec.models import ParamSpec
 
 _SPEC_NAMES = sorted(REGISTRY)
 
@@ -26,6 +28,7 @@ JSON_TYPE = {
     "bool": "boolean",
     "int_pair": "array",
     "str_list": "array",
+    "str_or_list": "string|array",
     "knowledge": "object",
     "targets": "object",
 }
@@ -66,7 +69,8 @@ def test_method_schema_matches_spec(name):
     for p in spec.params:
         entry = props[p.name]
         assert entry["default"] == json.loads(json.dumps(p.default)) and "description" in entry
-        assert types_of(entry) == {JSON_TYPE[p.type], *(["null"] if p.nullable else [])}
+        expected_types = {*JSON_TYPE[p.type].split("|"), *(["null"] if p.nullable else [])}
+        assert types_of(entry) == expected_types
         if p.choices:
             expected = [*p.choices, None] if p.nullable else list(p.choices)
             assert entry["enum"] == expected
@@ -118,3 +122,17 @@ def test_skill_is_an_installable_skill_that_explains_every_edge_type():
     assert set(EDGE_MEANINGS) == set(EDGE_GLYPHS)
     for name, glyph in EDGE_GLYPHS.items():
         assert name in skill and glyph in skill
+
+
+@pytest.mark.parametrize("nullable", [False, True])
+def test_str_or_list_is_one_string_or_a_list_of_at_least_one(nullable):
+    """The schema takes a string or a list of strings, and null where the parameter is nullable;
+    the value passes its check unchanged, for the method to read."""
+    default = None if nullable else "a"
+    param = ParamSpec(name="names", type="str_or_list", default=default, doc="", nullable=nullable)
+    entry = _param_schema(param)
+    assert types_of(entry) == {"string", "array", *(["null"] if nullable else [])}
+    assert entry["items"] == {"type": "string"} and entry["minItems"] == 1
+    assert entry["default"] == default
+    for value in ("a", ["a", "b"], ("a", "b")):
+        assert param.check(value, "method") is value
