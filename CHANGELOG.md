@@ -437,6 +437,9 @@ names its pull request.
   test included, as the paper's search does. Such a pair could keep an edge, and a v-structure that
   named it could direct a neighbor's other edge. On samples of the paper's networks the answers
   change, mostly on Hailfinder, where the errors at the target fall in most settings. ([#1030])
+- `gin` numbers the latents it leaves unordered by their clusters' lowest-ranked column, as the rest
+  of its search runs, instead of by their smallest column index, so a new column order relabels the
+  graph and no longer renumbers them. Its clusters and causal order do not change. ([#1067])
 
 ## [0.17.1] - 2026-11-12
 
@@ -3047,3 +3050,4 @@ First alpha release.
 [ages-page]: https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/ages.md
 [#920]: https://github.com/Abel-ai-lab/Andrey/pull/920
 [#1059]: https://github.com/Abel-ai-lab/Andrey/pull/1059
+[#1067]: https://github.com/Abel-ai-lab/Andrey/pull/1067
