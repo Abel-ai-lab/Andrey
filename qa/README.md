@@ -43,15 +43,21 @@ uv run python -m qa.identity --compare before.json after.json
 The compare counts the rows whose graph differs and the rows where only bits differ, and lists them,
 the rows in one manifest only, and every count that changed; it exits 1 when a row differs, is in
 one manifest only, or has a count that rose. Two more options refit each draw and list every refit
-whose answer differs from the first fit, with the parts that differ, exiting 1 if there is one:
+whose answer differs from the first fit, with the parts that differ. `--workers` exits 1 on any
+difference and `--shuffle` on a difference beyond rounding:
 
 - `--shuffle K` refits on `K` seeded column orders and maps each answer back to the original
-  columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out. ICP,
-  IGSP, FCI-JCI, J-PCMCI+, MB-by-MB, CMB, MMB-by-MMB, local ISA-LiNG, LDP, LD3, LDECC, LOAD, and
-  LocPC-CDE are not refit: their data hold each row's environment in one column, the target of ICP,
-  MB-by-MB, CMB, MMB-by-MMB, and local ISA-LiNG is the last variable, LDP's, LD3's, and LocPC-CDE's
-  treatment and outcome are the first and the last, and LDECC's treatment and outcome and LOAD's two
-  variables are the last and the first, and J-PCMCI+'s contexts follow the system variables.
+  columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out. ICP's
+  target, IGSP's targets, and J-PCMCI+'s contexts move with the columns, and each row's environment
+  stays with its row. MB-by-MB, CMB, MMB-by-MMB, local ISA-LiNG, LDP, LD3, LDECC, LOAD, and
+  LocPC-CDE are not refit: the target of MB-by-MB, CMB, MMB-by-MMB, and local ISA-LiNG is the last
+  variable, LDP's, LD3's, and LocPC-CDE's treatment and outcome are the first and the last, and
+  LDECC's treatment and outcome and LOAD's two variables are the last and the first. A column
+  order fails the check when a graph, a graph's kind, or the causal order differs, or when an edge weight or metadata value differs by
+  more than rounding (a relative `1e-6`, or an absolute `1e-12` near zero); a boolean that becomes a
+  number or an integer that becomes a float differs. A difference of rounding alone, such as the
+  p-values of ICP and J-PCMCI+, which differ by about `1e-14` because their regressions sum in the
+  order of the columns, is listed as information and does not change the exit status.
 - `--workers N` refits PC, FCI, FCI-JCI, GFCI, CD-NOD, RSMAX2 (with PC's skeleton), GES, and PNL
   on `N` workers, with every GES pass, every skeleton pass of conditioning size two or more, and
   every possible-d-sep search sent to the worker pool.
@@ -328,7 +334,7 @@ test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP le
   column, jnk, and the fit finds one of them with a wrong mark, as FCI does, so it makes as many
   errors as the empty answer. The empty answer's median errors are the last column's median
   number of edges in the PAG, 1.5 on the `latent_gauss_er` cells and 2 on ASIA. Identity fits the
-  same column, so it skips the column-order refits, as it does for ICP.
+  same column, so it skips the column-order refits.
 - **Planted graphs.** LDP needs a confounder, a cause of the treatment only, and a cause of the
   outcome only, and LD3 an outcome that is a sink with every parent observed, which no other
   dataset of the gate has. Each is a linear-Gaussian model of the published graph, with standardized
