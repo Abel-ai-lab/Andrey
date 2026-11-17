@@ -420,6 +420,13 @@ names its pull request.
   that builds one target's answer 1 MB instead of 0.7 to 2.2 GB. Every graph, set, and
   `metadata["n_tests"]` is the same bit for bit.
   ([#1086])
+- A [missing values guide](https://andrey.abel.ai/docs/guides/missing-values.html) holds what the
+  getting-started guide said about missing values, with a table from the kind of data and the
+  reason its values are missing to the `missing` value and the methods that take it. A method that
+  does not accept missing values names the guide in its error. The example notebook adds values
+  missing not at random, FCI, categorical data, and a time series. The Limitations of `pc` with
+  `missing="mvpc"` and of the searches that take `missing="em"` are a few sentences and a link to
+  the release card, and those of `fci` name the 0.11.0 card that measured missing values. ([#PR])
 
 ### Fixed
 

@@ -9,8 +9,8 @@ accept ``NaN``; every other method raises a ``ValueError`` that names it.
 from __future__ import annotations
 
 import json
-import re
 import warnings
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -26,7 +26,7 @@ from andrey.core.ci import (
     make_indep_test,
     register_indep_test,
 )
-from andrey.core.ci_missing import EM_METHODS, rows_metadata, rows_tested
+from andrey.core.ci_missing import EM_METHODS, MISSING_GUIDE, rows_metadata, rows_tested
 from andrey.core.score import CopiedColumnsError
 from andrey.spec import REGISTRY
 from andrey.temporal.pcmci import design_test, lagged_design
@@ -495,6 +495,7 @@ def test_every_other_method_refuses_missing_values_naming_itself(name):
     )
     with pytest.raises(ValueError, match=pattern) as error:
         getattr(andrey, name)(*_refused_inputs(name))
+    assert MISSING_GUIDE in str(error.value)
     if name == "longitudinal_lingam":  # a panel: a unit's rows go together
         assert "drop the units that hold one from every dataset of data" in str(error.value)
     elif REGISTRY[name].family == "temporal":  # one series: a step cannot be dropped
@@ -530,16 +531,10 @@ def test_the_refusal_lists_every_supported_method_but_the_pair_tests():
     assert [*TESTWISE_METHODS, *TESTWISE_SERIES_METHODS] == tables
 
 
-def test_the_refusal_names_a_guide_page_of_the_docs():
-    from pathlib import Path
-
-    from andrey.api._adapt import MISSING_GUIDE
-
+def test_the_guide_the_refusal_names_is_a_page_of_the_docs():
     site, page = MISSING_GUIDE.split("/docs/", 1)
     source = Path(__file__).parents[2] / "docs" / "docs" / page.replace(".html", ".md")
     assert site == "https://andrey.abel.ai" and source.is_file()
-    with pytest.raises(ValueError, match=re.escape(MISSING_GUIDE)):
-        andrey.direct_lingam(_gaps(np.random.default_rng(0).uniform(size=(50, 3)), 0.1))
 
 
 @pytest.mark.parametrize("name", ["anm", "pnl", "loci"])

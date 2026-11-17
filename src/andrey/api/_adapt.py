@@ -18,7 +18,7 @@ from andrey.core.ci import (
     SingularCorrelationError,
     is_partial_correlation_test,
 )
-from andrey.core.ci_missing import EM, EM_METHODS, EM_SUPPORTED
+from andrey.core.ci_missing import EM, EM_METHODS, EM_SUPPORTED, MISSING_GUIDE
 from andrey.core.knowledge import as_node, column_position, resolve
 from andrey.core.score import (
     DISCRETE_SCORES,
@@ -88,8 +88,6 @@ FILL_STEPS = (
     f"{_listed(TESTWISE_SERIES_METHODS)}, whose tests delete rows per test"
 )
 DROP_UNITS = "drop the units that hold one from every dataset of {name}"
-#: The guide a refusal of missing values names: which handling fits which data.
-MISSING_GUIDE = "https://andrey.abel.ai/docs/guides/missing-values.html"
 
 
 def fit_by_em(method: str | None) -> str:
