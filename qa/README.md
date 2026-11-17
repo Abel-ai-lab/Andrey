@@ -500,7 +500,10 @@ A summary without `parity_rule` (0.1.0 to 0.7.0) keeps the count rule, which fai
 
 A row where either side has no result is skipped. A released summary never changes, so a method
 re-measured against the same reference in a later summary is judged by the later rows only. Where
-a summary has one entry per regime for a method and reference, a row's key names its `regime`.
+a summary has one entry per regime for a method and reference, a row's key names its `regime`. A
+row's key also names its size and its scenario (`ROW_KEYS`: the network, the effect, the hidden
+nodes, and the like), and two failing rows of one comparison with the same key fail whatever the
+allowlist holds.
 
 A row of a reference whose result depends on the column order (`reference_order_dependent`) may
 also hold Andrey's column-order mode on the same datasets (`andrey_column_shd_by_seed`,
