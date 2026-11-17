@@ -1,0 +1,34 @@
+{
+  "algorithm": "CPCM",
+  "case": "lsnm_pair",
+  "input": {
+    "case": "lsnm_pair",
+    "column_order": [
+      0,
+      1
+    ],
+    "seed": 20261108,
+    "sha256": "b5672fabbda6e8003f9509eca7e99931b31ac74164c71415018f7b8d1f68be44",
+    "shape": [
+      500,
+      2
+    ]
+  },
+  "output": {
+    "graph": [
+      [
+        0,
+        1
+      ],
+      [
+        2,
+        0
+      ]
+    ],
+    "pval_backward": 3.5983244005944814e-05,
+    "pval_forward": 0.742508765967287,
+    "stat_backward": 4.166711137409592,
+    "stat_forward": 0.6550646489199033
+  },
+  "schema_version": 3
+}

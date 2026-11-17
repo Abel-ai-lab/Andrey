@@ -46,10 +46,14 @@ RANK = 10
 MAX_LEVELS = 9
 #: Largest number of variables the exact search enumerates (543 DAGs on 4 variables).
 EXACT_MAX = 4
-_LOG_SP_BOUNDS = (-12.0, 18.0)
+#: Half-width of the log smoothing parameters' range around their start, which follows the units.
+_LOG_SP_RANGE = 20.0
 _NEWTON_TOL = 1e-11
 _MAX_NEWTON = 100
 _FD_STEP = 1e-3
+#: L-BFGS-B stops once every projected gradient component of the LAML is below this; the
+#: central differences carry an error of about 1e-5 from the Newton tolerance.
+_LAML_GTOL = 1e-4
 
 Derivs = tuple[float, list[np.ndarray], list[list[np.ndarray]]]
 
@@ -319,8 +323,9 @@ def fit(y: np.ndarray, terms: list[_Term], family: Family) -> list[np.ndarray]:
 
     Each smooth linear predictor has an intercept and every term's columns; a constant one has the
     intercept alone. The coefficients minimize the penalized negative log-likelihood, and the log
-    smoothing parameters, bounded to ``[-12, 18]``, minimize its Laplace approximate marginal
-    likelihood (Wood, Pya, and Safken 2016) by L-BFGS-B with central-difference gradients.
+    smoothing parameters minimize its Laplace approximate marginal likelihood (Wood, Pya, and
+    Safken 2016) by L-BFGS-B with central-difference gradients, each within 20 of its start, which
+    puts its penalty on the scale of its Hessian block and so moves with the units.
     """
     n = y.size
     full = np.hstack([np.ones((n, 1)), *(t.X for t in terms)])
@@ -361,7 +366,12 @@ def fit(y: np.ndarray, terms: list[_Term], family: Family) -> list[np.ndarray]:
         return out
 
     result = optimize.minimize(
-        laml, rho, jac=grad, method="L-BFGS-B", bounds=[_LOG_SP_BOUNDS] * rho.size
+        laml,
+        rho,
+        jac=grad,
+        method="L-BFGS-B",
+        bounds=[(r - _LOG_SP_RANGE, r + _LOG_SP_RANGE) for r in rho],
+        options={"gtol": _LAML_GTOL},
     )
     return model.etas(model.newton(state["beta"], result.x))
 
@@ -441,7 +451,7 @@ class _Model:
             math.log(max(np.trace(H[cols, cols]), 1e-8) / np.trace(block))
             for cols, block, _ in self.penalties
         ]
-        return np.clip(np.array(rho), *_LOG_SP_BOUNDS)
+        return np.array(rho)
 
 
 def _solve_pd(H: np.ndarray, g: np.ndarray) -> np.ndarray:
@@ -586,7 +596,7 @@ def resolve_families(
         if bad.size:
             raise ValueError(
                 f"{method}: family {label!r} models {fam.support}, but column {name(j)} holds "
-                f"{X[bad[0], j]!r} in row {bad[0]}; choose a family whose support holds the "
+                f"{float(X[bad[0], j])!r} in row {bad[0]}; choose a family whose support holds the "
                 "column, or transform the column"
             )
         if fam.counts and not np.any(X[:, j] > 0):
