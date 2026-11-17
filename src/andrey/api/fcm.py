@@ -999,8 +999,9 @@ def das(
         allowed to be adjacent, and temporal tiers, all honored. A variable is the next leaf only
         when no remaining variable is in a later tier or is the effect of a required edge out of
         it. Forbidden edges, edges into an earlier tier, and pairs outside the allowed set are
-        never candidates; the score estimate still reads every remaining variable. A required
-        edge is a candidate that the pruning never removes.
+        never candidates, but the edge screen still ranks them and may take one as its reference;
+        the score estimate still reads every remaining variable. A required edge is a candidate
+        that the pruning never removes.
 
     Returns
     -------
@@ -1069,10 +1070,12 @@ def das(
        p-value is at most ``alpha`` [3]_.
 
     The choices the paper leaves open. It states no pruning cutoff and follows the experiments of
-    [2]_, whose cutoff ``0.001`` is the default. The five largest medians stay without a test, as
-    in the code published with the paper: the paper's screen never keeps the reference, so
-    without them a variable all of whose predecessors are parents would lose the weakest one, and
-    a chain of two variables would have no edge. The ranking follows that code, the absolute
+    [2]_, whose cutoff ``0.001`` is the default. The five largest medians stay without a test, the
+    value of the ``min_parents`` of the code published with the paper: the paper's screen never
+    keeps the reference, so without them a variable all of whose predecessors are parents would
+    lose the weakest one, and a chain of two variables would have no edge. That code counts the
+    leaf's own entry among the ranked ones, so it usually keeps four untested; here the ranking
+    holds only the predecessors, and five stay. The ranking follows that code, the absolute
     median of the entries, where the paper states the mean of their absolute values. That code
     estimates the Jacobian once on all the variables; DAS here reads each leaf's row at the step
     that removes it, as the paper's Algorithm 1 does. A test whose two samples are both constant

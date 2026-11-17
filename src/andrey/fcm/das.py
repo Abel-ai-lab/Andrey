@@ -14,7 +14,9 @@ value is positive exactly at the parents. The method runs three phases:
    The absolute median of the entry over the rows ranks the variables before ``l``; the ``K + 1``
    largest are kept, the smallest of them is the reference, and each of the others stays when a
    one-sided Welch test of equal means of the absolute entries against the reference's has a
-   p-value at most :data:`LEVEL`.
+   p-value at most :data:`LEVEL`. A variable that knowledge forbids as a parent is ranked with
+   the others but never kept; when it ranks below the reference, the lowest-ranked such variable
+   is the reference instead, since its entry is known to be zero.
 3. **Pruning.** The DAG of the screened edges is pruned by the smooth-term tests of CAM,
    :func:`andrey.fcm.pruning.prune`, at most ``K`` candidate parents per fit instead of every
    variable before it in the order.
@@ -26,8 +28,11 @@ The choices the paper leaves open, and where its text and the authors' code diff
 - The pruning cutoff :data:`ALPHA` is ``0.001``. The paper states none and follows the experiments
   of Rolland et al. (2022), whose cutoff it is.
 - The ``MIN_PARENTS`` largest medians stay without a test. The paper has no such step; ``5`` is the
-  authors' code's. Without it the reference is a parent whenever every variable before the leaf
-  is one, and the smallest of them is never kept: a chain of two variables would have no edge.
+  value of the authors' code's ``min_parents``. That code counts the leaf's own diagonal entry
+  among the ranked entries and then skips it, so it usually keeps four predecessors untested; here
+  the ranking holds only the variables before the leaf, and five stay. Without them the reference
+  is a parent whenever every variable before the leaf is one, and the smallest of them is never
+  kept: a chain of two variables would have no edge.
 - The ranking is the absolute median of the entries, as in the authors' code; the paper's text
   states the mean of their absolute values.
 - The authors' code estimates the Jacobian once, on all the variables. The paper's lemma reads the
@@ -78,16 +83,18 @@ LEVEL = 0.01
 MIN_PARENTS = 5
 
 
-def screen(entries: np.ndarray, slots: int | None) -> list[int]:
+def screen(entries: np.ndarray, slots: int | None, allowed: np.ndarray | None = None) -> list[int]:
     """Pick a leaf's candidate parents from the entries of its Jacobian row.
 
     Parameters
     ----------
     entries : np.ndarray
-        ``(n, m)`` entries of the leaf's row at the rows, one column per variable before the leaf
-        that may be a parent.
+        ``(n, m)`` entries of the leaf's row at the rows, one column per variable before the leaf.
     slots : int or None
         Most columns to keep, the paper's ``K``; ``None`` keeps any number.
+    allowed : np.ndarray or None
+        ``(m,)`` boolean mask of the columns that may be kept; ``None`` allows every column. A
+        column that is not allowed is still ranked, so it can be the reference, but is never kept.
 
     Returns
     -------
@@ -98,12 +105,19 @@ def screen(entries: np.ndarray, slots: int | None) -> list[int]:
     magnitudes = np.abs(entries)
     medians = np.abs(np.median(entries, axis=0))
     ranked = sorted(range(m), key=lambda k: (-tie_key(float(medians[k])), k))
-    top = ranked if slots is None else ranked[: slots + 1]
+    mask = np.ones(m, dtype=bool) if allowed is None else np.asarray(allowed, dtype=bool)
+    keepable = [k for k in ranked if mask[k]]
+    top = keepable if slots is None else keepable[: slots + 1]
     if not top:
         return []
     reference = top[-1]
     # The reference stands for a zero entry, so it is never kept when it lies beyond the slots.
     beyond = slots is not None and len(top) > slots
+    # A column that is not allowed has a zero entry: when it ranks below the reference, it is the
+    # reference, so that no column that may be a parent has to stand for the zero.
+    zeros = [k for k in ranked[ranked.index(reference) + 1 :] if not mask[k]]
+    if zeros:
+        reference, top, beyond = zeros[-1], top[:slots], False
     kept = []
     for rank, k in enumerate(top):
         if k == reference and beyond:
@@ -142,9 +156,10 @@ def das(
     """Fit DAS to the ``(n, d)`` matrix ``X``.
 
     ``precedence`` goes to :func:`~andrey.fcm.score_matching.leaf_order`; a ``forbidden`` edge is
-    never a candidate, and a ``required`` one is a candidate the pruning never removes, which takes
-    one of the leaf's ``max_parents`` slots. Ties go to the earlier column, so a caller that orders
-    the columns by rank breaks them by rank.
+    never a candidate, though its column is still ranked and can be the screen's reference, and a
+    ``required`` one is a candidate the pruning never removes, which takes one of the leaf's
+    ``max_parents`` slots. Ties go to the earlier column, so a caller that orders the columns by
+    rank breaks them by rank.
     """
     d = X.shape[1]
     unit = (X - X.mean(axis=0)) * unit_factors(X, standardize=True)
@@ -159,20 +174,19 @@ def das(
         pool = [
             (position, k)
             for position, k in enumerate(remaining)
-            if k != leaf
-            and not candidates[k, leaf]
-            and (forbidden is None or not forbidden[k, leaf])
+            if k != leaf and not candidates[k, leaf]
         ]
-        if not pool:
+        allowed = np.array([forbidden is None or not forbidden[k, leaf] for _, k in pool], bool)
+        if not allowed.any():
             return
         row = step["estimate"].row(remaining.index(leaf))
         entries = row[:, [position for position, _ in pool]]
         slots = (
             None if max_parents is None else max(max_parents - int(candidates[:, leaf].sum()), 0)
         )
-        kept = screen(entries, slots)
+        kept = screen(entries, slots, allowed)
         candidates[[pool[i][1] for i in kept], leaf] = True
-        _log.debug("leaf %d: %d of %d kept", leaf, len(kept), len(pool))
+        _log.debug("leaf %d: %d of %d kept", leaf, len(kept), int(allowed.sum()))
 
     order = leaf_order(unit, criterion, precedence, on_leaf=on_leaf)
     dag = prune(X, candidates, cutoff=alpha, k=K).astype(bool)
