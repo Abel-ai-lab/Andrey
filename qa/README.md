@@ -43,12 +43,18 @@ uv run python -m qa.identity --compare before.json after.json
 The compare counts the rows whose graph differs and the rows where only bits differ, and lists them,
 the rows in one manifest only, and every count that changed; it exits 1 when a row differs, is in
 one manifest only, or has a count that rose. Two more options refit each draw and list every refit
-whose answer differs from the first fit, with the parts that differ, exiting 1 if there is one:
+whose answer differs from the first fit, with the parts that differ. `--workers` exits 1 on any
+difference and `--shuffle` on a difference beyond rounding:
 
 - `--shuffle K` refits on `K` seeded column orders and maps each answer back to the original
-  columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out. ICP,
-  IGSP, FCI-JCI, and J-PCMCI+ are not refit: their data hold each row's environment in one column,
-  ICP's target is the last variable, and J-PCMCI+'s contexts follow the system variables.
+  columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out. ICP's
+  target, IGSP's targets, and J-PCMCI+'s contexts move with the columns, and each row's environment
+  stays with its row. A column order fails the check when a graph, a graph's kind, or the causal
+  order differs, or when an edge weight or metadata value differs by more than rounding (a relative
+  `1e-6`, or an absolute `1e-12` near zero); a boolean that becomes a number or an integer that
+  becomes a float differs. A difference of rounding alone, such as the p-values of ICP and
+  J-PCMCI+, which differ by about `1e-14` because their regressions sum in the order of the
+  columns, is listed as information and does not change the exit status.
 - `--workers N` refits PC, FCI, FCI-JCI, GFCI, CD-NOD, RSMAX2 (with PC's skeleton), GES, and PNL
   on `N` workers, with every GES pass, every skeleton pass of conditioning size two or more, and
   every possible-d-sep search sent to the worker pool.
