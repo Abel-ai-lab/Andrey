@@ -9,6 +9,8 @@ matrix.
 
 from __future__ import annotations
 
+import pickle
+
 import numpy as np
 import pytest
 from threadpoolctl import threadpool_info, threadpool_limits
@@ -221,3 +223,16 @@ def test_rows_computed_in_any_order_keep_their_values_as_the_store_grows():
         assert lazy.entry(column, 7) == whole[column, 7]
     assert lazy.computed == d
     assert np.array_equal(lazy.rows(np.arange(d)), whole)
+
+
+@pytest.mark.parametrize("protocol", [4, 5])
+def test_a_pickled_copy_grows_and_keeps_its_rows(protocol):
+    d = 2 * BLOCK + 10
+    x = np.random.default_rng(6).standard_normal((60, d))
+    whole = correlation_matrix(x)
+    copy = pickle.loads(pickle.dumps(LazyCorrelation(x), protocol=protocol))
+    for block in (1, 0, 2):
+        column = block * BLOCK + 1
+        assert np.array_equal(copy.rows([column]), whole[[column]])
+    assert copy.computed == d
+    assert np.array_equal(copy.rows(np.arange(d)), whole)
