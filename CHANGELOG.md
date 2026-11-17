@@ -16,7 +16,7 @@ names its pull request.
   `exact_search`, `boss`, `grasp`, `notears`, `dagma`, `calm`) sets the number of structural EM
   rounds. The default stays 10, the number Gao et al. (2022) run, so a fit without the argument
   returns what it did. The warning of a fit whose last round still changed the graph names the
-  argument; values other than 10 are not benchmarked yet. ([#PR])
+  argument; values other than 10 are not benchmarked yet. ([#1095])
 
 ## [0.17.1] - 2026-11-12
 
@@ -2564,3 +2564,4 @@ First alpha release.
 [nd-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/notears-dagma.md
 [ages-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/ages.md
 [#920]: https://github.com/Abel-ai-lab/andrey/pull/920
+[#1095]: https://github.com/Abel-ai-lab/Andrey/pull/1095
