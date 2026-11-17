@@ -192,8 +192,8 @@ def correct_skeleton(
     the first search removed keep theirs. The ``sink`` receives ``parents``, the parents of each
     indicator that has any, ``retested``, the candidates, ``removed``, those Step 4 removed, and
     ``uncorrected``, those with a test too short of rows to correct, as ``(x, y)`` pairs with
-    ``x < y`` in ascending order. Returns the skeleton, the separating sets,
-    and the p-values.
+    ``x < y`` in ascending order, and ``rows``, the counter of the rows the corrected tests read.
+    Returns the skeleton, the separating sets, and the p-values.
     """
     d = X.shape[1]
     adjacent = skeleton != NULL
@@ -219,6 +219,7 @@ def correct_skeleton(
         sink["retested"] = adjacent_pairs(retested)
         sink["removed"] = adjacent_pairs(retested & (corrected == NULL))
         sink["uncorrected"] = sorted(correction.uncorrected)
+        sink["rows"] = correction.rows
     return corrected, {**sepsets, **more_sepsets}, {**pvalues, **more_pvalues}
 
 

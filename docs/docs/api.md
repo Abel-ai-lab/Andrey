@@ -108,7 +108,8 @@ both columns are observed; `metadata["rows_tested"]` gives the fewest (`min`) an
 test read. Their argument `missing` names the handling: `"testwise"` is test-wise deletion, and
 `None`, the default, picks the method's default handling, `"testwise"`; `metadata["missing"]`
 records the one a fit used. `pc` also takes `missing="mvpc"`: Missing-Value PC (Tu et al., 2019)
-finds the parents of each missingness indicator and tests again the edges they could have kept.
+finds the parents of each missingness indicator and tests again the edges they could have kept;
+`metadata["corrected_edges"]["rows_tested"]` gives the fewest and the median rows such a test read.
 `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm`, whose
 fits read the data only through their covariance, refuse missing values under `None` and take
 `missing="em"`: structural EM runs the search on the expected covariance of the data 10 times,

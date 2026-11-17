@@ -8,6 +8,14 @@ and, when a change breaks the API, Breaking, and from 0.11.0 it closes with New 
 someone contributes for the first time, sections Keep a Changelog does not define; each change
 names its pull request.
 
+## [Unreleased]
+
+### Added
+
+- `pc(missing="mvpc")` records the fewest and the median rows a corrected test read as
+  `metadata["corrected_edges"]["rows_tested"]`, so a fit shows when the correction ran on few rows.
+  The graph and the other metadata are unchanged. ([#PR])
+
 ## [0.17.1] - 2026-11-12
 
 ### Highlights
