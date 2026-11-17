@@ -454,6 +454,9 @@ names its pull request.
 - `gin` numbers the latents it leaves unordered by their clusters' lowest-ranked column, as the rest
   of its search runs, instead of by their smallest column index, so a new column order relabels the
   graph and no longer renumbers them. Its clusters and causal order do not change. ([#1067])
+- The reference-parity check names a row by its network, effect, hidden nodes, node count, and
+  number of series beside its size, so rows of one size that differ only there no longer share a
+  key, and it fails two failing rows of one comparison that still do. ([#1070])
 
 ## [0.17.1] - 2026-11-12
 
@@ -3067,3 +3070,4 @@ First alpha release.
 [#1059]: https://github.com/Abel-ai-lab/Andrey/pull/1059
 [#1055]: https://github.com/Abel-ai-lab/Andrey/pull/1055
 [#1067]: https://github.com/Abel-ai-lab/Andrey/pull/1067
+[#1070]: https://github.com/Abel-ai-lab/Andrey/pull/1070
