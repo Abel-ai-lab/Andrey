@@ -204,8 +204,8 @@ to set up a development environment.
 We write much of Andrey with AI coding tools, under our maintainers' direction and review, and you
 are welcome to use them in a contribution. However a change is written, it follows the same rules,
 passes the same checks, and goes through a pull request that a person answers for. Benchmark
-numbers come from recorded runs, never from a model, and each new blog post and release card ends
-with a statement of how AI tools were used to write it. The
+numbers come from recorded runs and are never written by an AI tool, and each blog post and release
+card ends with a statement of how AI tools were used to write it. The
 [AI policy](https://github.com/Abel-ai-lab/Andrey/blob/main/DEVELOPMENT.md#ai-tools) has the rules.
 
 Andrey is inspired by

@@ -471,28 +471,33 @@ that way under its maintainers' direction and review. One policy covers maintain
 contributors:
 
 - **Same rules, same gates.** A change written with a tool follows [`AGENTS.md`](AGENTS.md) and
-  this file, passes every check CI runs and, for a method, every rung of
-  [Test a method](#test-a-method), and goes through an issue, a pull request, and review
+  this file, passes every check CI runs and, for a method, each step of
+  [Test a method](#test-a-method) that its status requires, and goes through the same issue, pull
+  request, and review as any other change
+  ([`CONTRIBUTING.md`](CONTRIBUTING.md#make-a-change-step-by-step)), into its release's branch
   ([Releases, labels, and the changelog](#releases-labels-and-the-changelog)). No rule is relaxed
-  for it, and none is added.
+  for it.
 - **A person answers for it.** Whoever opens the pull request, or directs the agent that opens it,
   is its author: that person has reviewed the change, can explain it in review, and has the right
-  to contribute it under the Apache License 2.0. Code a tool reproduces from another project is
-  copied code and keeps that project's license notice.
-- **Use is recorded.** A commit a tool wrote ends with a `Co-Authored-By` trailer that names the
-  model, and the pull request names the tool, under "How it was checked" or in the tool's own
-  "Generated with" line. The record helps the reviewer; it asks no permission. Completion and
-  spelling or grammar checks need none.
+  to contribute it under the Apache License 2.0. A tool may draft the description; in review the
+  author answers, in their own words or with replies they have read and stand behind. Code a tool
+  reproduces from another project is copied code and keeps that project's license notice.
+- **Use is recorded.** The pull request names each tool, under "How it was checked" or in the
+  tool's own "Generated with" line. A maintainer's commit that a tool wrote also ends with a
+  `Co-Authored-By` trailer that names the tool or its model; in a contribution the trailer is
+  welcome and not required. The record helps the reviewer and is not a request for permission: a
+  pull request without one is asked for it in review and is not closed for that alone. Completion
+  and spelling or grammar checks need no record.
 - **Numbers and references are never generated.** A benchmark number comes from a recorded run, and
-  a reference is cited only after a person has opened it.
+  a reference is cited only after it has been opened and found to support the claim; the author
+  answers for it.
 - **Blog posts and release cards end with an AI statement.** It says how AI tools were used to
   write the page, as a conference asks of a paper's authors. The author sets `ai` (`none`,
   `edited`, or `drafted`) and `ai_tools` in the front matter, and the site writes the sentence
-  ([The blog](docs/DEVELOPMENT.md#the-blog)). Every post dated 2026-11-17 or later and every card
-  from 0.18.0 on has one.
+  ([The blog](docs/DEVELOPMENT.md#the-blog)). Every post and every release card has one.
 
-Not acceptable: a change nobody reviewed, a number or a reference a model made up, a test or a gate
-weakened so that a change passes, and a post or a card whose statement is missing or untrue. A
+Not acceptable: a change nobody reviewed, a number or a reference an AI tool made up, a test or a
+gate weakened so that a change passes, and a post or a card whose statement is missing or untrue. A
 maintainer may close a pull request that shows one of these without a full review.
 
 These rules follow published ones. The
@@ -500,8 +505,9 @@ These rules follow published ones. The
 [Python developer's guide](https://devguide.python.org/getting-started/ai-tools/) hold the person
 who submits a change responsible for it, and the guide rules out altering a test to make it pass.
 [statsmodels](https://www.statsmodels.org/devel/dev/ai-policy.html) holds every contribution to the
-same bar, [pandas](https://pandas.pydata.org/docs/dev/development/contributing.html) asks for the
-tool and its model, and the
+same bar,
+[pandas](https://pandas.pydata.org/docs/dev/development/contributing.html#automated-contributions-policy)
+asks for the tool and its model, and the
 [Apache Software Foundation](https://www.apache.org/legal/generative-tooling.html) suggests the
 commit trailer. The AI statement follows the
 [ICLR 2027 policy for authors](https://iclr.cc/Conferences/2027/AIPolicyForAuthors) and

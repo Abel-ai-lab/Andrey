@@ -11,6 +11,8 @@ redirect: blog/introducing-andrey
 version: 0.1.0
 cover: pair
 cover_caption: "Andrey Markov and Andrey Kolmogorov."
+ai: drafted
+ai_tools: Claude Code and Codex
 ---
 
 # Introducing Andrey

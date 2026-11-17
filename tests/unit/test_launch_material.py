@@ -19,7 +19,6 @@ IMAGES = ".github/readme"
 SUMMARY = ROOT / "benchmarks/published/0.1.0/summary.json"
 POSTS = ROOT / "docs" / "blog"
 CARDS = ROOT / "docs" / "docs" / "benchmarks"
-AI_FROM = datetime.date(2026, 11, 17)
 AI_USE = {"none", "edited", "drafted"}
 CONF = (ROOT / "docs" / "conf.py").read_text()
 
@@ -104,15 +103,13 @@ def test_every_post_is_dated_once_and_names_its_version():
             assert path.startswith(f"{meta['version']}/") and (POSTS / path).is_file(), path
 
 
-def test_new_posts_and_cards_state_how_ai_was_used():
-    # A post dated from AI_FROM on and a release card from 0.18.0 on set `ai` and, unless it is
-    # `none`, `ai_tools`. conf.py writes the statement from them, so no page types its own.
+def test_every_post_and_card_states_how_ai_was_used():
+    # Every post and every release card sets `ai` and, unless it is `none`, `ai_tools`. conf.py
+    # writes the statement from them, so no page types its own.
     posts = [p for p in POSTS.glob("*.md") if front_matter(p).get("blogpost") == "true"]
     cards = [c for c in CARDS.glob("*.md") if re.fullmatch(r"\d+\.\d+\.\d+", c.stem)]
-    due = [p for p in posts if datetime.date.fromisoformat(front_matter(p)["date"]) >= AI_FROM]
-    due += [c for c in cards if tuple(map(int, c.stem.split("."))) >= (0, 18, 0)]
-    assert CARDS / "0.18.0.md" in due
-    for page in {*due, *(p for p in posts + cards if "ai" in front_matter(p))}:
+    assert posts and cards
+    for page in posts + cards:
         meta = front_matter(page)
         assert meta.get("ai") in AI_USE, page.name
         assert bool(meta.get("ai_tools")) == (meta["ai"] != "none"), page.name
