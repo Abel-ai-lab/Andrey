@@ -863,6 +863,7 @@ def _stored_fit(solution, answer, errors, *, seed=0, treatment=3, outcome=7):
         "pair": 0,
         "treatment": treatment,
         "outcome": outcome,
+        "estimand": "total",
         "solution": solution,
         "status": "ok",
         "wall_s": 0.1,
@@ -924,6 +925,76 @@ def test_valid_and_f1_read_the_sets_of_the_pair_asked_only(asked_first):
     (row,) = adjustment_cpu.summarize([fit])
     assert row["valid"] == pytest.approx(1.0) and row["f1"] == pytest.approx(1.0)
     assert [s["set"] for s in adjustment_cpu.asked_sets(fit)] == [[1]]
+
+
+def _scored_fit(seed, valid, *, status="ok"):
+    """A fit of one pair whose scored sets are one set, valid or not, or none when ``valid`` is None."""
+    fit = _stored_fit(
+        "stand-in.both",
+        [_answer(3, 7, sets=[[1]] * (valid is not None))],
+        {(3, 7): None},
+        seed=seed,
+    )
+    fit["status"] = status
+    if valid is not None:
+        fit["scores"]["sets"] = [{"pair": [3, 7], "set": [1], "valid": valid}]
+    return fit
+
+
+def test_an_abstention_is_an_error_of_one_in_the_valid_set_loss_and_pairs_with_the_other_arm():
+    from andrey_bench import pairing
+
+    # Of 20 datasets one arm answers 19 with 15 valid sets, the other 17 with 15 valid sets.
+    mine = [True] * 15 + [False] * 4 + [None]
+    ref = [True] * 15 + [False] * 2 + [None] * 3
+    a = [adjustment_cpu.valid_set_loss(_scored_fit(s, v)) for s, v in enumerate(mine)]
+    b = [adjustment_cpu.valid_set_loss(_scored_fit(s, v)) for s, v in enumerate(ref)]
+    assert a[-1] == 1.0 and b[-3:] == [1.0] * 3  # an abstention
+    assert a[15] == 1.0 and b[15] == 1.0  # a set that is not valid
+    assert a[0] == 0.0
+    assert None not in a + b
+    assert np.mean(a) == np.mean(b) == 0.25
+    assert pairing.compare(a, b)["paired"] == 20
+    rows = {
+        r["solution"]: r
+        for r in adjustment_cpu.summarize(
+            [{**_scored_fit(s, v), "solution": "stand-in.ref"} for s, v in enumerate(ref)]
+        )
+    }
+    assert rows["stand-in.ref"]["valid_set_loss"] == 0.25
+    assert rows["stand-in.ref"]["valid"] == pytest.approx(15 / 17)  # the share of returned sets
+
+
+def test_a_fit_that_did_not_finish_has_no_valid_set_loss():
+    assert adjustment_cpu.valid_set_loss(_scored_fit(0, True, status="timeout")) is None
+    assert adjustment_cpu.valid_set_loss(_scored_fit(0, None, status="timeout")) is None
+
+
+def test_a_direct_effect_fit_has_no_valid_set_loss():
+    """The scorer checks the validity of total-effect sets only, so a direct fit is not a failure."""
+    fit = {**_scored_fit(0, None), "estimand": "direct"}
+    assert adjustment_cpu.valid_set_loss(fit) is None
+    (row,) = adjustment_cpu.summarize([fit])
+    assert np.isnan(row["valid_set_loss"])
+
+
+def test_a_fit_with_no_set_has_the_empty_sets_member_errors_and_pairs_with_the_empty_set():
+    from andrey_bench import pairing
+
+    optimal = {1, 2, 3}
+    wrong = _stored_fit("stand-in.both", [_answer(3, 7, sets=[[1, 2, 4]])], {(3, 7): None})
+    none = _stored_fit("stand-in.both", [_answer(3, 7)], {(3, 7): None})
+    two = _stored_fit("stand-in.both", [_answer(3, 7, sets=[[1, 2, 3], [1]])], {(3, 7): None})
+    assert adjustment_cpu.member_errors(wrong, optimal) == 2  # 3 missing, 4 extra
+    assert adjustment_cpu.member_errors(none, optimal) == len(optimal)  # the empty set's
+    assert adjustment_cpu.member_errors(two, optimal) == 1  # the mean over the sets
+    assert adjustment_cpu.member_errors({**wrong, "status": "timeout"}, optimal) is None
+    # Over 20 datasets the fit with no set on one of them still pairs it, as no better than the empty set.
+    mine = [adjustment_cpu.member_errors(f, optimal) for f in [wrong] * 19 + [none]]
+    empty = [len(optimal)] * 20
+    c = pairing.compare(mine, empty)
+    assert c["paired"] == 20 and None not in mine
+    assert [m - e for m, e in zip(mine, empty)][-1] == 0
 
 
 def test_a_fit_whose_asked_record_abstains_has_no_error_and_is_not_answered():
