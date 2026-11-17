@@ -90,6 +90,8 @@ benchmarks/.mmb/
 # The authors' sbcd R code that benchmarks/start_sbcd_r.sh fetches, read from disk and never
 # committed.
 benchmarks/.sbcd-r/
+# The logs and summary benchmarks/run_tests.sh writes, one run's worth.
+benchmarks/.test-logs/
 # The authors' Causal Explorer toolbox that benchmarks/start_causal_explorer.sh fetches, run from
 # disk and never committed.
 benchmarks/.causal-explorer/
