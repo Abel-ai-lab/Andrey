@@ -203,6 +203,24 @@ def test_a_family_that_fixes_a_scale_reads_the_units(name, outside):
         cpcm(table * np.array([1.0, outside]), family=family)
 
 
+def test_a_mostly_tied_cause_gives_the_same_answer_in_any_units():
+    # More than half of the cause's pairs of rows are tied, so its kernel width is the one for a
+    # zero median distance.
+    rng = np.random.default_rng(0)
+    x = rng.choice([0.0, 1.0, 2.5], size=200, p=[0.8, 0.1, 0.1])
+    table = np.column_stack([x, x + (0.5 + 0.5 * x) * rng.normal(size=200)])
+    first = cpcm(table)
+    for factor in UNIT_FACTORS:
+        _assert_same_in_units(first, cpcm(table * np.array([factor, 1.0])), factor)
+    _assert_same_in_units(first, cpcm(table + np.array([5.0, 0.0])), 3.7)
+
+
+def test_a_count_column_in_units_too_large_to_fit_fails_fast():
+    table = _family_pair("negative_binomial", n=300) * np.array([1.0, 2.0**1000])
+    with pytest.raises(ValueError, match="stopped away from a minimum"):
+        cpcm(table, family=["gaussian_fixed_scale", "negative_binomial"])
+
+
 def test_location_scale_families_read_no_origin():
     table = _pair()
     first = cpcm(table)

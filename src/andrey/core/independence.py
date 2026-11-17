@@ -540,22 +540,27 @@ def dhsic_gram(column: np.ndarray, *, standardize: bool = False) -> np.ndarray:
     with ``standardize`` each of its columns is first scaled to unit standard deviation (a constant
     column stays as it is), so the joint distances do not depend on the columns' units. The kernel
     is ``exp(-d^2 / (2 w^2))`` with ``w = sqrt(0.5 m)``, ``m`` the upper median of the squared
-    distances over all pairs of rows, ties included, and ``w = 0.001`` when ``m`` is ``0``, the
-    rule of Pfister et al. (2018), whose software reads a random subsample of 1,000 rows where this
-    reads every row. The distances are formed on :func:`within_one`'s values, so the gram is the
-    same in any units.
+    distances over all pairs of rows, ties included, the rule of Pfister et al. (2018), whose
+    software reads a random subsample of 1,000 rows where this reads every row. When ``m`` is
+    ``0``, as for a column whose rows are mostly tied, ``w`` is 0.001 of the rows' root mean square
+    distance from their mean: the 0.001 of that software for a column of unit standard deviation,
+    and the same kernel in any other units. The distances are formed on :func:`within_one`'s
+    values, so the gram is the same in any units.
     """
-    col, power = within_one(_as_columns(column), each_column=standardize)
+    col = within_one(_as_columns(column), each_column=standardize)[0]
     col = col - col.mean(axis=0)
     if standardize:
         sd = col.std(axis=0)
         col = col / np.where(sd > 0, sd, 1.0)
-        power = 0
     sq = np.maximum(_sq_dists(col), 0.0)
     upper = _upper(sq)
     middle = upper.size // 2
     m = float(np.partition(upper, middle)[middle]) if upper.size else 0.0
-    width = math.sqrt(0.5 * m) if m > 0 else math.ldexp(0.001, -int(power))
+    if m > 0:
+        width = math.sqrt(0.5 * m)
+    else:
+        spread = math.sqrt(float(col.var(axis=0).sum()))
+        width = 0.001 * (spread if spread > 0 else 1.0)
     sq *= -1.0 / (2.0 * width * width)
     return np.exp(sq, out=sq)
 
