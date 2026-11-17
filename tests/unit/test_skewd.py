@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -249,3 +250,92 @@ def test_a_graph_with_no_acyclic_orientation_raises_instead_of_returning_a_cycle
         native.merge_components(
             base, components, [[0.0] * len(members) for _, members in components]
         )
+
+
+def test_a_cycle_among_many_independent_components_still_finds_the_acyclic_combination():
+    # The cycle case above next to twelve independent edges: 2^14 combinations, more than any cap on
+    # combinations admits, and exactly one cycle to avoid.
+    base = _orient(np.zeros((28, 28), dtype=np.int8), (1, 2), (3, 0))
+    free = [(4 + 2 * i, 5 + 2 * i) for i in range(12)]
+    components = [
+        ([0, 1], [_orient(base, (0, 1)), _orient(base, (1, 0))]),
+        ([2, 3], [_orient(base, (2, 3)), _orient(base, (3, 2))]),
+        *(([i, j], [_orient(base, (i, j)), _orient(base, (j, i))]) for i, j in free),
+    ]
+    scores = [[3.0, 0.0], [3.0, 1.0], *([[1.0, 0.0]] * len(free))]
+    dag = native.merge_components(base, components, scores)
+    assert _acyclic(dag)
+    assert dag[0, 1] == dag[3, 2] == 1  # the best acyclic total reverses C--D
+    assert all(dag[i, j] == 1 for i, j in free)  # each independent edge keeps its best orientation
+
+
+def _random_components(rng: np.random.Generator, d: int = 8):
+    """Directed edges along a random order and up to four disjoint pairs or paths of free edges,
+    each component's members the orientations that keep the directed edges acyclic."""
+    order = rng.permutation(d)
+    base = np.zeros((d, d), dtype=np.int8)
+    for i, j in itertools.combinations(range(d), 2):
+        if rng.random() < 0.3:
+            base[order[i], order[j]] = 1
+    nodes, components = rng.permutation(d).tolist(), []
+    for size in rng.choice([2, 3], size=4):
+        if len(nodes) < size:
+            break
+        group, nodes = nodes[:size], nodes[size:]
+        edges = list(itertools.pairwise(group))
+        members = []
+        for flips in itertools.product((False, True), repeat=len(edges)):
+            member = _orient(base, *(e[::-1] if flip else e for e, flip in zip(edges, flips)))
+            if not _acyclic(member):
+                continue
+            members.append(member)
+        if members:
+            components.append((sorted(group), members))
+    return base, components
+
+
+def _combined(base, components, choice):
+    return np.maximum.reduce([base, *(c[1][i] for c, i in zip(components, choice, strict=True))])
+
+
+def test_the_joint_search_matches_exhaustive_search_on_random_conflicting_graphs():
+    rng = np.random.default_rng(1)
+    conflicts = 0
+    for _ in range(1000):
+        base, components = _random_components(rng)
+        scores = [list(rng.normal(size=len(members))) for _, members in components]
+        best = tuple(int(np.argmax(row)) for row in scores)
+        conflicts += not _acyclic(_combined(base, components, best))
+        totals = {
+            _combined(base, components, c).tobytes(): sum(
+                row[i] for row, i in zip(scores, c, strict=True)
+            )
+            for c in itertools.product(*(range(len(row)) for row in scores))
+            if _acyclic(_combined(base, components, c))
+        }
+        if not totals:
+            with pytest.raises(ValueError, match="no DAG that keeps its directed edges"):
+                native.merge_components(base, components, scores)
+            continue
+        merged = native.merge_components(base, components, scores)
+        assert _acyclic(merged)
+        assert totals[merged.tobytes()] == pytest.approx(max(totals.values()))
+    assert conflicts > 20  # the draw reaches the cycle case often
+
+
+def test_a_constant_cross_validation_fold_starts_from_a_symmetric_shape():
+    # Eight folds of eight rows: the fold that holds out the one row that differs trains on a
+    # constant effect, whose skewness is 0 / 0.
+    parents = np.random.default_rng(0).standard_normal((8, 1))
+    effect = np.array([0.0] * 7 + [1.0])
+    budget = native.Budget(knots=8, folds=8, tuning_iter=1, initial=1, max_iter=5)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")  # a division by zero is a RuntimeWarning
+        result = native.fit(parents, effect, budget, 0)
+    assert np.isfinite(result.log_likelihood)
+    design = native._design(parents, budget.knots)
+    start = native._start(design.location[:7], design.scale[:7], effect[:7])
+    assert np.isfinite(start).all()
+    assert start[-1] == 0.0
+    nearly = native._start(design.location[:7], design.scale[:7], np.full(7, 1 / 3))
+    assert nearly[-1] == 0.0  # rounding in the mean leaves no skewness either

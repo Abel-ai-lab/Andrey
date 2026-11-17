@@ -1534,10 +1534,13 @@ def skewd_mv(
     parent and a penalty pair per parent chosen by a 5-fold cross-validation [1]_. Only these
     variables' terms differ between the DAGs, so their sum decides (Proposition 5.1 of [1]_), and
     each group contributes its own terms: the returned DAG holds the orientation of each group with
-    the largest sum, the first on a tie, which is the DAG of the class with the largest sum. The
-    defaults, 20 candidates of the Bayesian optimization and 3,000 iterations, are those of the
-    paper's runs. The columns are fitted in the order of their values' ranks, so the DAG does not
-    depend on the column order; ties follow ``andrey.config.tie_break``.
+    the largest sum, the first on a tie, which is the DAG of the class with the largest sum. Where
+    a conflicting graph lets the groups' best orientations close a directed cycle across its
+    directed edges, the search takes the acyclic combination with the largest sum, and a graph
+    with none raises an error. The defaults, 20 candidates of the Bayesian optimization and 3,000
+    iterations, are those of the paper's runs. The columns are fitted in the order of their
+    values' ranks, so the DAG does not depend on the column order; ties follow
+    ``andrey.config.tie_break``.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows

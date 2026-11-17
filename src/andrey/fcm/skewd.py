@@ -34,7 +34,6 @@ distribution. Journal of Applied Statistics 50(6).
 
 from __future__ import annotations
 
-import itertools
 import math
 import warnings
 from collections.abc import Iterator
@@ -59,6 +58,8 @@ DEGREE = 3
 #: The bounds on each log-variance coefficient and on the shape (Appendix B.1).
 RHO_BOUNDS = (-10.0, 5.0)
 SHAPE_BOUND = 25.0
+#: The variance of a standardized effect under which its rows count as constant.
+CONSTANT_VARIANCE = 1e-12
 #: The range of each log penalty that the Bayesian optimization searches (the authors' code).
 LOG_PENALTY_BOUNDS = (-4.0, 4.0)
 #: CMA-ES: the population, the first step size, and the most generations (Appendix B.1).
@@ -72,8 +73,6 @@ TOLERANCE = 1e-6
 #: The expected-improvement margin and the random candidates the acquisition is maximized over.
 EI_MARGIN = 0.01
 EI_CANDIDATES = 10_000
-#: Most combinations of component orientations searched when the best of each closes a cycle.
-JOINT_LIMIT = 10_000
 
 _LOG_NORM = math.log(2.0) - 0.5 * math.log(2.0 * math.pi)
 
@@ -243,10 +242,13 @@ def _cma_es(
 
 def _start(location: np.ndarray, scale: np.ndarray, effect: np.ndarray) -> np.ndarray:
     """Least squares for the location, ``rho = 0``, and the effect's sample skewness as the shape
-    (the authors' code)."""
+    (the authors' code), or a shape of 0 when the effect is constant, a cross-validation fold whose
+    training rows hold no variation (the callers standardize, so a variance under
+    :data:`CONSTANT_VARIANCE` is rounding)."""
     psi = np.linalg.lstsq(location, effect, rcond=None)[0]
     centered = effect - effect.mean()
-    skewness = float(np.mean(centered**3) / np.mean(centered**2) ** 1.5)
+    variance = float(np.mean(centered**2))
+    skewness = float(np.mean(centered**3) / variance**1.5) if variance > CONSTANT_VARIANCE else 0.0
     return np.concatenate([psi, np.zeros(scale.shape[1]), [np.clip(skewness, -25, 25)]])
 
 
@@ -538,6 +540,74 @@ def class_candidates(
     return components, base, sorted(fits)
 
 
+def _coupled_groups(
+    base: np.ndarray, components: list[tuple[list[int], list[np.ndarray]]]
+) -> list[list[int]]:
+    """Group the components that can lie on one directed cycle: those that touch the same
+    strongly connected set of the graph of every edge some orientation can hold."""
+    reach = base.astype(bool)
+    for _, members in components:
+        for member in members:
+            reach = reach | member.astype(bool)
+    reach = reach | np.eye(len(reach), dtype=bool)
+    for k in range(len(reach)):
+        reach |= reach[:, k, None] & reach[None, k, :]
+    label = np.argmax(reach & reach.T, axis=1)  # a node's smallest mutually reachable node
+    parent = list(range(len(components)))
+
+    def find(k: int) -> int:
+        while parent[k] != k:
+            parent[k] = parent[parent[k]]
+            k = parent[k]
+        return k
+
+    holder: dict[int, int] = {}
+    for k, (nodes, _) in enumerate(components):
+        for node_label in set(label[nodes].tolist()):
+            parent[find(k)] = find(holder.setdefault(node_label, k))
+    groups: dict[int, list[int]] = {}
+    for k in range(len(components)):
+        groups.setdefault(find(k), []).append(k)
+    return list(groups.values())
+
+
+def _best_acyclic(
+    base: np.ndarray, members: list[list[np.ndarray]], scores: list[list[float]]
+) -> list[int] | None:
+    """The orientation of each component, one index per component, that keeps ``base`` acyclic and
+    has the highest total score (the first found on a tie), or ``None`` when none is acyclic.
+
+    A depth-first search takes each component's orientations from the best score down and drops a
+    partial choice as soon as it closes a cycle (more edges never open one) or its score plus the
+    best of every remaining component cannot beat the best total found, so it lists no combination
+    that one of these rules rules out.
+    """
+    order = [sorted(range(len(row)), key=lambda i: -row[i]) for row in scores]
+    after = [0.0] * (len(scores) + 1)  # after[k]: the best total of components k and later
+    for k in range(len(scores) - 1, -1, -1):
+        after[k] = after[k + 1] + scores[k][order[k][0]]
+    best: list[int] | None = None
+    best_total = -math.inf
+    choice = [0] * len(scores)
+
+    def search(k: int, graph: np.ndarray, total: float) -> None:
+        nonlocal best, best_total
+        if k == len(scores):
+            if total > best_total:
+                best, best_total = choice.copy(), total
+            return
+        for i in order[k]:
+            if total + scores[k][i] + after[k + 1] <= best_total:
+                break  # the later orientations score no higher
+            merged = np.maximum(graph, members[k][i])
+            if not has_cycle(merged):
+                choice[k] = i
+                search(k + 1, merged, total + scores[k][i])
+
+    search(0, base, 0.0)
+    return best
+
+
 def merge_components(
     base: np.ndarray,
     components: list[tuple[list[int], list[np.ndarray]]],
@@ -548,31 +618,22 @@ def merge_components(
 
     ``scores[k][i]`` is the log-likelihood the ``i``-th DAG of ``components[k]`` gives its nodes.
     The components are independent, so the best of each combine into the best DAG, unless a graph
-    with conflicting orientations lets them close a directed cycle across its directed edges; then
-    the acyclic combination with the highest total wins, from at most ``JOINT_LIMIT`` combinations,
-    and a graph with none raises ``ValueError``.
+    with conflicting orientations lets them close a directed cycle across its directed edges. Only
+    components on a common cycle depend on each other, so the components are grouped by the
+    strongly connected sets of every edge they could hold and each group takes its acyclic
+    combination with the highest total, exactly (:func:`_best_acyclic`). The search stays short
+    while the best orientations of a group are nearly acyclic and grows with the number of its
+    components that conflict. A group with no acyclic combination raises ``ValueError``.
     """
-
-    def combine(choice: tuple[int, ...]) -> np.ndarray:
-        out = base.copy()
-        for (_, members), i in zip(components, choice, strict=True):
-            out = np.maximum(out, members[i])
-        return out
-
-    best = tuple(int(np.argmax(row)) for row in scores)
-    merged = combine(best)
-    if not has_cycle(merged):
-        return merged
-    sizes = [len(row) for row in scores]
-    if math.prod(sizes) > JOINT_LIMIT:
-        raise ValueError(
-            f"skewd_mv: the components' best orientations close a directed cycle and their "
-            f"{math.prod(sizes)} combinations exceed the limit of {JOINT_LIMIT}"
-        )
-    acyclic = [c for c in itertools.product(*map(range, sizes)) if not has_cycle(combine(c))]
-    if not acyclic:
-        raise ValueError(
-            "skewd_mv: PC's graph leaves no DAG that keeps its directed edges and adds no collider"
-        )
-    choice = max(acyclic, key=lambda c: sum(row[i] for row, i in zip(scores, c, strict=True)))
-    return combine(choice)
+    out = base.copy()
+    for group in _coupled_groups(base, components):
+        members = [components[k][1] for k in group]
+        choice = _best_acyclic(base, members, [scores[k] for k in group])
+        if choice is None:
+            raise ValueError(
+                "skewd_mv: PC's graph leaves no DAG that keeps its directed edges and adds no "
+                "collider"
+            )
+        for k, i in zip(group, choice, strict=True):
+            out = np.maximum(out, components[k][1][i])
+    return out
