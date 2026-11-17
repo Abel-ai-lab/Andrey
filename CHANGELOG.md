@@ -441,6 +441,9 @@ names its pull request.
   test included, as the paper's search does. Such a pair could keep an edge, and a v-structure that
   named it could direct a neighbor's other edge. On samples of the paper's networks the answers
   change, mostly on Hailfinder, where the errors at the target fall in most settings. ([#1030])
+- The reference-parity check names a row by its network, effect, hidden nodes, node count, and
+  number of series beside its size, so rows of one size that differ only there no longer share a
+  key, and it fails two failing rows of one comparison that still do. ([#1070])
 
 ## [0.17.1] - 2026-11-12
 
@@ -3052,3 +3055,4 @@ First alpha release.
 [#920]: https://github.com/Abel-ai-lab/Andrey/pull/920
 [#1059]: https://github.com/Abel-ai-lab/Andrey/pull/1059
 [#1055]: https://github.com/Abel-ai-lab/Andrey/pull/1055
+[#1070]: https://github.com/Abel-ai-lab/Andrey/pull/1070
