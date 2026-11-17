@@ -606,6 +606,7 @@ def fit_missing(
     missing: str | None,
     fit: Callable[[np.ndarray | None], tuple[R, GraphStructure]],
     *,
+    n_em_iterations: int,
     bic: bool = False,
 ) -> tuple[R, dict[str, object]]:
     """Run a fit on ``X``, by structural EM when ``missing="em"`` and ``X`` holds ``NaN``.
@@ -614,7 +615,8 @@ def fit_missing(
     rows, in place of the data's, or over the data's own with ``None``, and returns its result and
     the graph it learned. Without a missing value, or without ``"em"``, ``fit(None)`` runs once and
     the metadata are empty. Otherwise :func:`~andrey.search.em.structural_em` runs it on each
-    expected covariance, and the metadata hold its record under ``"em"``. With ``bic``, the fit
+    expected covariance, for ``n_em_iterations`` rounds, and the metadata hold its record under
+    ``"em"``. With ``bic``, the fit
     scores by the linear-Gaussian BIC, so copies among the observed values raise
     :class:`~andrey.core.score.CopiedColumnsError` first
     (:func:`~andrey.search.em.observed_copies`), as on complete data.
@@ -625,7 +627,7 @@ def fit_missing(
 
     if bic and (groups := observed_copies(X)):
         raise copies_error(groups)
-    result, record = structural_em(X, fit)
+    result, record = structural_em(X, fit, iterations=n_em_iterations)
     return result, {"em": record}
 
 
@@ -647,6 +649,7 @@ def cpdag_search(
     categorical: Sequence[str | int] | None,
     knowledge: Knowledge | None,
     missing: str | None = None,
+    n_em_iterations: int,
     **settings: object,
 ) -> StructureOutput:
     """Run the score search ``name``, whose ``engine`` returns a CPDAG and its score, on ``data``.
@@ -656,7 +659,7 @@ def cpdag_search(
     they reach, go in ``metadata``. ``settings`` reach ``engine``. An ``n_perturbations`` of
     ``None``, the default of ``hc`` and ``tabu``, becomes one change per data variable, which
     ``metadata`` records when ``n_starts`` is above 1. ``missing="em"`` keeps a missing value as
-    ``NaN`` and fits by structural EM (:func:`fit_missing`).
+    ``NaN`` and fits by structural EM, for ``n_em_iterations`` rounds (:func:`fit_missing`).
     """
     assert score_func is not None  # method_spec picks it from the column types
     check_em(name, missing, score_func, env)
@@ -693,7 +696,9 @@ def cpdag_search(
         return found, found[0]
 
     with copies_named(labels, index_namer(labels, column)):
-        (cpdag, score), em = fit_missing(augmented, missing, fit, bic=True)
+        (cpdag, score), em = fit_missing(
+            augmented, missing, fit, n_em_iterations=n_em_iterations, bic=True
+        )
     cpdag, index_edges = split_index(cpdag, column)
     metadata = {"score": json_safe(score), **categorical_metadata(mask, data), **em}
     if "n_perturbations" in settings and settings["n_starts"] != 1:

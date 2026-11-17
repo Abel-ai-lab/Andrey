@@ -732,11 +732,11 @@ They take `missing="em"` instead: structural EM (Friedman, 1997; [Gao et al., 20
 alternates two steps. Under a linear-Gaussian model of the current graph, it replaces each row's
 missing values by their expected values given the row's observed ones and adds their uncertainty.
 This gives the expected covariance of the data. The search then runs on that covariance over every
-row, and the model is fit again to the graph it returns. It runs 10 rounds. Before each search after
-the first, 5 more steps refit the model on the graph it has, so the search reads a covariance that
-graph's fit has settled on (Friedman's alternating scheme). `metadata["em"]` records whether each
-round changed the graph (`graph_changed`; when the last round still did, the fit logs a warning) and
-the observed-data log-likelihood after each round:
+row, and the model is fit again to the graph it returns. It runs 10 rounds, or the number you pass
+as `n_em_iterations`. Before each search after the first, 5 more steps refit the model on the graph
+it has, so the search reads a covariance that graph's fit has settled on (Friedman's alternating
+scheme). `metadata["em"]` records whether each round changed the graph (`graph_changed`; when the
+last round still did, the fit logs a warning) and the observed-data log-likelihood after each round:
 
 ```{code-cell} ipython3
 em = andrey.ges(gappy, missing="em")
@@ -745,7 +745,7 @@ em.metadata["em"]["log_likelihood"][-1]
 
 EM is sound when values are missing completely at random or at random given observed values. When
 whether a value is missing depends on the missing value itself, it has no guarantee. Each fit runs
-the search 10 times, and `missing="em"` takes only `score_func="bic"` and no `env`.
+the search once per round, and `missing="em"` takes only `score_func="bic"` and no `env`.
 
 `missing="em"` is supported in `ges`, `hc`, `tabu`, `boss`, `grasp`, and `notears`, where no setting
 we measured was less accurate than a reference implementation on the first datasets and again on
@@ -759,8 +759,10 @@ empty graph, with EM and on complete data alike.
 
 EM does not always settle within its 10 rounds. In our benchmark the last round still changed the
 graph in 2 to 6% of the fits, and in 20% of `grasp`'s, most often with 50 variables and 100 rows.
-Such a fit logs a warning, and more rows help. EM also costs time: a fit runs the search 10 times
-and the E-step 56 times, and it took 2 to 72 times as long as the same search on complete data. The
+Such a fit logs a warning, and more rows help. A larger `n_em_iterations` runs more rounds, which
+lets some of these fits settle while others keep changing between graphs; we have not benchmarked
+values other than 10 yet. EM also costs time: with 10 rounds a fit runs the search 10 times and the
+E-step 56 times, and it took 2 to 72 times as long as the same search on complete data. The
 [missing-data comparison](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md)
 has every number. In `xges`, `exact_search`, `dagma`, and `calm`, `missing="em"` is experimental: no
 reference implementation exists to compare them with, so the

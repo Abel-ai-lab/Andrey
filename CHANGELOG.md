@@ -8,6 +8,16 @@ and, when a change breaks the API, Breaking, and from 0.11.0 it closes with New 
 someone contributes for the first time, sections Keep a Changelog does not define; each change
 names its pull request.
 
+## [Unreleased]
+
+### Added
+
+- `n_em_iterations` on the ten searches that take `missing="em"` (`ges`, `xges`, `hc`, `tabu`,
+  `exact_search`, `boss`, `grasp`, `notears`, `dagma`, `calm`) sets the number of structural EM
+  rounds. The default stays 10, the number Gao et al. (2022) run, so a fit without the argument
+  returns what it did. The warning of a fit whose last round still changed the graph names the
+  argument; values other than 10 are not benchmarked yet. ([#PR])
+
 ## [0.17.1] - 2026-11-12
 
 ### Highlights

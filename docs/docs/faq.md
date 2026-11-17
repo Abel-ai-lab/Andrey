@@ -193,8 +193,9 @@ it against dropping incomplete samples. The searches whose fit reads the data on
 covariance, {{ em_methods }}, take `missing="em"`: structural EM over the expected covariance of
 the data, sound when values are missing completely at random or at random given observed values. It
 is supported in GES, hill climbing, Tabu search, BOSS, GRaSP, and NOTEARS, where it runs Friedman's
-alternating scheme: 10 searches, with 5 parameter-only EM steps before each after the first. It is
-experimental in the others, which have no reference implementation to compare with; the
+alternating scheme: 10 searches unless you pass `n_em_iterations`, with 5 parameter-only EM steps
+before each after the first. It is experimental in the others, which have no reference
+implementation to compare with; the
 [missing-data comparison](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md)
 has what we measured.
 The other methods refuse missing values with an error that says what to do

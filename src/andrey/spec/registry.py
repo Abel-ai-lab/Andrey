@@ -3151,24 +3151,26 @@ for _name in CONCEPTS["missing"].conforming:
 
 #: Structural EM on the searches whose fit reads only a covariance and the row count, after their
 #: categorical columns where they have them: supported in EM_SUPPORTED, experimental in the others.
+#: The number of its rounds follows it.
 _MISSING_EM = {
     supported: concept_param(
         "missing",
         choices=(EM,),
         doc=f"How missing values (NaN) are handled: em = {status}structural EM, which alternates "
         "the search on the expected covariance of the data with linear-Gaussian fits of the "
-        "graph it returns: 10 searches, with 5 parameter-only EM steps on the current graph "
-        "before each after the first; it assumes values missing completely at random or at "
-        "random given observed values. null refuses missing values.",
+        "graph it returns: n_em_iterations searches, with 5 parameter-only EM steps on the "
+        "current graph before each after the first; it assumes values missing completely at "
+        "random or at random given observed values. null refuses missing values.",
     )
     for supported, status in ((True, ""), (False, "experimental "))
 }
+_N_EM_ITERATIONS = concept_param("n_em_iterations")
 for _name in EM_METHODS:
     _params = REGISTRY[_name].params
     _cut = next((i + 1 for i, p in enumerate(_params) if p.name == "categorical"), len(_params))
     _missing_em = _MISSING_EM[_name in EM_SUPPORTED]
     REGISTRY[_name] = REGISTRY[_name].model_copy(
-        update={"params": (*_params[:_cut], _missing_em, *_params[_cut:])}
+        update={"params": (*_params[:_cut], _missing_em, _N_EM_ITERATIONS, *_params[_cut:])}
     )
 
 #: The path and confounder parts a method honors as supported: the method ran in the lanes of

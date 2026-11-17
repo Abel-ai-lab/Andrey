@@ -30,6 +30,7 @@ from andrey.core.fdr import FDR_METHODS
 from andrey.core.invariance import TWO_GROUP_INVARIANCE_TESTS
 from andrey.core.score import RANK_SCORES, SCORES
 from andrey.core.structure import Kind
+from andrey.search.em import ITERATIONS
 from andrey.search.gfci import EDGE_REMOVALS
 
 from .models import ParamSpec, ParamType, Spec
@@ -1101,15 +1102,37 @@ _CONCEPTS = (
                     reason="em, structural EM over the expected covariance (Friedman 1997; Gao "
                     "et al. 2022), suits a fit that reads only a covariance and the row count; "
                     "None refuses missing values. It is Friedman's alternating scheme with two "
-                    "constants: 10 rounds of one search each, the number Gao et al. run, and 5 "
-                    "parameter-only EM steps on the current graph before each search after the "
-                    "first, a count Friedman leaves open (until convergence or a largest count); "
-                    "with 5, the graph settled within the 10 rounds in most measured fits, and "
-                    "with none it was still changing.",
+                    "constants: 10 rounds of one search each, the number Gao et al. run and the "
+                    "default of n_em_iterations, and 5 parameter-only EM steps on the current "
+                    "graph before each search after the first, a count Friedman leaves open "
+                    "(until convergence or a largest count); with 5, the graph settled within the "
+                    "10 rounds in most measured fits, and with none it was still changing.",
                 )
                 for m in EM_METHODS
             ),
         ),
+    ),
+    Concept(
+        key="n_em_iterations",
+        summary="The number of rounds structural EM runs under missing=em, each with one search. "
+        "The default, 10, is the number Gao et al. (2022) run; another value is an option their "
+        "paper does not measure. EM runs every round, as no rule ends it earlier, so the name is "
+        "a count (n_, as n_starts and n_preliminary_iterations) and not a cap (max_iter, "
+        "warm_iter, subproblem_iter), and it differs from the max_iter that hc, tabu, notears, "
+        "dagma, and calm take for the loop of one search.",
+        param=_template(
+            "n_em_iterations",
+            "int",
+            ITERATIONS,
+            "The rounds of structural EM that missing=em runs on data with missing values, at "
+            "least 1, each with one search; more rounds let some fits whose last round still "
+            "changed the graph settle on one. Changes nothing on complete data or without "
+            "missing=em.",
+            minimum=1,
+        ),
+        fragment="rounds of structural EM",
+        suitable=EM_METHODS,
+        others_exempt="Does not fit by structural EM.",
     ),
     Concept(
         key="units",

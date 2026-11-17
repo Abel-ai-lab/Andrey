@@ -111,7 +111,7 @@ records the one a fit used. `pc` also takes `missing="mvpc"`: Missing-Value PC (
 finds the parents of each missingness indicator and tests again the edges they could have kept.
 `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm`, whose
 fits read the data only through their covariance, refuse missing values under `None` and take
-`missing="em"`: structural EM runs the search on the expected covariance of the data 10 times,
+`missing="em"`: structural EM runs the search on the expected covariance of the data in rounds,
 refitting a linear-Gaussian model of each graph it returns, with 5 parameter-only EM steps on that
 graph before the next search (Friedman's alternating scheme). `metadata["em"]` records the rounds,
 the observed-data log-likelihood after each, and whether each changed the graph; a fit whose last
@@ -135,6 +135,14 @@ for `"fisherz"` and `"student_t"` and 2 for the other tests, raises one during i
 `fci_jci` need a complete `env`. Every other method raises a `ValueError` that names it and says
 what to do instead, as [Missing values](guides/getting-started.md#missing-values) describes; each
 method's Notes say why.
+
+% concept: n_em_iterations
+`ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm` take
+`n_em_iterations`, the number of rounds `missing="em"` runs on data with missing values, each with
+one search. The default, 10, is the number Gao et al. (2022) run. A fit whose last round still
+changed the graph logs a warning that names the argument: more rounds let some such fits settle on a
+graph, others keep changing between graphs, and the time grows with the rounds. Values other than 10
+are not benchmarked yet. On complete data or without `missing="em"` it changes nothing.
 
 % concept: indep_test
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
