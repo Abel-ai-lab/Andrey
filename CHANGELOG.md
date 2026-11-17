@@ -416,6 +416,13 @@ names its pull request.
 
 ### Fixed
 
+- `mmb_by_mmb`, and `mb_by_mb`, `ldecc`, and `local_optimal_adjustment` with
+  `blanket="total_conditioning"`, check their rows before any test when the test is a
+  partial-correlation test: total conditioning conditions every test on all the other variables, so
+  the data needs at least `d + 2` rows with every variable observed. Below that they raise a
+  `ValueError` that names the requirement and suggests another blanket learner, where they raised
+  the test's degrees-of-freedom message; a `max_depth` below `d - 2` runs no test and needs no rows.
+  ([#1081])
 - `notears(robust=True)` and `dagma(robust=True)` minimize the Gaussian likelihood of the path of
   Deng et al. (2024) without `-log|det(I - W)|`, as its authors' code does. The term is zero
   for every DAG, so the graphs each step is judged by do not change, but its gradient is not zero
@@ -3084,3 +3091,4 @@ First alpha release.
 [#1072]: https://github.com/Abel-ai-lab/Andrey/issues/1072
 [#1073]: https://github.com/Abel-ai-lab/Andrey/pull/1073
 [#1070]: https://github.com/Abel-ai-lab/Andrey/pull/1070
+[#1081]: https://github.com/Abel-ai-lab/Andrey/pull/1081
