@@ -35,6 +35,7 @@ import json
 import socket
 import statistics
 import time
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -475,6 +476,35 @@ def gave_an_answer(fit: dict) -> bool:
     return record is not None and bool(record["adjustment_sets"] or record["nonzero"] is False)
 
 
+def valid_set_loss(fit: dict) -> float | None:
+    """The valid-set loss of a fit: 1 when its record for the pair asked holds no adjustment set or
+    a set that is not valid in the true DAG (hidden variables included), else 0.
+
+    An abstention is an error, so a comparison of two solutions pairs every dataset both finished.
+    ``None`` is a fit that did not finish and one that asks for another estimand than the total
+    effect, whose sets the scorer does not check for validity.
+    """
+    if fit["status"] != "ok" or fit["estimand"] != "total":
+        return None
+    sets = asked_sets(fit)
+    return float(not sets or not all(s["valid"] for s in sets))
+
+
+def member_errors(fit: dict, optimal: Iterable[int]) -> float | None:
+    """The missing plus extra members of a fit's sets for the pair asked, against ``optimal``, the
+    pair's optimal adjustment set in the true DAG: the mean over the returned sets.
+
+    A fit that returns no set counts as the empty set, whose errors are the size of ``optimal``, so
+    comparing a fit with the empty set pairs every dataset. ``None`` is a fit that did not finish.
+    """
+    if fit["status"] != "ok":
+        return None
+    record = asked_record(fit)
+    truth = set(optimal)
+    sets = record["adjustment_sets"] if record else []
+    return statistics.mean([len(truth ^ set(s)) for s in sets] or [len(truth)])
+
+
 def summarize(records: list[dict]) -> list[dict[str, Any]]:
     """One row per cell and solution: fits, answer rate, how the answers fare, and the effect error.
 
@@ -483,7 +513,8 @@ def summarize(records: list[dict]) -> list[dict[str, Any]]:
     ``wrong``, ``incomplete``) of the pairs whose effect is not zero; ``valid`` is the share of
     returned sets that satisfy the adjustment criterion and ``f1`` the mean F1 of a returned set
     against the optimal set (total effects, no hidden variables), over the sets of the record for
-    the pair asked (:func:`asked_sets`).
+    the pair asked (:func:`asked_sets`); ``valid_set_loss`` is the mean of :func:`valid_set_loss`
+    over the finished total-effect fits, so an abstention counts as an error.
     ``error`` is the mean effect error of the record for the pair asked (:func:`asked_error`) over
     the fits that have one, and ``empty`` the unadjusted regression's on the same fits; ``paired``
     is their paired comparison (:func:`andrey_bench.pairing.compare`, ``better`` when the
@@ -524,6 +555,9 @@ def summarize(records: list[dict]) -> list[dict[str, Any]]:
                         k: sum(a[k] for a in adjustment) for k in ("correct", "wrong", "incomplete")
                     },
                     "valid": _mean([float(s["valid"]) for s in sets]),
+                    "valid_set_loss": _mean(
+                        [v for r in ok if (v := valid_set_loss(r)) is not None]
+                    ),
                     "f1": _mean([s.get("f1", float("nan")) for s in sets]),
                     "error": _mean(list(errors.values())),
                     "empty": _mean([e for _, e in paired]),
@@ -545,14 +579,16 @@ def _summarize(records: list[dict]) -> None:
     _log("")
     _log(
         f"{'cell':34s} {'solution':26s} {'ok/all':>7s} {'answ':>5s} {'right':>5s} {'wrong':>5s} "
-        f"{'valid':>5s} {'f1':>5s} {'error':>6s} {'empty':>6s} {'vs empty':>9s} {'wall_s':>7s}"
+        f"{'valid':>5s} {'vsl':>5s} {'f1':>5s} {'error':>6s} {'empty':>6s} {'vs empty':>9s} "
+        f"{'wall_s':>7s}"
     )
     for row in summarize(records):
         verdict = row["paired"]["verdict"] if row["paired"] else "-"
         _log(
             f"{row['cell']:34s} {row['solution']:26s} {row['ok']:3d}/{row['fits']:<3d} "
             f"{row['answered']:5.2f} {row['adj']['correct']:5d} {row['adj']['wrong']:5d} "
-            f"{row['valid']:5.2f} {row['f1']:5.2f} {row['error']:6.3f} {row['empty']:6.3f} "
+            f"{row['valid']:5.2f} {row['valid_set_loss']:5.2f} {row['f1']:5.2f} "
+            f"{row['error']:6.3f} {row['empty']:6.3f} "
             f"{verdict:>9s} {row['wall_s']:7.3g}"
         )
 

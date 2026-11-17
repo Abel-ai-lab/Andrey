@@ -77,7 +77,9 @@ reversed for a method whose result does not depend on the column order, where th
 An entry that matches no failing row also fails. A released summary never changes, so a method
 re-measured against the same reference in a later summary is judged by the later rows only. Where a
 summary has two entries of one method against one reference, one per regime, a row's key also names
-its ``regime``.
+its ``regime``. A row's key is also the fields of ``ROW_KEYS`` it has: its size and its scenario,
+such as the network, the effect, or the hidden nodes. Two failing rows of one comparison with the
+same key fail whatever the allowlist holds, since one entry could not tell them apart.
 
     uv run python -m qa.reference_parity              # exit 1 if any row fails
 """
@@ -108,8 +110,13 @@ SERIES_COUNTS: tuple[tuple[str, str], ...] = (
 COLUMN_SERIES: tuple[str, str] = ("andrey_column_shd_by_seed", "comparator_shd_by_seed")
 #: Error fields recorded as ``andrey_<field>`` and ``comparator_<field>``: the row's mean or median.
 ERRORS: tuple[str, ...] = ("shd", "directed_errors")
-#: Row fields that name a row within its method's table.
-ROW_KEYS: tuple[str, ...] = ("mean_degree", "d", "observed", "n")
+#: Row fields that name a row within its method's table: its size, then the scenario fields that
+#: tell apart rows of one size (the network, the effect planted or not, the hidden nodes, the
+#: number of nodes of a random graph, and the number of series).
+ROW_KEYS: tuple[str, ...] = (
+    *("mean_degree", "d", "observed", "n"),
+    *("network", "effect", "hide", "nodes", "M"),
+)
 #: The ``claim`` values: a row in the setting its method claims, and one outside it.
 IN_CLAIM, OUT_OF_CLAIM = "in", "out"
 #: The ``role`` of an entry whose comparator is reported and never judged.
@@ -529,6 +536,11 @@ def published_rows(root: Path = PUBLISHED) -> list[Row]:
     return [row for _, rows in sorted(newest.values(), key=lambda v: v[0]) for row in rows]
 
 
+def _identity(row: Row) -> tuple[str, str, str, str]:
+    """Return what an allowlist entry names a row by: its summary, method, reference, and key."""
+    return row.summary, row.method, row.comparator, json.dumps(row.key, sort_keys=True)
+
+
 def _matches(entry: dict, row: Row) -> bool:
     return (
         entry.get("summary") == row.summary
@@ -541,8 +553,16 @@ def _matches(entry: dict, row: Row) -> bool:
 def check(rows: list[Row], allowlist: list[dict]) -> tuple[list[str], list[str]]:
     """Return ``(failures, exemptions)``, one line each, for ``rows`` under ``allowlist``."""
     failed = [r for r in rows if r.failed]
+    shared = Counter(_identity(r) for r in failed)
     failures, exemptions = [], []
     for row in failed:
+        if shared[_identity(row)] > 1:
+            failures.append(
+                f"FAIL {row.label()}: {row.numbers()}; {shared[_identity(row)]} failing rows share "
+                f"this key, so an allowlist entry cannot name one of them: add the field that "
+                f"tells them apart to ROW_KEYS"
+            )
+            continue
         entries = [e for e in allowlist if _matches(e, row)]
         entry = entries[0] if len(entries) == 1 else None
         problem = _entry_problem(entry, row) if entry else None

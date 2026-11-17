@@ -3430,11 +3430,11 @@ _add(
         ),
         accel="numpy",
         status="supported",
-        column_order="can_change",
+        column_order="relabels",
         tie_break=True,
         order_note=(
-            "Reordering whole clusters relabels the result; reordering the columns inside a "
-            "cluster can change the latents' order."
+            '`tie_break="position"` breaks ties between root candidates, and numbers the unordered '
+            "latents, in column order."
         ),
         params=(
             concept_param(
