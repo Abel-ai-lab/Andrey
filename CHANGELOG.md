@@ -24,7 +24,7 @@ names its pull request.
   for every column or one per column). `cpcm` decides a pair by the paper's residual independence
   tests, `cpcm_graph` returns the DAG of lowest penalized dHSIC score (`edge_penalty=2`) by exact
   search up to 4 variables and RESIT-greedy search above. A column outside its family's support
-  raises `ValueError` ([#1084]).
+  raises `ValueError` ([#1085]).
 - `target` takes a list of columns on every method that takes one (`iamb`, `inter_iamb`, `gs`,
   `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
   `icp`, `local_isa_ling`): one call returns one result per target, each equal to a call for that
@@ -3084,4 +3084,4 @@ First alpha release.
 [#1055]: https://github.com/Abel-ai-lab/Andrey/pull/1055
 [#1067]: https://github.com/Abel-ai-lab/Andrey/pull/1067
 [#1082]: https://github.com/Abel-ai-lab/Andrey/pull/1082
-[#1084]: https://github.com/Abel-ai-lab/Andrey/pull/1084
+[#1085]: https://github.com/Abel-ai-lab/Andrey/pull/1085
