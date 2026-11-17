@@ -7,16 +7,16 @@
 # The script runs `start.sh`, `start_r.sh`, and then every other `start_*.sh` in name order. A
 # failed build is reported and the run goes on: its lane's tests skip or fail, and the exit status
 # is 1. Each `export ANDREY_BENCH_*` line a start script prints is applied to the test run unless
-# the variable is already set, so a lane can be pointed at a build of your own by setting its
-# variable first. The run requires R (`ANDREY_BENCH_REQUIRE_R=1`; set it empty to let the R lane
-# skip, and a failed R build, `start_r.sh` or `start_*_r.sh`, is then reported without failing the
-# run) and takes the tools no start script fetches from the environment: `ANDREY_BENCH_TETRAD_JAR`
+# the variable is already set, so setting a lane's variable first points the lane at another
+# build. The run requires R (`ANDREY_BENCH_REQUIRE_R=1`; an empty value lets the R lane skip, and a
+# failed R build, `start_r.sh` or `start_*_r.sh`, is then reported without failing the run) and
+# takes the tools no start script fetches from the environment: `ANDREY_BENCH_TETRAD_JAR`
 # and `ANDREY_BENCH_TETRAD_GIN_JAR` (the Tetrad jars the lane pages name) and `ANDREY_BENCH_JAVA`.
 # A test whose variable is unset skips, and the summary lists it.
 #
 # Logs go to `$ANDREY_BENCH_TEST_LOGS` (default `benchmarks/.test-logs`): one log per step,
 # `summary.txt` (steps, variables, failures, skips), and `env.sh`, the variables the run set.
-# `source env.sh` and run `pytest` to rerun a test without rebuilding.
+# Sourcing `env.sh` and running `pytest` reruns a test without rebuilding.
 
 set -uo pipefail
 
