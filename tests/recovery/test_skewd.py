@@ -57,6 +57,7 @@ def _tree(seed: int, n: int = 600) -> tuple[np.ndarray, np.ndarray]:
 
 def test_skewd_mv_beats_the_empty_graph_on_a_skew_normal_tree():
     data, truth = _tree(0)
-    out = skewd_mv(data, indep_test="fisherz", seed=0, **FIT)
+    out = skewd_mv(data, seed=0, **FIT)
+    assert out.metadata["indep_test"] == "kci"  # PC's test is the default's, not the picked one
     dag = out.structure
     assert shd(dag, truth) < shd(np.zeros((4, 4), dtype=np.int8), truth)
