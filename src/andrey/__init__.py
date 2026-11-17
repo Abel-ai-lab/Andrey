@@ -31,6 +31,7 @@ from .api import (
     cpcm,
     cpcm_graph,
     dagma,
+    das,
     direct_lingam,
     dynotears,
     exact_search,
@@ -191,6 +192,7 @@ __all__ = [
     "cpcm_graph",
     "score_matching",
     "nogam",
+    "das",
     # Latent-variable structure - observed indicators plus discovered latents in causal order.
     "gin",
     # Multi-output: one StructureOutput per group (shared order, per-group weights).

@@ -1,4 +1,4 @@
-"""Functional-causal-model facades: CAM, RESIT, CPCM, SCORE, NoGAM, and CAM-UV."""
+"""Functional-causal-model facades: CAM, RESIT, CPCM, SCORE, NoGAM, DAS, and CAM-UV."""
 
 from __future__ import annotations
 
@@ -314,18 +314,20 @@ def cam(
 MIN_ROWS = 6
 
 
-def _regression_rows(X: np.ndarray, method: str) -> None:
-    """Raise ``ValueError`` when a fit on all the other variables has as many coefficients as rows.
+def _regression_rows(X: np.ndarray, method: str, parents: int | None = None) -> None:
+    """Raise ``ValueError`` when a fit on its most parents has as many coefficients as rows.
 
-    A fit of one variable on the ``d - 1`` others, each smooth term of at least 3 basis functions,
-    2 coefficients after its centering constraint, plus the intercept, has ``2d - 1`` coefficients,
-    which need ``2d`` rows. No fit has more terms.
+    A fit of one variable on ``m`` others, each smooth term of at least 3 basis functions, 2
+    coefficients after its centering constraint, plus the intercept, has ``2m + 1`` coefficients,
+    which need ``2m + 2`` rows. ``m`` is ``parents``, at most ``d - 1``; ``None`` means ``d - 1``.
     """
     n, d = X.shape
-    if n < 2 * d:
+    m = d - 1 if parents is None else min(parents, d - 1)
+    if n < 2 * (m + 1):
+        others = f"the other {d - 1}" if m == d - 1 else f"{m} others"
         raise ValueError(
-            f"data needs at least {2 * d} rows (samples) over {d} variables, got {n}: {method} "
-            f"can regress a variable on the other {d - 1} with a smooth term of at least 2 "
+            f"data needs at least {2 * (m + 1)} rows (samples) over {d} variables, got {n}: "
+            f"{method} can regress a variable on {others} with a smooth term of at least 2 "
             "coefficients each, plus an intercept, which needs more rows than coefficients"
         )
 
@@ -1097,6 +1099,219 @@ def nogam(
         result = _nogam(
             X[:, order],
             alpha=alpha,
+            forbidden=forbidden,
+            required=required,
+            precedence=precedence,
+        )
+    back = np.argsort(order)
+    dag = result.dag[np.ix_(back, back)]
+    return structure_output(dag_from_adjacency(dag), labels=labels, ordering=order[result.order])
+
+
+@method_spec("das")
+def das(
+    data: npt.ArrayLike,
+    *,
+    alpha: float = 0.001,
+    max_parents: int | None = 20,
+    knowledge: Knowledge | None = None,
+) -> StructureOutput:
+    """Learn a DAG with DAS, SCORE's causal order with edges screened from the score's Jacobian.
+
+    DAS [1]_ (Discovery At Scale) assumes the model of :func:`~andrey.score_matching`: each
+    variable is a nonlinear function of its parents plus Gaussian noise, ``x_j = f_j(parents) +
+    e_j``. It finds SCORE's causal order [2]_ and then reads the edges from the same estimate of
+    the score's Jacobian: for a leaf ``l``, the entry ``d^2 log p(x) / d x_l d x_j`` is zero at
+    every point exactly when ``j`` is not a parent [1]_. Each leaf keeps the variables before it
+    whose entries are clearly above zero, at most ``max_parents`` of them, and the smooth-term
+    tests of CAM [3]_ prune those candidates only, not every variable before it in the order,
+    which makes the pruning fast for many variables. It returns a DAG and a causal order.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    alpha : float, default=0.001
+        Significance level of the pruning test, in ``(0, 1)``: a candidate parent stays when its
+        smooth term's p-value is at most ``alpha``. Neither the causal order nor the edge screen
+        reads it. ``0.001`` is the cutoff of the SCORE experiments the paper follows.
+    max_parents : int or None, default=20
+        A cap on every node's parents, at least ``0``: the edge screen keeps at most
+        ``max_parents`` candidate parents per variable, required edges included, so no node of the
+        returned DAG has more. ``20`` is the paper's value. ``None`` sets no cap.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. A variable is the next leaf only
+        when no remaining variable is in a later tier or is the effect of a required edge out of
+        it. Forbidden edges, edges into an earlier tier, and pairs outside the allowed set are
+        never candidates; the score estimate still reads every remaining variable. A required
+        edge is a candidate that the pruning never removes.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
+        ``"das"``. ``ordering`` is the causal order of the leaf search, as a tuple of column
+        indices, causes first; it is the order :func:`~andrey.score_matching` finds on the same
+        data. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a usable 2-D
+        matrix: not numeric, holding ``NaN`` or ``inf``, with fewer than ``2 m + 2`` rows for
+        pruning fits on ``m = min(max_parents, n_variables - 1)`` parents, or with a constant
+        column, a column of fewer than 3 distinct values, or a column that repeats another up to
+        scale and shift, each named in the message; or if more than half of the pairs of rows are
+        equal on the remaining variables at a step, which leaves the kernel no bandwidth. Also if
+        ``knowledge`` names a column ``data`` lacks, contradicts itself, as
+        :class:`~andrey.Knowledge` lists, or requires more than ``max_parents`` parents of a
+        variable.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method is not supported (see Limitations), and its
+        API may change without deprecation.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+
+    Notes
+    -----
+    **When to use.** DAS suits i.i.d. continuous observational data whose effects are nonlinear in
+    every parent, with additive Gaussian noise and no unmeasured common causes [1]_, when there
+    are too many variables for :func:`~andrey.score_matching`'s pruning: it finds the same causal
+    order and prunes at most ``max_parents`` candidates per variable instead of every variable
+    before it. The paper shows it on 10 to 1,000 variables and 1,000 rows, with a DAG close to
+    SCORE's and a fit several times faster from 20 variables up. With fewer variables
+    :func:`~andrey.score_matching` prunes every edge its order allows; with linear effects and
+    Gaussian noise use :func:`~andrey.pc` or :func:`~andrey.ges`, and for additive noise that is
+    not Gaussian, :func:`~andrey.nogam` or :func:`~andrey.resit`.
+
+    **The steps.** The paper's three phases [1]_:
+
+    1. *Causal order.* The leaf search of :func:`~andrey.score_matching`: the diagonal of the
+       score's Jacobian is estimated at every row of the remaining variables by the Stein
+       estimator of [2]_ (Gaussian kernel at the median distance between the rows), the variable
+       whose entry varies least is the next leaf, and the estimate is made again on the others.
+    2. *Edge screen.* At the step that picks a leaf, the variables left are the leaf and those
+       before it in the order, so the leaf has no children among them, and the leaf's row of the
+       step's estimate gives ``d^2 log p / d x_l d x_j`` at every row. The absolute median of the
+       entry ranks the variables before the leaf. The ``max_parents + 1`` largest are kept and
+       the smallest of them is the reference, standing for a zero entry; each of the others stays
+       as a candidate parent when a one-sided Welch test of equal means of the absolute entries
+       against the reference's gives a p-value at most ``0.01``, the paper's level.
+    3. *Pruning.* Each variable is fit on its candidate parents, an additive model of penalized
+       thin plate regression splines with ten basis functions per parent and smoothing chosen by
+       GCV [4]_, as in :func:`~andrey.score_matching`, and a candidate stays when its smooth term's
+       p-value is at most ``alpha`` [3]_.
+
+    The choices the paper leaves open. It states no pruning cutoff and follows the experiments of
+    [2]_, whose cutoff ``0.001`` is the default. The five largest medians stay without a test, as
+    in the code published with the paper: the paper's screen never keeps the reference, so
+    without them a variable all of whose predecessors are parents would lose the weakest one, and
+    a chain of two variables would have no edge. The ranking follows that code, the absolute
+    median of the entries, where the paper states the mean of their absolute values. That code
+    estimates the Jacobian once on all the variables; DAS here reads each leaf's row at the step
+    that removes it, as the paper's Algorithm 1 does. A test whose two samples are both constant
+    keeps no edge. The estimator's ridge term and bandwidth are those of
+    :func:`~andrey.score_matching`, whose Notes state them.
+
+    The order search reads the columns centered and divided by their standard deviations, as
+    :func:`~andrey.score_matching` does, so rescaling or shifting a column changes no step; the
+    pruning reads each variable through an affine map to a fixed interval. The paper's
+    experiments run on the columns as simulated. The fit draws no random numbers and runs on one
+    BLAS thread.
+
+    **Ties.** The variances and the medians are compared rounded to 9 decimal places, as
+    :func:`~andrey.hc` compares its score changes per row, so two values that differ only in
+    their rounding tie. A tie goes to the variable with the lower rank computed from the data, as
+    for :func:`~andrey.hc`; the fit runs on the columns in that rank order, so the result does not
+    depend on the column order unless two columns are identical. The
+    :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps under a new
+    column order.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
+    its variables, so a row with a missing value has no place in it. Drop the incomplete rows
+    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** DAS is not benchmarked yet: no campaign has compared its graph with the code
+    published with the paper or with other methods. Its causal order is SCORE's, computed by the
+    same code, so the order's measured limits, which :func:`~andrey.score_matching` states in full,
+    are its own. The order search reads standardized columns, where it orders fewer edges of a
+    sparse graph correctly: on ten graphs of 10 variables with as many edges as variables, it put
+    99% of the true edges in the true direction on the columns as simulated and 80% on
+    standardized columns. Where links have a strong linear part, so that variance builds up along
+    the order, it did no better than a random order (41% to 53% of the true edges on links
+    ``z + sin z``). The leaf rule is exact only for Gaussian noise: under other noise, such as
+    Gumbel noise, a leaf's entry changes with its residual, and :func:`~andrey.nogam` and
+    :func:`~andrey.resit` drop that assumption. An edge the order reverses cannot be recovered,
+    and the screen can drop a true parent whose entries are small next to the reference's, which
+    the pruning cannot add back. Each step factors a matrix with one row and one column per
+    sample, so the order search's time grows with the cube of ``n_samples`` and its memory with
+    the square; the screen adds one solve per step. Binary columns, and any column with fewer than
+    3 distinct values, are not supported: the pruning fits a smooth term of each parent, and such
+    a column raises ``ValueError`` before the fit. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
+
+    References
+    ----------
+    .. [1] Montagna, F., Noceti, N., Rosasco, L., Zhang, K., and Locatello, F. (2023). Scalable
+       causal discovery with score matching. CLeaR, PMLR 213, 752-771.
+    .. [2] Rolland, P., Cevher, V., Kleindessner, M., Russell, C., Janzing, D., Scholkopf, B., and
+       Locatello, F. (2022). Score matching enables causal discovery of nonlinear additive noise
+       models. ICML, PMLR 162, 18741-18753.
+    .. [3] Buhlmann, P., Peters, J., and Ernest, J. (2014). CAM: Causal additive models,
+       high-dimensional order search and penalized regression. Annals of Statistics 42(6),
+       2526-2556.
+    .. [4] Wood, S. N. (2003). Thin plate regression splines. Journal of the Royal Statistical
+       Society B 65(1), 95-114.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import das
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(300)
+    >>> y = np.sin(2 * x) + 0.3 * rng.standard_normal(300)
+    >>> out = das(np.column_stack([x, y]))
+    >>> out.structure.kind, out.ordering
+    ('dag', (0, 1))
+    """
+    from andrey.core.ties import tie_ranks
+    from andrey.fcm.das import das as _das
+
+    X = data_matrix(data, method="das")
+    labels = column_labels(data)
+    _smooth_columns(X, labels, "das")
+    _regression_rows(X, "das", max_parents)
+    constraints = resolve(knowledge, X.shape[1], labels, method="das")
+    # The fit runs on the columns in rank order, so no step reads their positions.
+    order = np.argsort(tie_ranks(X), kind="stable")
+    forbidden = required = precedence = None
+    if constraints is not None:
+        most = int(constraints.required.sum(axis=0).max(initial=0))
+        if max_parents is not None and most > max_parents:
+            raise ValueError(
+                f"das: knowledge requires {most} parents of a variable, more than "
+                f"max_parents={max_parents}"
+            )
+        ranked = constraints.permuted(order)
+        forbidden, required, precedence = ranked.forbidden, ranked.required, ranked.precedence()
+    with one_blas_thread():
+        result = _das(
+            X[:, order],
+            alpha=alpha,
+            max_parents=max_parents,
             forbidden=forbidden,
             required=required,
             precedence=precedence,
