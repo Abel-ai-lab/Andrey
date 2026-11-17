@@ -12,6 +12,15 @@ names its pull request.
 
 ### Added
 
+- `target` takes a list of columns on every method that takes one (`iamb`, `inter_iamb`, `gs`,
+  `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
+  `icp`, `local_isa_ling`): one call returns one result per target, each equal to a call for that
+  target alone. The twelve with a test-based search answer every target with one search, making a
+  step two targets share once, and split the targets over `andrey.config(n_jobs=...)` worker
+  processes for a partial-correlation test, with the same results for any number of workers.
+  `andrey run` takes the list as `'target=[a,b]'`, by header name or position, or as a list in
+  `--config`; its envelope then holds `multi: true` and `results`, one per target, and the
+  `--help --json` schema types `target` as a string or a list of strings ([#1058]).
 - `andrey.locpc_cde`, LocPC-CDE (Loranchet and Assaad 2026), supported: whether the controlled
   direct effect of a treatment on an outcome is identifiable, from a graph learned around the
   outcome one hop at a time with PC's tests, and the outcome's parents as its adjustment set. The
@@ -347,6 +356,32 @@ names its pull request.
   set size plus two) sets the smallest scan that takes the factor. A repeated variable in the
   conditioning set counts once, and a correlation matrix that is not exactly symmetric gives each
   pair one answer whichever variable is the target. ([#1047], [#1048])
+- Lazy correlation: the local methods (the blanket learners `iamb`, `inter_iamb`, `gs`, `fast_iamb`,
+  `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, and `pcmb`, and `mb_by_mb`, `mmb_by_mmb`, `cmb`, `ldecc`,
+  `local_optimal_adjustment`, `locpc_cde`, `ldp`, `ld3`, and `y_structures`, and the restrict phase
+  of `mmhc` and `rsmax2`) with `fisherz`, `student_t`, or `normal_scores` on complete data compute
+  the rows of the correlation matrix 256 at a time, when a test first reads one of them, and keep
+  them, where they computed the whole matrix before the search; once every row is computed, the test
+  reads them as the whole matrix. At 2,000 rows and 16,000 variables, `iamb` at one target takes 2.1
+  seconds and 0.4 GB in all on one thread (0.9 seconds on eight), where the whole matrix and its
+  copied-column check took 18 seconds and 8 GB before the first test, and at 100,000 variables,
+  whose matrix would need 80 GB, it takes 15 seconds and 2.6 GB. `mmb_by_mmb`, `ldecc`, and
+  `local_optimal_adjustment` still rank every column's ties to order their visits, about 6 GB at
+  16,000 variables. The check for copied columns runs on the rows computed: a copy raises when a row
+  that shows it is computed, and copies among columns whose rows are never computed no longer
+  raise. A backend that puts the correlation matrix on a GPU computes the whole matrix there, as
+  before. `ANDREY_LAZY_CORRELATION=0` computes the whole matrix and checks every column before the
+  search. ([#1050], [#1053])
+- The correlation matrix of `fisherz`, `student_t`, and `normal_scores` is computed in blocks of 256
+  columns, each product on one BLAS thread and as many products at once as the BLAS has threads,
+  the same products whether a row is computed alone or with the whole matrix, so a lazily computed
+  row equals the whole matrix's bit for bit, the matrix is the same on any number of threads, and it
+  is exactly symmetric with a unit diagonal. At 2,000 rows and 16,000 variables the whole matrix
+  takes 15.5 seconds on one thread and 2.4 seconds on eight, where `np.corrcoef` took 14.7 and 4.0.
+  The correlations change in their last bits, once: every graph that Andrey's identity checks
+  record is the same, 2,433 of 4.2 million partial-correlation p-values differ in their ninth
+  significant digit and none crosses 0.05, and the two recorded baselines whose values move are
+  captured again for that change alone. ([#1050], [#1053])
 - The causal-order search of `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and
   `longitudinal_lingam` with `measure="pwling"` stops scoring a candidate once its partial score,
   a sum of nonnegative terms, shows it can be neither picked nor tied, and scores every other
@@ -2976,8 +3011,11 @@ First alpha release.
 [#1044]: https://github.com/Abel-ai-lab/Andrey/pull/1044
 [#1047]: https://github.com/Abel-ai-lab/Andrey/pull/1047
 [#1048]: https://github.com/Abel-ai-lab/Andrey/pull/1048
+[#1050]: https://github.com/Abel-ai-lab/Andrey/issues/1050
+[#1053]: https://github.com/Abel-ai-lab/Andrey/pull/1053
 [#1045]: https://github.com/Abel-ai-lab/Andrey/issues/1045
 [#1051]: https://github.com/Abel-ai-lab/Andrey/pull/1051
+[#1058]: https://github.com/Abel-ai-lab/Andrey/pull/1058
 [#995]: https://github.com/Abel-ai-lab/Andrey/pull/995
 [#991]: https://github.com/Abel-ai-lab/Andrey/pull/991
 [#982]: https://github.com/Abel-ai-lab/Andrey/pull/982

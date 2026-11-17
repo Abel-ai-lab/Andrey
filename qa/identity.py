@@ -319,10 +319,49 @@ FITS: dict[str, Fit] = {
     "DYNOTEARS": Fit(lambda x: andrey.dynotears(x, **_DYNOTEARS)),
 }
 
+
+def _target_list(name: str, every: int) -> Fit:
+    """``name`` with a list of targets, every ``every``-th variable from the first, in one call."""
+    method = getattr(andrey, name)
+    return Fit(
+        lambda x: method(x, alpha=ALPHA, target=list(range(0, x.shape[1], every))),
+        shuffled=False,
+        alpha=ALPHA,
+    )
+
+
+#: The set learners, by their names here and in the package.
+SET_LEARNERS = {
+    **{"IAMB": "iamb", "InterIAMB": "inter_iamb", "GS": "gs", "FastIAMB": "fast_iamb"},
+    **{
+        "MMPC": "mmpc",
+        "HITONPC": "hiton_pc",
+        "HITONMB": "hiton_mb",
+        "MMMB": "mmmb",
+        "PCMB": "pcmb",
+    },
+}
+#: The target-centered methods with a shared search, fitted with a list of targets, each on the
+#: datasets of the method it names: the set learners with every variable a target, the sequential
+#: methods with every fifth.
+TARGET_LISTS: dict[str, str] = {
+    **{f"{name}-targets": name for name in SET_LEARNERS},
+    "MB-by-MB-targets": "MB-by-MB",
+    "CMB-targets": "CMB",
+    "MMB-by-MMB-targets": "MMB-by-MMB",
+}
+FITS |= {
+    **{f"{name}-targets": _target_list(SET_LEARNERS[name], 1) for name in SET_LEARNERS},
+    "MB-by-MB-targets": _target_list("mb_by_mb", 5),
+    "CMB-targets": _target_list("cmb", 5),
+    "MMB-by-MMB-targets": _target_list("mmb_by_mmb", 5),
+}
+
 #: The methods that run on ``andrey.config(n_jobs=...)``: GES, GFCI's GES phase, the skeleton
 #: searches of PC, FCI, FCI-JCI, GFCI, CD-NOD, and RSMAX2's PC phase, and the possible-d-sep
-#: searches of FCI, FCI-JCI, and GFCI in worker processes, and PNL's two directions on threads.
-WORKER_METHODS = ("PC", "FCI", "FCI-JCI", "GFCI", "CDNOD", "RSMAX2", "GES", "PNL")
+#: searches of FCI, FCI-JCI, and GFCI in worker processes, PNL's two directions on threads, and the
+#: lists of targets of :data:`TARGET_LISTS`.
+WORKER_METHODS = ("PC", "FCI", "FCI-JCI", "GFCI", "CDNOD", "RSMAX2", "GES", "PNL", *TARGET_LISTS)
 
 #: The factor on the longitudinal LiNGAM panel's coefficients at ``d = 10``. At the published
 #: ranges the panel grows several-fold per time point; at this factor the spectral radius of every
@@ -448,6 +487,7 @@ UNKNOWN_TARGETS: dict[str, tuple[str, ...]] = dict.fromkeys(
 
 def datasets(method: str) -> tuple[str, ...]:
     """Return the datasets ``method`` is fitted on: its gate datasets, then its larger dataset."""
+    method = TARGET_LISTS.get(method, method)
     if method in UNKNOWN_TARGETS:
         return UNKNOWN_TARGETS[method]
     return (*qg.SUPPORTED[method].datasets, LARGER[method])

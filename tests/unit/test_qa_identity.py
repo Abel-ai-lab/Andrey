@@ -452,8 +452,11 @@ def test_counting_records_the_exact_search_scores(x: np.ndarray) -> None:
 
 
 def test_every_supported_method_is_fitted_on_its_datasets() -> None:
-    assert set(identity.FITS) == set(qg.SUPPORTED)
-    assert all(m in identity.LARGER or m in identity.UNKNOWN_TARGETS for m in identity.FITS)
+    assert set(identity.FITS) - set(identity.TARGET_LISTS) == set(qg.SUPPORTED)
+    assert set(identity.TARGET_LISTS.values()) <= set(qg.SUPPORTED)
+    assert set(identity.TARGET_LISTS) <= set(identity.WORKER_METHODS)
+    fitted = [identity.TARGET_LISTS.get(m, m) for m in identity.FITS]
+    assert all(m in identity.LARGER or m in identity.UNKNOWN_TARGETS for m in fitted)
 
 
 def test_pnl_is_refitted_on_workers_and_gives_the_same_bits() -> None:
