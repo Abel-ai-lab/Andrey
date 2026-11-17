@@ -220,3 +220,32 @@ def test_skewd_mv_reads_columns_whose_moments_overflow():
     assert (
         huge.structure.oriented_edges() == skewd_mv(data, **SHORT_GRAPH).structure.oriented_edges()
     )
+
+
+def _orient(base: np.ndarray, *edges: tuple[int, int]) -> np.ndarray:
+    dag = base.copy()
+    for i, j in edges:
+        dag[i, j] = 1
+    return dag
+
+
+def test_components_whose_best_orientations_close_a_cycle_take_the_best_acyclic_combination():
+    # A--B and C--D with B -> C and D -> A: A -> B and C -> D are each the best orientation of their
+    # component and together close A -> B -> C -> D -> A.
+    base = _orient(np.zeros((4, 4), dtype=np.int8), (1, 2), (3, 0))
+    components = [
+        ([0, 1], [_orient(base, (0, 1)), _orient(base, (1, 0))]),
+        ([2, 3], [_orient(base, (2, 3)), _orient(base, (3, 2))]),
+    ]
+    dag = native.merge_components(base, components, [[3.0, 0.0], [3.0, 1.0]])
+    assert _acyclic(dag)
+    assert dag[0, 1] == dag[3, 2] == dag[1, 2] == dag[3, 0] == 1  # the best acyclic total, 4
+
+
+def test_a_graph_with_no_acyclic_orientation_raises_instead_of_returning_a_cycle():
+    marks = _marks(4, lines=[(0, 1), (2, 3)], arrows=[(1, 2), (3, 0)])
+    components, base, _ = native.class_candidates(marks, None)
+    with pytest.raises(ValueError, match="no DAG that keeps its directed edges"):
+        native.merge_components(
+            base, components, [[0.0] * len(members) for _, members in components]
+        )

@@ -34,6 +34,7 @@ distribution. Journal of Applied Statistics 50(6).
 
 from __future__ import annotations
 
+import itertools
 import math
 import warnings
 from collections.abc import Iterator
@@ -48,6 +49,8 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import ConstantKernel, Matern, WhiteKernel
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import SplineTransformer
+
+from andrey.core.structure import has_cycle
 
 #: The scale spline's knots and both splines' degree (the authors' code: 5 knots, degree 3, so
 #: ``p~ = 7`` columns per parent, Appendix B.1). Each spline extends linearly past the data's range.
@@ -69,6 +72,8 @@ TOLERANCE = 1e-6
 #: The expected-improvement margin and the random candidates the acquisition is maximized over.
 EI_MARGIN = 0.01
 EI_CANDIDATES = 10_000
+#: Most combinations of component orientations searched when the best of each closes a cycle.
+JOINT_LIMIT = 10_000
 
 _LOG_NORM = math.log(2.0) - 0.5 * math.log(2.0 * math.pi)
 
@@ -531,3 +536,43 @@ def class_candidates(
             )
         components.append((group, members))
     return components, base, sorted(fits)
+
+
+def merge_components(
+    base: np.ndarray,
+    components: list[tuple[list[int], list[np.ndarray]]],
+    scores: list[list[float]],
+) -> np.ndarray:
+    """The DAG that holds the directed edges ``base`` and the highest-scoring orientation of each
+    component (the first on a tie), as 0/1 adjacency.
+
+    ``scores[k][i]`` is the log-likelihood the ``i``-th DAG of ``components[k]`` gives its nodes.
+    The components are independent, so the best of each combine into the best DAG, unless a graph
+    with conflicting orientations lets them close a directed cycle across its directed edges; then
+    the acyclic combination with the highest total wins, from at most ``JOINT_LIMIT`` combinations,
+    and a graph with none raises ``ValueError``.
+    """
+
+    def combine(choice: tuple[int, ...]) -> np.ndarray:
+        out = base.copy()
+        for (_, members), i in zip(components, choice, strict=True):
+            out = np.maximum(out, members[i])
+        return out
+
+    best = tuple(int(np.argmax(row)) for row in scores)
+    merged = combine(best)
+    if not has_cycle(merged):
+        return merged
+    sizes = [len(row) for row in scores]
+    if math.prod(sizes) > JOINT_LIMIT:
+        raise ValueError(
+            f"skewd_mv: the components' best orientations close a directed cycle and their "
+            f"{math.prod(sizes)} combinations exceed the limit of {JOINT_LIMIT}"
+        )
+    acyclic = [c for c in itertools.product(*map(range, sizes)) if not has_cycle(combine(c))]
+    if not acyclic:
+        raise ValueError(
+            "skewd_mv: PC's graph leaves no DAG that keeps its directed edges and adds no collider"
+        )
+    choice = max(acyclic, key=lambda c: sum(row[i] for row, i in zip(scores, c, strict=True)))
+    return combine(choice)

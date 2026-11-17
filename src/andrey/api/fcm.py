@@ -1578,7 +1578,7 @@ def skewd_mv(
     from andrey.api.constraint import pc
     from andrey.core.ties import tie_ranks
     from andrey.core.warning_policy import warn_search_limit
-    from andrey.fcm.skewd import Budget, class_candidates, fit
+    from andrey.fcm.skewd import Budget, class_candidates, fit, merge_components
 
     X = data_matrix(data, method="skewd_mv", min_rows=MIN_ROWS)
     labels = column_labels(data)
@@ -1613,10 +1613,11 @@ def skewd_mv(
     # component change with that component's orientation, so the best DAG holds each component's
     # best orientation (the first, on a tie).
     candidates = 1
+    tables = []
     for nodes, members in components:
-        scores = [sum(term(member, y) for y in nodes) for member in members]
-        best = np.maximum(best, members[int(np.argmax(scores))])
+        tables.append([sum(term(member, y) for y in nodes) for member in members])
         candidates *= len(members)
+    best = merge_components(best, components, tables)
     back = np.argsort(order)
     return structure_output(
         dag_from_adjacency(best[np.ix_(back, back)]),
