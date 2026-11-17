@@ -24,7 +24,7 @@ names its pull request.
   larger likelihood (`criterion="likelihood"`). `skewd_mv` learns the Markov equivalence class with
   PC and returns its DAG with the largest likelihood; it lists the class's DAGs one at a time and
   stops with an error once they need more than `max_fits` conditional models (100, the order up to
-  which the paper expects it to apply), before it fits any. Not benchmarked yet. ([#1079])
+  which the paper expects it to apply), before it fits any. Not benchmarked yet. ([#1083])
 - `target` takes a list of columns on every method that takes one (`iamb`, `inter_iamb`, `gs`,
   `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
   `icp`, `local_isa_ling`): one call returns one result per target, each equal to a call for that
@@ -3084,4 +3084,4 @@ First alpha release.
 [#1055]: https://github.com/Abel-ai-lab/Andrey/pull/1055
 [#1067]: https://github.com/Abel-ai-lab/Andrey/pull/1067
 [#1082]: https://github.com/Abel-ai-lab/Andrey/pull/1082
-[#1079]: https://github.com/Abel-ai-lab/Andrey/pull/1079
+[#1083]: https://github.com/Abel-ai-lab/Andrey/pull/1083
