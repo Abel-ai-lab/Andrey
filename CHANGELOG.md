@@ -12,6 +12,10 @@ names its pull request.
 
 ### Added
 
+- `andrey.das`, DAS (Montagna et al. 2023), experimental: SCORE's causal order, then each leaf's
+  candidate parents screened by Welch tests on its row of the same Stein estimate of the score's
+  Jacobian, at most `max_parents=20` per variable, and CAM's smooth-term tests on those candidates
+  only, so the pruning no longer fits every variable before a node in the order ([#1082]).
 - `target` takes a list of columns on every method that takes one (`iamb`, `inter_iamb`, `gs`,
   `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
   `icp`, `local_isa_ling`): one call returns one result per target, each equal to a call for that
@@ -3070,3 +3074,4 @@ First alpha release.
 [#1059]: https://github.com/Abel-ai-lab/Andrey/pull/1059
 [#1055]: https://github.com/Abel-ai-lab/Andrey/pull/1055
 [#1067]: https://github.com/Abel-ai-lab/Andrey/pull/1067
+[#1082]: https://github.com/Abel-ai-lab/Andrey/pull/1082
