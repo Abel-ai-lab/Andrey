@@ -123,6 +123,48 @@ def test_a_tested_column_stays_when_its_mean_is_clearly_above_the_references():
     assert sorted(screen(entries, 20)) == [0, 1, 2, 3, 4, 6]
 
 
+def test_a_forbidden_column_stands_for_the_zero_entry_when_it_ranks_below_the_reference():
+    """Seven parents with alike entries: among themselves the weakest is the reference and is lost,
+    with the zero columns ranked beside them it is a zero column that is, and all seven stay."""
+    rng = np.random.default_rng(5)
+    parents = np.abs(rng.standard_normal((400, 7))) + 1.0
+    zeros = np.abs(rng.standard_normal((400, 3))) * 0.01
+    entries = np.hstack([zeros[:, :1], parents, zeros[:, 1:]])
+    allowed = np.array([False] + [True] * 7 + [False] * 2)
+    assert len(screen(parents, 20)) == MIN_PARENTS
+    assert sorted(screen(entries, 20, allowed)) == list(range(1, 8))
+    # A forbidden column with a large entry is ranked but never kept, and is not the reference.
+    big = np.hstack([entries, entries[:, [1]] * 4])
+    kept = screen(big, 20, np.append(allowed, False))
+    assert sorted(kept) == list(range(1, 8)) and 10 not in kept
+    # With more parents than slots the zero column still cuts the list at the slots.
+    assert len(screen(entries, 3, allowed)) == 3
+    assert screen(entries, 20, np.zeros(10, dtype=bool)) == []
+
+
+def _forbidden_zeros(seed: int, n: int = 500, d: int = 14, parents: int = 7) -> np.ndarray:
+    """Independent standard normals and a last column that sums odd cubic terms of the first
+    ``parents``: every other column is a known non-parent whose entries are zero."""
+    rng = np.random.default_rng(seed)
+    X = rng.standard_normal((n, d))
+    c = rng.uniform(0.8, 1.2, parents)
+    terms = sum(c[k] * (X[:, k] + X[:, k] ** 3 / 6) for k in range(parents))
+    X[:, -1] = 0.5 * terms + 0.5 * rng.standard_normal(n)
+    return X
+
+
+@pytest.mark.parametrize("seed", [0, 1])
+def test_correct_forbidden_knowledge_never_removes_a_parent_found_without_it(seed):
+    X = _forbidden_zeros(seed)
+    tiers = [list(range(13)), [13]]
+    forbidden = [(k, 13) for k in range(7, 13)]  # the true non-parents of the last column
+    without = _fit(X, knowledge=andrey.Knowledge(tiers=tiers))
+    with_it = _fit(X, knowledge=andrey.Knowledge(tiers=tiers, forbidden=forbidden))
+    found = {i for i, j in _edges(without) if j == 13}
+    assert found == set(range(7))
+    assert found <= {i for i, j in _edges(with_it) if j == 13}
+
+
 def test_on_leaf_sees_each_step_before_its_leaf_leaves():
     steps = []
     values = {3: [0.3, 0.1, 0.2], 2: [0.5, 0.4]}

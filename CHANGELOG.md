@@ -466,6 +466,11 @@ names its pull request.
 - `gin` numbers the latents it leaves unordered by their clusters' lowest-ranked column, as the rest
   of its search runs, instead of by their smallest column index, so a new column order relabels the
   graph and no longer renumbers them. Its clusters and causal order do not change. ([#1067])
+- `das` ranks the columns that knowledge forbids as parents with the others in its edge screen and
+  never keeps them, so the screen's reference can be a column known to have a zero entry instead of
+  the weakest allowed one. Correct forbidden edges no longer remove a true parent that the same
+  data gives without them. Its docstrings state that the five candidates kept without a test are
+  the value of the authors' code's `min_parents`, which usually keeps four ([#1088]).
 
 ## [0.17.1] - 2026-11-12
 
@@ -3082,3 +3087,4 @@ First alpha release.
 [#1067]: https://github.com/Abel-ai-lab/Andrey/pull/1067
 [#1082]: https://github.com/Abel-ai-lab/Andrey/pull/1082
 [#1084]: https://github.com/Abel-ai-lab/Andrey/pull/1084
+[#1088]: https://github.com/Abel-ai-lab/Andrey/pull/1088
