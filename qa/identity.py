@@ -18,17 +18,21 @@ queries a CI test or a local score also records two deterministic counts (:class
 compare names every row where one changed and fails on any change, a fall as well as a rise, unless
 ``--allow-fewer-queries`` accepts a fall.
 
-``--shuffle K`` refits each draw but ICP's, IGSP's, FCI-JCI's, J-PCMCI+'s, CMB's, MMB-by-MMB's,
-and local ISA-LiNG's (:class:`Fit`) on ``K`` seeded column orders and maps each answer back to the
-original columns before hashing it;
+``--shuffle K`` refits each draw but CMB's, MMB-by-MMB's, and local ISA-LiNG's (:class:`Fit`) on
+``K`` seeded column orders, moving the targets of ICP and IGSP and the contexts of J-PCMCI+ with the
+columns, and maps each answer back to the original columns before hashing it;
 ``--workers N`` refits the methods that run worker processes or threads (:data:`WORKER_METHODS`) on
 ``N`` workers, with every GES pass, every skeleton pass of conditioning size two or more, and every
 possible-d-sep search sent to the pool. Both report each refit whose answer differs from the first
-fit.
+fit. A different worker count must not change a bit, so any difference fails it. A column order
+fails the check when a graph or a causal order differs (:data:`STRUCTURE`) or when an edge weight or
+metadata value differs by more than rounding (:data:`RTOL`, or :data:`ATOL` near zero). The last
+bits of such values, such as p-values, depend on the order a sum runs in, so a refit that differs
+only by rounding is reported as information.
 
     uv run python -m qa.identity -o before.json             # fit the corpus, write a manifest
     uv run python -m qa.identity --compare before.json after.json  # exit 1 on any difference
-    uv run python -m qa.identity --shuffle 3                # exit 1 if a column order changes one
+    uv run python -m qa.identity --shuffle 3                # exit 1 if an order changes a graph
     uv run python -m qa.identity GES GFCI --workers 4       # exit 1 if 4 workers change one
 """
 
@@ -39,6 +43,7 @@ import dataclasses
 import functools
 import hashlib
 import json
+import math
 import os
 import platform
 import struct
@@ -78,19 +83,23 @@ class Fit:
 
     ``blocks`` is the number of side-by-side copies of the variables in the data: GIES's samples
     and intervention indicators, MultiGroupDirectLiNGAM's groups; a column order moves each copy
-    the same way. ``shuffled`` is ``False`` for ICP, IGSP, FCI-JCI, J-PCMCI+, MB-by-MB, CMB,
-    MMB-by-MMB, local ISA-LiNG, LDECC, LOAD, and LocPC-CDE, whose draws a column order does not
-    apply to: each row's environment is a column of the draw, the target of ICP, MB-by-MB, CMB,
-    MMB-by-MMB, and local ISA-LiNG is the last variable, LDECC's treatment and outcome and LOAD's
-    two variables are the last and the first, LocPC-CDE's treatment and outcome are the first and
-    the last, and J-PCMCI+'s contexts follow the system variables.
-    ``alpha`` is the significance level of a CI-test method.
+    the same way. ``refit`` is set for the methods whose draws hold more than the variables, ICP,
+    IGSP, FCI-JCI, and J-PCMCI+: ``refit(x, rng)`` draws a column order from ``rng``, fits the draw
+    with its columns in that order, moving the targets and contexts the call names along with them
+    while each row's environment stays, and returns the answer mapped back to the original columns
+    (:func:`unpermute`). ``shuffled`` is ``False`` for
+    MB-by-MB, CMB, MMB-by-MMB, local ISA-LiNG, LDECC, LOAD, and LocPC-CDE, whose draws a column
+    order does not apply to: the target of MB-by-MB, CMB, MMB-by-MMB, and local ISA-LiNG is the last
+    variable, LDECC's treatment and outcome and LOAD's two variables are the last and the first, and
+    LocPC-CDE's treatment and outcome are the first and the last. ``alpha`` is the significance
+    level of a CI-test method.
     """
 
     call: Callable[[np.ndarray], Any]
     blocks: int = 1
     shuffled: bool = True
     alpha: float | None = None
+    refit: Callable[[np.ndarray, np.random.Generator], Any] | None = None
 
 
 _CDNOD = qg.AndreyCDNOD().params()
@@ -177,6 +186,54 @@ def _jpcmciplus(x: np.ndarray) -> StructureOutput:
     )
 
 
+def _icp_refit(x: np.ndarray, rng: np.random.Generator) -> StructureOutput:
+    """ICP on a draw with its variables in a drawn order: each row's environment (the first column)
+    stays, and the target, the last variable, moves to where the order puts it."""
+    n = x.shape[1] - 1
+    order = rng.permutation(n)
+    moved = np.ascontiguousarray(x[:, [0, *(order + 1)]])
+    target = int(np.flatnonzero(order == n - 1)[0])
+    return unpermute(andrey.icp(moved[:, 1:], moved[:, 0], target=target), order)
+
+
+def _igsp_refit(x: np.ndarray, rng: np.random.Generator) -> StructureOutput:
+    """IGSP on a stacked draw (:func:`qg.known_target_stack`) with its variables in a drawn order:
+    the samples and the matrix marking each setting's targets move alike, and each row's
+    environment, the column between them, stays."""
+    p = (x.shape[1] - 1) // 2
+    order = rng.permutation(p)
+    moved = np.ascontiguousarray(x[:, [*order, p, *(order + p + 1)]])
+    return unpermute(qg.igsp_fit(moved), order)
+
+
+def _fci_jci_refit(x: np.ndarray, rng: np.random.Generator) -> StructureOutput:
+    """FCI-JCI on a draw with its variables in a drawn order; each row's environment, the last
+    column, stays."""
+    order = rng.permutation(x.shape[1] - 1)
+    moved = np.ascontiguousarray(x[:, [*order, x.shape[1] - 1]])
+    return unpermute(_fci_jci(moved), order)
+
+
+def _jpcmciplus_refit(x: np.ndarray, rng: np.random.Generator) -> StructureOutput:
+    """J-PCMCI+ on a draw with its columns, contexts among them, in a drawn order: the context lists
+    name the contexts' new columns, and the answer's system variables follow their order among
+    the columns."""
+    contexts = qg.context_columns(x)
+    order = rng.permutation(x.shape[-1])
+    new = np.argsort(order)  # the column each original column moves to
+    moved = np.ascontiguousarray(x[..., order])
+    out = andrey.jpcmciplus(
+        list(moved),
+        time_contexts=[int(new[c]) for c in contexts["time_contexts"]],
+        space_contexts=[int(new[c]) for c in contexts["space_contexts"]],
+        time_dummy=True,
+        tau_max=2,
+        alpha=ALPHA,
+    )
+    context = {c for kind in contexts.values() for c in kind}
+    return unpermute(out, np.array([c for c in order if c not in context]))
+
+
 def _longitudinal(x):
     """Longitudinal LiNGAM with the gate adapter's settings; the adapter names the lag ``n_lags``,
     as lingam does."""
@@ -191,7 +248,7 @@ FITS: dict[str, Fit] = {
     "FCI": Fit(functools.partial(andrey.fci, alpha=ALPHA), alpha=ALPHA),
     "GFCI": Fit(functools.partial(andrey.gfci, alpha=ALPHA), alpha=ALPHA),
     "CDNOD": Fit(_domains, alpha=_CDNOD["alpha"]),
-    "FCI-JCI": Fit(_fci_jci, shuffled=False, alpha=ALPHA),
+    "FCI-JCI": Fit(_fci_jci, alpha=ALPHA, refit=_fci_jci_refit),
     "GES": Fit(andrey.ges),
     "GIES": Fit(qg.gies_fit, blocks=2),
     "XGES": Fit(andrey.xges),
@@ -246,7 +303,7 @@ FITS: dict[str, Fit] = {
     "PCMCI": Fit(_pcmci),
     "PCMCIplus": Fit(lambda x: andrey.pcmciplus(x, **qg.andrey_pcmciplus_adapter(5).params())),
     "LPCMCI": Fit(lambda x: andrey.lpcmci(x, **qg.andrey_lpcmci_adapter(3).params())),
-    "J-PCMCI+": Fit(_jpcmciplus, shuffled=False, alpha=ALPHA),
+    "J-PCMCI+": Fit(_jpcmciplus, alpha=ALPHA, refit=_jpcmciplus_refit),
     "VARMA-LiNGAM": Fit(
         lambda x: andrey.varma_lingam(
             x, order=tuple(_VARMA["order"]), criterion=_VARMA["criterion"], prune=_VARMA["prune"]
@@ -256,8 +313,8 @@ FITS: dict[str, Fit] = {
     "Granger": Fit(lambda x: andrey.granger(x, tau_max=qg.GRANGER_LAGS)),
     "UT-IGSP": Fit(_ut_igsp, blocks=2),
     "GnIES": Fit(_gnies, blocks=2),
-    "ICP": Fit(qg.icp_fit, shuffled=False),
-    "IGSP": Fit(qg.igsp_fit, shuffled=False),
+    "ICP": Fit(qg.icp_fit, refit=_icp_refit),
+    "IGSP": Fit(qg.igsp_fit, refit=_igsp_refit),
     "CAM-UV": Fit(andrey.camuv),
     "DYNOTEARS": Fit(lambda x: andrey.dynotears(x, **_DYNOTEARS)),
 }
@@ -558,12 +615,17 @@ NODE_LISTS = (
     "conflicts",
     "cycle_edges",
     "dag",
+    "accepted_sets",
+    "context_links",
     "index_edges",
     "latent_pairs",
     "parents",
     "partial_order",
+    "time_index_edges",
     "unordered",
 )
+#: ICP's metadata with a value for each variable, ``[i]``.
+PER_VARIABLE = ("p_values", "confidence_intervals")
 #: The keys of a pair's two directions, first column to second and back, which a swap exchanges.
 DIRECTIONS = ("forward", "backward")
 
@@ -579,8 +641,8 @@ def unpermute(out: Any, order: np.ndarray) -> Any:
     """Return ``out``, fitted on the data's columns in ``order``, with each node moved back to its
     original column: the graphs, the time series's weights, the causal order, the edge weights,
     and the metadata in :data:`LAG_MATRICES`. Hidden nodes after the observed ones keep their
-    places, a swapped pair's :data:`DIRECTIONS` trade places, and the metadata in
-    :data:`NODE_LISTS` is left out."""
+    places, a swapped pair's :data:`DIRECTIONS` trade places, ICP's target and its metadata in
+    :data:`PER_VARIABLE` move back, and the metadata in :data:`NODE_LISTS` is left out."""
     if isinstance(out, list):
         return [unpermute(o, order) for o in out]
     order = np.concatenate([order, np.arange(len(order), out.structure.n_nodes)])
@@ -588,10 +650,15 @@ def unpermute(out: Any, order: np.ndarray) -> Any:
     weights = out.weighted_adjacency
     swapped = len(order) == 2 and order[0] == 1
     metadata = {}
+    icp = out.metadata.get("algorithm") == "icp"
     for key, value in out.metadata.items():
         if key in NODE_LISTS:
             continue
-        if isinstance(value, Mapping) and set(value) == set(DIRECTIONS):
+        if icp and key == "target":
+            value = int(order[value])
+        elif icp and key in PER_VARIABLE:
+            value = None if value is None else [value[i] for i in back]
+        elif isinstance(value, Mapping) and set(value) == set(DIRECTIONS):
             forward, backward = DIRECTIONS
             value = {forward: value[backward], backward: value[forward]} if swapped else value
         elif key in LAG_MATRICES:
@@ -929,6 +996,87 @@ def row(method: str, dataset: str, seed: int, permutation: int, workers: int, ou
     }
 
 
+#: The parts of an output (:func:`parts`) that a column order must not change: its graphs, their
+#: kinds and edges, and its causal order. The edge weights and metadata values are not among them.
+STRUCTURE = ("graph", "kind", "edges", "ordering")
+#: The kinds of difference between a refit and the first fit, as :func:`run` reports them:
+#: ``"graph"``, a different graph; ``"structure"``, the same graphs and a different kind, edge
+#: marks, or causal order; ``"bits"``, only different bits in a refit on workers; ``"values"``,
+#: edge weights or metadata values of a column-order refit that differ by more than rounding;
+#: ``"digits"``, edge weights or metadata values of a column-order refit that differ by rounding
+#: only. The last does not fail the check.
+FAILING = ("graph", "structure", "bits", "values")
+#: The relative and absolute differences that count as rounding between two values.
+RTOL, ATOL = 1e-6, 1e-12
+
+
+def _close(a: Any, b: Any) -> bool:
+    """Whether ``a`` and ``b`` are the same values up to :data:`RTOL` and :data:`ATOL`: numbers and
+    arrays by closeness, NaN with NaN, anything else, such as text, by equality."""
+    if isinstance(a, Mapping) and isinstance(b, Mapping):
+        return a.keys() == b.keys() and all(_close(a[key], b[key]) for key in a)
+    if isinstance(a, np.ndarray) or isinstance(b, np.ndarray):
+        a, b = np.asarray(a), np.asarray(b)
+        kinds = a.dtype.kind, b.dtype.kind
+        if kinds[0] in "iu" and kinds[1] in "iu":
+            return bool(np.array_equal(a, b))
+        if kinds == ("f", "f"):
+            return a.shape == b.shape and bool(np.allclose(a, b, RTOL, ATOL, equal_nan=True))
+        if kinds[0] in "fiu" or kinds[1] in "fiu":
+            return False  # an integer array and a float array are not the same values
+        return _close(a.tolist(), b.tolist())
+    if isinstance(a, list | tuple) and isinstance(b, list | tuple):
+        return len(a) == len(b) and all(_close(x, y) for x, y in zip(a, b, strict=True))
+    truth = bool | np.bool_
+    if isinstance(a, truth) or isinstance(b, truth):  # True and 1 are not the same value
+        return isinstance(a, truth) and isinstance(b, truth) and bool(a) == bool(b)
+    real = (float, int, np.floating, np.integer)
+    if isinstance(a, real) and isinstance(b, real):
+        if isinstance(a, int | np.integer) or isinstance(b, int | np.integer):
+            return isinstance(a, int | np.integer) and isinstance(b, int | np.integer) and a == b
+        return math.isclose(a, b, rel_tol=RTOL, abs_tol=ATOL) or (math.isnan(a) and math.isnan(b))
+    return bool(a == b)
+
+
+def _rounded(first: Any, refit: Any) -> bool:
+    """Whether the edge weights, the lag and time weights of a time series's structure, and the
+    metadata of ``refit`` equal ``first``'s up to rounding (:func:`_close`), and its lags and times
+    are the same."""
+    if isinstance(first, list):
+        return len(first) == len(refit) and all(_rounded(a, b) for a, b in zip(first, refit))
+    a, b = first.structure, refit.structure
+    axes = all(getattr(a, name, None) == getattr(b, name, None) for name in ("lags", "times"))
+    weights = all(
+        _close(getattr(a, name, None), getattr(b, name, None))
+        for name in ("lag_weights", "lag_weights_ma", "time_weights")
+    )
+    return (
+        axes
+        and weights
+        and _close(first.weighted_adjacency, refit.weighted_adjacency)
+        and _close(dict(first.metadata), dict(refit.metadata))
+    )
+
+
+def classify(first: Any, refit: Any, *, column_order: bool) -> tuple[str, list[str]] | None:
+    """Return the kind of difference between ``refit`` and ``first`` and the names of the parts
+    that differ (:func:`parts`), or ``None`` when no part differs; ``column_order`` is whether the
+    refit is on another column order, not on workers. A column order's difference in weights or
+    metadata is ``"digits"`` when it is rounding and ``"values"`` when it is more."""
+    a, b = parts(first), parts(refit)
+    changed = sorted(name for name in a.keys() | b.keys() if a.get(name) != b.get(name))
+    if not changed:
+        return None
+    structural = {name.split(".", 1)[-1] if name[0].isdigit() else name for name in changed}
+    if "graph" in structural:
+        return "graph", changed
+    if structural & set(STRUCTURE):
+        return "structure", changed
+    if not column_order:
+        return "bits", changed
+    return ("digits" if _rounded(first, refit) else "values"), changed
+
+
 def run(
     methods: list[str], seeds: int, shuffle: int = 0, workers: int = 1
 ) -> tuple[list[dict], list[tuple[str, str]]]:
@@ -941,7 +1089,8 @@ def run(
     conditioning size two or more, and every possible-d-sep search sent to the worker pool. A refit
     differs when one of its
     :func:`parts` differs from the first fit's, mapped back the same way for a column order; each
-    difference is reported as ``("graph" | "bits", description)``, naming the parts that changed.
+    difference is reported as ``(kind, description)``, naming the parts that changed, with the kind
+    of :func:`classify`.
     """
     rows, findings = [], []
     with andrey.config(backend="numpy", n_jobs=1), threadpool_limits(limits=1):
@@ -954,9 +1103,15 @@ def run(
             refits = []  # (permutation, workers, the first fit hashed as the refit is, the refit)
             n_vars = x.shape[-1] // fit.blocks
             for k in range(1, shuffle + 1 if fit.shuffled else 1):
-                order = np.random.default_rng([seed, k]).permutation(n_vars)
-                refit = unpermute(fit.call(permuted(x, order, fit.blocks)), order)
-                refits.append((k, 1, unpermute(out, np.arange(n_vars)), refit))
+                rng = np.random.default_rng([seed, k])
+                if fit.refit is None:
+                    order = rng.permutation(n_vars)
+                    refit = unpermute(fit.call(permuted(x, order, fit.blocks)), order)
+                    first = unpermute(out, np.arange(n_vars))
+                else:
+                    refit = fit.refit(x, rng)
+                    first = unpermute(out, np.arange(out.structure.n_nodes))
+                refits.append((k, 1, first, refit))
             if workers > 1 and method in WORKER_METHODS:
                 with (
                     andrey.config(n_jobs=workers),
@@ -966,13 +1121,10 @@ def run(
                     _environ("ANDREY_RCOT_PARALLEL_MIN_WORK", "0"),
                 ):
                     refits.append((0, workers, out, fit.call(x)))
-            base = rows[-1]
             for permutation, n_workers, first, refit in refits:
                 rows.append(row(method, dataset, seed, permutation, n_workers, refit))
-                a, b = parts(first), parts(refit)
-                changed = sorted(name for name in a.keys() | b.keys() if a.get(name) != b.get(name))
-                if changed:
-                    kind = "graph" if rows[-1]["graph_hash"] != base["graph_hash"] else "bits"
+                if found := classify(first, refit, column_order=permutation > 0):
+                    kind, changed = found
                     findings.append((kind, f"{_label(rows[-1])}: {', '.join(changed)}"))
     return rows, findings
 
@@ -1100,6 +1252,16 @@ def kind_change(before: Mapping[str, str], after: Mapping[str, str]) -> list[str
 # ==================================================================================================
 
 
+#: How each kind of difference reads in the report.
+LABELS = {
+    "graph": "graph differs",
+    "structure": "structure differs",
+    "bits": "only bits differ",
+    "values": "weights or metadata differ by more than rounding",
+    "digits": "weights or metadata differ by rounding only (not a failure)",
+}
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Hash every supported method's full output.")
     ap.add_argument("methods", nargs="*", help="methods to fit (default: all supported)")
@@ -1124,14 +1286,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.out:
         write(args.out, header(code, args.seeds, args.shuffle, args.workers), rows)
     for kind, line in findings:
-        print(f"{'graph differs' if kind == 'graph' else 'only bits differ'}: {line}")
+        print(f"{LABELS[kind]}: {line}")
     refits = sum(r["permutation"] > 0 or r["workers"] > 1 for r in rows)
-    graph = sum(kind == "graph" for kind, _ in findings)
+    count = {kind: sum(k == kind for k, _ in findings) for kind in LABELS}
     print(
-        f"\n{len(rows)} fits hashed. Of {refits} refits, {graph} have a different graph and "
-        f"{len(findings) - graph} only different bits."
+        f"\n{len(rows)} fits hashed. Of {refits} refits, {count['graph']} have a different graph, "
+        f"{count['structure']} a different structure, {count['values']} different values, and "
+        f"{count['bits']} only different bits; {count['digits']} differ only by rounding in their "
+        "weights or metadata under a column order, which does not fail the check."
     )
-    return 1 if findings else 0
+    return 1 if any(kind in FAILING for kind, _ in findings) else 0
 
 
 if __name__ == "__main__":
