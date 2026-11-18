@@ -102,6 +102,16 @@ def _run_ld3(X: np.ndarray, algorithm: str) -> dict:
     return project_output(out, algorithm)
 
 
+def _run_ldp_no_set(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    # The treatment x6 and the outcome x7 have no effect on each other. The confounders found
+    # include x4, which the one instrument candidate, x0, depends on, so no set is returned.
+    column = datagen.column_of("ldp_no_set_8v")
+    out = andrey.ldp(X, treatment=int(column[6]), outcome=int(column[7]))
+    return project_output(out, algorithm)
+
+
 def _run_ld3_no_direct(X: np.ndarray, algorithm: str) -> dict:
     import andrey
 
@@ -225,6 +235,7 @@ ALGORITHMS = {
     "LDP": (_run_ldp, "adjustment_7v"),
     "LD3": (_run_ld3, "adjustment_7v"),
     "LD3NoDirect": (_run_ld3_no_direct, "ld3_no_direct_7v"),
+    "LDPNoSet": (_run_ldp_no_set, "ldp_no_set_8v"),
     "LDECC": (_run_ldecc, "gauss_7v"),
     "LocalOptimalAdjustment": (_run_local_optimal_adjustment, "gauss_7v"),
     "LocPCCDE": (_run_locpc_cde, "gauss_7v"),

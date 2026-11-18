@@ -449,6 +449,25 @@ CASES: dict[str, dict] = {
             [0.0, 0.0, 0.0, 0.9, 0.0, 0.0, 0.0],
         ],
     },
+    # Linear-Gaussian SEM around the treatment 6 and the outcome 7, with no effect of one on the
+    # other: the confounder 5, reached from 0 and 3 through 4, and 3 also causes the outcome; 1
+    # causes the treatment only and 2 the outcome only. The one instrument candidate, 0, depends on
+    # a variable among the confounders found, so the answer is no set.
+    "ldp_no_set_8v": {
+        "noise": "gaussian",
+        "seed": 20261118,
+        "n_samples": 10000,
+        "weights": [
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.9, 0.0, 0.0, 0.8, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.9, 0.0, 0.0, 0.0],
+            [0.0, 0.8, 0.0, 0.0, 0.0, 0.8, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.7, 0.0, 0.8, 0.0, 0.0],
+        ],
+    },
     # The ``gauss_5v`` model in three environments of 500 rows: the second multiplies the noise
     # standard deviation of variable 3 by 3, the third that of variable 4 - GnIES, which learns
     # those targets with the graph they orient.
