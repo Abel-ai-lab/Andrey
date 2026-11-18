@@ -25,6 +25,15 @@ names its pull request.
   tests, `cpcm_graph` returns the DAG of lowest penalized dHSIC score (`edge_penalty=2`) by exact
   search up to 4 variables and RESIT-greedy search above. A column outside its family's support
   raises `ValueError` ([#1085]).
+- `andrey.skewd` and `andrey.skewd_mv`, SkewD and SkewD-MV (Klippert and Marx 2026), experimental:
+  the direction of a variable pair, and a DAG, in a location-scale model whose noise is skewed,
+  `y = f(pa) + g(pa) n` with skew-normal `n`. `skewd` fits the model in each direction, with
+  penalties chosen by Bayesian optimization of a cross-validated likelihood, and decides by an HSIC
+  test of the scaled residual against the cause (`criterion="independence"`, the default) or by the
+  larger likelihood (`criterion="likelihood"`). `skewd_mv` learns the Markov equivalence class with
+  PC and returns its DAG with the largest likelihood; it lists the class's DAGs one at a time and
+  stops with an error once they need more than `max_fits` conditional models (100, the order up to
+  which the paper expects it to apply), before it fits any. Not benchmarked yet. ([#1083])
 - `target` takes a list of columns on every method that takes one (`iamb`, `inter_iamb`, `gs`,
   `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
   `icp`, `local_isa_ling`): one call returns one result per target, each equal to a call for that
@@ -439,6 +448,9 @@ names its pull request.
   the ends of the float range, such as `2**-1000` or `1e300`, where the squares behind its marginal
   overflowed or vanished and could reorder the columns ([#1085]).
 
+- A column that holds both signs near the largest float no longer raises a `RuntimeWarning`
+  in the check for constant columns, which compared a difference that overflowed; every
+  method reads its data through that check. ([#1083])
 - `notears(robust=True)` and `dagma(robust=True)` minimize the Gaussian likelihood of the path of
   Deng et al. (2024) without `-log|det(I - W)|`, as its authors' code does. The term is zero
   for every DAG, so the graphs each step is judged by do not change, but its gradient is not zero
@@ -3107,6 +3119,7 @@ First alpha release.
 [#1055]: https://github.com/Abel-ai-lab/Andrey/pull/1055
 [#1067]: https://github.com/Abel-ai-lab/Andrey/pull/1067
 [#1082]: https://github.com/Abel-ai-lab/Andrey/pull/1082
+[#1083]: https://github.com/Abel-ai-lab/Andrey/pull/1083
 [#1084]: https://github.com/Abel-ai-lab/Andrey/pull/1084
 [#1085]: https://github.com/Abel-ai-lab/Andrey/pull/1085
 [#1088]: https://github.com/Abel-ai-lab/Andrey/pull/1088

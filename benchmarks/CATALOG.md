@@ -46,6 +46,7 @@ whose Reproduce table lists the driver.
 | [NOTEARS and DAGMA](comparisons/notears-dagma.md) | `notears_cpu.py`, `notears_summary.py` | NOTEARS, DAGMA, each also with `standardize=True` and `robust=True` | the authors' NOTEARS code, the authors' dagma; CausalDisco (R2-SortnRegress, Var-SortnRegress) as controls | 0.17.0, 0.18.0 |
 | [PNL direction test](comparisons/pnl.md) | `pnl_pairs.py` | PNL | causal-learn | 0.4.0, 0.9.0 |
 | [LOCI direction test](comparisons/loci.md) | `loci_pairs.py` | LOCI, both criteria; ANM, PNL, and CAM as context | the authors' LOCI code (spline features, both criteria) | 0.16.0 |
+| SkewD direction test | `skewd_pairs.py` | SkewD, both criteria; LOCI as context | the authors' SkewD code (both criteria) | |
 | [Categorical data](comparisons/categorical.md) | `discrete_cpu.py` | PC, GES, BOSS, GRaSP, hill climbing | causal-learn, bnlearn, pgmpy | 0.6.0, 0.8.0 |
 | [Markov blankets, and parents and children](comparisons/blankets.md) | `blanket_cpu.py`, `pcmb_summary.py` | IAMB, Inter-IAMB, MMPC, PCMB, and the family's other learners as they ship; the sets at a target and the graphs they give | bnlearn (GS, IAMB, Fast-IAMB, Inter-IAMB, MMPC, SI-HITON-PC; PC-stable read at a target); the authors' Causal Explorer (HITON-PC, HITON-MB, MMMB), MATLAB; for PCMB, which has no implementation, the published results of its paper | 0.18.0 |
 | [Edges and directions at a target](comparisons/target-edges.md) | `direct_cpu.py`, `direct_summary.py` | CMB and MB-by-MB, at every target; PC read at the target | bnlearn (PC-stable read at the target); for CMB and MB-by-MB, which have no implementation, the published results of their papers | 0.18.0 |
@@ -69,8 +70,8 @@ whose Reproduce table lists the driver.
 `start.sh` builds the benchmark environment; `start_r.sh`, `start_cam_r.sh`, `start_resit_r.sh`,
 `start_mvpc_r.sh`, `start_sbcd_r.sh`, `start_missdag.sh`, `start_mmb.sh`, `start_xges.sh`,
 `start_tigramite.sh`, `start_lingam.sh`, `start_lingam_ts.sh`, `start_causalnex.sh`,
-`start_utigsp.sh`, `start_loci.sh`, `start_stein.sh`, and `start_notears.sh` build the separate
-environments some comparisons need ([setup](README.md#setup)).
+`start_utigsp.sh`, `start_loci.sh`, `start_skewd.sh`, `start_stein.sh`, and `start_notears.sh` build
+the separate environments some comparisons need ([setup](README.md#setup)).
 
 ## Release cards
 
