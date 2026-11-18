@@ -38,7 +38,7 @@ import numpy as np
 from scipy import special, stats
 
 from andrey.core.independence import dhsic_gram, dhsic_log_p, within_one
-from andrey.core.ties import EPS_IMPROVE, tie_key
+from andrey.core.ties import EPS_IMPROVE
 from andrey.fcm.gam import tp_basis
 
 #: Basis rank of every smooth before its sum-to-zero constraint, mgcv's default for ``s(x)``.
@@ -747,7 +747,10 @@ def search(
     """Minimize the score over DAGs; return the parents, the causal order, and the log p-value.
 
     Up to :data:`EXACT_MAX` variables every DAG is scored and the first lowest score wins (fewest
-    edges first). Above, Algorithm 2: RESIT's order from the sink up, each sink the variable whose
+    edges first); here, in RESIT's choice, and in the edge removal a value beats another only by
+    more than :data:`~andrey.core.ties.EPS_IMPROVE`, far above the score's rounding error (about
+    ``1e-11`` in other units) and below any real difference, so the first of two tied values wins
+    in any units. Above, Algorithm 2: RESIT's order from the sink up, each sink the variable whose
     residual on the others is most independent of them, then the complete DAG of the order loses,
     one at a time, the edge whose removal lowers the score most, while one does. The causal order
     is ``None`` for the exact search.
@@ -757,7 +760,7 @@ def search(
         best, best_score = None, math.inf
         for dag in all_dags(d):
             value = score(res, dag, edge_penalty)
-            if tie_key(value) < tie_key(best_score):
+            if value < best_score - EPS_IMPROVE:
                 best, best_score = dag, value
         assert best is not None
         return best, None, res.log_p(best)
@@ -773,7 +776,10 @@ def search(
                 trials.append((score(res, trial, edge_penalty), trial))
         if not trials:
             break
-        value, trial = min(trials, key=lambda item: tie_key(item[0]))
+        value, trial = trials[0]
+        for item in trials[1:]:
+            if item[0] < value - EPS_IMPROVE:
+                value, trial = item
         if value >= current - EPS_IMPROVE:
             break
         parents, current = trial, value
@@ -792,7 +798,7 @@ def _resit_order(res: Residuals) -> list[int]:
             rest = tuple(u for u in remaining if u != v)
             grams = [res.gram(v, rest), dhsic_gram(res.X[:, rest], standardize=True)]
             log_p = dhsic_log_p(grams)[1]
-            if tie_key(log_p) > tie_key(best_log_p):
+            if log_p > best_log_p + EPS_IMPROVE:
                 best, best_log_p = v, log_p
         order.insert(0, best)
         remaining.remove(best)

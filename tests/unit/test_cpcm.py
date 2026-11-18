@@ -8,6 +8,7 @@ import pytest
 from andrey.api.fcm import cpcm_graph
 from andrey.api.irregular import cpcm
 from andrey.core.independence import dhsic_gram, dhsic_log_p
+from andrey.core.ties import tie_ranks
 from andrey.fcm.cpcm import FAMILIES, LOG_SCALE_FLOOR, _log_size_bound, _term, all_dags, fit
 
 SUPPORT = {
@@ -364,6 +365,33 @@ def test_the_graph_method_gives_the_same_answer_in_extreme_units():
     rounded = cpcm_graph(table * np.array([1e300, 1e-300, 3.7]))
     assert rounded.structure.oriented_edges() == first.structure.oriented_edges()
     np.testing.assert_allclose(rounded.metadata["score"], first.metadata["score"], rtol=1e-9)
+
+
+def test_the_column_ranks_are_the_same_in_units_near_the_ends_of_the_float_range():
+    for seed in range(10):
+        rng = np.random.default_rng(seed)
+        table = np.column_stack([rng.normal(size=60), rng.exponential(size=60)])
+        first = tie_ranks(table)  # two columns: their marginals decide
+        for factor in (2.0**-1000, 2.0**990, 1e300, 1e-300, 1e307):
+            for j in range(2):
+                factors = np.ones(2)
+                factors[j] = factor
+                np.testing.assert_array_equal(tie_ranks(table * factors), first)
+
+
+def test_a_table_that_mirrors_itself_keeps_its_tied_graph_in_any_units():
+    # Rows (a, b) and (b, a): the two one-edge DAGs score the same, and the first in the
+    # columns' rank order wins, which must not move when a column's units do.
+    for seed in range(3):
+        rng = np.random.default_rng(seed)
+        a = rng.normal(size=30)
+        b = a + 0.3 * rng.normal(size=30)
+        table = np.vstack([np.column_stack([a, b]), np.column_stack([b, a])])
+        first = cpcm_graph(table)
+        for factor in (2.0**-1000, 2.0**990, 1e300, 1e-300, 3.7):
+            moved = cpcm_graph(table * np.array([1.0, factor]))
+            assert moved.structure.oriented_edges() == first.structure.oriented_edges()
+            np.testing.assert_allclose(moved.metadata["score"], first.metadata["score"], rtol=1e-9)
 
 
 def test_a_gumbel_graph_with_a_count_parent_keeps_its_graph_in_other_units():
