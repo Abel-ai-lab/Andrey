@@ -520,6 +520,7 @@ PROSE_NAMES = {
     "resit": "RESIT",
     "score_matching": "SCORE",
     "nogam": "NoGAM",
+    "das": "DAS",
     "varma_lingam": "VARMA-LiNGAM",
     "longitudinal_lingam": "Longitudinal LiNGAM",
     "pcmci": "PCMCI",
@@ -1403,6 +1404,60 @@ def _post_byline(app, doctree, docname) -> None:  # noqa: ANN001
     title.parent.insert(at + 2, nodes.raw("", byline, format="html"))
 
 
+AI_POLICY = "https://github.com/Abel-ai-lab/Andrey/blob/main/DEVELOPMENT.md#ai-tools"
+AI_NUMBERS = (
+    "Every number we measured for this card comes from a recorded run of the benchmark harness; "
+    "no AI tool wrote or estimated any of them. "
+)
+AI_USE = {
+    "none": "No AI tools were used to write this {page}.",
+    "edited": (
+        "{who} wrote this {page}; its wording was edited with {tools}. "
+        "{who} reviewed every change and {be} responsible for the content."
+    ),
+    "drafted": (
+        "Parts of this {page} were drafted with {tools}. "
+        "{who} checked every statement, number, and reference and {be} responsible for the content."
+    ),
+}
+
+
+def _ai_statement(app, doctree) -> None:  # noqa: ANN001
+    """End a post or a release card with its AI statement, written from the ``ai`` and ``ai_tools``
+    of its front matter, so that every page words it the same way. A card's statement opens with
+    where its numbers come from. A page without ``ai`` gets no statement.
+
+    The statement is added when the page is read, before ABlog keeps its copy of a post, so the
+    feed's full text ends with it too. Sphinx has not collected the front matter by then, so it is
+    read from the page, where ``author`` is a node of its own.
+    """
+    docname = app.env.docname
+    card = re.fullmatch(r"docs/benchmarks/\d+\.\d+\.\d+", docname)
+    info = next(doctree.findall(nodes.docinfo), nodes.docinfo())
+    meta = {field[0].astext(): field[1].astext() for field in info.findall(nodes.field)}
+    if "ai" not in meta or not (card or "blogpost" in meta):
+        return
+    use, tools = meta["ai"], meta.get("ai_tools", "").strip()
+    if use not in AI_USE or bool(tools) != (use != "none"):
+        raise ConfigError(
+            f"{docname}: `ai` is none, edited, or drafted, and `ai_tools` names the tools unless "
+            "it is none"
+        )
+    several = bool(card) or any("," in author.astext() for author in info.findall(nodes.author))
+    who = "We" if card else "The authors" if several else "The author"
+    text = AI_USE[use].format(
+        page="card" if card else "post",
+        who=who,
+        be="are" if several else "is",
+        tools=html.escape(tools),
+    )
+    statement = (
+        f'<p class="ai-statement"><a href="{AI_POLICY}">AI statement.</a> '
+        f"{AI_NUMBERS if card else ''}{text}</p>"
+    )
+    next(doctree.findall(nodes.section), doctree).append(nodes.raw("", statement, format="html"))
+
+
 def _cover_kind(app, docname: str) -> str:  # noqa: ANN001
     """The post's art: its front matter's ``cover`` (``cards.COVERS``), else the stipple ground."""
     return app.env.metadata.get(docname, {}).get("cover", "ground")
@@ -1708,6 +1763,7 @@ def setup(app) -> None:  # noqa: ANN001 -- Sphinx extension entry point
     app.connect("doctree-read", _notebook_thumbnail)
     # Before ABlog keeps its copy of a post for the feed (the default priority, 500).
     app.connect("doctree-read", _moved_links, priority=400)
+    app.connect("doctree-read", _ai_statement, priority=400)
     app.connect("html-page-context", _page_assets)
     app.connect("html-page-context", _docs_sidebar)
     app.connect("html-collect-pages", _moved_pages)

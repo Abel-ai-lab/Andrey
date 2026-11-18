@@ -205,13 +205,41 @@ file name and address stay. Its files move to the new release's folder, named ap
 post's files there, and an example is run again on the new release. A number the new release did
 not measure names the release that did, such as "in the 0.4.0 benchmarks".
 
+Every post states how AI tools were used to write it. Its front matter sets `ai`, and `ai_tools`
+(each tool, and its model or version when the author knows it) unless `ai` is `none`; each value
+stays on its key's line. `_ai_statement` in `conf.py` writes the statement as the post's last
+paragraph, under the closing links, on its page and in the feed's full text, and the build fails
+on any other value:
+
+| `ai` | The author sets it when | The post ends with |
+|---|---|---|
+| `none` | no AI tool wrote, reworded, or drew any part of it; a spelling or grammar check does not count | No AI tools were used to write this post. |
+| `edited` | the author wrote it, and a tool reworded, shortened, or translated the text | The author wrote this post; its wording was edited with `<ai_tools>`. The author reviewed every change and is responsible for the content. |
+| `drafted` | a tool wrote a first draft of any part: text, code, or a figure | Parts of this post were drafted with `<ai_tools>`. The author checked every statement, number, and reference and is responsible for the content. |
+
+The statement covers what is on the page: its text, the code it shows, and its figures, with the
+code that drew them. It does not cover spelling or grammar checks, code completion, search, the
+research the post reports, or the cover art, which [the brand page](docs/brand.md) covers.
+`ai_tools` may say what a tool did, such as `<tool> (the code of figure 2)`. The author sets the
+highest value that applies to the post as published, a maintainer's edits included, and a guest
+author's value changes only with the guest's agreement. A post set to `none` is edited by hand: an
+agent changes only its front matter and markup, and proposes any change of wording to the author.
+With several authors the sentence reads "The authors ... are". The sentences never change, since
+later builds render earlier posts again; a new kind of use takes a new value.
+
 ## The release cards
 
 Each release has a release card, `docs/benchmarks/<release>.md`: its benchmarks, the methods it adds
 or promotes, their known limits, and how to rerun the measurements, from the summary it links,
-`benchmarks/published/<label>/summary.json`. Like a post, a released card and its summary never
-change; new measurements go into the next release's card. A card's figures are finished HTML files
-in `docs/benchmarks/<release>/`, included with `{raw} html`, so later code never redraws them.
+`benchmarks/published/<label>/summary.json`. Like a post, a released card's text and its summary
+never change; new measurements go into the next release's card. A card's figures are finished HTML
+files in `docs/benchmarks/<release>/`, included with `{raw} html`, so later code never redraws
+them.
+
+Every card sets `ai` and `ai_tools` as a post does ("The blog"). Its last paragraph opens with one
+fixed sentence on its numbers, "Every number we measured for this card comes from a recorded run of
+the benchmark harness; no AI tool wrote or estimated any of them.", and continues with the post's
+sentence for its value, with "card" for "post" and "We" for "The author".
 
 [`docs/benchmarks.md`](docs/benchmarks.md), the Release cards page, leads with the latest release as
 a cover beside its TL;DR (the abstract, three numbers, and a button to the card), then lists the
@@ -375,11 +403,11 @@ It checks a strict `-W` build; API coverage (every public symbol of
 `andrey`, `andrey.metrics`, and `andrey.viz`, and every loader of `andrey.data`, documented, no
 private symbol exposed); KaTeX-ready math; one description per page, the same as its link preview's,
 at most 160 characters; the navbar's links; the favicon and the link-preview cards; the blog's front
-page and each post's cover and byline; every site address in the README, the project URLs, and the
-citation; each page's structured data against its link preview and each post's front matter;
-`llms.txt`, `sitemap.xml`, and `robots.txt`; that only the search page, the 404 page, and the blog's
-generated pages are `noindex`; each title's ending; and that the 404 page's links resolve from the
-site's root. External links: `uv run --group docs
+page and each post's cover and byline; each post's and card's AI statement; every site address in
+the README, the project URLs, and the citation; each page's structured data against its link
+preview and each post's front matter; `llms.txt`, `sitemap.xml`, and `robots.txt`; that only the
+search page, the 404 page, and the blog's generated pages are `noindex`; each title's ending; and
+that the 404 page's links resolve from the site's root. External links: `uv run --group docs
 sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 
 ## How the site is wired

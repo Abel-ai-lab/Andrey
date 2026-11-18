@@ -1,4 +1,4 @@
-"""Stein estimators of a density's score and of the diagonal of the score's Jacobian.
+"""Stein estimators of a density's score and of the score's Jacobian.
 
 The score of a density ``p`` on ``R^d`` is ``grad log p``. Both estimators read ``n`` rows drawn
 from ``p`` and return their estimate at those rows. NoGAM (:mod:`andrey.fcm.nogam`) reads the
@@ -19,16 +19,24 @@ the same way::
     <grad^2, K>[i, j] = sum_k d^2 kappa(x_i, x_k) / d x_k[j]^2,
 
 where ``G * G`` squares each entry and row ``i`` of ``J`` estimates the diagonal of the Hessian of
-``log p`` at ``x_i``. The same ridge term serves both regressions (their Section 3.2).
+``log p`` at ``x_i``. The same ridge term serves both regressions (their Section 3.2). An
+off-diagonal entry ``(l, j)`` follows from the same identity with the mixed derivative::
+
+    H_l = -G[:, l] * G + (K + eta I)^-1 <grad_l grad, K>,
+    <grad_l grad, K>[i, j] = sum_k d^2 kappa(x_i, x_k) / d x_k[l] d x_k[j],
+
+whose column ``l`` is the diagonal's entry ``l``. DAS (:mod:`andrey.fcm.das`) reads such a row.
 
 **The kernel.** ``kappa(x, y) = exp(-||x - y||^2 / (2 s^2))``, with the bandwidth ``s`` the median
 distance between the rows (their Algorithm 2). For this kernel
 
 - ``<grad, K>[i, j] = sum_k K[i, k] (x_i[j] - x_k[j]) / s^2``, and
-- ``<grad^2, K>[i, j] = sum_k K[i, k] ((x_i[j] - x_k[j])^2 / s^4 - 1 / s^2)``,
+- ``<grad^2, K>[i, j] = sum_k K[i, k] ((x_i[j] - x_k[j])^2 / s^4 - 1 / s^2)``, and
+- ``<grad_l grad, K>[i, j] = sum_k K[i, k] ((x_i[l] - x_k[l]) (x_i[j] - x_k[j]) / s^4 - [j = l]
+  / s^2)``,
 
-each computed from ``K X``, ``K X^2``, and the row sums of ``K``, with no array of shape
-``(n, n, d)``.
+each computed from ``K X``, ``K X^2`` or ``K (x[l] X)``, and the row sums of ``K``, with no array of
+shape ``(n, n, d)``.
 
 The choices the papers leave open:
 
@@ -132,6 +140,70 @@ def score(X: np.ndarray, *, eta: float = ETA, method: str = "stein") -> np.ndarr
     return _score(X, _kernel(X, eta, method))[0]
 
 
+@dataclass(frozen=True)
+class Jacobian:
+    """The Stein estimate of the score's Jacobian at the rows of ``X``: its diagonal, and any row.
+
+    Attributes
+    ----------
+    diagonal : np.ndarray
+        ``(n, d)``; entry ``[i, j]`` estimates the second derivative of ``log p`` in ``x[j]`` at
+        ``x_i``.
+    """
+
+    X: np.ndarray
+    kernel: _Kernel
+    score: np.ndarray
+    KX: np.ndarray
+    row_sums: np.ndarray
+    diagonal: np.ndarray
+
+    def row(self, j: int) -> np.ndarray:
+        """Estimate row ``j`` of the score's Jacobian at the rows of ``X``.
+
+        Returns
+        -------
+        np.ndarray
+            ``(n, d)``; entry ``[i, k]`` estimates ``d^2 log p / d x[j] d x[k]`` at ``x_i``. Its
+            column ``j`` is column ``j`` of :attr:`diagonal`.
+        """
+        X, G, KX, row = self.X, self.score, self.KX, self.row_sums
+        a = X[:, j : j + 1]
+        s2 = self.kernel.bandwidth**2
+        mixed = (row * a * X - a * KX - X * KX[:, j : j + 1] + self.kernel.matrix @ (a * X)) / s2**2
+        mixed[:, j] -= row[:, 0] / s2
+        return -G[:, j : j + 1] * G + self.kernel.solve(mixed)
+
+
+def jacobian(X: np.ndarray, *, eta: float = ETA, method: str = "stein") -> Jacobian:
+    """Estimate the score's Jacobian at the rows of ``X``: the diagonal now, a row on demand.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        ``(n, d)`` rows drawn from the density.
+    eta : float, default :data:`ETA`
+        Ridge term of the regressions, positive.
+    method : str, default "stein"
+        The method a ``ValueError`` names.
+
+    Returns
+    -------
+    Jacobian
+        The estimate; :meth:`Jacobian.row` reuses its kernel factor.
+
+    Raises
+    ------
+    ValueError
+        If the median distance between the rows is 0.
+    """
+    kernel = _kernel(X, eta, method)
+    G, KX, row = _score(X, kernel)
+    s2 = kernel.bandwidth**2
+    second = (row * X**2 - 2.0 * X * KX + kernel.matrix @ X**2) / s2**2 - row / s2
+    return Jacobian(X, kernel, G, KX, row, -(G**2) + kernel.solve(second))
+
+
 def jacobian_diagonal(X: np.ndarray, *, eta: float = ETA, method: str = "stein") -> np.ndarray:
     """Estimate the diagonal of the score's Jacobian at the rows of ``X``.
 
@@ -155,8 +227,4 @@ def jacobian_diagonal(X: np.ndarray, *, eta: float = ETA, method: str = "stein")
     ValueError
         If the median distance between the rows is 0.
     """
-    kernel = _kernel(X, eta, method)
-    G, KX, row = _score(X, kernel)
-    s2 = kernel.bandwidth**2
-    second = (row * X**2 - 2.0 * X * KX + kernel.matrix @ X**2) / s2**2 - row / s2
-    return -(G**2) + kernel.solve(second)
+    return jacobian(X, eta=eta, method=method).diagonal

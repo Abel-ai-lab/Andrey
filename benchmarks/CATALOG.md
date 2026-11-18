@@ -38,7 +38,7 @@ whose Reproduce table lists the driver.
 | [DirectLiNGAM and ICA-LiNGAM](comparisons/lingam.md) | `lingam_cpu.py`, `lingam_gpu.py` | DirectLiNGAM (CPU and GPU), ICA-LiNGAM | causal-learn | 0.1.0, 0.9.0 |
 | [ANM direction test](comparisons/anm.md) | `anm_pairs.py` | ANM | causal-learn | 0.4.0, 0.9.0 |
 | [CAM and RESIT](comparisons/cam-resit.md) | `fcm_cpu.py` | CAM, RESIT | CAM 1.0 (R), the authors' R code for RESIT, lingam | 0.13.0 |
-| [SCORE and NoGAM](comparisons/score-nogam.md) | `stein_cpu.py` | SCORE, NoGAM; CAM as context | the authors' SCORE code, NoGAM in dodiscover, CausalDisco (R2-SortnRegress) | 0.17.0 |
+| [SCORE and NoGAM](comparisons/score-nogam.md) | `stein_cpu.py` | SCORE, NoGAM, DAS; CAM as context | the authors' SCORE code, NoGAM and DAS in dodiscover, CausalDisco (R2-SortnRegress) | 0.17.0 |
 | [NOTEARS and DAGMA](comparisons/notears-dagma.md) | `notears_cpu.py`, `notears_summary.py` | NOTEARS, DAGMA, each also with `standardize=True` and `robust=True` | the authors' NOTEARS code, the authors' dagma; CausalDisco (R2-SortnRegress, Var-SortnRegress) as controls | 0.17.0, 0.18.0 |
 | [PNL direction test](comparisons/pnl.md) | `pnl_pairs.py` | PNL | causal-learn | 0.4.0, 0.9.0 |
 | [LOCI direction test](comparisons/loci.md) | `loci_pairs.py` | LOCI, both criteria; ANM, PNL, and CAM as context | the authors' LOCI code (spline features, both criteria) | 0.16.0 |
