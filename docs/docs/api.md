@@ -316,8 +316,8 @@ default, sets no cap, except in `das`, whose default is its paper's 20. `ges`, `
 and `grasp` grow no parent set past it, `exact_search` scores only the parent sets within it,
 `cam`'s order search adds no edge past it, and `das`'s edge screen keeps no candidate past it.
 `icp` tests only the sets of at most that many variables, and its guarantee then needs the target
-to have no more parents. `gfci`, `boss_fci`, and `grasp_fci` cap their GES, BOSS, or GRaSP phase; the PAG their
-tests then orient can put more arrowheads at a node.
+to have no more parents. `gfci`, `boss_fci`, and `grasp_fci` cap their GES, BOSS, or GRaSP phase;
+the PAG their tests then orient can put more arrowheads at a node.
 
 % concept: seed
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
