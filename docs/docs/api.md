@@ -138,8 +138,9 @@ column with no observed value, or a constant one over its observed values, raise
 before the fit, and a test with fewer rows than it needs, `|S| + 3` for a partial-correlation test
 and 2 for the other tests, raises one during it. With a partial-correlation test
 (`"fisherz"`, `"student_t"`, or `"normal_scores"`), the `"total_conditioning"` blanket learner needs
-`d + 2` rows with every variable observed and raises before the fit without them. `cdnod` and
-`fci_jci` need a complete `env`. Every other method raises a `ValueError` that names it and says
+`d + 2` rows with every variable observed and raises before the fit without them, unless `max_depth`
+is below `d - 2` or there is one column, where it runs no such test. `cdnod` and `fci_jci` need a
+complete `env`. Every other method raises a `ValueError` that names it and says
 what to do instead, as the [Missing values](guides/missing-values.md) guide describes; each
 method's Notes say why.
 

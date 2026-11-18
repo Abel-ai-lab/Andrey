@@ -120,9 +120,10 @@ tests (`fisherz`, `student_t`, and `normal_scores`), with `|S|` the size of its 
 and 2 for the other tests. A test with fewer rows raises a `ValueError` that says so. The
 `total_conditioning` blanket learner, the default of `mmb_by_mmb`, conditions every test on all the
 other variables, so with a partial-correlation test it needs `d + 2` rows with every variable
-observed and raises before the fit without them. Cap the conditioning sets with `max_depth`
-(`max_p_global` in LPCMCI and the same-step phases of PCMCI+), or drop a column with many missing
-values, which can remove a common cause of the columns that stay.
+observed and raises before the fit without them, unless `max_depth` is below `d - 2` or there is
+one column, where it runs no such test. Cap the conditioning sets with `max_depth` (`max_p_global`
+in LPCMCI and the same-step phases of PCMCI+), or drop a column with many missing values, which can
+remove a common cause of the columns that stay.
 CD-NOD and FCI-JCI need a complete `env`.
 
 With `fisherz` and `student_t`, each test computes its correlations directly from its rows, for many
