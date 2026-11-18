@@ -10,140 +10,91 @@ names its pull request.
 
 ## [Unreleased]
 
+### Highlights
+
+- `dagma` is supported, with its gap stated: against its authors' package on its paper's
+  simulation, it made no more errors in any of the 24 settings with every column z-scored or the 18
+  in the simulation's own units. As with `notears`, its result depends on the data's scale
+  (Reisach, Seiler and Weichwald 2021), and the `robust=True` path of both now follows its authors'
+  code. The [0.18.0 release card][card-0180-dagma] has the numbers and a check of both methods on
+  the Sachs data. ([#1043], [#1046])
+- DAS, SkewD, and CPCM, experimental, extend the functional causal models. `das` (Montagna et al.
+  2023) prunes SCORE's causal order at scale; `skewd` and `skewd_mv` (Klippert and Marx 2026) read
+  the direction of a pair, and a small DAG, whose noise is skewed and changes scale with the cause;
+  and `cpcm` and `cpcm_graph` (Bodik and Chavez-Demoulin 2025) do so where each variable given its
+  causes follows a chosen parametric family, such as counts or positive values. ([#1082], [#1083],
+  [#1085], [#1088])
+- `andrey.data.load_dataset("tuebingen")` loads the 108 Tübingen cause-effect pairs (Mooij et al.
+  2016), each with its reference direction and weight. ([#1084])
+- `anm`, `pnl`, and `loci` return the same direction under any order of the rows, and every pairwise
+  method decides a tie between the two directions by one rule. ([#1112])
+- An AI policy: however a change is written, it follows the same rules and checks and goes through
+  a pull request that a person answers for, benchmark numbers come from recorded runs only, and
+  every blog post and release card ends with a statement of how AI tools were used to write it.
+  ([#1090])
+
 ### Added
 
-- An example notebook on missing values, `examples/missing_values.ipynb`: it removes values from
-  simulated data so that whether a value is missing depends on another variable, fits `pc` with its
-  default handling and with `missing="mvpc"` and `ges` with `missing="em"`, and scores each against
-  the true graph. ([#1059])
-- `andrey.das`, DAS (Montagna et al. 2023), experimental: SCORE's causal order, then each leaf's
-  candidate parents screened by Welch tests on its row of the same Stein estimate of the score's
-  Jacobian, at most `max_parents=20` per variable, and CAM's smooth-term tests on those candidates
-  only, so the pruning no longer fits every variable before a node in the order ([#1082]).
-- `andrey.cpcm` and `andrey.cpcm_graph`, CPCM (Bodik and Chavez-Demoulin 2025), experimental:
-  conditionally parametric causal models, where each variable given its parents follows a chosen
-  family whose parameters are smooth functions of the parents (`family`: `"gaussian"`, the default,
-  with mean and scale, `"gaussian_fixed_scale"`, `"exponential"`, `"pareto"`, `"poisson"`,
-  `"gamma"`, `"gamma_fixed_shape"`, `"gumbel"`, `"gumbel_fixed_scale"`, `"negative_binomial"`, one
-  for every column or one per column). `cpcm` decides a pair by the paper's residual independence
-  tests, `cpcm_graph` returns the DAG of lowest penalized dHSIC score (`edge_penalty=2`) by exact
-  search up to 4 variables and RESIT-greedy search above. A column outside its family's support
-  raises `ValueError` ([#1085]).
-- `andrey.skewd` and `andrey.skewd_mv`, SkewD and SkewD-MV (Klippert and Marx 2026), experimental:
-  the direction of a variable pair, and a DAG, in a location-scale model whose noise is skewed,
-  `y = f(pa) + g(pa) n` with skew-normal `n`. `skewd` fits the model in each direction, with
-  penalties chosen by Bayesian optimization of a cross-validated likelihood, and decides by an HSIC
-  test of the scaled residual against the cause (`criterion="independence"`, the default) or by the
-  larger likelihood (`criterion="likelihood"`). `skewd_mv` learns the Markov equivalence class with
-  PC and returns its DAG with the largest likelihood; it lists the class's DAGs one at a time and
-  stops with an error once they need more than `max_fits` conditional models (100, the order up to
-  which the paper expects it to apply), before it fits any. Not benchmarked yet. ([#1083])
+- `andrey.dagma` is supported, and the [0.18.0 release card][card-0180-dagma] compares it with its
+  authors' package on raw, rescaled, and z-scored columns and fits it and `notears` on the Sachs
+  data. ([#1043], [#1046])
+- `andrey.das`, DAS (Montagna et al. 2023), experimental, takes SCORE's causal order and screens
+  each leaf's candidate parents on the same estimate of the score's Jacobian, at most
+  `max_parents=20` per variable, before CAM's pruning. ([#1082], [#1088])
+- `andrey.skewd` and `andrey.skewd_mv`, SkewD and SkewD-MV (Klippert and Marx 2026), experimental,
+  decide a pair's direction, and choose a DAG in PC's equivalence class, under location-scale noise
+  that follows a skew-normal distribution. ([#1083])
+- `andrey.cpcm` and `andrey.cpcm_graph`, CPCM (Bodik and Chavez-Demoulin 2025), experimental, decide
+  a pair's direction, and learn a DAG of up to a few variables, where each variable given its causes
+  follows a chosen family (`family`, one for every column or a list, one per column, also on the
+  command line). ([#1085], [#1099])
 - `andrey.data.load_dataset("tuebingen")` loads the Tübingen cause-effect pairs (Mooij et al. 2016)
-  as a `CausePairs` collection of 108 pairs. Each pair is a dataset with its two columns, the
-  two-node graph of its reference direction, its weight (pairs from one source share weights that
-  sum to 1), and its `cause` and `effect` columns; the six pairs with a block of several columns (52
-  to 55, 71, 105) are marked `multivariate`. The collection states no license, so Andrey downloads
-  the archive from the original server, checks its SHA-256, and does not redistribute it. ([#1084])
-- `dagma` is supported, with its gap stated. Against its authors' package on its paper's simulation,
-  it made no more errors in any of the 24 settings with every column z-scored or any of the 18 on the
-  simulation's own units, and in 17 of the 18 with each variable divided by its standard deviation as
-  it is generated. On the simulation's own units it made fewer errors than the empty graph in all 18
-  settings, and on z-scored columns in none of the 24, as the package. Its result depends on the
-  data's scale (Reisach, Seiler and Weichwald 2021). The [0.18.0 release card][card-0180-dagma] has
-  the numbers and a check of `dagma` and `notears` on the Sachs data: on its 853 observational
-  measurements, four fits, default and `robust=True`, on raw and z-scored columns, made 13 or 14
-  errors against the empty graph's 17. ([#1043], [#1046])
+  as a `CausePairs` collection of 108 pairs, each with its two columns, the graph of its reference
+  direction, its weight, and its `cause` and `effect` columns, downloaded from the original server
+  and checked by SHA-256. ([#1084])
+- An example notebook on missing values, `examples/missing_values.ipynb`, scores `pc` with its
+  default handling and with `missing="mvpc"`, and `ges` with `missing="em"`, on data whose values go
+  missing depending on another variable. ([#1059])
+- An AI policy in the README, the AI tools section of `DEVELOPMENT.md`, and `CONTRIBUTING.md`, and
+  an AI statement at the end of every blog post and release card. ([#1090])
+- For contributors, `benchmarks/run_tests.sh` builds every environment of the benchmark harness and
+  runs its tests, a step of every release. ([#1068])
 
 ### Changed
 
-- The documentation of `register_indep_test` and `DSepOracle` states that a registered test's
-  indices are column positions of the matrix its factory receives, and that the
-  possible-d-separation step of `fci`, `fci_jci`, and `gfci` builds its test again over the columns
-  in rank order: a test that does not read its matrix, such as an oracle by d-separation, finds
-  which variable each column holds, and `possible_dsep="fast"` keeps the data's order. The
-  environment settings and the configuration page no longer list `fci_jci` with `normal_scores`
-  among the parallel possible-d-separation searches; it does not offer that test. ([#1040])
-- A partial-correlation test asked one query at a time with two or more conditioning variables
-  inverts the query's one submatrix directly, with the same `np.linalg.inv` call and the same
-  singularity bound, where it built an index grid and a stack of one. Every output is the same bit
-  for bit. ([#1035], [#1041])
 - The causal-order search of `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and
-  `longitudinal_lingam` with `measure="pwling"` stops scoring a candidate once its partial score,
-  a sum of nonnegative terms, shows it can be neither picked nor tied, and scores every other
-  candidate in full. `direct_lingam` on 50 variables at 2,500 rows and on 70 at 3,500 is 2.0 and
-  2.4 times faster, and `multi_group_direct_lingam` on three groups of 1,000 rows and 30 variables
-  1.4 times. Every order, graph, and weight is the same bit for bit. Steps with fewer rows times
-  ordered pairs of candidates than `ANDREY_LINGAM_PRUNE_MIN_WORK` (default `100000`) score every
-  candidate. ([#1045], [#1051])
-- `qa/identity.py --shuffle` also refits ICP, IGSP, FCI-JCI, and J-PCMCI+, moving each one's
-  targets and contexts with the columns. It exits 1 on a column order when a graph or a causal order
-  changes or a weight or metadata value changes by more than rounding, and lists a difference of
-  rounding alone, such as the p-values of ICP and J-PCMCI+, as information. ([#1055])
-- The Limitations of `notears` and `dagma` are one sentence: the result depends on the data's scale,
-  after Reisach, Seiler and Weichwald (2021), with a link to the release card. The registry and the
-  docstrings no longer say that the robust fit does not depend on the scale of the columns: its first
-  fit is least squares, and its penalty and threshold act on the weights in the data's units.
-  ([#1043], [#1046])
+  `longitudinal_lingam` with `measure="pwling"` stops scoring a candidate that can be neither picked
+  nor tied, so `direct_lingam` on 50 and 70 variables is 2.0 and 2.4 times as fast, with every
+  output the same bit for bit. ([#1045], [#1051])
+- The Limitations of `notears` and `dagma` state in one sentence that their result depends on the
+  data's scale, and link the release card. ([#1043], [#1046])
+- For contributors, `qa/identity.py --shuffle` also refits ICP, IGSP, FCI-JCI, and J-PCMCI+, moving
+  their targets and contexts with the columns. ([#1055])
 
 ### Fixed
 
-- A column that holds both signs near the largest float no longer raises a `RuntimeWarning`
-  in the check for constant columns, which compared a difference that overflowed; every
-  method reads its data through that check. ([#1083])
-- `"fisherz"` and `"normal_scores"` compute the upper tail of their p-value directly, and so do
-  the Fisher-aggregated HSIC test of `bottom_up_parce_lingam` and the Anderson-Darling p-value of
-  one value in `markov_check`. The subtraction `1 - cdf` they used was `0` below about `2e-16` and
-  off by up to a few percent near `1e-14`, so every strong dependence tied. A p-value above `1e-16`
-  is the same to rounding, and a strong dependence now keeps a positive p-value down to about
-  `1e-308`. On the recorded-output and recovery inputs, every method but four returns the same
-  output bit for bit: the p-values and statistics in the metadata of `pcmci`, `pcmciplus`,
-  `lpcmci`, and `jpcmciplus` change, and their graphs do not. The uniformity statistic and p-value
-  of `markov_check` change when a test's p-value was `0`, and the stored outputs of its example
-  notebook are refreshed. ([#1017])
-- The column ranks that order tied choices (`tie_ranks`) are the same for a column in units near
-  the ends of the float range, such as `2**-1000` or `1e300`, where the squares behind its marginal
-  overflowed or vanished and could reorder the columns ([#1085]).
-- `indep_test="normal_scores"` takes data from one environment. It ranks each column over every
-  row its test reads, so over several environments a column mixed their distributions: on two
-  simulated environments a true independence given the environment index was rejected in up to 95%
-  of runs at level 0.05, and the invariance tests of `igsp` and `ut_igsp` reported a change where
-  none occurred in up to all runs. `cdnod`, `fci_jci`, `igsp`, `ut_igsp`, and `jpcmciplus` no longer
-  offer it; `gfci`, `boss_fci`, and `grasp_fci` raise a `ValueError` for it with an `env`, as for
-  `score_func="normal_scores"`; and the error for a choice a method does not offer says why.
-  ([#1037])
-- `gin` numbers the latents it leaves unordered by their clusters' lowest-ranked column, as the rest
-  of its search runs, instead of by their smallest column index, so a new column order relabels the
-  graph and no longer renumbers them. Its clusters and causal order do not change. ([#1067])
-- The reference-parity check names a row by its network, effect, hidden nodes, node count, and
-  number of series beside its size, so rows of one size that differ only there no longer share a
-  key, and it fails two failing rows of one comparison that still do. ([#1070])
-- `das` ranks the columns that knowledge forbids as parents with the others in its edge screen and
-  never keeps them, so the screen's reference can be a column known to have a zero entry instead of
-  the weakest allowed one. Correct forbidden edges no longer remove a true parent that the same
-  data gives without them. Its docstrings state that the five candidates kept without a test are
-  the value of the authors' code's `min_parents`, which usually keeps four ([#1088]).
-- `notears(robust=True)` and `dagma(robust=True)` minimize the Gaussian likelihood of the path of
-  Deng et al. (2024) without `-log|det(I - W)|`, as its authors' code does. The term is zero
-  for every DAG, so the graphs each step is judged by do not change, but its gradient is not zero
-  while a fit is cyclic, and it led the path to other graphs. On the paper's simulation with z-scored
-  columns and 20 datasets per setting, the CPDAG errors of `dagma(robust=True)` fell from 23.05,
-  44.25, 23.50, and 54.05 to 21.30, 39.95, 17.90, and 39.05 on Erdos-Renyi and scale-free graphs
-  with 10 and 20 variables, against 20.05, 42.40, 18.15, and 39.35 for the path run with its
-  authors' code, and those of `notears(robust=True)` at 10 variables moved from 16.60 on z-scored
-  and 13.25 on raw columns to 18.50 and 11.80, against 18.45 and 11.75. ([#1043], [#1046])
-- `anm`, `pnl`, and `loci` fit each direction on its rows sorted by its cause, then its effect,
-  and standardize the pair with sums over sorted values, so a result does not depend on the order
-  of the rows. One tie rule decides the direction for all three: two log p-values, statistics, or
-  log-likelihoods that differ by at most `1e-9` times the larger of 1 and their absolute values are
-  equal. The two directions' numbers had changed in their last bits with the row order, so on a
-  two-valued table whose rows stay the same when its columns swap, every method drew an edge on all
-  of 300 such tables, its direction changing with the row order on about 70% of them. Such a table
-  now gives no edge. The recorded outputs change only in the last bits of their p-values,
-  statistics, and log-likelihoods. The refits of `qa/identity.py` move within the spread that the
-  row order used to cause (up to a relative 5e-5 for `loci`), and no graph or quality-gate verdict
-  changes. The causal-learn ANM and PNL benchmark adapters compare the reference package's p-values
-  with the same tie rule, which affects only p-values within the tolerance of each other.
-  ([#1112])
+- `"fisherz"` and `"normal_scores"`, and the HSIC aggregation of `bottom_up_parce_lingam` and the
+  Anderson-Darling p-value of `markov_check`, compute a p-value's upper tail directly, so a strong
+  dependence keeps a positive p-value down to about `1e-308` instead of tying at `0`. ([#1017])
+- `indep_test="normal_scores"` takes data from one environment only, since ranking each column over
+  several environments mixed their distributions and rejected true independences. ([#1037])
+- `anm`, `pnl`, and `loci` sort each direction's rows before they fit it, so a result no longer
+  depends on the order of the rows, and two directions within a relative `1e-9` of each other are a
+  tie, which gives no edge. ([#1112])
+- `notears(robust=True)` and `dagma(robust=True)` minimize the likelihood of the path of Deng et al.
+  (2024) without `-log|det(I - W)|`, as its authors' code does, which moved their errors on the
+  paper's simulation close to that code's. ([#1043], [#1046])
+- `das` ranks the columns that knowledge forbids as parents with the others in its edge screen, so
+  correct forbidden edges no longer remove a true parent. ([#1088])
+- `gin` numbers the latents it leaves unordered by their clusters' lowest-ranked column, so a new
+  column order relabels the graph and no longer renumbers them. ([#1067])
+- The column ranks that order tied choices are the same for a column in units near the ends of the
+  float range, such as `2**-1000` or `1e300`. ([#1085])
+- A column that holds both signs near the largest float no longer raises a `RuntimeWarning` in the
+  check for constant columns. ([#1083])
+- For contributors, the reference-parity check names a row by its network, effect, hidden nodes,
+  node count, and number of series beside its size, so two rows of one size no longer share a key.
+  ([#1070])
 
 ## [0.17.1] - 2026-11-12
 
@@ -2693,9 +2644,6 @@ First alpha release.
 [#920]: https://github.com/Abel-ai-lab/Andrey/pull/920
 [#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
 [#1037]: https://github.com/Abel-ai-lab/Andrey/pull/1037
-[#1040]: https://github.com/Abel-ai-lab/Andrey/pull/1040
-[#1035]: https://github.com/Abel-ai-lab/Andrey/pull/1035
-[#1041]: https://github.com/Abel-ai-lab/Andrey/pull/1041
 [#1045]: https://github.com/Abel-ai-lab/Andrey/issues/1045
 [#1051]: https://github.com/Abel-ai-lab/Andrey/pull/1051
 [#1059]: https://github.com/Abel-ai-lab/Andrey/pull/1059
@@ -2710,4 +2658,7 @@ First alpha release.
 [#1112]: https://github.com/Abel-ai-lab/Andrey/pull/1112
 [#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
 [#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
+[#1068]: https://github.com/Abel-ai-lab/Andrey/pull/1068
+[#1090]: https://github.com/Abel-ai-lab/Andrey/pull/1090
+[#1099]: https://github.com/Abel-ai-lab/Andrey/pull/1099
 [card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
