@@ -427,6 +427,9 @@ names its pull request.
 
 ### Fixed
 
+- A column that holds both signs near the largest float no longer raises a `RuntimeWarning`
+  in the check for constant columns, which compared a difference that overflowed; every
+  method reads its data through that check. ([#1083])
 - `notears(robust=True)` and `dagma(robust=True)` minimize the Gaussian likelihood of the path of
   Deng et al. (2024) without `-log|det(I - W)|`, as its authors' code does. The term is zero
   for every DAG, so the graphs each step is judged by do not change, but its gradient is not zero

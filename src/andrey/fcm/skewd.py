@@ -189,8 +189,12 @@ def _cma_es(
     The (mu/mu_w, lambda) strategy with the default weights and learning rates of Hansen (2016),
     the population :data:`POPULATION`, and the step size :data:`STEP_SIZE`. A candidate outside the
     bounds is moved to the nearest point inside them, and the update reads the moved candidate.
-    It stops after :data:`GENERATIONS` generations, once the best point moved less than
-    :data:`TOLERANCE` over :data:`WINDOW` generations, or once the steps fall below rounding.
+    The learning rates stay at those defaults for the whole search; the paper's runs adapt them
+    (Appendix B.1). It returns the best candidate of every generation and stops after
+    :data:`GENERATIONS` generations, once the distribution's mean moved less than :data:`TOLERANCE`
+    over :data:`WINDOW` generations, or once the steps fall below rounding. The window reads the
+    mean, not the best candidate, which stays where it is for as long as no candidate beats it,
+    however wide the search still is.
     """
     dim = start.size
     mu = POPULATION // 2
@@ -208,7 +212,7 @@ def _cma_es(
     cov, basis, scales = np.eye(dim), np.eye(dim), np.ones(dim)
     path_c, path_s = np.zeros(dim), np.zeros(dim)
     best, best_value = mean.copy(), float(objective(mean[None, :])[0])
-    history = [best]
+    history = [mean]
     for generation in range(GENERATIONS):
         steps = rng.standard_normal((POPULATION, dim)) @ (basis * scales).T
         candidates = np.clip(mean + sigma * steps, lower, upper)
@@ -232,12 +236,15 @@ def _cma_es(
             + c1 * (np.outer(path_c, path_c) + (1 - hsig) * cc * (2 - cc) * cov)
             + cmu * (chosen.T * weights) @ chosen
         )
-        sigma *= math.exp((cs / damps) * (norm_s / chi - 1))
+        try:
+            sigma *= math.exp((cs / damps) * (norm_s / chi - 1))
+        except OverflowError:  # the covariance lost a direction, so the step size means nothing
+            break
         cov = (cov + cov.T) / 2
         eigen, basis = np.linalg.eigh(cov)
         scales = np.sqrt(np.maximum(eigen, 1e-300))
-        history.append(best)
-        if generation >= WINDOW and np.linalg.norm(best - history[-1 - WINDOW]) < TOLERANCE:
+        history.append(mean)
+        if generation >= WINDOW and np.linalg.norm(mean - history[-1 - WINDOW]) < TOLERANCE:
             break
         if not math.isfinite(sigma) or sigma * scales.max() < 1e-12:
             break

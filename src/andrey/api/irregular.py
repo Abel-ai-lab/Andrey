@@ -711,20 +711,24 @@ def skewd(
     accurate on skewed location-scale pairs and the independence criterion the more robust across
     other benchmarks, so the independence criterion is the default.
 
-    In each direction, the effect given the cause is skew-normal with location ``f``, scale ``g``,
-    and one shape ``lambda`` for every row; ``f`` is a cubic B-spline of 12 knots (14 columns) and
-    ``log g^2`` one of 5 knots (7 columns), each extended linearly past the data's range [1]_.
-    The estimate maximizes the log-likelihood less a second-order difference penalty on each
-    spline's coefficients [3]_, in three steps [1]_: Bayesian optimization chooses the two
-    penalties, each candidate scored by the held-out log-likelihood of an 8-fold
+    In each direction, the effect given the cause is skew-normal with location ``f``, scale
+    ``g``, and one shape ``lambda`` for every row; ``f`` is a cubic B-spline of 12 knots (14
+    columns) and ``log g^2`` one of 5 knots (7 columns), each extended linearly past the data's
+    range [1]_. The estimate maximizes the log-likelihood less a second-order difference penalty
+    on each spline's coefficients [3]_, in three steps [1]_: Bayesian optimization chooses the
+    two penalties, each candidate scored by the held-out log-likelihood of an 8-fold
     cross-validation, ``tuning_iter`` candidates with a Gaussian-process model of the scores and
-    the expected improvement; CMA-ES [4]_, with a population of 100, maximizes the penalized
-    likelihood from least squares and from each fold's estimate; and expectation conditional
-    maximization refines the best of them until the parameters move less than ``1e-6`` over 25
-    iterations, or for ``max_iter`` iterations. The defaults, 60 candidates and 5,000 iterations,
-    are those of the paper's runs. Each column is standardized first, as in [1]_, so the result
-    does not depend on the units of either variable; the Gaussian marginals of the two
-    standardized causes are then equal, so the likelihoods compare the two conditional models.
+    the expected improvement; CMA-ES [4]_, with a population of 100 and fixed learning rates
+    where the paper's runs adapt them, maximizes the penalized likelihood from least squares and
+    from each fold's estimate; and expectation conditional maximization refines the best of them
+    until the parameters move less than ``1e-6`` over 25 iterations, or for ``max_iter``
+    iterations. The defaults, 60 candidates and 5,000 iterations, are those of the paper's runs.
+    Each column is standardized first, as in [1]_, so the model does not depend on the units of
+    either variable; the Gaussian marginals of the two standardized causes are then equal, so
+    the likelihoods compare the two conditional models. A change of units by a power of two
+    gives the identical result. Any other factor changes the standardized values in their last
+    digits, and the seeded search can then end at another local optimum, so the likelihoods, the
+    p-values and, on a pair whose two directions fit about equally, the edge can change.
 
     With ``criterion="independence"`` (SkewD-IT), each direction's scaled residual
     ``(y - f(x)) / g(x)`` is tested against the proposed cause with the HSIC test of

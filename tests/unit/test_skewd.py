@@ -11,6 +11,7 @@ import pytest
 from scipy.stats import skewnorm
 
 from andrey import skewd, skewd_mv
+from andrey.api.irregular import _pair_matrix
 from andrey.core.orient import ARROW, NULL, TAIL, dag2cpdag
 from andrey.fcm import skewd as native
 
@@ -186,6 +187,16 @@ def test_skewd_reads_no_units_and_repeats(criterion):
     scaled = skewd(data * np.array([2.0**-30, 2.0**20]), criterion=criterion, **SHORT_PAIR)
     assert scaled.structure.oriented_edges() == first.structure.oriented_edges()
     assert scaled.metadata == first.metadata
+
+
+def test_skewd_reads_the_same_table_in_any_units_up_to_rounding():
+    # A factor that is not a power of two changes the standardized values in their last digits
+    # only; the docstring says what the seeded search can make of that.
+    data = _pair()
+    base = _pair_matrix("skewd", data, standardize=True)[0]
+    for factors in ([3.7, 3.7], [1e6, 1e6], [3.7, 1.0], [1e-6, 1e6]):
+        scaled = _pair_matrix("skewd", data * np.array(factors), standardize=True)[0]
+        np.testing.assert_allclose(scaled, base, rtol=0, atol=1e-13)
 
 
 def test_skewd_swapped_columns_swap_the_directions():
@@ -416,3 +427,16 @@ def test_a_fit_with_two_parents_stops_on_the_rule():
     blocks = refined[: design.location.shape[1]].reshape(2, -1)
     assert blocks[0].sum() == pytest.approx(blocks[1].sum(), abs=1e-9)
     assert not native._ecm(design, effect, theta, np.zeros(4), 5)[1]  # a short limit still shows
+
+
+def test_a_search_started_near_an_optimum_moves_to_it():
+    # No candidate of the first generations, drawn at step size 1, beats a start this close to the
+    # optimum, and the search must go on until its distribution has narrowed onto it.
+    def objective(candidates: np.ndarray) -> np.ndarray:
+        return ((candidates - 1e-5) ** 2).sum(axis=1)
+
+    start = np.zeros(20)
+    free = np.full(20, np.inf)
+    best, value = native._cma_es(objective, start, -free, free, np.random.default_rng(0))
+    assert not np.array_equal(best, start)
+    assert value < 0.01 * float(objective(start[None, :])[0])
