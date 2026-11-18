@@ -74,10 +74,12 @@ def tie_key(value: float) -> float:
 
 
 #: Tolerance under which the two directions of a pairwise direction test (``anm``, ``pnl``,
-#: ``loci``) count as equal: two log p-values, two test statistics, or two log-likelihoods ``a``
-#: and ``b`` tie when ``|a - b| <= PAIR_RTOL * max(1, |a|, |b|)``. Each direction's fit reads its
-#: rows in one canonical order, so a table whose two columns hold the same values swapped gives
-#: both directions the same numbers bit for bit, and they tie for every method. The tolerance
+#: ``loci``, ``cpcm``) count as equal: two log p-values, two test statistics, or two
+#: log-likelihoods ``a`` and ``b`` tie when ``|a - b| <= PAIR_RTOL * max(1, |a|, |b|)``. For
+#: ``anm``, ``pnl`` and ``loci`` each direction's fit reads its rows in one canonical order, so a
+#: table whose two columns hold the same values swapped gives both directions the same numbers bit
+#: for bit, and they tie. ``cpcm`` fits both directions on the rows as given; on such tables in
+#: other row orders and units its two directions differed by at most ``1e-13``. The tolerance
 #: covers rounding carried through a fit: with such a table's columns in different units, which
 #: changes the last bits of its standardized values, the largest relative gap over 1,840 fits with
 #: 100 to 300 rows was ``1e-13`` for ``anm`` and ``0`` for ``pnl``, while for ``anm`` the two
@@ -361,7 +363,8 @@ def _marginal_key(col: np.ndarray, is_categorical: bool) -> bytes:
     values = np.sort(col[~np.isnan(col)])
     if values.size == 0 or values[0] == values[-1]:
         return f"V{values.size} constant".encode()
-    z = values - values.mean()
+    z = _within_one(values)
+    z -= z.mean()
     z /= np.sqrt(np.mean(z**2))
     return f"V{values.size} {abs(np.mean(z**3)):.9f} {np.mean(z**4):.9f}".encode()
 
@@ -401,9 +404,17 @@ def _standardized(col: np.ndarray) -> np.ndarray:
     z = np.full(col.shape, np.nan)
     z[present] = 0.0
     if values.size and values.min() != values.max():
-        centered = values - values.mean()
+        centered = _within_one(values)
+        centered -= centered.mean()
         z[present] = centered / np.sqrt(np.mean(centered**2))
     return z
+
+
+def _within_one(values: np.ndarray) -> np.ndarray:
+    """``values`` divided by the power of two that brings them within ``[-1, 1]``: exact, so the
+    keys are the same in any units, and the sums and squares that follow neither overflow nor
+    vanish for values near the largest or smallest float."""
+    return np.ldexp(values, -np.frexp(np.abs(values).max())[1])
 
 
 def _first_difference(a: np.ndarray, b: np.ndarray) -> int:

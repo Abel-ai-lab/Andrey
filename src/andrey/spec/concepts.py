@@ -152,8 +152,9 @@ _POOLED_RANKS = (
 )
 #: The methods that take a conditional-independence test.
 TESTED = (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp")
-#: The methods with no edge to name in knowledge, and ICP, whose tests take none.
-NO_KNOWLEDGE = ("gin", "anm", "pnl", "loci", "icp", "ages")
+#: The methods with no edge to name in knowledge, ICP, whose tests take none, and the methods that
+#: take none yet.
+NO_KNOWLEDGE = ("gin", "anm", "pnl", "loci", "icp", "ages", "cpcm", "cpcm_graph")
 #: The methods whose main loop a cap can stop early.
 CAPPED_LOOPS = (
     "hc",
@@ -197,12 +198,18 @@ _CONCEPTS = (
             "nogam",
             "das",
             "camuv",
+            "cpcm",
             "icp",
             "igsp",
             "ut_igsp",
         ),
         exempt=(
             *_exempt("A score search: no test decides an edge.", *PURE_SCORE, "gnies", "ages"),
+            *_exempt(
+                "Its score is the p-value of the residuals' joint independence test plus a "
+                "penalty per edge: no test at a level decides an edge.",
+                "cpcm_graph",
+            ),
             *_exempt("Continuous optimization: no test decides an edge.", *CONTINUOUS, "dynotears"),
             *_exempt(
                 "Its edges come from the gated likelihood; its moral-graph screen is a step "
@@ -245,7 +252,7 @@ _CONCEPTS = (
                     fragment="p-value",
                     reason="None decides without a level: the direction with the larger p-value.",
                 )
-                for m in ("anm", "pnl", "loci")
+                for m in ("anm", "pnl", "loci", "cpcm")
             ),
             Deviation(
                 method="cam",
@@ -326,6 +333,8 @@ _CONCEPTS = (
                 *RESIDUAL,
                 "resit",
                 "camuv",
+                "cpcm",
+                "cpcm_graph",
             ),
             *_exempt(
                 "No conditional-independence test.",
@@ -627,6 +636,8 @@ _CONCEPTS = (
                 "anm",
                 "pnl",
                 "loci",
+                "cpcm",
+                "cpcm_graph",
             ),
             *_exempt(
                 "No conditional-independence tests; max_parents caps the sets it tests.", "icp"
@@ -735,6 +746,12 @@ _CONCEPTS = (
                 "granger",
                 *RESIDUAL,
                 "resit",
+                "cpcm",
+            ),
+            *_exempt(
+                "Its search scores every DAG, or removes edges from the complete DAG of a causal "
+                "order, and sets no cap on a node's parents.",
+                "cpcm_graph",
             ),
             *_exempt(
                 "An order search with no search over parent sets: the pruning starts from every "
@@ -813,7 +830,16 @@ _CONCEPTS = (
             maximum=SEED_MAX,
         ),
         fragment="not a fresh random one",
-        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", *STARTS, "calm", "ica_lingam"),
+        suitable=(
+            *CI_SEARCHES,
+            *PCMCI_FAMILY,
+            "jpcmciplus",
+            *STARTS,
+            "calm",
+            "ica_lingam",
+            "cpcm",
+            "cpcm_graph",
+        ),
         exempt=(
             *_exempt(
                 "Deterministic.",
@@ -1006,7 +1032,13 @@ _CONCEPTS = (
         exempt=(
             *_exempt("Its edges run from latent variables, which Knowledge cannot name.", "gin"),
             *_exempt(
-                "Two variables: knowledge of the edge would be the answer.", "anm", "pnl", "loci"
+                "Two variables: knowledge of the edge would be the answer.",
+                *("anm", "pnl", "loci", "cpcm"),
+            ),
+            *_exempt(
+                "The paper gives no rule for background knowledge: its search scores every DAG, "
+                "or removes edges from the complete DAG of a causal order.",
+                "cpcm_graph",
             ),
             *_exempt(
                 "Its tests read each set of the target's predictors as the data give it; no "
@@ -1029,9 +1061,9 @@ _CONCEPTS = (
         exempt=(
             *_exempt(
                 "Has no edge for knowledge to name (the knowledge concept).",
-                *(m for m in NO_KNOWLEDGE if m not in ("icp", "ages")),
+                *(m for m in NO_KNOWLEDGE if m not in ("icp", "ages", "cpcm_graph")),
             ),
-            *_exempt("Takes no knowledge (the knowledge concept).", "icp", "ages"),
+            *_exempt("Takes no knowledge (the knowledge concept).", "icp", "ages", "cpcm_graph"),
         ),
     ),
     Concept(
@@ -1127,6 +1159,8 @@ _CONCEPTS = (
                 "score_matching",
                 "nogam",
                 "das",
+                "cpcm",
+                "cpcm_graph",
                 *LINGAM,
                 "gin",
                 "rcd",
@@ -1296,6 +1330,7 @@ _CONCEPTS = (
                 "Its regressions fit smooth functions of continuous causes, which an environment "
                 "label is not.",
                 *("cam", "resit", "score_matching", "nogam", "das", "camuv", "anm", "pnl", "loci"),
+                *("cpcm", "cpcm_graph"),
             ),
         ),
     ),
