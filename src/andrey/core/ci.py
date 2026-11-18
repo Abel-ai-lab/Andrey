@@ -220,9 +220,9 @@ class PartialCorrelationTest:
             ryz = float(corr[y_int, z_idx])
             r = (rxy - rxz * ryz) / math.sqrt((1.0 - rxz * rxz) * (1.0 - ryz * ryz))
         else:
-            var = (x_int, y_int, *cond)
-            inv = self._invert(corr[np.ix_(var, var)][None])[0]
-            r = -float(inv[0, 1]) / math.sqrt(abs(float(inv[0, 0]) * float(inv[1, 1])))
+            var = np.array((x_int, y_int, *cond), dtype=np.intp)
+            inv = self._invert_one(corr[var[:, None], var])
+            r = -inv.item(0, 1) / math.sqrt(abs(inv.item(0, 0) * inv.item(1, 1)))
         return -ONE_MINUS_EPS if r < -ONE_MINUS_EPS else ONE_MINUS_EPS if r > ONE_MINUS_EPS else r
 
     def copies(self) -> tuple[tuple[int, ...], ...]:
@@ -248,6 +248,20 @@ class PartialCorrelationTest:
             )
             named.groups = copies
             raise named from error
+
+    def _invert_one(self, matrix: np.ndarray) -> np.ndarray:
+        """:meth:`_invert` of the one ``(k, k)`` submatrix ``matrix``, with the bits of a stack of
+        one: the same ``np.linalg.inv`` call and the same bound as :func:`_invert_nonsingular`. A
+        matrix the bound does not settle, or that ``np.linalg.inv`` rejects, takes :meth:`_invert`.
+        """
+        try:
+            inv = np.linalg.inv(matrix)
+        except np.linalg.LinAlgError:
+            return self._invert(matrix[None])[0]
+        size = matrix.shape[0]
+        if not abs(inv).max() < 1.0 / (BOUND_MARGIN * SINGULAR_RTOL * size * size):
+            return self._invert(matrix[None])[0]
+        return inv
 
     def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
         """Return p-values for one ``(x, y)`` pair over many conditioning sets.
@@ -469,9 +483,10 @@ class FisherZ(PartialCorrelationTest):
     """Fisher-Z partial-correlation conditional-independence test.
 
     Applies Fisher's z-transform to the partial correlation ``r`` and reports
-    ``p = 2 * (1 - Phi(sqrt(n - |S| - 3) * |z|))`` with ``z = atanh(r)`` and ``Phi`` the
-    standard-normal CDF. A query needs ``n >= |S| + 3``. See :class:`PartialCorrelationTest` for
-    the partial correlation, the query paths, and their exact agreement.
+    ``p = 2 * Phi(-sqrt(n - |S| - 3) * |z|)`` with ``z = atanh(r)`` and ``Phi`` the standard-normal
+    CDF. The upper tail is computed directly, so a strong dependence keeps a positive p-value far
+    below ``1e-16``. A query needs ``n >= |S| + 3``. See :class:`PartialCorrelationTest` for the
+    partial correlation, the query paths, and their exact agreement.
     """
 
     def _degrees_of_freedom(self, size: int) -> int:
@@ -486,7 +501,7 @@ class FisherZ(PartialCorrelationTest):
     @staticmethod
     def _pvalue(r: np.ndarray | float, df: int) -> np.ndarray | float:
         z = 0.5 * np.log((1.0 + r) / (1.0 - r))
-        return 2.0 * (1.0 - ndtr(np.sqrt(df) * np.abs(z)))
+        return 2.0 * ndtr(-np.sqrt(df) * np.abs(z))
 
 
 class StudentT(PartialCorrelationTest):
@@ -767,7 +782,12 @@ class NormalScores(FisherZ):
     **Limitations.** Ranks measure monotone dependence: a relation that is not monotone, such as
     ``y = x**2`` for a symmetric ``x``, has zero rank correlation, and the test finds nothing where
     ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` do. Conditioning removes only the monotone
-    part of a dependence. The p-value is the Fisher-Z one, which holds asymptotically.
+    part of a dependence. The p-value is the Fisher-Z one, which holds asymptotically. The model
+    is one distribution: ranked over the rows of several environments that change a variable, a
+    column mixes their distributions, and its scores are no longer Gaussian; ranked within each
+    environment, every column is centered and scaled in each, so none depends on the environment.
+    The methods whose tests always read several environments do not offer the test, and the others
+    refuse it with an ``env``, as they refuse the rank-based score.
     """
 
     def __init__(self, data: np.ndarray) -> None:
@@ -1755,6 +1775,9 @@ SHIPPED_INDEP_TESTS: tuple[str, ...] = (
     *NONLINEAR_INDEP_TESTS,
 )
 DISCRETE_INDEP_TESTS: tuple[str, ...] = ("chisq", "gsq")
+#: The rank-based tests, which rank each column over every row they read; a method whose tests
+#: always read several environments does not offer them, as the ranks would mix the environments.
+RANK_INDEP_TESTS: tuple[str, ...] = ("normal_scores",)
 MIXED_INDEP_TESTS: tuple[str, ...] = ("degen_gauss", "cond_gauss")
 #: The shipped tests of continuous data: the partial-correlation and the nonlinear tests.
 CONTINUOUS_INDEP_TESTS: tuple[str, ...] = tuple(
@@ -1788,6 +1811,23 @@ def register_indep_test(name: str, factory: Callable[[np.ndarray], CITest]) -> N
     tests have, reports its own; for a test without one the family asks the call one query at a
     time and ranks the candidates by p-value, smallest first (:class:`PValueTest`), which it
     reports as the statistic ``-log10(p)``.
+
+    Every index a test is queried with is a column position of the matrix its factory received, and
+    a search can call the factory again for the same columns in another order: by default the
+    possible-d-separation step of FCI, FCI-JCI, and GFCI visits the variables in
+    :func:`~andrey.core.ties.tie_ranks` order and builds its test over the matrix in that order
+    (``possible_dsep="order_free"``). A test computed from its matrix needs nothing more. A test
+    that does not read its matrix, such as a :class:`~andrey.data.latent.DSepOracle`, must find
+    which variable each column of the matrix it receives holds::
+
+        def factory(columns):
+            nodes = [
+                next(j for j in range(data.shape[1]) if np.array_equal(c, data[:, j]))
+                for c in columns.T
+            ]
+            return DSepOracle(dag, nodes=nodes)
+
+    With ``possible_dsep="fast"`` the step keeps the columns in data order.
     """
     _CI_REGISTRY[name] = factory
 
@@ -1946,7 +1986,7 @@ def _separating_prefix(
 
 def _canonical(x: int, y: int, condition_set: Iterable[int]) -> tuple[int, int, list[int]]:
     """Canonicalize a query to ordered ints and a sorted-unique conditioning set."""
-    cond = sorted(set(int(c) for c in condition_set))
+    cond = sorted(set(map(int, condition_set)))
     x_int, y_int = (int(x), int(y)) if x < y else (int(y), int(x))
     assert x_int not in cond and y_int not in cond, "x, y cannot be in condition_set."
     return x_int, y_int, cond

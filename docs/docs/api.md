@@ -119,7 +119,7 @@ round changed it logs a warning. A row that observes no value is dropped first. 
 `score_func="bic"` only and no `env`, and it assumes values missing completely at random or at
 random given observed values. `missing="mvpc"` is supported, and so is `missing="em"` in `ges`,
 `hc`, `tabu`, `boss`, `grasp`, and `notears`: in the
-[missing-data comparison](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md),
+[missing-data comparison](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/missing-data.md),
 none was less accurate than its reference implementation in a setting that repeated on fresh
 datasets. For `ges`, `boss`, and `grasp` the reference estimates one covariance by EM before its
 search, a simpler method than structural EM, and the comparison is at `ebic_gamma=0.0`, up to 50
@@ -176,7 +176,7 @@ These marks and checks assume no selection bias. `lpcmci` takes each claim with 
 order search's prior knowledge (Shimizu et al. 2011, Section 3.4).
 
 These parts are supported wherever [true claims measured no
-worse](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
+worse](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
 than the same fit without them and than a reference package given the same knowledge: in every
 method that honors them except six. `required_paths` is experimental in `tabu`, `mmhc`, and
 `rsmax2`, where a reference package given the required edges those paths imply made fewer errors,
@@ -700,6 +700,14 @@ A method becomes supported once it has:
 | `"cmiknn"` | Nearest-neighbor conditional mutual information, with a local permutation null | Supported |
 | `"gpdc"` | Gaussian-process regression, then a distance-correlation test of the residuals | Supported |
 
+`normal_scores` ranks each column over every row its test reads, and its model is one distribution.
+Ranked over the rows of several environments, a column mixes their distributions, and its scores
+are no longer Gaussian. So `cdnod`, `fci_jci`, `igsp`, `ut_igsp`, and `jpcmciplus`, whose tests
+always read several environments, do not offer it, and `gfci`, `boss_fci`, and `grasp_fci` raise a
+`ValueError` for it with an `env`, as they do for `score_func="normal_scores"`. Scores ranked within
+each environment would not help: they center and scale every column in each environment, so no
+variable would depend on the environment.
+
 The nonlinear tests, the last four, detect nonlinear dependence that partial correlation misses,
 at a far higher cost per test. They are benchmarked and checked in the release quality gate. Inside
 the search, KCI uses every BLAS thread from 2,000 rows and the other tests use one. On every thread,
@@ -725,6 +733,34 @@ andrey.pc(data, indep_test="cmiknn_k5")
 
 {py:meth}`CMIknn.statistic <andrey.core.ci_cmiknn.CMIknn.statistic>` returns the conditional
 mutual information estimate the test's p-value is built on, a dependence measure of its own.
+
+Every index a registered test is queried with is a column position of the matrix its factory
+received, and a search can ask the factory again for the same columns in another order: by default
+the possible-d-separation step of FCI, FCI-JCI, and GFCI builds its test over the columns sorted by
+their ranks (`possible_dsep="order_free"`). A test computed from its matrix, as every shipped test
+is, needs nothing more. A test that does not read its matrix, such as an oracle that answers by
+d-separation in a known graph (`andrey.data.latent.DSepOracle`), must find which variable each
+column of the matrix it receives holds:
+
+```python
+import numpy as np
+
+import andrey
+from andrey.core.ci import register_indep_test
+from andrey.data.latent import DSepOracle
+
+# `dag` is a networkx DiGraph over the column numbers of `data`, plus any hidden nodes.
+def factory(columns):
+    nodes = [
+        next(j for j in range(data.shape[1]) if np.array_equal(c, data[:, j])) for c in columns.T
+    ]
+    return DSepOracle(dag, nodes=nodes)
+
+register_indep_test("dsep", factory)
+andrey.fci(data, indep_test="dsep")  # the PAG of the observed columns
+```
+
+With `possible_dsep="fast"` the step keeps the columns in data order.
 
 On data with a `NaN`, {py:func}`~andrey.core.ci.make_indep_test` returns a
 {py:class}`~andrey.core.ci_missing.TestwiseDeletion` of the test: each query reads the rows observed

@@ -8,6 +8,68 @@ and, when a change breaks the API, Breaking, and from 0.11.0 it closes with New 
 someone contributes for the first time, sections Keep a Changelog does not define; each change
 names its pull request.
 
+## [Unreleased]
+
+### Added
+
+- An example notebook on missing values, `examples/missing_values.ipynb`: it removes values from
+  simulated data so that whether a value is missing depends on another variable, fits `pc` with its
+  default handling and with `missing="mvpc"` and `ges` with `missing="em"`, and scores each against
+  the true graph. ([#1059])
+
+### Changed
+
+- The documentation of `register_indep_test` and `DSepOracle` states that a registered test's
+  indices are column positions of the matrix its factory receives, and that the
+  possible-d-separation step of `fci`, `fci_jci`, and `gfci` builds its test again over the columns
+  in rank order: a test that does not read its matrix, such as an oracle by d-separation, finds
+  which variable each column holds, and `possible_dsep="fast"` keeps the data's order. The
+  environment settings and the configuration page no longer list `fci_jci` with `normal_scores`
+  among the parallel possible-d-separation searches; it does not offer that test. ([#1040])
+- A partial-correlation test asked one query at a time with two or more conditioning variables
+  inverts the query's one submatrix directly, with the same `np.linalg.inv` call and the same
+  singularity bound, where it built an index grid and a stack of one. Every output is the same bit
+  for bit. ([#1035], [#1041])
+- The causal-order search of `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and
+  `longitudinal_lingam` with `measure="pwling"` stops scoring a candidate once its partial score,
+  a sum of nonnegative terms, shows it can be neither picked nor tied, and scores every other
+  candidate in full. `direct_lingam` on 50 variables at 2,500 rows and on 70 at 3,500 is 2.0 and
+  2.4 times faster, and `multi_group_direct_lingam` on three groups of 1,000 rows and 30 variables
+  1.4 times. Every order, graph, and weight is the same bit for bit. Steps with fewer rows times
+  ordered pairs of candidates than `ANDREY_LINGAM_PRUNE_MIN_WORK` (default `100000`) score every
+  candidate. ([#1045], [#1051])
+- `qa/identity.py --shuffle` also refits ICP, IGSP, FCI-JCI, and J-PCMCI+, moving each one's
+  targets and contexts with the columns. It exits 1 on a column order when a graph or a causal order
+  changes or a weight or metadata value changes by more than rounding, and lists a difference of
+  rounding alone, such as the p-values of ICP and J-PCMCI+, as information. ([#1055])
+
+### Fixed
+
+- `"fisherz"` and `"normal_scores"` compute the upper tail of their p-value directly, and so do
+  the Fisher-aggregated HSIC test of `bottom_up_parce_lingam` and the Anderson-Darling p-value of
+  one value in `markov_check`. The subtraction `1 - cdf` they used was `0` below about `2e-16` and
+  off by up to a few percent near `1e-14`, so every strong dependence tied. A p-value above `1e-16`
+  is the same to rounding, and a strong dependence now keeps a positive p-value down to about
+  `1e-308`. On the recorded-output and recovery inputs, every method but four returns the same
+  output bit for bit: the p-values and statistics in the metadata of `pcmci`, `pcmciplus`,
+  `lpcmci`, and `jpcmciplus` change, and their graphs do not. The uniformity statistic and p-value
+  of `markov_check` change when a test's p-value was `0`, and the stored outputs of its example
+  notebook are refreshed. ([#1017])
+- `indep_test="normal_scores"` takes data from one environment. It ranks each column over every
+  row its test reads, so over several environments a column mixed their distributions: on two
+  simulated environments a true independence given the environment index was rejected in up to 95%
+  of runs at level 0.05, and the invariance tests of `igsp` and `ut_igsp` reported a change where
+  none occurred in up to all runs. `cdnod`, `fci_jci`, `igsp`, `ut_igsp`, and `jpcmciplus` no longer
+  offer it; `gfci`, `boss_fci`, and `grasp_fci` raise a `ValueError` for it with an `env`, as for
+  `score_func="normal_scores"`; and the error for a choice a method does not offer says why.
+  ([#1037])
+- `gin` numbers the latents it leaves unordered by their clusters' lowest-ranked column, as the rest
+  of its search runs, instead of by their smallest column index, so a new column order relabels the
+  graph and no longer renumbers them. Its clusters and causal order do not change. ([#1067])
+- The reference-parity check names a row by its network, effect, hidden nodes, node count, and
+  number of series beside its size, so rows of one size that differ only there no longer share a
+  key, and it fails two failing rows of one comparison that still do. ([#1070])
+
 ## [0.17.1] - 2026-11-12
 
 ### Highlights
@@ -2268,289 +2330,300 @@ First alpha release.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
 [0.17.1]: https://github.com/Abel-ai-lab/Andrey/compare/v0.17.0...v0.17.1
-[0.17.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.16.0...v0.17.0
-[0.16.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.15.0...v0.16.0
-[0.15.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.14.0...v0.15.0
-[0.14.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.13.0...v0.14.0
-[0.13.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.12.0...v0.13.0
-[0.12.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.11.0...v0.12.0
-[0.11.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.10.0...v0.11.0
-[0.10.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.9.0...v0.10.0
-[0.9.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.8.0...v0.9.0
-[0.8.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.7.0...v0.8.0
-[0.7.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.6.0...v0.7.0
-[0.6.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.5.0...v0.6.0
-[0.5.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.4.1...v0.5.0
-[0.4.1]: https://github.com/Abel-ai-lab/andrey/compare/v0.4.0...v0.4.1
-[0.4.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.2.1...v0.3.0
-[0.2.1]: https://github.com/Abel-ai-lab/andrey/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/Abel-ai-lab/andrey/releases/tag/v0.1.0
-[#14]: https://github.com/Abel-ai-lab/andrey/pull/14
-[#18]: https://github.com/Abel-ai-lab/andrey/pull/18
-[#31]: https://github.com/Abel-ai-lab/andrey/pull/31
-[#33]: https://github.com/Abel-ai-lab/andrey/pull/33
-[#53]: https://github.com/Abel-ai-lab/andrey/pull/53
-[#56]: https://github.com/Abel-ai-lab/andrey/pull/56
-[#57]: https://github.com/Abel-ai-lab/andrey/pull/57
-[#59]: https://github.com/Abel-ai-lab/andrey/pull/59
-[#64]: https://github.com/Abel-ai-lab/andrey/pull/64
-[#122]: https://github.com/Abel-ai-lab/andrey/pull/122
-[#127]: https://github.com/Abel-ai-lab/andrey/pull/127
-[#133]: https://github.com/Abel-ai-lab/andrey/pull/133
-[#95]: https://github.com/Abel-ai-lab/andrey/pull/95
-[#94]: https://github.com/Abel-ai-lab/andrey/pull/94
-[#167]: https://github.com/Abel-ai-lab/andrey/pull/167
-[#168]: https://github.com/Abel-ai-lab/andrey/pull/168
-[#169]: https://github.com/Abel-ai-lab/andrey/pull/169
-[#175]: https://github.com/Abel-ai-lab/andrey/pull/175
-[#178]: https://github.com/Abel-ai-lab/andrey/pull/178
-[#179]: https://github.com/Abel-ai-lab/andrey/pull/179
-[#184]: https://github.com/Abel-ai-lab/andrey/pull/184
-[#187]: https://github.com/Abel-ai-lab/andrey/pull/187
-[#189]: https://github.com/Abel-ai-lab/andrey/pull/189
-[#190]: https://github.com/Abel-ai-lab/andrey/pull/190
-[#192]: https://github.com/Abel-ai-lab/andrey/pull/192
-[#202]: https://github.com/Abel-ai-lab/andrey/pull/202
-[#203]: https://github.com/Abel-ai-lab/andrey/pull/203
-[#205]: https://github.com/Abel-ai-lab/andrey/pull/205
-[#206]: https://github.com/Abel-ai-lab/andrey/pull/206
-[#207]: https://github.com/Abel-ai-lab/andrey/pull/207
-[#208]: https://github.com/Abel-ai-lab/andrey/pull/208
-[#209]: https://github.com/Abel-ai-lab/andrey/pull/209
-[#210]: https://github.com/Abel-ai-lab/andrey/pull/210
-[#211]: https://github.com/Abel-ai-lab/andrey/pull/211
-[#213]: https://github.com/Abel-ai-lab/andrey/pull/213
-[#214]: https://github.com/Abel-ai-lab/andrey/pull/214
-[#215]: https://github.com/Abel-ai-lab/andrey/pull/215
-[#216]: https://github.com/Abel-ai-lab/andrey/pull/216
-[#220]: https://github.com/Abel-ai-lab/andrey/pull/220
-[#225]: https://github.com/Abel-ai-lab/andrey/pull/225
-[#228]: https://github.com/Abel-ai-lab/andrey/pull/228
-[#229]: https://github.com/Abel-ai-lab/andrey/pull/229
-[#233]: https://github.com/Abel-ai-lab/andrey/pull/233
-[#237]: https://github.com/Abel-ai-lab/andrey/pull/237
-[#239]: https://github.com/Abel-ai-lab/andrey/pull/239
-[#248]: https://github.com/Abel-ai-lab/andrey/pull/248
-[#251]: https://github.com/Abel-ai-lab/andrey/pull/251
-[#261]: https://github.com/Abel-ai-lab/andrey/pull/261
-[#262]: https://github.com/Abel-ai-lab/andrey/pull/262
-[#265]: https://github.com/Abel-ai-lab/andrey/pull/265
-[#267]: https://github.com/Abel-ai-lab/andrey/pull/267
-[#269]: https://github.com/Abel-ai-lab/andrey/pull/269
-[#271]: https://github.com/Abel-ai-lab/andrey/pull/271
-[#273]: https://github.com/Abel-ai-lab/andrey/pull/273
-[#275]: https://github.com/Abel-ai-lab/andrey/pull/275
-[#277]: https://github.com/Abel-ai-lab/andrey/pull/277
-[#278]: https://github.com/Abel-ai-lab/andrey/pull/278
-[#280]: https://github.com/Abel-ai-lab/andrey/pull/280
-[#282]: https://github.com/Abel-ai-lab/andrey/pull/282
-[#284]: https://github.com/Abel-ai-lab/andrey/pull/284
-[#286]: https://github.com/Abel-ai-lab/andrey/pull/286
-[#288]: https://github.com/Abel-ai-lab/andrey/pull/288
-[#289]: https://github.com/Abel-ai-lab/andrey/pull/289
-[#290]: https://github.com/Abel-ai-lab/andrey/pull/290
-[#292]: https://github.com/Abel-ai-lab/andrey/pull/292
-[#294]: https://github.com/Abel-ai-lab/andrey/pull/294
-[#299]: https://github.com/Abel-ai-lab/andrey/pull/299
-[#311]: https://github.com/Abel-ai-lab/andrey/pull/311
-[#312]: https://github.com/Abel-ai-lab/andrey/pull/312
-[#328]: https://github.com/Abel-ai-lab/andrey/pull/328
-[#343]: https://github.com/Abel-ai-lab/andrey/pull/343
-[#346]: https://github.com/Abel-ai-lab/andrey/pull/346
-[#347]: https://github.com/Abel-ai-lab/andrey/pull/347
-[#350]: https://github.com/Abel-ai-lab/andrey/pull/350
-[#351]: https://github.com/Abel-ai-lab/andrey/pull/351
-[#353]: https://github.com/Abel-ai-lab/andrey/pull/353
-[#359]: https://github.com/Abel-ai-lab/andrey/pull/359
-[#361]: https://github.com/Abel-ai-lab/andrey/pull/361
-[#362]: https://github.com/Abel-ai-lab/andrey/pull/362
-[#363]: https://github.com/Abel-ai-lab/andrey/pull/363
-[#364]: https://github.com/Abel-ai-lab/andrey/pull/364
-[#365]: https://github.com/Abel-ai-lab/andrey/pull/365
-[#367]: https://github.com/Abel-ai-lab/andrey/pull/367
-[#368]: https://github.com/Abel-ai-lab/andrey/pull/368
-[#369]: https://github.com/Abel-ai-lab/andrey/pull/369
-[#371]: https://github.com/Abel-ai-lab/andrey/pull/371
-[#375]: https://github.com/Abel-ai-lab/andrey/pull/375
-[#380]: https://github.com/Abel-ai-lab/andrey/pull/380
-[#391]: https://github.com/Abel-ai-lab/andrey/pull/391
-[#393]: https://github.com/Abel-ai-lab/andrey/pull/393
-[#394]: https://github.com/Abel-ai-lab/andrey/pull/394
-[#395]: https://github.com/Abel-ai-lab/andrey/pull/395
-[#396]: https://github.com/Abel-ai-lab/andrey/pull/396
-[#397]: https://github.com/Abel-ai-lab/andrey/pull/397
-[#400]: https://github.com/Abel-ai-lab/andrey/pull/400
-[#410]: https://github.com/Abel-ai-lab/andrey/pull/410
-[#411]: https://github.com/Abel-ai-lab/andrey/pull/411
-[#415]: https://github.com/Abel-ai-lab/andrey/pull/415
-[#418]: https://github.com/Abel-ai-lab/andrey/pull/418
-[#430]: https://github.com/Abel-ai-lab/andrey/pull/430
-[#431]: https://github.com/Abel-ai-lab/andrey/pull/431
-[#438]: https://github.com/Abel-ai-lab/andrey/pull/438
-[#439]: https://github.com/Abel-ai-lab/andrey/pull/439
-[#441]: https://github.com/Abel-ai-lab/andrey/pull/441
-[#442]: https://github.com/Abel-ai-lab/andrey/pull/442
-[#443]: https://github.com/Abel-ai-lab/andrey/pull/443
-[#445]: https://github.com/Abel-ai-lab/andrey/pull/445
-[#446]: https://github.com/Abel-ai-lab/andrey/pull/446
-[#451]: https://github.com/Abel-ai-lab/andrey/pull/451
-[#453]: https://github.com/Abel-ai-lab/andrey/pull/453
-[#455]: https://github.com/Abel-ai-lab/andrey/pull/455
-[#457]: https://github.com/Abel-ai-lab/andrey/pull/457
-[#459]: https://github.com/Abel-ai-lab/andrey/pull/459
-[#461]: https://github.com/Abel-ai-lab/andrey/pull/461
-[#463]: https://github.com/Abel-ai-lab/andrey/pull/463
-[#467]: https://github.com/Abel-ai-lab/andrey/pull/467
-[#468]: https://github.com/Abel-ai-lab/andrey/pull/468
-[#469]: https://github.com/Abel-ai-lab/andrey/pull/469
-[#478]: https://github.com/Abel-ai-lab/andrey/pull/478
-[#479]: https://github.com/Abel-ai-lab/andrey/pull/479
-[#481]: https://github.com/Abel-ai-lab/andrey/pull/481
-[#485]: https://github.com/Abel-ai-lab/andrey/pull/485
-[#487]: https://github.com/Abel-ai-lab/andrey/pull/487
-[#492]: https://github.com/Abel-ai-lab/andrey/pull/492
-[#495]: https://github.com/Abel-ai-lab/andrey/pull/495
-[#496]: https://github.com/Abel-ai-lab/andrey/pull/496
-[#499]: https://github.com/Abel-ai-lab/andrey/pull/499
-[#500]: https://github.com/Abel-ai-lab/andrey/pull/500
-[#501]: https://github.com/Abel-ai-lab/andrey/pull/501
-[#505]: https://github.com/Abel-ai-lab/andrey/pull/505
-[#509]: https://github.com/Abel-ai-lab/andrey/pull/509
-[#510]: https://github.com/Abel-ai-lab/andrey/pull/510
-[#515]: https://github.com/Abel-ai-lab/andrey/pull/515
-[#516]: https://github.com/Abel-ai-lab/andrey/pull/516
-[#517]: https://github.com/Abel-ai-lab/andrey/pull/517
-[#520]: https://github.com/Abel-ai-lab/andrey/pull/520
-[#521]: https://github.com/Abel-ai-lab/andrey/pull/521
-[#524]: https://github.com/Abel-ai-lab/andrey/pull/524
-[#526]: https://github.com/Abel-ai-lab/andrey/pull/526
-[#544]: https://github.com/Abel-ai-lab/andrey/pull/544
-[#550]: https://github.com/Abel-ai-lab/andrey/pull/550
-[#551]: https://github.com/Abel-ai-lab/andrey/pull/551
-[#552]: https://github.com/Abel-ai-lab/andrey/pull/552
-[#553]: https://github.com/Abel-ai-lab/andrey/pull/553
-[#554]: https://github.com/Abel-ai-lab/andrey/pull/554
-[#555]: https://github.com/Abel-ai-lab/andrey/pull/555
-[#556]: https://github.com/Abel-ai-lab/andrey/pull/556
-[#559]: https://github.com/Abel-ai-lab/andrey/pull/559
-[#564]: https://github.com/Abel-ai-lab/andrey/pull/564
-[#565]: https://github.com/Abel-ai-lab/andrey/pull/565
-[#567]: https://github.com/Abel-ai-lab/andrey/pull/567
-[#569]: https://github.com/Abel-ai-lab/andrey/pull/569
-[#571]: https://github.com/Abel-ai-lab/andrey/pull/571
-[#572]: https://github.com/Abel-ai-lab/andrey/pull/572
-[#573]: https://github.com/Abel-ai-lab/andrey/pull/573
-[#574]: https://github.com/Abel-ai-lab/andrey/pull/574
-[#575]: https://github.com/Abel-ai-lab/andrey/pull/575
-[#577]: https://github.com/Abel-ai-lab/andrey/pull/577
-[#581]: https://github.com/Abel-ai-lab/andrey/pull/581
-[#584]: https://github.com/Abel-ai-lab/andrey/pull/584
-[#596]: https://github.com/Abel-ai-lab/andrey/pull/596
-[#597]: https://github.com/Abel-ai-lab/andrey/pull/597
-[#607]: https://github.com/Abel-ai-lab/andrey/pull/607
-[#611]: https://github.com/Abel-ai-lab/andrey/pull/611
-[#612]: https://github.com/Abel-ai-lab/andrey/pull/612
-[#619]: https://github.com/Abel-ai-lab/andrey/pull/619
-[#620]: https://github.com/Abel-ai-lab/andrey/pull/620
-[#623]: https://github.com/Abel-ai-lab/andrey/pull/623
-[#625]: https://github.com/Abel-ai-lab/andrey/pull/625
-[#626]: https://github.com/Abel-ai-lab/andrey/pull/626
-[#629]: https://github.com/Abel-ai-lab/andrey/pull/629
-[#630]: https://github.com/Abel-ai-lab/andrey/pull/630
-[#631]: https://github.com/Abel-ai-lab/andrey/pull/631
-[#633]: https://github.com/Abel-ai-lab/andrey/pull/633
-[#634]: https://github.com/Abel-ai-lab/andrey/pull/634
-[#639]: https://github.com/Abel-ai-lab/andrey/pull/639
-[#659]: https://github.com/Abel-ai-lab/andrey/pull/659
-[#660]: https://github.com/Abel-ai-lab/andrey/pull/660
-[#662]: https://github.com/Abel-ai-lab/andrey/pull/662
-[#663]: https://github.com/Abel-ai-lab/andrey/pull/663
-[#665]: https://github.com/Abel-ai-lab/andrey/pull/665
-[#668]: https://github.com/Abel-ai-lab/andrey/pull/668
-[#674]: https://github.com/Abel-ai-lab/andrey/pull/674
-[#675]: https://github.com/Abel-ai-lab/andrey/pull/675
-[#676]: https://github.com/Abel-ai-lab/andrey/pull/676
-[#677]: https://github.com/Abel-ai-lab/andrey/pull/677
-[#679]: https://github.com/Abel-ai-lab/andrey/pull/679
-[#680]: https://github.com/Abel-ai-lab/andrey/pull/680
-[#682]: https://github.com/Abel-ai-lab/andrey/pull/682
-[#687]: https://github.com/Abel-ai-lab/andrey/pull/687
-[#690]: https://github.com/Abel-ai-lab/andrey/pull/690
-[#692]: https://github.com/Abel-ai-lab/andrey/pull/692
-[#694]: https://github.com/Abel-ai-lab/andrey/pull/694
-[#702]: https://github.com/Abel-ai-lab/andrey/pull/702
-[#707]: https://github.com/Abel-ai-lab/andrey/pull/707
-[#711]: https://github.com/Abel-ai-lab/andrey/pull/711
-[#719]: https://github.com/Abel-ai-lab/andrey/pull/719
-[#720]: https://github.com/Abel-ai-lab/andrey/pull/720
-[#723]: https://github.com/Abel-ai-lab/andrey/pull/723
-[#732]: https://github.com/Abel-ai-lab/andrey/pull/732
-[#737]: https://github.com/Abel-ai-lab/andrey/pull/737
-[#738]: https://github.com/Abel-ai-lab/andrey/pull/738
-[#739]: https://github.com/Abel-ai-lab/andrey/pull/739
-[#749]: https://github.com/Abel-ai-lab/andrey/pull/749
-[#752]: https://github.com/Abel-ai-lab/andrey/pull/752
-[#755]: https://github.com/Abel-ai-lab/andrey/pull/755
-[#759]: https://github.com/Abel-ai-lab/andrey/pull/759
-[#761]: https://github.com/Abel-ai-lab/andrey/pull/761
-[#764]: https://github.com/Abel-ai-lab/andrey/pull/764
-[#765]: https://github.com/Abel-ai-lab/andrey/pull/765
-[#766]: https://github.com/Abel-ai-lab/andrey/pull/766
-[#768]: https://github.com/Abel-ai-lab/andrey/pull/768
-[#771]: https://github.com/Abel-ai-lab/andrey/pull/771
-[#774]: https://github.com/Abel-ai-lab/andrey/pull/774
-[#775]: https://github.com/Abel-ai-lab/andrey/pull/775
-[#781]: https://github.com/Abel-ai-lab/andrey/pull/781
-[#791]: https://github.com/Abel-ai-lab/andrey/pull/791
-[#796]: https://github.com/Abel-ai-lab/andrey/pull/796
-[#797]: https://github.com/Abel-ai-lab/andrey/pull/797
-[#798]: https://github.com/Abel-ai-lab/andrey/pull/798
-[#803]: https://github.com/Abel-ai-lab/andrey/pull/803
-[#806]: https://github.com/Abel-ai-lab/andrey/pull/806
-[#807]: https://github.com/Abel-ai-lab/andrey/pull/807
-[#808]: https://github.com/Abel-ai-lab/andrey/pull/808
-[#809]: https://github.com/Abel-ai-lab/andrey/pull/809
-[#821]: https://github.com/Abel-ai-lab/andrey/pull/821
-[#826]: https://github.com/Abel-ai-lab/andrey/pull/826
-[#828]: https://github.com/Abel-ai-lab/andrey/pull/828
-[#829]: https://github.com/Abel-ai-lab/andrey/pull/829
-[#830]: https://github.com/Abel-ai-lab/andrey/pull/830
-[#832]: https://github.com/Abel-ai-lab/andrey/pull/832
-[#835]: https://github.com/Abel-ai-lab/andrey/pull/835
-[#841]: https://github.com/Abel-ai-lab/andrey/pull/841
-[#842]: https://github.com/Abel-ai-lab/andrey/pull/842
-[#843]: https://github.com/Abel-ai-lab/andrey/pull/843
-[#848]: https://github.com/Abel-ai-lab/andrey/pull/848
-[#850]: https://github.com/Abel-ai-lab/andrey/pull/850
-[#853]: https://github.com/Abel-ai-lab/andrey/pull/853
-[#854]: https://github.com/Abel-ai-lab/andrey/pull/854
-[#856]: https://github.com/Abel-ai-lab/andrey/pull/856
-[#857]: https://github.com/Abel-ai-lab/andrey/pull/857
-[#870]: https://github.com/Abel-ai-lab/andrey/pull/870
-[#871]: https://github.com/Abel-ai-lab/andrey/pull/871
-[#872]: https://github.com/Abel-ai-lab/andrey/pull/872
-[#873]: https://github.com/Abel-ai-lab/andrey/pull/873
-[#874]: https://github.com/Abel-ai-lab/andrey/pull/874
-[#875]: https://github.com/Abel-ai-lab/andrey/pull/875
-[#879]: https://github.com/Abel-ai-lab/andrey/pull/879
-[#880]: https://github.com/Abel-ai-lab/andrey/pull/880
-[#882]: https://github.com/Abel-ai-lab/andrey/pull/882
-[#887]: https://github.com/Abel-ai-lab/andrey/pull/887
-[#891]: https://github.com/Abel-ai-lab/andrey/pull/891
-[#892]: https://github.com/Abel-ai-lab/andrey/pull/892
-[#893]: https://github.com/Abel-ai-lab/andrey/pull/893
-[#894]: https://github.com/Abel-ai-lab/andrey/pull/894
-[#896]: https://github.com/Abel-ai-lab/andrey/pull/896
-[#899]: https://github.com/Abel-ai-lab/andrey/pull/899
-[#910]: https://github.com/Abel-ai-lab/andrey/pull/910
-[#904]: https://github.com/Abel-ai-lab/andrey/pull/904
-[#928]: https://github.com/Abel-ai-lab/andrey/pull/928
-[#919]: https://github.com/Abel-ai-lab/andrey/pull/919
-[em-tetrad]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md
-[kp-paths]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
+[0.17.0]: https://github.com/Abel-ai-lab/Andrey/compare/v0.16.0...v0.17.0
+[0.16.0]: https://github.com/Abel-ai-lab/Andrey/compare/v0.15.0...v0.16.0
+[0.15.0]: https://github.com/Abel-ai-lab/Andrey/compare/v0.14.0...v0.15.0
+[0.14.0]: https://github.com/Abel-ai-lab/Andrey/compare/v0.13.0...v0.14.0
+[0.13.0]: https://github.com/Abel-ai-lab/Andrey/compare/v0.12.0...v0.13.0
+[0.12.0]: https://github.com/Abel-ai-lab/Andrey/compare/v0.11.0...v0.12.0
+[0.11.0]: https://github.com/Abel-ai-lab/Andrey/compare/v0.10.0...v0.11.0
+[0.10.0]: https://github.com/Abel-ai-lab/Andrey/compare/v0.9.0...v0.10.0
+[0.9.0]: https://github.com/Abel-ai-lab/Andrey/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/Abel-ai-lab/Andrey/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/Abel-ai-lab/Andrey/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/Abel-ai-lab/Andrey/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/Abel-ai-lab/Andrey/compare/v0.4.1...v0.5.0
+[0.4.1]: https://github.com/Abel-ai-lab/Andrey/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/Abel-ai-lab/Andrey/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/Abel-ai-lab/Andrey/compare/v0.2.1...v0.3.0
+[0.2.1]: https://github.com/Abel-ai-lab/Andrey/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/Abel-ai-lab/Andrey/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/Abel-ai-lab/Andrey/releases/tag/v0.1.0
+[#14]: https://github.com/Abel-ai-lab/Andrey/pull/14
+[#18]: https://github.com/Abel-ai-lab/Andrey/pull/18
+[#31]: https://github.com/Abel-ai-lab/Andrey/pull/31
+[#33]: https://github.com/Abel-ai-lab/Andrey/pull/33
+[#53]: https://github.com/Abel-ai-lab/Andrey/pull/53
+[#56]: https://github.com/Abel-ai-lab/Andrey/pull/56
+[#57]: https://github.com/Abel-ai-lab/Andrey/pull/57
+[#59]: https://github.com/Abel-ai-lab/Andrey/pull/59
+[#64]: https://github.com/Abel-ai-lab/Andrey/pull/64
+[#122]: https://github.com/Abel-ai-lab/Andrey/pull/122
+[#127]: https://github.com/Abel-ai-lab/Andrey/pull/127
+[#133]: https://github.com/Abel-ai-lab/Andrey/pull/133
+[#95]: https://github.com/Abel-ai-lab/Andrey/pull/95
+[#94]: https://github.com/Abel-ai-lab/Andrey/pull/94
+[#167]: https://github.com/Abel-ai-lab/Andrey/pull/167
+[#168]: https://github.com/Abel-ai-lab/Andrey/pull/168
+[#169]: https://github.com/Abel-ai-lab/Andrey/pull/169
+[#175]: https://github.com/Abel-ai-lab/Andrey/pull/175
+[#178]: https://github.com/Abel-ai-lab/Andrey/pull/178
+[#179]: https://github.com/Abel-ai-lab/Andrey/pull/179
+[#184]: https://github.com/Abel-ai-lab/Andrey/pull/184
+[#187]: https://github.com/Abel-ai-lab/Andrey/pull/187
+[#189]: https://github.com/Abel-ai-lab/Andrey/pull/189
+[#190]: https://github.com/Abel-ai-lab/Andrey/pull/190
+[#192]: https://github.com/Abel-ai-lab/Andrey/pull/192
+[#202]: https://github.com/Abel-ai-lab/Andrey/pull/202
+[#203]: https://github.com/Abel-ai-lab/Andrey/pull/203
+[#205]: https://github.com/Abel-ai-lab/Andrey/pull/205
+[#206]: https://github.com/Abel-ai-lab/Andrey/pull/206
+[#207]: https://github.com/Abel-ai-lab/Andrey/pull/207
+[#208]: https://github.com/Abel-ai-lab/Andrey/pull/208
+[#209]: https://github.com/Abel-ai-lab/Andrey/pull/209
+[#210]: https://github.com/Abel-ai-lab/Andrey/pull/210
+[#211]: https://github.com/Abel-ai-lab/Andrey/pull/211
+[#213]: https://github.com/Abel-ai-lab/Andrey/pull/213
+[#214]: https://github.com/Abel-ai-lab/Andrey/pull/214
+[#215]: https://github.com/Abel-ai-lab/Andrey/pull/215
+[#216]: https://github.com/Abel-ai-lab/Andrey/pull/216
+[#220]: https://github.com/Abel-ai-lab/Andrey/pull/220
+[#225]: https://github.com/Abel-ai-lab/Andrey/pull/225
+[#228]: https://github.com/Abel-ai-lab/Andrey/pull/228
+[#229]: https://github.com/Abel-ai-lab/Andrey/pull/229
+[#233]: https://github.com/Abel-ai-lab/Andrey/pull/233
+[#237]: https://github.com/Abel-ai-lab/Andrey/pull/237
+[#239]: https://github.com/Abel-ai-lab/Andrey/pull/239
+[#248]: https://github.com/Abel-ai-lab/Andrey/pull/248
+[#251]: https://github.com/Abel-ai-lab/Andrey/pull/251
+[#261]: https://github.com/Abel-ai-lab/Andrey/pull/261
+[#262]: https://github.com/Abel-ai-lab/Andrey/pull/262
+[#265]: https://github.com/Abel-ai-lab/Andrey/pull/265
+[#267]: https://github.com/Abel-ai-lab/Andrey/pull/267
+[#269]: https://github.com/Abel-ai-lab/Andrey/pull/269
+[#271]: https://github.com/Abel-ai-lab/Andrey/pull/271
+[#273]: https://github.com/Abel-ai-lab/Andrey/pull/273
+[#275]: https://github.com/Abel-ai-lab/Andrey/pull/275
+[#277]: https://github.com/Abel-ai-lab/Andrey/pull/277
+[#278]: https://github.com/Abel-ai-lab/Andrey/pull/278
+[#280]: https://github.com/Abel-ai-lab/Andrey/pull/280
+[#282]: https://github.com/Abel-ai-lab/Andrey/pull/282
+[#284]: https://github.com/Abel-ai-lab/Andrey/pull/284
+[#286]: https://github.com/Abel-ai-lab/Andrey/pull/286
+[#288]: https://github.com/Abel-ai-lab/Andrey/pull/288
+[#289]: https://github.com/Abel-ai-lab/Andrey/pull/289
+[#290]: https://github.com/Abel-ai-lab/Andrey/pull/290
+[#292]: https://github.com/Abel-ai-lab/Andrey/pull/292
+[#294]: https://github.com/Abel-ai-lab/Andrey/pull/294
+[#299]: https://github.com/Abel-ai-lab/Andrey/pull/299
+[#311]: https://github.com/Abel-ai-lab/Andrey/pull/311
+[#312]: https://github.com/Abel-ai-lab/Andrey/pull/312
+[#328]: https://github.com/Abel-ai-lab/Andrey/pull/328
+[#343]: https://github.com/Abel-ai-lab/Andrey/pull/343
+[#346]: https://github.com/Abel-ai-lab/Andrey/pull/346
+[#347]: https://github.com/Abel-ai-lab/Andrey/pull/347
+[#350]: https://github.com/Abel-ai-lab/Andrey/pull/350
+[#351]: https://github.com/Abel-ai-lab/Andrey/pull/351
+[#353]: https://github.com/Abel-ai-lab/Andrey/pull/353
+[#359]: https://github.com/Abel-ai-lab/Andrey/pull/359
+[#361]: https://github.com/Abel-ai-lab/Andrey/pull/361
+[#362]: https://github.com/Abel-ai-lab/Andrey/pull/362
+[#363]: https://github.com/Abel-ai-lab/Andrey/pull/363
+[#364]: https://github.com/Abel-ai-lab/Andrey/pull/364
+[#365]: https://github.com/Abel-ai-lab/Andrey/pull/365
+[#367]: https://github.com/Abel-ai-lab/Andrey/pull/367
+[#368]: https://github.com/Abel-ai-lab/Andrey/pull/368
+[#369]: https://github.com/Abel-ai-lab/Andrey/pull/369
+[#371]: https://github.com/Abel-ai-lab/Andrey/pull/371
+[#375]: https://github.com/Abel-ai-lab/Andrey/pull/375
+[#380]: https://github.com/Abel-ai-lab/Andrey/pull/380
+[#391]: https://github.com/Abel-ai-lab/Andrey/pull/391
+[#393]: https://github.com/Abel-ai-lab/Andrey/pull/393
+[#394]: https://github.com/Abel-ai-lab/Andrey/pull/394
+[#395]: https://github.com/Abel-ai-lab/Andrey/pull/395
+[#396]: https://github.com/Abel-ai-lab/Andrey/pull/396
+[#397]: https://github.com/Abel-ai-lab/Andrey/pull/397
+[#400]: https://github.com/Abel-ai-lab/Andrey/pull/400
+[#410]: https://github.com/Abel-ai-lab/Andrey/pull/410
+[#411]: https://github.com/Abel-ai-lab/Andrey/pull/411
+[#415]: https://github.com/Abel-ai-lab/Andrey/pull/415
+[#418]: https://github.com/Abel-ai-lab/Andrey/pull/418
+[#430]: https://github.com/Abel-ai-lab/Andrey/pull/430
+[#431]: https://github.com/Abel-ai-lab/Andrey/pull/431
+[#438]: https://github.com/Abel-ai-lab/Andrey/pull/438
+[#439]: https://github.com/Abel-ai-lab/Andrey/pull/439
+[#441]: https://github.com/Abel-ai-lab/Andrey/pull/441
+[#442]: https://github.com/Abel-ai-lab/Andrey/pull/442
+[#443]: https://github.com/Abel-ai-lab/Andrey/pull/443
+[#445]: https://github.com/Abel-ai-lab/Andrey/pull/445
+[#446]: https://github.com/Abel-ai-lab/Andrey/pull/446
+[#451]: https://github.com/Abel-ai-lab/Andrey/pull/451
+[#453]: https://github.com/Abel-ai-lab/Andrey/pull/453
+[#455]: https://github.com/Abel-ai-lab/Andrey/pull/455
+[#457]: https://github.com/Abel-ai-lab/Andrey/pull/457
+[#459]: https://github.com/Abel-ai-lab/Andrey/pull/459
+[#461]: https://github.com/Abel-ai-lab/Andrey/pull/461
+[#463]: https://github.com/Abel-ai-lab/Andrey/pull/463
+[#467]: https://github.com/Abel-ai-lab/Andrey/pull/467
+[#468]: https://github.com/Abel-ai-lab/Andrey/pull/468
+[#469]: https://github.com/Abel-ai-lab/Andrey/pull/469
+[#478]: https://github.com/Abel-ai-lab/Andrey/pull/478
+[#479]: https://github.com/Abel-ai-lab/Andrey/pull/479
+[#481]: https://github.com/Abel-ai-lab/Andrey/pull/481
+[#485]: https://github.com/Abel-ai-lab/Andrey/pull/485
+[#487]: https://github.com/Abel-ai-lab/Andrey/pull/487
+[#492]: https://github.com/Abel-ai-lab/Andrey/pull/492
+[#495]: https://github.com/Abel-ai-lab/Andrey/pull/495
+[#496]: https://github.com/Abel-ai-lab/Andrey/pull/496
+[#499]: https://github.com/Abel-ai-lab/Andrey/pull/499
+[#500]: https://github.com/Abel-ai-lab/Andrey/pull/500
+[#501]: https://github.com/Abel-ai-lab/Andrey/pull/501
+[#505]: https://github.com/Abel-ai-lab/Andrey/pull/505
+[#509]: https://github.com/Abel-ai-lab/Andrey/pull/509
+[#510]: https://github.com/Abel-ai-lab/Andrey/pull/510
+[#515]: https://github.com/Abel-ai-lab/Andrey/pull/515
+[#516]: https://github.com/Abel-ai-lab/Andrey/pull/516
+[#517]: https://github.com/Abel-ai-lab/Andrey/pull/517
+[#520]: https://github.com/Abel-ai-lab/Andrey/pull/520
+[#521]: https://github.com/Abel-ai-lab/Andrey/pull/521
+[#524]: https://github.com/Abel-ai-lab/Andrey/pull/524
+[#526]: https://github.com/Abel-ai-lab/Andrey/pull/526
+[#544]: https://github.com/Abel-ai-lab/Andrey/pull/544
+[#550]: https://github.com/Abel-ai-lab/Andrey/pull/550
+[#551]: https://github.com/Abel-ai-lab/Andrey/pull/551
+[#552]: https://github.com/Abel-ai-lab/Andrey/pull/552
+[#553]: https://github.com/Abel-ai-lab/Andrey/pull/553
+[#554]: https://github.com/Abel-ai-lab/Andrey/pull/554
+[#555]: https://github.com/Abel-ai-lab/Andrey/pull/555
+[#556]: https://github.com/Abel-ai-lab/Andrey/pull/556
+[#559]: https://github.com/Abel-ai-lab/Andrey/pull/559
+[#564]: https://github.com/Abel-ai-lab/Andrey/pull/564
+[#565]: https://github.com/Abel-ai-lab/Andrey/pull/565
+[#567]: https://github.com/Abel-ai-lab/Andrey/pull/567
+[#569]: https://github.com/Abel-ai-lab/Andrey/pull/569
+[#571]: https://github.com/Abel-ai-lab/Andrey/pull/571
+[#572]: https://github.com/Abel-ai-lab/Andrey/pull/572
+[#573]: https://github.com/Abel-ai-lab/Andrey/pull/573
+[#574]: https://github.com/Abel-ai-lab/Andrey/pull/574
+[#575]: https://github.com/Abel-ai-lab/Andrey/pull/575
+[#577]: https://github.com/Abel-ai-lab/Andrey/pull/577
+[#581]: https://github.com/Abel-ai-lab/Andrey/pull/581
+[#584]: https://github.com/Abel-ai-lab/Andrey/pull/584
+[#596]: https://github.com/Abel-ai-lab/Andrey/pull/596
+[#597]: https://github.com/Abel-ai-lab/Andrey/pull/597
+[#607]: https://github.com/Abel-ai-lab/Andrey/pull/607
+[#611]: https://github.com/Abel-ai-lab/Andrey/pull/611
+[#612]: https://github.com/Abel-ai-lab/Andrey/pull/612
+[#619]: https://github.com/Abel-ai-lab/Andrey/pull/619
+[#620]: https://github.com/Abel-ai-lab/Andrey/pull/620
+[#623]: https://github.com/Abel-ai-lab/Andrey/pull/623
+[#625]: https://github.com/Abel-ai-lab/Andrey/pull/625
+[#626]: https://github.com/Abel-ai-lab/Andrey/pull/626
+[#629]: https://github.com/Abel-ai-lab/Andrey/pull/629
+[#630]: https://github.com/Abel-ai-lab/Andrey/pull/630
+[#631]: https://github.com/Abel-ai-lab/Andrey/pull/631
+[#633]: https://github.com/Abel-ai-lab/Andrey/pull/633
+[#634]: https://github.com/Abel-ai-lab/Andrey/pull/634
+[#639]: https://github.com/Abel-ai-lab/Andrey/pull/639
+[#659]: https://github.com/Abel-ai-lab/Andrey/pull/659
+[#660]: https://github.com/Abel-ai-lab/Andrey/pull/660
+[#662]: https://github.com/Abel-ai-lab/Andrey/pull/662
+[#663]: https://github.com/Abel-ai-lab/Andrey/pull/663
+[#665]: https://github.com/Abel-ai-lab/Andrey/pull/665
+[#668]: https://github.com/Abel-ai-lab/Andrey/pull/668
+[#674]: https://github.com/Abel-ai-lab/Andrey/pull/674
+[#675]: https://github.com/Abel-ai-lab/Andrey/pull/675
+[#676]: https://github.com/Abel-ai-lab/Andrey/pull/676
+[#677]: https://github.com/Abel-ai-lab/Andrey/pull/677
+[#679]: https://github.com/Abel-ai-lab/Andrey/pull/679
+[#680]: https://github.com/Abel-ai-lab/Andrey/pull/680
+[#682]: https://github.com/Abel-ai-lab/Andrey/pull/682
+[#687]: https://github.com/Abel-ai-lab/Andrey/pull/687
+[#690]: https://github.com/Abel-ai-lab/Andrey/pull/690
+[#692]: https://github.com/Abel-ai-lab/Andrey/pull/692
+[#694]: https://github.com/Abel-ai-lab/Andrey/pull/694
+[#702]: https://github.com/Abel-ai-lab/Andrey/pull/702
+[#707]: https://github.com/Abel-ai-lab/Andrey/pull/707
+[#711]: https://github.com/Abel-ai-lab/Andrey/pull/711
+[#719]: https://github.com/Abel-ai-lab/Andrey/pull/719
+[#720]: https://github.com/Abel-ai-lab/Andrey/pull/720
+[#723]: https://github.com/Abel-ai-lab/Andrey/pull/723
+[#732]: https://github.com/Abel-ai-lab/Andrey/pull/732
+[#737]: https://github.com/Abel-ai-lab/Andrey/pull/737
+[#738]: https://github.com/Abel-ai-lab/Andrey/pull/738
+[#739]: https://github.com/Abel-ai-lab/Andrey/pull/739
+[#749]: https://github.com/Abel-ai-lab/Andrey/pull/749
+[#752]: https://github.com/Abel-ai-lab/Andrey/pull/752
+[#755]: https://github.com/Abel-ai-lab/Andrey/pull/755
+[#759]: https://github.com/Abel-ai-lab/Andrey/pull/759
+[#761]: https://github.com/Abel-ai-lab/Andrey/pull/761
+[#764]: https://github.com/Abel-ai-lab/Andrey/pull/764
+[#765]: https://github.com/Abel-ai-lab/Andrey/pull/765
+[#766]: https://github.com/Abel-ai-lab/Andrey/pull/766
+[#768]: https://github.com/Abel-ai-lab/Andrey/pull/768
+[#771]: https://github.com/Abel-ai-lab/Andrey/pull/771
+[#774]: https://github.com/Abel-ai-lab/Andrey/pull/774
+[#775]: https://github.com/Abel-ai-lab/Andrey/pull/775
+[#781]: https://github.com/Abel-ai-lab/Andrey/pull/781
+[#791]: https://github.com/Abel-ai-lab/Andrey/pull/791
+[#796]: https://github.com/Abel-ai-lab/Andrey/pull/796
+[#797]: https://github.com/Abel-ai-lab/Andrey/pull/797
+[#798]: https://github.com/Abel-ai-lab/Andrey/pull/798
+[#803]: https://github.com/Abel-ai-lab/Andrey/pull/803
+[#806]: https://github.com/Abel-ai-lab/Andrey/pull/806
+[#807]: https://github.com/Abel-ai-lab/Andrey/pull/807
+[#808]: https://github.com/Abel-ai-lab/Andrey/pull/808
+[#809]: https://github.com/Abel-ai-lab/Andrey/pull/809
+[#821]: https://github.com/Abel-ai-lab/Andrey/pull/821
+[#826]: https://github.com/Abel-ai-lab/Andrey/pull/826
+[#828]: https://github.com/Abel-ai-lab/Andrey/pull/828
+[#829]: https://github.com/Abel-ai-lab/Andrey/pull/829
+[#830]: https://github.com/Abel-ai-lab/Andrey/pull/830
+[#832]: https://github.com/Abel-ai-lab/Andrey/pull/832
+[#835]: https://github.com/Abel-ai-lab/Andrey/pull/835
+[#841]: https://github.com/Abel-ai-lab/Andrey/pull/841
+[#842]: https://github.com/Abel-ai-lab/Andrey/pull/842
+[#843]: https://github.com/Abel-ai-lab/Andrey/pull/843
+[#848]: https://github.com/Abel-ai-lab/Andrey/pull/848
+[#850]: https://github.com/Abel-ai-lab/Andrey/pull/850
+[#853]: https://github.com/Abel-ai-lab/Andrey/pull/853
+[#854]: https://github.com/Abel-ai-lab/Andrey/pull/854
+[#856]: https://github.com/Abel-ai-lab/Andrey/pull/856
+[#857]: https://github.com/Abel-ai-lab/Andrey/pull/857
+[#870]: https://github.com/Abel-ai-lab/Andrey/pull/870
+[#871]: https://github.com/Abel-ai-lab/Andrey/pull/871
+[#872]: https://github.com/Abel-ai-lab/Andrey/pull/872
+[#873]: https://github.com/Abel-ai-lab/Andrey/pull/873
+[#874]: https://github.com/Abel-ai-lab/Andrey/pull/874
+[#875]: https://github.com/Abel-ai-lab/Andrey/pull/875
+[#879]: https://github.com/Abel-ai-lab/Andrey/pull/879
+[#880]: https://github.com/Abel-ai-lab/Andrey/pull/880
+[#882]: https://github.com/Abel-ai-lab/Andrey/pull/882
+[#887]: https://github.com/Abel-ai-lab/Andrey/pull/887
+[#891]: https://github.com/Abel-ai-lab/Andrey/pull/891
+[#892]: https://github.com/Abel-ai-lab/Andrey/pull/892
+[#893]: https://github.com/Abel-ai-lab/Andrey/pull/893
+[#894]: https://github.com/Abel-ai-lab/Andrey/pull/894
+[#896]: https://github.com/Abel-ai-lab/Andrey/pull/896
+[#899]: https://github.com/Abel-ai-lab/Andrey/pull/899
+[#910]: https://github.com/Abel-ai-lab/Andrey/pull/910
+[#904]: https://github.com/Abel-ai-lab/Andrey/pull/904
+[#928]: https://github.com/Abel-ai-lab/Andrey/pull/928
+[#919]: https://github.com/Abel-ai-lab/Andrey/pull/919
+[em-tetrad]: https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/missing-data.md
+[kp-paths]: https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/knowledge-paths.md
 [card-0170-dagma]: https://andrey.abel.ai/docs/benchmarks/0.17.0.html#dagma
-[nd-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/notears-dagma.md
-[ages-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/ages.md
-[#920]: https://github.com/Abel-ai-lab/andrey/pull/920
+[nd-page]: https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/notears-dagma.md
+[ages-page]: https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/ages.md
+[#920]: https://github.com/Abel-ai-lab/Andrey/pull/920
+[#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
+[#1037]: https://github.com/Abel-ai-lab/Andrey/pull/1037
+[#1040]: https://github.com/Abel-ai-lab/Andrey/pull/1040
+[#1035]: https://github.com/Abel-ai-lab/Andrey/pull/1035
+[#1041]: https://github.com/Abel-ai-lab/Andrey/pull/1041
+[#1045]: https://github.com/Abel-ai-lab/Andrey/issues/1045
+[#1051]: https://github.com/Abel-ai-lab/Andrey/pull/1051
+[#1059]: https://github.com/Abel-ai-lab/Andrey/pull/1059
+[#1055]: https://github.com/Abel-ai-lab/Andrey/pull/1055
+[#1067]: https://github.com/Abel-ai-lab/Andrey/pull/1067
+[#1070]: https://github.com/Abel-ai-lab/Andrey/pull/1070

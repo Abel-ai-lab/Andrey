@@ -84,8 +84,10 @@ datasets and lists every output that changes.
 
 **Exceptions.** Each method's `column_order` in the registry records whether reordering relabels its
 result, and the [column-order table](guides/column-order.md#each-method) prints it with the reason.
-`qa/identity.py` runs by hand and does not refit ICP, IGSP, FCI-JCI, or J-PCMCI+; the last release
-card that reports a run is [0.9.0](benchmarks/0.9.0.md)'s.
+`qa/identity.py` runs by hand; the last release card that reports a run is
+[0.9.0](benchmarks/0.9.0.md)'s. A column order fails it when a graph or a causal order changes
+or a value changes by more than rounding; the last digits of a p-value, which depend on the order a
+sum runs in, are listed and do not fail it.
 
 ## Units and transforms
 
@@ -125,7 +127,7 @@ that take both read the values, so a monotone transform can change their graph e
 rank-based test. The file also refits every method that takes `"chisq"` or `"gsq"` with each
 column's categories recoded in order. A method that scores categorical data without a test, such as
 `ges` with `score_func="bdeu"`, is checked through its score alone. Both `"normal_scores"` options
-are experimental, and the score takes no `env`.
+are experimental and take no `env`.
 
 ## Faster paths, the same output
 
@@ -161,9 +163,11 @@ published measurement is ICA-LiNGAM's, on six BLAS kernels, in the same guide.
 
 Before a release merges, `qa/identity.py` fits every supported method on the release and on the
 release before it, on complete data with default arguments, and compares the outputs bit for bit.
-The quality gate and the reference comparisons run on the same code.
+The quality gate and the reference comparisons run on the same code. The tests of the benchmark
+harness that produces the comparisons (`benchmarks/tests`) run on it too, in the harness's own
+environments, since continuous integration runs only some of them.
 
-| Release | Outputs against the release before | Quality gate | Reference comparisons |
-|---|---|---|---|
-| 0.17.1 | 49 methods, 1,963 outputs, none changed | 145 checks, 0 failed | 2,971 rows, 0 failed |
-| 0.17.0 | 45 methods, 1,819 outputs, none changed; 4 methods new | 145 checks, 0 failed | 2,971 rows, 0 failed |
+| Release | Outputs against the release before | Quality gate | Reference comparisons | Harness tests |
+|---|---|---|---|---|
+| 0.17.1 | 49 methods, 1,963 outputs, none changed | 145 checks, 0 failed | 2,971 rows, 0 failed | 1,519 passed, 0 failed, 20 skipped |
+| 0.17.0 | 45 methods, 1,819 outputs, none changed; 4 methods new | 145 checks, 0 failed | 2,971 rows, 0 failed | 1,519 passed, 0 failed, 20 skipped |
