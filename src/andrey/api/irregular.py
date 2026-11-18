@@ -740,15 +740,16 @@ def cpcm(
     :func:`~andrey.anm`; for more than two variables, :func:`~andrey.cpcm_graph`.
 
     In each direction the effect's family is fitted on the cause and each value mapped through its
-    fitted distribution function, ``eps = F(y; theta(x))``. A count family's function is
-    randomized between its steps, ``F(y - 1) + u f(y)`` with ``u`` uniform, so the residual is
-    continuous. The residual is tested against the proposed cause by the gamma HSIC test with
-    Gaussian kernels whose bandwidth is the median heuristic over all rows [2]_ [3]_. With
-    ``alpha=None`` the larger p-value, compared through their logarithms, names the direction, and
-    on equal p-values the smaller statistic, with no edge when those are equal too. With a level,
-    the pair is first tested for independence, which gives no edge, and an edge is drawn only when
-    exactly one direction's residual tests independent; both or neither give no edge, which the
-    paper reads as an unidentifiable pair or a family that fits neither way [1]_.
+    fitted distribution function, ``eps = F(y; theta(x))``. A count family's function is randomized
+    between its steps, ``F(y - 1) + u f(y)`` with ``u`` uniform, so the residual is continuous. The
+    residual is tested against the proposed cause by the gamma HSIC test with Gaussian kernels whose
+    bandwidth is the median heuristic over all rows [2]_ [3]_. With ``alpha=None`` the larger
+    p-value, compared through their logarithms, names the direction, and on equal p-values the
+    smaller statistic, with no edge when those are equal too, two values equal when they differ by
+    at most ``1e-9`` times the larger of 1 and their absolute values. With a level, the pair is
+    first tested for independence, which gives no edge, and an edge is drawn only when exactly one
+    direction's residual tests independent; both or neither give no edge, which the paper reads as
+    an unidentifiable pair or a family that fits neither way [1]_.
 
     **Families.** Each parameter is a smooth function of the cause through the family's usual
     link: the identity for a Gaussian or Gumbel location, the logarithm for a scale, a mean, a

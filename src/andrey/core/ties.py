@@ -74,10 +74,12 @@ def tie_key(value: float) -> float:
 
 
 #: Tolerance under which the two directions of a pairwise direction test (``anm``, ``pnl``,
-#: ``loci``) count as equal: two log p-values, two test statistics, or two log-likelihoods ``a``
-#: and ``b`` tie when ``|a - b| <= PAIR_RTOL * max(1, |a|, |b|)``. Each direction's fit reads its
-#: rows in one canonical order, so a table whose two columns hold the same values swapped gives
-#: both directions the same numbers bit for bit, and they tie for every method. The tolerance
+#: ``loci``, ``cpcm``) count as equal: two log p-values, two test statistics, or two
+#: log-likelihoods ``a`` and ``b`` tie when ``|a - b| <= PAIR_RTOL * max(1, |a|, |b|)``. For
+#: ``anm``, ``pnl`` and ``loci`` each direction's fit reads its rows in one canonical order, so a
+#: table whose two columns hold the same values swapped gives both directions the same numbers bit
+#: for bit, and they tie. ``cpcm`` fits both directions on the rows as given; on such tables in
+#: other row orders and units its two directions differed by at most ``1e-13``. The tolerance
 #: covers rounding carried through a fit: with such a table's columns in different units, which
 #: changes the last bits of its standardized values, the largest relative gap over 1,840 fits with
 #: 100 to 300 rows was ``1e-13`` for ``anm`` and ``0`` for ``pnl``, while for ``anm`` the two
