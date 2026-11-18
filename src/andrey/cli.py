@@ -1094,18 +1094,22 @@ def recorded_warnings() -> Generator[list[warnings.WarningMessage]]:
     """Record a fit's warnings and the warning-level records of its loggers, for ``run.warnings``.
 
     The list fills when the block exits, the warnings first and the log records after, each record
-    as a :class:`LogWarning`; with a handler on the ``andrey`` logger, none reaches standard error.
+    as a :class:`LogWarning`. The ``andrey`` logger holds only the recording handler and does not
+    propagate during the block, so no record reaches standard error, through the handlers of the
+    root logger or an embedding application's either; both are restored after it.
     """
     handler = _LogRecords()
     logger = logging.getLogger("andrey")
-    logger.addHandler(handler)
+    handlers, propagate = logger.handlers[:], logger.propagate
+    recording: list[logging.Handler] = [handler]
+    logger.handlers, logger.propagate = recording, False
     try:
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             yield caught
         caught.extend(handler.caught)
     finally:
-        logger.removeHandler(handler)
+        logger.handlers, logger.propagate = handlers, propagate
 
 
 def run_info(

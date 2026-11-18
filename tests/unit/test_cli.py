@@ -692,12 +692,24 @@ def test_a_run_on_data_with_gaps_writes_nothing_to_stderr(tmp_path, gappy_path):
     assert json.loads(run.stdout)["run"]["warnings"][0]["category"] == "LogWarning"
 
 
-def test_the_handler_of_a_run_is_removed_after_it(capsys, gappy_path):
+def test_a_run_isolates_the_loggers_during_the_fit_and_restores_them(capsys, gappy_path):
+    """A handler on the root or the ``andrey`` logger sees none of the fit's records."""
     import logging
 
-    before = list(logging.getLogger("andrey").handlers)
-    _run(["run", "pc", "--data", str(gappy_path)], capsys)
-    assert logging.getLogger("andrey").handlers == before
+    seen = io.StringIO()
+    own = logging.StreamHandler(seen)
+    root, logger = logging.getLogger(), logging.getLogger("andrey")
+    root.addHandler(own)
+    logger.addHandler(own)
+    before = (list(logger.handlers), logger.propagate)
+    try:
+        code, out, err = _run(["run", "pc", "--data", str(gappy_path), "--json"], capsys)
+        assert (list(logger.handlers), logger.propagate) == before
+    finally:
+        root.removeHandler(own)
+        logger.removeHandler(own)
+    assert code == 0 and err == "" and seen.getvalue() == ""
+    assert json.loads(out)["run"]["warnings"][0]["category"] == "LogWarning"
 
 
 # --- shell-aware output ---------------------------------------------------------------------------
