@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from andrey.core.ci_missing import MISSING_GUIDE
 from andrey.core.knowledge import column_position
 from andrey.core.structure import column_labels
 
@@ -269,7 +270,8 @@ def pool_environments(
             raise ValueError(
                 f"{prefix}drop the rows that hold a missing value yourself, which suits values "
                 f"missing completely at random; {method or 'this method'} does not accept missing "
-                f"values, and {where} holds NaN (see Missing values in the getting-started guide)"
+                f"values, and {where} holds NaN (see the Missing values guide, "
+                f"{MISSING_GUIDE})"
             )
     if all(frames):
         repeated = [

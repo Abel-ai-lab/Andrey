@@ -35,6 +35,11 @@ names its pull request.
 - `pc(missing="mvpc")` records the fewest and the median rows a corrected test read as
   `metadata["corrected_edges"]["rows_tested"]`, so a fit shows when the correction ran on few rows.
   The graph and the other metadata are unchanged. ([#1094])
+- A [missing values guide](https://andrey.abel.ai/docs/guides/missing-values.html) holds what the
+  getting-started guide said about missing values, with a table from the kind of data and the
+  reason its values are missing to the `missing` value and the methods that take it. A method that
+  does not accept missing values names the guide in its error. The example notebook adds values
+  missing not at random, FCI, categorical data, and a time series. ([#1096])
 
 ### Changed
 
@@ -2762,6 +2767,7 @@ First alpha release.
 [#1042]: https://github.com/Abel-ai-lab/Andrey/pull/1042
 [#1072]: https://github.com/Abel-ai-lab/Andrey/issues/1072
 [#1073]: https://github.com/Abel-ai-lab/Andrey/pull/1073
+[#1096]: https://github.com/Abel-ai-lab/Andrey/pull/1096
 [#1102]: https://github.com/Abel-ai-lab/Andrey/pull/1102
 [#1094]: https://github.com/Abel-ai-lab/Andrey/pull/1094
 [#1095]: https://github.com/Abel-ai-lab/Andrey/pull/1095

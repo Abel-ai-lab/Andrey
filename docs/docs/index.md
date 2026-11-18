@@ -71,6 +71,8 @@ What changed in each release.
   family, with the data it reads and the graph it returns.
 - [API reference](api.md): methods, graph structures, and visualization.
 - [CLI reference](api.md#command-line-interface): run methods from the shell.
+- [Missing values](guides/missing-values.md): which handling to use for your data and the reason
+  its values are missing.
 - [Graph types](guides/graph-types.md): DAGs, CPDAGs, PAGs, and temporal graphs, with diagrams.
 - [Graph representation](guides/graph-representation.md): Andrey's graph model compared with other
   causal discovery packages.

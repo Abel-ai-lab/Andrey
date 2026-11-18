@@ -200,7 +200,7 @@ implementation to compare with; the
 [missing-data comparison](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/missing-data.md)
 has what we measured.
 The other methods refuse missing values with an error that says what to do
-instead, and [Missing values](guides/getting-started.md#missing-values) explains each handling.
+instead, and the [Missing values](guides/missing-values.md) guide explains each handling.
 
 ### Can I tell it what I already know?
 

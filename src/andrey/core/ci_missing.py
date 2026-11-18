@@ -82,6 +82,8 @@ TESTWISE_CLAIM = (
     "random sample of all rows, and otherwise they are a selected sample that more rows do not "
     "correct."
 )
+#: The guide a refusal of missing values names: which handling fits which data.
+MISSING_GUIDE = "https://andrey.abel.ai/docs/guides/missing-values.html"
 #: What the error of a test without the rows it needs advises: a test over fewer columns keeps more
 #: rows, and a dropped column is no longer there to condition on.
 MORE_ROWS = (
@@ -113,6 +115,8 @@ EM_SUPPORTED = ("ges", "hc", "tabu", "boss", "grasp", "notears")
 #: Missing-value PC (Tu et al. 2019), which only ``pc`` takes: test-wise deletion, then a corrected
 #: test of the edges a missingness indicator could have kept (:mod:`andrey.constraint.mvpc`).
 MVPC = "mvpc"
+#: The guide a refusal of missing values names: which handling fits which data.
+MISSING_GUIDE = "https://andrey.abel.ai/docs/guides/missing-values.html"
 
 # The most bytes of row blocks the tests one TestwiseDeletion keeps for reuse hold together.
 _CACHE_BYTES = 1 << 27
