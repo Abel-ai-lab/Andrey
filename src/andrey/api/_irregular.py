@@ -75,10 +75,10 @@ def _direction(
     With ``alpha=None``, ``pval_*`` are the p-values' logarithms (or two log-likelihoods), and the
     direction with the larger one is chosen. Equal ones, given both test statistics, choose the
     direction with the smaller statistic, the weaker dependence; equal or missing statistics give
-    no edge. Values that differ only past nine decimal places are equal
-    (:func:`andrey.core.ties.tie_key`), so two directions that mirror each other give no edge in
-    any units. Otherwise, choose a direction only when its
-    p-value exceeds ``alpha`` and the other does not.
+    no edge. Values that round to the same number at nine decimal places are equal
+    (:func:`andrey.core.ties.tie_key`); values that differ by more, or that lie on either side of a
+    rounding step, still choose a direction. Otherwise, choose a direction only when its p-value
+    exceeds ``alpha`` and the other does not.
     """
     if alpha is None:
         p_forward, p_backward = tie_key(pval_forward), tie_key(pval_backward)
