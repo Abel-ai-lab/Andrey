@@ -633,10 +633,7 @@ def cpcm_graph(
 
     **Units.** As for :func:`~andrey.cpcm`: the result does not depend on any column's units under
     the Gaussian, Gumbel, exponential, and gamma families, of which the last two read its origin;
-    ``"pareto"`` and the count families read the units, since they fix a scale. One exception was
-    measured: with several parents a ``"gumbel"`` fit can reach another maximum of its penalized
-    likelihood under rounding, which moved the score by 0.04, with the same graph, in 1 of 80
-    rescaled tables with a count parent.
+    ``"pareto"`` and the count families read the units, since they fix a scale.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows

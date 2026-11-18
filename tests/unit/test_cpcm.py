@@ -268,6 +268,56 @@ def test_a_row_the_location_fits_alone_keeps_its_scale_above_the_floor():
     assert all(0.0 < p <= 1.0 for p in out.metadata["p_values"].values())
 
 
+@pytest.mark.parametrize("name", ["poisson", "negative_binomial"])
+@pytest.mark.parametrize("zero", [0.0, 1.0])
+def test_a_parent_value_whose_counts_are_all_zero_has_mean_zero(name, zero):
+    # Value 0 is the indicators' reference, so its rows' mean sits in the intercept.
+    rng = np.random.default_rng(7)
+    x = rng.integers(0, 3, size=150).astype(float)
+    y = rng.poisson(np.where(x == 2.0, 6.0, 2.0)).astype(float)
+    y[x == zero] = 0.0
+    family = FAMILIES[name]
+    log_mean = fit(y, [_term(x)], family)[0]
+    assert np.all(log_mean[x == zero] == -np.inf)
+    for value in {0.0, 1.0, 2.0} - {zero}:
+        np.testing.assert_allclose(np.exp(log_mean[x == value]), y[x == value].mean(), rtol=1e-6)
+    out = cpcm(np.column_stack([x, y]), family=["gaussian_fixed_scale", name], seed=0)
+    assert all(0.0 < p <= 1.0 for p in out.metadata["p_values"].values())
+
+
+def _single_value_table(name: str, seed: int, *, reference: bool = False) -> np.ndarray:
+    """A count cause with a value seen once and an effect of family ``name``; with ``reference``
+    that value is the lowest, the indicators' reference."""
+    rng = np.random.default_rng(seed)
+    x = rng.poisson(2.0, size=100).astype(float) + 1.0
+    if reference:
+        x[0] = 0.0
+    if name == "gamma":
+        return np.column_stack([x, np.exp(0.3 * x) * rng.gamma(3.0, 1.0 / 3.0, size=100)])
+    return np.column_stack([x, np.sin(x) + (0.5 + 0.1 * x) * rng.normal(size=100)])
+
+
+@pytest.mark.parametrize(
+    ("name", "seed", "reference"),
+    [("gumbel", 23, False), ("gamma", 5, False), ("gaussian", 1, True), ("gumbel", 1, True)],
+)
+def test_a_scale_that_falls_to_its_floor_is_held_there_in_any_units(name, seed, reference):
+    # The location fits the rows of a value seen once, so their scale falls toward the floor
+    # without reaching it; the fit holds them at the floor, wherever its steps stop.
+    table = _single_value_table(name, seed, reference=reference)
+    family = FAMILIES[name]
+    log_scale = fit(family.rescale(table[:, 1]), [_term(table[:, 0])], family)[1]
+    values, counts = np.unique(table[:, 0], return_counts=True)
+    once = np.isin(table[:, 0], values[counts == 1])
+    assert np.all(log_scale[once] == -np.inf)  # the floored scale reads this as the floor
+    assert np.all(log_scale[~once] > family.floor)
+    families = ["gaussian", name]
+    first = cpcm(table, family=families)
+    for factor in (3.7, 1e-7, 2.0**40, 2.0**-1000):
+        moved = cpcm(table * np.array([1.0, factor]), family=families)
+        _assert_same_in_units(first, moved, factor)
+
+
 def _rare_value_table(seed: int) -> np.ndarray:
     """A count parent whose largest value is seen once, a smooth parent, and their effect."""
     rng = np.random.default_rng(seed)
@@ -394,9 +444,9 @@ def test_a_table_that_mirrors_itself_keeps_its_tied_graph_in_any_units():
             np.testing.assert_allclose(moved.metadata["score"], first.metadata["score"], rtol=1e-9)
 
 
-def test_a_gumbel_graph_with_a_count_parent_keeps_its_graph_in_other_units():
-    # The exception the graph method's Units paragraph states: on 20 seeds of this generator and
-    # four rescales each, this table under y * 1e-7 is the one of 80 whose score moved, by 0.040.
+def test_a_gumbel_graph_with_a_count_parent_keeps_its_answer_in_other_units():
+    # A value of the count parent seen twice: the location fits its rows, so their scale falls to
+    # the floor, where the fit holds it; the score moved by 0.04 under y * 1e-7 before.
     rng = np.random.default_rng(5)
     c = rng.poisson(1.0, 200).astype(float)
     x = rng.normal(size=200)
@@ -404,9 +454,10 @@ def test_a_gumbel_graph_with_a_count_parent_keeps_its_graph_in_other_units():
     table = np.column_stack([c, x, y])
     families = ["poisson", "gaussian", "gumbel"]
     first = cpcm_graph(table, family=families)
-    moved = cpcm_graph(table * np.array([1.0, 1.0, 1e-7]), family=families)
-    assert moved.structure.oriented_edges() == first.structure.oriented_edges()
-    assert abs(moved.metadata["score"] - first.metadata["score"]) <= 0.05
+    for factors in ([1.0, 1.0, 1e-7], [1.0, 3.7, 1e9]):
+        moved = cpcm_graph(table * np.array(factors), family=families)
+        assert moved.structure.oriented_edges() == first.structure.oriented_edges()
+        np.testing.assert_allclose(moved.metadata["score"], first.metadata["score"], rtol=1e-9)
 
 
 def test_a_count_family_repeats_under_its_seed_and_follows_it():

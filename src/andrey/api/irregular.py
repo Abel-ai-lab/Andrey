@@ -746,7 +746,11 @@ def cpcm(
     its logarithm around a start that follows the data. A scale fitted as a function of the cause
     stays above a floor, without which the likelihood has no maximum where the location fits a row
     exactly: 0.01 of the column's standard deviation under ``"gaussian"``, ``exp(-7)`` of it under
-    ``"gumbel"``, and a dispersion of ``exp(-7)`` under ``"gamma"``. The size of
+    ``"gumbel"``, and a dispersion of ``exp(-7)`` under ``"gamma"``. Such a scale approaches the
+    floor without reaching it, so rows on which it falls to within ``exp(-12)`` of the floor are
+    held at the floor itself, outside the fit and its Laplace determinant. Likewise, under a count
+    family the mean of a cause value whose counts are all 0 is 0, and those rows leave the fit,
+    their residual a uniform draw. The size of
     ``"negative_binomial"`` has an upper bound of ``exp(5)`` times the column's largest count,
     kept between ``exp(12)`` and ``exp(20)``; a size at that bound is read as the Poisson limit,
     whose variance is then within 1 part in 148 for counts up to ``exp(15)``, about 3.3 million,
