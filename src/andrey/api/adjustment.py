@@ -179,9 +179,6 @@ def ldp(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -211,7 +208,15 @@ def ldp(
     variables are post-treatment. A ``Zmix`` variable independent of such a candidate is a
     confounder, and any other is post-treatment. A candidate dependent on a confounder found in
     that collider test is a confounder, and any other is an instrument; this step reuses those
-    tests and runs none. Each query is tested once and its p-value kept. Where the algorithm is
+    tests and runs none. The Z5 criterion is tested with each instrument independent of every
+    confounder found (condition C2 read on the labels). An instrument dependent on one can be
+    separated from the outcome by the confounders found while a back-door path stays open: with
+    ``A -> B -> W``, ``U -> B``, ``W -> X``, ``W -> Y``, ``U -> Y``, an instrument of ``X``, a
+    cause of ``Y`` independent of ``X``, and no effect of ``X`` on ``Y``, ``A`` is labeled an
+    instrument and ``W`` post-treatment, and ``B`` separates ``A`` from ``Y``. With exact tests on
+    24,000 random graphs that meet C1 and C2, every set it returned was valid, and the check left
+    30 of them without a set.
+    Each query is tested once and its p-value kept. Where the algorithm is
     open, the authors' code decides: every candidate in such a collider is kept, Step 6's second
     pass covers ``Zmix`` alone, and ``Z7`` is ``Z5,7`` less the candidates. Only ``Z4``, ``Z7``,
     and ``Z8`` are labeled right in every graph (Theorem 4.6); the other labels need stronger
@@ -228,14 +233,18 @@ def ldp(
     ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
     ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Tested with exact d-separation on the partition graphs
-    of [1]_ and on random graphs, and on simulated linear-Gaussian data. Without a confounder in
-    the data there is no instrument to check, so the method gives no set even when the empty set
-    is valid; it also gives none for some effects that a set identifies, such as a zero effect
-    [4]_. The test of Step 5 conditions on all the variables Step 4 kept, so it needs more rows as
-    they grow. With 5,000 rows a fit ran about 40 tests on the 10-node graph of [1]_ and about 120
-    on its 18-node graph, each in under a second. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** Measured against its authors' code on the partition graphs of [1]_ (Figure 3
+    at 1,000 to 7,500 rows, with and without the effect; Figure E.5 with hidden nodes) with
+    Fisher's z test at 0.01, and on the MILDEW network at 25,000 to 75,000 rows with the
+    chi-square test at 0.001: its answers were as often valid and its effect errors as low as the
+    code's in every setting, and its effect errors were below adjusting for nothing. The
+    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#ldp>`_ has the
+    numbers. Without a confounder in the data there is no instrument to check, so it gives no set
+    even when the empty set is valid; it also gives none for some effects that a set identifies,
+    such as a zero effect [4]_. The test of Step 5 conditions on all the variables Step 4 kept, so
+    it needs more rows as they grow. A fit ran a median of 40 tests on the 10-node graph and about
+    115 on MILDEW, each in under a second. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -304,11 +313,10 @@ def ld3(
 
     LD3 sorts every other variable by its causal relation to the pair from tests that read the
     pair and the variables already sorted, keeps those that are parents of the outcome, and tests
-    the treatment against the outcome given the parents that are confounders or mediators [1]_.
-    The treatment is a parent of the outcome (the structural direct criterion of fairness
-    analysis) when the two stay dependent. The parents it finds are a valid adjustment set for
-    the weighted controlled direct effect. It runs a number of tests linear in the number of
-    variables.
+    the treatment against the outcome given those parents [1]_. The treatment is a parent of the
+    outcome (the structural direct criterion of fairness analysis) when the two stay dependent.
+    The parents it finds are a valid adjustment set for the weighted controlled direct effect. It
+    runs a number of tests linear in the number of variables.
 
     Parameters
     ----------
@@ -391,9 +399,6 @@ def ld3(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         As for :func:`~andrey.pc`, when a mixed-data test finds no declared categorical column or a
         setting reads columns that look like category codes as numbers; once per process.
@@ -405,13 +410,13 @@ def ld3(
     affects a decision directly, and to estimate that direct effect, without learning a graph.
     Its claim [1]_: when every independence follows from the causal graph (faithfulness), the
     tests are exact, the outcome has no descendant among the columns (its assumption A1), and
-    every parent of the outcome is observed (A2), it finds exactly the parents of the outcome and
-    whether the treatment is one (Theorem 1; see Limitations for graphs where the second part
-    fails); hidden variables that are not parents of the outcome are allowed (Theorem 2), and
-    the parents other than the treatment are a valid adjustment set for the weighted controlled
-    direct effect (Theorem 3). The default
-    Fisher-Z test assumes continuous data with linear effects and Gaussian noise; the other tests
-    read categorical or mixed data or detect nonlinear effects, as :func:`~andrey.pc` describes.
+    every parent of the outcome is observed (A2), it finds exactly the parents of the outcome
+    (Theorem 1), and the criterion **How it works.** describes says whether the treatment is one;
+    hidden variables that are not parents of the outcome are allowed (Theorem 2), and the
+    parents other than the treatment are a valid adjustment set for the weighted controlled
+    direct effect (Theorem 3). The default Fisher-Z test assumes continuous data with linear
+    effects and Gaussian noise; the other tests read categorical or mixed data or detect
+    nonlinear effects, as :func:`~andrey.pc` describes.
     For an adjustment set for the total effect, use :func:`~andrey.ldp`.
 
     **How it works.** Algorithm 1 of [1]_. Three tests sort each variable on its own: independent
@@ -420,9 +425,13 @@ def ld3(
     remaining variable dependent on the outcome given the treatment, the ``Z4`` variables, and the
     other remaining variables is a parent of the outcome. A ``Z4`` variable dependent on the
     outcome given the treatment, those parents, and the other ``Z4`` variables is a parent too.
-    The criterion holds when the treatment and the outcome are dependent given the parents found
-    among the remaining variables. Each query is tested once. The answer does not depend on the
-    column order.
+    The criterion holds when the treatment and the outcome are dependent given every parent found,
+    the ``Z4`` parents included. A parent can be a common effect of the treatment and of a parent
+    independent of it (``X -> M <- W`` with ``M -> Y <- W``): given ``M`` without ``W``, the path
+    ``X -> M <- W -> Y`` is open. Given every parent, a treatment that is not a parent is
+    independent of the outcome (the local Markov property, since the outcome has no descendants),
+    so with exact tests the criterion is exact, on the graph of Figure D.1 of [1]_ without the
+    direct effect too. Each query is tested once. The answer does not depend on the column order.
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [2]_ [3]_, so it keeps rows that
@@ -433,15 +442,16 @@ def ld3(
     ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
     ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Not benchmarked yet. Tested with exact d-separation on the graph of [1]_
-    and on random graphs whose outcome has no descendants, and on simulated linear-Gaussian data.
-    The criterion's test leaves out the parents independent of the treatment: when one of them
-    also causes a mediator that is a parent, as in the graph of Figure D.1 of [1]_, the test
-    finds a dependence through that mediator, and the criterion says the treatment is a parent
-    when it is not. A descendant of the outcome among the columns, or a hidden parent of it,
-    breaks the claim.
-    The parent tests condition on most of the other variables, so they need more rows as the
-    number of variables grows. With 5,000 rows a fit ran about 65 tests on the 18-node graph of
+    **Limitations.** Measured against its authors' code on the graph of [1]_ (Figure D.1 at
+    1,000 to 10,000 rows, with and without the direct effect, and with a non-parent hidden), on
+    random graphs with 50 and 100 nodes, and on the SANGIOVESE network, with Fisher's z test at
+    0.01: its parents and effect errors were as near the truth as the code's or nearer in every
+    setting, and its direct-effect answers were right on 90% to 100% of the datasets without the
+    direct effect. The
+    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#ld3>`_ has the
+    numbers. A descendant of the outcome among the columns, or a hidden parent of it, breaks the
+    claim. The parent tests condition on most of the other variables, so they need more rows as
+    the number of variables grows. With 5,000 rows a fit ran about 65 tests on the 18-node graph of
     [1]_ and about 190 on random 50-node graphs, each in under a second. The numbers are a
     reference, not a hard limit: they change with the data generator, the density, the method's
     settings, and the machine.

@@ -40,7 +40,11 @@ summary's ``parity_rule`` sets how its rows are judged:
   effects the family gives in the population, in standard deviations), ``"verdict_error"`` (1 when
   the answer's ``identifiable`` is not the truth's, an undecided answer included), or
   ``"parents_error"`` (1 unless the answer is identifiable with the outcome's true parents other
-  than the treatment as its set). A row's means are
+  than the treatment as its set, or for an answer that sets parents apart, unless those are the
+  outcome's true parents other than the treatment), ``"valid_set_loss"`` (1 when the answer holds
+  no adjustment set or one that is not a valid adjustment set in the true DAG, hidden variables
+  included), or ``"direct_error"`` (1 when the answer's nonzero direct effect is not the truth's,
+  an edge from the treatment to the outcome). A row's means are
   ``andrey_<metric>_mean`` and ``comparator_<metric>_mean``, or the ``*_shd_mean`` fields, which
   then hold that error's means. A method with a gated metric beside SHD has one entry per metric,
   and a row's key names the ``metric``.
@@ -140,6 +144,8 @@ METRICS: dict[str, str] = {
     "hausdorff_mse": "effect-set Hausdorff MSE",
     "verdict_error": "identifiability verdict error",
     "parents_error": "outcome-parents error",
+    "valid_set_loss": "valid-set loss",
+    "direct_error": "direct-effect error",
     "edge_distance": "edge distance",
     "edge_f1_loss": "edge F1 loss",
     "claim_error": "claim errors",

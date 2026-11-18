@@ -1,0 +1,125 @@
+{
+  "algorithm": "LDP",
+  "case": "adjustment_7v",
+  "input": {
+    "case": "adjustment_7v",
+    "column_order": [
+      4,
+      5,
+      3,
+      2,
+      1,
+      6,
+      0
+    ],
+    "seed": 20261116,
+    "sha256": "c793d2c2e22ae6890ac676ae70e7db16a8a6930b8c5de2eccada549de3e3d546",
+    "shape": [
+      2000,
+      7
+    ]
+  },
+  "output": {
+    "effects": [
+      {
+        "adjustment_sets": [
+          [
+            6
+          ]
+        ],
+        "estimand": "total",
+        "identifiable": true,
+        "nonzero": null,
+        "outcome": 1,
+        "set_kind": "valid",
+        "treatment": 2
+      }
+    ],
+    "graph": [
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    ],
+    "partition": {
+      "Z1": [
+        6
+      ],
+      "Z4": [
+        3
+      ],
+      "Z5": [
+        4
+      ],
+      "Z5,7": [],
+      "Z7": [
+        5
+      ],
+      "Z8": [],
+      "Zpost": [
+        0
+      ],
+      "unlabeled": []
+    }
+  },
+  "schema_version": 3
+}

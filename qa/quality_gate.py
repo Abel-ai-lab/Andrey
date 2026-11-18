@@ -10,7 +10,9 @@ regimes. On each dataset, the median SHD over the draws must be below the empty 
 the tolerance of its recorded baseline; a method that estimates a set of variables, such as one
 variable's parents, counts its false and missed members instead (:func:`set_errors`), and one that
 answers the edges at a single variable counts the errors at that variable alone, or in its local
-structure (:func:`local_errors`).
+structure (:func:`local_errors`), and one that answers adjustment sets for a treatment and an
+outcome counts one error for a draw where it returns no set or a set that is not valid and is
+judged by the errors summed over the draws, since the median of a 0 or 1 score cannot move far.
 ``quality_baselines.json`` holds the baselines and, in one block, every tolerance with the reason
 for its size. Before any fit, the gate runs :mod:`qa.reference_parity` over the published
 benchmark summaries as a soft gate: it prints the rows where Andrey makes more errors than the
@@ -173,6 +175,29 @@ ASIA_ARCS = (
     ("either", "dysp"),
     ("bronc", "dysp"),
 )
+
+#: LDP's Figure 3 (Maasch et al., 2024) and LD3's Figure D.1 (Maasch et al., 2025) with the nodes
+#: ``Z7`` and ``Z8``, each as the arcs between named nodes and the nodes with no arc. The
+#: treatment ``X`` is the first column of a draw and the outcome ``Y`` the last. Figure 3 has a
+#: confounder ``Z1``, a cause of the treatment only ``Z5``, and a cause of the outcome only ``Z4``;
+#: in Figure D.1 the outcome is a sink and every parent of it is observed.
+LDP_FIGURE_3 = (
+    *(("Z1", "X"), ("Z1", "Y"), ("Z5", "X"), ("Z4", "Y"), ("X", "Y"), ("X", "Z3")),
+    *(("Z3", "Y"), ("X", "Z2"), ("Y", "Z2"), ("X", "Z7"), ("Y", "Z6")),
+)
+LD3_FIGURE_D1 = (
+    *(("B1", "B3"), ("B2", "B3"), ("B1", "X"), ("B3", "X"), ("B3", "Y"), ("B2", "Y")),
+    *(("Z1", "X"), ("Z1", "Y"), ("Z5", "X"), ("X", "Y"), ("X", "Z3a"), ("Z3a", "Z3b")),
+    *(("Z3b", "Z3c"), ("Z3c", "Y"), ("X", "Z3d"), ("Z4a", "Z3d"), ("Z3d", "Y"), ("Z4a", "Z4b")),
+    *(("Z4b", "Y"), ("M1", "X"), ("M1", "M3"), ("M2", "M3"), ("M2", "Y"), ("X", "Z7")),
+)
+#: ``(arcs, isolated nodes, n)`` of each planted dataset, by name.
+PLANTED_CELLS: dict[str, tuple[tuple[tuple[str, str], ...], tuple[str, ...], int]] = {
+    "ldp_figure3_n1000": (LDP_FIGURE_3, ("Z8",), 1000),
+    "ldp_figure3_n5000": (LDP_FIGURE_3, ("Z8",), 5000),
+    "ld3_figure_d1_n1000": (LD3_FIGURE_D1, ("Z8",), 1000),
+    "ld3_figure_d1_n10000": (LD3_FIGURE_D1, ("Z8",), 10000),
+}
 
 
 #: The published cause-effect pair regimes as ``andrey.data.sample_scm`` arguments: two
@@ -552,6 +577,28 @@ def asia_draws(noise: str) -> tuple[Draw, ...]:
     return tuple(Draw(ds.data, ds.graph) for ds in samples)
 
 
+def planted_draws(
+    arcs: tuple[tuple[str, str], ...], isolated: tuple[str, ...], n: int
+) -> tuple[Draw, ...]:
+    """Draws from a linear-Gaussian model over the nodes of ``arcs`` and ``isolated``, standardized.
+
+    The treatment ``X`` is the first column and the outcome ``Y`` the last; the other columns come
+    in an order drawn from the seed, so the columns say nothing of the causal order.
+    """
+    others = sorted(({v for arc in arcs for v in arc} | set(isolated)) - {"X", "Y"})
+    out = []
+    for seed in SEEDS:
+        middle = np.random.default_rng(seed).permutation(others).tolist()
+        scm = data.SCM(
+            graph=data.graphs.FixedDAG(nodes=("X", *middle, "Y"), arcs=arcs),
+            functional=data.functional.linear(),
+            noise=data.noise.gaussian(),
+        )
+        ds = scm.sample(n=n, seed=seed, scale="standardize", shuffle=False)
+        out.append(Draw(ds.data, ds.graph))
+    return tuple(out)
+
+
 def unknown_target_stack(x: np.ndarray, env: np.ndarray, given: list[list[int]]) -> np.ndarray:
     """The samples, each row's environment, and a 0/1 matrix marking, in each row of a setting, the
     targets the fit is given: the benchmark driver's ``known`` matrix."""
@@ -723,6 +770,7 @@ DATASETS: dict[str, Callable[[], tuple[Draw, ...]]] = {
     **{name: functools.partial(context_draws, cell) for name, cell in CONTEXT_CELLS.items()},
     "asia_gauss": functools.partial(asia_draws, "gaussian"),
     "asia_lingam": functools.partial(asia_draws, "uniform"),
+    **{name: functools.partial(planted_draws, *cell) for name, cell in PLANTED_CELLS.items()},
     "sachs": sachs_draws,
     **{
         name: functools.partial(unknown_target_draws, cell)
@@ -764,7 +812,10 @@ def draws(dataset: str) -> tuple[Draw, ...]:
 #: ancestral pairs against the truth's ancestral pairs, the false claims plus the true pairs
 #: not claimed (:func:`set_errors`). ``local_dag`` scores the edges into and out of the last
 #: variable and into each of its children, each graph's own, against the DAG's
-#: (:func:`local_errors`). ``direct``
+#: (:func:`local_errors`). ``adjustment`` scores the adjustment sets an estimate returns for the
+#: first variable as the treatment and the last as the outcome, as the list of sets: 0 for a draw
+#: where it returns at least one set and every set is valid in the DAG, else 1, an abstention
+#: included (:func:`adjustment_errors`). ``direct``
 #: scores the directed edges against those between observed variables that no hidden
 #: path joins (:func:`direct`). ``index_pag`` scores the PAG over the variables and the environment
 #: index by its endpoints against the one the draw records. A time-series estimate is scored in its
@@ -789,8 +840,13 @@ Target = Literal[
     "lagged_edges",
     "targets",
     "ancestors",
+    "adjustment",
 ]
 SERIES_TARGETS = ("lagged", "window", "window_edges", "cross_links", "lagged_edges")
+#: Targets scored 0 or 1 on each draw. The median of such a cell is 0, a half, or 1, so a baseline
+#: within one of it rejects nothing: the cell is judged by the draws with an error, summed, which
+#: moves by one for each draw that changes.
+BINARY_TARGETS = ("adjustment",)
 
 
 @dataclass(frozen=True)
@@ -831,6 +887,12 @@ PAG_DATA = (*_sizes("latent_gauss_er"), "asia_gauss", "sachs")
 #: one draw, and at its last column, jnk, MB-by-MB, CMB, LDECC, and LOAD each find at most one of
 #: the two edges, as PC does: none scores below the empty answer there.
 TARGET_CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss")
+#: LDP and LD3 answer for the first column as the treatment and the last as the outcome, on the
+#: planted graphs of their papers (:data:`PLANTED_CELLS`): LDP needs a confounder, a cause of the
+#: treatment only, and a cause of the outcome only, and LD3 an outcome that is a sink with every
+#: parent observed, which the other gate datasets do not have.
+LDP_DATA = ("ldp_figure3_n1000", "ldp_figure3_n5000")
+LD3_DATA = ("ld3_figure_d1_n1000", "ld3_figure_d1_n10000")
 #: MMB-by-MMB answers one variable, the last column. Sachs has one draw, and at its last column,
 #: jnk, the fit finds one of the two edges, as FCI does, and gets its marks wrong: its SHD there
 #: equals the empty answer's.
@@ -963,16 +1025,25 @@ def locpc_cde_at_last(x: np.ndarray) -> StructureOutput:
     return andrey.locpc_cde(x, treatment=int(np.argmax(strength)), outcome=x.shape[1] - 1)
 
 
+def ldp_adjustment_sets(x: np.ndarray) -> list[set[int]]:
+    """The adjustment sets LDP returns for the first column as the treatment and the last as the
+    outcome: none when it gives no answer."""
+    out = andrey.ldp(x, treatment=0, outcome=x.shape[1] - 1)
+    return [set(s) for record in out.metadata["effects"] for s in record["adjustment_sets"]]
+
+
 #: Public defaults, except MMPC, HITON-PC, and RSMAX2: MMPC and HITON-PC return a skeleton by
 #: default, so the gate fits their CPDAG, and RSMAX2's default restrict phase is MMHC's, so the gate
 #: fits its IAMB restrict phase. MB-by-MB, CMB, MMB-by-MMB, and local ISA-LiNG answer one variable,
 #: the last column; LDECC takes it as the treatment and the first column as the outcome, LOAD takes
 #: the two as its variables, LocPC-CDE takes it as the outcome (:func:`locpc_cde_at_last`), and each
-#: is scored by its edges at the last column. A fixed seed pins the search orders of BOSS, GRaSP,
-#: BOSS-FCI, and GRaSP-FCI, FastICA's start, and CALM's optimizer. CD-NOD and
-#: MultiGroupDirectLiNGAM run through their benchmark adapters, which call the public functions with
-#: the published settings: the domain index of four equal blocks of rows, and three groups of
-#: columns.
+#: is scored by its edges at the last column. LDP and LD3 take the first column as the treatment and
+#: the last as the outcome, on the planted graphs (:data:`PLANTED_CELLS`): LD3 is scored by the
+#: parents of the last column, LDP by the adjustment sets it returns (:func:`ldp_adjustment_sets`).
+#: A fixed seed pins the search orders of BOSS, GRaSP, BOSS-FCI, and GRaSP-FCI, FastICA's start, and
+#: CALM's optimizer. CD-NOD and MultiGroupDirectLiNGAM run through their benchmark adapters, which
+#: call the public functions with the published settings: the domain index of four equal blocks of
+#: rows, and three groups of columns.
 SUPPORTED: dict[str, Method] = {
     "PC": Method(lambda x: andrey.pc(x), "cpdag", CPDAG_DATA),
     "FCI": Method(lambda x: andrey.fci(x), "pag", PAG_DATA),
@@ -1003,6 +1074,10 @@ SUPPORTED: dict[str, Method] = {
     "Y-structures": Method(y_structures_claims, "ancestors", ANCESTOR_DATA),
     "CMB": Method(
         lambda x: andrey.cmb(x, target=x.shape[1] - 1), "target_cpdag", TARGET_CPDAG_DATA
+    ),
+    "LDP": Method(ldp_adjustment_sets, "adjustment", LDP_DATA),
+    "LD3": Method(
+        lambda x: andrey.ld3(x, treatment=0, outcome=x.shape[1] - 1), "parents", LD3_DATA
     ),
     "LDECC": Method(
         lambda x: andrey.ldecc(x, treatment=x.shape[1] - 1, outcome=0),
@@ -1177,7 +1252,11 @@ def shd(estimate: object, truth: GraphStructure, target: Target) -> int:
     ``clusters`` the latents missed, ``parents`` the errors in the last variable's parents,
     ``target_cpdag`` and ``target_pag`` the missing, extra, and mismarked edges at the last
     variable, ``local_dag`` the errors in its local structure (:func:`local_errors`), and
-    ``direct`` the directed edges in one graph and not the other, a reversed edge twice."""
+    ``direct`` the directed edges in one graph and not the other, a reversed edge twice, and
+    ``adjustment`` one for a set of adjustment sets that is empty or holds an invalid one
+    (:func:`adjustment_errors`)."""
+    if target == "adjustment":
+        return adjustment_errors(estimate, truth)
     if target == "direct":
         return len(directed(estimate) ^ directed(truth))
     if target == "clusters":
@@ -1194,6 +1273,19 @@ def shd(estimate: object, truth: GraphStructure, target: Target) -> int:
     if target == "cpdag":
         estimate = metrics.to_cpdag(estimate)
     return metrics.shd(estimate, truth, endpoint_aware=target in ("pag", "projection", "index_pag"))
+
+
+def adjustment_errors(estimate: list[set[int]], truth: GraphStructure) -> int:
+    """Return 0 when ``estimate``, the adjustment sets of an answer, holds at least one set and
+    every set is an adjustment set in ``truth`` for the first variable as the treatment and the last
+    as the outcome, else 1. An answer with no set, an abstention, counts 1, as does a set that holds
+    the treatment or the outcome, and the empty set when the pair has a confounder, which is the
+    empty answer's error."""
+    last = truth.n_nodes - 1
+    return int(
+        not estimate
+        or not all(not s & {0, last} and truth.is_adjustment_set(0, last, s) for s in estimate)
+    )
 
 
 def edge_matrix(graph: Any) -> np.ndarray:
@@ -1299,6 +1391,8 @@ def empty_estimate(draw: Draw, target: Target) -> Any:
         return empty_graph(truth.n_nodes, "cpdag")
     if target == "ancestors":
         return set()
+    if target == "adjustment":  # the empty answer: the empty set as the one adjustment set
+        return [set()]
     if target == "parents":  # the data hold each row's environment beside the variables
         return empty_graph(truth.n_nodes, "dag")
     if target == "clusters":
@@ -1315,7 +1409,11 @@ def empty_estimate(draw: Draw, target: Target) -> Any:
 
 @dataclass
 class CellResult:
-    """One method on one dataset: the SHD of each draw and of the empty graph, and both checks."""
+    """One method on one dataset: the SHD of each draw and of the empty graph, and both checks.
+
+    The cell is judged by the median over the draws, or, for a binary score
+    (:data:`BINARY_TARGETS`), by the sum over the draws, ``statistic`` ``"total"``.
+    """
 
     method: str
     dataset: str
@@ -1324,6 +1422,7 @@ class CellResult:
     baseline: float | None
     tolerance: float | None
     seconds: float = 0.0
+    statistic: str = "median"
 
     @property
     def median(self) -> float:
@@ -1334,18 +1433,27 @@ class CellResult:
         return float(statistics.median(self.empty_shd))
 
     @property
+    def score(self) -> float:
+        """The cell's value: the median over the draws, or the sum for a binary score."""
+        return float(sum(self.shd)) if self.statistic == "total" else self.median
+
+    @property
+    def empty_score(self) -> float:
+        """The empty graph's value under the same statistic."""
+        return float(sum(self.empty_shd)) if self.statistic == "total" else self.empty_median
+
+    @property
     def failures(self) -> list[str]:
         out = []
-        if not self.median < self.empty_median:
-            out.append(
-                f"median SHD {self.median:g} is not below the empty graph's {self.empty_median:g}"
-            )
+        name = "total errors" if self.statistic == "total" else "median SHD"
+        if not self.score < self.empty_score:
+            out.append(f"{name} {self.score:g} is not below the empty graph's {self.empty_score:g}")
         if self.baseline is None or self.tolerance is None:
             out.append("no recorded baseline")
-        elif abs(self.median - self.baseline) > self.tolerance:
-            gap = self.median - self.baseline
+        elif abs(self.score - self.baseline) > self.tolerance:
+            gap = self.score - self.baseline
             out.append(
-                f"median SHD {self.median:g} is {abs(gap):g} {'above' if gap > 0 else 'below'} "
+                f"{name} {self.score:g} is {abs(gap):g} {'above' if gap > 0 else 'below'} "
                 f"the baseline {self.baseline:g} (tolerance {self.tolerance:g})"
                 + ("" if gap > 0 else "; recapture if the change is intended")
             )
@@ -1364,9 +1472,16 @@ class CellResult:
         verdict = verdict or ("PASS" if self.passed else "FAIL")
         return (
             f"[{verdict}] {self.method:12s} {self.dataset:20s} "
-            f"SHD {self.median:5g}  empty {self.empty_median:5g}  baseline {baseline:9s} "
+            f"{'sum' if self.statistic == 'total' else 'SHD'} {self.score:5g}  "
+            f"empty {self.empty_score:5g}  baseline {baseline:9s} "
             f"{self.seconds:6.1f} s"
         )
+
+
+def statistic_of(target: Target) -> str:
+    """Return ``"total"`` for a binary score and ``"median"`` otherwise; the baseline and the
+    tolerance of a cell are recorded as ``<statistic>_shd``."""
+    return "total" if target in BINARY_TARGETS else "median"
 
 
 def recorded() -> dict:
@@ -1401,14 +1516,16 @@ def evaluate(method: str, dataset: str, fit: Callable[[Draw], object] | None = N
             empties.append(shd(empty, truth, spec.target))
     ledger = recorded()
     cell = ledger["baselines"].get(method, {}).get(dataset, {})
+    statistic = statistic_of(spec.target)
     return CellResult(
         method=method,
         dataset=dataset,
         shd=shds,
         empty_shd=empties,
-        baseline=cell.get("median_shd"),
-        tolerance=ledger["tolerances"].get(method, {}).get("median_shd"),
+        baseline=cell.get(f"{statistic}_shd"),
+        tolerance=ledger["tolerances"].get(method, {}).get(f"{statistic}_shd"),
         seconds=time.perf_counter() - start,
+        statistic=statistic,
     )
 
 
@@ -1498,8 +1615,8 @@ def capture(results: list[CellResult]) -> None:
         baselines[method] = {}
     for r in results:
         baselines[r.method][r.dataset] = {
-            "median_shd": r.median,
-            "empty_median_shd": r.empty_median,
+            f"{r.statistic}_shd": r.score,
+            f"empty_{r.statistic}_shd": r.empty_score,
             "shd": r.shd,
         }
     everything["supported"]["baselines"] = {m: baselines[m] for m in CHECKS if m in baselines}
@@ -1536,7 +1653,10 @@ def main(argv: list[str] | None = None) -> int:
         ap.error(f"unknown methods {unknown}; known: {list(CHECKS)}")
 
     parity_failed = 0 if args.capture else reference_parity.main()
-    print("\nQuality gate: median SHD over each dataset's draws, against the known graph.\n")
+    print(
+        "\nQuality gate: median SHD over each dataset's draws (the sum for a binary score), "
+        "against the known graph.\n"
+    )
     results = []
     for result in run_cells(cells(args.methods or None), args.jobs):
         results.append(result)

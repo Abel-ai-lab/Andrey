@@ -12,6 +12,8 @@ GRAPH_ONLY = {"structural": ["graph"], "numeric": {}}
 GRAPH_SCORE = {"structural": ["graph"], "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}}}
 #: The graph and the ``effects`` records, exactly.
 GRAPH_EFFECTS = {"structural": ["graph", "effects"], "numeric": {}}
+#: The graph, the ``effects`` records, and the labels of the other columns, exactly.
+GRAPH_EFFECTS_PARTITION = {"structural": ["graph", "effects", "partition"], "numeric": {}}
 
 SPEC: dict[str, dict] = {
     "DirectLiNGAM": {
@@ -50,6 +52,10 @@ SPEC: dict[str, dict] = {
         "numeric": {"scores": {"atol": 1e-6, "rtol": 1e-6}},
     },
     "CMB": GRAPH_ONLY,
+    "LDP": GRAPH_EFFECTS_PARTITION,
+    "LD3": GRAPH_EFFECTS_PARTITION,
+    "LD3NoDirect": GRAPH_EFFECTS_PARTITION,
+    "LDPNoSet": GRAPH_EFFECTS_PARTITION,
     "LDECC": GRAPH_EFFECTS,
     "LocalOptimalAdjustment": GRAPH_EFFECTS,
     "LocPCCDE": GRAPH_EFFECTS,

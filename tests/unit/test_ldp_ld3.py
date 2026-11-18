@@ -13,8 +13,6 @@ from andrey.constraint.blanket import local_search
 from andrey.core.ci import counting_tests
 from andrey.core.effects import check_effects
 
-pytestmark = pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-
 METHODS = (ldp, ld3)
 
 

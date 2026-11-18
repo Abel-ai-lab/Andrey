@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import gzip
 import importlib
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -19,7 +20,9 @@ from qa import quality_gate as qg
 def test_every_cell_has_a_baseline_and_every_method_a_tolerance() -> None:
     ledger = qg.recorded()
     assert set(ledger["tolerances"]) == set(qg.CHECKS)
-    assert all(t["median_shd"] >= 1 and t["reason"] for t in ledger["tolerances"].values())
+    for method, tolerance in ledger["tolerances"].items():
+        statistic = qg.statistic_of(qg.CHECKS[method].target)
+        assert tolerance[f"{statistic}_shd"] >= 1 and tolerance["reason"], method
     assert {m: set(ledger["baselines"][m]) for m in qg.CHECKS} == {
         m: set(qg.CHECKS[m].datasets) for m in qg.CHECKS
     }
@@ -32,13 +35,16 @@ def empty_answer(draw: qg.Draw, target: qg.Target) -> object:
 def shifted_truth(draw: qg.Draw, target: qg.Target) -> object:
     """The true graph with each variable moved one column: an off-by-one in column handling. A
     measurement model moves its indicators and keeps its latents last; learned targets move to
-    the next variable; claimed ancestral pairs are the shifted graph's."""
+    the next variable; claimed ancestral pairs are the shifted graph's; adjustment sets are the
+    treatment's parents, moved."""
     if target == "targets":
         p = draw.truth.n_nodes
         return [sorted((v + 1) % p for v in t) for t in draw.targets]
     if target in qg.SERIES_TARGETS:
         return shifted_series_truth(draw.truth, target)
     truth = qg.target_truth(draw.truth, target)
+    if target == "adjustment":  # the treatment's parents, a valid set, each moved one column
+        return [{(v + 1) % truth.n_nodes for v in qg.parents_of(truth, 0)}]
     marks = truth.to_numpy()
     shift = np.arange(len(marks))
     types = None if target != "clusters" else np.asarray(truth.node_types)
@@ -130,6 +136,24 @@ def test_target_pag_counts_the_edges_at_the_last_variable_alone() -> None:
     assert qg.shd(qg.empty_graph(4, "target_pag"), truth, "target_pag") == 2
 
 
+def test_adjustment_counts_one_for_an_abstention_or_a_set_that_is_not_valid() -> None:
+    marks = np.zeros((4, 4), dtype=np.int8)
+    for i, j in ((1, 0), (1, 3), (2, 3), (0, 3)):  # 1 confounds the treatment 0 and the outcome 3
+        marks[i, j], marks[j, i] = TAIL, ARROW
+    truth = GraphStructure.from_numpy(marks, kind="dag")
+    assert qg.shd([{1}], truth, "adjustment") == qg.shd([{1}, {1, 2}], truth, "adjustment") == 0
+    assert qg.shd([], truth, "adjustment") == 1  # no answer
+    assert qg.shd([set()], truth, "adjustment") == 1  # the confounder is open
+    assert qg.shd([{1}, {2}], truth, "adjustment") == 1  # one set of two is not valid
+    assert qg.shd([{1, 3}], truth, "adjustment") == 1  # a set holding the outcome
+    assert (
+        qg.shd(
+            qg.empty_estimate(qg.Draw(np.zeros((1, 4)), truth), "adjustment"), truth, "adjustment"
+        )
+        == 1
+    )
+
+
 def test_local_dag_counts_the_local_structure_at_the_last_variable() -> None:
     def graph(*edges: tuple[int, int], kind: str = "digraph") -> GraphStructure:
         """A graph over five variables with the edges ``(i, j)``, ``i -> j``; a pair listed both
@@ -163,6 +187,44 @@ def test_tolerance_is_two_sided() -> None:
     assert cell(4).passed and cell(6).passed
     assert not cell(3).passed and not cell(7).passed
     assert qg.CellResult("PC", "x", shd=[5], empty_shd=[5], baseline=5, tolerance=1).failures
+
+
+def abstains_on_first(draws: int) -> Callable[[qg.Draw], object]:
+    """LDP's fit returning no set on the first ``draws`` draws and the treatment's parents, a
+    valid set, on the others."""
+    seen: list[qg.Draw] = []
+
+    def fit(draw: qg.Draw) -> list[set[int]]:
+        seen.append(draw)
+        if len(seen) <= draws:
+            return []
+        return [qg.parents_of(qg.target_truth(draw.truth, "adjustment"), 0)]
+
+    return fit
+
+
+@pytest.mark.parametrize(("abstaining", "passes"), [(0, True), (1, True), (2, False), (4, False)])
+def test_ldp_is_judged_by_the_draws_it_gets_wrong(abstaining: int, passes: bool) -> None:
+    """A binary score moves the median of ten draws only when five change, so the cell is judged by
+    the draws that score 1: one borderline draw passes, a second does not."""
+    result = qg.evaluate("LDP", "ldp_figure3_n5000", fit=abstains_on_first(abstaining))
+    assert result.statistic == "total" and result.score == sum(result.shd) == abstaining
+    assert result.passed is passes
+    if abstaining == 4:
+        assert result.median < result.empty_median  # the median alone would accept it
+
+
+def test_ldp_rejects_half_the_draws_wrong_and_all_of_them() -> None:
+    half = qg.evaluate("LDP", "ldp_figure3_n5000", fit=abstains_on_first(5))
+    assert half.median == 0.5 < half.empty_median and not half.passed
+    every = qg.evaluate("LDP", "ldp_figure3_n5000", fit=abstains_on_first(10))
+    assert any("empty graph" in f for f in every.failures)
+
+
+def test_only_a_binary_score_is_judged_by_its_sum() -> None:
+    assert {m for m, spec in qg.CHECKS.items() if qg.statistic_of(spec.target) == "total"} == {
+        "LDP"
+    }
 
 
 def test_the_slowest_cells_are_cells_of_the_gate_and_start_first() -> None:

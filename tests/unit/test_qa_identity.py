@@ -196,6 +196,51 @@ def test_jpcmciplus_names_the_contexts_new_columns(monkeypatch) -> None:
         assert np.array_equal(dataset[:, kwargs["space_contexts"]], original[:, [6]])
 
 
+@pytest.mark.parametrize(
+    ("method", "dataset"), [("ldp", "ldp_figure3_n1000"), ("ld3", "ld3_figure_d1_n1000")]
+)
+def test_ldp_and_ld3_move_the_treatment_and_the_outcome_with_the_columns(
+    monkeypatch, method: str, dataset: str
+) -> None:
+    x = qg.draws(dataset)[0].data
+    calls = spy(monkeypatch, method)
+    refit = identity.FITS[method.upper()].refit
+    assert refit is not None
+    rng = np.random.default_rng(5)
+    mapped = refit(x, rng)
+    order = np.random.default_rng(5).permutation(x.shape[1])
+    (moved,), kwargs = calls[0]
+    assert np.array_equal(moved, x[:, order])
+    assert np.array_equal(moved[:, kwargs["treatment"]], x[:, 0])
+    assert np.array_equal(moved[:, kwargs["outcome"]], x[:, -1])
+    first = identity.FITS[method.upper()].call(x)
+    kinds = identity.classify(
+        identity.unpermute(first, np.arange(x.shape[1])), mapped, column_order=True
+    )
+    assert kinds is None or kinds[0] == "digits"
+    assert mapped.metadata["effects"][0]["treatment"] == 0
+    assert mapped.metadata["effects"][0]["outcome"] == x.shape[1] - 1
+    # without the map back the answer names the moved columns, which the check would report
+    unmapped = getattr(andrey, method)(moved, **kwargs)
+    assert identity.classify(first, unmapped, column_order=True)
+
+
+def test_a_column_order_leaves_out_the_number_of_tests_of_ldp_only() -> None:
+    marks = np.zeros((2, 2), dtype=np.int8)
+
+    def output(algorithm: str, n_tests: int) -> StructureOutput:
+        return StructureOutput.new(
+            GraphStructure.from_numpy(marks, kind="dag"),
+            metadata={"algorithm": algorithm, "n_tests": n_tests},
+        )
+
+    for algorithm, expected in (("ldp", None), ("ld3", "values")):
+        first = identity.unpermute(output(algorithm, 40), np.arange(2))
+        refit = identity.unpermute(output(algorithm, 41), np.arange(2))
+        found = identity.classify(first, refit, column_order=True)
+        assert (found and found[0]) == expected, algorithm
+
+
 def test_icps_target_and_per_variable_metadata_map_back() -> None:
     marks = np.zeros((3, 3), dtype=np.int8)
     marks[1, 2], marks[2, 1] = 1, 2  # 1 -> 2, the target

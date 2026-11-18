@@ -1,0 +1,123 @@
+{
+  "algorithm": "LD3NoDirect",
+  "case": "ld3_no_direct_7v",
+  "input": {
+    "case": "ld3_no_direct_7v",
+    "column_order": [
+      0,
+      2,
+      1,
+      5,
+      4,
+      6,
+      3
+    ],
+    "seed": 20261120,
+    "sha256": "7d6f4dbe8076b97c85ba3f110d8301acdce98f8121d7d4831fcc066fda29de04",
+    "shape": [
+      2000,
+      7
+    ]
+  },
+  "output": {
+    "effects": [
+      {
+        "adjustment_sets": [
+          [
+            0,
+            1,
+            4
+          ]
+        ],
+        "estimand": "direct",
+        "identifiable": null,
+        "nonzero": false,
+        "outcome": 3,
+        "set_kind": "parents_of_outcome",
+        "treatment": 6
+      }
+    ],
+    "graph": [
+      [
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        2,
+        2,
+        0,
+        0,
+        2,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    ],
+    "partition": {
+      "Z1,3": [
+        0,
+        4
+      ],
+      "Z4": [
+        1
+      ],
+      "Z5,7": [
+        5
+      ],
+      "Z8": [],
+      "unlabeled": [
+        2
+      ]
+    }
+  },
+  "schema_version": 3
+}
