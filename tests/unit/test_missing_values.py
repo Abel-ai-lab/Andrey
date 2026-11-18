@@ -552,8 +552,9 @@ def test_no_text_says_that_fci_stays_sound_when_values_are_missing_for_a_reason(
     """FCI with one test per query is valid for values missing completely at random only."""
     texts = {name: inspect.getdoc(getattr(andrey, name)) or "" for name in SUPPORTED}
     texts |= {"ci_missing": ci_missing.__doc__ or "", "agent text": render_skill()}
+    texts = {name: " ".join(text.split()) for name, text in texts.items()}
     assert not [name for name, text in texts.items() if "missingness mechanism" in text]
-    assert TESTWISE_CLAIM in " ".join(texts["fci"].split())
+    assert TESTWISE_CLAIM in texts["fci"]
     assert TESTWISE_CLAIM in texts["agent text"]
 
 
