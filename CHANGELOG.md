@@ -87,11 +87,11 @@ names its pull request.
   Deng et al. (2024) without `-log|det(I - W)|`, as its authors' code does. The term is zero
   for every DAG, so the graphs each step is judged by do not change, but its gradient is not zero
   while a fit is cyclic, and it led the path to other graphs. On the paper's simulation with z-scored
-  columns and 20 datasets per setting, the CPDAG errors of `dagma(robust=True)` fell from 23.1, 44.2,
-  23.5, and 54.0 to 21.3, 40.0, 17.9, and 39.0 on Erdos-Renyi and scale-free graphs with 10 and 20
-  variables, against 20.1, 42.4, 18.1, and 39.4 for the path run with its authors' code, and those of
-  `notears(robust=True)` at 10 variables moved from 16.6 on z-scored and 13.2 on raw columns to 18.5
-  and 11.8, against 18.4 and 11.8. ([#1043], [#1046])
+  columns and 20 datasets per setting, the CPDAG errors of `dagma(robust=True)` fell from 23.05,
+  44.25, 23.50, and 54.05 to 21.30, 39.95, 17.90, and 39.05 on Erdos-Renyi and scale-free graphs
+  with 10 and 20 variables, against 20.05, 42.40, 18.15, and 39.35 for the path run with its
+  authors' code, and those of `notears(robust=True)` at 10 variables moved from 16.60 on z-scored
+  and 13.25 on raw columns to 18.50 and 11.80, against 18.45 and 11.75. ([#1043], [#1046])
 
 ## [0.17.1] - 2026-11-12
 

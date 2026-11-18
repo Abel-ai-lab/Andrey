@@ -115,7 +115,9 @@ all three. The NOTEARS and DAGMA lane's rows are in
 authors' code, with the fresh seeds of one setting. The 0.18.0 summary holds DAGMA's rows against
 its authors' package, from
 [`published/0.18.0/notears-dagma.json`](published/0.18.0/notears-dagma.json), which keeps the rows
-of the default fit that 0.17.0 measured. The AGES lane's rows are in
+of the default fit that 0.17.0 measured; both files also record the `robust=True` path beside its
+authors' code and the fits on the Sachs data, under `likelihood_path` and `sachs`. The AGES lane's
+rows are in
 [`published/0.17.0/ages.json`](published/0.17.0/ages.json), with their
 [comparison page](comparisons/ages.md); the 0.17.0 summary holds its rows against pcalg.
 
