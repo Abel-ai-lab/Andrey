@@ -176,6 +176,7 @@ def test_a_last_round_that_changed_the_graph_logs_a_warning(caplog):
     (logged,) = caplog.records
     assert logged.levelno == logging.WARNING
     assert "still changed in the last of 3 rounds" in logged.getMessage()
+    assert "n_em_iterations above 3 runs more rounds" in logged.getMessage()
 
 
 def test_no_parameter_step_lowers_the_observed_data_log_likelihood(monkeypatch):
@@ -238,6 +239,52 @@ def test_a_fit_on_missing_values_records_its_handling_and_repeats(name):
     assert first.metadata["missing"] == "em"
     record = first.metadata["em"]
     assert record["iterations"] == 10 == len(record["log_likelihood"])
+
+
+@pytest.mark.parametrize("name", EM_METHODS)
+def test_a_fit_runs_the_rounds_it_is_asked_for_and_ten_are_the_default(name):
+    """Naming the default changes no fit, and a fit of fewer or more rounds runs that many, the
+    rounds it shares with the default fit giving the same record."""
+    fit = _method(name)
+    x = _gaps(_chain(), 0.1)
+    default = fit(x, missing="em")
+    assert ITERATIONS == 10
+    assert fit(x, missing="em", n_em_iterations=10) == default
+    for rounds in (1, 12):
+        record = fit(x, missing="em", n_em_iterations=rounds).metadata["em"]
+        assert record["iterations"] == rounds
+        assert len(record["graph_changed"]) == len(record["log_likelihood"]) == rounds
+        shared = min(rounds, 10)
+        for key in ("graph_changed", "log_likelihood"):
+            assert record[key][:shared] == default.metadata["em"][key][:shared]
+
+
+def test_a_fit_whose_last_round_changed_the_graph_logs_a_warning_that_names_the_rounds(caplog):
+    with caplog.at_level(logging.WARNING, logger="andrey.search.em"):
+        out = andrey.ges(_gaps(_chain(), 0.1), missing="em", n_em_iterations=1)
+    assert out.metadata["em"]["graph_changed"] == [True]  # against the graph with no edge
+    (logged,) = caplog.records
+    assert "n_em_iterations above 1 runs more rounds" in logged.getMessage()
+
+
+@pytest.mark.parametrize("name", EM_METHODS)
+@pytest.mark.parametrize(("value", "error"), [(0, ValueError), (-2, ValueError), (2.0, TypeError)])
+def test_a_number_of_rounds_that_is_not_a_whole_number_from_1_raises_before_the_fit(
+    name, value, error
+):
+    fit = _method(name)
+    for x, missing in ((_gaps(_chain(), 0.1), "em"), (_chain(), "em"), (_chain(), None)):
+        with pytest.raises(error, match=rf"^{name}: n_em_iterations must be "):
+            fit(x, missing=missing, n_em_iterations=value)
+
+
+@pytest.mark.parametrize("name", EM_METHODS)
+def test_the_rounds_change_nothing_when_em_does_not_run(name):
+    fit = _method(name)
+    x = _chain()
+    plain = fit(x)
+    assert fit(x, n_em_iterations=3) == plain
+    assert fit(x, missing="em", n_em_iterations=3) == plain
 
 
 @pytest.mark.parametrize("name", EM_METHODS)

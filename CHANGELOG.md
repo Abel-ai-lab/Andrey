@@ -18,6 +18,11 @@ names its pull request.
 - `metadata["em"]` records `rows_dropped`, the rows dropped for observing no value, and
   `min_shared_rows`, the fewest rows that observe both columns of a pair. A fit whose every missing
   value sat in a dropped row records its handling too. ([#1102])
+- `n_em_iterations` on the ten searches that take `missing="em"` (`ges`, `xges`, `hc`, `tabu`,
+  `exact_search`, `boss`, `grasp`, `notears`, `dagma`, `calm`) sets the number of structural EM
+  rounds. The default stays 10, the number Gao et al. (2022) run, so a fit without the argument
+  returns what it did. The warning of a fit whose last round still changed the graph names the
+  argument; values other than 10 are not benchmarked yet. ([#1095])
 - `pc(missing="mvpc")` records the fewest and the median rows a corrected test read as
   `metadata["corrected_edges"]["rows_tested"]`, so a fit shows when the correction ran on few rows.
   The graph and the other metadata are unchanged. ([#1094])
@@ -2597,3 +2602,4 @@ First alpha release.
 [nd-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/notears-dagma.md
 [ages-page]: https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/ages.md
 [#920]: https://github.com/Abel-ai-lab/andrey/pull/920
+[#1095]: https://github.com/Abel-ai-lab/Andrey/pull/1095
