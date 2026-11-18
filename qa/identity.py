@@ -19,8 +19,9 @@ compare names every row where one changed and fails on any change, a fall as wel
 ``--allow-fewer-queries`` accepts a fall.
 
 ``--shuffle K`` refits each draw but CMB's, MMB-by-MMB's, and local ISA-LiNG's (:class:`Fit`) on
-``K`` seeded column orders, moving the targets of ICP and IGSP and the contexts of J-PCMCI+ with the
-columns, and maps each answer back to the original columns before hashing it;
+``K`` seeded column orders, moving the targets of ICP and IGSP, the contexts of J-PCMCI+, and the
+treatment and outcome of LDP and LD3 with the columns, and maps each answer back to the original
+columns before hashing it;
 ``--workers N`` refits the methods that run worker processes or threads (:data:`WORKER_METHODS`) on
 ``N`` workers, with every GES pass, every skeleton pass of conditioning size two or more, and every
 possible-d-sep search sent to the pool. Both report each refit whose answer differs from the first
@@ -84,15 +85,15 @@ class Fit:
     ``blocks`` is the number of side-by-side copies of the variables in the data: GIES's samples
     and intervention indicators, MultiGroupDirectLiNGAM's groups; a column order moves each copy
     the same way. ``refit`` is set for the methods whose draws hold more than the variables, ICP,
-    IGSP, FCI-JCI, and J-PCMCI+: ``refit(x, rng)`` draws a column order from ``rng``, fits the draw
-    with its columns in that order, moving the targets and contexts the call names along with them
-    while each row's environment stays, and returns the answer mapped back to the original columns
-    (:func:`unpermute`). ``shuffled`` is ``False`` for MB-by-MB, CMB, MMB-by-MMB, local ISA-LiNG,
-    LDP, LD3, LDECC, LOAD, and LocPC-CDE, whose draws a column order does not apply to: the target
-    of MB-by-MB, CMB, MMB-by-MMB, and local ISA-LiNG is the last variable, LDP's, LD3's, and
-    LocPC-CDE's treatment and outcome are the first and the last, and LDECC's treatment and outcome
-    and LOAD's two variables are the last and the first. ``alpha`` is the significance level of a
-    CI-test method.
+    IGSP, FCI-JCI, J-PCMCI+, LDP, and LD3: ``refit(x, rng)`` draws a column order from ``rng``,
+    fits the draw with its columns in that order, moving the targets, contexts, treatment, and
+    outcome the call names along with them while each row's environment stays, and returns the
+    answer mapped back to the original columns (:func:`unpermute`). ``shuffled`` is ``False`` for
+    MB-by-MB, CMB, MMB-by-MMB, local ISA-LiNG, LDECC, LOAD, and LocPC-CDE, whose draws a column
+    order does not apply to: the target of MB-by-MB, CMB, MMB-by-MMB, and local ISA-LiNG is the last
+    variable, LocPC-CDE's treatment and outcome are the first and the last, and LDECC's treatment
+    and outcome and LOAD's two variables are the last and the first. ``alpha`` is the significance
+    level of a CI-test method.
     """
 
     call: Callable[[np.ndarray], Any]
@@ -246,6 +247,24 @@ def _jpcmciplus_refit(x: np.ndarray, rng: np.random.Generator) -> StructureOutpu
     return unpermute(out, np.array([c for c in order if c not in context]))
 
 
+def _pair_refit(method: str) -> Callable[[np.ndarray, np.random.Generator], StructureOutput]:
+    """The column-order refit of LDP or LD3 (``method``, ``"ldp"`` or ``"ld3"``) on a draw whose
+    first column is the treatment and last the outcome: every column moves to a drawn position, the
+    call names where the treatment and the outcome went, and the answer maps back to the original
+    columns."""
+
+    def refit(x: np.ndarray, rng: np.random.Generator) -> StructureOutput:
+        order = rng.permutation(x.shape[1])
+        new = np.argsort(order)  # the column each original column moves to
+        moved = np.ascontiguousarray(x[:, order])
+        out = getattr(andrey, method)(
+            moved, treatment=int(new[0]), outcome=int(new[-1]), alpha=ALPHA
+        )
+        return unpermute(out, order)
+
+    return refit
+
+
 def _longitudinal(x):
     """Longitudinal LiNGAM with the gate adapter's settings; the adapter names the lag ``n_lags``,
     as lingam does."""
@@ -279,8 +298,8 @@ FITS: dict[str, Fit] = {
     "MMMB": Fit(functools.partial(andrey.mmmb, alpha=ALPHA), alpha=ALPHA),
     "Y-structures": Fit(functools.partial(andrey.y_structures, alpha=ALPHA), alpha=ALPHA),
     "CMB": Fit(_last_column("cmb"), shuffled=False, alpha=ALPHA),
-    "LDP": Fit(_ldp, shuffled=False, alpha=ALPHA),
-    "LD3": Fit(_ld3, shuffled=False, alpha=ALPHA),
+    "LDP": Fit(_ldp, alpha=ALPHA, refit=_pair_refit("ldp")),
+    "LD3": Fit(_ld3, alpha=ALPHA, refit=_pair_refit("ld3")),
     "LDECC": Fit(_ldecc, shuffled=False, alpha=ALPHA),
     "LocalOptimalAdjustment": Fit(_local_optimal_adjustment, shuffled=False, alpha=ALPHA),
     "LocPCCDE": Fit(_locpc_cde, shuffled=False, alpha=ALPHA),
@@ -660,7 +679,9 @@ def unpermute(out: Any, order: np.ndarray) -> Any:
     original column: the graphs, the time series's weights, the causal order, the edge weights,
     and the metadata in :data:`LAG_MATRICES`. Hidden nodes after the observed ones keep their
     places, a swapped pair's :data:`DIRECTIONS` trade places, ICP's target and its metadata in
-    :data:`PER_VARIABLE` move back, and the metadata in :data:`NODE_LISTS` is left out."""
+    :data:`PER_VARIABLE` move back, the ``effects`` records and the ``partition`` of LDP and LD3
+    name the original columns again, and the metadata in :data:`NODE_LISTS` is left out, as is the
+    number of tests of LDP, which its spec says a column order can change."""
     if isinstance(out, list):
         return [unpermute(o, order) for o in out]
     order = np.concatenate([order, np.arange(len(order), out.structure.n_nodes)])
@@ -669,10 +690,15 @@ def unpermute(out: Any, order: np.ndarray) -> Any:
     swapped = len(order) == 2 and order[0] == 1
     metadata = {}
     icp = out.metadata.get("algorithm") == "icp"
+    pair = out.metadata.get("algorithm") in ("ldp", "ld3")
     for key, value in out.metadata.items():
-        if key in NODE_LISTS:
+        if key in NODE_LISTS or (key == "n_tests" and out.metadata.get("algorithm") == "ldp"):
             continue
-        if icp and key == "target":
+        if pair and key == "effects":
+            value = [_record_moved(record, order) for record in value]
+        elif pair and key == "partition":
+            value = {label: sorted(int(order[i]) for i in nodes) for label, nodes in value.items()}
+        elif icp and key == "target":
             value = int(order[value])
         elif icp and key in PER_VARIABLE:
             value = None if value is None else [value[i] for i in back]
@@ -688,6 +714,18 @@ def unpermute(out: Any, order: np.ndarray) -> Any:
         weighted_adjacency=None if weights is None else weights[np.ix_(back, back)],
         metadata=metadata,
     )
+
+
+def _record_moved(record: Mapping[str, Any], order: np.ndarray) -> dict[str, Any]:
+    """Return an ``effects`` record fitted on the columns in ``order`` with the treatment, the
+    outcome, and each adjustment set named by their original columns, in ascending order."""
+    sets = sorted(sorted(int(order[i]) for i in s) for s in record["adjustment_sets"])
+    return {
+        **record,
+        "treatment": int(order[record["treatment"]]),
+        "outcome": int(order[record["outcome"]]),
+        "adjustment_sets": sets,
+    }
 
 
 def _moved(value: Any, back: np.ndarray) -> Any:

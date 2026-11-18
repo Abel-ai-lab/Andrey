@@ -48,11 +48,13 @@ difference and `--shuffle` on a difference beyond rounding:
 
 - `--shuffle K` refits on `K` seeded column orders and maps each answer back to the original
   columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out. ICP's
-  target, IGSP's targets, and J-PCMCI+'s contexts move with the columns, and each row's environment
-  stays with its row. MB-by-MB, CMB, MMB-by-MMB, local ISA-LiNG, LDP, LD3, LDECC, LOAD, and
-  LocPC-CDE are not refit: the target of MB-by-MB, CMB, MMB-by-MMB, and local ISA-LiNG is the last
-  variable, LDP's, LD3's, and LocPC-CDE's treatment and outcome are the first and the last, and
-  LDECC's treatment and outcome and LOAD's two variables are the last and the first. A column order
+  target, IGSP's targets, J-PCMCI+'s contexts, and LDP's and LD3's treatment and outcome move with
+  the columns, and each row's environment stays with its row; LDP's and LD3's `effects` records
+  and `partition` name the original columns again, and LDP's number of tests is left out, since its
+  spec says a column order can change it. MB-by-MB, CMB, MMB-by-MMB, local ISA-LiNG, LDECC, LOAD,
+  and LocPC-CDE are not refit: the target of MB-by-MB, CMB, MMB-by-MMB, and local ISA-LiNG is the
+  last variable, LocPC-CDE's treatment and outcome are the first and the last, and LDECC's
+  treatment and outcome and LOAD's two variables are the last and the first. A column order
   fails the check when a graph, a graph's kind, or the causal order differs, or when an edge weight
   or metadata value differs by more than rounding (a relative `1e-6`, or an absolute `1e-12` near
   zero); a boolean that becomes a number or an integer that becomes a float differs. A difference of
@@ -345,8 +347,8 @@ test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP le
   mediator `Z3`, a collider `Z2`, a child of the treatment `Z7`, a child of the outcome `Z6`, and an
   isolated node `Z8`. LD3's Figure D.1 has eight parents of the outcome, among them mediators, a
   collider of the treatment and a cause of the outcome, and the parents of an M-structure. The gate
-  fits each at the first column as the treatment and the last as the outcome, so identity skips the
-  column-order refits, and fits it once more on 20,000 rows.
+  fits each at the first column as the treatment and the last as the outcome, which identity moves
+  with the columns in its column-order refits, and fits it once more on 20,000 rows.
 - **ASIA.** The 8-arc network of Lauritzen and Spiegelhalter (1988), sampled as a linear SCM with
   1,000 rows per seed. Its arcs are bnlearn's (`andrey.data.load_dataset("asia")`); the gate lists
   them in its own order, which fixes each seed's weights, and a test checks the two agree.
