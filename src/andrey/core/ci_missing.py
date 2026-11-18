@@ -10,12 +10,15 @@ built over those rows of those columns, kept in data order, and asked the same q
 p-value is the one that test gives on that block exactly. Each test thus keeps every row its own
 variables allow, where deleting every row with a missing value would drop rows for all of them.
 
-Deleting rows per test is sound when the values are missing completely at random (MCAR): the rows a
-test keeps are a random sample of all rows, so each test keeps its level and a constraint-based
-search stays consistent [1]_ [2]_. When whether a value is missing depends on the variables, the
-rows a test keeps are a selected sample. PC's tests can then find dependence where the full
-population has none and keep extra edges [2]_; FCI, which allows for selection, stays sound when
-no missingness mechanism causally affects another [1]_.
+Deleting rows per test is valid when the values are missing completely at random (MCAR): the rows
+a test keeps are then a random sample of all rows, so each test keeps its level; with perfect
+tests FCI then returns the graph it returns on complete data [1]_, and [2]_ argue the same for PC.
+When whether a value is missing depends on the variables, the rows a test keeps are a selected
+sample, and each test selects its own. The tests can then find dependence where the full population
+has none, which keeps extra edges [2]_ and can turn orientations wrong; FCI with one test per query
+is then not sound in general [1]_. The procedure that [1]_ proves sound beyond MCAR confirms each
+independence on the rows complete in every column, and is not this one. :data:`TESTWISE_CLAIM`
+is the sentence every method that deletes rows per test states.
 
 References
 ----------
@@ -71,6 +74,20 @@ __all__ = ["TestwiseDeletion"]
 #: deletes rows per test (:class:`TestwiseDeletion`), the default of every method that takes it.
 TESTWISE = "testwise"
 MISSING_HANDLING = (TESTWISE,)
+#: When test-wise deletion is valid, in the one sentence that the docstring of every method that
+#: runs it, the ``missing`` concept, and the notice of a default handling share.
+TESTWISE_CLAIM = (
+    "Test-wise deletion is valid when values are missing completely at random, which means that "
+    "whether a value is missing depends on no value in the data; the rows a test reads are then a "
+    "random sample of all rows, and otherwise they are a selected sample that more rows do not "
+    "correct."
+)
+#: What the error of a test without the rows it needs advises: a test over fewer columns keeps more
+#: rows, and a dropped column is no longer there to condition on.
+MORE_ROWS = (
+    "cap the conditioning sets with max_depth where the method has it, or drop a column with many "
+    "missing values, which can remove a common cause of the columns that stay"
+)
 #: Structural EM over the expected covariance (:mod:`andrey.search.em`), which the searches whose
 #: fit reads only a covariance and the row count take.
 EM = "em"
@@ -112,18 +129,39 @@ _MARGIN = 100.0
 # n - |S| - offset.
 _DF_OFFSET: dict[type, int] = {FisherZ: 3, StudentT: 2}
 
-#: The row counts of the tests run inside :func:`rows_tested`, or ``None`` outside it.
-_ROWS: ContextVar[Counter[int] | None] = ContextVar("andrey_rows_tested", default=None)
+#: The tests run inside :func:`rows_tested`, or ``None`` outside it.
+_ROWS: ContextVar[RowCounts | None] = ContextVar("andrey_rows_tested", default=None)
+
+
+class RowCounts(Counter[int]):
+    """The tests of a fit by the rows each read, and the tests that answered ``p = 1``.
+
+    Every query a :class:`TestwiseDeletion` answers is counted here, whichever test it runs and
+    whichever way it is asked, by :meth:`add`: its row count, and ``p_one`` when its p-value is
+    exactly ``1``. A test with no degrees of freedom left, as a table with one category, answers
+    so by design, with no evidence for or against independence, and so does a test whose
+    statistic is exactly zero.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.p_one = 0
+
+    def add(self, rows: Iterable[int], p: np.ndarray | float) -> None:
+        """Count the queries answered with the row counts ``rows`` and the p-values ``p``."""
+        self.update(np.asarray(rows).tolist())
+        self.p_one += int(np.count_nonzero(np.asarray(p) == 1.0))
 
 
 @contextlib.contextmanager
-def rows_tested() -> Generator[Counter[int]]:
+def rows_tested() -> Generator[RowCounts]:
     """Count the rows each test-wise deletion test reads inside the block.
 
     The counter maps a row count to the number of tests that read that many rows; it stays empty
-    when no test met a missing value. :func:`rows_metadata` summarizes it.
+    when no test met a missing value. Its ``p_one`` counts the tests of the block answered
+    ``p = 1``. :func:`rows_metadata` summarizes both.
     """
-    counter: Counter[int] = Counter()
+    counter = RowCounts()
     token = _ROWS.set(counter)
     try:
         yield counter
@@ -131,11 +169,14 @@ def rows_tested() -> Generator[Counter[int]]:
         _ROWS.reset(token)
 
 
-def rows_metadata(counter: Mapping[int, int]) -> dict[str, dict[str, float]]:
-    """Return ``{"rows_tested": {"min": ..., "median": ...}}`` for ``counter``; ``{}`` when empty.
+def rows_metadata(counter: Mapping[int, int]) -> dict[str, Any]:
+    """Return the metadata of the tests ``counter`` holds; ``{}`` when it is empty.
 
-    ``min`` is the fewest rows a test read and ``median`` the median over the tests, the mean of
-    the two middle counts when the number of tests is even.
+    ``"rows_tested"`` is ``{"min": ..., "median": ...}``: ``min`` is the fewest rows a test read and
+    ``median`` the median over the tests, the mean of the two middle counts when the number of
+    tests is even. ``"p_one_tests"``, present when it is not zero, is the number of tests answered
+    ``p = 1`` that a :class:`RowCounts` holds, whichever test it is: a test with no degrees of
+    freedom left answers so, and reads as independence without evidence.
     """
     if not counter:
         return {}
@@ -148,7 +189,11 @@ def rows_metadata(counter: Mapping[int, int]) -> dict[str, dict[str, float]]:
             values.append(rows)
             middle.pop(0)
         seen += n
-    return {"rows_tested": {"min": counts[0][0], "median": (values[0] + values[1]) / 2}}
+    metadata: dict[str, Any] = {
+        "rows_tested": {"min": counts[0][0], "median": (values[0] + values[1]) / 2}
+    }
+    p_one = getattr(counter, "p_one", 0)
+    return metadata | ({"p_one_tests": p_one} if p_one else {})
 
 
 class TestwiseDeletion:
@@ -164,11 +209,12 @@ class TestwiseDeletion:
     test gets the :class:`GaussianDeletion` subclass, which builds no test per block.
 
     A query raises ``ValueError`` when its block has fewer rows than its test needs: 2, or
-    ``|S| + 3`` for ``"fisherz"`` and ``"student_t"``, the rows their degrees of freedom need; when
-    a continuous column is constant on the block, as a constant column of the data is rejected
-    before a fit; and when the test fails on the block or gives a p-value that is not a number, as
-    a mixed-data test can on a block with fewer rows than columns. A categorical column with one
-    category on the block is left to the test.
+    ``|S| + 3`` for a partial-correlation test (``"fisherz"``, ``"student_t"``, or
+    ``"normal_scores"``), the rows its degrees of freedom need; when a continuous column is constant
+    on the block, as a constant column of the data is rejected before a fit; and when the test fails
+    on the block or gives a p-value that is not a number, as a mixed-data test can on a block with
+    fewer rows than columns. A categorical column with one category on the block is left to the
+    test.
 
     Parameters
     ----------
@@ -246,7 +292,8 @@ class TestwiseDeletion:
 
         ``test`` is the test over the query's block, and ``a``, ``b``, and ``s`` the query's
         columns as indices of that block; the answer's last entry is the p-value. The query's row
-        count enters the running :func:`rows_tested` counter once it is answered. A copies error
+        count, and whether its p-value is ``1``, enter the running :func:`rows_tested` counter once
+        it is answered, the same for every test. A copies error
         names the data's columns, and another error of the test on its block, or a p-value that is
         not a number, raises ``ValueError`` saying how many rows the block holds.
         """
@@ -263,15 +310,14 @@ class TestwiseDeletion:
             raise self._failed(rows, " gives no p-value")
         counter = _ROWS.get()
         if counter is not None:
-            counter[rows] += 1
+            counter.add([rows], p)
         return out
 
     def _failed(self, rows: int, what: str) -> ValueError:
         """The error of a test that fails on a block of ``rows`` rows, ``what`` saying how."""
         return ValueError(
             f"indep_test={self._name!r} on the {rows} rows where all the columns of one of its "
-            f"tests are observed{what}; drop the columns with the most missing values, or cap the "
-            "conditioning sets with max_depth where the method has it"
+            f"tests are observed{what}; {MORE_ROWS}"
         )
 
     def _block_test(self, x: int, y: int, cond: list[int]) -> tuple[CITest, list[int], int]:
@@ -304,8 +350,7 @@ class TestwiseDeletion:
             raise ValueError(
                 f"indep_test={self._name!r} tests a pair given {size} conditioning variables on "
                 f"the {block.shape[0]} rows where all of them are observed, and needs at least "
-                f"{least}; drop the columns with the most missing values, or cap the conditioning "
-                "sets with max_depth where the method has it"
+                f"{least}; {MORE_ROWS}"
             )
         # A column can be constant on the block only when one of its values fills every row.
         index = list(columns)
@@ -316,7 +361,7 @@ class TestwiseDeletion:
             raise ValueError(
                 f"indep_test={self._name!r} meets a column that is constant on the "
                 f"{block.shape[0]} rows where all the columns of a test are observed, so the test "
-                "measures no dependence; drop the columns with the most missing values"
+                f"measures no dependence; {MORE_ROWS}"
             )
 
     def _repeats(self, columns: list[int]) -> np.ndarray:
@@ -575,14 +620,14 @@ class GaussianDeletion(PartialCorrelationDeletion):
         start = 0
         for k in np.flatnonzero(flagged).tolist():
             if counter is not None:
-                counter.update(rows[start:k].tolist())
+                counter.add(rows[start:k], p[start:k])
             x, y, cond = query(k)
             r[k], p[k] = self._query(
                 lambda test, a, b, s: test.statistic_pvalue(a, b, s), x, y, cond
             )
             start = k + 1
         if counter is not None:
-            counter.update(rows[start:].tolist())
+            counter.add(rows[start:], p[start:])
 
     def _fast(
         self, lo: np.ndarray, hi: np.ndarray, conds: np.ndarray

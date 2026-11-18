@@ -143,7 +143,9 @@ def boss(
         expectation-maximization (EM) over the expected covariance of the data, which assumes values
         missing completely at random or at random given observed values. ``None`` refuses missing
         values. On data with missing values, ``metadata["missing"]`` records the handling used and
-        ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
+        ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
+        fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
+        See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
         1. Each round runs the search once, so the time grows with them. A fit whose last round
@@ -333,7 +335,7 @@ def boss(
     holds when values are missing completely at random or at random given observed values; when
     whether a value is missing depends on the missing values themselves, the expected covariance is
     biased, and the data cannot show it. On complete data, ``"em"`` gives the complete-data result.
-    Without ``"em"``, drop the incomplete rows first, which suits values missing completely at
+    Without ``"em"``, drop the incomplete rows yourself, which suits values missing completely at
     random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for ``ebic_gamma=0.0``. Measured on
@@ -562,7 +564,9 @@ def grasp(
         expectation-maximization (EM) over the expected covariance of the data, which assumes values
         missing completely at random or at random given observed values. ``None`` refuses missing
         values. On data with missing values, ``metadata["missing"]`` records the handling used and
-        ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
+        ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
+        fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
+        See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
         1. Each round runs the search once, so the time grows with them. A fit whose last round
@@ -765,7 +769,7 @@ def grasp(
     holds when values are missing completely at random or at random given observed values; when
     whether a value is missing depends on the missing values themselves, the expected covariance is
     biased, and the data cannot show it. On complete data, ``"em"`` gives the complete-data result.
-    Without ``"em"``, drop the incomplete rows first, which suits values missing completely at
+    Without ``"em"``, drop the incomplete rows yourself, which suits values missing completely at
     random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for ``ebic_gamma=0.0``. Measured on
@@ -1835,9 +1839,9 @@ def boss_fci(
     mixed-data settings each label as a category, as for :func:`~andrey.fci_jci`.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``, as for :func:`~andrey.gfci`:
-    its BOSS phase scores every variable over the same rows. Drop the incomplete rows first, which
-    suits values missing completely at random, or use :func:`~andrey.fci`, whose tests delete rows
-    per test.
+    its BOSS phase scores every variable over the same rows. Drop the incomplete rows yourself,
+    which suits values missing completely at random, or use :func:`~andrey.fci`, whose tests delete
+    rows per test.
 
     **Limitations.** Measured on its authors' simulation [1]_, linear-Gaussian data with hidden
     common causes: 20 measured variables with 0, 4, or 8 hidden, mean degree 2, 4, or 6, and 200 to
@@ -2162,9 +2166,9 @@ def grasp_fci(
     mixed-data settings each label as a category, as for :func:`~andrey.fci_jci`.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``, as for :func:`~andrey.gfci`:
-    its GRaSP phase scores every variable over the same rows. Drop the incomplete rows first, which
-    suits values missing completely at random, or use :func:`~andrey.fci`, whose tests delete rows
-    per test.
+    its GRaSP phase scores every variable over the same rows. Drop the incomplete rows yourself,
+    which suits values missing completely at random, or use :func:`~andrey.fci`, whose tests delete
+    rows per test.
 
     **Limitations.** Measured on its authors' simulation [1]_, linear-Gaussian data with hidden
     common causes: 20 measured variables with 0, 4, or 8 hidden, mean degree 2, 4, or 6, and 200 to

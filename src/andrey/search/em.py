@@ -75,6 +75,7 @@ __all__ = [
     "expected_moments",
     "fit_dag",
     "observed_copies",
+    "shared_rows",
     "structural_em",
 ]
 
@@ -141,6 +142,16 @@ def expected_moments(
     return expected_mean, (centered.T @ centered + extra) / n, loglik
 
 
+def shared_rows(X: np.ndarray) -> np.ndarray:
+    """The ``(d, d)`` counts of the rows of ``X`` that observe both columns of each pair.
+
+    Two columns that share no row have no covariance in the data: any value EM gave it would come
+    from the model alone, so :func:`~andrey.api._adapt.fit_missing` refuses such data.
+    """
+    both = (~np.isnan(X)).astype(np.float64)
+    return both.T @ both
+
+
 def observed_copies(X: np.ndarray) -> tuple[tuple[int, ...], ...]:
     """The groups of columns of ``X`` that repeat one another up to scale and shift where observed.
 
@@ -153,7 +164,7 @@ def observed_copies(X: np.ndarray) -> tuple[tuple[int, ...], ...]:
     observed = ~np.isnan(X)
     centered = np.where(observed, X - np.nanmean(X, axis=0), 0.0)
     both = observed.astype(np.float64)
-    count = both.T @ both  # count[i, j]: the rows that observe columns i and j
+    count = shared_rows(X)  # count[i, j]: the rows that observe columns i and j
     sums = centered.T @ both  # sums[i, j]: column i summed over those rows
     squares = (centered**2).T @ both
     rows = np.maximum(count, 1.0)

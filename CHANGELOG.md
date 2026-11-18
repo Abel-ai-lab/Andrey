@@ -12,11 +12,44 @@ names its pull request.
 
 ### Added
 
+- `metadata["p_one_tests"]` counts every test of a fit on data with missing values that returned
+  `p = 1`, whichever test it is; a test with zero degrees of freedom answers so by design.
+  ([#1102])
+- `metadata["em"]` records `rows_dropped`, the rows dropped for observing no value, and
+  `min_shared_rows`, the fewest rows that observe both columns of a pair. A fit whose every missing
+  value sat in a dropped row records its handling too. ([#1102])
 - `n_em_iterations` on the ten searches that take `missing="em"` (`ges`, `xges`, `hc`, `tabu`,
   `exact_search`, `boss`, `grasp`, `notears`, `dagma`, `calm`) sets the number of structural EM
   rounds. The default stays 10, the number Gao et al. (2022) run, so a fit without the argument
   returns what it did. The warning of a fit whose last round still changed the graph names the
   argument; values other than 10 are not benchmarked yet. ([#1095])
+
+### Changed
+
+- With `missing=None` on data with missing values, a method whose tests delete rows logs one notice
+  per process that names the handling, test-wise deletion, and when it is valid. Pass
+  `missing="testwise"` to choose it by name. `bootstrap` logs it once for all of its worker
+  processes. On the command line, `run.warnings` holds it, and any other warning-level log of the
+  fit, as a `LogWarning`; nothing goes to stderr. ([#1102])
+- A refusal of missing values leads with what you can do. A time series is pointed to `pcmci`,
+  `pcmciplus`, and `lpcmci` in place of filling in the missing steps, and dropping rows is named as
+  your own step, with the same rows of every row-aligned argument. `jpcmciplus`, whose datasets
+  with their contexts no other method reads, is pointed to dropping the datasets that hold a missing
+  value. ([#1102])
+- The error of a test that cannot run on the rows where its variables are observed advises capping
+  the conditioning sets with `max_depth` first, and says that dropping a column with many missing
+  values can remove a common cause of the columns that stay. ([#1102])
+- `missing="em"` raises `ValueError` when two columns share no observed row, as the data hold no
+  covariance for them. Such data ran before, on a covariance the model alone supplied. ([#1102])
+
+### Fixed
+
+- The docs no longer say that FCI with test-wise deletion stays sound when values are missing for a
+  reason: the cited result covers another procedure. Every method that deletes rows per test now
+  states one shared sentence, valid when values are missing completely at random, and the guide's
+  text on `None` and on structural EM is corrected. ([#1102])
+- The docs name `normal_scores` among the tests that need `|S| + 3` rows where their variables are
+  observed; they gave it the 2 rows of the other tests. ([#1102])
 
 ## [0.17.1] - 2026-11-12
 
@@ -2554,6 +2587,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#1102]: https://github.com/Abel-ai-lab/Andrey/pull/1102
 [#910]: https://github.com/Abel-ai-lab/andrey/pull/910
 [#904]: https://github.com/Abel-ai-lab/andrey/pull/904
 [#928]: https://github.com/Abel-ai-lab/andrey/pull/928

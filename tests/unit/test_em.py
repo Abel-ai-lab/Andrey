@@ -290,7 +290,9 @@ def test_the_rounds_change_nothing_when_em_does_not_run(name):
 @pytest.mark.parametrize("name", EM_METHODS)
 def test_without_em_a_missing_value_raises_naming_em(name):
     fit = _method(name)
-    with pytest.raises(ValueError, match=rf'^{name} does not accept .*pass missing="em"') as error:
+    with pytest.raises(
+        ValueError, match=rf'^{name}: pass missing="em".*; {name} does not accept'
+    ) as error:
         fit(_gaps(_chain(), 0.1))
     # The message and the schema mark "em" experimental exactly where it is not supported.
     marked = name not in EM_SUPPORTED
@@ -311,7 +313,11 @@ def test_a_row_that_observes_no_value_changes_no_fit(name):
     fit = _method(name)
     x = _gaps(_chain(), 0.1)
     padded = np.insert(x, [0, 150, 150], nan, axis=0)
-    assert fit(padded, missing="em") == fit(x, missing="em")
+    with_rows, without = fit(padded, missing="em"), fit(x, missing="em")
+    assert with_rows.structure == without.structure
+    assert with_rows.metadata["em"].pop("rows_dropped") == 3
+    assert without.metadata["em"].pop("rows_dropped") == 0
+    assert with_rows.metadata == without.metadata
 
 
 def test_the_refusal_names_em_only_where_em_would_run():
@@ -381,3 +387,38 @@ def test_the_methods_that_take_em_list_it_as_their_only_handling():
         param = next(p for p in REGISTRY[name].params if p.name == "missing")
         assert param.choices == ("em",) and param.default is None
         assert {"missing", "em"} <= set(REGISTRY[name].output.metadata)
+
+
+@pytest.mark.parametrize("name", CORE)
+def test_a_fit_whose_every_gap_sits_in_a_dropped_row_still_records_the_rows(name):
+    fit = _method(name)
+    x = _chain()
+    padded = np.insert(x, [0, 150, 150], nan, axis=0)
+    out, plain = fit(padded, missing="em"), fit(x)
+    assert out.structure == plain.structure
+    assert out.metadata["missing"] == "em"
+    record = out.metadata["em"]
+    assert record["rows_dropped"] == 3 and record["min_shared_rows"] == len(x)
+    assert record["iterations"] == 0 and record["log_likelihood"] == []
+
+
+@pytest.mark.parametrize("name", EM_METHODS)
+def test_the_record_holds_the_fewest_rows_two_columns_share(name):
+    fit = _method(name)
+    x = _gaps(_chain(), 0.1)
+    observed = ~np.isnan(x)
+    record = fit(x, missing="em").metadata["em"]
+    assert record["min_shared_rows"] == (observed[:, :, None] & observed[:, None, :]).sum(0).min()
+    assert record["rows_dropped"] == int((~observed).all(axis=1).sum())
+
+
+@pytest.mark.parametrize("name", EM_METHODS)
+def test_two_columns_that_share_no_observed_row_are_refused(name):
+    fit = _method(name)
+    x = _chain()
+    x[:200, 0] = nan
+    x[200:, 2] = nan
+    with pytest.raises(ValueError, match=r"^drop column 0 or column 2 .*share none"):
+        fit(x, missing="em")
+    x[200, 2] = _chain()[200, 2]  # one shared row is accepted, and recorded
+    assert fit(x, missing="em").metadata["em"]["min_shared_rows"] == 1

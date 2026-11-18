@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import andrey
-from andrey.core.ci_missing import EM_METHODS, EM_SUPPORTED
+from andrey.core.ci_missing import EM_METHODS, EM_SUPPORTED, TESTWISE_CLAIM
 from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.core.structure import EDGE_GLYPHS
 
@@ -297,8 +297,8 @@ def cli_meta() -> dict:
         "output": (
             "runs and listings -> JSON on a non-interactive stdout (piped, an agent, CI); "
             "an interactive terminal gets a human summary, and --json forces JSON. failure -> a "
-            "JSON error envelope on stderr plus a non-zero exit. Warnings from the fit go in "
-            "run.warnings, never to stderr."
+            "JSON error envelope on stderr plus a non-zero exit. Warnings from the fit, and the "
+            "notices it logs (category LogWarning), go in run.warnings, never to stderr."
         ),
         "bounded_output": (
             "large arrays are capped at 1000 on stdout: a graph's inline edges (edges_truncated) "
@@ -573,20 +573,23 @@ def render_skill() -> str:
         "The methods whose schema sets `data.missing` accept it, and their `missing` parameter "
         "names how: `testwise`, the default under `null`, deletes rows per test, each test "
         "reading the rows observed in all of its variables. `metadata.rows_tested` gives the "
-        "fewest (`min`) and the median rows a test read, and `metadata.missing` the handling. "
-        "They are "
+        "fewest (`min`) and the median rows a test read, `metadata.missing` the handling, and "
+        "`metadata.p_one_tests`, present when it is not zero, the number of tests that returned "
+        "p = 1, whichever test it is; a test with zero degrees of freedom answers so. A fit "
+        "that runs the deletion under `null` logs one notice per process that names it. They are "
         + ", ".join(f"`{s.name}`" for s in REGISTRY.values() if s.data.missing)
-        + ". The deletion is sound when values are missing completely at random; when whether a "
-        "value is missing depends on the variables, `pc` can keep extra edges, and `fci` stays "
-        "sound when no missingness mechanism causally affects another. The searches whose fit "
+        + f". {TESTWISE_CLAIM} The searches whose fit "
         "reads only a covariance, "
         + ", ".join(f"`{name}`" for name in EM_METHODS)
         + ", refuse a missing value under `null` and take `em`: structural EM, which runs the "
         "search on the expected covariance of the data 10 times, with 5 parameter-only EM steps "
         "on the current graph before each search after the first, and assumes values missing "
         "completely at random or at random given observed values; `metadata.em` records its "
-        "rounds, the observed-data log-likelihood after each, and whether each changed the "
-        "graph, and a fit whose last round changed it logs a warning. `em` is supported in "
+        "rounds, the observed-data log-likelihood after each, whether each changed the "
+        "graph, the rows dropped for observing no value (`rows_dropped`), and the fewest rows "
+        "that observe both columns of a pair (`min_shared_rows`); a fit whose last round changed "
+        "the graph logs a warning, and data in which two columns share no observed row are "
+        "refused. `em` is supported in "
         + ", ".join(f"`{name}`" for name in EM_SUPPORTED)
         + ", where it measured no less accurate than a reference implementation, and "
         "experimental in the others, which have none to compare with. Every other method refuses "

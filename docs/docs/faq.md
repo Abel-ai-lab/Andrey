@@ -187,11 +187,12 @@ empty in a CSV file. Each conditional-independence test then reads only the samp
 variables are observed (test-wise deletion), so the fit keeps the samples that dropping every
 incomplete one would lose; `missing="testwise"` names this handling, the default, and PC also takes
 `missing="mvpc"`, a correction for values whose missingness depends on the variables.
-Test-wise deletion is sound when values are missing completely at random; when whether a value is
+Test-wise deletion is valid when values are missing completely at random; when whether a value is
 missing depends on the variables, a test can be biased. The [release cards](benchmarks.md) measure
 it against dropping incomplete samples. The searches whose fit reads the data only through their
 covariance, {{ em_methods }}, take `missing="em"`: structural EM over the expected covariance of
-the data, sound when values are missing completely at random or at random given observed values. It
+the data, which suits linear-Gaussian data whose missing values depend at most on columns that
+have none; this is measured, not proved. It
 is supported in GES, hill climbing, Tabu search, BOSS, GRaSP, and NOTEARS, where it runs Friedman's
 alternating scheme: 10 searches unless you pass `n_em_iterations`, with 5 parameter-only EM steps
 before each after the first. It is experimental in the others, which have no reference

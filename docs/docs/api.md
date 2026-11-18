@@ -105,21 +105,29 @@ accept missing values, a `NaN` cell, pandas' `NA`, or an empty, `NA`, or `N/A` f
 each conditional-independence test reads only the rows where all of its variables are observed
 (test-wise deletion), and so do the pair tests `anm`, `pnl`, and `loci`, which read the rows where
 both columns are observed; `metadata["rows_tested"]` gives the fewest (`min`) and the median rows a
-test read. Their argument `missing` names the handling: `"testwise"` is test-wise deletion, and
-`None`, the default, picks the method's default handling, `"testwise"`; `metadata["missing"]`
-records the one a fit used. `pc` also takes `missing="mvpc"`: Missing-Value PC (Tu et al., 2019)
-finds the parents of each missingness indicator and tests again the edges they could have kept.
+test read. Test-wise deletion is valid when values are missing completely at random, which means
+that whether a value is missing depends on no value in the data; the rows a test reads are then a
+random sample of all rows, and otherwise they are a selected sample that more rows do not correct.
+Their argument `missing` names the handling: `"testwise"` is test-wise deletion, and `None`, the
+default, picks the method's default handling, `"testwise"`, and logs one notice per process that
+names it; `metadata["missing"]` records the one a fit used. A test with zero degrees of freedom
+returns a p-value of 1, and `metadata["p_one_tests"]`, present when it is not zero, counts every
+test of the fit that returned a p-value of 1, whichever test it is. `pc` also takes
+`missing="mvpc"`: Missing-Value PC (Tu et al., 2019) finds the parents of each missingness indicator
+and tests again the edges they could have kept.
 `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm`, whose
 fits read the data only through their covariance, refuse missing values under `None` and take
 `missing="em"`: structural EM runs the search on the expected covariance of the data in rounds,
 refitting a linear-Gaussian model of each graph it returns, with 5 parameter-only EM steps on that
 graph before the next search (Friedman's alternating scheme). `metadata["em"]` records the rounds,
 the observed-data log-likelihood after each, and whether each changed the graph; a fit whose last
-round changed it logs a warning. A row that observes no value is dropped first. It takes
+round changed it logs a warning. A row that observes no value is dropped first, and `metadata["em"]`
+records how many (`rows_dropped`) and the fewest rows that observe both columns of a pair
+(`min_shared_rows`); two columns that share no observed row raise a `ValueError`. It takes
 `score_func="bic"` only and no `env`, and it assumes values missing completely at random or at
 random given observed values. `missing="mvpc"` is supported, and so is `missing="em"` in `ges`,
-`hc`, `tabu`, `boss`, `grasp`, and `notears`: in the
-[missing-data comparison](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md),
+`hc`, `tabu`, `boss`, `grasp`, and `notears`: in the [missing-data
+comparison](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md),
 none was less accurate than its reference implementation in a setting that repeated on fresh
 datasets. For `ges`, `boss`, and `grasp` the reference estimates one covariance by EM before its
 search, a simpler method than structural EM, and the comparison is at `ebic_gamma=0.0`, up to 50
@@ -127,14 +135,13 @@ variables, at two settings of the sample size the reference's score counts. In t
 last round still changed the graph in 2 to 6% of the fits, and in 20% of `grasp`'s, most often with
 50 variables and 100 rows. In `xges`, `exact_search`, `dagma`, and `calm` it is experimental, as no
 reference implementation exists to compare them with; the benchmark reports their results beside the
-baselines. A value a method does not list raises a
-`ValueError` that
-names the values it takes. A column with no observed value, or a constant one over its observed
-values, raises a `ValueError` before the fit, and a test with fewer rows than it needs, `|S| + 3`
-for `"fisherz"` and `"student_t"` and 2 for the other tests, raises one during it. `cdnod` and
-`fci_jci` need a complete `env`. Every other method raises a `ValueError` that names it and says
-what to do instead, as [Missing values](guides/getting-started.md#missing-values) describes; each
-method's Notes say why.
+baselines. A value a method does not list raises a `ValueError` that names the values it takes. A
+column with no observed value, or a constant one over its observed values, raises a `ValueError`
+before the fit, and a test with fewer rows than it needs, `|S| + 3` for the partial-correlation
+tests (`"fisherz"`, `"student_t"`, and `"normal_scores"`) and 2 for the other tests, raises one
+during it. `cdnod` and `fci_jci` need a complete `env`. Every other method raises a `ValueError`
+that names it and says what to do instead, as
+[Missing values](guides/getting-started.md#missing-values) describes; each method's Notes say why.
 
 % concept: n_em_iterations
 `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm` take
@@ -993,7 +1000,8 @@ module.
 From the command line, `-W error::UserWarning` escalates Andrey's warnings along with every other
 `UserWarning`; for one category, use `warnings.filterwarnings` or pytest's flag. `andrey run`
 returns a fit's warnings in the `run.warnings` field of its JSON output, each with its category
-name.
+name; a notice the fit logs, as the default handling of missing values, has the category
+`LogWarning`.
 
 ```{eval-rst}
 .. autosummary::

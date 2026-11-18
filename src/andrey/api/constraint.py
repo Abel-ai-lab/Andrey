@@ -308,13 +308,13 @@ def pc(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [12]_ [13]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. When values are missing completely at random, the rows a test keeps
-    are a random sample, so each test keeps its level [13]_. When whether a value is missing depends
-    on the variables, the rows a test keeps are a selected sample, and the tests can find dependence
-    where the population has none and keep extra edges [13]_. A test raises ``ValueError`` when it
-    has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
-    other tests, or when a continuous column is constant on its rows. With missing values, the
-    skeleton search runs in one process.
+    the median rows a test read. A test raises ``ValueError`` when it has fewer rows than it needs,
+    ``|S| + 3`` for the partial-correlation tests (``"fisherz"``, ``"student_t"``, and
+    ``"normal_scores"``) and 2 for the other tests, or when a continuous column is constant on its
+    rows. With missing values, the skeleton search runs in one process. Test-wise deletion is valid
+    when values are missing completely at random, which means that whether a value is missing
+    depends on no value in the data; the rows a test reads are then a random sample of all rows, and
+    otherwise they are a selected sample that more rows do not correct.
 
     **Missing-Value PC.** ``missing="mvpc"`` follows Algorithm 1 of Tu et al. [13]_. The test-wise
     skeleton keeps every true edge but can keep extra ones: an extra edge ``x - y`` needs the
@@ -813,13 +813,13 @@ def fci(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [6]_ [7]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. When values are missing completely at random, the rows a test keeps
-    are a random sample, so each test keeps its level [7]_. When whether a value is missing depends
-    on the variables, the rows a test keeps are a selected sample; FCI allows for selection, and
-    stays sound when no missingness mechanism causally affects another [6]_. A test raises
-    ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
-    ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
-    With missing values, the skeleton search runs in one process.
+    the median rows a test read. A test raises ``ValueError`` when it has fewer rows than it needs,
+    ``|S| + 3`` for the partial-correlation tests (``"fisherz"``, ``"student_t"``, and
+    ``"normal_scores"``) and 2 for the other tests, or when a continuous column is constant on its
+    rows. With missing values, the skeleton search runs in one process. Test-wise deletion is valid
+    when values are missing completely at random, which means that whether a value is missing
+    depends on no value in the data; the rows a test reads are then a random sample of all rows, and
+    otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs with no
     hidden variable, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through which
@@ -1297,8 +1297,8 @@ def gfci(
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: its GES phase scores every
     variable over the same rows, and score terms over different rows do not add up to the score of
-    one dataset. Drop the incomplete rows first, which suits values missing completely at random, or
-    use :func:`~andrey.fci`, whose tests delete rows per test.
+    one dataset. Drop the incomplete rows yourself, which suits values missing completely at random,
+    or use :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs with no
     hidden variable, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through which
@@ -1633,15 +1633,15 @@ def cdnod(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [5]_ [6]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. When values are missing completely at random, the rows a test keeps
-    are a random sample, so each test keeps its level [6]_. When whether a value is missing depends
-    on the variables, the rows a test keeps are a selected sample, and the tests can find dependence
-    where the population has none and keep extra edges [6]_. A test raises ``ValueError`` when it
-    has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
-    other tests, or when a continuous column is constant on its rows. ``env`` must be
-    complete, and ``dependence_threshold``, whose kernel measures read every row, raises
-    ``ValueError`` on data with missing values. With missing values, the skeleton search runs in one
-    process.
+    the median rows a test read. A test raises ``ValueError`` when it has fewer rows than it needs,
+    ``|S| + 3`` for the partial-correlation tests (``"fisherz"``, ``"student_t"``, and
+    ``"normal_scores"``) and 2 for the other tests, or when a continuous column is constant on its
+    rows. ``env`` must be complete, and ``dependence_threshold``, whose kernel measures read every
+    row, raises ``ValueError`` on data with missing values. With missing values, the skeleton search
+    runs in one process. Test-wise deletion is valid when values are missing completely at random,
+    which means that whether a value is missing depends on no value in the data; the rows a test
+    reads are then a random sample of all rows, and otherwise they are a selected sample that more
+    rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs whose means
     shift across 4 domains, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes
@@ -1998,15 +1998,15 @@ def fci_jci(
     zero, leaves the means unchanged, so the tests other than the nonlinear ones do not find it.
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value; ``env`` must be complete. Each
-    test reads only the rows where all of its variables are observed (test-wise deletion) [6]_
-    [7]_, the index among them, as for :func:`~andrey.fci`; ``metadata["rows_tested"]`` gives the
-    fewest and the median rows a test read. When values are missing completely at random, the rows
-    a test keeps are a random sample, so each test keeps its level [7]_. When whether a value is
-    missing depends on the variables, the rows a test keeps are a selected sample, which FCI-JCI,
-    assuming no selection bias, does not allow for. A test raises ``ValueError`` when it has fewer
-    rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the other
-    tests, or when a continuous column is constant on its rows. With missing values, the skeleton
-    search runs in one process.
+    test reads only the rows where all of its variables are observed (test-wise deletion) [6]_ [7]_,
+    the index among them, as for :func:`~andrey.fci`; ``metadata["rows_tested"]`` gives the fewest
+    and the median rows a test read. A test raises ``ValueError`` when it has fewer rows than it
+    needs, ``|S| + 3`` for the partial-correlation tests (``"fisherz"``, ``"student_t"``, and
+    ``"normal_scores"``) and 2 for the other tests, or when a continuous column is constant on its
+    rows. With missing values, the skeleton search runs in one process. Test-wise deletion is valid
+    when values are missing completely at random, which means that whether a value is missing
+    depends on no value in the data; the rows a test reads are then a random sample of all rows, and
+    otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on its authors' simulation [1]_, linear-Gaussian data with hidden
     common causes and one context variable that changes one variable: 4, 10, and 100 variables with
