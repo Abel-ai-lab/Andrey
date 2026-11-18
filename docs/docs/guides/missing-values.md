@@ -23,7 +23,9 @@ write `NA` or `N/A` in the data file. Infinity is not a missing value and raises
 observed value, or with one value throughout, raises before the fit.
 
 The argument `missing` names the handling. `None`, the default, picks the method's default
-handling. A value a method does not list raises a `ValueError` that names the values it takes.
+handling: test-wise deletion in the methods whose tests delete rows, and a refusal in the searches
+that take only `"em"`. A value a method does not list raises a `ValueError` that names the values
+it takes.
 
 ## Which handling to use
 
@@ -41,9 +43,9 @@ Find your data in the first column and the reason in the first row:
 
 | Your data | Completely at random | At random | Not at random |
 |---|---|---|---|
-| Continuous, linear with Gaussian noise | `"testwise"`, or `"em"` in a search that takes it | `"em"` in a search that takes it, `"mvpc"` in `pc`, or `"testwise"` in `fci` | `"mvpc"` in `pc`, or `"testwise"` in `fci` |
-| Continuous, nonlinear or not Gaussian | `"testwise"` | `"testwise"` in `fci` | `"testwise"` in `fci` |
-| Categorical or mixed | `"testwise"` | `"testwise"` in `fci` | `"testwise"` in `fci` |
+| Continuous, linear with Gaussian noise | `"testwise"`, or `"em"` in a search that takes it | `"em"` in a search that takes it, or `"mvpc"` in `pc` | `"mvpc"` in `pc` |
+| Continuous, nonlinear or not Gaussian | `"testwise"` | No handling corrects it | No handling corrects it |
+| Categorical or mixed | `"testwise"` | No handling corrects it | No handling corrects it |
 | A time series | `"testwise"` in `pcmci`, `pcmciplus`, or `lpcmci` | No handling corrects it | No handling corrects it |
 
 The methods that take each value:
@@ -54,15 +56,20 @@ The methods that take each value:
 | `"mvpc"` | [Missing-Value PC](#missing-value-pc): tests again the edges that the reason for the gaps could have kept | `pc`, with `indep_test="fisherz"` or `"student_t"` |
 | `"em"` | [Structural EM](#structural-em): the search runs on the expected covariance of the data | {{ em_names }}, with `score_func="bic"` and no `env` where the search takes them |
 
-Three limits apply to the first table:
+Four limits apply to the first table:
 
 - No handling corrects self-masking. `"mvpc"` assumes that no value causes its own missingness, and
   `"em"` has no guarantee when values are missing not at random.
-- `"testwise"` runs in every method that takes it, whatever the reason. Outside the cells that
-  name it, a test can find dependence that the population does not have, and the fit can keep
-  extra edges. `fci` reads such an edge as a possible effect of selection, which is why the table
-  names it; it stays sound when no missingness mechanism causally affects another
-  ([Strobl, Visweswaran, and Spirtes, 2018][strobl]).
+- `"testwise"` runs in every method that takes it, whatever the reason, and is valid only when
+  values are missing completely at random. Outside the cells that name it, a test can find
+  dependence that the population does not have, and the fit can keep extra edges and get
+  orientations wrong. This holds for `fci` too: the procedure that
+  [Strobl, Visweswaran, and Spirtes (2018)][strobl] prove sound for values missing for a reason
+  confirms each independence on the complete rows, and it is not the one `"testwise"` runs.
+- Dropping every row that holds a missing value, then running the method, is your own step. For
+  independent rows it keeps the population when values are missing completely at random and enough
+  complete rows are left. Check how many rows are left first, and drop the same rows from `env`
+  and every other argument that has one entry per row. Never drop a step of a time series.
 - Every other method [refuses missing values](#methods-that-refuse-missing-values).
 
 The data alone do not tell you the reason. What you know about how the data were collected is the
@@ -97,10 +104,12 @@ out.metadata["rows_tested"]
 andrey.pc(gappy, missing="testwise").structure == out.structure
 ```
 
-Deleting rows per test is sound when values are missing completely at random: the rows a test keeps
-are then a random sample of all rows. Otherwise the rows a test keeps are a selected sample. PC's
-tests can then find dependence where the population has none and keep extra edges
-([Tu et al., 2019][tu]).
+Test-wise deletion is valid when values are missing completely at random, which means that whether
+a value is missing depends on no value in the data; the rows a test reads are then a random sample
+of all rows, and otherwise they are a selected sample that more rows do not correct. This is the
+condition for every method that deletes rows per test. With a selected sample, the tests can find
+dependence where the population has none, and a fit can keep extra edges
+([Tu et al., 2019][tu]) and get orientations wrong.
 
 A time series keeps every step: each row of the lagged design that reads a missing value holds it.
 Each test of PCMCI, PCMCI+, or LPCMCI reads the design rows where all of its lagged variables are
@@ -111,8 +120,9 @@ with `|S|` the size of its conditioning set, and 2 for the other tests. A test w
 raises a `ValueError` that says so. The `total_conditioning` blanket learner, the default of
 `mmb_by_mmb`, conditions every test on all the other variables, so with a partial-correlation test
 (`fisherz`, `student_t`, or `normal_scores`) it needs `d + 2` rows with every variable observed and
-raises before the fit without them. Drop the columns with the most missing values, or cap the
-conditioning sets with `max_depth` (`max_p_global` in LPCMCI and the same-step phases of PCMCI+).
+raises before the fit without them. Cap the conditioning sets with `max_depth` (`max_p_global` in
+LPCMCI and the same-step phases of PCMCI+), or drop a column with many missing values, which can
+remove a common cause of the columns that stay.
 CD-NOD and FCI-JCI need a complete `env`.
 
 With `fisherz` and `student_t`, each test computes its correlations directly from its rows, for many
@@ -175,10 +185,12 @@ em = andrey.ges(gappy, missing="em")
 em.metadata["em"]["log_likelihood"][-1]
 ```
 
-EM is sound when values are missing completely at random or at random. When whether a value is
-missing depends on missing values, it has no guarantee. Where a search takes a `score_func` or an
-`env`, `missing="em"` takes only `"bic"` and no `env`. A row with no observed value is dropped
-first.
+EM suits data that fit its model, a linear model with Gaussian noise, when whether a value is
+missing depends at most on variables that are always observed, and when the variables are observed
+together often enough. This is measured, not proved: no result we know of covers the loop as it
+runs. When whether a value is missing depends on missing values, it has no guarantee. Where a search
+takes a `score_func` or an `env`, `missing="em"` takes only `"bic"` and no `env`. A row with no
+observed value is dropped first.
 
 `missing="em"` is supported in {{ em_supported_names }}, where no setting we measured was less
 accurate than a reference implementation on the first datasets and again on fresh ones. In
@@ -199,8 +211,9 @@ The [0.17.0 release card](../benchmarks/0.17.0.md#missing-data) has the numbers.
 Every other method raises a `ValueError` that names it: its score or loss reads every variable over
 the same rows, so it cannot delete rows per test. Drop the incomplete rows yourself, with
 `data.dropna()` for a DataFrame, which suits values missing completely at random, or use one of the
-methods above. A time series cannot lose a step without joining the steps around it, so for
-VARMA-LiNGAM, Granger, DYNOTEARS, and J-PCMCI+, fill in the missing steps first.
+methods above. A time series cannot lose a step without joining the steps around it, and a filled
+step is a guess the fit reads as data, so for VARMA-LiNGAM, Granger, DYNOTEARS, and J-PCMCI+, use
+PCMCI, PCMCI+, or LPCMCI instead, whose tests delete rows per test and keep every time step.
 
 ## Try it on data you control
 
@@ -213,7 +226,8 @@ series.
 ## References
 
 - [Strobl, Visweswaran, and Spirtes (2018), Fast Causal Inference with Non-Random Missingness by
-  Test-Wise Deletion][strobl]: FCI with test-wise deletion.
+  Test-Wise Deletion][strobl]: FCI with test-wise deletion, and a procedure that confirms each
+  independence on the complete rows.
 - [Tu et al. (2019), Causal Discovery in the Presence of Missing Data][tu]: Missing-Value PC.
 - Friedman (1997), Learning Belief Networks in the Presence of Missing Values and Hidden
   Variables, Proceedings of the 14th International Conference on Machine Learning: structural EM.

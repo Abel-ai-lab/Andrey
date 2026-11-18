@@ -189,8 +189,9 @@ incomplete one would lose. `missing="testwise"` names this handling, the default
 values are missing completely at random; when whether a value is missing depends on the variables,
 a test can be biased, and PC also takes `missing="mvpc"`, a correction for that case. The searches
 whose fit reads the data only through their covariance, {{ em_methods }}, take `missing="em"`:
-structural EM over the expected covariance of the data, sound when values are missing completely at
-random or at random given observed values. It is supported in {{ em_supported_names }} and
+structural EM over the expected covariance of the data, which suits linear-Gaussian data whose
+missing values depend at most on variables that are always observed; this is measured, not proved.
+It is supported in {{ em_supported_names }} and
 experimental in the others. The other methods refuse missing values with an error that says what to
 do instead. The [Missing values](guides/missing-values.md) guide has a table from your data and the
 reason its values are missing to the handling to use, and links what we measured.
