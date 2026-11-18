@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import functools
+
 import numpy as np
 import pytest
 
@@ -148,7 +150,9 @@ def test_anm_matches_scikit_learns_own_search():
             warnings.simplefilter("ignore", ConvergenceWarning)
             gp = GaussianProcessRegressor(kernel=_kernel()).fit(cause, effect)
         expected.append(hsic_test(cause, effect - gp.predict(cause).reshape(-1, 1)))
-    assert np.allclose(np.exp(anm(x[:, 0], x[:, 1])[:2]), expected, rtol=0, atol=1e-8)
+    assert np.allclose(
+        np.exp(anm((x[:, 0], x[:, 1]), (x[:, 1], x[:, 0]))[:2]), expected, rtol=0, atol=1e-8
+    )
 
 
 def test_anm_names_the_planted_direction_in_any_units_and_column_order():
@@ -187,3 +191,63 @@ def test_anm_decision_rules_on_measured_pairs(pair, alpha, edges):
     from andrey.api.irregular import anm as anm_facade
 
     assert anm_facade(_pairs()[pair], alpha=alpha).structure.oriented_edges() == edges
+
+
+# Every pairwise direction test follows one rule: each direction's fit reads its rows in one
+# canonical order, so the row order changes nothing, and a table whose rows stay the same when its
+# columns swap gives both directions the same numbers, which tie.
+_PAIRWISE = {
+    "anm": andrey.anm,
+    "pnl": andrey.pnl,
+    "loci": andrey.loci,
+    "loci-likelihood": functools.partial(andrey.loci, criterion="likelihood"),
+}
+
+
+def _mirrored(table: str) -> np.ndarray:
+    """A two-valued table with as many ``(0, 1)`` rows as ``(1, 0)`` rows, or a continuous pair
+    stacked on its column swap."""
+    if table == "binary":
+        return np.repeat([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]], [20, 13, 13, 54], axis=0)
+    pair = datagen.generate("anm_pair_cubic")[:100]
+    return np.vstack([pair, pair[:, ::-1]])
+
+
+@pytest.mark.parametrize("table", ["binary", "continuous"])
+@pytest.mark.parametrize(
+    ("method", "alpha"),
+    [(m, None) for m in _PAIRWISE] + [(m, 0.05) for m in ("anm", "pnl", "loci")],
+)
+def test_a_mirrored_table_gives_no_edge_in_any_row_order(method, alpha, table):
+    # For anm and pnl the last permutation also puts the second column in other units, which
+    # leaves its standardized values different in their last bits; the tie rule absorbs that.
+    # loci's solver carries such a difference up to its stopping tolerance, past the tie rule.
+    X = _mirrored(table)
+    fit = functools.partial(_PAIRWISE[method], alpha=alpha) if alpha else _PAIRWISE[method]
+    rng = np.random.default_rng(0)
+    for scale in (1.0, 1.0, 1.0, 1.0 if method.startswith("loci") else 1e3):
+        out = fit(X[rng.permutation(len(X))] * np.array([1.0, scale]))
+        assert out.structure.oriented_edges() == []
+        if scale == 1.0:  # the same arrays in both directions: the same numbers, bit for bit
+            for key in ("p_values", "statistics", "log_likelihoods"):
+                if key in out.metadata:
+                    assert out.metadata[key]["forward"] == out.metadata[key]["backward"]
+
+
+@pytest.mark.parametrize("method", list(_PAIRWISE))
+def test_a_row_permutation_gives_the_same_output(method):
+    X = datagen.generate("anm_pair_cubic")
+    first = _PAIRWISE[method](X)
+    for seed in range(2):
+        out = _PAIRWISE[method](X[np.random.default_rng(seed).permutation(len(X))])
+        assert out.structure.oriented_edges() == first.structure.oriented_edges()
+        assert out.metadata == first.metadata
+
+
+@pytest.mark.parametrize("method", list(_PAIRWISE))
+def test_the_direction_does_not_depend_on_the_units(method):
+    X = datagen.generate("anm_pair_cubic")
+    first = _PAIRWISE[method](X)
+    for scale in ([1e-3, 7.0], [2.0**-30, 2.0**20]):
+        out = _PAIRWISE[method](X * np.array(scale))
+        assert out.structure.oriented_edges() == first.structure.oriented_edges()

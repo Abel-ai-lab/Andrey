@@ -107,6 +107,19 @@ names its pull request.
   with 10 and 20 variables, against 20.05, 42.40, 18.15, and 39.35 for the path run with its
   authors' code, and those of `notears(robust=True)` at 10 variables moved from 16.60 on z-scored
   and 13.25 on raw columns to 18.50 and 11.80, against 18.45 and 11.75. ([#1043], [#1046])
+- `anm`, `pnl`, and `loci` fit each direction on its rows sorted by its cause, then its effect,
+  and standardize the pair with sums over sorted values, so a result does not depend on the order
+  of the rows. One tie rule decides the direction for all three: two log p-values, statistics, or
+  log-likelihoods that differ by at most `1e-9` times the larger of 1 and their absolute values are
+  equal. The two directions' numbers had changed in their last bits with the row order, so on a
+  two-valued table whose rows stay the same when its columns swap, every method drew an edge on all
+  of 300 such tables, its direction changing with the row order on about 70% of them. Such a table
+  now gives no edge. The recorded outputs change only in the last bits of their p-values,
+  statistics, and log-likelihoods. The refits of `qa/identity.py` move within the spread that the
+  row order used to cause (up to a relative 5e-5 for `loci`), and no graph or quality-gate verdict
+  changes. The causal-learn ANM and PNL benchmark adapters compare the reference package's p-values
+  with the same tie rule, which affects only p-values within the tolerance of each other.
+  ([#1112])
 
 ## [0.17.1] - 2026-11-12
 
@@ -2668,6 +2681,7 @@ First alpha release.
 [#1082]: https://github.com/Abel-ai-lab/Andrey/pull/1082
 [#1084]: https://github.com/Abel-ai-lab/Andrey/pull/1084
 [#1088]: https://github.com/Abel-ai-lab/Andrey/pull/1088
+[#1112]: https://github.com/Abel-ai-lab/Andrey/pull/1112
 [#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
 [#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
 [card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
