@@ -346,13 +346,26 @@ def _ecm(
     max_iter: int,
 ) -> tuple[np.ndarray, bool]:
     """Refine ``theta`` by ECM (Section 4) for at most ``max_iter`` iterations; return it and
-    whether it stopped on the paper's rule."""
+    whether it stopped on the paper's rule.
+
+    Each parent's location basis sums to one and the difference penalty ignores constants, so with
+    several parents the likelihood leaves free a constant moved from one parent's coefficients to
+    another's. The location step then takes the solution whose blocks have equal sums, which sets
+    ``psi`` without changing a fitted value, so the rule on the parameters can be met.
+    """
     location, scale = design.location, design.scale
     q, p = location.shape[1], scale.shape[1]
     k_alpha, m_kappa = design.penalties(log_penalties)
     bounds = [RHO_BOUNDS] * p
     psi, rho, shape = theta[:q].copy(), theta[q : q + p].copy(), float(theta[-1])
-    history = [theta.copy()]
+    block = q // design.parents
+    ties = np.zeros((design.parents - 1, q))  # block 0's sum less each other block's
+    ties[:, :block] = 1.0
+    for t in range(1, design.parents):
+        ties[t - 1, t * block : (t + 1) * block] = -1.0
+    if design.parents > 1:
+        psi -= ties.T @ np.linalg.solve(ties @ ties.T, ties @ psi)
+    history = [np.concatenate([psi, rho, [shape]])]
     for _ in range(max_iter):
         residual = effect - location @ psi
         variance = np.exp(scale @ rho)
@@ -365,6 +378,8 @@ def _ecm(
         shrink = 1.0 + shape**2
         lhs = location.T @ (location * weight[:, None]) + k_alpha / shrink
         rhs = location.T @ (weight * (effect - shape / shrink * v))
+        if design.parents > 1:
+            lhs += np.trace(lhs) / q * (ties.T @ ties)
         try:
             psi_next = np.linalg.solve(lhs, rhs)
         except np.linalg.LinAlgError:

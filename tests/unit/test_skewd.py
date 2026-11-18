@@ -366,3 +366,20 @@ def test_a_constant_cross_validation_fold_starts_from_a_symmetric_shape():
     assert start[-1] == 0.0
     nearly = native._start(design.location[:7], design.scale[:7], np.full(7, 1 / 3))
     assert nearly[-1] == 0.0  # rounding in the mean leaves no skewness either
+
+
+def test_a_fit_with_two_parents_stops_on_the_rule():
+    # Each parent's basis sums to one, so a constant can move between the parents' coefficients
+    # and change no fitted value; the refinement must not read that as movement.
+    rng = np.random.default_rng(1)
+    parents = rng.standard_normal((200, 2))
+    noise = skewnorm.rvs(5, size=200, random_state=rng)
+    effect = np.sin(parents[:, 0]) + 0.5 * parents[:, 1] ** 2 + np.exp(0.3 * parents[:, 0]) * noise
+    effect = (effect - effect.mean()) / effect.std()
+    design = native._design(parents, 8)
+    theta, _ = native._heuristic(design, np.arange(200), effect, np.zeros(4), [], rng)
+    refined, converged = native._ecm(design, effect, theta, np.zeros(4), 3000)
+    assert converged
+    blocks = refined[: design.location.shape[1]].reshape(2, -1)
+    assert blocks[0].sum() == pytest.approx(blocks[1].sum(), abs=1e-9)
+    assert not native._ecm(design, effect, theta, np.zeros(4), 5)[1]  # a short limit still shows
