@@ -11,6 +11,7 @@ distribution is that of the complete data on the rows where those parents are ob
 from __future__ import annotations
 
 import hashlib
+from collections import Counter
 from collections.abc import Iterable, Mapping
 
 import numpy as np
@@ -62,7 +63,8 @@ class PermutationCorrection:
     fewer is answered by ``deletion``, as a query with an empty ``W`` is, and its pair joins
     ``uncorrected``: the paper leaves the case open, the correction can only remove an edge the
     deletion tests kept, and without the rows to compute it the pair keeps the deletion test's
-    answer for that conditioning set.
+    answer for that conditioning set. ``rows`` counts the rows of the block of each query PermC
+    answers, which holds no more rows than the deletion test of the same query reads.
 
     The draw comes from a generator seeded by ``seed`` and by the fingerprints of the queried
     columns, a digest of where each one's values are missing: a p-value then depends on neither the
@@ -92,6 +94,8 @@ class PermutationCorrection:
         self._seed = seed
         #: The pairs ``(x, y)``, ``x < y``, with a query too short of rows to correct.
         self.uncorrected: set[tuple[int, int]] = set()
+        #: The rows the corrected queries read: a row count to the number of queries with it.
+        self.rows: Counter[int] = Counter()
         gaps = np.packbits(~self._observed, axis=0).T
         self._fingerprints = [
             int.from_bytes(hashlib.blake2b(g.tobytes(), digest_size=8).digest(), "big")
@@ -126,6 +130,7 @@ class PermutationCorrection:
         if m < least:
             self.uncorrected.add((x, y))
             return self._deletion(x, y, given)
+        self.rows[m] += 1
         block = self._data[rows]
         design = np.column_stack([np.ones(m), block[:, parents]])
         values = block[:, tested]

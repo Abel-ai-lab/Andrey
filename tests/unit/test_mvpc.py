@@ -61,6 +61,8 @@ def test_column_order_units_and_origin_change_no_result():
     assert _labeled(out) == _labeled(want)
     assert out.metadata["missingness_parents"] == want.metadata["missingness_parents"]
     assert out.metadata["corrected_edges"]["removed"] == [["x", "y"]]
+    rows, want_rows = (o.metadata["corrected_edges"]["rows_tested"] for o in (out, want))
+    assert rows == want_rows
 
 
 def test_candidates_share_an_adjacent_variable_or_an_indicator_they_cause():
@@ -119,6 +121,41 @@ def test_a_corrected_test_with_too_few_rows_is_the_deletion_test():
     assert test.uncorrected == {(0, 1)}
     assert test(0, 2) == make_indep_test("fisherz", X)(0, 2)  # no indicator parent: not counted
     assert test.uncorrected == {(0, 1)}
+    assert not test.rows  # no query was corrected
+
+
+def _gapped(seed: int) -> np.ndarray:
+    """Figure 1b with rows that miss ``x`` or the indicator's parent ``w``, whatever they hold."""
+    X = figure_1b(seed)
+    X[:300, 2] = np.nan
+    X[200:500, 0] = np.nan
+    return X
+
+
+def test_a_corrected_test_counts_the_rows_where_its_variables_and_parents_are_observed():
+    X = _gapped(0)
+    observed = ~np.isnan(X)
+    test = _correction(X, {1: [2]})
+    test(0, 1)
+    test(1, 2)
+    test(2, 1, (0,))
+    assert test.rows == {observed.all(axis=1).sum(): 2, observed[:, [1, 2]].all(axis=1).sum(): 1}
+    test(0, 2)  # no indicator parent: the deletion test, not counted
+    assert sum(test.rows.values()) == 3
+
+
+@pytest.mark.parametrize("seed", range(3))
+def test_a_fit_records_the_fewest_and_the_median_rows_its_corrected_tests_read(seed):
+    X = _gapped(seed)
+    out = andrey.pc(X, missing="mvpc")
+    assert out.metadata["missingness_parents"] == {1: [2]}
+    observed = ~np.isnan(X)
+    complete, pair = observed.all(axis=1).sum(), observed[:, [0, 1]].all(axis=1).sum()
+    # A corrected test of x and y also needs w, the parent of y's indicator: fewer rows than the
+    # deletion test of the pair, and the counts of the deletion tests stay under their own key.
+    assert out.metadata["corrected_edges"]["rows_tested"] == {"min": complete, "median": complete}
+    assert complete < pair
+    assert out.metadata["rows_tested"]["median"] > complete
 
 
 def _blocked(seed: int, n: int = 450) -> np.ndarray:

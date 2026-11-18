@@ -18,6 +18,9 @@ names its pull request.
 - `metadata["em"]` records `rows_dropped`, the rows dropped for observing no value, and
   `min_shared_rows`, the fewest rows that observe both columns of a pair. A fit whose every missing
   value sat in a dropped row records its handling too. ([#1102])
+- `pc(missing="mvpc")` records the fewest and the median rows a corrected test read as
+  `metadata["corrected_edges"]["rows_tested"]`, so a fit shows when the correction ran on few rows.
+  The graph and the other metadata are unchanged. ([#1094])
 
 ### Changed
 
@@ -2577,6 +2580,7 @@ First alpha release.
 [#882]: https://github.com/Abel-ai-lab/andrey/pull/882
 [#887]: https://github.com/Abel-ai-lab/andrey/pull/887
 [#891]: https://github.com/Abel-ai-lab/andrey/pull/891
+[#1094]: https://github.com/Abel-ai-lab/Andrey/pull/1094
 [#892]: https://github.com/Abel-ai-lab/andrey/pull/892
 [#893]: https://github.com/Abel-ai-lab/andrey/pull/893
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
