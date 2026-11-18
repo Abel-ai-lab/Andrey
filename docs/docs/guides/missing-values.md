@@ -213,8 +213,10 @@ Every other method raises a `ValueError` that names it: it has no handling of mi
 each method's Notes say why. Drop the incomplete rows yourself, with `data.dropna()` for a
 DataFrame, which suits values missing completely at random, or use one of the methods above.
 A time series cannot lose a step without joining the steps around it, and a filled step is a guess
-the fit reads as data, so for VARMA-LiNGAM, Granger, DYNOTEARS, and J-PCMCI+, use PCMCI, PCMCI+, or
-LPCMCI instead, whose tests delete rows per test and keep every time step.
+the fit reads as data, so for VARMA-LiNGAM, Granger, and DYNOTEARS, use PCMCI, PCMCI+, or LPCMCI
+instead, whose tests delete rows per test and keep every time step. J-PCMCI+ reads several datasets
+with their contexts, which those three do not, so no method that accepts missing values replaces
+it: drop the datasets that hold a missing value.
 
 ## Try it on data you control
 

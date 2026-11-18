@@ -492,8 +492,10 @@ names its pull request.
   stays sound when values are missing for a reason: the cited result covers another procedure, and
   the deletion is valid when values are missing completely at random. A time series method that
   refuses missing values points to `pcmci`, `pcmciplus`, and `lpcmci` and no longer advises filling
-  in the missing steps, and the missing values guide names `normal_scores` among the tests that
-  need `|S| + 3` rows where their variables are observed. ([#1096])
+  in the missing steps, except `jpcmciplus`, whose datasets with their contexts no other method
+  reads: it points to dropping the datasets that hold a missing value. The missing values guide
+  names `normal_scores` among the tests that need `|S| + 3` rows where their variables are
+  observed. ([#1096])
 
 ## [0.17.1] - 2026-11-12
 

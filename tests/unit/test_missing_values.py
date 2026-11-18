@@ -507,6 +507,9 @@ def test_every_other_method_refuses_missing_values_naming_itself(name):
     assert MISSING_GUIDE in str(error.value)
     if name == "longitudinal_lingam":  # a panel: a unit's rows go together
         assert "drop the units that hold one from every dataset of data" in str(error.value)
+    elif name == "jpcmciplus":  # datasets read with their contexts: no other method stands in
+        assert "drop the datasets of data that hold a missing value" in str(error.value)
+        assert "use pcmci, pcmciplus, or lpcmci" not in str(error.value)
     elif REGISTRY[name].family == "temporal":  # one series: a step cannot be dropped
         assert "use pcmci, pcmciplus, or lpcmci, whose tests delete rows per test" in str(
             error.value
