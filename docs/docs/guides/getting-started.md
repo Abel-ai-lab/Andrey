@@ -703,7 +703,9 @@ rows where those variables are observed. It takes `fisherz` or `student_t`;
 edges it tested again and removed. A corrected test reads the rows where its pair, its conditioning
 set, and those parents are all observed. When too few rows are available, it uses the test-wise
 test instead. The pair then keeps its test-wise result for that conditioning set, and
-`metadata["corrected_edges"]["uncorrected"]` lists the pair. On complete data, MVPC gives the
+`metadata["corrected_edges"]["uncorrected"]` lists the pair.
+`metadata["corrected_edges"]["rows_tested"]` gives the fewest and the median rows a corrected test
+read, so you can see when the correction ran on few rows. On complete data, MVPC gives the
 test-wise result.
 
 The correction holds when no indicator causes a variable, every independence in the observed rows

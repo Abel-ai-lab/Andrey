@@ -168,7 +168,8 @@ _add(
             "data with missing values, metadata['missingness_parents'] maps each column whose "
             "missingness indicator has parents to them, and metadata['corrected_edges'] lists the "
             "edges tested again (retested), removed (removed), and left with a test that had too "
-            "few rows to correct (uncorrected), by name or 0-based position",
+            "few rows to correct (uncorrected), by name or 0-based position, and the fewest and "
+            "the median rows a corrected test read (rows_tested)",
         ),
         accel="numpy",
         status="supported",

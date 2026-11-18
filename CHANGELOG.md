@@ -23,6 +23,9 @@ names its pull request.
   rounds. The default stays 10, the number Gao et al. (2022) run, so a fit without the argument
   returns what it did. The warning of a fit whose last round still changed the graph names the
   argument; values other than 10 are not benchmarked yet. ([#1095])
+- `pc(missing="mvpc")` records the fewest and the median rows a corrected test read as
+  `metadata["corrected_edges"]["rows_tested"]`, so a fit shows when the correction ran on few rows.
+  The graph and the other metadata are unchanged. ([#1094])
 
 ### Changed
 
@@ -2582,6 +2585,7 @@ First alpha release.
 [#882]: https://github.com/Abel-ai-lab/andrey/pull/882
 [#887]: https://github.com/Abel-ai-lab/andrey/pull/887
 [#891]: https://github.com/Abel-ai-lab/andrey/pull/891
+[#1094]: https://github.com/Abel-ai-lab/Andrey/pull/1094
 [#892]: https://github.com/Abel-ai-lab/andrey/pull/892
 [#893]: https://github.com/Abel-ai-lab/andrey/pull/893
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
