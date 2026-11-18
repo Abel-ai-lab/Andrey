@@ -16,6 +16,16 @@ names its pull request.
   simulated data so that whether a value is missing depends on another variable, fits `pc` with its
   default handling and with `missing="mvpc"` and `ges` with `missing="em"`, and scores each against
   the true graph. ([#1059])
+- `andrey.das`, DAS (Montagna et al. 2023), experimental: SCORE's causal order, then each leaf's
+  candidate parents screened by Welch tests on its row of the same Stein estimate of the score's
+  Jacobian, at most `max_parents=20` per variable, and CAM's smooth-term tests on those candidates
+  only, so the pruning no longer fits every variable before a node in the order ([#1082]).
+- `andrey.data.load_dataset("tuebingen")` loads the Tübingen cause-effect pairs (Mooij et al. 2016)
+  as a `CausePairs` collection of 108 pairs. Each pair is a dataset with its two columns, the
+  two-node graph of its reference direction, its weight (pairs from one source share weights that
+  sum to 1), and its `cause` and `effect` columns; the six pairs with a block of several columns (52
+  to 55, 71, 105) are marked `multivariate`. The collection states no license, so Andrey downloads
+  the archive from the original server, checks its SHA-256, and does not redistribute it. ([#1084])
 
 ### Changed
 
@@ -69,6 +79,11 @@ names its pull request.
 - The reference-parity check names a row by its network, effect, hidden nodes, node count, and
   number of series beside its size, so rows of one size that differ only there no longer share a
   key, and it fails two failing rows of one comparison that still do. ([#1070])
+- `das` ranks the columns that knowledge forbids as parents with the others in its edge screen and
+  never keeps them, so the screen's reference can be a column known to have a zero entry instead of
+  the weakest allowed one. Correct forbidden edges no longer remove a true parent that the same
+  data gives without them. Its docstrings state that the five candidates kept without a test are
+  the value of the authors' code's `min_parents`, which usually keeps four ([#1088]).
 
 ## [0.17.1] - 2026-11-12
 
@@ -2627,3 +2642,6 @@ First alpha release.
 [#1055]: https://github.com/Abel-ai-lab/Andrey/pull/1055
 [#1067]: https://github.com/Abel-ai-lab/Andrey/pull/1067
 [#1070]: https://github.com/Abel-ai-lab/Andrey/pull/1070
+[#1082]: https://github.com/Abel-ai-lab/Andrey/pull/1082
+[#1084]: https://github.com/Abel-ai-lab/Andrey/pull/1084
+[#1088]: https://github.com/Abel-ai-lab/Andrey/pull/1088

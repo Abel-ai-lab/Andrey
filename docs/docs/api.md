@@ -92,10 +92,11 @@ you. Every method that takes `indep_test`, with a partial-correlation test, `"fi
 `"student_t"`, rejects copies the same way before any test runs, and so do `icp` and `dynotears`.
 `pcmci`, `pcmciplus`, and `lpcmci` with those tests also reject a series that repeats another up to
 `2 * tau_max` steps back and name its lagged value, such as `'a' at lag 1 repeats 'd'`. `cam`,
-`resit`, `score_matching`, `nogam`, and `camuv` reject copies the same way, and a column of fewer
-than 3 distinct values, such as a binary one, on which no smooth term can be fit; `resit`,
-`score_matching`, `nogam`, and `camuv` also need at least twice as many rows as columns, and `camuv`
-rejects a column that is a linear function of other columns, such as a total, as the BIC methods do.
+`resit`, `score_matching`, `nogam`, `das`, and `camuv` reject copies the same way, and a column of
+fewer than 3 distinct values, such as a binary one, on which no smooth term can be fit; `resit`,
+`score_matching`, `nogam`, and `camuv` also need at least twice as many rows as columns (`das`
+twice as many as `max_parents + 1`), and `camuv` rejects a column that is a linear function of
+other columns, such as a total, as the BIC methods do.
 Other data raises a `ValueError` that names the argument and, for a bad cell, its row and column. A
 single column gives a one-node graph.
 
@@ -153,7 +154,7 @@ reports only p-values is ordered by its p-value, smallest first.
 % concept: knowledge
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
 `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`,
-`exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`, `nogam`,
+`exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`, `nogam`, `das`,
 `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`,
 `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`,
 `bottom_up_parce_lingam`, and `camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
@@ -308,14 +309,15 @@ details.
 
 % concept: max_parents
 `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, `rsmax2`,
-`gfci`, `boss_fci`, `grasp_fci`, `cam`, and `icp` take `max_parents`, a cap on every node's parents:
-no DAG the returned graph represents gives a node more than that many parents. `None`, the default,
-sets no cap. `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, and the score phase of `mmhc` and
-`rsmax2` take no move past the cap, `boss` and `grasp` grow no parent set past it, `exact_search`
-scores only the parent sets within it, and `cam`'s order search adds no edge past it. `icp` tests
-only the sets of at most that many variables, and its guarantee then needs the target to have no
-more parents. `gfci`, `boss_fci`, and `grasp_fci` cap their GES, BOSS, or GRaSP phase; the PAG their
-tests then orient can put more arrowheads at a node.
+`gfci`, `boss_fci`, `grasp_fci`, `cam`, `das`, and `icp` take `max_parents`, a cap on every node's
+parents: no DAG the returned graph represents gives a node more than that many parents. `None`, the
+default, sets no cap, except in `das`, whose default is its paper's 20. `ges`, `gies`, `gnies`,
+`xges`, `hc`, `tabu`, and the score phase of `mmhc` and `rsmax2` take no move past the cap, `boss`
+and `grasp` grow no parent set past it, `exact_search` scores only the parent sets within it,
+`cam`'s order search adds no edge past it, and `das`'s edge screen keeps no candidate past it.
+`icp` tests only the sets of at most that many variables, and its guarantee then needs the target
+to have no more parents. `gfci`, `boss_fci`, and `grasp_fci` cap their GES, BOSS, or GRaSP phase;
+the PAG their tests then orient can put more arrowheads at a node.
 
 % concept: seed
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
@@ -663,6 +665,7 @@ in a process.
    :nosignatures:
 
    dagma
+   das
 ```
 
 DAGMA (Bello et al. 2022) is a continuous-optimization learner in the line of NOTEARS: it fits a
@@ -673,6 +676,14 @@ the empty graph at its default settings, which is why it is experimental. The
 [0.17.0](benchmarks/0.17.0.md#dagma) release card has the numbers. `robust=True` follows the first
 fit with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
 (Deng et al. 2024).
+
+DAS (Montagna et al. 2023), {py:func}`~andrey.das`, finds SCORE's causal order with the same Stein
+estimator and then reads the edges from it: for a leaf, the second derivative of the log density in
+the leaf and another variable is zero at every point unless that variable is a parent. Each leaf
+keeps the variables before it whose derivatives are clearly above zero, at most `max_parents=20`
+of them by Welch tests at 0.01, and CAM's smooth-term tests at `alpha=0.001` prune only those, so
+its pruning does not grow with every variable before a node in the order. It returns a DAG and
+SCORE's causal order. It is experimental until its comparison with the authors' code is published.
 
 A method becomes supported once it has:
 
@@ -1047,6 +1058,7 @@ name.
 | Name | Variables | Edges | Data |
 |---|---|---|---|
 | `sachs` | 11 | 17 | Measured: 853 observational cells, or 7,466 in nine conditions (Sachs et al., 2005) |
+| `tuebingen` | 2 per pair | 1 per pair | Measured: 108 cause-effect pairs, each with its direction and weight (Mooij et al., 2016) |
 | `asia` | 8 | 8 | Simulated on the published network (bnlearn) |
 | `child` | 20 | 25 | Simulated on the published network (bnlearn) |
 | `insurance` | 27 | 52 | Simulated on the published network (bnlearn) |
@@ -1086,6 +1098,27 @@ rows = np.isin(pooled.env, list(known))
 andrey.gies(pooled.data[rows], pooled.env[rows], targets=known)
 ```
 
+`load_dataset("tuebingen")` loads the Tübingen cause-effect pairs (Mooij et al., 2016) as a
+collection: iterating it gives 108 pairs, each a dataset with the two columns `x` and `y` in the
+file's order, the two-node `graph` of its reference direction (the cause is `x` in some pairs and
+`y` in others), and its `name`, `weight`, `cause`, and `effect`. The collection gives the pairs of
+one source weights that sum to 1, so weigh each pair's outcome by its `weight` when you average
+over pairs. Six pairs (52 to 55, 71, and 105) have a block of several columns, marked
+`multivariate`; five of them have weight 0. The other 102 are the two-column pairs the pairwise
+methods (`anm`, `pnl`, `loci`) read. The collection states no license, and its pairs come from
+other collections with their own terms, so Andrey does not redistribute it: the first load downloads
+the archive from its original server and checks its SHA-256, and a changed archive is refused:
+
+```python
+pairs = load_dataset("tuebingen")
+usable = [p for p in pairs if not p.multivariate and p.weight > 0]
+correct = [
+    andrey.anm(p.data, alpha=None).structure.oriented_edges() == p.graph.oriented_edges()
+    for p in usable
+]
+accuracy = np.average(correct, weights=[p.weight for p in usable])
+```
+
 ```{eval-rst}
 .. currentmodule:: andrey.data
 
@@ -1096,6 +1129,8 @@ andrey.gies(pooled.data[rows], pooled.env[rows], targets=known)
    load_dataset
    list_datasets
    RealDataset
+   CausePairs
+   CausePair
 ```
 
 ### Simulators
