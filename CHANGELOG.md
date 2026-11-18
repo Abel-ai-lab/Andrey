@@ -8,6 +8,35 @@ and, when a change breaks the API, Breaking, and from 0.11.0 it closes with New 
 someone contributes for the first time, sections Keep a Changelog does not define; each change
 names its pull request.
 
+## [Unreleased]
+
+### Changed
+
+- With `missing=None` on data with missing values, a method whose tests delete rows logs one notice
+  per process that names the handling, test-wise deletion, and when it is valid. Pass
+  `missing="testwise"` to choose it by name. ([#1102])
+- A refusal of missing values leads with what you can do. A time series is pointed to `pcmci`,
+  `pcmciplus`, and `lpcmci` in place of filling in the missing steps, and dropping rows is named as
+  your own step, with the same rows of every row-aligned argument. ([#1102])
+- `missing="em"` raises `ValueError` when two columns share no observed row, as the data hold no
+  covariance for them. ([#1102])
+
+### Added
+
+- `metadata["zero_df_tests"]` counts the tests of a fit on data with missing values that were
+  answered `p = 1` for having zero degrees of freedom, as the categorical tests and `degen_gauss`
+  do by design. ([#1102])
+- `metadata["em"]` records `rows_dropped`, the rows dropped for observing no value, and
+  `min_shared_rows`, the fewest rows that observe both columns of a pair. A fit whose every missing
+  value sat in a dropped row records its handling too. ([#1102])
+
+### Fixed
+
+- The docs no longer say that FCI with test-wise deletion stays sound when values are missing for a
+  reason: the cited result covers another procedure. Every method that deletes rows per test now
+  states one shared sentence, valid when values are missing completely at random, and the guide's
+  text on `None` and on structural EM is corrected. ([#1102])
+
 ## [0.17.1] - 2026-11-12
 
 ### Highlights
@@ -2544,6 +2573,7 @@ First alpha release.
 [#894]: https://github.com/Abel-ai-lab/andrey/pull/894
 [#896]: https://github.com/Abel-ai-lab/andrey/pull/896
 [#899]: https://github.com/Abel-ai-lab/andrey/pull/899
+[#1102]: https://github.com/Abel-ai-lab/Andrey/pull/1102
 [#910]: https://github.com/Abel-ai-lab/andrey/pull/910
 [#904]: https://github.com/Abel-ai-lab/andrey/pull/904
 [#928]: https://github.com/Abel-ai-lab/andrey/pull/928
