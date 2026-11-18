@@ -4798,7 +4798,7 @@
    "NumPy (reference)": "2.5.4",
    "NumPy (Andrey)": "2.4.6"
   },
-  "protocol": "each fit in its own process with one BLAS thread, on nodes of AMD EPYC processors of the Zen 3 generation; a cap of 2,400 s per Andrey fit and 1,800 s per reference fit, which no fit reached; times are not published",
+  "protocol": "each fit in its own process with one BLAS thread, on nodes of AMD EPYC processors of the Zen 3 generation; a cap per fit of 2,400 s (the fits of the build after, and NOTEARS's of the build before) or 1,800 s (DAGMA's of the build before, and the reference's), which no fit reached; times are not published",
   "rows": [
    {
     "method": "dagma",
