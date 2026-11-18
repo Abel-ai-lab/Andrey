@@ -45,6 +45,11 @@ right, make it fast." For algorithm implementations:
   `site/brand/art-<cover>.jpg`, its subject on the right; the link preview's banner adds the title
   and the release. A centered `art-<cover>-center.jpg`, when there is one, is the post's cover and
   thumbnail instead. A published post that is renamed keeps its old address with `redirect`.
+- A blog post and a release card (`docs/docs/benchmarks/<x.y.z>.md`) also set `ai`, how AI tools
+  were used to write the page (`none`, `edited`, or `drafted`), and name the tools in `ai_tools`
+  unless it is `none`. An agent that wrote or reworded any part of the page never sets `none`, and
+  never changes a value an author chose. A page set to `none` is edited by hand: an agent changes
+  only its front matter and markup, and proposes any change of wording to the author.
 
 ## Documentation style
 
@@ -68,3 +73,12 @@ One issue -> one PR, each checked by CI. A PR targets its release's branch, `rel
 release PR, from that branch to `main`, is the only PR that merges to `main`, and the tag follows
 it. `uv` manages the environment, `ruff` lints and formats, and `prek` runs the commit hooks
 (`DEVELOPMENT.md` has the commands).
+
+A change an agent writes meets every rule in this file and goes through the same issue, pull
+request, CI, and review as any other; the person who directs the agent is its author and answers
+for it ([`DEVELOPMENT.md`](DEVELOPMENT.md#ai-tools)). Its commits end with a `Co-Authored-By`
+trailer that names the tool or its model, and its pull request names each tool or carries the
+tool's "Generated with" line; neither links a tool session. An agent never writes a number that a
+recorded run did not produce, never cites a source it has not opened and found to support the
+claim, and never weakens a test, a recorded output, or a gate to make a check pass. It says what
+it did not run or check.
