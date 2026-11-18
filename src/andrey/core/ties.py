@@ -80,10 +80,10 @@ def tie_key(value: float) -> float:
 #: both directions the same numbers bit for bit, and they tie for every method. The tolerance
 #: covers rounding carried through a fit: with such a table's columns in different units, which
 #: changes the last bits of its standardized values, the largest relative gap over 1,840 fits with
-#: 100 to 300 rows was ``1e-13`` for ``anm`` and ``0`` for ``pnl``, while the two directions of
-#: unrelated pairs, which nearly mirror each other, differ by ``4e-6`` and more. ``loci``'s solver
-#: stops when the mean log-likelihood changes by less than ``1e-6``, so its gap on such a table can
-#: reach ``6e-4``, and there the direction follows that difference.
+#: 100 to 300 rows was ``1e-13`` for ``anm`` and ``0`` for ``pnl``, while for ``anm`` the two
+#: directions of 50 unrelated pairs, which nearly mirror each other, differ by ``2e-8`` and more.
+#: ``loci``'s solver stops when the mean log-likelihood changes by less than ``1e-6``, so its gap on
+#: such a table can reach ``6e-4``, and there the direction follows that difference.
 PAIR_RTOL = 1e-9
 
 
