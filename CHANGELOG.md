@@ -427,12 +427,17 @@ names its pull request.
 
 ### Fixed
 
-- `anm`, `pnl`, and `loci` with `alpha=None` apply their documented tie rule to p-values and
-  likelihoods that are equal up to rounding: logarithms that differ only past nine decimal places
-  count as equal, so two directions whose p-values agree to rounding give no edge, where the order
-  of their last digits picked one. On 200 seeded pairs per method, 3 `anm` and 4 `loci` results change,
-  all on two-valued pairs, from an edge to no edge; `pnl` on 40 pairs, `loci` with
-  `criterion="likelihood"`, and the recorded outputs do not change ([#1085]).
+- `anm`, `pnl`, and `loci` with `alpha=None` round the logarithms of the two directions'
+  p-values (or likelihoods), and then their statistics, to nine decimal places before comparing
+  them, so two values that round to the same number count as equal, and equal values and
+  statistics give no edge. Values that differ by more than that still choose a direction, as can
+  two values on either side of a rounding step. On 200 seeded pairs per method, 3 `anm` and 4
+  `loci` results change, all on two-valued pairs, from an edge to no edge; `pnl` on 40 pairs,
+  `loci` with `criterion="likelihood"`, and the recorded outputs do not change ([#1085]).
+
+- The column ranks that order tied choices (`tie_ranks`) are the same for a column in units near
+  the ends of the float range, such as `2**-1000` or `1e300`, where the squares behind its marginal
+  overflowed or vanished and could reorder the columns ([#1085]).
 
 - `notears(robust=True)` and `dagma(robust=True)` minimize the Gaussian likelihood of the path of
   Deng et al. (2024) without `-log|det(I - W)|`, as its authors' code does. The term is zero
