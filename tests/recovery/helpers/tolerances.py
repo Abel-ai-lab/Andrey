@@ -216,7 +216,9 @@ SPEC: dict[str, dict] = {
         },
     },
     # CPCM: the decided graph and both tests' p-values and statistics. The smoothing parameters
-    # stop on a projected LAML gradient of 1e-4, so p-values are compared relatively at 1e-3.
+    # come from a compass search on a fixed lattice that takes a point only if it lowers the LAML
+    # by more than 1e-6 of its value, so rounding can tip a near-tie between two lattice points;
+    # p-values are compared relatively at 1e-3.
     "CPCM": {
         "structural": ["graph"],
         "numeric": {
