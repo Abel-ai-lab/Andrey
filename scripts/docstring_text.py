@@ -41,6 +41,8 @@ SENTENCE_END = re.compile(r"\.\s+(?=[A-Z`:])")
 PENALTIES = ("penalty_discount", "ebic_gamma", "equivalent_sample_size")
 #: The score searches followed by FCI's tests and rules, which refuse missing values.
 FCI_SEARCHES = ("gfci", "boss_fci", "grasp_fci")
+# The refusing temporal methods that read units or datasets, not one series.
+PANELS = ("longitudinal_lingam", "jpcmciplus")
 
 
 class Shared(NamedTuple):
@@ -253,7 +255,7 @@ SHARED = {
         ":func:`~andrey.fci`, whose tests delete rows per test.",
         lambda m: m in FCI_SEARCHES,
     ),
-    # longitudinal_lingam reads units at each time point, not one series.
+    # longitudinal_lingam and jpcmciplus read units or datasets, not one series.
     "keep_steps": Shared(
         "Notes",
         "**Missing values.**",
@@ -261,7 +263,17 @@ SHARED = {
         "Use :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose "
         "tests delete rows per test and keep every time step, as dropping a step would join the "
         "steps around it.",
-        lambda m: refuses_missing(m, series=True) and m != "longitudinal_lingam",
+        lambda m: refuses_missing(m, series=True) and m not in PANELS,
+    ),
+    # jpcmciplus reads several series with their contexts, which the three methods above do not.
+    "drop_datasets": Shared(
+        "Notes",
+        "**Missing values.**",
+        "last",
+        "No method that accepts missing values reads several datasets with their contexts, as "
+        ":func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, and :func:`~andrey.lpcmci` read one "
+        "series, so drop the datasets that hold one.",
+        lambda m: m == "jpcmciplus",
     ),
     "limits": Shared(
         "Notes",

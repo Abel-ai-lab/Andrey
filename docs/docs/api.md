@@ -110,10 +110,11 @@ that whether a value is missing depends on no value in the data; the rows a test
 random sample of all rows, and otherwise they are a selected sample that more rows do not correct.
 Their argument `missing` names the handling: `"testwise"` is test-wise deletion, and `None`, the
 default, picks the method's default handling, `"testwise"`, and logs one notice per process that
-names it; `metadata["missing"]` records the one a fit used. A categorical test or `degen_gauss` with
-zero degrees of freedom returns a p-value of 1, and `metadata["zero_df_tests"]`, present when it is
-not zero, counts those tests. `pc` also takes `missing="mvpc"`: Missing-Value PC (Tu et al., 2019)
-finds the parents of each missingness indicator and tests again the edges they could have kept.
+names it; `metadata["missing"]` records the one a fit used. A test with zero degrees of freedom
+returns a p-value of 1, and `metadata["p_one_tests"]`, present when it is not zero, counts every
+test of the fit that returned a p-value of 1, whichever test it is. `pc` also takes
+`missing="mvpc"`: Missing-Value PC (Tu et al., 2019) finds the parents of each missingness indicator
+and tests again the edges they could have kept.
 `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm`, whose
 fits read the data only through their covariance, refuse missing values under `None` and take
 `missing="em"`: structural EM runs the search on the expected covariance of the data 10 times,
@@ -991,7 +992,8 @@ module.
 From the command line, `-W error::UserWarning` escalates Andrey's warnings along with every other
 `UserWarning`; for one category, use `warnings.filterwarnings` or pytest's flag. `andrey run`
 returns a fit's warnings in the `run.warnings` field of its JSON output, each with its category
-name.
+name; a notice the fit logs, as the default handling of missing values, has the category
+`LogWarning`.
 
 ```{eval-rst}
 .. autosummary::

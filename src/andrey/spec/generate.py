@@ -297,8 +297,8 @@ def cli_meta() -> dict:
         "output": (
             "runs and listings -> JSON on a non-interactive stdout (piped, an agent, CI); "
             "an interactive terminal gets a human summary, and --json forces JSON. failure -> a "
-            "JSON error envelope on stderr plus a non-zero exit. Warnings from the fit go in "
-            "run.warnings, never to stderr."
+            "JSON error envelope on stderr plus a non-zero exit. Warnings from the fit, and the "
+            "notices it logs (category LogWarning), go in run.warnings, never to stderr."
         ),
         "bounded_output": (
             "large arrays are capped at 1000 on stdout: a graph's inline edges (edges_truncated) "
@@ -574,9 +574,9 @@ def render_skill() -> str:
         "names how: `testwise`, the default under `null`, deletes rows per test, each test "
         "reading the rows observed in all of its variables. `metadata.rows_tested` gives the "
         "fewest (`min`) and the median rows a test read, `metadata.missing` the handling, and "
-        "`metadata.zero_df_tests`, present when it is not zero, the number of categorical or "
-        "mixed-data tests answered p = 1 for having zero degrees of freedom. A fit that runs "
-        "the deletion under `null` logs one notice per process that names it. They are "
+        "`metadata.p_one_tests`, present when it is not zero, the number of tests that returned "
+        "p = 1, whichever test it is; a test with zero degrees of freedom answers so. A fit "
+        "that runs the deletion under `null` logs one notice per process that names it. They are "
         + ", ".join(f"`{s.name}`" for s in REGISTRY.values() if s.data.missing)
         + f". {TESTWISE_CLAIM} The searches whose fit "
         "reads only a covariance, "

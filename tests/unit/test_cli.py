@@ -6,6 +6,8 @@ import io
 import json
 import re
 import shlex
+import subprocess
+import sys
 import textwrap
 import tomllib
 import warnings
@@ -646,6 +648,56 @@ def test_fit_warnings_go_in_the_envelope_not_stderr(capsys, csv_path, filter_act
     [warning] = json.loads(out)["run"]["warnings"]
     assert warning["category"] == "SearchLimitWarning"
     assert warning["message"].startswith("hc stopped at its limit of max_iter=1 moves")
+
+
+@pytest.fixture
+def gappy_path(tmp_path, csv_path):
+    """The chain of ``csv_path`` with about one cell in ten missing, as empty fields."""
+    data = np.loadtxt(csv_path, delimiter=",")
+    data[np.random.default_rng(1).random(data.shape) < 0.1] = np.nan
+    path = tmp_path / "gappy.csv"
+    path.write_text(
+        "\n".join(",".join("" if np.isnan(v) else repr(float(v)) for v in row) for row in data)
+    )
+    return path
+
+
+def test_the_notice_of_a_default_goes_in_the_envelope_not_stderr(capsys, gappy_path):
+    code, out, err = _run(["run", "pc", "--data", str(gappy_path), "--json"], capsys)
+    assert code == 0 and err == ""
+    [notice] = json.loads(out)["run"]["warnings"]
+    assert notice["category"] == "LogWarning"
+    assert notice["message"].startswith("andrey.pc: the data hold missing values and missing=None")
+
+
+def test_a_run_on_data_with_gaps_writes_nothing_to_stderr(tmp_path, gappy_path):
+    """In a fresh process, where a logger with no handler would print to standard error."""
+    run = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; from andrey.cli import main; sys.exit(main())",
+            "run",
+            "pc",
+            "--data",
+            str(gappy_path),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=tmp_path,
+    )
+    assert run.stderr == ""
+    assert json.loads(run.stdout)["run"]["warnings"][0]["category"] == "LogWarning"
+
+
+def test_the_handler_of_a_run_is_removed_after_it(capsys, gappy_path):
+    import logging
+
+    before = list(logging.getLogger("andrey").handlers)
+    _run(["run", "pc", "--data", str(gappy_path)], capsys)
+    assert logging.getLogger("andrey").handlers == before
 
 
 # --- shell-aware output ---------------------------------------------------------------------------

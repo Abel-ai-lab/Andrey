@@ -20,6 +20,7 @@ from andrey.core.knowledge import Knowledge, KnowledgeError, resolve_lagged
 from andrey.core.score import copies_error, copy_groups
 
 from ._adapt import (
+    DROP_DATASETS,
     DROP_UNITS,
     KEEP_STEPS,
     categorical_metadata,
@@ -1236,9 +1237,9 @@ def jpcmciplus(
     dataset or step, and a context is fixed given its dummy, so it leaves the conditions.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the stacked design reads every
-    step. Use :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose
-    tests delete rows per test and keep every time step, as dropping a step would join the steps
-    around it.
+    step. No method that accepts missing values reads several datasets with their contexts, as
+    :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, and :func:`~andrey.lpcmci` read one series, so
+    drop the datasets that hold one.
 
     **Limitations.** Measured on the linear model of its authors' experiment script [1]_, with both
     dummies at ``tau_max=2`` and ``alpha=0.05``, on one core: 5 system variables with lagged links
@@ -2184,7 +2185,7 @@ def context_inputs(
         import pandas as pd
 
         stacked = pd.DataFrame(stacked, columns=list(labels))
-    stacked = data_matrix(stacked, method="jpcmciplus", fix=KEEP_STEPS)
+    stacked = data_matrix(stacked, method="jpcmciplus", fix=DROP_DATASETS)
     lengths = [len(table) for table in tables]
     blocks = np.split(stacked, np.cumsum(lengths)[:-1])
     d = stacked.shape[1]

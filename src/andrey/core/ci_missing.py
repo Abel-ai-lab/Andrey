@@ -48,7 +48,6 @@ from .ci import (
     BOUND_MARGIN,
     ONE_MINUS_EPS,
     SINGULAR_RTOL,
-    ZERO_DF_TESTS,
     CGTest,
     ChiSquare,
     CITest,
@@ -130,21 +129,28 @@ _MARGIN = 100.0
 # n - |S| - offset.
 _DF_OFFSET: dict[type, int] = {FisherZ: 3, StudentT: 2}
 
-#: The row counts of the tests run inside :func:`rows_tested`, or ``None`` outside it.
-_ROWS: ContextVar[Counter[int] | None] = ContextVar("andrey_rows_tested", default=None)
+#: The tests run inside :func:`rows_tested`, or ``None`` outside it.
+_ROWS: ContextVar[RowCounts | None] = ContextVar("andrey_rows_tested", default=None)
 
 
 class RowCounts(Counter[int]):
-    """The tests of a fit by the rows each read, and the tests answered at zero degrees of freedom.
+    """The tests of a fit by the rows each read, and the tests that answered ``p = 1``.
 
-    ``zero_df`` is a one-item list, the running count of :func:`~andrey.core.ci.count_zero_df`. A
-    test counts when it is computed: a marginal answer that a categorical test kept and reads
-    again counts once.
+    Every query a :class:`TestwiseDeletion` answers is counted here, whichever test it runs and
+    whichever way it is asked, by :meth:`add`: its row count, and ``p_one`` when its p-value is
+    exactly ``1``. A test with no degrees of freedom left, as a table with one category, answers
+    so by design, with no evidence for or against independence, and so does a test whose
+    statistic is exactly zero.
     """
 
     def __init__(self) -> None:
         super().__init__()
-        self.zero_df = [0]
+        self.p_one = 0
+
+    def add(self, rows: Iterable[int], p: np.ndarray | float) -> None:
+        """Count the queries answered with the row counts ``rows`` and the p-values ``p``."""
+        self.update(np.asarray(rows).tolist())
+        self.p_one += int(np.count_nonzero(np.asarray(p) == 1.0))
 
 
 @contextlib.contextmanager
@@ -152,16 +158,14 @@ def rows_tested() -> Generator[RowCounts]:
     """Count the rows each test-wise deletion test reads inside the block.
 
     The counter maps a row count to the number of tests that read that many rows; it stays empty
-    when no test met a missing value. Its ``zero_df`` counts the tests of the block answered
-    ``p = 1`` for having zero degrees of freedom. :func:`rows_metadata` summarizes both.
+    when no test met a missing value. Its ``p_one`` counts the tests of the block answered
+    ``p = 1``. :func:`rows_metadata` summarizes both.
     """
     counter = RowCounts()
     token = _ROWS.set(counter)
-    zero_df = ZERO_DF_TESTS.set(counter.zero_df)
     try:
         yield counter
     finally:
-        ZERO_DF_TESTS.reset(zero_df)
         _ROWS.reset(token)
 
 
@@ -170,9 +174,9 @@ def rows_metadata(counter: Mapping[int, int]) -> dict[str, Any]:
 
     ``"rows_tested"`` is ``{"min": ..., "median": ...}``: ``min`` is the fewest rows a test read and
     ``median`` the median over the tests, the mean of the two middle counts when the number of
-    tests is even. ``"zero_df_tests"``, present when it is not zero, is the number of tests
-    answered ``p = 1`` for having zero degrees of freedom, which a :class:`RowCounts` holds: those
-    tests removed an edge, or a candidate, without evidence.
+    tests is even. ``"p_one_tests"``, present when it is not zero, is the number of tests answered
+    ``p = 1`` that a :class:`RowCounts` holds, whichever test it is: a test with no degrees of
+    freedom left answers so, and reads as independence without evidence.
     """
     if not counter:
         return {}
@@ -188,8 +192,8 @@ def rows_metadata(counter: Mapping[int, int]) -> dict[str, Any]:
     metadata: dict[str, Any] = {
         "rows_tested": {"min": counts[0][0], "median": (values[0] + values[1]) / 2}
     }
-    zero_df = getattr(counter, "zero_df", [0])[0]
-    return metadata | ({"zero_df_tests": zero_df} if zero_df else {})
+    p_one = getattr(counter, "p_one", 0)
+    return metadata | ({"p_one_tests": p_one} if p_one else {})
 
 
 class TestwiseDeletion:
@@ -288,7 +292,8 @@ class TestwiseDeletion:
 
         ``test`` is the test over the query's block, and ``a``, ``b``, and ``s`` the query's
         columns as indices of that block; the answer's last entry is the p-value. The query's row
-        count enters the running :func:`rows_tested` counter once it is answered. A copies error
+        count, and whether its p-value is ``1``, enter the running :func:`rows_tested` counter once
+        it is answered, the same for every test. A copies error
         names the data's columns, and another error of the test on its block, or a p-value that is
         not a number, raises ``ValueError`` saying how many rows the block holds.
         """
@@ -305,7 +310,7 @@ class TestwiseDeletion:
             raise self._failed(rows, " gives no p-value")
         counter = _ROWS.get()
         if counter is not None:
-            counter[rows] += 1
+            counter.add([rows], p)
         return out
 
     def _failed(self, rows: int, what: str) -> ValueError:
@@ -615,14 +620,14 @@ class GaussianDeletion(PartialCorrelationDeletion):
         start = 0
         for k in np.flatnonzero(flagged).tolist():
             if counter is not None:
-                counter.update(rows[start:k].tolist())
+                counter.add(rows[start:k], p[start:k])
             x, y, cond = query(k)
             r[k], p[k] = self._query(
                 lambda test, a, b, s: test.statistic_pvalue(a, b, s), x, y, cond
             )
             start = k + 1
         if counter is not None:
-            counter.update(rows[start:].tolist())
+            counter.add(rows[start:], p[start:])
 
     def _fast(
         self, lo: np.ndarray, hi: np.ndarray, conds: np.ndarray

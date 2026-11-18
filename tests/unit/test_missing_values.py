@@ -543,6 +543,9 @@ def test_every_other_method_refuses_missing_values_naming_itself(name):
             f"{name}: drop the units that hold a missing value from every dataset of data"
             in str(error.value)
         )
+    elif name == "jpcmciplus":  # datasets read with their contexts: no other method stands in
+        assert f"{name}: drop the datasets of data that hold a missing value" in str(error.value)
+        assert "use pcmci, pcmciplus, or lpcmci" not in str(error.value)
     elif REGISTRY[name].family == "temporal":  # one series: a step cannot be dropped
         assert f"{name}: use pcmci, pcmciplus, or lpcmci" in str(error.value)
         assert "keep every time step" in str(error.value)
@@ -745,25 +748,101 @@ def _one_category_where_observed() -> np.ndarray:
     return x
 
 
-@pytest.mark.parametrize("name", ["chisq", "gsq", "degen_gauss"])
-def test_the_counter_counts_the_tests_answered_at_zero_degrees_of_freedom(name):
-    x = _one_category_where_observed()
-    mask = np.ones(x.shape[1], dtype=bool) if name == "degen_gauss" else None
+def _starved_queries(name: str) -> tuple[np.ndarray, np.ndarray | None, list[tuple]]:
+    """Data, categorical mask, and queries for the test ``name`` where some block is starved.
+
+    Categorical and mixed tests get a column with one category on the rows that observe another
+    (zero degrees of freedom); the others get a column observed on 4 rows, so a test given one
+    conditioner reads ``|S| + 3`` rows, where the partial-correlation tests have no degrees of
+    freedom left.
+    """
+    if name in ci.DISCRETE_INDEP_TESTS or name in ci.MIXED_INDEP_TESTS:
+        x = _one_category_where_observed()
+        mask = None
+        if name in ci.MIXED_INDEP_TESTS:
+            mask = np.ones(x.shape[1], dtype=bool)
+    else:
+        x = np.random.default_rng(5).standard_normal((40, 4))
+        x[4:, 2] = np.nan
+        mask = None
+    d = x.shape[1]
+    pairs = [(i, j) for i in range(d) for j in range(i + 1, d)]
+    queries = [(i, j, []) for i, j in pairs]
+    queries += [(i, j, [k]) for i, j in pairs for k in range(d) if k not in (i, j)]
+    return x, mask, queries
+
+
+def _ask(test, query: tuple, path: str) -> float | None:
+    """The p-value of ``query`` through the wrapper's method ``path``; ``None`` when it raises."""
+    try:
+        return _ask_path(test, query, path)
+    except ValueError:
+        return None
+
+
+def _ask_path(test, query: tuple, path: str) -> float:
+    x, y, cond = query
+    if path == "call":
+        return float(test(x, y, cond))
+    if path == "batched_call":
+        return float(test.batched_call(x, y, [cond])[0])
+    xs, ys, conds = np.array([x]), np.array([y]), np.array([cond], dtype=np.intp).reshape(1, -1)
+    return float(test.statistic_pvalues(xs, ys, conds)[1][0])
+
+
+@pytest.mark.parametrize("name", ci.available_indep_tests())
+def test_every_registered_test_counts_the_queries_it_answers_with_p_one(name):
+    x, mask, queries = _starved_queries(name)
+    test = make_indep_test(name, x, categorical=mask)
+    paths = [
+        "call",
+        "statistic_pvalues",
+        *(["batched_call"] if hasattr(test, "batched_call") else []),
+    ]
+    for path in paths:
+        with rows_tested() as rows:
+            answers = [p for p in (_ask(test, q, path) for q in queries) if p is not None]
+        ones = sum(p == 1.0 for p in answers)
+        assert answers and sum(rows.values()) == len(answers), (name, path)
+        assert rows.p_one == ones, (name, path)
+        assert rows_metadata(rows).get("p_one_tests", 0) == ones, (name, path)
+
+
+@pytest.mark.parametrize("name", ["fisherz", "normal_scores", "chisq", "gsq", "degen_gauss"])
+def test_a_test_with_no_degrees_of_freedom_left_answers_p_one_and_is_counted(name):
+    x, mask, queries = _starved_queries(name)
+    test = make_indep_test(name, x, categorical=mask)
     with rows_tested() as rows:
-        test = make_indep_test(name, x, categorical=mask)
-        assert test(0, 1) == 1.0
-        assert test(1, 2) < 1.0  # a test with degrees of freedom is not counted
-    assert rows.zero_df == [1]
-    assert rows_metadata(rows) == {"rows_tested": {"min": 30, "median": 45.0}, "zero_df_tests": 1}
-    assert test(0, 2) <= 1.0 and rows.zero_df == [1]  # outside the block nothing counts
+        answers = [test(*q) for q in queries]
+    assert 1.0 in answers and rows.p_one >= 1
+    assert rows.p_one < len(queries)  # the tests with degrees of freedom are not counted
 
 
-def test_a_fit_records_its_tests_at_zero_degrees_of_freedom_only_when_it_has_some():
-    out = andrey.pc(_one_category_where_observed(), indep_test="chisq")
-    assert out.metadata["zero_df_tests"] >= 1
-    assert out.metadata["rows_tested"]["min"] == 30
-    assert (
-        "zero_df_tests" not in andrey.pc(_gaps(_categorical(), 0.05), indep_test="chisq").metadata
+def test_a_registered_test_is_counted_as_the_shipped_ones_are(monkeypatch):
+    answer = {"p": 1.0}
+    monkeypatch.setitem(ci._CI_REGISTRY, "constant", lambda data: lambda x, y, s=(): answer["p"])
+    data = _gaps(_continuous(60), 0.1)
+    test = make_indep_test("constant", data)
+    with rows_tested() as rows:
+        for pair in [(0, 1), (0, 2), (1, 2)]:
+            test(*pair, [3])
+        answer["p"] = 0.5
+        test(0, 4)
+    assert rows.p_one == 3 and sum(rows.values()) == 4
+
+
+def test_a_fit_records_the_tests_answered_p_one_only_when_it_has_some():
+    rng = np.random.default_rng(2)
+    x = rng.standard_normal(60)
+    data = np.column_stack(
+        [x, x + 0.3 * rng.standard_normal(60), x + 0.3 * rng.standard_normal(60)]
     )
-    assert "zero_df_tests" not in andrey.pc(_gaps(_continuous(400), 0.1)).metadata
-    assert "zero_df_tests" not in andrey.pc(_categorical(), indep_test="chisq").metadata
+    data[4:, 2] = np.nan  # the tests that read column 2 and a conditioner read 4 rows: no df left
+    assert andrey.pc(data, indep_test="fisherz").metadata["p_one_tests"] >= 1
+    assert "p_one_tests" not in andrey.pc(data, indep_test="student_t").metadata
+    out = andrey.pc(_one_category_where_observed(), indep_test="chisq")
+    assert out.metadata["p_one_tests"] >= 1
+    assert out.metadata["rows_tested"]["min"] == 30
+    assert "p_one_tests" not in andrey.pc(_gaps(_categorical(), 0.05), indep_test="chisq").metadata
+    assert "p_one_tests" not in andrey.pc(_gaps(_continuous(400), 0.1)).metadata
+    assert "p_one_tests" not in andrey.pc(_categorical(), indep_test="chisq").metadata

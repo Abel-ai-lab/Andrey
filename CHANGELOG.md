@@ -12,9 +12,9 @@ names its pull request.
 
 ### Added
 
-- `metadata["zero_df_tests"]` counts the tests of a fit on data with missing values that were
-  answered `p = 1` for having zero degrees of freedom, as the categorical tests and `degen_gauss`
-  do by design. ([#1102])
+- `metadata["p_one_tests"]` counts every test of a fit on data with missing values that returned
+  `p = 1`, whichever test it is; a test with zero degrees of freedom answers so by design.
+  ([#1102])
 - `metadata["em"]` records `rows_dropped`, the rows dropped for observing no value, and
   `min_shared_rows`, the fewest rows that observe both columns of a pair. A fit whose every missing
   value sat in a dropped row records its handling too. ([#1102])
@@ -24,10 +24,13 @@ names its pull request.
 - With `missing=None` on data with missing values, a method whose tests delete rows logs one notice
   per process that names the handling, test-wise deletion, and when it is valid. Pass
   `missing="testwise"` to choose it by name. `bootstrap` logs it once for all of its worker
-  processes. ([#1102])
+  processes. On the command line, `run.warnings` holds it, and any other warning-level log of the
+  fit, as a `LogWarning`; nothing goes to stderr. ([#1102])
 - A refusal of missing values leads with what you can do. A time series is pointed to `pcmci`,
   `pcmciplus`, and `lpcmci` in place of filling in the missing steps, and dropping rows is named as
-  your own step, with the same rows of every row-aligned argument. ([#1102])
+  your own step, with the same rows of every row-aligned argument. `jpcmciplus`, whose datasets
+  with their contexts no other method reads, is pointed to dropping the datasets that hold a missing
+  value. ([#1102])
 - The error of a test that cannot run on the rows where its variables are observed advises capping
   the conditioning sets with `max_depth` first, and says that dropping a column with many missing
   values can remove a common cause of the columns that stay. ([#1102])
