@@ -187,8 +187,12 @@ def _cma_es(
     """Minimize ``objective`` (rows of candidates -> values) by CMA-ES from ``start``.
 
     The (mu/mu_w, lambda) strategy with the default weights and learning rates of Hansen (2016),
-    the population :data:`POPULATION`, and the step size :data:`STEP_SIZE`. A candidate outside the
-    bounds is moved to the nearest point inside them, and the update reads the moved candidate.
+    the population :data:`POPULATION`, and the step size :data:`STEP_SIZE`. A candidate is the mean
+    plus the step size times the covariance's symmetric square root applied to a standard normal
+    draw: the root, unlike the eigenvectors it is built from, has no signs to choose, so a
+    covariance that differs in its last digits gives the same candidates up to rounding. A
+    candidate outside the bounds is moved to the nearest point inside them, and the update reads
+    the moved candidate.
     The learning rates stay at those defaults for the whole search; the paper's runs adapt them
     (Appendix B.1). It returns the best candidate of every generation and stops after
     :data:`GENERATIONS` generations, once the distribution's mean moved less than :data:`TOLERANCE`
@@ -214,7 +218,7 @@ def _cma_es(
     best, best_value = mean.copy(), float(objective(mean[None, :])[0])
     history = [mean]
     for generation in range(GENERATIONS):
-        steps = rng.standard_normal((POPULATION, dim)) @ (basis * scales).T
+        steps = rng.standard_normal((POPULATION, dim)) @ ((basis * scales) @ basis.T)
         candidates = np.clip(mean + sigma * steps, lower, upper)
         steps = (candidates - mean) / sigma
         values = objective(candidates)
@@ -271,7 +275,11 @@ def _heuristic(
     starts: list[np.ndarray],
     rng: np.random.Generator,
 ) -> tuple[np.ndarray, float]:
-    """The best CMA-ES estimate on ``rows`` over ``starts`` (the least-squares start first)."""
+    """The best CMA-ES estimate on ``rows`` over ``starts`` (the least-squares start first).
+
+    Each search draws from its own stream spawned from ``rng``, so the draws of a search do not
+    depend on how many generations the searches before it ran.
+    """
     location, scale, y = design.location[rows], design.scale[rows], effect[rows]
     k_alpha, m_kappa = design.penalties(log_penalties)
     lower, upper = _bounds(location.shape[1], scale.shape[1])
@@ -279,8 +287,10 @@ def _heuristic(
     def objective(theta: np.ndarray) -> np.ndarray:
         return _penalized_nll(theta, location, scale, y, k_alpha, m_kappa)
 
+    points = [_start(location, scale, y), *starts]
     found = [
-        _cma_es(objective, s, lower, upper, rng) for s in [_start(location, scale, y), *starts]
+        _cma_es(objective, point, lower, upper, stream)
+        for point, stream in zip(points, rng.spawn(len(points)), strict=True)
     ]
     return min(found, key=lambda f: f[1])
 
@@ -641,18 +651,34 @@ def _best_acyclic(
     return best
 
 
-def class_size(base: np.ndarray, components: list[tuple[list[int], list[np.ndarray]]]) -> int:
+def class_size(
+    base: np.ndarray,
+    components: list[tuple[list[int], list[np.ndarray]]],
+    limit: int | None = None,
+) -> int:
     """The number of DAGs that hold ``base`` and one orientation of each component.
 
     It is the product of the components' counts, except that components on a common cycle
-    (:func:`_coupled_groups`) contribute their acyclic combinations, counted one at a time.
+    (:func:`_coupled_groups`) contribute their acyclic combinations, counted one at a time: with
+    ``limit``, such a group with more than ``limit`` of them raises ``ValueError``. A count of 0
+    says the graph leaves no DAG.
     """
 
     def acyclic(members: list[list[np.ndarray]], k: int, graph: np.ndarray) -> int:
         if k == len(members):
             return 1
-        merged = (np.maximum(graph, member) for member in members[k])
-        return sum(acyclic(members, k + 1, g) for g in merged if not has_cycle(g))
+        count = 0
+        for member in members[k]:
+            merged = np.maximum(graph, member)
+            if not has_cycle(merged):
+                count += acyclic(members, k + 1, merged)
+                if limit is not None and count > limit:
+                    raise ValueError(
+                        f"skewd_mv: {len(members)} undirected components of PC's graph that "
+                        f"share a cycle have more than {limit} acyclic combinations to count; "
+                        "set max_fits to None to count them all"
+                    )
+        return count
 
     size = 1
     for group in _coupled_groups(base, components):

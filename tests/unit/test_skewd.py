@@ -199,6 +199,18 @@ def test_skewd_reads_the_same_table_in_any_units_up_to_rounding():
         np.testing.assert_allclose(scaled, base, rtol=0, atol=1e-13)
 
 
+def test_the_likelihood_criterion_points_from_the_larger_likelihood_of_the_same_fits():
+    data = _pair()
+    by_test = skewd(data, criterion="independence", **SHORT_PAIR)
+    by_likelihood = skewd(data, criterion="likelihood", **SHORT_PAIR)
+    fits = by_likelihood.metadata["log_likelihoods"]
+    assert fits == by_test.metadata["log_likelihoods"]
+    cause = 0 if fits["forward"] > fits["backward"] else 1
+    assert by_likelihood.structure.oriented_edges() == [(cause, 1 - cause, "directed")]
+    reverse = skewd(data[:, ::-1], criterion="likelihood", **SHORT_PAIR)
+    assert reverse.structure.oriented_edges() == [(1 - cause, cause, "directed")]
+
+
 def test_skewd_swapped_columns_swap_the_directions():
     data = pd.DataFrame(_pair(), columns=["x", "y"])
     first = skewd(data, criterion="likelihood", **SHORT_PAIR)
@@ -309,6 +321,8 @@ def test_components_whose_best_orientations_close_a_cycle_take_the_best_acyclic_
     ]
     dag = native.merge_components(base, components, [[3.0, 0.0], [3.0, 1.0]])
     assert native.class_size(base, components) == 3  # four combinations, one of them the cycle
+    with pytest.raises(ValueError, match="more than 2 acyclic combinations"):
+        native.class_size(base, components, 2)
     assert _acyclic(dag)
     assert dag[0, 1] == dag[3, 2] == dag[1, 2] == dag[3, 0] == 1  # the best acyclic total, 4
 
@@ -320,6 +334,22 @@ def test_a_graph_with_no_acyclic_orientation_raises_instead_of_returning_a_cycle
         native.merge_components(
             base, components, [[0.0] * len(members) for _, members in components]
         )
+
+
+def test_skewd_mv_refuses_a_graph_with_no_dag_before_fitting(monkeypatch):
+    # The graph above stands in for PC's: each component has one orientation and the two close a
+    # cycle, which the graph alone shows.
+    def forbidden(*args, **kwargs):
+        raise AssertionError("a conditional model was fitted")
+
+    listed = native.class_candidates(
+        _marks(4, lines=[(0, 1), (2, 3)], arrows=[(1, 2), (3, 0)]), None
+    )
+    monkeypatch.setattr(native, "class_candidates", lambda marks, max_fits: listed)
+    monkeypatch.setattr(native, "fit", forbidden)
+    data = np.random.default_rng(0).standard_normal((300, 4))
+    with pytest.raises(ValueError, match="no DAG that keeps its directed edges"):
+        skewd_mv(data, indep_test="fisherz")
 
 
 def test_a_cycle_among_many_independent_components_still_finds_the_acyclic_combination():
@@ -440,3 +470,28 @@ def test_a_search_started_near_an_optimum_moves_to_it():
     best, value = native._cma_es(objective, start, -free, free, np.random.default_rng(0))
     assert not np.array_equal(best, start)
     assert value < 0.01 * float(objective(start[None, :])[0])
+
+
+def test_a_search_draws_the_same_numbers_however_long_the_searches_before_it_ran(monkeypatch):
+    # A table in other units differs in its last digits, which can end one search a generation
+    # sooner; the next search's random numbers must not shift with that.
+    data = _pair_matrix("skewd", _pair(60), standardize=True)[0]
+    budget = native.Budget(knots=12, folds=8, tuning_iter=3, initial=2, max_iter=5)
+
+    def fit_with_searches_of(generations: int) -> tuple[list[float], native.Fit]:
+        draws: list[float] = []
+
+        def search(objective, start, lower, upper, rng):
+            draws.append(float(rng.standard_normal()))
+            rng.standard_normal((generations, 3))
+            point = np.clip(start, lower, upper)
+            return point, float(objective(point[None, :])[0])
+
+        monkeypatch.setattr(native, "_cma_es", search)
+        return draws, native.fit(data[:, :1], data[:, 1], budget, 0)
+
+    short, long = fit_with_searches_of(1), fit_with_searches_of(7)
+    assert len(short[0]) == 3 * 8 + 9  # 3 penalty settings on 8 folds, then 9 final starts
+    assert len(set(short[0])) == len(short[0])
+    assert long[0] == short[0]
+    assert long[1].log_likelihood == short[1].log_likelihood

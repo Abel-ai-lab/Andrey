@@ -4,7 +4,6 @@ location-scale models, better than the floors of ``andrey.metrics``."""
 from __future__ import annotations
 
 import numpy as np
-import pytest
 from scipy.stats import binomtest, skewnorm
 
 from andrey import skewd, skewd_mv
@@ -29,17 +28,23 @@ def _pair(seed: int) -> np.ndarray:
     return np.column_stack([x, y])
 
 
-@pytest.mark.parametrize("criterion", ["independence", "likelihood"])
-def test_skewd_names_the_direction_of_skew_normal_location_scale_pairs(criterion):
-    predicted = []
+def test_skewd_names_the_direction_of_skew_normal_location_scale_pairs():
+    # Both criteria read the same two fits of a pair, and the likelihood criterion's edge points
+    # from the larger of the reported log-likelihoods (tests/unit/test_skewd.py), so each pair is
+    # fitted once.
+    by_test, by_likelihood = [], []
     for seed in range(PAIRS):
-        edges = skewd(_pair(seed), criterion=criterion, seed=seed, **FIT).structure.oriented_edges()
-        predicted.append(1 if edges == [(0, 1, "directed")] else -1 if edges else 0)
-    right = sum(p == 1 for p in predicted)
-    interval = binomtest(right, PAIRS).proportion_ci(method="wilson")
-    assert direction_accuracy(predicted, np.ones(PAIRS)) == right / PAIRS
-    assert decision_rate(predicted) == 1.0  # with no alpha, every pair gets a direction
-    assert interval.low > 0.5, f"{right} of {PAIRS} pairs: {interval}"
+        out = skewd(_pair(seed), criterion="independence", seed=seed, **FIT)
+        edges = out.structure.oriented_edges()
+        by_test.append(1 if edges == [(0, 1, "directed")] else -1 if edges else 0)
+        fits = out.metadata["log_likelihoods"]
+        by_likelihood.append(1 if fits["forward"] > fits["backward"] else -1)
+    for predicted in (by_test, by_likelihood):
+        right = sum(p == 1 for p in predicted)
+        interval = binomtest(right, PAIRS).proportion_ci(method="wilson")
+        assert direction_accuracy(predicted, np.ones(PAIRS)) == right / PAIRS
+        assert decision_rate(predicted) == 1.0  # with no alpha, every pair gets a direction
+        assert interval.low > 0.5, f"{right} of {PAIRS} pairs: {interval}"
 
 
 def _tree(seed: int, n: int = 600) -> tuple[np.ndarray, np.ndarray]:
