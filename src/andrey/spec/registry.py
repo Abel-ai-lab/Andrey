@@ -19,6 +19,19 @@ from .concepts import CONCEPTS, UNRANKED_TESTS, concept_param
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
 
 # Shared inputs and parameters; a parameter that implements a concept comes from its template.
+#: The conditional families of cpcm and cpcm_graph.
+_CPCM_FAMILIES = (
+    "gaussian",
+    "gaussian_fixed_scale",
+    "exponential",
+    "pareto",
+    "poisson",
+    "gamma",
+    "gamma_fixed_shape",
+    "gumbel",
+    "gumbel_fixed_scale",
+    "negative_binomial",
+)
 _DATA_MATRIX = InputSpec(
     name="data",
     kind="matrix",
@@ -1940,6 +1953,63 @@ _add(
 )
 _add(
     MethodSpec(
+        name="cpcm_graph",
+        family="functional",
+        summary="Conditionally parametric causal models (CPCM) for small graphs: each variable "
+        "given its parents follows a chosen parametric family (Gaussian location-scale, "
+        "exponential, Pareto, Poisson, gamma, Gumbel, negative binomial); the DAG minimizing "
+        "minus the log p-value of a dHSIC test of the residuals' joint independence plus a "
+        "penalty per edge, by exact search up to 4 variables and RESIT order with greedy edge "
+        "removal above. Returns a DAG.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            doc="DAG of lowest score; metadata p_value is the joint independence p-value of its "
+            "residuals, score its score, search exact or greedy, families each column's family.",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            ParamSpec(
+                name="family",
+                type="str_or_list",
+                default="gaussian",
+                choices=_CPCM_FAMILIES,
+                doc="The family of each variable given its parents: one name for every column or a "
+                "list of one name per column. gaussian = mean and scale change with the parents; "
+                "gaussian_fixed_scale = the mean alone; exponential; pareto = scale 1, values of "
+                "at least 1; poisson; gamma = mean and shape; gamma_fixed_shape = the mean alone; "
+                "gumbel = location and scale; gumbel_fixed_scale = the location alone; "
+                "negative_binomial = the mean, one size for all rows. A column outside its "
+                "family's support raises ValueError.",
+            ),
+            ParamSpec(
+                name="edge_penalty",
+                type="float",
+                default=2.0,
+                minimum=0,
+                doc="Added to the score per edge. 2 is the paper's value; a larger penalty keeps "
+                "fewer edges.",
+            ),
+            concept_param(
+                "seed",
+                doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
+                "random one, so a fit repeats. Seed for the random draws of the count families, "
+                "poisson and negative_binomial; the other families draw nothing.",
+            ),
+        ),
+        references=(
+            "Bodik & Chavez-Demoulin 2025",
+            "Pfister et al. 2018",
+            "Peters, Mooij, Janzing & Scholkopf 2014",
+        ),
+    )
+)
+_add(
+    MethodSpec(
         name="skewd_mv",
         family="functional",
         summary="SkewD-MV for nonlinear effects with skew-normal location-scale noise on a few "
@@ -2840,6 +2910,77 @@ _add(
     )
 )
 
+_add(
+    MethodSpec(
+        name="cpcm",
+        family="pairwise",
+        summary="Conditionally parametric causal model (CPCM) pairwise direction test: the effect "
+        "given its cause follows a chosen parametric family (Gaussian location-scale, "
+        "exponential, Pareto, Poisson, gamma, Gumbel, negative binomial) whose parameters are "
+        "smooth functions of the cause; decides whether column 0 causes column 1, the reverse, "
+        "or neither, from a two-column table.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data",
+                    kind="matrix",
+                    doc="The two variables, one per column: column 0 is x, column 1 is y.",
+                ),
+            ),
+            layout="(n_samples, 2), rows are samples",
+        ),
+        params=(
+            ParamSpec(
+                name="alpha",
+                type="float",
+                default=None,
+                doc="How the two p-values decide the edge. null: the direction with the larger "
+                "p-value, or with the smaller HSIC statistic when the p-values are equal (the "
+                "forced estimate). A level such as 0.05: no edge when the two columns test "
+                "independent, else an edge only when exactly one direction's p-value is above it "
+                "(the conservative estimate).",
+                nullable=True,
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+                concept="alpha",
+            ),
+            ParamSpec(
+                name="family",
+                type="str_or_list",
+                default="gaussian",
+                choices=_CPCM_FAMILIES,
+                doc="The family of each variable given its parents: one name for every column or a "
+                "list of one name per column. gaussian = mean and scale change with the parents; "
+                "gaussian_fixed_scale = the mean alone; exponential; pareto = scale 1, values of "
+                "at least 1; poisson; gamma = mean and shape; gamma_fixed_shape = the mean alone; "
+                "gumbel = location and scale; gumbel_fixed_scale = the location alone; "
+                "negative_binomial = the mean, one size for all rows. A column outside its "
+                "family's support raises ValueError.",
+            ),
+            concept_param(
+                "seed",
+                doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
+                "random one, so a fit repeats. Seed for the random draws of the count families, "
+                "poisson and negative_binomial; the other families draw nothing.",
+            ),
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            doc="two-node graph with the decided edge, or none; metadata p_values and statistics "
+            "map forward (x->y) and backward (y->x) to the p-value and the HSIC statistic, divided "
+            "by its mean under independence, of each residual test; independence_p_value is the "
+            "p-value of the test that x and y are independent; families is each column's family.",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        references=("Bodik & Chavez-Demoulin 2025", "Gretton et al. 2008", "Pfister et al. 2018"),
+    )
+)
+
 _TUNING_ITER = ParamSpec(
     name="tuning_iter",
     type="int",
@@ -3505,6 +3646,8 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "lpcmci": ("links", "p_values", "statistics", "parents", "conflicts"),
     **dict.fromkeys(("anm", "pnl"), ("p_values", "statistics")),
     "loci": ("log_likelihoods", "p_values", "statistics"),
+    "cpcm": ("p_values", "statistics", "independence_p_value", "families"),
+    "cpcm_graph": ("p_value", "score", "search", "families"),
     "skewd": ("log_likelihoods", "p_values", "statistics"),
     "skewd_mv": ("candidates", "fits"),
     "gin": ("clusters", "cluster_order", "unordered"),

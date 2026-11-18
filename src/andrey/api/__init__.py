@@ -15,9 +15,9 @@ Wrappers share :mod:`andrey.api._adapt` for adjacency conversion, JSON-safe meta
 from .blanket import iamb, inter_iamb, mmpc
 from .constraint import cdnod, fci, fci_jci, gfci, icp, pc
 from .continuous import dagma, notears
-from .fcm import cam, camuv, das, nogam, resit, score_matching, skewd_mv
+from .fcm import cam, camuv, cpcm_graph, das, nogam, resit, score_matching, skewd_mv
 from .hybrid import mmhc, rsmax2
-from .irregular import anm, bottom_up_parce_lingam, loci, pnl, rcd, skewd
+from .irregular import anm, bottom_up_parce_lingam, cpcm, loci, pnl, rcd, skewd
 from .latent import gin
 from .lingam import direct_lingam, ica_lingam, multi_group_direct_lingam
 from .permutation import boss, boss_fci, grasp, grasp_fci, igsp, ut_igsp
@@ -73,6 +73,7 @@ __all__ = [
     "multi_group_direct_lingam",
     "cam",
     "resit",
+    "cpcm_graph",
     "skewd_mv",
     "score_matching",
     "nogam",
@@ -90,6 +91,7 @@ __all__ = [
     "anm",
     "pnl",
     "loci",
+    "cpcm",
     "skewd",
     # latent-variable family
     "gin",
