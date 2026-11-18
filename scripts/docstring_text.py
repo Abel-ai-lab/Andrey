@@ -252,13 +252,13 @@ SHARED = {
         lambda m: m in FCI_SEARCHES,
     ),
     # longitudinal_lingam reads units at each time point, not one series.
-    "fill_steps": Shared(
+    "keep_steps": Shared(
         "Notes",
         "**Missing values.**",
         "last",
-        "Fill in the missing steps first, as dropping one would join the steps around it, or use "
-        ":func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests "
-        "delete rows per test.",
+        "Use :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose "
+        "tests delete rows per test and keep every time step, as dropping a step would join the "
+        "steps around it.",
         lambda m: refuses_missing(m, series=True) and m != "longitudinal_lingam",
     ),
     "limits": Shared(

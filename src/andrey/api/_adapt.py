@@ -83,9 +83,9 @@ DROP_ROWS = (
     f"rows per test: {_listed(TESTWISE_METHODS)}, or for a time series "
     f"{_listed(TESTWISE_SERIES_METHODS)}"
 )
-FILL_STEPS = (
-    "fill in the missing steps first, as dropping one would join the steps around it, or use "
-    f"{_listed(TESTWISE_SERIES_METHODS)}, whose tests delete rows per test"
+KEEP_STEPS = (
+    f"use {_listed(TESTWISE_SERIES_METHODS)}, whose tests delete rows per test and keep every "
+    "time step, as dropping a step would join the steps around it"
 )
 DROP_UNITS = "drop the units that hold one from every dataset of {name}"
 
@@ -128,7 +128,7 @@ def data_matrix(
     model, and in the E-step it would count as a row and add the model's whole covariance to the
     expected covariance. Without ``missing``, a missing value raises,
     naming ``method`` when it is given, and ``fix``, the way on: :data:`DROP_ROWS` by default,
-    :data:`FILL_STEPS` for one time series, or :data:`DROP_UNITS` for a panel.
+    :data:`KEEP_STEPS` for one time series, or :data:`DROP_UNITS` for a panel.
 
     Checked data larger than ``method``'s measured boundary warn once per method
     (:func:`~andrey.api._boundary.warn_past_boundary`), before the fit. With ``method`` given,

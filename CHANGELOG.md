@@ -488,6 +488,12 @@ names its pull request.
 - The reference-parity check names a row by its network, effect, hidden nodes, node count, and
   number of series beside its size, so rows of one size that differ only there no longer share a
   key, and it fails two failing rows of one comparison that still do. ([#1070])
+- The docs of `fci` and the generated agent text no longer say that FCI with test-wise deletion
+  stays sound when values are missing for a reason: the cited result covers another procedure, and
+  the deletion is valid when values are missing completely at random. A time series method that
+  refuses missing values points to `pcmci`, `pcmciplus`, and `lpcmci` and no longer advises filling
+  in the missing steps, and the missing values guide names `normal_scores` among the tests that
+  need `|S| + 3` rows where their variables are observed. ([#1096])
 
 ## [0.17.1] - 2026-11-12
 

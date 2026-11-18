@@ -10,12 +10,15 @@ built over those rows of those columns, kept in data order, and asked the same q
 p-value is the one that test gives on that block exactly. Each test thus keeps every row its own
 variables allow, where deleting every row with a missing value would drop rows for all of them.
 
-Deleting rows per test is sound when the values are missing completely at random (MCAR): the rows a
-test keeps are a random sample of all rows, so each test keeps its level and a constraint-based
-search stays consistent [1]_ [2]_. When whether a value is missing depends on the variables, the
-rows a test keeps are a selected sample. PC's tests can then find dependence where the full
-population has none and keep extra edges [2]_; FCI, which allows for selection, stays sound when
-no missingness mechanism causally affects another [1]_.
+Deleting rows per test is valid when the values are missing completely at random (MCAR): the rows
+a test keeps are then a random sample of all rows, so each test keeps its level; with perfect
+tests FCI then returns the graph it returns on complete data [1]_, and [2]_ argue the same for PC.
+When whether a value is missing depends on the variables, the rows a test keeps are a selected
+sample, and each test selects its own. The tests can then find dependence where the full population
+has none, which keeps extra edges [2]_ and can turn orientations wrong; FCI with one test per query
+is then not sound in general [1]_. The procedure that [1]_ proves sound beyond MCAR confirms each
+independence on the rows complete in every column, and is not this one. :data:`TESTWISE_CLAIM`
+states the condition in one sentence.
 
 References
 ----------
@@ -72,6 +75,14 @@ __all__ = ["TestwiseDeletion"]
 #: deletes rows per test (:class:`TestwiseDeletion`), the default of every method that takes it.
 TESTWISE = "testwise"
 MISSING_HANDLING = (TESTWISE,)
+#: When test-wise deletion is valid, in the one sentence that the docstring of
+#: :func:`~andrey.fci`, the generated agent text, and the Missing values guide state.
+TESTWISE_CLAIM = (
+    "Test-wise deletion is valid when values are missing completely at random, which means that "
+    "whether a value is missing depends on no value in the data; the rows a test reads are then a "
+    "random sample of all rows, and otherwise they are a selected sample that more rows do not "
+    "correct."
+)
 #: Structural EM over the expected covariance (:mod:`andrey.search.em`), which the searches whose
 #: fit reads only a covariance and the row count take.
 EM = "em"
@@ -175,11 +186,12 @@ class TestwiseDeletion:
     test gets the :class:`GaussianDeletion` subclass, which builds no test per block.
 
     A query raises ``ValueError`` when its block has fewer rows than its test needs: 2, or
-    ``|S| + 3`` for ``"fisherz"`` and ``"student_t"``, the rows their degrees of freedom need; when
-    a continuous column is constant on the block, as a constant column of the data is rejected
-    before a fit; and when the test fails on the block or gives a p-value that is not a number, as
-    a mixed-data test can on a block with fewer rows than columns. A categorical column with one
-    category on the block is left to the test.
+    ``|S| + 3`` for a partial-correlation test (``"fisherz"``, ``"student_t"``, or
+    ``"normal_scores"``), the rows its degrees of freedom need; when a continuous column is constant
+    on the block, as a constant column of the data is rejected before a fit; and when the test fails
+    on the block or gives a p-value that is not a number, as a mixed-data test can on a block with
+    fewer rows than columns. A categorical column with one category on the block is left to the
+    test.
 
     Parameters
     ----------

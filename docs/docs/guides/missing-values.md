@@ -115,14 +115,14 @@ A time series keeps every step: each row of the lagged design that reads a missi
 Each test of PCMCI, PCMCI+, or LPCMCI reads the design rows where all of its lagged variables are
 observed.
 
-A test needs enough rows where its variables are observed: `|S| + 3` for `fisherz` and `student_t`,
-with `|S|` the size of its conditioning set, and 2 for the other tests. A test with fewer rows
-raises a `ValueError` that says so. The `total_conditioning` blanket learner, the default of
-`mmb_by_mmb`, conditions every test on all the other variables, so with a partial-correlation test
-(`fisherz`, `student_t`, or `normal_scores`) it needs `d + 2` rows with every variable observed and
-raises before the fit without them. Cap the conditioning sets with `max_depth` (`max_p_global` in
-LPCMCI and the same-step phases of PCMCI+), or drop a column with many missing values, which can
-remove a common cause of the columns that stay.
+A test needs enough rows where its variables are observed: `|S| + 3` for the partial-correlation
+tests (`fisherz`, `student_t`, and `normal_scores`), with `|S|` the size of its conditioning set,
+and 2 for the other tests. A test with fewer rows raises a `ValueError` that says so. The
+`total_conditioning` blanket learner, the default of `mmb_by_mmb`, conditions every test on all the
+other variables, so with a partial-correlation test it needs `d + 2` rows with every variable
+observed and raises before the fit without them. Cap the conditioning sets with `max_depth`
+(`max_p_global` in LPCMCI and the same-step phases of PCMCI+), or drop a column with many missing
+values, which can remove a common cause of the columns that stay.
 CD-NOD and FCI-JCI need a complete `env`.
 
 With `fisherz` and `student_t`, each test computes its correlations directly from its rows, for many
@@ -208,12 +208,12 @@ The [0.17.0 release card](../benchmarks/0.17.0.md#missing-data) has the numbers.
 
 ## Methods that refuse missing values
 
-Every other method raises a `ValueError` that names it: its score or loss reads every variable over
-the same rows, so it cannot delete rows per test. Drop the incomplete rows yourself, with
-`data.dropna()` for a DataFrame, which suits values missing completely at random, or use one of the
-methods above. A time series cannot lose a step without joining the steps around it, and a filled
-step is a guess the fit reads as data, so for VARMA-LiNGAM, Granger, DYNOTEARS, and J-PCMCI+, use
-PCMCI, PCMCI+, or LPCMCI instead, whose tests delete rows per test and keep every time step.
+Every other method raises a `ValueError` that names it: it has no handling of missing values, and
+each method's Notes say why. Drop the incomplete rows yourself, with `data.dropna()` for a
+DataFrame, which suits values missing completely at random, or use one of the methods above.
+A time series cannot lose a step without joining the steps around it, and a filled step is a guess
+the fit reads as data, so for VARMA-LiNGAM, Granger, DYNOTEARS, and J-PCMCI+, use PCMCI, PCMCI+, or
+LPCMCI instead, whose tests delete rows per test and keep every time step.
 
 ## Try it on data you control
 
