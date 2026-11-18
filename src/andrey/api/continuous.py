@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 from andrey.api._adapt import (
     column_labels,
     copies_named,
@@ -24,7 +26,6 @@ from andrey.core.ci_missing import EM
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
-    import numpy as np
     import numpy.typing as npt
 
     from andrey.core import GraphStructure, StructureOutput
@@ -225,7 +226,7 @@ def notears(
     completely at random or at random given observed values; when whether a value is missing depends
     on the missing values themselves, the expected covariance is biased, and the data cannot show
     it. On complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the
-    incomplete rows first, which suits values missing completely at random, or use
+    incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured in the setting of [1]_: simulated linear data with weights of
@@ -371,7 +372,7 @@ def notears(
         return found, found.dag
 
     with copies_named(labels), one_blas_thread():
-        result, em = fit_missing(X, missing, fit)
+        result, em = fit_missing(X, missing, fit, rows=np.shape(data)[0])
     return _output(result, labels, em)
 
 
@@ -565,7 +566,7 @@ def dagma(
     completely at random or at random given observed values; when whether a value is missing depends
     on the missing values themselves, the expected covariance is biased, and the data cannot show
     it. On complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the
-    incomplete rows first, which suits values missing completely at random, or use
+    incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured in the setting of [1]_: simulated linear data with weights of
@@ -673,5 +674,5 @@ def dagma(
         return found, found.dag
 
     with copies_named(labels), one_blas_thread():
-        result, em = fit_missing(X, missing, fit)
+        result, em = fit_missing(X, missing, fit, rows=np.shape(data)[0])
     return _output(result, labels, em)

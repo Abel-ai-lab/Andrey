@@ -10,12 +10,16 @@ built over those rows of those columns, kept in data order, and asked the same q
 p-value is the one that test gives on that block exactly. Each test thus keeps every row its own
 variables allow, where deleting every row with a missing value would drop rows for all of them.
 
-Deleting rows per test is sound when the values are missing completely at random (MCAR): the rows a
-test keeps are a random sample of all rows, so each test keeps its level and a constraint-based
-search stays consistent [1]_ [2]_. When whether a value is missing depends on the variables, the
-rows a test keeps are a selected sample. PC's tests can then find dependence where the full
-population has none and keep extra edges [2]_; FCI, which allows for selection, stays sound when
-no missingness mechanism causally affects another [1]_.
+Deleting rows per test is valid when the values are missing completely at random (MCAR): the rows
+a test keeps are then a random sample of all rows, so each test keeps its level; with perfect
+tests FCI then returns the graph it returns on complete data [1]_, and [2]_ argue the same for PC.
+When whether a value is
+missing depends on the variables, the rows a test keeps are a selected sample, and each test
+selects its own. The tests can then find dependence where the full population has none, which
+keeps extra edges [2]_ and can turn orientations wrong; FCI with one test per query is then not
+sound in general [1]_. The procedure that [1]_ proves sound beyond MCAR confirms each independence
+on the rows complete in every column, and is not this one. :data:`TESTWISE_CLAIM` is the sentence
+every method that deletes rows per test states.
 
 References
 ----------
@@ -45,6 +49,7 @@ from .ci import (
     BOUND_MARGIN,
     ONE_MINUS_EPS,
     SINGULAR_RTOL,
+    ZERO_DF_TESTS,
     CGTest,
     ChiSquare,
     CITest,
@@ -71,6 +76,14 @@ __all__ = ["TestwiseDeletion"]
 #: deletes rows per test (:class:`TestwiseDeletion`), the default of every method that takes it.
 TESTWISE = "testwise"
 MISSING_HANDLING = (TESTWISE,)
+#: When test-wise deletion is valid, in the one sentence that the docstring of every method that
+#: runs it, the ``missing`` concept, and the notice of a default handling share.
+TESTWISE_CLAIM = (
+    "Test-wise deletion is valid when values are missing completely at random, which means that "
+    "whether a value is missing depends on no value in the data; the rows a test reads are then a "
+    "random sample of all rows, and otherwise they are a selected sample that more rows do not "
+    "correct."
+)
 #: Structural EM over the expected covariance (:mod:`andrey.search.em`), which the searches whose
 #: fit reads only a covariance and the row count take.
 EM = "em"
@@ -116,26 +129,45 @@ _DF_OFFSET: dict[type, int] = {FisherZ: 3, StudentT: 2}
 _ROWS: ContextVar[Counter[int] | None] = ContextVar("andrey_rows_tested", default=None)
 
 
+class RowCounts(Counter[int]):
+    """The tests of a fit by the rows each read, and the tests answered at zero degrees of freedom.
+
+    ``zero_df`` is a one-item list, the running count of :func:`~andrey.core.ci.count_zero_df`. A
+    test counts when it is computed: a marginal answer that a categorical test kept and reads
+    again counts once.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.zero_df = [0]
+
+
 @contextlib.contextmanager
-def rows_tested() -> Generator[Counter[int]]:
+def rows_tested() -> Generator[RowCounts]:
     """Count the rows each test-wise deletion test reads inside the block.
 
     The counter maps a row count to the number of tests that read that many rows; it stays empty
-    when no test met a missing value. :func:`rows_metadata` summarizes it.
+    when no test met a missing value. Its ``zero_df`` counts the tests of the block answered
+    ``p = 1`` for having zero degrees of freedom. :func:`rows_metadata` summarizes both.
     """
-    counter: Counter[int] = Counter()
+    counter = RowCounts()
     token = _ROWS.set(counter)
+    zero_df = ZERO_DF_TESTS.set(counter.zero_df)
     try:
         yield counter
     finally:
+        ZERO_DF_TESTS.reset(zero_df)
         _ROWS.reset(token)
 
 
-def rows_metadata(counter: Mapping[int, int]) -> dict[str, dict[str, float]]:
-    """Return ``{"rows_tested": {"min": ..., "median": ...}}`` for ``counter``; ``{}`` when empty.
+def rows_metadata(counter: Mapping[int, int]) -> dict[str, Any]:
+    """Return the metadata of the tests ``counter`` holds; ``{}`` when it is empty.
 
-    ``min`` is the fewest rows a test read and ``median`` the median over the tests, the mean of
-    the two middle counts when the number of tests is even.
+    ``"rows_tested"`` is ``{"min": ..., "median": ...}``: ``min`` is the fewest rows a test read and
+    ``median`` the median over the tests, the mean of the two middle counts when the number of
+    tests is even. ``"zero_df_tests"``, present when it is not zero, is the number of tests
+    answered ``p = 1`` for having zero degrees of freedom, which a :class:`RowCounts` holds: those
+    tests removed an edge, or a candidate, without evidence.
     """
     if not counter:
         return {}
@@ -148,7 +180,11 @@ def rows_metadata(counter: Mapping[int, int]) -> dict[str, dict[str, float]]:
             values.append(rows)
             middle.pop(0)
         seen += n
-    return {"rows_tested": {"min": counts[0][0], "median": (values[0] + values[1]) / 2}}
+    metadata: dict[str, Any] = {
+        "rows_tested": {"min": counts[0][0], "median": (values[0] + values[1]) / 2}
+    }
+    zero_df = getattr(counter, "zero_df", [0])[0]
+    return metadata | ({"zero_df_tests": zero_df} if zero_df else {})
 
 
 class TestwiseDeletion:

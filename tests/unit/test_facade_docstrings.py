@@ -16,6 +16,7 @@ import pytest
 import andrey
 import scripts.docstring_text as shared
 from andrey.api._method import draws_random_numbers
+from andrey.core.ci_missing import TESTWISE_CLAIM
 from andrey.spec import REGISTRY
 from andrey.spec.concepts import CONCEPTS
 from tests.unit.test_concepts import docstring_section as section
@@ -50,6 +51,21 @@ def test_notes_say_how_missing_values_are_read_and_end_with_limitations(method):
     paragraphs = section(docstring(method), "Notes").strip().split("\n\n")
     assert any(p.startswith("**Missing values.**") for p in paragraphs)
     assert paragraphs[-1].startswith("**Limitations.**")
+
+
+@pytest.mark.parametrize("method", list(REGISTRY))
+def test_a_method_that_deletes_rows_per_test_states_when_that_is_valid_in_the_shared_sentence(
+    method,
+):
+    deletes = shared.deletes_testwise(method)
+    assert deletes is REGISTRY[method].data.missing
+    notes = " ".join(section(docstring(method), "Notes").split())
+    assert notes.count(TESTWISE_CLAIM) == int(deletes)
+    assert ("stays sound" in notes) is False
+
+
+def test_the_missing_concept_states_the_shared_sentence():
+    assert TESTWISE_CLAIM in CONCEPTS["missing"].summary
 
 
 @pytest.mark.parametrize("method", list(REGISTRY))

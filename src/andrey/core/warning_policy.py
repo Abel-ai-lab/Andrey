@@ -11,6 +11,7 @@ warns for every fit that drops a claim (:func:`warn_each`).
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import threading
@@ -24,6 +25,8 @@ _PACKAGE_DIR = os.path.dirname(os.path.dirname(__file__)) + os.sep
 _PACKAGE = __name__.partition(".")[0]
 
 _warned: set[tuple[type[Warning], str]] = set()
+#: The keys :func:`log_once` has logged in this process.
+_logged: set[str] = set()
 # Reentrant: a warning handler that warns again from the same thread must not deadlock.
 _lock = threading.RLock()
 
@@ -104,6 +107,20 @@ def warn_once(message: str, category: type[AndreyWarning], *, key: str | None = 
             return
         warnings.warn(message, category, stacklevel=_caller_stacklevel())
         _warned.add(seen)
+
+
+def log_once(logger: logging.Logger, key: str, message: str) -> None:
+    """Log ``message`` at warning level through ``logger`` the first time this process sees ``key``.
+
+    For a notice about a default the fit chose, which changes no result and needs no filter: it
+    goes through :mod:`logging`, so it reaches standard error unless the caller configures logging
+    otherwise.
+    """
+    with _lock:
+        if key in _logged:
+            return
+        _logged.add(key)
+    logger.warning(message)
 
 
 def warn_each(message: str, category: type[AndreyWarning]) -> None:

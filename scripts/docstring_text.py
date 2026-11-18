@@ -28,7 +28,7 @@ from typing import NamedTuple
 
 from andrey.api._adapt import MAX_CATEGORIES
 from andrey.api._boundary import CAP_STOPS, measured
-from andrey.core.ci_missing import EM_METHODS, EM_SUPPORTED
+from andrey.core.ci_missing import EM_METHODS, EM_SUPPORTED, TESTWISE, TESTWISE_CLAIM
 from andrey.spec import REGISTRY
 from andrey.spec.concepts import CONCEPTS
 
@@ -72,6 +72,13 @@ def can_pass_boundary(method: str) -> bool:
 def records_penalties(method: str) -> bool:
     """Whether a fit of ``method`` records the penalties its score used."""
     return any(key in REGISTRY[method].output.metadata for key in PENALTIES)
+
+
+def deletes_testwise(method: str) -> bool:
+    """Whether ``method``'s ``missing`` takes ``"testwise"``."""
+    return any(
+        p.concept == "missing" and TESTWISE in (p.choices or ()) for p in REGISTRY[method].params
+    )
 
 
 def refuses_missing(method: str, *, series: bool) -> bool:
@@ -210,12 +217,16 @@ SHARED = {
         'handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.',
         lambda m: m in EM_METHODS and m not in EM_SUPPORTED,
     ),
+    # One sentence for every method that deletes rows per test, the pair methods included.
+    "testwise_claim": Shared(
+        "Notes", "**Missing values.**", "last", TESTWISE_CLAIM, deletes_testwise
+    ),
     # icp, igsp, and ut_igsp end on "Drop the incomplete rows first."
     "drop_rows": Shared(
         "Notes",
         "**Missing values.**",
         "last",
-        "Drop the incomplete rows first, which suits values missing completely at random, or use "
+        "Drop the incomplete rows yourself, which suits values missing completely at random, or use "
         ":func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.",
         lambda m: (
             refuses_missing(m, series=False)
@@ -226,26 +237,26 @@ SHARED = {
         "Notes",
         "**Missing values.**",
         "last",
-        'Without ``"em"``, drop the incomplete rows first, which suits values missing completely at '
-        "random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.",
+        'Without ``"em"``, drop the incomplete rows yourself, which suits values missing completely '
+        "at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.",
         lambda m: m in EM_METHODS,
     ),
     "drop_rows_fci": Shared(
         "Notes",
         "**Missing values.**",
         "last",
-        "Drop the incomplete rows first, which suits values missing completely at random, or use "
+        "Drop the incomplete rows yourself, which suits values missing completely at random, or use "
         ":func:`~andrey.fci`, whose tests delete rows per test.",
         lambda m: m in FCI_SEARCHES,
     ),
     # longitudinal_lingam reads units at each time point, not one series.
-    "fill_steps": Shared(
+    "keep_steps": Shared(
         "Notes",
         "**Missing values.**",
         "last",
-        "Fill in the missing steps first, as dropping one would join the steps around it, or use "
-        ":func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests "
-        "delete rows per test.",
+        "Use :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose "
+        "tests delete rows per test and keep every time step, as dropping a step would join the "
+        "steps around it.",
         lambda m: refuses_missing(m, series=True) and m != "longitudinal_lingam",
     ),
     "limits": Shared(

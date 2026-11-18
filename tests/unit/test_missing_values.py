@@ -9,6 +9,7 @@ accept ``NaN``; every other method raises a ``ValueError`` that names it.
 from __future__ import annotations
 
 import json
+import logging
 import warnings
 
 import numpy as np
@@ -24,7 +25,7 @@ from andrey.core.ci import (
     make_indep_test,
     register_indep_test,
 )
-from andrey.core.ci_missing import EM_METHODS, rows_metadata, rows_tested
+from andrey.core.ci_missing import EM_METHODS, TESTWISE_CLAIM, rows_metadata, rows_tested
 from andrey.core.score import CopiedColumnsError
 from andrey.spec import REGISTRY
 from andrey.temporal.pcmci import design_test, lagged_design
@@ -348,7 +349,9 @@ def test_pandas_na_is_a_missing_value():
     frame = pd.DataFrame(x, columns=list("abcde")).astype("Float64")
     assert pd.isna(frame.iloc[:, 0]).any() and frame.iloc[:, 0].dtype == "Float64"
     assert andrey.pc(frame) == andrey.pc(pd.DataFrame(x, columns=list("abcde")))
-    with pytest.raises(ValueError, match="^ges does not accept missing values"):
+    with pytest.raises(
+        ValueError, match="^ges: pass missing=.*; ges does not accept missing values"
+    ):
         andrey.ges(frame)
 
 
@@ -486,21 +489,30 @@ def _refused_inputs(name: str) -> list:
 def test_every_other_method_refuses_missing_values_naming_itself(name):
     if name == "calm":
         pytest.importorskip("torch")  # without the extra, calm raises ImportError first
+    # The message leads with what the caller can do, then says what was refused and where.
     pattern = (
-        rf"^{name} does not accept missing values, and data\S* holds NaN .*row \d+, column \d+"
+        rf"^{name}: (drop|use|pass) .*; {name} does not accept missing values, "
+        r"and data\S* holds NaN .*row \d+, column \d+"
     )
     with pytest.raises(ValueError, match=pattern) as error:
         getattr(andrey, name)(*_refused_inputs(name))
     if name == "longitudinal_lingam":  # a panel: a unit's rows go together
-        assert "drop the units that hold one from every dataset of data" in str(error.value)
+        assert (
+            f"{name}: drop the units that hold a missing value from every dataset of data"
+            in str(error.value)
+        )
     elif REGISTRY[name].family == "temporal":  # one series: a step cannot be dropped
-        assert "fill in the missing steps first" in str(error.value)
-        assert "use pcmci, pcmciplus, or lpcmci" in str(error.value)
+        assert f"{name}: use pcmci, pcmciplus, or lpcmci" in str(error.value)
+        assert "keep every time step" in str(error.value)
+        assert "fill in" not in str(error.value)  # a filled step is a single imputation
     elif name in EM_METHODS:
-        assert 'pass missing="em"' in str(error.value)
-        assert "drop the rows that hold one" in str(error.value)
+        assert f'{name}: pass missing="em"' in str(error.value)
+        assert "drop the rows of data that hold a missing value yourself" in str(error.value)
     else:
-        assert "drop the rows that hold one" in str(error.value)
+        assert f"{name}: drop the rows of data that hold a missing value yourself" in str(
+            error.value
+        )
+        assert "the same rows of every argument that has one entry per row" in str(error.value)
         assert "pc, fci, cdnod, fci_jci, iamb, inter_iamb, or mmpc" in str(error.value)
         assert 'missing="em"' not in str(error.value)
 
@@ -509,7 +521,9 @@ def test_a_refused_text_category_names_the_method():
     frame = pd.DataFrame(_categorical(), columns=list("abcd"))
     frame["b"] = frame["b"].map({0.0: "low", 1.0: "mid", 2.0: "high"})
     frame.loc[3, "b"] = None
-    with pytest.raises(ValueError, match=r"^hc does not accept .* column 'b' has a missing value"):
+    with pytest.raises(
+        ValueError, match=r"^hc: drop .*; hc does not accept .* column 'b' has a missing value"
+    ):
         andrey.hc(frame, score_func="bdeu")
 
 
@@ -613,5 +627,75 @@ def test_a_series_method_refits_a_series_with_missing_steps(name):
 
 @pytest.mark.parametrize("name", ["varma_lingam", "granger"])
 def test_the_other_series_methods_refuse_missing_steps(name):
-    with pytest.raises(ValueError, match=rf"^{name} does not accept missing values"):
+    with pytest.raises(
+        ValueError, match=rf"^{name}: use pcmci, .*; {name} does not accept missing values"
+    ):
         getattr(andrey, name)(_gaps(_continuous(400), 0.05))
+
+
+def _notices(caplog) -> list[str]:
+    """The notices of a default handling logged so far."""
+    return [r.getMessage() for r in caplog.records if r.name == "andrey.api._method"]
+
+
+@pytest.mark.parametrize("name", SUPPORTED)
+def test_the_default_handling_logs_one_notice_naming_it_and_its_assumption(name, caplog):
+    x = _gaps(_continuous(400), 0.1)
+    with caplog.at_level(logging.WARNING, logger="andrey"):
+        _fit(name, _continuous(400))  # no missing value
+        _fit(name, x, missing="testwise")  # the handling chosen by name
+        assert not _notices(caplog)
+        _fit(name, x)
+        _fit(name, x)
+    (notice,) = _notices(caplog)
+    assert notice.startswith(f"andrey.{name}: ")
+    assert "test-wise deletion" in notice and TESTWISE_CLAIM in notice
+    assert 'missing="testwise"' in notice
+
+
+def test_the_notice_is_one_per_process_whatever_the_method(caplog):
+    x = _gaps(_continuous(400), 0.1)
+    with caplog.at_level(logging.WARNING, logger="andrey"):
+        andrey.pc(x)
+        andrey.fci(x)
+        andrey.anm(x[:, :2])
+    (notice,) = _notices(caplog)
+    assert notice.startswith("andrey.pc: ")
+
+
+def test_a_fit_by_em_logs_no_notice_of_a_default(caplog):
+    with caplog.at_level(logging.WARNING, logger="andrey"):
+        out = andrey.ges(_gaps(_continuous(400), 0.1), missing="em")
+    assert out.metadata["missing"] == "em" and not _notices(caplog)
+
+
+def _one_category_where_observed() -> np.ndarray:
+    """Categorical data whose column 1 holds one category on the rows that observe column 0."""
+    x = _categorical(60)
+    x[:30, 1] = 2.0
+    x[30:, 0] = np.nan
+    return x
+
+
+@pytest.mark.parametrize("name", ["chisq", "gsq", "degen_gauss"])
+def test_the_counter_counts_the_tests_answered_at_zero_degrees_of_freedom(name):
+    x = _one_category_where_observed()
+    mask = np.ones(x.shape[1], dtype=bool) if name == "degen_gauss" else None
+    with rows_tested() as rows:
+        test = make_indep_test(name, x, categorical=mask)
+        assert test(0, 1) == 1.0
+        assert test(1, 2) < 1.0  # a test with degrees of freedom is not counted
+    assert rows.zero_df == [1]
+    assert rows_metadata(rows) == {"rows_tested": {"min": 30, "median": 45.0}, "zero_df_tests": 1}
+    assert test(0, 2) <= 1.0 and rows.zero_df == [1]  # outside the block nothing counts
+
+
+def test_a_fit_records_its_tests_at_zero_degrees_of_freedom_only_when_it_has_some():
+    out = andrey.pc(_one_category_where_observed(), indep_test="chisq")
+    assert out.metadata["zero_df_tests"] >= 1
+    assert out.metadata["rows_tested"]["min"] == 30
+    assert (
+        "zero_df_tests" not in andrey.pc(_gaps(_categorical(), 0.05), indep_test="chisq").metadata
+    )
+    assert "zero_df_tests" not in andrey.pc(_gaps(_continuous(400), 0.1)).metadata
+    assert "zero_df_tests" not in andrey.pc(_categorical(), indep_test="chisq").metadata

@@ -81,6 +81,7 @@ from __future__ import annotations
 import importlib
 import math
 from collections.abc import Callable, Iterable, Sequence
+from contextvars import ContextVar
 from functools import lru_cache, partial
 from typing import Any, Protocol, Self, cast, runtime_checkable
 
@@ -113,6 +114,22 @@ SINGULAR_RTOL = 1e-12
 # How far the inverse bound in _invert_nonsingular stays above that threshold; the factor absorbs
 # the rounding of the computed inverse and of the eigenvalues.
 BOUND_MARGIN = 1e4
+
+
+#: Inside :func:`~andrey.core.ci_missing.rows_tested`, a one-item list that counts the tests
+#: answered ``p = 1`` for having zero degrees of freedom; ``None`` outside it.
+ZERO_DF_TESTS: ContextVar[list[int] | None] = ContextVar("andrey_zero_df_tests", default=None)
+
+
+def count_zero_df(tests: int = 1) -> None:
+    """Add ``tests`` to the running count of tests answered ``p = 1`` at zero degrees of freedom.
+
+    :class:`ChiSquare` and :class:`DGTest` answer so by design: with zero degrees of freedom the
+    data hold no evidence for or against independence, and the answer removes the edge.
+    """
+    counter = ZERO_DF_TESTS.get()
+    if counter is not None:
+        counter[0] += tests
 
 
 class SingularCorrelationError(ValueError):
@@ -832,7 +849,9 @@ class ChiSquare:
     support when the cell's expected count is below 10, and expanded about it through the fourth
     central moment above, which is within ``2e-3`` per cell. This is the semiparametric test of
     Tsamardinos and Borboudakis [4]_ with the mean worked out where they estimate it by shuffling.
-    With zero degrees of freedom the p-value is ``1``.
+    With zero degrees of freedom the p-value is ``1``: the rows hold no evidence for or against
+    independence, and the answer reads as independence. A fit on data with missing values
+    counts these tests in ``metadata["zero_df_tests"]``.
 
     **Limitations.** Referring the statistic to ``(r_x - 1) * (r_y - 1)`` degrees of freedom
     over-rejects a true independence once the table is sparse, G-square more than Pearson [5]_.
@@ -1097,6 +1116,7 @@ class ChiSquare:
         per_table = _null_means(n_sx, n_sy, n_s, self._g_square)
         dof = float(np.sum(per_table))
         if dof == 0.0:
+            count_zero_df()
             return statistic, 1.0
         return statistic, float(chdtrc(dof, max(statistic, 0.0)))
 
@@ -1329,6 +1349,7 @@ class ChiSquare:
         dof = _segment_sums(per_table, bounds)
         out = np.ones(len(dof))
         live = dof != 0
+        count_zero_df(len(dof) - int(np.count_nonzero(live)))
         out[live] = chdtrc(dof[live], np.maximum(statistic[live], 0.0))
         return out
 
@@ -1569,6 +1590,7 @@ class DGTest:
         wy = _whitener(block[px:, px:])
         dof = wx.shape[1] * wy.shape[1]
         if dof == 0:
+            count_zero_df()
             return 0.0, 1.0
         rho = np.linalg.svd(wx.T @ block[:px, px:] @ wy, compute_uv=False)
         rho = np.minimum(rho, ONE_MINUS_EPS)

@@ -267,9 +267,9 @@ def pool_environments(
             if not pd.isna(cells.iat[row, j]):
                 raise ValueError(f"{where} holds inf; drop or replace it before the fit")
             raise ValueError(
-                f"{where} holds NaN, and {method or 'this method'} does not accept missing "
-                "values; drop the rows that hold one (see Missing values in the getting-started "
-                "guide)"
+                "drop the rows that hold a missing value yourself, which suits values missing "
+                f"completely at random: {where} holds NaN, and {method or 'this method'} does not "
+                "accept missing values (see Missing values in the getting-started guide)"
             )
     if all(frames):
         repeated = [

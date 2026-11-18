@@ -258,8 +258,8 @@ def mmhc(
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: its hill-climbing phase scores
     every variable over the same rows, and score terms over different rows do not add up to the
-    score of one dataset. Drop the incomplete rows first, which suits values missing completely at
-    random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    score of one dataset. Drop the incomplete rows yourself, which suits values missing completely
+    at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear-Gaussian data with 20, 50, and 100 variables,
     1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05 and the BIC, on
@@ -530,8 +530,8 @@ def rsmax2(
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: its score phase scores every
     variable over the same rows, and score terms over different rows do not add up to the score of
-    one dataset. Drop the incomplete rows first, which suits values missing completely at random, or
-    use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    one dataset. Drop the incomplete rows yourself, which suits values missing completely at random,
+    or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear-Gaussian data with 20, 50, and 100 variables,
     1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05 and the BIC, on
