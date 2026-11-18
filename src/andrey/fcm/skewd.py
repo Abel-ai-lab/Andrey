@@ -70,6 +70,10 @@ GENERATIONS = 5000
 #: ``WINDOW`` iterations (Appendix B.1, Section 4).
 WINDOW = 25
 TOLERANCE = 1e-6
+#: The most DAGs one undirected component may list while ``max_fits`` caps the conditional models: a
+#: sparse component with conflicting colliders has about ``2^edges`` acyclic orientations for a few
+#: models per edge, so the cap on models alone does not stop its listing.
+LISTED_DAGS = 2**16
 #: The expected-improvement margin and the random candidates the acquisition is maximized over.
 EI_MARGIN = 0.01
 EI_CANDIDATES = 10_000
@@ -500,8 +504,9 @@ def class_candidates(
     DAG of a class with no undirected edge. A conditional model is a node of a component with at
     least one parent, fitted given a parent set. The DAGs of a component are listed one at a time,
     and the listing stops with a ``ValueError`` as soon as the components together need more than
-    ``max_fits`` conditional models (``None`` sets no cap), so a class too large to score is never
-    listed in full. A directed cycle among the directed edges also raises ``ValueError``.
+    ``max_fits`` conditional models or one component lists more than :data:`LISTED_DAGS` DAGs
+    (``None`` sets neither cap), so a class too large to score is never listed in full. A directed
+    cycle among the directed edges also raises ``ValueError``.
     """
     d = marks.shape[0]
     adjacent = (marks != 0) & (marks.T != 0)
@@ -534,6 +539,12 @@ def class_candidates(
         for collider_check in (True, False):
             members: list[np.ndarray] = []
             for dag in class_members(part, collider_check=collider_check):
+                if max_fits is not None and len(members) == LISTED_DAGS:
+                    raise ValueError(
+                        f"skewd_mv: one undirected component of PC's graph ({len(group)} "
+                        f"variables) has more than {LISTED_DAGS} orientations to score; set "
+                        "max_fits to None to list them all"
+                    )
                 members.append(dag)
                 for y in group:
                     parents = tuple(np.flatnonzero(dag[:, y]).tolist())
@@ -621,6 +632,26 @@ def _best_acyclic(
 
     search(0, base, 0.0)
     return best
+
+
+def class_size(base: np.ndarray, components: list[tuple[list[int], list[np.ndarray]]]) -> int:
+    """The number of DAGs that hold ``base`` and one orientation of each component.
+
+    It is the product of the components' counts, except that components on a common cycle
+    (:func:`_coupled_groups`) contribute their acyclic combinations, counted one at a time.
+    """
+
+    def acyclic(members: list[list[np.ndarray]], k: int, graph: np.ndarray) -> int:
+        if k == len(members):
+            return 1
+        merged = (np.maximum(graph, member) for member in members[k])
+        return sum(acyclic(members, k + 1, g) for g in merged if not has_cycle(g))
+
+    size = 1
+    for group in _coupled_groups(base, components):
+        members = [components[k][1] for k in group]
+        size *= len(members[0]) if len(group) == 1 else acyclic(members, 0, base)
+    return size
 
 
 def merge_components(

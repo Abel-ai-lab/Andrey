@@ -61,3 +61,4 @@ def test_skewd_mv_beats_the_empty_graph_on_a_skew_normal_tree():
     assert out.metadata["indep_test"] == "kci"  # PC's test is the default's, not the picked one
     dag = out.structure
     assert shd(dag, truth) < shd(np.zeros((4, 4), dtype=np.int8), truth)
+    assert shd(dag, truth) == 0  # the likelihood picks the true DAG among the tree's four

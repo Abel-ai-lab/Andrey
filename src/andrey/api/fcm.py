@@ -1481,6 +1481,8 @@ def skewd_mv(
         The most conditional models, at least 1, the class's DAGs may need before the call refuses
         to list more of them (``ValueError``); 100 is the order up to which the paper expects the
         method to apply [1]_. ``None`` sets no cap, and the call can then run for days.
+        While it is set, a group of undirected edges with more than 65,536 orientations is
+        refused too.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed of PC's randomized tests and of the random
@@ -1528,22 +1530,22 @@ def skewd_mv(
     orient the undirected edges with no directed cycle and no new collider [1]_, and are every
     combination of one orientation of each connected group of undirected edges, so each group is
     listed on its own, one DAG at a time, and the listing stops with an error once the groups need
-    more than ``max_fits`` conditional models, so a class too large to score is never listed in
-    full. When a group has no such orientation, as conflicting colliders can leave, its candidates
-    are every acyclic orientation of its edges. Each variable with an undirected edge is fitted
-    given its parents in each orientation, once per distinct parent set: the standard Gaussian
-    log-likelihood for a variable without parents, and otherwise :func:`~andrey.skewd`'s
-    skew-normal fit with additive B-splines of the parents, 10 location and 7 scale columns per
-    parent and a penalty pair per parent chosen by a 5-fold cross-validation [1]_. Only these
-    variables' terms differ between the DAGs, so their sum decides (Proposition 5.1 of [1]_), and
-    each group contributes its own terms: the returned DAG holds the orientation of each group with
-    the largest sum, the first on a tie, which is the DAG of the class with the largest sum. Where
-    a conflicting graph lets the groups' best orientations close a directed cycle across its
-    directed edges, the search takes the acyclic combination with the largest sum, and a graph
-    with none raises an error. The defaults, 20 candidates of the Bayesian optimization and 3,000
-    iterations, are those of the paper's runs. The columns are fitted in the order of their
-    values' ranks, so the DAG does not depend on the column order; ties follow
-    ``andrey.config.tie_break``.
+    more than ``max_fits`` conditional models or one group has more than 65,536 orientations, so a
+    class too large to score is never listed in full. When a group has no such orientation, as
+    conflicting colliders can leave, its candidates are every acyclic orientation of its edges.
+    Each variable with an undirected edge is fitted given its parents in each orientation, once
+    per distinct parent set: the standard Gaussian log-likelihood for a variable without
+    parents, and otherwise :func:`~andrey.skewd`'s skew-normal fit with additive B-splines of
+    the parents, 10 location and 7 scale columns per parent and a penalty pair per parent chosen
+    by a 5-fold cross-validation [1]_. Only these variables' terms differ between the DAGs, so
+    their sum decides (Proposition 5.1 of [1]_), and each group contributes its own terms: the
+    returned DAG holds the orientation of each group with the largest sum, the first on a tie,
+    which is the DAG of the class with the largest sum. Where a conflicting graph lets the
+    groups' best orientations close a directed cycle across its directed edges, the search takes
+    the acyclic combination with the largest sum, and a graph with none raises an error. The
+    defaults, 20 candidates of the Bayesian optimization and 3,000 iterations, are those of the
+    paper's runs. The columns are fitted in the order of their values' ranks, so the DAG does
+    not depend on the column order; ties follow ``andrey.config.tie_break``.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows
@@ -1584,7 +1586,7 @@ def skewd_mv(
     from andrey.api.constraint import pc
     from andrey.core.ties import tie_ranks
     from andrey.core.warning_policy import warn_search_limit
-    from andrey.fcm.skewd import Budget, class_candidates, fit, merge_components
+    from andrey.fcm.skewd import Budget, class_candidates, class_size, fit, merge_components
 
     X = data_matrix(data, method="skewd_mv", min_rows=MIN_ROWS)
     labels = column_labels(data)
@@ -1618,11 +1620,10 @@ def skewd_mv(
     # A DAG's likelihood is the sum over its variables, and only the variables of an undirected
     # component change with that component's orientation, so the best DAG holds each component's
     # best orientation (the first, on a tie).
-    candidates = 1
-    tables = []
-    for nodes, members in components:
-        tables.append([sum(term(member, y) for y in nodes) for member in members])
-        candidates *= len(members)
+    tables = [
+        [sum(term(member, y) for y in nodes) for member in members] for nodes, members in components
+    ]
+    candidates = class_size(best, components)
     best = merge_components(best, components, tables)
     back = np.argsort(order)
     return structure_output(

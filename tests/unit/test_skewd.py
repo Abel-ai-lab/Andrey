@@ -115,6 +115,17 @@ def test_the_directed_edges_stay_in_every_component_dag():
     assert all(m[2, 0] == m[2, 3] == 1 for _, members in components for m in members)
 
 
+def test_a_component_with_too_many_orientations_stops_the_listing(monkeypatch):
+    # A chordless four-cycle has no orientation without a new collider, so its candidates are its
+    # 14 acyclic orientations: few conditional models, and a count that doubles with each edge.
+    marks = _marks(4, lines=[(0, 1), (1, 2), (2, 3), (3, 0)])
+    monkeypatch.setattr(native, "LISTED_DAGS", 10)
+    with pytest.raises(ValueError, match="more than 10 orientations"):
+        native.class_candidates(marks, 100)
+    components, _, _ = native.class_candidates(marks, None)
+    assert len(components[0][1]) == 14
+
+
 def _single_factor(d: int, n: int) -> np.ndarray:
     """Columns that are all dependent given any others, so PC keeps every edge undirected."""
     rng = np.random.default_rng(0)
@@ -205,6 +216,26 @@ def test_skewd_mv_reads_no_units_ignores_column_order_and_repeats():
     assert sorted(reordered.structure.oriented_edges()) == sorted(first.structure.oriented_edges())
 
 
+@pytest.mark.parametrize("root", [0, 1, 2])
+def test_skewd_mv_returns_the_most_likely_dag_of_the_class(monkeypatch, root):
+    # The chain's class holds one DAG per root. Each conditional model is given a likelihood that
+    # makes the DAG rooted at ``root`` the most likely one, and that DAG must come back.
+    data = _chain()
+    edges = {0: [(0, 1), (1, 2)], 1: [(1, 0), (1, 2)], 2: [(2, 1), (1, 0)]}
+
+    def column(values: np.ndarray) -> int:
+        return int(np.argmax([abs(np.corrcoef(values, data[:, j])[0, 1]) for j in range(3)]))
+
+    def fit(parents, effect, budget, seed):
+        edge = (column(parents[:, 0]), column(effect))
+        return native.Fit(0.0 if edge in edges[root] else -1.0, effect, True)
+
+    monkeypatch.setattr(native, "fit", fit)
+    out = skewd_mv(data, **SHORT_GRAPH)
+    assert out.metadata["candidates"] == 3
+    assert sorted(edge[:2] for edge in out.structure.oriented_edges()) == sorted(edges[root])
+
+
 def test_skewd_needs_a_complete_row_for_each_cross_validation_fold():
     with pytest.raises(ValueError, match="at least 8 rows"):
         skewd(_pair(7), **SHORT_PAIR)
@@ -266,6 +297,7 @@ def test_components_whose_best_orientations_close_a_cycle_take_the_best_acyclic_
         ([2, 3], [_orient(base, (2, 3)), _orient(base, (3, 2))]),
     ]
     dag = native.merge_components(base, components, [[3.0, 0.0], [3.0, 1.0]])
+    assert native.class_size(base, components) == 3  # four combinations, one of them the cycle
     assert _acyclic(dag)
     assert dag[0, 1] == dag[3, 2] == dag[1, 2] == dag[3, 0] == 1  # the best acyclic total, 4
 
@@ -345,6 +377,7 @@ def test_the_joint_search_matches_exhaustive_search_on_random_conflicting_graphs
                 native.merge_components(base, components, scores)
             continue
         merged = native.merge_components(base, components, scores)
+        assert native.class_size(base, components) == len(totals)
         assert _acyclic(merged)
         assert totals[merged.tobytes()] == pytest.approx(max(totals.values()))
     assert conflicts > 20  # the draw reaches the cycle case often
