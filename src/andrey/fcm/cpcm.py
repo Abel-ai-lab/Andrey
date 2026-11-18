@@ -62,8 +62,9 @@ _MAX_NEWTON = 100
 #: location-scale families in the paper's software; without a bound the likelihood has no maximum,
 #: since it grows without limit as the scale shrinks at a row the location fits exactly.
 LOG_SCALE_FLOOR = {"gaussian": math.log(0.01), "gumbel": -7.0, "gamma": -7.0}
-#: Rows on which such a log scale ends this far below its floor, with the likelihood still falling
-#: toward it, are held at the floor itself: their scale is then the floor's to within ``exp(-12)``
+#: Rows that share one design row of such a log scale, such as the rows of one parent value, and on
+#: which it ends this far below its floor, with their likelihood still falling toward it, are held
+#: at the floor itself: their scale is then the floor's to within ``exp(-12)``
 #: of it, about 6e-6. The likelihood of a row that the location fits exactly falls toward the floor
 #: without reaching it, so the scale's coefficient has no finite optimum, and Newton's steps, which
 #: shrink with the vanishing slope, stall 20 to 35 below the floor, past this point.
@@ -609,8 +610,12 @@ class _Model:
         family: Family,
         start: np.ndarray,
         held: np.ndarray | None = None,
+        shared: np.ndarray | None = None,
     ) -> None:
         self.y, self.designs, self.offsets, self.start = y, designs, offsets, start
+        if shared is None and family.floor is not None:
+            shared = np.unique(designs[1], axis=0, return_inverse=True)[1].ravel()
+        self.shared = shared
         self.penalties, self.family = penalties, family
         self.upper = np.full(offsets[-1], math.inf)
         if family.upper is not None:
@@ -640,8 +645,8 @@ class _Model:
         whose rows are all held, or one of them when the reference value's rows are, stays at its
         start, outside the fit and its Laplace determinant.
         """
-        designs = list(self.designs)
-        return _Model(self.y, designs, self.offsets, self.penalties, self.family, self.start, rows)
+        args = self.y, list(self.designs), self.offsets, self.penalties, self.family, self.start
+        return _Model(*args, rows, self.shared)
 
     def etas(self, beta: np.ndarray) -> list[np.ndarray]:
         o = self.offsets
@@ -651,13 +656,21 @@ class _Model:
         return etas
 
     def at_floor(self, beta: np.ndarray) -> np.ndarray:
-        """The rows whose floored log scale ends :data:`_AT_FLOOR` below the floor while the
-        likelihood still falls toward it, and the rows already held there."""
-        assert self.family.floor is not None
+        """The rows held at the floor: those held already, and each set of rows with one design
+        row of the floored log scale, such as the rows of one parent value, whose predictor ends
+        :data:`_AT_FLOOR` below the floor while their summed likelihood still falls toward it.
+
+        The rows of a set share their scale, so they are held together: one held alone would leave
+        the others to pull the shared coefficient below the floor on their own."""
+        assert self.family.floor is not None and self.shared is not None
         etas = self.etas(beta)
         with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
             _, g, _ = self.family.derivs(self.y, etas)
-        return self.held | ((etas[1] < self.family.floor - _AT_FLOOR) & (g[1] > 0))
+        above = (etas[1] >= self.family.floor - _AT_FLOOR).astype(np.float64)
+        slope = np.where(np.isfinite(g[1]), g[1], 0.0)
+        low = np.bincount(self.shared, weights=above)[self.shared] == 0
+        falling = np.bincount(self.shared, weights=slope)[self.shared] > 0
+        return self.held | (low & falling)
 
     def penalty(self, rho: np.ndarray) -> np.ndarray:
         S = np.zeros((self.offsets[-1], self.offsets[-1]))

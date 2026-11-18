@@ -318,6 +318,40 @@ def test_a_scale_that_falls_to_its_floor_is_held_there_in_any_units(name, seed, 
         _assert_same_in_units(first, moved, factor)
 
 
+def _small_value_table(seed: int, rows: int, gap: float) -> np.ndarray:
+    """A cause with values 0 to 3, value 3 cut to ``rows`` rows whose effects lie ``gap`` apart in
+    standard deviations of the effect."""
+    rng = np.random.default_rng(seed)
+    x = rng.integers(0, 4, size=80).astype(float)
+    y = np.sin(x) + (0.5 + 0.2 * x) * rng.normal(size=80)
+    level = np.flatnonzero(x == 3.0)
+    x[level[rows:]] = rng.integers(0, 3, size=level.size - rows)
+    y[level[:rows]] = y[level[0]] + gap * np.std(y) * np.arange(rows)
+    return np.column_stack([x, y])
+
+
+@pytest.mark.parametrize(
+    ("seed", "gap"), [(0, 1.0), (0, 1.05), (0, 1.1), (1, 0.99), (1, 1 + 1e-6), (1, 1.01)]
+)
+def test_a_gumbel_value_seen_twice_with_nearly_equal_effects_fits(seed, gap):
+    # The two rows share the value's scale; with the gap near twice the floor, one of them alone
+    # would push that scale below the floor while the other pulls it up.
+    table = _small_value_table(seed, 2, gap * 2.0 * math.exp(LOG_SCALE_FLOOR["gumbel"]))
+    assert cpcm(table, family="gumbel").structure.oriented_edges() == [(0, 1, "directed")]
+
+
+@pytest.mark.parametrize("name", ["gaussian", "gumbel", "gamma"])
+@pytest.mark.parametrize("rows", [1, 2, 3])
+def test_the_rows_of_a_value_are_held_at_the_floor_together(name, rows):
+    family = FAMILIES[name]
+    for gap in 2.0 * math.exp(family.floor) * np.array([0.0, 0.5, 0.9, 1.0, 1.1, 2.0]):
+        x, y = _small_value_table(0, rows, gap).T
+        if name == "gamma":
+            y = np.exp(y)
+        log_scale = fit(family.rescale(y), [_term(x)], family)[1]
+        assert np.unique(np.isneginf(log_scale[x == 3.0])).size == 1
+
+
 def _rare_value_table(seed: int) -> np.ndarray:
     """A count parent whose largest value is seen once, a smooth parent, and their effect."""
     rng = np.random.default_rng(seed)
