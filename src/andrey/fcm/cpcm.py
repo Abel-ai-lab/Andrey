@@ -850,8 +850,8 @@ def search(
 
     Up to :data:`EXACT_MAX` variables every DAG is scored and the first lowest score wins (fewest
     edges first); here, in RESIT's choice, and in the edge removal a value beats another only by
-    more than :data:`~andrey.core.ties.EPS_IMPROVE`, far above the score's rounding error (about
-    ``1e-11`` in other units) and below any real difference, so the first of two tied values wins
+    more than :data:`~andrey.core.ties.EPS_IMPROVE`, above every change of the score under other
+    units that was measured and below any real difference, so the first of two tied values wins
     in any units. Above, Algorithm 2: RESIT's order from the sink up, each sink the variable whose
     residual on the others is most independent of them, then the complete DAG of the order loses,
     one at a time, the edge whose removal lowers the score most, while one does. The causal order

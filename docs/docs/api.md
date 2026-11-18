@@ -878,6 +878,7 @@ dHSIC test finds most jointly independent, with a penalty of 2 per edge, by exac
 variables and RESIT's order with greedy edge removal above. A column outside its family's support,
 such as a non-integer under `"poisson"`, raises `ValueError`. Both are experimental until their
 comparison with the authors' code is published.
+
 SkewD (Klippert and Marx 2026), {py:func}`~andrey.skewd`, decides the direction of a variable pair
 whose noise is skewed, in the location-scale model of LOCI with a skew-normal noise. It fits the
 model in each direction, the location and the log scale smooth functions of the proposed cause and
