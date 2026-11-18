@@ -10,12 +10,13 @@ from typing import TYPE_CHECKING, Any, TypeVar
 import numpy as np
 
 from andrey.api._boundary import warn_past_boundary
-from andrey.core import ARROW, NULL, TAIL, GraphStructure, Structure, StructureOutput
+from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, Structure, StructureOutput
 from andrey.core.ci import (
     DISCRETE_INDEP_TESTS,
     MIXED_INDEP_TESTS,
     RANK_INDEP_TESTS,
     SingularCorrelationError,
+    is_partial_correlation_test,
 )
 from andrey.core.ci_missing import EM, EM_METHODS, EM_SUPPORTED
 from andrey.core.knowledge import as_node, column_position, resolve
@@ -30,12 +31,14 @@ from andrey.core.score import (
 )
 from andrey.core.structure import EDGE_TYPES, column_labels, relabel
 from andrey.core.warning_policy import DataTypeWarning, warn_once
+from andrey.data.graphs import csr_from_endpoints
 
 if TYPE_CHECKING:
     import numpy.typing as npt
 
     from andrey.core.knowledge import Constraints, Knowledge
     from andrey.core.output import JSONValue
+    from andrey.core.structure import Kind
 
 
 #: The methods that accept missing values, by deleting rows per test, named by the refusal of
@@ -519,6 +522,37 @@ def fit_inputs(
     return X, mask, labels, resolve(knowledge, X.shape[1], labels, method=method)
 
 
+def check_total_conditioning_rows(
+    X: np.ndarray, blanket: str, indep_test: str, *, method: str, max_depth: int | None = None
+) -> None:
+    """Raise ``ValueError`` when total conditioning with a partial-correlation test lacks rows.
+
+    Each test of the ``"total_conditioning"`` learner conditions on the other ``d - 2`` variables,
+    so it reads the rows where every variable is observed. Fisher-Z has a positive degree of
+    freedom from ``|S| + 4`` rows, ``d + 2``, and Student-t from one row fewer; the bound
+    ``d + 2`` serves every shipped partial-correlation test. With ``max_depth`` below ``d - 2``, or
+    fewer than two columns, no test runs, so no rows are needed. Any other ``blanket`` or
+    ``indep_test`` returns without a check: another test has its own requirement.
+    """
+    d = X.shape[1]
+    if (
+        blanket != "total_conditioning"
+        or d < 2
+        or not is_partial_correlation_test(indep_test)
+        or (max_depth is not None and d - 2 > max_depth)
+    ):
+        return
+    rows = int((~np.isnan(X).any(axis=1)).sum())
+    if rows < d + 2:
+        observed = "" if rows == X.shape[0] else f" ({X.shape[0]} rows in all)"
+        raise ValueError(
+            f"{method}: blanket='total_conditioning' conditions every test on all the other "
+            f"variables, so with indep_test={indep_test!r} it needs at least d + 2 = {d + 2} rows "
+            f"with every variable observed, got {rows}{observed}; pass another blanket learner, "
+            "such as blanket='iamb'"
+        )
+
+
 def env_index(
     data: Any, env: npt.ArrayLike | None, *, method: str
 ) -> tuple[Any, np.ndarray | None]:
@@ -995,6 +1029,39 @@ def flag(value: object, name: str) -> bool:
     if not isinstance(value, (bool, np.bool_)):
         raise TypeError(f"{name} must be True or False, got {type(value).__name__}")
     return bool(value)
+
+
+def edge_structure(
+    d: int, edges: Iterable[tuple[int, int, int, int]], *, kind: Kind
+) -> GraphStructure:
+    """Build a ``kind`` structure over ``d`` nodes from the endpoint marks of its edges.
+
+    Each edge is ``(i, j, mark_i, mark_j)``: the mark at ``i`` and at ``j`` on the edge ``i - j``,
+    ``TAIL`` or ``ARROW``, or ``CIRCLE`` for a ``"pag"``. The structure is the one
+    :func:`~andrey.core.orient.to_structure` makes of the matrix these edges fill, built from the
+    edges alone, so a graph with few edges never takes a ``(d, d)`` matrix.
+
+    Raises
+    ------
+    ValueError
+        If an edge is a self-loop or repeats a pair, or a mark is not one of the kind's.
+    IndexError
+        If an edge names a node outside ``range(d)``.
+    """
+    listed = np.asarray(list(edges), dtype=np.int64).reshape(-1, 4)
+    i, j, at_i, at_j = listed.T
+    marks = (TAIL, ARROW, CIRCLE) if kind == "pag" else (TAIL, ARROW)
+    if ((listed[:, :2] < 0) | (listed[:, :2] >= d)).any():
+        raise IndexError(f"an edge names a node outside range({d})")
+    if (i == j).any():
+        raise ValueError("adjacency must have a zero diagonal (no self-loops)")
+    if not (np.isin(at_i, marks).all() and np.isin(at_j, marks).all()):
+        raise ValueError(f"marks of a {kind!r} edge must be in {marks}")
+    if len(np.unique(np.minimum(i, j) * d + np.maximum(i, j))) < len(listed):
+        raise ValueError("an edge repeats a pair")
+    return csr_from_endpoints(
+        np.concatenate((i, j)), np.concatenate((j, i)), np.concatenate((at_i, at_j)), d, kind=kind
+    )
 
 
 def dag_from_adjacency(adjacency: npt.ArrayLike) -> GraphStructure:

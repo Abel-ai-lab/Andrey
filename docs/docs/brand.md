@@ -91,7 +91,8 @@ We use the two parts of a causal graph as plain marks.
 </ul>
 ```
 
-Each composition has one amber node or edge; everything else is ink, cobalt, and navy.
+Each composition has one amber node or edge; everything else is ink, cobalt, and navy. We generate
+the cover art with the help of AI.
 
 ## Colors
 

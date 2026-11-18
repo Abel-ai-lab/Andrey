@@ -221,10 +221,15 @@ class LazyCorrelation:
 
     def _store(self, rows: np.ndarray, ids: np.ndarray) -> None:
         if self._count + len(ids) > len(self._rows):
-            size = max(min(2 * len(self._rows), self.d), self._count + len(ids))
-            grown = np.empty((size, self.d))
-            grown[: self._count] = self._rows[: self._count]
-            self._rows = grown
+            shape = (self._count + len(ids), self.d)
+            if self._rows.flags.owndata:
+                # In place, so that the rows held and the grown array never coexist; no view of
+                # the rows outlives a read.
+                self._rows.resize(shape, refcheck=False)
+            else:  # unpickled (a pool worker's copy) over a buffer it does not own
+                grown = np.empty(shape)
+                grown[: self._count] = self._rows[: self._count]
+                self._rows = grown
         slots = np.arange(self._count, self._count + len(ids))
         self._rows[slots] = rows
         self._slot[ids] = slots

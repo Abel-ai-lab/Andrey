@@ -170,13 +170,29 @@ class ColumnView:
         return self.test(int(c[x]), int(c[y]), [int(c[v]) for v in condition_set])
 
 
+class ColumnRanks(Sequence[int]):
+    """Tie ranks read over a subset of their columns, as :class:`ColumnView` reads a test: item
+    ``k`` is ``ranks[columns[k]]``, read when asked, so the view reads only the ranks a search
+    compares."""
+
+    def __init__(self, ranks: Sequence[int], columns: Sequence[int]) -> None:
+        self.ranks = ranks
+        self.columns = columns
+
+    def __len__(self) -> int:
+        return len(self.columns)
+
+    def __getitem__(self, k: Any) -> Any:
+        return self.ranks[self.columns[k]]
+
+
 def column_search(search: LocalSearch, columns: Sequence[int]) -> LocalSearch:
     """A :class:`~andrey.constraint.blanket.LocalSearch` over ``columns`` of ``search``'s test, the
     same level, cap, and ranks, so a choice between tied candidates goes as in ``search``."""
     levels = None if search.levels is None else search.levels[list(columns)]
     return LocalSearch(
         ColumnView(search.test, columns),
-        [search.ranks[k] for k in columns],
+        ColumnRanks(search.ranks, columns),
         search.alpha,
         max_depth=search.max_depth,
         levels=levels,
@@ -203,14 +219,15 @@ class Result:
     """One run of :func:`local_optimal_adjustment`.
 
     ``answers`` holds one :class:`Answer` per ordered pair.
-    ``marks`` holds the edges at the two variables as their own runs grew them, over every column.
+    ``edges`` holds the edges at the two variables as their own runs grew them, each as ``(i, j,
+    mark at i, mark at j)`` with ``i < j``, by ascending ``(i, j)``.
     ``learned`` lists the variables whose blanket the search learned, in order, Step 4's included
     (over its columns, named by position in the data). ``possible_descendants`` holds Step 3's
     answer, ``None`` when the search stopped before it.
     """
 
     answers: list[Answer]
-    marks: np.ndarray
+    edges: list[tuple[int, int, int, int]]
     learned: list[int]
     possible_descendants: list[int] | None
 
@@ -233,6 +250,27 @@ def _union(first: np.ndarray, second: np.ndarray) -> np.ndarray:
     return undirect_conflicts(marks)
 
 
+def _union_edges(
+    first: Network, x: int, second: Network, y: int
+) -> list[tuple[int, int, int, int]]:
+    """The edges at ``x`` in ``first`` and at ``y`` in ``second``, united (:func:`_union`) over the
+    variables they touch, as :attr:`Result.edges` lists them."""
+    nodes = sorted({x, y, *first.neighbors(x), *second.neighbors(y)})
+    place = {v: i for i, v in enumerate(nodes)}
+
+    def star(network: Network, target: int) -> np.ndarray:
+        out = np.zeros((len(nodes), len(nodes)), dtype=np.int8)
+        for v, near, far in network.edges_at(target):
+            out[place[target], place[v]], out[place[v], place[target]] = near, far
+        return out
+
+    marks = _union(star(first, x), star(second, y))
+    return [
+        (nodes[i], nodes[j], int(marks[i, j]), int(marks[j, i]))
+        for i, j in np.argwhere(np.triu(marks != NULL, 1)).tolist()
+    ]
+
+
 def local_optimal_adjustment(
     search: LocalSearch, pair: tuple[int, int], blanket: str = "gs"
 ) -> Result:
@@ -248,10 +286,10 @@ def local_optimal_adjustment(
     runs = {v: sequential(search, v, blanket, LOAD, cache) for v in (x, y)}
     learned = [v for r in runs.values() for v in r.learned]
     graph = {v: r.network for v, r in runs.items()}
-    marks = _union(graph[x].star(x, d), graph[y].star(y, d))
+    edges = _union_edges(graph[x], x, graph[y], y)
 
     def result(answers: list[Answer], possde: list[int] | None = None) -> Result:
-        return Result(answers, marks, learned, possde)
+        return Result(answers, edges, learned, possde)
 
     # Step 1: the relation of the two variables (Algorithm 1).
     if explicit_ancestor(search, x, y, graph[x]):

@@ -21,7 +21,7 @@ from andrey.core.ties import tie_ranks
 
 from . import backend, env, stats
 from .ci import _canonical_ranked, count_tests, per_query
-from .independence import hsic_statistic_log_p
+from .independence import HSICKernel, hsic_kernel, hsic_kernels_statistic_log_p
 from .seeding import resolve_seed
 from .warning_policy import SampleSizeWarning, warn_once
 
@@ -164,8 +164,9 @@ class KCI:
     4 of 40 fits passed a half-hour cap. Each query with a conditioning set costs two products of
     ``n x n`` matrices, plus an eigendecomposition for a conditioning set not seen before and two
     more products for a new ``y`` with it; the test keeps up to 256 MB of each kind of matrix, at
-    least one. So time grows as the cube of the number of rows and memory as its square: thousands
-    of rows are practical, tens of thousands are not. The kernel widths follow the row count and the
+    least one, except the kernels of single variables, which it keeps only when two fit. So time
+    grows as the cube of the number of rows and memory as its square: thousands of rows are
+    practical, tens of thousands are not. The kernel widths follow the row count and the
     size of the conditioning set, not the data. On simulated draws with up to three conditioning
     variables and 500 rows, it rejected a true independence at rates between ``alpha`` and twice
     ``alpha``; a test that rejects too often makes PC and FCI keep edges. The numbers are a
@@ -202,6 +203,11 @@ class KCI:
         entries = max(1, _CACHE_BYTES // (8 * self._n * self._n))
         self._resid = lru_cache(entries)(self._residual_maker)
         self._resid_y = lru_cache(entries)(self._residualized_kernel)
+        # A column's kernel without conditions does not depend on its partner, so the queries
+        # that pair it with others share it; kept only when two kernels fit the cache's bytes.
+        self._kernel = (
+            lru_cache(entries)(self._marginal_kernel) if entries > 1 else self._marginal_kernel
+        )
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the KCI p-value for ``x`` independent of ``y`` given ``condition_set``."""
@@ -229,7 +235,9 @@ class KCI:
         if not (np.ptp(data[:, x_int]) > 0.0 and np.ptp(data[:, y_int]) > 0.0):
             return 0.0, 1.0  # a constant variable: no variation to depend on
         if not cond:
-            statistic, log_p = hsic_statistic_log_p(data[:, x_int], data[:, y_int])
+            statistic, log_p = hsic_kernels_statistic_log_p(
+                self._kernel(x_int), self._kernel(y_int)
+            )
             return statistic, math.exp(log_p)
 
         width = self._width(len(cond))
@@ -252,6 +260,11 @@ class KCI:
         """The Gaussian kernels' width with ``size`` conditioning variables."""
         n = self._n
         return (1.2 if n < 200 else 0.7 if n < 1200 else 0.4) * np.sqrt(size)
+
+    def _marginal_kernel(self, column: int) -> HSICKernel:
+        """The centered kernel of ``column``, with its trace and sum of squares, for a query with
+        no conditioning set."""
+        return hsic_kernel(self._data[:, column])
 
     def _residual_maker(self, cond: tuple[int, ...]) -> np.ndarray:
         """``R = ridge (Ks + ridge I)^-1`` of the conditioning set ``cond``."""

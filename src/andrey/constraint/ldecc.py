@@ -57,8 +57,6 @@ import numpy as np
 
 from andrey.constraint.blanket import LocalSearch
 
-#: A query: the lower and the higher variable and the sorted conditioning set.
-Query = tuple[int, int, tuple[int, ...]]
 #: The step that finds the treatment's neighbors from its blanket: ``(tests, x, mb)`` to the
 #: neighbors and the separating set of each blanket member left out.
 Adjacency = Callable[["Tests", int, Sequence[int]], tuple[list[int], dict[int, tuple[int, ...]]]]
@@ -67,8 +65,9 @@ Adjacency = Callable[["Tests", int, Sequence[int]], tuple[list[int], dict[int, t
 class Tests:
     """The p-values of the queries asked of ``search``, each asked once.
 
-    ``allowed`` says whether a conditioning set of a given size is within the search's
-    ``max_depth``; a query beyond it is never asked.
+    The p-values are kept by conditioning set, whose sorted tuple is built once per call, and
+    within it by pair (:meth:`pair`). ``allowed`` says whether a conditioning set of a given size
+    is within the search's ``max_depth``; a query beyond it is never asked.
     """
 
     def __init__(self, search: LocalSearch) -> None:
@@ -76,11 +75,16 @@ class Tests:
         self.alpha = search.alpha
         self.ranks = list(search.ranks)  # read in the sorts of every step, so read as a list
         self.max_depth = search.max_depth
-        self.kept: dict[Query, float] = {}
+        self.d = search.d
+        self.kept: dict[tuple[int, ...], dict[int, float]] = {}
 
-    @staticmethod
-    def key(a: int, b: int, cond: Iterable[int]) -> Query:
-        return (min(a, b), max(a, b), tuple(sorted(cond)))
+    def pair(self, a: int, b: int) -> int:
+        """The key of the unordered pair ``a``, ``b``: ``low * d + high``."""
+        return a * self.d + b if a < b else b * self.d + a
+
+    def table(self, cond: Iterable[int]) -> dict[int, float]:
+        """The p-values kept for the conditioning set ``cond``, by :meth:`pair`."""
+        return self.kept.setdefault(tuple(sorted(cond)), {})
 
     def allowed(self, size: int) -> bool:
         return self.max_depth is None or size <= self.max_depth
@@ -88,22 +92,29 @@ class Tests:
     def ask(self, a: int, bs: Sequence[int], cond: Sequence[int] = ()) -> None:
         """Keep the p-value of ``a`` against each of ``bs`` given ``cond``, asking the test
         together for those not kept yet."""
-        new = [b for b in bs if self.key(a, b, cond) not in self.kept]
+        table = self.table(cond)
+        new = [b for b in bs if self.pair(a, b) not in table]
         if new:
-            _, pvalues = self.search.scan(a, new, tuple(cond))
-            for b, p in zip(new, pvalues, strict=True):
-                self.kept[self.key(a, b, cond)] = float(p)
+            self._scan(table, a, new, cond)
+
+    def _scan(
+        self, table: dict[int, float], a: int, bs: Sequence[int], cond: Sequence[int]
+    ) -> None:
+        _, pvalues = self.search.scan(a, bs, tuple(cond))
+        for b, p in zip(bs, pvalues, strict=True):
+            table[self.pair(a, b)] = float(p)
 
     def independent(self, a: int, b: int, cond: Sequence[int] = ()) -> bool:
         """Whether ``a`` and ``b`` test independent given ``cond``: a p-value above ``alpha``."""
-        key = self.key(a, b, cond)
-        if key not in self.kept:
+        table = self.table(cond)
+        pair = self.pair(a, b)
+        if pair not in table:
             low, high = (a, b) if self.ranks[a] < self.ranks[b] else (b, a)
-            self.ask(low, [high], cond)
-        return self.kept[key] > self.alpha
+            self._scan(table, low, [high], cond)
+        return table[pair] > self.alpha
 
     def by_rank(self, nodes: Iterable[int]) -> list[int]:
-        return sorted(nodes, key=lambda v: self.ranks[v])
+        return sorted(nodes, key=self.ranks.__getitem__)
 
     def first_separating(
         self, a: int, b: int, among: Sequence[int], size: int
@@ -314,22 +325,23 @@ def ldecc(
                 break
             if np.count_nonzero(adjacent[a]) - 1 < size:
                 continue
-            pairs = sorted(
-                (b for b in np.flatnonzero(adjacent[a]).tolist() if b != x), key=place.__getitem__
-            )
+            around = [b for b in np.flatnonzero(adjacent[a]).tolist() if b != x]
+            ranked = tests.by_rank(around)  # a's neighbors but x, in rank order, as they go
+            pairs = sorted(around, key=place.__getitem__)
             if size == 0:  # the tests read no neighbor, so asking them together changes nothing
                 tests.ask(a, pairs)
             for b in pairs:
                 if not adjacent[a, b]:
                     continue
-                rest = [v for v in np.flatnonzero(adjacent[a]).tolist() if v not in (b, x)]
-                pool = ([x] if adjacent[a, x] else []) + tests.by_rank(rest)
-                if len(pool) < size:
+                held = [x] if adjacent[a, x] else []
+                if len(held) + len(ranked) - 1 < size:  # the pool: x first, then ranked without b
                     continue
                 testable = True
+                pool = [*held, *(v for v in ranked if v != b)] if size else []
                 found = tests.first_separating(a, b, pool, size)
                 if found is not None:
                     adjacent[a, b] = adjacent[b, a] = False
+                    ranked.remove(b)
                     read(a, b, found)
                     if not unoriented():
                         break

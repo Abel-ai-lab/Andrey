@@ -15,7 +15,9 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from andrey.api._adapt import (
+    check_total_conditioning_rows,
     copies_named,
+    edge_structure,
     fit_inputs,
     label_of,
     structure_output,
@@ -25,10 +27,9 @@ from andrey.api._method import method_spec
 from andrey.core import ARROW, TAIL, GraphStructure, backend
 from andrey.core.ci import counting_tests
 from andrey.core.ci_missing import rows_tested
-from andrey.core.orient import to_structure
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Iterable, Mapping, Sequence
 
     import numpy.typing as npt
 
@@ -37,13 +38,16 @@ if TYPE_CHECKING:
     from andrey.constraint.sequential import Rules
     from andrey.core import StructureOutput
     from andrey.core.knowledge import Knowledge
+    from andrey.core.structure import Kind
 
 
-def _edge_sets(star: np.ndarray, t: int) -> dict[str, list[int]]:
-    """Return the target's parents, children, and undirected neighbors in ``star``, by position."""
+def _edge_sets(edges: Iterable[tuple[int, int, int]]) -> dict[str, list[int]]:
+    """Return the target's parents, children, and undirected neighbors among ``edges``, by position.
+
+    Each edge is ``(neighbor, mark at the target, mark at the neighbor)``, ascending by neighbor.
+    """
     sets: dict[str, list[int]] = {"parents": [], "children": [], "undirected": []}
-    for j in np.flatnonzero(star[t]).tolist():
-        near, far = star[t, j], star[j, t]
+    for j, near, far in edges:
         if near == ARROW and far == TAIL:
             sets["parents"].append(j)
         elif near == TAIL and far == ARROW:
@@ -57,8 +61,9 @@ def _edge_sets(star: np.ndarray, t: int) -> dict[str, list[int]]:
 class _Edges:
     """The edges at a target as a sequential search found them.
 
-    ``marks`` holds each neighbor's mark at the target and at itself, ``blanket`` the target's
-    Markov blanket, and ``learned`` the variables whose blankets the search learned.
+    ``marks`` holds each neighbor's mark at the target and at itself, ascending by neighbor,
+    ``blanket`` the target's Markov blanket, and ``learned`` the variables whose blankets the search
+    learned.
     """
 
     marks: list[tuple[int, int, int]]
@@ -77,16 +82,15 @@ def _sequential_edges(
 
     result = sequential(search, t, blanket, rules, local_depth=local_depth)
     network = result.network
-    marks = [(v, network.mark(t, v), network.mark(v, t)) for v in network.neighbors(t)]
-    return _Edges(marks, list(result.cache.blankets[t]), list(result.learned))
+    return _Edges(network.edges_at(t), list(result.cache.blankets[t]), list(result.learned))
 
 
-def _star(edges: _Edges, t: int, d: int) -> np.ndarray:
-    """Return the marks over all ``d`` variables of the edges at ``t`` alone."""
-    out = np.zeros((d, d), dtype=np.int8)
-    for v, at_t, at_v in edges.marks:
-        out[t, v], out[v, t] = at_t, at_v
-    return out
+def _star(marks: Iterable[tuple[int, int, int]], t: int, d: int, kind: Kind) -> GraphStructure:
+    """Return the structure over all ``d`` variables of the edges at ``t`` alone.
+
+    The edges are the ``(neighbor, mark at t, mark at the neighbor)`` of :func:`_edge_sets`.
+    """
+    return edge_structure(d, [(t, v, near, far) for v, near, far in marks], kind=kind)
 
 
 def _cmb_codes(blanket: str, decided: np.ndarray | None, search: LocalSearch, t: int) -> CMBResult:
@@ -222,8 +226,10 @@ def mb_by_mb(
         method, the argument, what it accepts, and the value. Also if ``target`` is ``None`` or
         names a column ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as
         for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats
-        another up to scale and shift. Also if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists.
+        another up to scale and shift. With ``blanket="total_conditioning"``, a partial-correlation
+        test, and no ``max_depth`` below ``d - 2``, also if ``data`` has fewer than ``d + 2`` rows
+        with every variable observed, ``d`` its number of columns. Also if ``knowledge`` names a
+        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
     NotImplementedError
         If ``knowledge`` holds ``required_paths`` or ``forbidden_paths``; the message names the
         methods that honor them.
@@ -294,8 +300,11 @@ def mb_by_mb(
     tests without the cap. Under the default ``local_max_depth=5``, a pair that only a larger set
     separates keeps its edge. The default blanket learner never drops a variable it added, so a
     large sample, in which more variables test dependent, gives larger blankets, and each test of
-    the blanket learner conditions on the whole set so far. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    the blanket learner conditions on the whole set so far. ``"total_conditioning"`` with a
+    partial-correlation test needs at least two more rows than variables, rows with every variable
+    observed, and raises ``ValueError`` below that. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------
@@ -335,15 +344,15 @@ def mb_by_mb(
     d = X.shape[1]
     targets = target_columns(target, labels, d, "mb_by_mb")
     t = target_column(target, labels, d, "mb_by_mb") if targets is None else -1
+    check_total_conditioning_rows(X, blanket, indep_test, method="mb_by_mb", max_depth=max_depth)
     name = label_of(labels)
     answer = partial(_sequential_edges, blanket, MB_BY_MB, local_max_depth)
 
     def output(t: int, edges: _Edges, n: int, rows: Mapping[int, int]) -> StructureOutput:
-        star = _star(edges, t, d)
-        metadata = target_metadata(t, _edge_sets(star, t), name)
+        metadata = target_metadata(t, _edge_sets(edges.marks), name)
         metadata["blankets_learned"] = [name(x) for x in edges.learned]
         metadata |= fit_metadata(mask, data, rows, n)
-        return structure_output(to_structure(star, kind="cpdag"), labels=labels, metadata=metadata)
+        return structure_output(_star(edges.marks, t, d, "cpdag"), labels=labels, metadata=metadata)
 
     with copies_named(labels):
         search = local_search(
@@ -364,10 +373,11 @@ def mb_by_mb(
     return [output(t, *answer_) for t, answer_ in zip(targets, found, strict=True)]
 
 
-def _pag_sets(star: np.ndarray, t: int) -> dict[str, list[int]]:
-    """Return the target's parents, children, bidirected, and undetermined neighbors in ``star``.
+def _pag_sets(edges: Iterable[tuple[int, int, int]]) -> dict[str, list[int]]:
+    """Return the target's parents, children, bidirected, and undetermined neighbors in ``edges``.
 
-    The PAG's edges at the target fall in one each, by position.
+    The PAG's edges at the target fall in one each, by position; the edges are those of
+    :func:`_edge_sets`.
     """
     sets: dict[str, list[int]] = {
         "parents": [],
@@ -375,8 +385,7 @@ def _pag_sets(star: np.ndarray, t: int) -> dict[str, list[int]]:
         "bidirected": [],
         "undetermined": [],
     }
-    for j in np.flatnonzero(star[t]).tolist():
-        near, far = star[t, j], star[j, t]
+    for j, near, far in edges:
         if near == ARROW and far == ARROW:
             sets["bidirected"].append(j)
         elif near == ARROW and far == TAIL:
@@ -519,9 +528,10 @@ def mmb_by_mmb(
         method, the argument, what it accepts, and the value. Also if ``target`` is ``None`` or
         names a column ``data`` lacks, or if ``data`` or ``categorical`` does not suit the test, as
         for :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats
-        another up to scale and shift, or, with ``"total_conditioning"``, if ``data`` has too few
-        rows for a test given all the other variables. Also if ``knowledge`` names a column
-        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        another up to scale and shift. With ``blanket="total_conditioning"``, a partial-correlation
+        test, and no ``max_depth`` below ``d - 2``, also if ``data`` has fewer than ``d + 2`` rows
+        with every variable observed, ``d`` its number of columns. Also if ``knowledge`` names a
+        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
     NotImplementedError
         If ``knowledge`` holds ``required_paths`` or ``forbidden_paths``; the message names the
         methods that honor them.
@@ -607,9 +617,11 @@ def mmb_by_mmb(
     answer's in all eight; the
     `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#mmb-by-mmb>`_ has the
     numbers. Two adjacent variables that both have very wide blankets can still take long.
-    ``"total_conditioning"`` needs more rows than variables and continuous data with linear
-    effects; on other data, choose another learner. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    ``"total_conditioning"`` needs continuous data with linear effects, and with a
+    partial-correlation test at least two more rows than variables, rows with every variable
+    observed, or it raises ``ValueError``; on other data or with fewer rows, choose another learner.
+    The numbers are a reference, not a hard limit: they change with the data generator, the density,
+    the method's settings, and the machine.
 
     References
     ----------
@@ -653,18 +665,16 @@ def mmb_by_mmb(
     d = X.shape[1]
     targets = target_columns(target, labels, d, "mmb_by_mmb")
     t = target_column(target, labels, d, "mmb_by_mmb") if targets is None else -1
+    check_total_conditioning_rows(X, blanket, indep_test, method="mmb_by_mmb", max_depth=max_depth)
     name = label_of(labels)
     answer = partial(_sequential_edges, blanket, MMB_BY_MMB, local_max_depth)
 
     def output(t: int, edges: _Edges, n: int, rows: Mapping[int, int]) -> StructureOutput:
-        star = _star(edges, t, d)
-        sets = {"markov_blanket": edges.blanket, **_pag_sets(star, t)}
+        sets = {"markov_blanket": edges.blanket, **_pag_sets(edges.marks)}
         metadata = target_metadata(t, sets, name)
         metadata["blankets_learned"] = [name(x) for x in edges.learned]
         metadata |= fit_metadata(mask, data, rows, n)
-        return structure_output(
-            GraphStructure.from_numpy(star, kind="pag"), labels=labels, metadata=metadata
-        )
+        return structure_output(_star(edges.marks, t, d, "pag"), labels=labels, metadata=metadata)
 
     with copies_named(labels):
         search = local_search(
@@ -917,15 +927,15 @@ def cmb(
     answer = partial(_cmb_codes, blanket, decided)
 
     def output(t: int, result: CMBResult, n: int, rows: Mapping[int, int]) -> StructureOutput:
-        star = np.zeros((d, d), dtype=np.int8)
-        for x, code in result.codes.items():
-            star[t, x] = ARROW if code == PARENT else TAIL
-            star[x, t] = ARROW if code == CHILD else TAIL
-        sets = {"markov_blanket": result.blanket, **_edge_sets(star, t)}
+        marks = [
+            (x, ARROW if code == PARENT else TAIL, ARROW if code == CHILD else TAIL)
+            for x, code in sorted(result.codes.items())
+        ]
+        sets = {"markov_blanket": result.blanket, **_edge_sets(marks)}
         metadata = target_metadata(t, sets, name)
         metadata["blankets_learned"] = [name(x) for x in result.learned]
         metadata |= fit_metadata(mask, data, rows, n)
-        return structure_output(to_structure(star, kind="cpdag"), labels=labels, metadata=metadata)
+        return structure_output(_star(marks, t, d, "cpdag"), labels=labels, metadata=metadata)
 
     with copies_named(labels):
         search = local_search(

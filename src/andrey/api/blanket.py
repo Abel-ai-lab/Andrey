@@ -12,12 +12,10 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING
 
-import numpy as np
-
-from andrey.api._adapt import copies_named, fit_inputs, label_of, structure_output
+from andrey.api._adapt import copies_named, edge_structure, fit_inputs, label_of, structure_output
 from andrey.api._local import fit_metadata, target_columns, target_metadata
 from andrey.api._method import method_spec
-from andrey.core import NULL, TAIL, backend
+from andrey.core import TAIL, backend
 from andrey.core.ci import counting_tests
 from andrey.core.ci_missing import rows_tested
 from andrey.core.knowledge import Knowledge, as_node, column_position
@@ -29,7 +27,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
     from andrey.constraint.blanket import LocalSearch
-    from andrey.core import StructureOutput
+    from andrey.core import GraphStructure, StructureOutput
 
 
 def fit_blanket(
@@ -84,26 +82,22 @@ def fit_blanket(
             )
         outs = []
         for x, ((pc, mb), n, rows) in zip(targets, found, strict=True):
-            marks, metadata = _target_answer(x, pc, mb, d, labels)
+            graph, metadata = _target_answer(x, pc, mb, d, labels)
             metadata |= fit_metadata(mask, data, rows, n)
-            outs.append(
-                structure_output(
-                    to_structure(marks, kind="undirected"), labels=labels, metadata=metadata
-                )
-            )
+            outs.append(structure_output(graph, labels=labels, metadata=metadata))
         return outs
     metadata: dict[str, object] = {}
     kind = BLANKET_STRUCTURES[structure] if t is None else "undirected"
     with copies_named(labels), rows_tested() as rows, counting_tests() as tests:
         if t is None:
-            marks = local_structure(X, method, structure, **settings)
+            graph = to_structure(local_structure(X, method, structure, **settings), kind=kind)
         else:
             search = local_search(X, **settings)  # ty: ignore[invalid-argument-type]
             with search.pinned():
                 pc, mb = _target_sets(method, search, t)
-            marks, metadata = _target_answer(t, pc, mb, d, labels)
+            graph, metadata = _target_answer(t, pc, mb, d, labels)
     metadata |= fit_metadata(mask, data, rows, tests.n)
-    return structure_output(to_structure(marks, kind=kind), labels=labels, metadata=metadata)
+    return structure_output(graph, labels=labels, metadata=metadata)
 
 
 def _target_sets(
@@ -119,19 +113,17 @@ def _target_sets(
 
 def _target_answer(
     t: int, pc: list[int] | None, mb: list[int] | None, d: int, labels: tuple[str, ...] | None
-) -> tuple[np.ndarray, dict[str, object]]:
-    """Return the answer for ``t`` as endpoint marks and metadata.
+) -> tuple[GraphStructure, dict[str, object]]:
+    """Return the answer for ``t`` as an undirected structure and metadata.
 
-    The marks are an undirected graph joining ``t`` to each member of its set; the metadata names
-    ``t`` and lists the sets.
+    The structure joins ``t`` to each member of its set; the metadata names ``t`` and lists the
+    sets.
     """
     sets = {"markov_blanket": mb, "parents_and_children": pc}
     members = mb if mb is not None else pc
     assert members is not None  # every learner learns one of the two
-    adjacent = np.zeros((d, d), dtype=bool)
-    adjacent[t, members] = adjacent[members, t] = True
-    marks = np.where(adjacent, TAIL, NULL).astype(np.int8)
-    return marks, target_metadata(
+    graph = edge_structure(d, [(t, v, TAIL, TAIL) for v in members], kind="undirected")
+    return graph, target_metadata(
         t, {k: v for k, v in sets.items() if v is not None}, label_of(labels)
     )
 
