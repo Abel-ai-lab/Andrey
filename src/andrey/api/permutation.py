@@ -352,37 +352,27 @@ def boss(
     reads a numeric ``env`` as a number, so with three or more environments a shift that does not
     follow the labels' values, such as one in the middle environment of three coded ``0, 1, 2``, can
     go unnoticed, and recoding the labels can change the result. ``max_parents`` counts the index as
-    a parent of each variable it points into. ``missing="em"`` was measured on simulated
+    a parent of each variable it points into. With ``missing="em"``, measured on simulated
     linear-Gaussian data with values missing completely at random or at random given observed
-    values, 20 datasets per setting, on one core. At the default ``ebic_gamma=1.0`` (Erdos-Renyi
-    graphs of mean degree 2 and 4, 10 to 100 variables, 100 to 2,000 rows, 10 to 30% missing), its
-    mean errors stayed below the empty graph's in 214 of 216 settings, measured with one parameter
-    refit per round in place of the 5 parameter steps. At the standard BIC, ``ebic_gamma=0.0``, with
-    10 to 50 variables, they stayed below it in 102 of 108 settings, with every miss at 100 rows.
-    With 15 variables and 100 rows (10 to 50% missing) they stayed below it in 20 of 24 settings,
-    with the 4 misses at 50% missing. A reference implementation that estimates one covariance by EM
-    and then runs its search once ran at the standard BIC on those 132 settings, with two sample
-    sizes in its score. With every row counted, this search had fewer errors than it in 100 settings
-    and tied in 32. With the mean number of rows on which a pair of variables is observed, where the
-    reference is more accurate, this search had fewer errors in 72, tied in 59, and had more in 1,
-    which tied on 20 fresh datasets. :func:`~andrey.pc`, whose tests delete rows per test, had fewer
-    errors than it at the standard BIC in 12 of the 132 settings and more in 62, comparisons not
-    rerun on fresh seeds. EM runs the search 10 times and the E-step 56 times: the median fit took
-    1.5 to 44 s, against 0.4 to 2.3 s on the complete data. In 170 of the 2,640 fits the last round
-    still changed the graph (77 of 240 with 50 variables and 100 rows), and each such fit logs a
-    warning. Under values missing not at random it has no guarantee. Before EM, only a column that
-    repeats another up to scale and shift where both are observed raises; a column that is a linear
-    function of several others, which raises on complete data, is not caught, and the fit runs. With
-    true ``required_paths`` or ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated
-    linear-Gaussian data (10 to 50 variables, mean degree 2 or 4, 500 or 2,000 rows), its result was
-    no farther from the true DAG than without them in any setting. The claims direct edges of the
-    graph the search found, as their rules take the class as given: of the edges they directed, 1.7%
-    with required paths and 4.1% with forbidden paths pointed against the true DAG, each in a fit
-    whose graph had an edge missing or extra or a collider wrong. A required path says less than a
-    required edge and directs less: it cannot restore an edge the search left out, and on simulated
-    data a required edge, which also states that the pair is adjacent, lowered the errors more. A
-    known edge belongs in ``required``. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    values, at the standard BIC with 10 to 50 variables: it was less accurate than a reference
+    implementation in no setting that repeated on fresh datasets. With 100 rows its errors did not
+    always stay below the empty graph's. EM runs the search 10 times, so a fit takes much longer
+    than on complete data, and in a few fits the graph still changed in the last round; such a fit
+    logs a warning, and more rows help. Under values missing not at random it has no guarantee. The
+    `0.17.0 release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#missing-data>`_ has the
+    numbers. Before EM, only a column that repeats another up to scale and shift where both are
+    observed raises; a column that is a linear function of several others, which raises on complete
+    data, is not caught, and the fit runs. With true ``required_paths`` or ``forbidden_paths`` on 5
+    to 30% of the variable pairs of simulated linear-Gaussian data (10 to 50 variables, mean degree
+    2 or 4, 500 or 2,000 rows), its result was no farther from the true DAG than without them in any
+    setting. The claims direct edges of the graph the search found, as their rules take the class as
+    given: of the edges they directed, 1.7% with required paths and 4.1% with forbidden paths
+    pointed against the true DAG, each in a fit whose graph had an edge missing or extra or a
+    collider wrong. A required path says less than a required edge and directs less: it cannot
+    restore an edge the search left out, and on simulated data a required edge, which also states
+    that the pair is adjacent, lowered the errors more. A known edge belongs in ``required``. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -778,37 +768,27 @@ def grasp(
     ``"cond_gauss"``. ``"bic"`` reads a numeric ``env`` as a number, so with three or more
     environments a shift that does not follow the labels' values, such as one in the middle
     environment of three coded ``0, 1, 2``, can go unnoticed, and recoding the labels can change the
-    result. ``max_parents`` counts the index as a parent of each variable it points into.
-    ``missing="em"`` was measured on simulated linear-Gaussian data with values missing completely
-    at random or at random given observed values, 20 datasets per setting, on one core. At the
-    default ``ebic_gamma=1.0`` (Erdos-Renyi graphs of mean degree 2 and 4, 10 to 100 variables, 100
-    to 2,000 rows, 10 to 30% missing), its mean errors stayed below the empty graph's in 213 of 216
-    settings, measured with one parameter refit per round in place of the 5 parameter steps. At the
-    standard BIC, ``ebic_gamma=0.0``, with 10 to 50 variables, they stayed below it in 103 of 108
-    settings, with every miss at 100 rows. With 15 variables and 100 rows (10 to 50% missing) they
-    stayed below it in 21 of 24 settings, with the 3 misses at 50% missing. A reference
-    implementation that estimates one covariance by EM and then runs its search once ran at the
-    standard BIC on those 132 settings, with two sample sizes in its score. With every row counted,
-    this search had fewer errors than it in 101 settings and tied in 31. With the mean number of
-    rows on which a pair of variables is observed, where the reference is more accurate, this search
-    had fewer errors in 68, tied in 61, and had more in 3, each of which tied on 20 fresh datasets.
-    :func:`~andrey.pc`, whose tests delete rows per test, had fewer errors than it at the standard
-    BIC in 8 of the 132 settings and more in 74, comparisons not rerun on fresh seeds. EM runs the
-    search 10 times and the E-step 56 times: the median fit took 1.2 to 40 s, against 0.4 to 2.2 s
-    on the complete data. In 533 of the 2,640 fits the last round still changed the graph (210 of
-    240 with 50 variables and 100 rows), and each such fit logs a warning. Under values missing not
-    at random it has no guarantee. Before EM, only a column that repeats another up to scale and
-    shift where both are observed raises; a column that is a linear function of several others,
-    which raises on complete data, is not caught, and the fit runs. With true ``required_paths`` or
-    ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated linear-Gaussian data (10 to
-    50 variables, mean degree 2 or 4, 500 or 2,000 rows), its result was no farther from the true
-    DAG than without them in any setting. The claims direct edges of the graph the search found, as
-    their rules take the class as given: of the edges they directed, 1.7% with required paths and
-    3.2% with forbidden paths pointed against the true DAG. No reference implementation takes these
-    claims for this search, so they were compared with the same fit without them. A required path
-    says less than a required edge and directs less: it cannot restore an edge the search left out.
-    A known edge belongs in ``required``. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    result. ``max_parents`` counts the index as a parent of each variable it points into. With
+    ``missing="em"``, measured on simulated linear-Gaussian data with values missing completely at
+    random or at random given observed values, at the standard BIC with 10 to 50 variables: it was
+    less accurate than a reference implementation in no setting that repeated on fresh datasets.
+    With 100 rows its errors did not always stay below the empty graph's. EM runs the search 10
+    times, so a fit takes much longer than on complete data, and in one fit in five the graph still
+    changed in the last round, most often with 50 variables and 100 rows; such a fit logs a warning,
+    and more rows help. Under values missing not at random it has no guarantee. The
+    `0.17.0 release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#missing-data>`_ has the
+    numbers. Before EM, only a column that repeats another up to scale and shift where both are
+    observed raises; a column that is a linear function of several others, which raises on complete
+    data, is not caught, and the fit runs. With true ``required_paths`` or ``forbidden_paths`` on 5
+    to 30% of the variable pairs of simulated linear-Gaussian data (10 to 50 variables, mean degree
+    2 or 4, 500 or 2,000 rows), its result was no farther from the true DAG than without them in any
+    setting. The claims direct edges of the graph the search found, as their rules take the class as
+    given: of the edges they directed, 1.7% with required paths and 3.2% with forbidden paths
+    pointed against the true DAG. No reference implementation takes these claims for this search, so
+    they were compared with the same fit without them. A required path says less than a required
+    edge and directs less: it cannot restore an edge the search left out. A known edge belongs in
+    ``required``. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------

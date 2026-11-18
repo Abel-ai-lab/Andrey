@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import andrey
-from andrey.core.ci_missing import EM_METHODS, EM_SUPPORTED
+from andrey.core.ci_missing import EM_METHODS, EM_SUPPORTED, TESTWISE_CLAIM
 from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.core.structure import EDGE_GLYPHS
 
@@ -585,9 +585,7 @@ def render_skill() -> str:
         "fewest (`min`) and the median rows a test read, and `metadata.missing` the handling. "
         "They are "
         + ", ".join(f"`{s.name}`" for s in REGISTRY.values() if s.data.missing)
-        + ". The deletion is sound when values are missing completely at random; when whether a "
-        "value is missing depends on the variables, `pc` can keep extra edges, and `fci` stays "
-        "sound when no missingness mechanism causally affects another. The searches whose fit "
+        + f". {TESTWISE_CLAIM} The searches whose fit "
         "reads only a covariance, "
         + ", ".join(f"`{name}`" for name in EM_METHODS)
         + ", refuse a missing value under `null` and take `em`: structural EM, which runs the "

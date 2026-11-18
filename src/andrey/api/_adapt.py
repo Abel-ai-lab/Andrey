@@ -18,7 +18,7 @@ from andrey.core.ci import (
     SingularCorrelationError,
     is_partial_correlation_test,
 )
-from andrey.core.ci_missing import EM, EM_METHODS, EM_SUPPORTED
+from andrey.core.ci_missing import EM, EM_METHODS, EM_SUPPORTED, MISSING_GUIDE
 from andrey.core.knowledge import as_node, column_position, resolve
 from andrey.core.score import (
     DISCRETE_SCORES,
@@ -77,17 +77,22 @@ def _listed(names: Sequence[str]) -> str:
 
 
 #: The ways on that a refusal of missing values names, for a table of independent rows, ``{name}``
-#: the data's argument; for one time series, whose steps cannot be dropped; and for a panel.
+#: the data's argument; for one time series, whose steps cannot be dropped; for a panel; and for
+#: several datasets read with their contexts, which no other method does.
 DROP_ROWS = (
     "drop the rows that hold one (for a DataFrame, {name}.dropna()), or use a method that deletes "
     f"rows per test: {_listed(TESTWISE_METHODS)}, or for a time series "
     f"{_listed(TESTWISE_SERIES_METHODS)}"
 )
-FILL_STEPS = (
-    "fill in the missing steps first, as dropping one would join the steps around it, or use "
-    f"{_listed(TESTWISE_SERIES_METHODS)}, whose tests delete rows per test"
+KEEP_STEPS = (
+    f"use {_listed(TESTWISE_SERIES_METHODS)}, whose tests delete rows per test and keep every "
+    "time step, as dropping a step would join the steps around it"
 )
 DROP_UNITS = "drop the units that hold one from every dataset of {name}"
+DROP_DATASETS = (
+    "drop the datasets of {name} that hold a missing value, as no method that accepts missing "
+    "values reads several datasets with their contexts"
+)
 
 
 def fit_by_em(method: str | None) -> str:
@@ -128,7 +133,8 @@ def data_matrix(
     model, and in the E-step it would count as a row and add the model's whole covariance to the
     expected covariance. Without ``missing``, a missing value raises,
     naming ``method`` when it is given, and ``fix``, the way on: :data:`DROP_ROWS` by default,
-    :data:`FILL_STEPS` for one time series, or :data:`DROP_UNITS` for a panel.
+    :data:`KEEP_STEPS` for one time series, :data:`DROP_UNITS` for a panel, or
+    :data:`DROP_DATASETS` for datasets read with their contexts.
 
     Checked data larger than ``method``'s measured boundary warn once per method
     (:func:`~andrey.api._boundary.warn_past_boundary`), before the fit. With ``method`` given,
@@ -256,7 +262,7 @@ def _refusal(method: str | None, name: str, where: str, fix: str = DROP_ROWS) ->
     base = name.split("[")[0]
     return (
         f"{who} does not accept missing values, and {name} {where}; {fix.format(name=base)} (see "
-        "Missing values in the getting-started guide)"
+        f"the Missing values guide, {MISSING_GUIDE})"
     )
 
 

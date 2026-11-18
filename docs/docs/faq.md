@@ -185,20 +185,16 @@ continuous non-Gaussian noise.
 Yes, in {{ missing_methods }}. Mark a missing value with `NaN` or pandas' `NA`, or leave its field
 empty in a CSV file. Each conditional-independence test then reads only the samples where all of its
 variables are observed (test-wise deletion), so the fit keeps the samples that dropping every
-incomplete one would lose; `missing="testwise"` names this handling, the default, and PC also takes
-`missing="mvpc"`, a correction for values whose missingness depends on the variables.
-Test-wise deletion is sound when values are missing completely at random; when whether a value is
-missing depends on the variables, a test can be biased. The [release cards](benchmarks.md) measure
-it against dropping incomplete samples. The searches whose fit reads the data only through their
-covariance, {{ em_methods }}, take `missing="em"`: structural EM over the expected covariance of
-the data, sound when values are missing completely at random or at random given observed values. It
-is supported in GES, hill climbing, Tabu search, BOSS, GRaSP, and NOTEARS, where it runs Friedman's
-alternating scheme: 10 searches, with 5 parameter-only EM steps before each after the first. It is
-experimental in the others, which have no reference implementation to compare with; the
-[missing-data comparison](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/missing-data.md)
-has what we measured.
-The other methods refuse missing values with an error that says what to do
-instead, and [Missing values](guides/getting-started.md#missing-values) explains each handling.
+incomplete one would lose. `missing="testwise"` names this handling, the default. It is sound when
+values are missing completely at random; when whether a value is missing depends on the variables,
+a test can be biased, and PC also takes `missing="mvpc"`, a correction for that case. The searches
+whose fit reads the data only through their covariance, {{ em_methods }}, take `missing="em"`:
+structural EM over the expected covariance of the data, which suits linear-Gaussian data whose
+missing values depend at most on variables that are always observed; this is measured, not proved.
+It is supported in {{ em_supported_names }} and
+experimental in the others. The other methods refuse missing values with an error that says what to
+do instead. The [Missing values](guides/missing-values.md) guide has a table from your data and the
+reason its values are missing to the handling to use, and links what we measured.
 
 ### Can I tell it what I already know?
 

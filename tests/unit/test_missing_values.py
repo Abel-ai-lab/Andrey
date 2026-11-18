@@ -8,8 +8,11 @@ accept ``NaN``; every other method raises a ``ValueError`` that names it.
 
 from __future__ import annotations
 
+import inspect
 import json
+import re
 import warnings
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -18,16 +21,23 @@ import pytest
 import andrey
 from andrey.api._adapt import TESTWISE_SERIES_METHODS
 from andrey.cli import main
-from andrey.core import ci, warning_policy
+from andrey.core import ci, ci_missing, warning_policy
 from andrey.core.ci import (
     FisherZ,
     StudentT,
     make_indep_test,
     register_indep_test,
 )
-from andrey.core.ci_missing import EM_METHODS, rows_metadata, rows_tested
+from andrey.core.ci_missing import (
+    EM_METHODS,
+    MISSING_GUIDE,
+    TESTWISE_CLAIM,
+    rows_metadata,
+    rows_tested,
+)
 from andrey.core.score import CopiedColumnsError
 from andrey.spec import REGISTRY
+from andrey.spec.generate import render_skill
 from andrey.temporal.pcmci import design_test, lagged_design
 from tests.recovery.helpers.ci_tests import PValueOnly
 from tests.unit.methods import REQUIRED
@@ -494,11 +504,17 @@ def test_every_other_method_refuses_missing_values_naming_itself(name):
     )
     with pytest.raises(ValueError, match=pattern) as error:
         getattr(andrey, name)(*_refused_inputs(name))
+    assert MISSING_GUIDE in str(error.value)
     if name == "longitudinal_lingam":  # a panel: a unit's rows go together
         assert "drop the units that hold one from every dataset of data" in str(error.value)
+    elif name == "jpcmciplus":  # datasets read with their contexts: no other method stands in
+        assert "drop the datasets of data that hold a missing value" in str(error.value)
+        assert "use pcmci, pcmciplus, or lpcmci" not in str(error.value)
     elif REGISTRY[name].family == "temporal":  # one series: a step cannot be dropped
-        assert "fill in the missing steps first" in str(error.value)
-        assert "use pcmci, pcmciplus, or lpcmci" in str(error.value)
+        assert "use pcmci, pcmciplus, or lpcmci, whose tests delete rows per test" in str(
+            error.value
+        )
+        assert "fill" not in str(error.value)  # a filled step is a guess the fit reads as data
     elif name in EM_METHODS:
         assert 'pass missing="em"' in str(error.value)
         assert "drop the rows that hold one" in str(error.value)
@@ -527,6 +543,38 @@ def test_the_refusal_lists_every_supported_method_but_the_pair_tests():
 
     tables = [name for name in SUPPORTED if REGISTRY[name].family != "pairwise"]
     assert [*TESTWISE_METHODS, *TESTWISE_SERIES_METHODS] == tables
+
+
+def test_the_guide_the_refusal_names_is_a_page_of_the_docs():
+    site, page = MISSING_GUIDE.split("/docs/", 1)
+    source = Path(__file__).parents[2] / "docs" / "docs" / page.replace(".html", ".md")
+    assert site == "https://andrey.abel.ai" and source.is_file()
+
+
+def test_no_text_says_that_fci_stays_sound_when_values_are_missing_for_a_reason():
+    """FCI with one test per query is valid for values missing completely at random only."""
+    texts = {name: inspect.getdoc(getattr(andrey, name)) or "" for name in SUPPORTED}
+    texts |= {"ci_missing": ci_missing.__doc__ or "", "agent text": render_skill()}
+    texts = {name: " ".join(text.split()) for name, text in texts.items()}
+    assert not [name for name, text in texts.items() if "missingness mechanism" in text]
+    assert TESTWISE_CLAIM in texts["fci"]
+    assert TESTWISE_CLAIM in texts["agent text"]
+
+
+@pytest.mark.parametrize("page", ["api.md", "guides/missing-values.md"])
+def test_a_page_that_names_the_tests_needing_more_rows_names_each_partial_correlation_test(page):
+    """A partial-correlation test needs ``|S| + 3`` rows; the other tests need 2."""
+    partial = {
+        name
+        for name, test in ci._CI_REGISTRY.items()
+        if isinstance(test, type) and issubclass(test, ci.PartialCorrelationTest)
+    }
+    text = " ".join((Path(__file__).parents[2] / "docs" / "docs" / page).read_text().split())
+    spans = re.findall(r"\|S\| \+ 3` for (.*?) and 2 for the other tests", text)
+    assert spans
+    for span in spans:
+        named = set(re.findall(r'`"?(\w+)"?`', span)) & set(ci.SHIPPED_INDEP_TESTS)
+        assert named in (set(), partial)
 
 
 @pytest.mark.parametrize("name", ["anm", "pnl", "loci"])

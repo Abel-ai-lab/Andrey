@@ -420,6 +420,13 @@ names its pull request.
   that builds one target's answer 1 MB instead of 0.7 to 2.2 GB. Every graph, set, and
   `metadata["n_tests"]` is the same bit for bit.
   ([#1086])
+- A [missing values guide](https://andrey.abel.ai/docs/guides/missing-values.html) holds what the
+  getting-started guide said about missing values, with a table from the kind of data and the
+  reason its values are missing to the `missing` value and the methods that take it. A method that
+  does not accept missing values names the guide in its error. The example notebook adds values
+  missing not at random, FCI, categorical data, and a time series. The Limitations of `pc` with
+  `missing="mvpc"` and of the searches that take `missing="em"` are a few sentences and a link to
+  the release card, and those of `fci` name the 0.11.0 card that measured missing values. ([#1096])
 
 ### Fixed
 
@@ -481,6 +488,14 @@ names its pull request.
 - The reference-parity check names a row by its network, effect, hidden nodes, node count, and
   number of series beside its size, so rows of one size that differ only there no longer share a
   key, and it fails two failing rows of one comparison that still do. ([#1070])
+- The docs of `fci` and the generated agent text no longer say that FCI with test-wise deletion
+  stays sound when values are missing for a reason: the cited result covers another procedure, and
+  the deletion is valid when values are missing completely at random. A time series method that
+  refuses missing values points to `pcmci`, `pcmciplus`, and `lpcmci` and no longer advises filling
+  in the missing steps, except `jpcmciplus`, whose datasets with their contexts no other method
+  reads: it points to dropping the datasets that hold a missing value. The missing values guide
+  names `normal_scores` among the tests that need `|S| + 3` rows where their variables are
+  observed. ([#1096])
 
 ## [0.17.1] - 2026-11-12
 
@@ -3100,3 +3115,4 @@ First alpha release.
 [#1070]: https://github.com/Abel-ai-lab/Andrey/pull/1070
 [#1081]: https://github.com/Abel-ai-lab/Andrey/pull/1081
 [#1086]: https://github.com/Abel-ai-lab/Andrey/pull/1086
+[#1096]: https://github.com/Abel-ai-lab/Andrey/pull/1096
