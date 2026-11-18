@@ -439,6 +439,7 @@ variable.
    exact_search
    calm
    notears
+   dagma
    mmhc
    rsmax2
    boss
@@ -475,13 +476,15 @@ CALM is a continuous-optimization method in the line of NOTEARS ({py:func}`~andr
 {py:func}`~andrey.dagma`): it minimizes a Gaussian likelihood with L0 gates under a smooth
 acyclicity constraint, within an estimated moral graph.
 
-NOTEARS (Zheng et al. 2018), {py:func}`~andrey.notears`, fits a weighted DAG by minimizing the
-least-squares loss of a linear model with an `l1` penalty under a smooth acyclicity constraint, with
-NumPy and SciPy only. It returns a DAG with the coefficient of each edge, and its fit reads the
-columns' units, and on standardized columns its result depends on the `l1` penalty. `robust=True`
-follows the first fit with a refit under the Gaussian likelihood (Deng et al. 2024). The
-[0.17.0](benchmarks/0.17.0.md#notears) release card measures it from 10 to 100 variables against
-the authors' code.
+NOTEARS (Zheng et al. 2018), {py:func}`~andrey.notears`, and DAGMA (Bello et al. 2022),
+{py:func}`~andrey.dagma`, fit a weighted DAG by minimizing the least-squares loss of a linear model
+with an `l1` penalty under a smooth acyclicity constraint, with NumPy and SciPy only. They return a
+DAG with the coefficient of each edge. Their fits read the columns' units, so their results depend
+on the data's scale (Reisach, Seiler, and Weichwald 2021). `robust=True` follows the first fit with
+a refit under the Gaussian likelihood (Deng et al. 2024). The
+[0.17.0](benchmarks/0.17.0.md#notears) release card measures NOTEARS from 10 to 100 variables
+against the authors' code, and the [0.18.0](benchmarks/0.18.0.md#dagma) release card measures both
+on measured data.
 
 AGES, aggregative greedy equivalence search (Eigenmann, Nandy, and Maathuis 2017),
 {py:func}`~andrey.ages`, is for linear-Gaussian data with weak edges. A weak edge that closes a
@@ -664,18 +667,8 @@ in a process.
    :toctree: api
    :nosignatures:
 
-   dagma
    das
 ```
-
-DAGMA (Bello et al. 2022) is a continuous-optimization learner in the line of NOTEARS: it fits a
-weighted DAG by minimizing a loss under a smooth acyclicity constraint, with NumPy and SciPy only.
-It is for data whose units are meaningful: on the usual simulated data its accuracy comes from the
-columns' variances following the causal order, and on standardized columns it does no better than
-the empty graph at its default settings, which is why it is experimental. The
-[0.17.0](benchmarks/0.17.0.md#dagma) release card has the numbers. `robust=True` follows the first
-fit with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
-(Deng et al. 2024).
 
 DAS (Montagna et al. 2023), {py:func}`~andrey.das`, finds SCORE's causal order with the same Stein
 estimator and then reads the edges from it: for a leaf, the second derivative of the log density in

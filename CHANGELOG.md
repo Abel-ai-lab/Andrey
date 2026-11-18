@@ -26,6 +26,15 @@ names its pull request.
   sum to 1), and its `cause` and `effect` columns; the six pairs with a block of several columns (52
   to 55, 71, 105) are marked `multivariate`. The collection states no license, so Andrey downloads
   the archive from the original server, checks its SHA-256, and does not redistribute it. ([#1084])
+- `dagma` is supported, with its gap stated. Against its authors' package on its paper's simulation,
+  it made no more errors in any of the 24 settings with every column z-scored or any of the 18 on the
+  simulation's own units, and in 17 of the 18 with each variable divided by its standard deviation as
+  it is generated. On the simulation's own units it made fewer errors than the empty graph in all 18
+  settings, and on z-scored columns in none of the 24, as the package. Its result depends on the
+  data's scale (Reisach, Seiler and Weichwald 2021). The [0.18.0 release card][card-0180-dagma] has
+  the numbers and a check of `dagma` and `notears` on the Sachs data: on its 853 observational
+  measurements, four fits, default and `robust=True`, on raw and z-scored columns, made 13 or 14
+  errors against the empty graph's 17. ([#1043], [#1046])
 
 ### Changed
 
@@ -52,6 +61,11 @@ names its pull request.
   targets and contexts with the columns. It exits 1 on a column order when a graph or a causal order
   changes or a weight or metadata value changes by more than rounding, and lists a difference of
   rounding alone, such as the p-values of ICP and J-PCMCI+, as information. ([#1055])
+- The Limitations of `notears` and `dagma` are one sentence: the result depends on the data's scale,
+  after Reisach, Seiler and Weichwald (2021), with a link to the release card. The registry and the
+  docstrings no longer say that the robust fit does not depend on the scale of the columns: its first
+  fit is least squares, and its penalty and threshold act on the weights in the data's units.
+  ([#1043], [#1046])
 
 ### Fixed
 
@@ -84,6 +98,15 @@ names its pull request.
   the weakest allowed one. Correct forbidden edges no longer remove a true parent that the same
   data gives without them. Its docstrings state that the five candidates kept without a test are
   the value of the authors' code's `min_parents`, which usually keeps four ([#1088]).
+- `notears(robust=True)` and `dagma(robust=True)` minimize the Gaussian likelihood of the path of
+  Deng et al. (2024) without `-log|det(I - W)|`, as its authors' code does. The term is zero
+  for every DAG, so the graphs each step is judged by do not change, but its gradient is not zero
+  while a fit is cyclic, and it led the path to other graphs. On the paper's simulation with z-scored
+  columns and 20 datasets per setting, the CPDAG errors of `dagma(robust=True)` fell from 23.05,
+  44.25, 23.50, and 54.05 to 21.30, 39.95, 17.90, and 39.05 on Erdos-Renyi and scale-free graphs
+  with 10 and 20 variables, against 20.05, 42.40, 18.15, and 39.35 for the path run with its
+  authors' code, and those of `notears(robust=True)` at 10 variables moved from 16.60 on z-scored
+  and 13.25 on raw columns to 18.50 and 11.80, against 18.45 and 11.75. ([#1043], [#1046])
 
 ## [0.17.1] - 2026-11-12
 
@@ -2645,3 +2668,6 @@ First alpha release.
 [#1082]: https://github.com/Abel-ai-lab/Andrey/pull/1082
 [#1084]: https://github.com/Abel-ai-lab/Andrey/pull/1084
 [#1088]: https://github.com/Abel-ai-lab/Andrey/pull/1088
+[#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
+[#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
+[card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma

@@ -801,9 +801,11 @@ def _sizes(regime: str) -> tuple[str, ...]:
 # measured by indicators. CAM-UV runs on its benchmark's nonlinear regimes with hidden variables.
 # SCORE and NoGAM run on their papers' simulation: Gaussian-process links with additive noise.
 # NOTEARS runs on its benchmark's cells, the simulation its claim is measured in: its least-squares
-# fit reads the columns' units, so one cell has standardized columns and one raw. AGES runs on two
-# cells of its paper's simulation, where some edges are weak, and is scored against the true DAG,
-# whose directions it claims beyond the CPDAG's.
+# fit reads the columns' units, so one cell has standardized columns and one raw. DAGMA runs on the
+# raw cell only: on standardized columns its median SHD is not below the empty graph's by a clear
+# margin at 10, 20, or 50 variables, so a standardized cell could not tell a broken fit from a
+# correct one. AGES runs on two cells of its paper's simulation, where some edges are weak, and is
+# scored against the true DAG, whose directions it claims beyond the CPDAG's.
 CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss", "sachs")
 SMALL_DATA = (*(f"linear_gauss_er_d{d}" for d, _ in SMALL_SIZES), "asia_gauss", "sachs")
 CALM_DATA = (SMALL_DATA[0], "asia_gauss")
@@ -953,6 +955,7 @@ SUPPORTED: dict[str, Method] = {
     "ExactSearch": Method(lambda x: andrey.exact_search(x), "cpdag", SMALL_DATA),
     "CALM": Method(lambda x: andrey.calm(x, seed=0), "cpdag", CALM_DATA),
     "NOTEARS": Method(lambda x: andrey.notears(x), "dag", tuple(LINEAR_SEM_CELLS)),
+    "DAGMA": Method(lambda x: andrey.dagma(x), "dag", ("notears_paper_raw_d10",)),
     "BOSS": Method(lambda x: andrey.boss(x, seed=0), "cpdag", CPDAG_DATA),
     "GRaSP": Method(lambda x: andrey.grasp(x, seed=0), "cpdag", CPDAG_DATA),
     "BOSS-FCI": Method(lambda x: andrey.boss_fci(x, seed=0), "pag", PAG_DATA),
@@ -1326,6 +1329,7 @@ SLOWEST_FIRST: tuple[tuple[str, str], ...] = (
     ("GPDC", "nonmonotone_er_d5"),
     ("ExactSearch", "linear_gauss_er_d15"),
     ("ScoreMatching", "score_paper_standardized_d10_er1"),
+    ("DAGMA", "notears_paper_raw_d10"),
     ("NOTEARS", "notears_paper_raw_d10"),
 )
 
