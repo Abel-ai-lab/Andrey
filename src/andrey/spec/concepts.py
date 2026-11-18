@@ -151,9 +151,12 @@ _POOLED_RANKS = (
     "distributions"
 )
 #: The methods that take a conditional-independence test.
-TESTED = (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp")
-#: The methods with no edge to name in knowledge, and ICP, whose tests take none.
-NO_KNOWLEDGE = ("gin", "anm", "pnl", "loci", "icp", "ages")
+TESTED = (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp", "skewd_mv")
+#: The tested methods that read continuous data only, so take the tests of continuous data.
+CONTINUOUS_TESTED = ("jpcmciplus", "skewd_mv")
+#: The methods with no edge to name in knowledge, ICP, whose tests take none, and the methods that
+#: take none yet.
+NO_KNOWLEDGE = ("gin", "anm", "pnl", "loci", "skewd", "skewd_mv", "icp", "ages")
 #: The methods whose main loop a cap can stop early.
 CAPPED_LOOPS = (
     "hc",
@@ -165,6 +168,8 @@ CAPPED_LOOPS = (
     "ica_lingam",
     "varma_lingam",
     "dynotears",
+    "skewd",
+    "skewd_mv",
 )
 #: Every method, in ``andrey.api.__all__`` order.
 ALL_METHODS: tuple[str, ...] = tuple(api.__all__)
@@ -193,6 +198,8 @@ _CONCEPTS = (
             *RESIDUAL,
             "cam",
             "resit",
+            "skewd",
+            "skewd_mv",
             "score_matching",
             "nogam",
             "das",
@@ -245,7 +252,7 @@ _CONCEPTS = (
                     fragment="p-value",
                     reason="None decides without a level: the direction with the larger p-value.",
                 )
-                for m in ("anm", "pnl", "loci")
+                for m in ("anm", "pnl", "loci", "skewd")
             ),
             Deviation(
                 method="cam",
@@ -325,6 +332,7 @@ _CONCEPTS = (
                 "It tests the independence of residuals as part of its own model.",
                 *RESIDUAL,
                 "resit",
+                "skewd",
                 "camuv",
             ),
             *_exempt(
@@ -379,6 +387,15 @@ _CONCEPTS = (
                 reason="The dummies enter every test as numeric one-hot columns, so it takes the "
                 "tests of continuous data, but not normal_scores, which ranks each column over the "
                 "rows of every dataset and so mixes their distributions.",
+            ),
+            Deviation(
+                method="skewd_mv",
+                name="indep_test",
+                default="kci",
+                choices=tuple(t for t in CONTINUOUS_INDEP_TESTS if t in UNRANKED_TESTS),
+                reason="Its likelihood stage models continuous values, so it takes the tests of "
+                "continuous data, but not normal_scores, which would make its skeleton blind to "
+                "monotone changes the likelihood stage reads; the authors' code runs PC with kci.",
             ),
         ),
     ),
@@ -627,7 +644,9 @@ _CONCEPTS = (
                 "anm",
                 "pnl",
                 "loci",
+                "skewd",
             ),
+            *_exempt("Runs PC at no depth limit, as its paper does.", "skewd_mv"),
             *_exempt(
                 "No conditional-independence tests; max_parents caps the sets it tests.", "icp"
             ),
@@ -735,6 +754,8 @@ _CONCEPTS = (
                 "granger",
                 *RESIDUAL,
                 "resit",
+                "skewd",
+                "skewd_mv",
             ),
             *_exempt(
                 "An order search with no search over parent sets: the pruning starts from every "
@@ -813,7 +834,10 @@ _CONCEPTS = (
             maximum=SEED_MAX,
         ),
         fragment="not a fresh random one",
-        suitable=(*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", *STARTS, "calm", "ica_lingam"),
+        suitable=(
+            *(*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", *STARTS, "calm", "ica_lingam"),
+            *("skewd", "skewd_mv"),
+        ),
         exempt=(
             *_exempt(
                 "Deterministic.",
@@ -1006,8 +1030,10 @@ _CONCEPTS = (
         exempt=(
             *_exempt("Its edges run from latent variables, which Knowledge cannot name.", "gin"),
             *_exempt(
-                "Two variables: knowledge of the edge would be the answer.", "anm", "pnl", "loci"
+                "Two variables: knowledge of the edge would be the answer.",
+                *("anm", "pnl", "loci", "skewd"),
             ),
+            *_exempt("Its paper gives no rule for background knowledge.", "skewd_mv"),
             *_exempt(
                 "Its tests read each set of the target's predictors as the data give it; no "
                 "knowledge of edges enters an invariance test.",
@@ -1103,6 +1129,7 @@ _CONCEPTS = (
             "anm",
             "pnl",
             "loci",
+            "skewd",
             *EM_METHODS,
         ),
         exempt=(
@@ -1124,6 +1151,7 @@ _CONCEPTS = (
                 "A score or a regression reads every column.",
                 "cam",
                 "resit",
+                "skewd_mv",
                 "score_matching",
                 "nogam",
                 "das",
@@ -1296,6 +1324,7 @@ _CONCEPTS = (
                 "Its regressions fit smooth functions of continuous causes, which an environment "
                 "label is not.",
                 *("cam", "resit", "score_matching", "nogam", "das", "camuv", "anm", "pnl", "loci"),
+                *("skewd", "skewd_mv"),
             ),
         ),
     ),

@@ -1940,6 +1940,77 @@ _add(
 )
 _add(
     MethodSpec(
+        name="skewd_mv",
+        family="functional",
+        summary="SkewD-MV for nonlinear effects with skew-normal location-scale noise on a few "
+        "variables: PC's Markov equivalence class, then the class's DAG whose skew-normal "
+        "location-scale models of each variable given its parents have the largest likelihood. "
+        "Returns a DAG. No torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            doc="DAG of the class with the largest likelihood; metadata candidates is the number "
+            "of DAGs scored and fits the number of conditional models fitted.",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "alpha", doc="Significance level of PC's conditional-independence tests."
+            ),
+            concept_param(
+                "indep_test",
+                default="kci",
+                choices=tuple(t for t in CONTINUOUS_INDEP_TESTS if t in UNRANKED_TESTS),
+                doc="PC's conditional-independence test, one of continuous data and not "
+                "normal_scores, as the likelihood stage reads the values: fisherz = Fisher's "
+                "z-transform of the partial correlation; student_t = its Student-t form; for "
+                "nonlinear effects, each far slower per test: kci = kernel test, the authors' "
+                "choice; rcot = its random-feature approximation; cmiknn = nearest-neighbor "
+                "conditional mutual information; gpdc = Gaussian-process regression and distance "
+                "correlation. null picks fisherz.",
+            ),
+            ParamSpec(
+                name="tuning_iter",
+                type="int",
+                default=20,
+                minimum=1,
+                doc="The penalty settings the Bayesian optimization scores by cross-validation for "
+                "each conditional model, at least 1; the first half, rounded up, are Latin "
+                "hypercube points. 20 is the value of the paper's runs.",
+            ),
+            concept_param(
+                "max_iter",
+                default=3000,
+                doc="Most iterations of the expectation conditional maximization of each "
+                "conditional model, at least 1; 3000 is the value of the paper's runs. Reaching it "
+                "warns with SearchLimitWarning.",
+            ),
+            ParamSpec(
+                name="max_fits",
+                type="int",
+                default=100,
+                nullable=True,
+                minimum=1,
+                doc="The most conditional models the class's DAGs may need, at least 1; more is a "
+                "ValueError, raised once they are found, before any is fitted. 100 is the order up "
+                "to which the paper expects the method to apply. null sets no cap.",
+            ),
+            concept_param(
+                "seed",
+                doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
+                "random one, so a fit repeats. Seed for PC's randomized tests and the random draws "
+                "of each fit.",
+            ),
+        ),
+        references=("Klippert & Marx 2026", "Colombo & Maathuis 2014", "Zhang et al. 2011"),
+    )
+)
+_add(
+    MethodSpec(
         name="score_matching",
         family="functional",
         summary="SCORE for nonlinear effects with additive Gaussian noise: a causal order from the "
@@ -2769,6 +2840,88 @@ _add(
     )
 )
 
+_TUNING_ITER = ParamSpec(
+    name="tuning_iter",
+    type="int",
+    default=60,
+    minimum=1,
+    doc="The penalty settings the Bayesian optimization scores by cross-validation in each "
+    "direction, at least 1; the first two thirds, rounded up, are Latin hypercube points. 60 is "
+    "the value of the paper's runs.",
+)
+
+_add(
+    MethodSpec(
+        name="skewd",
+        family="pairwise",
+        summary="Skew-normal location-scale pairwise direction test (SkewD): decides whether "
+        "column 0 causes column 1, the reverse, or neither, from a two-column table whose noise "
+        "may be skewed.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data",
+                    kind="matrix",
+                    doc="The two variables, one per column: column 0 is x, column 1 is y.",
+                ),
+            ),
+            layout="(n_samples, 2), rows are samples",
+            missing=True,
+        ),
+        params=(
+            ParamSpec(
+                name="alpha",
+                type="float",
+                default=None,
+                doc="How the two p-values decide the edge under criterion independence. null: the "
+                "direction with the larger p-value, or with the smaller HSIC statistic when the "
+                "p-values are equal. A level such as 0.05: an edge only when exactly one "
+                "direction's p-value is above it. Must be null under criterion likelihood.",
+                nullable=True,
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+                concept="alpha",
+            ),
+            ParamSpec(
+                name="criterion",
+                type="str",
+                default="independence",
+                choices=("independence", "likelihood"),
+                doc="independence = an HSIC test of each direction's scaled residual against its "
+                "proposed cause decides (SkewD-IT); likelihood = the direction whose model has the "
+                "larger likelihood (SkewD-LL).",
+            ),
+            _TUNING_ITER,
+            concept_param(
+                "max_iter",
+                default=5000,
+                doc="Most iterations of the expectation conditional maximization in each "
+                "direction, at least 1; 5000 is the value of the paper's runs. Reaching it warns "
+                "with SearchLimitWarning.",
+            ),
+            concept_param(
+                "seed",
+                doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
+                "random one, so a fit repeats. Seed for the random draws of the optimization.",
+            ),
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            doc="two-node graph with the decided edge, or none; metadata log_likelihoods maps "
+            "forward (x->y) and backward (y->x) to each model's mean log-likelihood, and under "
+            "criterion independence p_values and statistics map them to the p-value and the HSIC "
+            "statistic, divided by its mean under independence, of each test.",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        references=("Klippert & Marx 2026", "Gretton et al. 2008"),
+    )
+)
+
 # --- latent-variable family -----------------------------------------------------------------------
 
 _add(
@@ -3352,6 +3505,8 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "lpcmci": ("links", "p_values", "statistics", "parents", "conflicts"),
     **dict.fromkeys(("anm", "pnl"), ("p_values", "statistics")),
     "loci": ("log_likelihoods", "p_values", "statistics"),
+    "skewd": ("log_likelihoods", "p_values", "statistics"),
+    "skewd_mv": ("candidates", "fits"),
     "gin": ("clusters", "cluster_order", "unordered"),
     "rcd": ("confounded_pairs",),
     "bottom_up_parce_lingam": ("partial_order",),
