@@ -9,7 +9,12 @@ accept ``NaN``; every other method raises a ``ValueError`` that names it.
 from __future__ import annotations
 
 import json
+import logging
+import re
+import subprocess
+import sys
 import warnings
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -20,11 +25,18 @@ from andrey.cli import main
 from andrey.core import ci, warning_policy
 from andrey.core.ci import (
     FisherZ,
+    PartialCorrelationTest,
     StudentT,
     make_indep_test,
     register_indep_test,
 )
-from andrey.core.ci_missing import EM_METHODS, rows_metadata, rows_tested
+from andrey.core.ci_missing import (
+    EM_METHODS,
+    MORE_ROWS,
+    TESTWISE_CLAIM,
+    rows_metadata,
+    rows_tested,
+)
 from andrey.core.score import CopiedColumnsError
 from andrey.spec import REGISTRY
 from andrey.temporal.pcmci import design_test, lagged_design
@@ -96,6 +108,12 @@ TESTS = {
     "cond_gauss": (lambda: _mixed()[0], _mixed()[1]),
 }
 QUERIES = [(0, 3, ()), (3, 0, (2,)), (0, 3, (2, 1)), (1, 2, (3,))]
+#: The shipped partial-correlation tests, whose degrees of freedom set the rows a query needs.
+PARTIAL = [
+    name
+    for name, test in ci._CI_REGISTRY.items()
+    if isinstance(test, type) and issubclass(test, PartialCorrelationTest)
+]
 
 
 def _block(x: np.ndarray, columns: list[int]) -> np.ndarray:
@@ -227,16 +245,39 @@ def test_rows_tested_reports_the_fewest_and_the_median_rows():
 # --- edge cases -----------------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize("page", ["api.md", "guides/getting-started.md"])
+def test_a_page_that_names_the_tests_needing_more_rows_names_each_partial_correlation_test(page):
+    """A partial-correlation test needs ``|S| + 3`` rows; the other tests need 2."""
+    text = " ".join((Path(__file__).parents[2] / "docs" / "docs" / page).read_text().split())
+    spans = re.findall(r"\|S\| \+ 3` for (.*?) and 2 for the other tests", text)
+    assert spans
+    for span in spans:
+        named = set(re.findall(r'`"?(\w+)"?`', span)) & set(ci.SHIPPED_INDEP_TESTS)
+        assert named in (set(), set(PARTIAL))
+
+
+def _advises_more_rows(error) -> None:
+    """The advice caps the conditioning sets first, and says what dropping a column can remove."""
+    advice = str(error.value).partition("; ")[2]
+    assert advice.startswith("cap the conditioning sets with max_depth")
+    assert "or drop a column with many missing values, which can remove a common cause" in advice
+
+
 @pytest.mark.parametrize(
-    ("name", "size", "least"), [("fisherz", 2, 5), ("student_t", 1, 4), ("chisq", 1, 2)]
+    ("name", "size"), [*((name, size) for name in PARTIAL for size in (1, 2)), ("chisq", 1)]
 )
-def test_a_test_with_too_few_rows_raises_naming_its_minimum(name, size, least):
+def test_a_test_with_too_few_rows_raises_naming_its_minimum(name, size):
+    """A partial-correlation test needs ``|S| + 3`` rows, the rows of its degrees of freedom."""
     make, _ = TESTS[name]
+    least = size + 3 if name in PARTIAL else 2
     x = make()[:40]
     x[least - 1 :, 0] = np.nan  # column 0 observed on least - 1 rows
     test = make_indep_test(name, x)
-    with pytest.raises(ValueError, match=rf"on the {least - 1} rows .* needs at least {least}"):
+    with pytest.raises(
+        ValueError, match=rf"on the {least - 1} rows .* needs at least {least}"
+    ) as error:
         test(0, 1, list(range(2, 2 + size)))
+    _advises_more_rows(error)
     x[least - 1, 0] = 1.0  # one row more: the test runs
     assert 0.0 <= make_indep_test(name, x)(0, 1, list(range(2, 2 + size))) <= 1.0
 
@@ -253,6 +294,7 @@ def test_a_small_block_gives_a_p_value_or_raises(name):
                 p = test(0, 1, list(range(2, 2 + size)))
             except ValueError as error:
                 assert f"the {rows} rows where all" in str(error)
+                assert str(error).endswith(MORE_ROWS)
             else:
                 assert 0.0 <= p <= 1.0
 
@@ -283,8 +325,9 @@ def test_a_column_constant_on_a_test_rows_raises_for_a_continuous_test():
     x = _continuous(60)
     x[:30, 1] = 2.0
     x[30:, 0] = np.nan  # the rows where column 0 is observed hold column 1 constant
-    with pytest.raises(ValueError, match="constant on the 30 rows"):
+    with pytest.raises(ValueError, match="constant on the 30 rows") as error:
         make_indep_test("fisherz", x)(0, 1)
+    _advises_more_rows(error)
     assert 0.0 <= make_indep_test("fisherz", x)(1, 2) <= 1.0
 
 
@@ -348,7 +391,9 @@ def test_pandas_na_is_a_missing_value():
     frame = pd.DataFrame(x, columns=list("abcde")).astype("Float64")
     assert pd.isna(frame.iloc[:, 0]).any() and frame.iloc[:, 0].dtype == "Float64"
     assert andrey.pc(frame) == andrey.pc(pd.DataFrame(x, columns=list("abcde")))
-    with pytest.raises(ValueError, match="^ges does not accept missing values"):
+    with pytest.raises(
+        ValueError, match="^ges: pass missing=.*; ges does not accept missing values"
+    ):
         andrey.ges(frame)
 
 
@@ -486,21 +531,33 @@ def _refused_inputs(name: str) -> list:
 def test_every_other_method_refuses_missing_values_naming_itself(name):
     if name == "calm":
         pytest.importorskip("torch")  # without the extra, calm raises ImportError first
+    # The message leads with what the caller can do, then says what was refused and where.
     pattern = (
-        rf"^{name} does not accept missing values, and data\S* holds NaN .*row \d+, column \d+"
+        rf"^{name}: (drop|use|pass) .*; {name} does not accept missing values, "
+        r"and data\S* holds NaN .*row \d+, column \d+"
     )
     with pytest.raises(ValueError, match=pattern) as error:
         getattr(andrey, name)(*_refused_inputs(name))
     if name == "longitudinal_lingam":  # a panel: a unit's rows go together
-        assert "drop the units that hold one from every dataset of data" in str(error.value)
+        assert (
+            f"{name}: drop the units that hold a missing value from every dataset of data"
+            in str(error.value)
+        )
+    elif name == "jpcmciplus":  # datasets read with their contexts: no other method stands in
+        assert f"{name}: drop the datasets of data that hold a missing value" in str(error.value)
+        assert "use pcmci, pcmciplus, or lpcmci" not in str(error.value)
     elif REGISTRY[name].family == "temporal":  # one series: a step cannot be dropped
-        assert "fill in the missing steps first" in str(error.value)
-        assert "use pcmci, pcmciplus, or lpcmci" in str(error.value)
+        assert f"{name}: use pcmci, pcmciplus, or lpcmci" in str(error.value)
+        assert "keep every time step" in str(error.value)
+        assert "fill in" not in str(error.value)  # a filled step is a single imputation
     elif name in EM_METHODS:
-        assert 'pass missing="em"' in str(error.value)
-        assert "drop the rows that hold one" in str(error.value)
+        assert f'{name}: pass missing="em"' in str(error.value)
+        assert "drop the rows of data that hold a missing value yourself" in str(error.value)
     else:
-        assert "drop the rows that hold one" in str(error.value)
+        assert f"{name}: drop the rows of data that hold a missing value yourself" in str(
+            error.value
+        )
+        assert "the same rows of every argument that has one entry per row" in str(error.value)
         assert "pc, fci, cdnod, fci_jci, iamb, inter_iamb, or mmpc" in str(error.value)
         assert 'missing="em"' not in str(error.value)
 
@@ -509,7 +566,9 @@ def test_a_refused_text_category_names_the_method():
     frame = pd.DataFrame(_categorical(), columns=list("abcd"))
     frame["b"] = frame["b"].map({0.0: "low", 1.0: "mid", 2.0: "high"})
     frame.loc[3, "b"] = None
-    with pytest.raises(ValueError, match=r"^hc does not accept .* column 'b' has a missing value"):
+    with pytest.raises(
+        ValueError, match=r"^hc: drop .*; hc does not accept .* column 'b' has a missing value"
+    ):
         andrey.hc(frame, score_func="bdeu")
 
 
@@ -613,5 +672,177 @@ def test_a_series_method_refits_a_series_with_missing_steps(name):
 
 @pytest.mark.parametrize("name", ["varma_lingam", "granger"])
 def test_the_other_series_methods_refuse_missing_steps(name):
-    with pytest.raises(ValueError, match=rf"^{name} does not accept missing values"):
+    with pytest.raises(
+        ValueError, match=rf"^{name}: use pcmci, .*; {name} does not accept missing values"
+    ):
         getattr(andrey, name)(_gaps(_continuous(400), 0.05))
+
+
+def _notices(caplog) -> list[str]:
+    """The notices of a default handling logged so far."""
+    return [r.getMessage() for r in caplog.records if r.name == "andrey.api._method"]
+
+
+@pytest.mark.parametrize("name", SUPPORTED)
+def test_the_default_handling_logs_one_notice_naming_it_and_its_assumption(name, caplog):
+    x = _gaps(_continuous(400), 0.1)
+    with caplog.at_level(logging.WARNING, logger="andrey"):
+        _fit(name, _continuous(400))  # no missing value
+        _fit(name, x, missing="testwise")  # the handling chosen by name
+        assert not _notices(caplog)
+        _fit(name, x)
+        _fit(name, x)
+    (notice,) = _notices(caplog)
+    assert notice.startswith(f"andrey.{name}: ")
+    assert "test-wise deletion" in notice and TESTWISE_CLAIM in notice
+    assert 'missing="testwise"' in notice
+
+
+def test_the_notice_is_one_per_process_whatever_the_method(caplog):
+    x = _gaps(_continuous(400), 0.1)
+    with caplog.at_level(logging.WARNING, logger="andrey"):
+        andrey.pc(x)
+        andrey.fci(x)
+        andrey.anm(x[:, :2])
+    (notice,) = _notices(caplog)
+    assert notice.startswith("andrey.pc: ")
+
+
+def test_a_fit_by_em_logs_no_notice_of_a_default(caplog):
+    with caplog.at_level(logging.WARNING, logger="andrey"):
+        out = andrey.ges(_gaps(_continuous(400), 0.1), missing="em")
+    assert out.metadata["missing"] == "em" and not _notices(caplog)
+
+
+_BOOTSTRAP_PROBE = """
+import numpy as np
+
+import andrey
+
+if __name__ == "__main__":
+    rng = np.random.default_rng(0)
+    x = rng.standard_normal((300, 4))
+    x[rng.random(x.shape) < 0.1] = np.nan
+    with andrey.config(n_jobs=2):
+        for _ in range(2):
+            andrey.bootstrap("pc", x, n_resamples=4, seed=0, missing=MISSING)
+"""
+
+
+@pytest.mark.parametrize(("missing", "notices"), [(None, 1), ("testwise", 0)])
+def test_bootstrap_on_worker_processes_logs_the_notice_once_in_all(missing, notices, tmp_path):
+    """The workers of every bootstrap call stay silent; the calling process logs the one notice."""
+    probe = tmp_path / "probe.py"
+    probe.write_text(_BOOTSTRAP_PROBE.replace("MISSING", repr(missing)))
+    run = subprocess.run([sys.executable, str(probe)], capture_output=True, text=True, check=True)
+    assert run.stderr.count("the default handling, test-wise deletion") == notices
+    if notices:
+        assert "andrey.pc: " in run.stderr
+
+
+def _one_category_where_observed() -> np.ndarray:
+    """Categorical data whose column 1 holds one category on the rows that observe column 0."""
+    x = _categorical(60)
+    x[:30, 1] = 2.0
+    x[30:, 0] = np.nan
+    return x
+
+
+def _starved_queries(name: str) -> tuple[np.ndarray, np.ndarray | None, list[tuple]]:
+    """Data, categorical mask, and queries for the test ``name`` where some block is starved.
+
+    Categorical and mixed tests get a column with one category on the rows that observe another
+    (zero degrees of freedom); the others get a column observed on 4 rows, so a test given one
+    conditioner reads ``|S| + 3`` rows, where the partial-correlation tests have no degrees of
+    freedom left.
+    """
+    if name in ci.DISCRETE_INDEP_TESTS or name in ci.MIXED_INDEP_TESTS:
+        x = _one_category_where_observed()
+        mask = None
+        if name in ci.MIXED_INDEP_TESTS:
+            mask = np.ones(x.shape[1], dtype=bool)
+    else:
+        x = np.random.default_rng(5).standard_normal((40, 4))
+        x[4:, 2] = np.nan
+        mask = None
+    d = x.shape[1]
+    pairs = [(i, j) for i in range(d) for j in range(i + 1, d)]
+    queries = [(i, j, []) for i, j in pairs]
+    queries += [(i, j, [k]) for i, j in pairs for k in range(d) if k not in (i, j)]
+    return x, mask, queries
+
+
+def _ask(test, query: tuple, path: str) -> float | None:
+    """The p-value of ``query`` through the wrapper's method ``path``; ``None`` when it raises."""
+    try:
+        return _ask_path(test, query, path)
+    except ValueError:
+        return None
+
+
+def _ask_path(test, query: tuple, path: str) -> float:
+    x, y, cond = query
+    if path == "call":
+        return float(test(x, y, cond))
+    if path == "batched_call":
+        return float(test.batched_call(x, y, [cond])[0])
+    xs, ys, conds = np.array([x]), np.array([y]), np.array([cond], dtype=np.intp).reshape(1, -1)
+    return float(test.statistic_pvalues(xs, ys, conds)[1][0])
+
+
+@pytest.mark.parametrize("name", ci.available_indep_tests())
+def test_every_registered_test_counts_the_queries_it_answers_with_p_one(name):
+    x, mask, queries = _starved_queries(name)
+    test = make_indep_test(name, x, categorical=mask)
+    paths = [
+        "call",
+        "statistic_pvalues",
+        *(["batched_call"] if hasattr(test, "batched_call") else []),
+    ]
+    for path in paths:
+        with rows_tested() as rows:
+            answers = [p for p in (_ask(test, q, path) for q in queries) if p is not None]
+        ones = sum(p == 1.0 for p in answers)
+        assert answers and sum(rows.values()) == len(answers), (name, path)
+        assert rows.p_one == ones, (name, path)
+        assert rows_metadata(rows).get("p_one_tests", 0) == ones, (name, path)
+
+
+@pytest.mark.parametrize("name", ["fisherz", "normal_scores", "chisq", "gsq", "degen_gauss"])
+def test_a_test_with_no_degrees_of_freedom_left_answers_p_one_and_is_counted(name):
+    x, mask, queries = _starved_queries(name)
+    test = make_indep_test(name, x, categorical=mask)
+    with rows_tested() as rows:
+        answers = [test(*q) for q in queries]
+    assert 1.0 in answers and rows.p_one >= 1
+    assert rows.p_one < len(queries)  # the tests with degrees of freedom are not counted
+
+
+def test_a_registered_test_is_counted_as_the_shipped_ones_are(monkeypatch):
+    answer = {"p": 1.0}
+    monkeypatch.setitem(ci._CI_REGISTRY, "constant", lambda data: lambda x, y, s=(): answer["p"])
+    data = _gaps(_continuous(60), 0.1)
+    test = make_indep_test("constant", data)
+    with rows_tested() as rows:
+        for pair in [(0, 1), (0, 2), (1, 2)]:
+            test(*pair, [3])
+        answer["p"] = 0.5
+        test(0, 4)
+    assert rows.p_one == 3 and sum(rows.values()) == 4
+
+
+def test_a_fit_records_the_tests_answered_p_one_only_when_it_has_some():
+    rng = np.random.default_rng(2)
+    x = rng.standard_normal(60)
+    data = np.column_stack(
+        [x, x + 0.3 * rng.standard_normal(60), x + 0.3 * rng.standard_normal(60)]
+    )
+    data[4:, 2] = np.nan  # the tests that read column 2 and a conditioner read 4 rows: no df left
+    assert andrey.pc(data, indep_test="fisherz").metadata["p_one_tests"] >= 1
+    assert "p_one_tests" not in andrey.pc(data, indep_test="student_t").metadata
+    out = andrey.pc(_one_category_where_observed(), indep_test="chisq")
+    assert out.metadata["p_one_tests"] >= 1
+    assert out.metadata["rows_tested"]["min"] == 30
+    assert "p_one_tests" not in andrey.pc(_gaps(_categorical(), 0.05), indep_test="chisq").metadata
+    assert "p_one_tests" not in andrey.pc(_gaps(_continuous(400), 0.1)).metadata
+    assert "p_one_tests" not in andrey.pc(_categorical(), indep_test="chisq").metadata

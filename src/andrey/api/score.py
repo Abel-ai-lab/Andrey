@@ -140,7 +140,9 @@ def ges(
         expectation-maximization (EM) over the expected covariance of the data, which assumes values
         missing completely at random or at random given observed values. ``None`` refuses missing
         values. On data with missing values, ``metadata["missing"]`` records the handling used and
-        ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
+        ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
+        fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
+        See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -349,7 +351,7 @@ def ges(
     at random or at random given observed values; when whether a value is missing depends on the
     missing values themselves, the expected covariance is biased, and the data cannot show it. On
     complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete
-    rows first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    rows yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
@@ -622,7 +624,7 @@ def ages(
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
     variable, each over every row, and terms over different rows do not add up to the score of one
     dataset, so the search cannot delete rows per test as the conditional-independence searches do.
-    Drop the incomplete rows first, which suits values missing completely at random, or use
+    Drop the incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on the paper's simulation at 10 variables only: 23 settings of strong
@@ -913,7 +915,7 @@ def gies(
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
     variable, each over every row, and terms over different rows do not add up to the score of one
     dataset, so the search cannot delete rows per test as the conditional-independence searches do.
-    Drop the incomplete rows first, which suits values missing completely at random, or use
+    Drop the incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured at the standard BIC (``ebic_gamma=0.0``) on simulated linear-Gaussian
@@ -1196,7 +1198,7 @@ def gnies(
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
     variable, each over every row, and terms over different rows do not add up to the score of one
     dataset, so the search cannot delete rows per test as the conditional-independence searches do.
-    Drop the incomplete rows first, which suits values missing completely at random, or use
+    Drop the incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured with the targets unknown on simulated data from the model above:
@@ -1415,7 +1417,9 @@ def xges(
         structural expectation-maximization (EM) over the expected covariance of the data, which
         assumes values missing completely at random or at random given observed values. ``None``
         refuses missing values. On data with missing values, ``metadata["missing"]`` records the
-        handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
+        handling used and ``metadata["em"]`` the EM record, with the rows dropped for observing no
+        value and the fewest rows two columns share; two columns that share no observed row raise
+        ``ValueError``. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -1532,7 +1536,7 @@ def xges(
     holds when values are missing completely at random or at random given observed values; when
     whether a value is missing depends on the missing values themselves, the expected covariance is
     biased, and the data cannot show it. On complete data, ``"em"`` gives the complete-data result.
-    Without ``"em"``, drop the incomplete rows first, which suits values missing completely at
+    Without ``"em"``, drop the incomplete rows yourself, which suits values missing completely at
     random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
@@ -1641,7 +1645,7 @@ def xges(
         return found, found[0]
 
     with copies_named(labels):
-        (cpdag, score), em = fit_missing(X, missing, fit, bic=True)
+        (cpdag, score), em = fit_missing(X, missing, fit, rows=np.shape(data)[0], bic=True)
     metadata = {"score": json_safe(score), **categorical_metadata(mask, data), **em}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
@@ -1756,7 +1760,9 @@ def hc(
         expectation-maximization (EM) over the expected covariance of the data, which assumes values
         missing completely at random or at random given observed values. ``None`` refuses missing
         values. On data with missing values, ``metadata["missing"]`` records the handling used and
-        ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
+        ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
+        fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
+        See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -1924,7 +1930,7 @@ def hc(
     at random or at random given observed values; when whether a value is missing depends on the
     missing values themselves, the expected covariance is biased, and the data cannot show it. On
     complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete
-    rows first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    rows yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
@@ -2163,7 +2169,9 @@ def tabu(
         expectation-maximization (EM) over the expected covariance of the data, which assumes values
         missing completely at random or at random given observed values. ``None`` refuses missing
         values. On data with missing values, ``metadata["missing"]`` records the handling used and
-        ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
+        ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
+        fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
+        See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -2323,7 +2331,7 @@ def tabu(
     at random or at random given observed values; when whether a value is missing depends on the
     missing values themselves, the expected covariance is biased, and the data cannot show it. On
     complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete
-    rows first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    rows yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
@@ -2525,7 +2533,9 @@ def exact_search(
         structural expectation-maximization (EM) over the expected covariance of the data, which
         assumes values missing completely at random or at random given observed values. ``None``
         refuses missing values. On data with missing values, ``metadata["missing"]`` records the
-        handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
+        handling used and ``metadata["em"]`` the EM record, with the rows dropped for observing no
+        value and the fewest rows two columns share; two columns that share no observed row raise
+        ``ValueError``. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Each variable's parent sets exclude
@@ -2648,7 +2658,7 @@ def exact_search(
     when values are missing completely at random or at random given observed values; when whether a
     value is missing depends on the missing values themselves, the expected covariance is biased,
     and the data cannot show it. On complete data, ``"em"`` gives the complete-data result. Without
-    ``"em"``, drop the incomplete rows first, which suits values missing completely at random, or
+    ``"em"``, drop the incomplete rows yourself, which suits values missing completely at random, or
     use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for ``ebic_gamma=0.0``. Measured on
@@ -2752,7 +2762,7 @@ def exact_search(
         return found, found
 
     with copies_named(labels):
-        dag, em = fit_missing(X, missing, fit, bic=True)
+        dag, em = fit_missing(X, missing, fit, rows=np.shape(data)[0], bic=True)
     marks = dag.to_numpy()
     cpdag = dag2cpdag(marks)
     if constraints is not None:
@@ -2848,7 +2858,9 @@ def calm(
         structural expectation-maximization (EM) over the expected covariance of the data, which
         assumes values missing completely at random or at random given observed values. ``None``
         refuses missing values. On data with missing values, ``metadata["missing"]`` records the
-        handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
+        handling used and ``metadata["em"]`` the EM record, with the rows dropped for observing no
+        value and the fewest rows two columns share; two columns that share no observed row raise
+        ``ValueError``. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The candidate edges are the pairs
@@ -2970,7 +2982,7 @@ def calm(
     completely at random or at random given observed values; when whether a value is missing depends
     on the missing values themselves, the expected covariance is biased, and the data cannot show
     it. On complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the
-    incomplete rows first, which suits values missing completely at random, or use
+    incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores
@@ -3067,7 +3079,7 @@ def calm(
         return found, found.dag
 
     with copies_named(labels):
-        result, em = fit_missing(X, missing, fit)
+        result, em = fit_missing(X, missing, fit, rows=np.shape(data)[0])
     return structure_output(
         result.dag,
         labels=labels,

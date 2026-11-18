@@ -667,9 +667,11 @@ out.metadata["rows_tested"]
 `metadata["rows_tested"]` gives the minimum (`min`) and median number of rows read by a test.
 `metadata["missing"]` names the handling the fit used; a fit on complete data has neither entry.
 The argument `missing` names the handling. `missing="testwise"` is test-wise deletion.
-`None`, the default, picks the method's default handling, which is `"testwise"` for every method
-that takes the argument. A value a method does not list raises a `ValueError` that names the values
-it takes:
+`None`, the default, picks the method's default handling: `"testwise"` in the methods whose tests
+delete rows, and a refusal in the searches that take only `"em"` (below). The first fit of a
+session that runs test-wise deletion under `None` logs one notice that names the handling and what
+it assumes; pass `missing="testwise"` to choose it by name. A value a method does not list raises a
+`ValueError` that names the values it takes:
 
 ```{code-cell} ipython3
 andrey.pc(gappy, missing="testwise").structure == out.structure
@@ -680,12 +682,18 @@ tests at once. The other tests are built anew on each test's rows, which costs m
 keeps every step: each row of the lagged design that reads a missing value holds it. Each test of
 PCMCI, PCMCI+, or LPCMCI reads the design rows where all of its lagged variables are observed.
 
-Deleting rows per test is sound when values are missing completely at random: the rows a test keeps
-are then a random sample of all rows. When whether a value is missing depends on the variables, as
-when high incomes go unreported, the rows a test keeps are a selected sample. PC's tests can then
-find dependence where the population has none and keep extra edges ([Tu et al., 2019][tu]); FCI
-allows for selection and stays sound when no missingness mechanism causally affects another
-([Strobl, Visweswaran, and Spirtes, 2018][strobl]).
+Test-wise deletion is valid when values are missing completely at random, which means that whether
+a value is missing depends on no value in the data; the rows a test reads are then a random sample
+of all rows, and otherwise they are a selected sample that more rows do not correct. This holds
+for every method that deletes rows per test, `fci` included
+([Strobl, Visweswaran, and Spirtes, 2018][strobl]). When whether a value is missing depends on the
+variables, as when high incomes go unreported, the tests can find dependence where the population
+has none, and a fit can keep extra edges ([Tu et al., 2019][tu]) and get orientations wrong.
+
+Dropping every row that holds a missing value and then running the method is your own step. It is
+valid under the same condition, and it keeps fewer rows: check how many are left first, and drop
+the same rows from `env` and every other argument that has one entry per row. Never drop a step of
+a time series.
 
 `andrey.pc(data, missing="mvpc")` corrects PC for those extra edges with Missing-Value PC
 ([Tu et al., 2019][tu]). It finds the variables each missingness indicator depends on, then tests
@@ -719,12 +727,17 @@ its search for those variables can take a long time; `max_depth` bounds it. On l
 deletion in 12 settings, on two sets of datasets each. The
 [0.16.0 release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data) has the numbers.
 
-A test needs enough rows where its variables are observed: `|S| + 3` for `fisherz` and `student_t`,
-with `|S|` the size of its conditioning set, and 2 for the other tests. A test with fewer rows
-raises a `ValueError` that says so. Drop the columns with the most missing values, or cap the
-conditioning sets with `max_depth` (`max_p_global` in LPCMCI and the same-step phases of PCMCI+). A
-column with no observed value, or with one value throughout, raises before the fit, and so does
-infinity, which is not a missing value. CD-NOD needs a complete `env`.
+A test needs enough rows where its variables are observed: `|S| + 3` for the partial-correlation
+tests (`fisherz`, `student_t`, and `normal_scores`), with `|S|` the size of its conditioning set,
+and 2 for the other tests. A test with fewer rows raises a `ValueError` that says so. Cap the
+conditioning sets with `max_depth` (`max_p_global` in LPCMCI and the same-step phases of PCMCI+), or
+drop a column with many missing values, which can remove a common cause of the columns that stay.
+A test with zero degrees of freedom, as when a column holds one category on the test's rows or
+`fisherz` reads `|S| + 3` rows, returns a p-value of 1, which reads as independence without
+evidence. `metadata["p_one_tests"]`, present when it is not zero, counts every test of the fit that
+returned a p-value of 1, whichever test it is. A column with no observed value, or with one value
+throughout, raises before the fit, and so does infinity, which is not a missing value. CD-NOD needs
+a complete `env`.
 
 The searches whose fit reads the data only through their covariance, {{ em_methods }}, cannot delete
 rows per test. They refuse missing values by default, with a message that names `missing="em"`.
@@ -743,9 +756,15 @@ em = andrey.ges(gappy, missing="em")
 em.metadata["em"]["log_likelihood"][-1]
 ```
 
-EM is sound when values are missing completely at random or at random given observed values. When
-whether a value is missing depends on the missing value itself, it has no guarantee. Each fit runs
-the search 10 times, and `missing="em"` takes only `score_func="bic"` and no `env`.
+EM suits data that fit its model, a linear model with Gaussian noise, when whether a value is
+missing depends at most on columns that have no missing values, and when the columns are observed
+together often enough. This is measured, not proved: no result we know of covers the loop as it
+runs. When whether a value is missing depends on the value itself or on other columns that have
+missing values, EM has no guarantee. Each fit runs the search 10 times, and `missing="em"` takes
+only `score_func="bic"` and no `env`. A row with no observed value is dropped first, and two
+columns that share no observed row raise a `ValueError`: the data hold no covariance for them.
+`metadata["em"]` records the rows dropped (`rows_dropped`) and the fewest rows that observe both
+columns of a pair (`min_shared_rows`).
 
 `missing="em"` is supported in `ges`, `hc`, `tabu`, `boss`, `grasp`, and `notears`, where no setting
 we measured was less accurate than a reference implementation on the first datasets and again on
@@ -771,7 +790,10 @@ Every other method raises a `ValueError` that names it: its score or loss reads 
 the same rows, so it cannot delete rows per test. Drop the incomplete rows yourself, with
 `data.dropna()` for a DataFrame, which suits values missing completely at random, or use one of the
 methods above. A time series cannot lose a step without joining the steps around it, so for
-VARMA-LiNGAM, Granger, DYNOTEARS, and J-PCMCI+, fill in the missing steps first.
+VARMA-LiNGAM, Granger, and DYNOTEARS, use PCMCI, PCMCI+, or LPCMCI instead, whose tests delete rows
+per test and keep every time step. J-PCMCI+ reads several datasets with their contexts, which those
+three do not, so no method that accepts missing values replaces it: drop the datasets that hold a
+missing value. Each refusal leads with what you can do.
 
 ## Backends and parallelism
 
