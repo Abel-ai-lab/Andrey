@@ -45,18 +45,25 @@ def _listed(names: Sequence[str]) -> str:
     return names[0] if len(names) == 1 else f"{', '.join(names[:-1])}, or {names[-1]}"
 
 
-#: The ways on that a refusal of missing values names, for a table of independent rows, ``{name}``
-#: the data's argument; for one time series, whose steps cannot be dropped; and for a panel.
+#: The ways on that a refusal of missing values leads with, for a table of independent rows,
+#: ``{name}`` the data's argument; for one time series, which cannot drop a step; for a panel; and
+#: for several datasets read with their contexts, which no other method does.
+#: Dropping rows is the caller's own step, and is valid as test-wise deletion is.
 DROP_ROWS = (
-    "drop the rows that hold one (for a DataFrame, {name}.dropna()), or use a method that deletes "
-    f"rows per test: {_listed(TESTWISE_METHODS)}, or for a time series "
-    f"{_listed(TESTWISE_SERIES_METHODS)}"
+    "drop the rows of {name} that hold a missing value yourself (for a DataFrame, "
+    "{name}.dropna()), with the same rows of every argument that has one entry per row, which "
+    "suits values missing completely at random, or use a method that deletes rows per test "
+    f"({_listed(TESTWISE_METHODS)}, or for a time series {_listed(TESTWISE_SERIES_METHODS)})"
 )
-FILL_STEPS = (
-    "fill in the missing steps first, as dropping one would join the steps around it, or use "
-    f"{_listed(TESTWISE_SERIES_METHODS)}, whose tests delete rows per test"
+KEEP_STEPS = (
+    f"use {_listed(TESTWISE_SERIES_METHODS)}, whose tests delete rows per test and keep every "
+    "time step, as dropping a step would join the steps around it"
 )
-DROP_UNITS = "drop the units that hold one from every dataset of {name}"
+DROP_UNITS = "drop the units that hold a missing value from every dataset of {name}"
+DROP_DATASETS = (
+    "drop the datasets of {name} that hold a missing value, as no method that accepts missing "
+    "values reads several datasets with their contexts"
+)
 
 
 def fit_by_em(method: str | None) -> str:
@@ -69,7 +76,8 @@ def fit_by_em(method: str | None) -> str:
     mark = "" if method in EM_SUPPORTED else " (experimental)"
     return (
         f'pass missing="em"{mark}, which fits the method by expectation-maximization over '
-        "the expected covariance, or drop the rows that hold one (for a DataFrame, {name}.dropna())"
+        "the expected covariance, or drop the rows of {name} that hold a missing value yourself "
+        "(for a DataFrame, {name}.dropna()), which suits values missing completely at random"
     )
 
 
@@ -97,7 +105,8 @@ def data_matrix(
     model, and in the E-step it would count as a row and add the model's whole covariance to the
     expected covariance. Without ``missing``, a missing value raises,
     naming ``method`` when it is given, and ``fix``, the way on: :data:`DROP_ROWS` by default,
-    :data:`FILL_STEPS` for one time series, or :data:`DROP_UNITS` for a panel.
+    :data:`KEEP_STEPS` for one time series, :data:`DROP_UNITS` for a panel, or
+    :data:`DROP_DATASETS` for datasets read with their contexts.
 
     Checked data larger than ``method``'s measured boundary warn once per method
     (:func:`~andrey.api._boundary.warn_past_boundary`), before the fit. With ``method`` given,
@@ -219,13 +228,15 @@ def _missing_values(
 def _refusal(method: str | None, name: str, where: str, fix: str = DROP_ROWS) -> str:
     """Return the refusal of a method without missing values, found ``where`` in ``name``.
 
-    ``fix``, with ``{name}`` for the data's argument, says what to do instead.
+    The message leads with ``fix``, what the caller can do, with ``{name}`` for the data's
+    argument, and then says what was refused and where.
     """
     who = "this method" if method is None else method
+    lead = "" if method is None else f"{method}: "
     base = name.split("[")[0]
     return (
-        f"{who} does not accept missing values, and {name} {where}; {fix.format(name=base)} (see "
-        "Missing values in the getting-started guide)"
+        f"{lead}{fix.format(name=base)}; {who} does not accept missing values, and {name} {where} "
+        "(see Missing values in the getting-started guide)"
     )
 
 
@@ -606,27 +617,56 @@ def fit_missing(
     missing: str | None,
     fit: Callable[[np.ndarray | None], tuple[R, GraphStructure]],
     *,
+    rows: int,
     bic: bool = False,
 ) -> tuple[R, dict[str, object]]:
-    """Run a fit on ``X``, by structural EM when ``missing="em"`` and ``X`` holds ``NaN``.
+    """Run a fit on ``X``, by structural EM when ``missing="em"`` and the data hold ``NaN``.
 
     ``fit(cov)`` runs the method's search over the covariance ``cov``, divided by the number of
     rows, in place of the data's, or over the data's own with ``None``, and returns its result and
-    the graph it learned. Without a missing value, or without ``"em"``, ``fit(None)`` runs once and
+    the graph it learned. ``rows`` is the number of rows the caller's data had: with ``"em"``,
+    :func:`data_matrix` dropped the ``rows - len(X)`` of them that observe no value. Without
+    ``"em"``, or when no row was dropped and ``X`` holds no ``NaN``, ``fit(None)`` runs once and
     the metadata are empty. Otherwise :func:`~andrey.search.em.structural_em` runs it on each
-    expected covariance, and the metadata hold its record under ``"em"``. With ``bic``, the fit
-    scores by the linear-Gaussian BIC, so copies among the observed values raise
+    expected covariance, and the metadata hold its record under ``"em"``, with ``"rows_dropped"``,
+    the rows dropped for observing no value, and ``"min_shared_rows"``, the fewest rows that
+    observe both columns of a pair. When every missing value sat in a dropped row, ``fit(None)``
+    runs once on the rows left and the record holds no round.
+
+    Raises ``ValueError`` when two columns share no observed row: the data hold no covariance for
+    the pair, and a value for it would come from the model alone. With ``bic``, the fit scores by
+    the linear-Gaussian BIC, so copies among the observed values raise
     :class:`~andrey.core.score.CopiedColumnsError` first
     (:func:`~andrey.search.em.observed_copies`), as on complete data.
     """
-    if missing != EM or not np.isnan(X).any():
+    dropped = rows - X.shape[0] if missing == EM else 0
+    gaps = bool(np.isnan(X).any())
+    if missing != EM or not (gaps or dropped):
         return fit(None)[0], {}
-    from andrey.search.em import observed_copies, structural_em
+    from andrey.search.em import PARAMETER_STEPS, observed_copies, shared_rows, structural_em
 
+    shared = shared_rows(X)
+    apart = np.argwhere(np.triu(shared == 0, 1))
+    if apart.size:
+        i, j = (int(k) for k in apart[0])
+        raise ValueError(
+            f"drop column {i} or column {j} (counted from 0), or add rows that observe both: "
+            f'missing="em" needs every pair of columns observed together in at least one row, and '
+            "these two share none, so the data hold no covariance for them"
+        )
+    extra: dict[str, object] = {"rows_dropped": dropped, "min_shared_rows": int(shared.min())}
+    if not gaps:
+        record: dict[str, object] = {
+            "iterations": 0,
+            "parameter_steps": PARAMETER_STEPS,
+            "log_likelihood": [],
+            "graph_changed": [],
+        }
+        return fit(None)[0], {"em": record | extra}
     if bic and (groups := observed_copies(X)):
         raise copies_error(groups)
     result, record = structural_em(X, fit)
-    return result, {"em": record}
+    return result, {"em": record | extra}
 
 
 def bic_cov(cov: np.ndarray | None, n: int) -> np.ndarray | None:
@@ -693,7 +733,7 @@ def cpdag_search(
         return found, found[0]
 
     with copies_named(labels, index_namer(labels, column)):
-        (cpdag, score), em = fit_missing(augmented, missing, fit, bic=True)
+        (cpdag, score), em = fit_missing(augmented, missing, fit, rows=np.shape(data)[0], bic=True)
     cpdag, index_edges = split_index(cpdag, column)
     metadata = {"score": json_safe(score), **categorical_metadata(mask, data), **em}
     if "n_perturbations" in settings and settings["n_starts"] != 1:

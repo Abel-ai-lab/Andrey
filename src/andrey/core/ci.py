@@ -832,7 +832,8 @@ class ChiSquare:
     support when the cell's expected count is below 10, and expanded about it through the fourth
     central moment above, which is within ``2e-3`` per cell. This is the semiparametric test of
     Tsamardinos and Borboudakis [4]_ with the mean worked out where they estimate it by shuffling.
-    With zero degrees of freedom the p-value is ``1``.
+    With zero degrees of freedom the p-value is ``1``: the rows hold no evidence for or against
+    independence, and the answer reads as independence.
 
     **Limitations.** Referring the statistic to ``(r_x - 1) * (r_y - 1)`` degrees of freedom
     over-rejects a true independence once the table is sparse, G-square more than Pearson [5]_.
@@ -1353,9 +1354,9 @@ class DGTest:
     correlations of ``x``'s and ``y``'s columns after the linear regression on ``S``'s. Its degrees
     of freedom are the product of the two variables' numbers of columns, and its p-value is the
     chi-square survival function. A direction of ``x`` or ``y`` that ``S`` determines exactly
-    carries no information and adds no degree of freedom; with none left, the p-value is ``1``. On
-    continuous columns only, the statistic is ``-n log(1 - r**2)`` with ``r`` the partial
-    correlation.
+    carries no information and adds no degree of freedom; with none left, the p-value is ``1``,
+    which reads as independence without evidence. On continuous columns only, the statistic is
+    ``-n log(1 - r**2)`` with ``r`` the partial correlation.
 
     The statistic does not depend on the columns' units, and queries are canonicalized as
     :class:`FisherZ`'s are, so the p-value does not depend on the argument order.

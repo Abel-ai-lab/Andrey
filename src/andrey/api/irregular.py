@@ -221,9 +221,11 @@ def anm(
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both tests read only the rows
     where both columns are observed, which for a pair are the rows test-wise deletion keeps;
-    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. When values are
-    missing completely at random, those rows are a random sample of all rows. Fewer than 2 such
-    rows, or a column constant on them, raises ``ValueError``.
+    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. Fewer than 2 such
+    rows, or a column constant on them, raises ``ValueError``. Test-wise deletion is valid when
+    values are missing completely at random, which means that whether a value is missing depends on
+    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
+    they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated cause-effect pairs with a nonlinear additive-noise
     mechanism and Gaussian noise, with rows doubling from 1,000, on 4 cores with a cap of 1 h and 28
@@ -382,9 +384,11 @@ def pnl(
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both tests read only the rows
     where both columns are observed, which for a pair are the rows test-wise deletion keeps;
-    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. When values are
-    missing completely at random, those rows are a random sample of all rows. Fewer than 2 such
-    rows, or a column constant on them, raises ``ValueError``.
+    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. Fewer than 2 such
+    rows, or a column constant on them, raises ``ValueError``. Test-wise deletion is valid when
+    values are missing completely at random, which means that whether a value is missing depends on
+    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
+    they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated cause-effect pairs with a post-nonlinear mechanism, a
     linear inner transform and an invertible nonlinear outer one, and Laplace noise, with rows
@@ -534,9 +538,11 @@ def loci(
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits read only the rows
     where both columns are observed, which for a pair are the rows test-wise deletion keeps;
-    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. When values are
-    missing completely at random, those rows are a random sample of all rows. Fewer than 2 such
-    rows, or a column constant on them, raises ``ValueError``.
+    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. Fewer than 2 such
+    rows, or a column constant on them, raises ``ValueError``. Test-wise deletion is valid when
+    values are missing completely at random, which means that whether a value is missing depends on
+    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
+    they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated cause-effect pairs of 500, 1,000, and 2,000 rows, 100
     pairs per setting, on one core: location-scale pairs with Gaussian, Gumbel, or Laplace noise,
@@ -710,7 +716,7 @@ def rcd(
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the causal order compares the
     residuals of every variable over the same rows, so a row with a missing value has no place in
-    it. Drop the incomplete rows first, which suits values missing completely at random, or use
+    it. Drop the incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear data with uniform noise from Erdos-Renyi graphs in
@@ -856,7 +862,7 @@ def bottom_up_parce_lingam(
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the causal order compares the
     residuals of every variable over the same rows, so a row with a missing value has no place in
-    it. Drop the incomplete rows first, which suits values missing completely at random, or use
+    it. Drop the incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear data with uniform noise from Erdos-Renyi graphs in

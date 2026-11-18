@@ -24,7 +24,7 @@ from pydantic import model_validator
 from andrey import api
 from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.core.ci import CONTINUOUS_INDEP_TESTS, SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS
-from andrey.core.ci_missing import EM, EM_METHODS, MISSING_HANDLING, MVPC
+from andrey.core.ci_missing import EM, EM_METHODS, MISSING_HANDLING, MVPC, TESTWISE_CLAIM
 from andrey.core.env import SEED_MAX
 from andrey.core.fdr import FDR_METHODS
 from andrey.core.invariance import TWO_GROUP_INVARIANCE_TESTS
@@ -1021,10 +1021,11 @@ _CONCEPTS = (
         key="missing",
         summary="How a fit handles missing values: a NaN cell, pandas' NA, or an empty, NA, or N/A "
         "field of a CSV file. testwise deletes rows per test, each test reading the rows that "
-        "observe its variables; em fits a search that reads only a covariance by structural EM "
-        "over the expected covariance. None picks the method's default handling: testwise for the "
-        "methods that delete rows per test, and a refusal for those that take only em; each method "
-        "lists the values it accepts.",
+        f"observe its variables. {TESTWISE_CLAIM} em fits a search that reads only a covariance "
+        "by structural EM over the expected covariance. None picks the method's default handling: "
+        "testwise for the methods that delete rows per test, with one logged notice per process "
+        "that names it, and a refusal for those that take only em; each method lists the values "
+        "it accepts.",
         param=_template(
             "missing",
             "str",

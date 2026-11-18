@@ -16,6 +16,7 @@ from __future__ import annotations
 import dataclasses
 import functools
 import inspect
+import logging
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -25,7 +26,7 @@ from andrey.api._adapt import default_score, default_test, label_of
 from andrey.core import environments
 from andrey.core.backend import config
 from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS, available_indep_tests
-from andrey.core.ci_missing import TESTWISE
+from andrey.core.ci_missing import TESTWISE, TESTWISE_CLAIM
 from andrey.core.knowledge import PATH_PARTS, Knowledge, resolve
 from andrey.core.removed import removal_hint
 from andrey.core.score import LINEAR_SCORES, PENALIZED_SCORES, RANK_SCORES
@@ -35,6 +36,7 @@ from andrey.core.warning_policy import (
     DeprecatedArgumentWarning,
     ExperimentalWarning,
     KnowledgeWarning,
+    log_once,
     warn_each,
     warn_once,
 )
@@ -45,6 +47,8 @@ if TYPE_CHECKING:
     from andrey.spec.models import MethodSpec, ParamSpec
 
 __all__ = ["method_spec"]
+
+_log = logging.getLogger(__name__)
 
 Facade = TypeVar("Facade", bound=Callable[..., Any])
 
@@ -591,12 +595,37 @@ def missing_used(
 
     A fit met them when its tests counted the rows they read, ``metadata["rows_tested"]``, or when
     it ran structural EM, ``metadata["em"]``. The value is the call's ``missing`` or, for ``None``,
-    the method's default handling, ``"testwise"``.
+    the method's default handling, ``"testwise"``, which the call did not name: the first such fit
+    of the process logs :func:`notice_default_missing`.
     """
     met = "rows_tested" in out.metadata or "em" in out.metadata
     if not met or not any(p.concept == "missing" for p in spec.params):
         return {}
+    if arguments.get("missing") is None:
+        notice_default_missing(spec.name)
     return {"missing": arguments.get("missing") or TESTWISE}
+
+
+#: The key of :func:`notice_default_missing` in :func:`~andrey.core.warning_policy.log_once`.
+MISSING_DEFAULT_NOTICE = "missing_default"
+
+
+def notice_default_missing(method: str) -> None:
+    """Log, once per process, that ``method`` ran test-wise deletion as its default handling.
+
+    The notice says which handling ran, when it is valid
+    (:data:`~andrey.core.ci_missing.TESTWISE_CLAIM`), and how to choose it by name. The worker
+    processes of :func:`~andrey.bootstrap` log none: the calling process logs it for their fits.
+    """
+    log_once(
+        _log,
+        MISSING_DEFAULT_NOTICE,
+        f"andrey.{method}: the data hold missing values and missing=None, so the fit ran the "
+        "default handling, test-wise deletion: each test read only the rows where its variables "
+        f'are observed. {TESTWISE_CLAIM} Pass missing="testwise" to choose it by name, and read '
+        'the rows the tests kept in metadata["rows_tested"]. This notice is logged once per '
+        "process.",
+    )
 
 
 def stamped(out: StructureOutput, stamp: dict[str, object]) -> StructureOutput:

@@ -18,6 +18,7 @@ import importlib.metadata
 import inspect
 import io
 import json
+import logging
 import math
 import os
 import platform
@@ -1071,6 +1072,46 @@ def fit_errors() -> Generator[None]:
         raise CliError("algorithm_failure", str(exc), EXIT_ALGORITHM) from exc
 
 
+class LogWarning(Warning):
+    """The category ``run.warnings`` gives a warning-level log record of a fit."""
+
+
+class _LogRecords(logging.Handler):
+    """Collects the warning-level records of the ``andrey`` loggers as warnings."""
+
+    def __init__(self) -> None:
+        super().__init__(logging.WARNING)
+        self.caught: list[warnings.WarningMessage] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.caught.append(
+            warnings.WarningMessage(record.getMessage(), LogWarning, record.pathname, record.lineno)
+        )
+
+
+@contextlib.contextmanager
+def recorded_warnings() -> Generator[list[warnings.WarningMessage]]:
+    """Record a fit's warnings and the warning-level records of its loggers, for ``run.warnings``.
+
+    The list fills when the block exits, the warnings first and the log records after, each record
+    as a :class:`LogWarning`. The ``andrey`` logger holds only the recording handler and does not
+    propagate during the block, so no record reaches standard error, through the handlers of the
+    root logger or an embedding application's either; both are restored after it.
+    """
+    handler = _LogRecords()
+    logger = logging.getLogger("andrey")
+    handlers, propagate = logger.handlers[:], logger.propagate
+    recording: list[logging.Handler] = [handler]
+    logger.handlers, logger.propagate = recording, False
+    try:
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            yield caught
+        caught.extend(handler.caught)
+    finally:
+        logger.handlers, logger.propagate = handlers, propagate
+
+
 def run_info(
     positional: list,
     resolved: dict,
@@ -1127,8 +1168,7 @@ def execute_run(
     start = time.perf_counter()
     with fit_errors():
         # The fit's warnings travel in the envelope: stderr carries only a failure's JSON.
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
+        with recorded_warnings() as caught:
             out = fn(*positional, **fkwargs)
     elapsed = time.perf_counter() - start
     if isinstance(out, list):
@@ -1225,8 +1265,7 @@ def execute_bootstrap(
     aligned = {inp.name: x for inp, x in zip(spec.data.inputs[1:], positional[1:])}
     start = time.perf_counter()
     with fit_errors():
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
+        with recorded_warnings() as caught:
             out = andrey.bootstrap(
                 spec.name,
                 positional[0],
@@ -1347,8 +1386,7 @@ def execute_markov_check(
     table = _table(data, labels)
     start = time.perf_counter()
     with fit_errors():
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
+        with recorded_warnings() as caught:
             out = andrey.markov_check(
                 graph,
                 table,  # ty: ignore[invalid-argument-type]  # one table; _table also takes a list
