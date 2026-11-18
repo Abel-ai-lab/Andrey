@@ -505,6 +505,17 @@ def test_a_count_family_repeats_under_its_seed_and_follows_it():
     assert cpcm(_pair(), seed=5).metadata["p_values"] == cpcm(_pair(), seed=6).metadata["p_values"]
 
 
+def test_a_count_column_with_a_negative_zero_draws_the_uniforms_of_its_zero():
+    rng = np.random.default_rng(3)
+    x = rng.normal(size=200)
+    y = rng.poisson(np.exp(np.sin(2 * x))).astype(float)
+    signed = y.copy()
+    signed[np.flatnonzero(y == 0.0)[0]] = -0.0
+    family = ["gaussian_fixed_scale", "poisson"]
+    first = cpcm(np.column_stack([x, y]), family=family, seed=0)
+    assert cpcm(np.column_stack([x, signed]), family=family, seed=0).metadata == first.metadata
+
+
 def test_independent_columns_give_no_edge_at_a_level():
     rng = np.random.default_rng(4)
     out = cpcm(rng.normal(size=(300, 2)), alpha=0.05)

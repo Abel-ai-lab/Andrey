@@ -412,7 +412,7 @@ class Residuals:
         return self._terms[j]
 
     def uniforms(self, j: int) -> np.ndarray:
-        column = np.ascontiguousarray(self.X[:, j])
+        column = np.ascontiguousarray(self.X[:, j]) + 0.0  # -0.0 hashes as 0.0
         rng = np.random.default_rng([self.seed, zlib.crc32(column.tobytes())])
         return rng.random(column.size)
 
