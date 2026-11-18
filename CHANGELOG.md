@@ -16,6 +16,15 @@ names its pull request.
   candidate parents screened by Welch tests on its row of the same Stein estimate of the score's
   Jacobian, at most `max_parents=20` per variable, and CAM's smooth-term tests on those candidates
   only, so the pruning no longer fits every variable before a node in the order ([#1082]).
+- `andrey.cpcm` and `andrey.cpcm_graph`, CPCM (Bodik and Chavez-Demoulin 2025), experimental:
+  conditionally parametric causal models, where each variable given its parents follows a chosen
+  family whose parameters are smooth functions of the parents (`family`: `"gaussian"`, the default,
+  with mean and scale, `"gaussian_fixed_scale"`, `"exponential"`, `"pareto"`, `"poisson"`,
+  `"gamma"`, `"gamma_fixed_shape"`, `"gumbel"`, `"gumbel_fixed_scale"`, `"negative_binomial"`, one
+  for every column or one per column). `cpcm` decides a pair by the paper's residual independence
+  tests, `cpcm_graph` returns the DAG of lowest penalized dHSIC score (`edge_penalty=2`) by exact
+  search up to 4 variables and RESIT-greedy search above. A column outside its family's support
+  raises `ValueError` ([#1085]).
 - `andrey.skewd` and `andrey.skewd_mv`, SkewD and SkewD-MV (Klippert and Marx 2026), experimental:
   the direction of a variable pair, and a DAG, in a location-scale model whose noise is skewed,
   `y = f(pa) + g(pa) n` with skew-normal `n`. `skewd` fits the model in each direction, with
@@ -426,6 +435,18 @@ names its pull request.
   rounding alone, such as the p-values of ICP and J-PCMCI+, as information. ([#1055])
 
 ### Fixed
+
+- `anm`, `pnl`, and `loci` with `alpha=None` round the logarithms of the two directions'
+  p-values (or likelihoods), and then their statistics, to nine decimal places before comparing
+  them, so two values that round to the same number count as equal, and equal values and
+  statistics give no edge. Values that differ by more than that still choose a direction, as can
+  two values on either side of a rounding step. On 200 seeded pairs per method, 3 `anm` and 4
+  `loci` results change, all on two-valued pairs, from an edge to no edge; `pnl` on 40 pairs,
+  `loci` with `criterion="likelihood"`, and the recorded outputs do not change ([#1085]).
+
+- The column ranks that order tied choices (`tie_ranks`) are the same for a column in units near
+  the ends of the float range, such as `2**-1000` or `1e300`, where the squares behind its marginal
+  overflowed or vanished and could reorder the columns ([#1085]).
 
 - A column that holds both signs near the largest float no longer raises a `RuntimeWarning`
   in the check for constant columns, which compared a difference that overflowed; every
@@ -3100,4 +3121,5 @@ First alpha release.
 [#1082]: https://github.com/Abel-ai-lab/Andrey/pull/1082
 [#1083]: https://github.com/Abel-ai-lab/Andrey/pull/1083
 [#1084]: https://github.com/Abel-ai-lab/Andrey/pull/1084
+[#1085]: https://github.com/Abel-ai-lab/Andrey/pull/1085
 [#1088]: https://github.com/Abel-ai-lab/Andrey/pull/1088

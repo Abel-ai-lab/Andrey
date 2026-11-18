@@ -358,16 +358,17 @@ tests then orient can put more arrowheads at a node.
 `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
 `mmhc`, `rsmax2`, `y_structures`, `ldp`, `ld3`, `ldecc`, `local_optimal_adjustment`, `locpc_cde`,
 `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, `tabu`,
-`calm`, `ica_lingam`, `skewd`, and `skewd_mv` take `seed`, a whole number from 0 to 2**32 - 1 that
-fixes their random draws. `None`, the default, is the configured seed, `ANDREY_SEED` or 0 when it is
-unset, not a fresh random one, so a call repeats exactly. Apart from `boss_fci` and `grasp_fci`,
-whose BOSS or GRaSP phase visits the variables in a random order on every fit, the methods that test
-independence draw random numbers only under `indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `pc` also
-with `missing="mvpc"` on data with missing values, `igsp` and `ut_igsp` also with `n_starts` above
-1, and `hc` and `tabu` only with `n_starts` above 1; `skewd` and `skewd_mv` draw in every fit, in
-their Bayesian optimization and CMA-ES, whatever test PC runs. Otherwise `seed` changes nothing, and
-`metadata["seed"]` is not set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every
-other method is deterministic and takes no seed.
+`calm`, `ica_lingam`, `cpcm`, `cpcm_graph`, `skewd`, and `skewd_mv` take `seed`, a whole number from
+0 to 2**32 - 1 that fixes their random draws. `None`, the default, is the configured seed,
+`ANDREY_SEED` or 0 when it is unset, not a fresh random one, so a call repeats exactly. Apart from
+`boss_fci` and `grasp_fci`, whose BOSS or GRaSP phase visits the variables in a random order on
+every fit, the methods that test independence draw random numbers only under `indep_test="rcot"`,
+`"cmiknn"`, or `"gpdc"`, `pc` also with `missing="mvpc"` on data with missing values, `igsp` and
+`ut_igsp` also with `n_starts` above 1, `hc` and `tabu` only with `n_starts` above 1, and `cpcm` and
+`cpcm_graph` only for a column under `family="poisson"` or `"negative_binomial"`; `skewd` and
+`skewd_mv` draw in every fit, in their Bayesian optimization and CMA-ES, whatever test PC runs.
+Otherwise `seed` changes nothing, and `metadata["seed"]` is not set. A call that gives `seed` does
+not depend on `ANDREY_SEED`. Every other method is deterministic and takes no seed.
 
 % concept: n_starts
 `boss`, `grasp`, `boss_fci`, `grasp_fci`, `igsp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the
@@ -841,6 +842,8 @@ in a process.
    skewd
    skewd_mv
    das
+   cpcm
+   cpcm_graph
 ```
 
 LDP, local discovery by partitioning (Maasch et al. 2024), answers for one `treatment` and
@@ -863,6 +866,18 @@ keeps the variables before it whose derivatives are clearly above zero, at most 
 of them by Welch tests at 0.01, and CAM's smooth-term tests at `alpha=0.001` prune only those, so
 its pruning does not grow with every variable before a node in the order. It returns a DAG and
 SCORE's causal order. It is experimental until its comparison with the authors' code is published.
+
+CPCM, conditionally parametric causal models (Bodik and Chavez-Demoulin 2025), models each
+variable given its parents by a parametric family whose parameters are smooth functions of the
+parents: Gaussian with mean and scale (the default), Gaussian with the mean alone, exponential,
+Pareto, Poisson, gamma, Gumbel, or negative binomial, one family for every column or one per
+column. Each variable's values mapped through its fitted distribution function are independent of
+its causes only in the causal direction. {py:func}`~andrey.cpcm` decides a pair by an HSIC test of
+that residual in each direction; {py:func}`~andrey.cpcm_graph` returns the DAG whose residuals a
+dHSIC test finds most jointly independent, with a penalty of 2 per edge, by exact search up to 4
+variables and RESIT's order with greedy edge removal above. A column outside its family's support,
+such as a non-integer under `"poisson"`, raises `ValueError`. Both are experimental until their
+comparison with the authors' code is published.
 
 SkewD (Klippert and Marx 2026), {py:func}`~andrey.skewd`, decides the direction of a variable pair
 whose noise is skewed, in the location-scale model of LOCI with a skew-normal noise. It fits the

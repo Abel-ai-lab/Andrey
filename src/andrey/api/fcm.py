@@ -1,8 +1,9 @@
-"""Functional-causal-model facades: CAM, RESIT, SCORE, NoGAM, DAS, and CAM-UV."""
+"""Functional-causal-model facades: CAM, RESIT, CPCM, SCORE, NoGAM, DAS, and CAM-UV."""
 
 from __future__ import annotations
 
 import logging
+import math
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -535,6 +536,184 @@ def resit(
     back = np.argsort(order)
     dag = result.dag[np.ix_(back, back)]
     return structure_output(dag_from_adjacency(dag), labels=labels, ordering=order[result.order])
+
+
+@method_spec("cpcm_graph")
+def cpcm_graph(
+    data: npt.ArrayLike,
+    *,
+    family: str | list[str] = "gaussian",
+    edge_penalty: float = 2.0,
+    seed: int | None = None,
+) -> StructureOutput:
+    """Learn a DAG with CPCM, conditionally parametric causal models, by a penalized score.
+
+    CPCM [1]_ models each variable given its parents by a known parametric family whose parameters
+    are smooth functions of the parents, such as a Gaussian whose mean and scale change with them,
+    an exponential or Pareto law whose rate does, or a Poisson count. A DAG's residuals are each
+    variable's values mapped through its fitted distribution function; the score of a DAG is minus
+    the logarithm of the p-value of a test that the residuals are jointly independent [2]_, plus a
+    penalty per edge. The DAG of lowest score is returned.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample, at least 2 columns. Coerced to ``float64``. A
+        DataFrame's column names become the structure's ``labels``.
+    family : str or list of str, default="gaussian"
+        The family of each variable given its parents, one name for every column or a list of one
+        name per column: ``"gaussian"`` (mean and scale change with the parents),
+        ``"gaussian_fixed_scale"`` (the mean alone), ``"exponential"``, ``"pareto"`` (scale 1,
+        values of at least 1), ``"poisson"``, ``"gamma"`` (mean and shape), ``"gamma_fixed_shape"``
+        (the mean alone), ``"gumbel"`` (location and scale), ``"gumbel_fixed_scale"`` (the
+        location alone), or ``"negative_binomial"`` (the mean, one size for all rows). A
+        variable without parents is not modeled. See **Families.** in :func:`~andrey.cpcm`.
+    edge_penalty : float, default=2.0
+        Added to the score per edge, at least ``0``. ``2`` is the paper's value. A larger penalty
+        keeps fewer edges.
+    seed : int or None, default=None
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of the count families,
+        ``"poisson"`` and ``"negative_binomial"``; the other families draw nothing.
+
+    Returns
+    -------
+    StructureOutput
+        Contains a :class:`~andrey.core.GraphStructure` of kind ``dag``. ``metadata["algorithm"]``
+        is ``"cpcm_graph"``, ``metadata["p_value"]`` the p-value of the joint independence test of
+        the returned DAG's residuals, ``metadata["score"]`` its score, ``metadata["search"]``
+        ``"exact"`` or ``"greedy"``, and ``metadata["families"]`` the family of each column.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` has fewer than 2
+        columns, holds ``NaN`` or ``inf``, or has fewer than ``4 d + 12`` rows for ``d`` columns,
+        if ``family`` names an unknown family or does not give one name per column, or if a column
+        holds a value outside its family's support, such as a non-integer under ``"poisson"`` or
+        a value below 1 under ``"pareto"``. Also if a column's residual on a set of parents the
+        search reads is the same on every row, as when the column is an exact function of them,
+        or if a fit ends away from a maximum; the message names the columns.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method is not supported (see Limitations), and its
+        API may change without deprecation.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+
+    Notes
+    -----
+    **When to use.** CPCM learns a small DAG from i.i.d. observations when each variable given its
+    parents follows a known parametric family, with no hidden common cause [1]_. It is designed for
+    effects whose whole distribution changes with their causes, such as counts, positive or
+    heavy-tailed variables, or a mix where each column gets its own family; the paper claims it for
+    graphs of 5 variables [1]_. For a pair, :func:`~andrey.cpcm` runs the paper's pair test; for
+    nonlinear effects with additive noise, use :func:`~andrey.resit` or :func:`~andrey.cam`.
+
+    Each variable with parents is fitted by its family on them and mapped through the fitted
+    distribution function, as in :func:`~andrey.cpcm`; a variable without parents is its own
+    residual. The score of a DAG is ``-log p + edge_penalty * edges``, ``p`` the gamma dHSIC test
+    of the residuals' joint independence with Gaussian kernels whose bandwidth is the median
+    heuristic over all rows [2]_. Up to 4 variables every DAG is scored, the paper's exact search,
+    and the first lowest score wins, the DAGs ordered by their number of edges. Above, the paper's
+    RESIT-greedy search: a causal order from the sink up, each sink the variable whose residual on
+    the remaining ones is most independent of them by the gamma HSIC test, the remaining ones read
+    jointly with each column scaled to unit standard deviation, then the complete DAG of the order
+    loses, one at a time, the edge whose removal lowers the score most, while one does [1]_ [3]_.
+    The columns are read in rank order, so the result does not depend on their order.
+
+    **Units.** As for :func:`~andrey.cpcm`: the result does not depend on any column's units under
+    the Gaussian, Gumbel, exponential, and gamma families, of which the last two read its origin;
+    ``"pareto"`` and the count families read the units, since they fix a scale.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
+    its variables, so a row with a missing value has no place in it. Drop the incomplete rows
+    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** Not benchmarked yet. The paper claims graphs of 5 variables and measures the
+    exact search as feasible to 4 variables; the residual fits grow with the number of parents and
+    the greedy search refits a variable for each parent set it tries. Each test builds matrices with
+    one row and one column per sample, and every distinct residual's matrix is kept for the fit, so
+    memory grows with the square of ``n_samples``. Under the count families the rank-10 spline
+    must follow the mean to within the counts' own noise, which it does for means up to a few
+    hundred: from means of a few thousand that vary strongly with the parents, the true graph's
+    test rejects too. The family must be chosen: the paper's choice of a family from each
+    column's support, and its sequential choice between one- and two-parameter families, are not
+    offered. The numbers are a reference, not a hard limit: they change with the
+    data generator, the density, the method's settings, and the machine.
+
+    References
+    ----------
+    .. [1] Bodik, J., and Chavez-Demoulin, V. (2025). Identifiability of causal graphs under
+       non-additive conditionally parametric causal models. JMLR 26(264), 1-55.
+    .. [2] Pfister, N., Buhlmann, P., Scholkopf, B., and Peters, J. (2018). Kernel-based tests for
+       joint independence. JRSS-B 80(1), 5-31.
+    .. [3] Peters, J., Mooij, J. M., Janzing, D., and Scholkopf, B. (2014). Causal discovery with
+       continuous additive noise models. JMLR 15, 2009-2053.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import cpcm_graph
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.normal(0, 1, 300)
+    >>> y = rng.exponential(1 + x**2)
+    >>> z = rng.exponential(1 + np.sqrt(y))
+    >>> family = ["gaussian_fixed_scale", "exponential", "exponential"]
+    >>> out = cpcm_graph(np.column_stack([x, y, z]), family=family, seed=0)
+    >>> out.structure.oriented_edges()
+    [(0, 1, 'directed'), (1, 2, 'directed')]
+    """
+    from andrey.core.ties import tie_ranks
+    from andrey.fcm.cpcm import Residuals, resolve_families, search
+    from andrey.fcm.cpcm import score as cpcm_score
+
+    X = data_matrix(data, method="cpcm_graph")
+    labels = column_labels(data)
+    min_rows = 4 * X.shape[1] + 12
+    if X.shape[0] < min_rows:
+        raise ValueError(f"data needs at least {min_rows} rows (samples), got {X.shape[0]}")
+    if X.shape[1] < 2:
+        raise ValueError(f"cpcm_graph needs at least 2 columns, got {X.shape[1]}")
+    name = column_namer(labels)
+    families = resolve_families(family, X, "cpcm_graph", name)
+    assert seed is not None  # method_spec resolves it
+    # The fit runs on the columns in rank order, so no step reads their positions.
+    order = np.argsort(tie_ranks(X), kind="stable")
+    res = Residuals(
+        X[:, order],
+        [families[j] for j in order],
+        seed,
+        method="cpcm_graph",
+        name=lambda j: name(int(order[j])),
+    )
+    with one_blas_thread():
+        parents, _, log_p = search(res, edge_penalty)
+        value = cpcm_score(res, parents, edge_penalty)
+    dag = np.zeros((X.shape[1], X.shape[1]), dtype=np.int8)
+    for v, pa in enumerate(parents):
+        for p in pa:
+            dag[order[p], order[v]] = 1
+    return structure_output(
+        dag_from_adjacency(dag),
+        labels=labels,
+        metadata={
+            "p_value": math.exp(log_p),
+            "score": value,
+            "search": "exact" if X.shape[1] <= 4 else "greedy",
+            "families": [f.name for f in families],
+        },
+    )
 
 
 @method_spec("score_matching")

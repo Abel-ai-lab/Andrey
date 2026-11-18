@@ -554,6 +554,8 @@ PROSE_NAMES = {
     "rcd": "RCD",
     "bottom_up_parce_lingam": "BottomUpParceLiNGAM",
     "camuv": "CAM-UV",
+    "cpcm": "CPCM",
+    "cpcm_graph": "CPCM-graph",
 }
 
 

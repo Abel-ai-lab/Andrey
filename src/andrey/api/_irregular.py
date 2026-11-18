@@ -15,12 +15,14 @@ Fitted models are read by attribute name.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
 
 from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput
+from andrey.core.ties import tie_key
 
 from ._adapt import structure_output
 from ._marks import marks_from_signed
@@ -70,18 +72,28 @@ def _direction(
 ) -> int:
     """Return ``1`` for ``x -> y``, ``-1`` for ``y -> x``, or ``0`` for no edge.
 
-    With ``alpha=None``, choose the direction with the larger p-value, which ``pval_*`` may give as
-    its logarithm. Equal p-values, given both test statistics, choose the direction with the
-    smaller statistic, the weaker dependence; equal or missing statistics give no edge. Otherwise,
-    choose a direction only when its p-value exceeds ``alpha`` and the other does not.
+    With ``alpha=None``, ``pval_*`` are the p-values' logarithms (or two log-likelihoods), and the
+    direction with the larger one is chosen. Equal ones, given both test statistics, choose the
+    direction with the smaller statistic, the weaker dependence; equal or missing statistics give
+    no edge. Values that round to the same number at nine decimal places are equal
+    (:func:`andrey.core.ties.tie_key`); values that differ by more, or that lie on either side of a
+    rounding step, still choose a direction. Otherwise, choose a direction only when its p-value
+    exceeds ``alpha`` and the other does not.
     """
     if alpha is None:
-        forward, backward = pval_forward > pval_backward, pval_backward > pval_forward
-        if pval_forward == pval_backward and stat_forward is not None and stat_backward is not None:
-            forward, backward = stat_forward < stat_backward, stat_backward < stat_forward
+        p_forward, p_backward = tie_key(pval_forward), tie_key(pval_backward)
+        forward, backward = p_forward > p_backward, p_backward > p_forward
+        if p_forward == p_backward and stat_forward is not None and stat_backward is not None:
+            s_forward, s_backward = tie_key(stat_forward), tie_key(stat_backward)
+            forward, backward = s_forward < s_backward, s_backward < s_forward
     else:
         forward, backward = pval_forward > alpha, pval_backward > alpha
     return 1 if forward and not backward else -1 if backward and not forward else 0
+
+
+def _log(p: float) -> float:
+    """Return the natural logarithm of the p-value ``p``: ``-inf`` at ``0``, ``nan`` for ``nan``."""
+    return math.log(p) if p > 0 else -math.inf if p == 0 else math.nan
 
 
 def _pair_dag(direction: int) -> GraphStructure:
@@ -91,6 +103,11 @@ def _pair_dag(direction: int) -> GraphStructure:
         source, target = (0, 1) if direction > 0 else (1, 0)
         M[source, target], M[target, source] = TAIL, ARROW
     return GraphStructure.from_numpy(M, kind="dag")
+
+
+def empty_pair_dag() -> GraphStructure:
+    """Return the two-node ``dag`` with no edge."""
+    return _pair_dag(0)
 
 
 def likelihood_output(
@@ -124,12 +141,13 @@ def pairwise_output(
     """Return ANM's or PNL's two-node ``dag`` with the chosen edge and ``float`` p-value metadata.
 
     ``metadata["p_values"]`` maps ``"forward"`` (``x -> y``) and ``"backward"`` to the p-values.
-    ``log_p``, when given, holds the two p-values' natural logarithms, which keep their order where
-    both p-values underflow to ``0``; with ``alpha=None`` they are compared in place of the
-    p-values. Each test statistic, when given, is an HSIC statistic divided by its mean under
-    independence: with ``alpha=None`` the statistics decide a p-value tie, the smaller one winning,
-    and without them a tie gives no edge (:func:`_direction`). They go in ``metadata["statistics"]``
-    under the same keys. A p-value or statistic may be a shape-``(1,)`` array
+    With ``alpha=None`` the p-values are compared through their natural logarithms, so the tie
+    rule of :func:`_direction` holds to nine digits at any size of p-value; ``log_p``, when given,
+    holds those logarithms, which keep their order where both p-values underflow to ``0``. Each
+    test statistic, when given, is an HSIC statistic divided by its mean under independence: with
+    ``alpha=None`` the statistics decide a p-value tie, the smaller one winning, and without them a
+    tie gives no edge (:func:`_direction`). They go in ``metadata["statistics"]`` under the same
+    keys. A p-value or statistic may be a shape-``(1,)`` array
     (:func:`_coerce_float`). ``extra`` adds metadata entries after them, such as ``rows_tested``.
     """
     forward, backward = _coerce_float(pval_forward), _coerce_float(pval_backward)
@@ -139,7 +157,9 @@ def pairwise_output(
             "stat_forward": _coerce_float(stat_forward),
             "stat_backward": _coerce_float(stat_backward),
         }
-    compared = (forward, backward) if log_p is None or alpha is not None else log_p
+    compared = (forward, backward)
+    if alpha is None:
+        compared = log_p if log_p is not None else (_log(forward), _log(backward))
     return structure_output(
         _pair_dag(_direction(*compared, alpha, **stats)),
         labels=labels,
