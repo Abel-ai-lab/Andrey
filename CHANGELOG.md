@@ -16,6 +16,15 @@ names its pull request.
   simulated data so that whether a value is missing depends on another variable, fits `pc` with its
   default handling and with `missing="mvpc"` and `ges` with `missing="em"`, and scores each against
   the true graph. ([#1059])
+- `dagma` is supported, with its gap stated. Against its authors' package on its paper's simulation,
+  it made no more errors in any of the 24 settings with every column z-scored or any of the 18 on the
+  simulation's own units, and in 17 of the 18 with each variable divided by its standard deviation as
+  it is generated. On the simulation's own units it made fewer errors than the empty graph in all 18
+  settings, and on z-scored columns in none of the 24, as the package. Its result depends on the
+  data's scale (Reisach, Seiler and Weichwald 2021). The [0.18.0 release card][card-0180-dagma] has
+  the numbers and a check of `dagma` and `notears` on the Sachs data: on its 853 observational
+  measurements, four fits, default and `robust=True`, on raw and z-scored columns, made 13 or 14
+  errors against the empty graph's 17. ([#1043], [#1046])
 
 ### Changed
 
@@ -42,6 +51,11 @@ names its pull request.
   targets and contexts with the columns. It exits 1 on a column order when a graph or a causal order
   changes or a weight or metadata value changes by more than rounding, and lists a difference of
   rounding alone, such as the p-values of ICP and J-PCMCI+, as information. ([#1055])
+- The Limitations of `notears` and `dagma` are one sentence: the result depends on the data's scale,
+  after Reisach, Seiler and Weichwald (2021), with a link to the release card. The registry and the
+  docstrings no longer say that the robust fit does not depend on the scale of the columns: its first
+  fit is least squares, and its penalty and threshold act on the weights in the data's units.
+  ([#1043], [#1046])
 
 ### Fixed
 
@@ -69,6 +83,15 @@ names its pull request.
 - The reference-parity check names a row by its network, effect, hidden nodes, node count, and
   number of series beside its size, so rows of one size that differ only there no longer share a
   key, and it fails two failing rows of one comparison that still do. ([#1070])
+- `notears(robust=True)` and `dagma(robust=True)` minimize the Gaussian likelihood of the path of
+  Deng et al. (2024) without `-log|det(I - W)|`, as its authors' code does. The term is zero
+  for every DAG, so the graphs each step is judged by do not change, but its gradient is not zero
+  while a fit is cyclic, and it led the path to other graphs. On the paper's simulation with z-scored
+  columns and 20 datasets per setting, the CPDAG errors of `dagma(robust=True)` fell from 23.1, 44.2,
+  23.5, and 54.0 to 21.3, 40.0, 17.9, and 39.0 on Erdos-Renyi and scale-free graphs with 10 and 20
+  variables, against 20.1, 42.4, 18.1, and 39.4 for the path run with its authors' code, and those of
+  `notears(robust=True)` at 10 variables moved from 16.6 on z-scored and 13.2 on raw columns to 18.5
+  and 11.8, against 18.4 and 11.8. ([#1043], [#1046])
 
 ## [0.17.1] - 2026-11-12
 
@@ -2627,3 +2650,6 @@ First alpha release.
 [#1055]: https://github.com/Abel-ai-lab/Andrey/pull/1055
 [#1067]: https://github.com/Abel-ai-lab/Andrey/pull/1067
 [#1070]: https://github.com/Abel-ai-lab/Andrey/pull/1070
+[#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
+[#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
+[card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
