@@ -25,10 +25,9 @@ if [[ ! -e "$DEST/.git" ]]; then
     git clone --filter=blob:none --no-checkout https://github.com/causality-lab/skewd.git "$DEST"
     git -C "$DEST" sparse-checkout set src data/skew data/MVskew6 data/MVskew10
 fi
-if [[ "$(git -C "$DEST" rev-parse HEAD 2>/dev/null)" != "$COMMIT" ]]; then
+git -C "$DEST" cat-file -e "$COMMIT^{commit}" 2>/dev/null ||
     git -C "$DEST" fetch --filter=blob:none origin "$COMMIT"
-    git -C "$DEST" checkout "$COMMIT"
-fi
+git -C "$DEST" checkout "$COMMIT"  # a fresh clone has no files yet, whatever its HEAD
 git -C "$DEST" diff --quiet "$COMMIT" -- src || { echo "$DEST/src differs from $COMMIT" >&2; exit 1; }
 
 echo ">> skewd-env"

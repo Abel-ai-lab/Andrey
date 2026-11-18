@@ -495,3 +495,26 @@ def test_a_search_draws_the_same_numbers_however_long_the_searches_before_it_ran
     assert len(set(short[0])) == len(short[0])
     assert long[0] == short[0]
     assert long[1].log_likelihood == short[1].log_likelihood
+
+
+def test_a_search_does_not_read_the_signs_of_the_eigenvectors(monkeypatch):
+    # An eigenvector is defined up to its sign, and two covariances that differ in their last
+    # digits can come back with different signs.
+    def objective(candidates: np.ndarray) -> np.ndarray:
+        return ((candidates - 0.3) ** 2 * np.arange(1, 6)).sum(axis=1)
+
+    def search() -> tuple[np.ndarray, float]:
+        free = np.full(5, np.inf)
+        return native._cma_es(objective, np.zeros(5), -free, free, np.random.default_rng(0))
+
+    eigh = np.linalg.eigh
+
+    def flipped(matrix: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        values, vectors = eigh(matrix)
+        return values, vectors * np.array([1.0, -1.0, 1.0, -1.0, 1.0])
+
+    first = search()
+    monkeypatch.setattr(np.linalg, "eigh", flipped)
+    again = search()
+    np.testing.assert_array_equal(again[0], first[0])
+    assert again[1] == first[1]
