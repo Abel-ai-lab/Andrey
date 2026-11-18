@@ -12,7 +12,9 @@ difference penalties on each parent's spline coefficients, ``alpha_t`` on the lo
    log-likelihood, without penalty, of a k-fold cross-validation (Appendix B.1).
 2. CMA-ES (Hansen 2016) maximizes the penalized log-likelihood at the chosen penalties from
    several starts: least squares with ``rho = 0`` and ``lambda`` the effect's sample skewness, and
-   each fold's estimate at those penalties.
+   each fold's estimate at those penalties. With several parents it reads the location
+   coefficients as those whose parents' blocks have equal sums, as ECM does: a constant moved
+   from one block to another changes no fitted value.
 3. Expectation conditional maximization (ECM, Section 4) refines the best of them: the E-step's
    moments of the latent truncated normal, a closed-form step in ``(psi, lambda)``, then the
    maximum over ``rho`` of the expected penalized log-likelihood. That function is concave in
@@ -30,6 +32,10 @@ Eilers and Marx (1996). Flexible smoothing with B-splines and penalties. Statist
 
 Ferreira, Zeller, and Garcia (2023). Heteroscedastic partially linear model under skew-normal
 distribution. Journal of Applied Statistics 50(6).
+
+Tarjan and Yannakakis (1984). Simple linear-time algorithms to test chordality of graphs, test
+acyclicity of hypergraphs, and selectively reduce acyclic hypergraphs. SIAM Journal on Computing
+13(3).
 """
 
 from __future__ import annotations
@@ -267,6 +273,24 @@ def _start(location: np.ndarray, scale: np.ndarray, effect: np.ndarray) -> np.nd
     return np.concatenate([psi, np.zeros(scale.shape[1]), [np.clip(skewness, -25, 25)]])
 
 
+def _identified(design: _Design) -> np.ndarray:
+    """An orthonormal basis, one column per coordinate, of the location coefficients whose
+    parents' blocks have equal sums, for a fit with several parents.
+
+    Each parent's location basis sums to one and the difference penalty ignores constants, so a
+    constant moved from one parent's block of ``psi`` to another's changes neither a fitted value
+    nor the penalized likelihood. The basis holds each block's centered part (Helmert contrasts)
+    and one constant shared by every block: the vectors ECM's location step keeps.
+    """
+    s, q = design.parents, design.location.shape[1]
+    block = q // s
+    helmert = np.zeros((block, block - 1))
+    for k in range(1, block):
+        helmert[:k, k - 1] = 1.0 / math.sqrt(k * (k + 1))
+        helmert[k, k - 1] = -k / math.sqrt(k * (k + 1))
+    return np.hstack([np.kron(np.eye(s), helmert), np.full((q, 1), 1.0 / math.sqrt(q))])
+
+
 def _heuristic(
     design: _Design,
     rows: np.ndarray,
@@ -278,21 +302,37 @@ def _heuristic(
     """The best CMA-ES estimate on ``rows`` over ``starts`` (the least-squares start first).
 
     Each search draws from its own stream spawned from ``rng``, so the draws of a search do not
-    depend on how many generations the searches before it ran.
+    depend on how many generations the searches before it ran. With several parents the searches
+    read ``psi`` in the coordinates of :func:`_identified`: along a constant moved between the
+    parents' blocks the likelihood is flat, so the distribution's mean would wander along it and
+    the stop rule on the mean would not hold. The same constant in ``rho`` stays, as its bounds
+    keep it from wandering far.
     """
     location, scale, y = design.location[rows], design.scale[rows], effect[rows]
     k_alpha, m_kappa = design.penalties(log_penalties)
     lower, upper = _bounds(location.shape[1], scale.shape[1])
+    points = [_start(location, scale, y), *starts]
+    frame = None
+    if design.parents > 1:
+        q = location.shape[1]
+        frame = _identified(design)
+        free = np.full(frame.shape[1], np.inf)  # psi has no bounds
+        lower, upper = np.concatenate([-free, lower[q:]]), np.concatenate([free, upper[q:]])
+        points = [np.concatenate([frame.T @ point[:q], point[q:]]) for point in points]
 
     def objective(theta: np.ndarray) -> np.ndarray:
+        if frame is not None:
+            theta = np.hstack([theta[:, : frame.shape[1]] @ frame.T, theta[:, frame.shape[1] :]])
         return _penalized_nll(theta, location, scale, y, k_alpha, m_kappa)
 
-    points = [_start(location, scale, y), *starts]
     found = [
         _cma_es(objective, point, lower, upper, stream)
         for point, stream in zip(points, rng.spawn(len(points)), strict=True)
     ]
-    return min(found, key=lambda f: f[1])
+    best, value = min(found, key=lambda f: f[1])
+    if frame is not None:
+        best = np.concatenate([frame @ best[: frame.shape[1]], best[frame.shape[1] :]])
+    return best, value
 
 
 def _tune(
@@ -455,19 +495,30 @@ def class_members(marks: np.ndarray, *, collider_check: bool = True) -> Iterator
     ``i-j``): a directed edge keeps its direction, and an undirected or bidirected one takes either.
     A DAG qualifies when it is acyclic and, with ``collider_check``, makes no collider ``a -> c <-
     b`` of nonadjacent ``a`` and ``b`` that the graph does not already hold, so for a CPDAG the DAGs
-    are the members of its Markov equivalence class. The edges are oriented one at a time in
-    column order and a partial orientation that already breaks a condition is dropped, so the DAGs
-    come one at a time and a caller that stops reading stops the search.
+    are the members of its Markov equivalence class. The edges are oriented one at a time and a
+    partial orientation that already breaks a condition is dropped, so the DAGs come one at a time
+    and a caller that stops reading stops the search. The edges are taken vertex by vertex in a
+    maximum cardinality search order (Tarjan and Yannakakis 1984), each vertex's edges to the
+    vertices before it: in a chordal component those vertices are adjacent to each other, so the
+    vertex can always be made their common child, and an orientation of the vertices so far
+    always extends to a DAG. A dead end then costs at most the orientations of one vertex's
+    edges, and the work follows the number of DAGs whatever the column order.
     """
     d = marks.shape[0]
     adjacent = (marks != 0) & (marks.T != 0)
     fixed = (marks == 1) & (marks.T == 2)  # tail at i, arrow at j: i -> j
-    free = [
-        (i, j)
-        for i in range(d)
-        for j in range(i + 1, d)
-        if adjacent[i, j] and not (fixed[i, j] or fixed[j, i])
-    ]
+    undirected = adjacent & ~fixed & ~fixed.T
+    position = np.full(d, -1)
+    visited = np.zeros(d, dtype=int)  # each vertex's neighbors already placed
+    for k in range(d):
+        weight = np.where(position < 0, visited, -1)
+        node = int(np.argmax(weight))  # the most placed neighbors, then the first column
+        position[node] = k
+        visited += undirected[node]
+    free = sorted(
+        ((i, j) for i in range(d) for j in range(i + 1, d) if undirected[i, j]),
+        key=lambda edge: (max(position[list(edge)]), min(position[list(edge)])),
+    )
 
     def reaches(dag: np.ndarray, source: int, target: int) -> bool:
         seen, stack = {source}, [source]
@@ -519,11 +570,13 @@ def class_candidates(
     with no directed cycle and no new collider, or, when none does, as conflicting colliders can
     leave, every acyclic orientation of them. The first array holds the directed edges alone, the
     DAG of a class with no undirected edge. A conditional model is a node of a component with at
-    least one parent, fitted given a parent set. The DAGs of a component are listed one at a time,
-    and the listing stops with a ``ValueError`` as soon as the components together need more than
-    ``max_fits`` conditional models or one component lists more than :data:`LISTED_DAGS` DAGs
-    (``None`` sets neither cap), so a class too large to score is never listed in full. A directed
-    cycle among the directed edges also raises ``ValueError``.
+    least one parent, fitted given a parent set. A component's DAGs come sorted by the directions
+    of its edges in column order, each edge from its lower column first, so their order, which
+    decides ties, does not depend on the order of the listing. The DAGs of a component are listed
+    one at a time, and the listing stops with a ``ValueError`` as soon as the components together
+    need more than ``max_fits`` conditional models or one component lists more than
+    :data:`LISTED_DAGS` DAGs (``None`` sets neither cap), so a class too large to score is never
+    listed in full. A directed cycle among the directed edges also raises ``ValueError``.
     """
     d = marks.shape[0]
     adjacent = (marks != 0) & (marks.T != 0)
@@ -579,6 +632,9 @@ def class_candidates(
             raise ValueError(
                 "skewd_mv: PC's graph orients a directed cycle, so no DAG keeps its edges"
             )
+        edges = np.argwhere(np.triu(undirected[np.ix_(group, group)]))
+        tails, heads = np.array(group)[edges[:, 0]], np.array(group)[edges[:, 1]]
+        members.sort(key=lambda dag: dag[heads, tails].tobytes())
         components.append((group, members))
     return components, base, sorted(fits)
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import time
 import warnings
 
 import numpy as np
@@ -125,6 +126,26 @@ def test_a_component_with_too_many_orientations_stops_the_listing(monkeypatch):
         native.class_candidates(marks, 100)
     components, _, _ = native.class_candidates(marks, None)
     assert len(components[0][1]) == 14
+
+
+def test_the_listing_does_not_depend_on_the_column_order():
+    # A comb whose teeth come first in column order: edge by edge in that order, all 2^18
+    # orientations of the teeth pass before the spine prunes them to the class's 36 DAGs.
+    m = 18
+    comb = _marks(
+        2 * m, lines=[(i, m + i) for i in range(m)] + [(m + i, m + i + 1) for i in range(m - 1)]
+    )
+    order = np.random.default_rng(0).permutation(2 * m)
+    back = np.argsort(order)
+    listed = []
+    for marks, relabel in ((comb, np.arange(2 * m)), (comb[np.ix_(order, order)], back)):
+        start = time.perf_counter()
+        components, _, fits = native.class_candidates(marks, 100)
+        assert time.perf_counter() - start < 2.0
+        dags = {m[np.ix_(relabel, relabel)].tobytes() for _, members in components for m in members}
+        listed.append((len(dags), dags, len(fits)))
+    assert listed[0] == listed[1]
+    assert listed[0][0] == 2 * m
 
 
 def _single_factor(d: int, n: int) -> np.ndarray:
@@ -457,6 +478,35 @@ def test_a_fit_with_two_parents_stops_on_the_rule():
     blocks = refined[: design.location.shape[1]].reshape(2, -1)
     assert blocks[0].sum() == pytest.approx(blocks[1].sum(), abs=1e-9)
     assert not native._ecm(design, effect, theta, np.zeros(4), 5)[1]  # a short limit still shows
+
+
+def test_the_searches_of_a_fit_with_two_parents_stop_on_their_rule(monkeypatch):
+    # The likelihood is flat along a constant moved between the parents' blocks; a search that sees
+    # that direction lets its mean wander along it and runs to the generation cap.
+    rng = np.random.default_rng(3)
+    parents = rng.standard_normal((150, 2))
+    scale = 0.5 + 0.2 * np.tanh(parents[:, 0])
+    effect = np.tanh(parents).sum(axis=1) + scale * rng.standard_normal(150)
+    parents = (parents - parents.mean(axis=0)) / parents.std(axis=0)
+    effect = (effect - effect.mean()) / effect.std()
+    search, generations = native._cma_es, []
+
+    def counted(objective, start, lower, upper, rng):
+        calls = [0]
+
+        def counting(theta: np.ndarray) -> np.ndarray:
+            calls[0] += 1
+            return objective(theta)
+
+        found = search(counting, start, lower, upper, rng)
+        generations.append(calls[0] - 1)  # one call per generation after the start's
+        return found
+
+    monkeypatch.setattr(native, "_cma_es", counted)
+    budget = native.Budget(knots=8, folds=5, tuning_iter=1, initial=1, max_iter=5)
+    native.fit(parents, effect, budget, 0)
+    assert len(generations) == 11
+    assert max(generations) < 0.8 * native.GENERATIONS
 
 
 def test_a_search_started_near_an_optimum_moves_to_it():

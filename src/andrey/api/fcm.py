@@ -1532,20 +1532,22 @@ def skewd_mv(
     combination of one orientation of each connected group of undirected edges, so each group is
     listed on its own, one DAG at a time, and the listing stops with an error once the groups need
     more than ``max_fits`` conditional models or one group has more than 65,536 orientations, so a
-    class too large to score is never listed in full. When a group has no such orientation, as
-    conflicting colliders can leave, its candidates are every acyclic orientation of its edges.
-    Each variable with an undirected edge is fitted given its parents in each orientation, once
-    per distinct parent set: the standard Gaussian log-likelihood for a variable without
-    parents, and otherwise :func:`~andrey.skewd`'s skew-normal fit with additive B-splines of
-    the parents, 10 location and 7 scale columns per parent and a penalty pair per parent chosen
-    by a 5-fold cross-validation [1]_. Only these variables' terms differ between the DAGs, so
-    their sum decides (Proposition 5.1 of [1]_), and each group contributes its own terms: the
-    returned DAG holds the orientation of each group with the largest sum, the first on a tie,
-    which is the DAG of the class with the largest sum. Where a conflicting graph lets the
-    groups' best orientations close a directed cycle across its directed edges, the search takes
-    the acyclic combination with the largest sum, and a graph with none raises an error. The
-    defaults, 20 candidates of the Bayesian optimization and 3,000 iterations, are those of the
-    paper's runs. The columns are fitted in the order of their values' ranks, so the DAG does
+    class too large to score is never listed in full. The edges are oriented in a maximum
+    cardinality search order, so the listing's time does not depend on the column order. When a
+    group has no such orientation, as conflicting colliders can leave, its candidates are every
+    acyclic orientation of its edges. Each variable with an undirected edge is fitted given its
+    parents in each orientation, once per distinct parent set: the standard Gaussian log-likelihood
+    for a variable without parents, and otherwise :func:`~andrey.skewd`'s skew-normal fit with
+    additive B-splines of the parents, 10 location and 7 scale columns per parent and a penalty pair
+    per parent chosen by a 5-fold cross-validation [1]_. A constant moved between two parents'
+    location coefficients changes no fitted value, so the fit leaves it out. Only these variables'
+    terms differ between the DAGs, so their sum decides (Proposition 5.1 of [1]_), and each group
+    contributes its own terms: the returned DAG holds the orientation of each group with the largest
+    sum, the first on a tie, which is the DAG of the class with the largest sum. Where a conflicting
+    graph lets the groups' best orientations close a directed cycle across its directed edges, the
+    search takes the acyclic combination with the largest sum, and a graph with none raises an
+    error. The defaults, 20 candidates of the Bayesian optimization and 3,000 iterations, are those
+    of the paper's runs. The columns are fitted in the order of their values' ranks, so the DAG does
     not depend on the column order; ties follow ``andrey.config.tie_break``.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
