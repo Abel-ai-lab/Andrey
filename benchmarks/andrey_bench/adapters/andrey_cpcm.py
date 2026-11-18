@@ -118,7 +118,7 @@ class AndreyCPCMGraph(AndreyCPCM):
         self.edge_penalty = edge_penalty
         self.name = self.name.replace("andrey.cpcm.", "andrey.cpcm_graph.", 1)
         if edge_penalty != 2.0:
-            self.name = self.name.replace(".numpy", f".penalty{edge_penalty:g}.numpy")
+            self.name = self.name.replace(".numpy", f".penalty{float(edge_penalty)!r}.numpy")
 
     def setup(self) -> None:
         """Fit a tiny table before timing, so lazy imports and the warning stay out of the fit.

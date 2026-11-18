@@ -234,7 +234,7 @@ class BodikCPCM:
         # A run_id holds the name but not the params, so every setting off its default is named.
         self.name = "bodik.cpcm." + self.family.lower().replace(" ", "_")
         self.name += f".{greedy_method}" if greedy_method != "RESIT_greedy" else ""
-        self.name += f".lambda{lambda_:g}" if lambda_ != 2.0 else ""
+        self.name += f".lambda{float(lambda_)!r}" if lambda_ != 2.0 else ""
         self.name += f".seed{seed}" if seed != 0 else ""
 
     def setup(self) -> None:
