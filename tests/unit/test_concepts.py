@@ -30,6 +30,7 @@ from andrey.spec.concepts import (
     BOOTSTRAP_PARAMS,
     CI_SEARCHES,
     CONCEPTS,
+    CONTINUOUS_TESTED,
     PCMCI_FAMILY,
     Concept,
 )
@@ -375,6 +376,8 @@ UNIT_CASES = {
     "loci": "lsnm_pair",
     "cpcm": "lsnm_pair",
     "cpcm_graph": "lsnm_pair",
+    "skewd": "lsnm_pair",
+    "skewd_mv": "nonmonotone_4v",
     "cam": "nonmonotone_4v",
     "resit": "nonmonotone_4v",
     "score_matching": "rational_chain_4v",
@@ -730,7 +733,7 @@ def test_a_seeded_fit_records_its_seed(method, monkeypatch):
 #: The CI searches whose score search visits the variables in a random order on every fit.
 ORDER_SEARCH_FIRST = ("boss_fci", "grasp_fci")
 #: The search whose dummies enter its tests as numeric columns, so it reads continuous data only.
-CONTINUOUS_ONLY = ("jpcmciplus",)
+CONTINUOUS_ONLY = CONTINUOUS_TESTED
 
 
 def test_a_fit_that_draws_no_random_numbers_records_no_seed():

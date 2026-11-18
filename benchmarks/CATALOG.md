@@ -42,6 +42,7 @@ whose Reproduce table lists the driver.
 | [NOTEARS and DAGMA](comparisons/notears-dagma.md) | `notears_cpu.py`, `notears_summary.py` | NOTEARS, DAGMA, each also with `standardize=True` and `robust=True` | the authors' NOTEARS code, the authors' dagma; CausalDisco (R2-SortnRegress, Var-SortnRegress) as controls | 0.17.0, 0.18.0 |
 | [PNL direction test](comparisons/pnl.md) | `pnl_pairs.py` | PNL | causal-learn | 0.4.0, 0.9.0 |
 | [LOCI direction test](comparisons/loci.md) | `loci_pairs.py` | LOCI, both criteria; ANM, PNL, and CAM as context | the authors' LOCI code (spline features, both criteria) | 0.16.0 |
+| SkewD direction test | `skewd_pairs.py` | SkewD, both criteria; LOCI as context | the authors' SkewD code (both criteria) | |
 | [Categorical data](comparisons/categorical.md) | `discrete_cpu.py` | PC, GES, BOSS, GRaSP, hill climbing | causal-learn, bnlearn, pgmpy | 0.6.0, 0.8.0 |
 | [Missing data](comparisons/missing-data.md) | `missing_cpu.py` | PC with MVPC; GES, XGES, BOSS, GRaSP, hill climbing, Tabu search, exact search, NOTEARS, DAGMA, and CALM with structural EM; test-wise PC, listwise deletion, and mean imputation | the MVPC authors' R code, MissDAG, bnlearn's `structural.em`, Tetrad's EM covariance policy | 0.16.0, 0.17.0 |
 | [Path and confounder claims](comparisons/knowledge-paths.md) | `knowledge_paths.py` | The 22 methods that honor them, from PC to multi-group DirectLiNGAM, with `required_paths`, `forbidden_paths`, and `confounded`, against the same fit without them | enumeration of every small graph; Tetrad, pcalg, tigramite, lingam, bnlearn, and causal-learn given the same knowledge | |
@@ -59,8 +60,8 @@ whose Reproduce table lists the driver.
 
 `start.sh` builds the benchmark environment; `start_r.sh`, `start_cam_r.sh`, `start_resit_r.sh`,
 `start_mvpc_r.sh`, `start_missdag.sh`, `start_xges.sh`, `start_tigramite.sh`, `start_lingam.sh`,
-`start_lingam_ts.sh`, `start_causalnex.sh`, `start_utigsp.sh`, `start_loci.sh`, `start_stein.sh`,
-and `start_notears.sh` build the separate environments some comparisons need
+`start_lingam_ts.sh`, `start_causalnex.sh`, `start_utigsp.sh`, `start_loci.sh`, `start_skewd.sh`,
+`start_stein.sh`, and `start_notears.sh` build the separate environments some comparisons need
 ([setup](README.md#setup)).
 
 ## Release cards

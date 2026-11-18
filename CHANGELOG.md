@@ -29,6 +29,15 @@ names its pull request.
   tests, `cpcm_graph` returns the DAG of lowest penalized dHSIC score (`edge_penalty=2`) by exact
   search up to 4 variables and RESIT-greedy search above. A column outside its family's support
   raises `ValueError` ([#1085]).
+- `andrey.skewd` and `andrey.skewd_mv`, SkewD and SkewD-MV (Klippert and Marx 2026), experimental:
+  the direction of a variable pair, and a DAG, in a location-scale model whose noise is skewed,
+  `y = f(pa) + g(pa) n` with skew-normal `n`. `skewd` fits the model in each direction, with
+  penalties chosen by Bayesian optimization of a cross-validated likelihood, and decides by an HSIC
+  test of the scaled residual against the cause (`criterion="independence"`, the default) or by the
+  larger likelihood (`criterion="likelihood"`). `skewd_mv` learns the Markov equivalence class with
+  PC and returns its DAG with the largest likelihood; it lists the class's DAGs one at a time and
+  stops with an error once they need more than `max_fits` conditional models (100, the order up to
+  which the paper expects it to apply), before it fits any. Not benchmarked yet. ([#1083])
 - `andrey.data.load_dataset("tuebingen")` loads the Tübingen cause-effect pairs (Mooij et al. 2016)
   as a `CausePairs` collection of 108 pairs. Each pair is a dataset with its two columns, the
   two-node graph of its reference direction, its weight (pairs from one source share weights that
@@ -78,6 +87,9 @@ names its pull request.
 
 ### Fixed
 
+- A column that holds both signs near the largest float no longer raises a `RuntimeWarning`
+  in the check for constant columns, which compared a difference that overflowed; every
+  method reads its data through that check. ([#1083])
 - `"fisherz"` and `"normal_scores"` compute the upper tail of their p-value directly, and so do
   the Fisher-aggregated HSIC test of `bottom_up_parce_lingam` and the Anderson-Darling p-value of
   one value in `markov_check`. The subtraction `1 - cdf` they used was `0` below about `2e-16` and
@@ -2691,6 +2703,7 @@ First alpha release.
 [#1067]: https://github.com/Abel-ai-lab/Andrey/pull/1067
 [#1070]: https://github.com/Abel-ai-lab/Andrey/pull/1070
 [#1082]: https://github.com/Abel-ai-lab/Andrey/pull/1082
+[#1083]: https://github.com/Abel-ai-lab/Andrey/pull/1083
 [#1084]: https://github.com/Abel-ai-lab/Andrey/pull/1084
 [#1085]: https://github.com/Abel-ai-lab/Andrey/pull/1085
 [#1088]: https://github.com/Abel-ai-lab/Andrey/pull/1088

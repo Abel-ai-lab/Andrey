@@ -174,6 +174,18 @@ export ANDREY_BENCH_LOCI_PYTHON=$PWD/benchmarks/.venv-loci/bin/python
 export ANDREY_BENCH_LOCI=$PWD/benchmarks/.loci
 ```
 
+The authors' SkewD code, the reference for SkewD (`skewd_pairs.py`), is MIT-licensed; the harness
+still runs it unmodified and copies none of it: `start_skewd.sh` checks out a pinned commit into the
+git-ignored `benchmarks/.skewd` and builds an environment from the lock file
+`requirements-skewd.txt`. A fit at the budgets of the authors' experiments takes hours, so the
+driver's wall cap is a day:
+
+```shell
+benchmarks/start_skewd.sh
+export ANDREY_BENCH_SKEWD_PYTHON=$PWD/benchmarks/.venv-skewd/bin/python
+export ANDREY_BENCH_SKEWD=$PWD/benchmarks/.skewd
+```
+
 The missing-value lanes (`missing_cpu.py`) run two authors' codes that carry no license, unmodified
 and outside the package. Each script downloads its pinned commit, checks the archive's SHA-256, and
 extracts it into a git-ignored folder the adapters read from. MissDAG, the reference for
