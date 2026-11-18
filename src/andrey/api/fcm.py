@@ -1440,3 +1440,208 @@ def camuv(
     latent = [[int(i), int(j)] for i, j in zip(*np.nonzero(np.triu(pairs)), strict=True)]
     metadata = {"latent_pairs": latent, "cycle_edges": cycle_edges}
     return structure_output(structure, labels=labels, metadata=metadata)
+
+
+@method_spec("skewd_mv")
+def skewd_mv(
+    data: npt.ArrayLike,
+    *,
+    alpha: float = 0.05,
+    indep_test: str | None = "kci",
+    tuning_iter: int = 20,
+    max_iter: int = 3000,
+    max_fits: int | None = 100,
+    seed: int | None = None,
+) -> StructureOutput:
+    """Learn a DAG of a skew-normal location-scale model with SkewD-MV.
+
+    SkewD-MV [1]_ estimates the Markov equivalence class with PC [2]_ and returns the DAG of the
+    class whose skew-normal location-scale models, one per variable given its parents, have the
+    largest likelihood. It is the graph version of :func:`~andrey.skewd`'s likelihood criterion.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    alpha : float, default=0.05
+        Significance level of PC's conditional-independence tests, in ``(0, 1)``.
+    indep_test : {"fisherz", "student_t", "kci", "rcot", "cmiknn", "gpdc"} or None, default="kci"
+        PC's conditional-independence test, a test of continuous data as in :func:`~andrey.pc`, but
+        not ``"normal_scores"``: the likelihood stage reads the values, which ranks would hide. The
+        default is the kernel test [3]_, the authors' choice. ``None`` picks ``"fisherz"``.
+    tuning_iter : int, default=20
+        The penalty settings, at least 1, that the Bayesian optimization scores by
+        cross-validation for each conditional model; the first half, rounded up, are Latin
+        hypercube points.
+    max_iter : int, default=3000
+        The most iterations, at least 1, of the expectation conditional maximization that refines
+        each conditional model.
+    max_fits : int or None, default=100
+        The most conditional models, at least 1, the class's DAGs may need before the call refuses
+        to list more of them (``ValueError``); 100 is the order up to which the paper expects the
+        method to apply [1]_. ``None`` sets no cap, and the call can then run for days.
+        While it is set, a group of undirected edges with more than 65,536 orientations is
+        refused too, and so are groups that share a cycle and have more than 65,536 acyclic
+        combinations.
+    seed : int or None, default=None
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed of PC's randomized tests and of the random
+        draws of each fit.
+
+    Returns
+    -------
+    StructureOutput
+        Contains a :class:`~andrey.core.GraphStructure` of kind ``dag``.
+        ``metadata["algorithm"]`` is ``"skewd_mv"``, ``metadata["candidates"]`` the number of DAGs
+        in the class, and ``metadata["fits"]`` the number of conditional models fitted.
+        ``metadata["indep_test"]`` names the test the fit used and ``metadata["seed"]`` the seed.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+    ExperimentalWarning
+        On the first call in a process: the method is not benchmarked yet.
+    SearchLimitWarning
+        When a conditional model's refinement stops at ``max_iter`` rather than on its own rule.
+
+    Notes
+    -----
+    **When to use.** SkewD-MV learns a DAG from continuous variables observed i.i.d. under a
+    location-scale noise model, each variable ``y = f(pa) + g(pa) n`` with ``g > 0``, skew-normal
+    noise ``n`` independent of its parents, and no hidden common cause; it also assumes the
+    faithfulness PC needs, so that the true DAG lies in the estimated class [1]_. It is designed
+    for small graphs, 6 to 10 variables in the paper, whose noise scale changes with the parents,
+    which the additive models of :func:`~andrey.cam` and :func:`~andrey.resit` do not allow.
+
+    Each column is standardized first [1]_. PC, order-independent [2]_, gives the class. Its DAGs
+    orient the undirected edges with no directed cycle and no new collider [1]_, and are every
+    combination of one orientation of each connected group of undirected edges, so each group is
+    listed on its own, one DAG at a time, and the listing stops with an error once the groups need
+    more than ``max_fits`` conditional models or one group has more than 65,536 orientations, so a
+    class too large to score is never listed in full. The edges are oriented in a maximum
+    cardinality search order, so the listing's time does not depend on the column order. When a
+    group has no such orientation, as conflicting colliders can leave, its candidates are every
+    acyclic orientation of its edges. Each variable with an undirected edge is fitted given its
+    parents in each orientation, once per distinct parent set: the standard Gaussian log-likelihood
+    for a variable without parents, and otherwise :func:`~andrey.skewd`'s skew-normal fit with
+    additive B-splines of the parents, 10 location and 7 scale columns per parent and a penalty pair
+    per parent chosen by a 5-fold cross-validation [1]_. A constant moved between two parents'
+    location coefficients changes no fitted value, so the fit leaves it out. Only these variables'
+    terms differ between the DAGs, so their sum decides (Proposition 5.1 of [1]_), and each group
+    contributes its own terms: the returned DAG holds the orientation of each group with the largest
+    sum, the first on a tie, which is the DAG of the class with the largest sum. Where a conflicting
+    graph lets the groups' best orientations close a directed cycle across its directed edges, the
+    search takes the acyclic combination with the largest sum, and a graph with none raises an
+    error. The defaults, 20 candidates of the Bayesian optimization and 3,000 iterations, are those
+    of the paper's runs. The columns are fitted in the order of their values' ranks, so the DAG does
+    not depend on the column order; ties follow ``andrey.config.tie_break``.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
+    its variables, so a row with a missing value has no place in it. Drop the incomplete rows
+    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** Not benchmarked yet. The paper measures it on skew-normal location-scale
+    graphs of 6 and 10 variables with 1,000 rows [1]_. Its cost grows with the number of distinct
+    parent sets the class allows, exponentially in a variable's undirected edges, and each fit
+    takes minutes at the defaults; it refuses a class that needs more than 100 (``max_fits``),
+    where the paper counts parent-child configurations and expects the method to apply while they
+    are in the order of 100. An edge PC misses or misorients stays wrong: the likelihood only
+    chooses among the class's DAGs. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
+
+    References
+    ----------
+    .. [1] Klippert, D., and Marx, A. (2026). Skewness-robust causal discovery in location-scale
+       noise models. ICML, PMLR 306.
+    .. [2] Colombo, D., and Maathuis, M. H. (2014). Order-independent constraint-based causal
+       structure learning. JMLR 15, 3741-3782.
+    .. [3] Zhang, K., Peters, J., Janzing, D., and Scholkopf, B. (2011). Kernel-based conditional
+       independence test and application in causal discovery. UAI, 804-813.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import skewd_mv
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(300)
+    >>> y = np.tanh(2 * x) + (0.4 + 0.2 * np.tanh(x)) * rng.standard_normal(300)
+    >>> z = y + 0.5 * rng.standard_normal(300)
+    >>> data = np.column_stack([x, y, z])
+    >>> out = skewd_mv(data, indep_test="fisherz", tuning_iter=1, max_iter=20, seed=0)
+    >>> out.structure.kind, out.metadata["candidates"]
+    ('dag', 3)
+    """
+    from andrey.api.constraint import pc
+    from andrey.core.ties import tie_ranks
+    from andrey.core.warning_policy import warn_search_limit
+    from andrey.fcm.skewd import (
+        LISTED_DAGS,
+        Budget,
+        class_candidates,
+        class_size,
+        fit,
+        merge_components,
+    )
+
+    X = data_matrix(data, method="skewd_mv", min_rows=MIN_ROWS)
+    labels = column_labels(data)
+    X = X / np.abs(X).max(axis=0)  # divide first, so tiny or huge units cannot overflow the moments
+    order = np.argsort(tie_ranks(X), kind="stable")
+    X = X[:, order]
+    X = (X - X.mean(axis=0)) / X.std(axis=0)
+    assert seed is not None  # method_spec resolves it
+    skeleton = pc(X, alpha=alpha, indep_test=indep_test, seed=seed).structure
+    assert isinstance(skeleton, GraphStructure)
+    marks = skeleton.to_numpy()
+    components, best, fits = class_candidates(marks, max_fits)
+    candidates = class_size(best, components, None if max_fits is None else LISTED_DAGS)
+    if candidates == 0:  # known from the graph alone, so before any model is fitted
+        raise ValueError(
+            "skewd_mv: PC's graph leaves no DAG that keeps its directed edges and adds no collider"
+        )
+    budget = Budget(
+        knots=8, folds=5, tuning_iter=tuning_iter, initial=-(-tuning_iter // 2), max_iter=max_iter
+    )
+    n = X.shape[0]
+    terms: dict[tuple[int, tuple[int, ...]], float] = {}
+    converged = True
+    for y, parents in fits:
+        result = fit(X[:, list(parents)], X[:, y], budget, seed)
+        terms[(y, parents)] = n * result.log_likelihood
+        converged &= result.converged
+    if not converged:
+        warn_search_limit("skewd_mv", "max_iter", max_iter, "ECM iterations")
+    gaussian = -0.5 * n * np.log(2 * np.pi) - 0.5 * (X**2).sum(axis=0)  # a variable with no parent
+
+    def term(dag: np.ndarray, y: int) -> float:
+        parents = tuple(np.flatnonzero(dag[:, y]).tolist())
+        return terms[(y, parents)] if parents else float(gaussian[y])
+
+    # A DAG's likelihood is the sum over its variables, and only the variables of an undirected
+    # component change with that component's orientation, so the best DAG holds each component's
+    # best orientation (the first, on a tie).
+    tables = [
+        [sum(term(member, y) for y in nodes) for member in members] for nodes, members in components
+    ]
+    best = merge_components(best, components, tables)
+    back = np.argsort(order)
+    return structure_output(
+        dag_from_adjacency(best[np.ix_(back, back)]),
+        labels=labels,
+        metadata={"candidates": candidates, "fits": len(fits)},
+    )
