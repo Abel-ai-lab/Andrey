@@ -114,7 +114,8 @@ def test_choices_include_the_default():
     for spec in REGISTRY.values():
         for p in spec.params:
             if p.choices and p.default is not None:
-                assert p.default in p.choices
+                several = p.type == "str_or_list" and not isinstance(p.default, str)
+                assert all(d in p.choices for d in (p.default if several else [p.default]))
 
 
 def _type_matches(ptype: str, default: object) -> bool:
@@ -130,6 +131,8 @@ def _type_matches(ptype: str, default: object) -> bool:
         return isinstance(default, tuple) and all(isinstance(x, int) for x in default)
     if ptype == "str_list":
         return isinstance(default, (tuple, list))
+    if ptype == "str_or_list":
+        return isinstance(default, (str, tuple, list))
     if ptype == "knowledge":
         return isinstance(default, dict)
     return False
