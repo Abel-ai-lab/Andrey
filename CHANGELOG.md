@@ -110,7 +110,7 @@ names its pull request.
 - `anm`, `pnl`, and `loci` fit each direction on its rows sorted by its cause, then its effect,
   and standardize the pair with sums over sorted values, so a result does not depend on the order
   of the rows. One tie rule decides the direction for all three: two log p-values, statistics, or
-  log-likelihoods that agree to a relative `1e-3` are equal. The two directions' numbers had
+  log-likelihoods that agree to a relative `1e-9` are equal. The two directions' numbers had
   changed in their last bits with the row order, so on a two-valued table whose rows stay the same
   when its columns swap, every method drew an edge on all of 300 such tables, its direction changing
   with the row order on about 70% of them. Such a table now gives no edge. The recorded outputs and

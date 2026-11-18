@@ -40,6 +40,7 @@ DECISIONS = [
     (0.0, 0.0, None, None),  # nor does a tie at zero, without statistics
     (3.4e-26, 3.4e-26 * (1 + 1e-12), None, None),  # p-values that differ in their last bits tie
     (1e-12, 1e-11, None, (1, 0)),  # small p-values keep their order through their logarithms
+    (0.0, 0.5, None, (1, 0)),  # a p-value of zero does not tie with a positive one
     (0.23, 0.02, 0.05, (0, 1)),  # forward passes, backward fails
     (0.02, 0.23, 0.05, (1, 0)),
     (0.60, 0.30, 0.05, None),  # both pass: either direction fits
@@ -61,6 +62,7 @@ TIE_BREAKS = [
     (0.0, 0.0, 16.3, 17.0, None, (0, 1)),  # both p-values zero: the smaller statistic wins
     (0.0, 0.0, 17.0, 16.3, None, (1, 0)),
     (0.0, 0.0, 17.0, 17.0, None, None),  # the statistics tie too: no edge
+    (0.0, 0.5, 1.1, 9.0, None, (1, 0)),  # unequal p-values decide, one of them zero
     (0.60, 0.30, 9.0, 1.1, None, (0, 1)),  # unequal p-values decide whatever the statistics
     (0.30, 0.60, 1.1, 9.0, None, (1, 0)),
     (0.0, 0.0, 1.1, 9.0, 0.05, None),  # with a level, only the p-values decide
@@ -82,8 +84,8 @@ LOG_P = [
     (-900.0, -800.0, None, (1, 0)),  # the logarithms order p-values that read 0
     (-800.0, -900.0, None, (0, 1)),
     (-900.0, -900.0, None, (0, 1)),  # equal logarithms: the statistics decide
-    (-900.0, -900.45, None, (0, 1)),  # logarithms within a relative 1e-3 are equal
-    (-900.0, -899.0, None, (1, 0)),  # and ones farther apart are not
+    (-900.0, -900.0000004, None, (0, 1)),  # logarithms within a relative 1e-9 are equal
+    (-900.0, -899.9999, None, (1, 0)),  # and ones farther apart are not
     (-900.0, -800.0, 0.05, None),  # with a level, only the p-values decide
 ]
 

@@ -202,7 +202,7 @@ def anm(
     With ``alpha=None``, the edge points in the direction with the larger p-value. The two are
     compared through their logarithms, which keep their order where both p-values fall below about
     ``1e-308`` and read zero, as on a large sample or a pair that fits neither direction; two
-    logarithms that agree to a relative ``1e-3`` count as equal. Equal p-values leave the choice to
+    logarithms that agree to a relative ``1e-9`` count as equal. Equal p-values leave the choice to
     the HSIC statistics, each divided by its mean under independence and compared the same way, and
     the edge points in the direction with the smaller one, the weaker dependence between the
     proposed cause and its residual. Equal statistics give no edge. The rule therefore produces an
@@ -353,7 +353,7 @@ def pnl(
     With ``alpha=None``, the edge points in the direction with the larger p-value. The two are
     compared through their logarithms, which keep their order where both p-values fall below about
     ``1e-308`` and read zero, as on a large sample or a pair that fits neither direction; two
-    logarithms that agree to a relative ``1e-3`` count as equal. Equal p-values leave the choice to
+    logarithms that agree to a relative ``1e-9`` count as equal. Equal p-values leave the choice to
     the HSIC statistics, each divided by its mean under independence and compared the same way, and
     the edge points in the direction with the smaller one, the weaker dependence between the
     proposed cause and its estimated noise. Equal statistics give no edge. The rule therefore
@@ -526,12 +526,12 @@ def loci(
     distribution [2]_. The p-values then decide as for :func:`~andrey.anm`: with ``alpha=None``, the
     larger p-value, compared through their logarithms, and on equal p-values the smaller
     statistic, with no edge when those are equal too, each pair equal when it agrees to a relative
-    ``1e-3``; with a significance level, an edge only when exactly one direction's p-value exceeds
+    ``1e-9``; with a significance level, an edge only when exactly one direction's p-value exceeds
     it. Mooij et al. (2016) [3]_ compare p-values to avoid choosing a level. The paper proposes this
     criterion for noise that is not Gaussian.
 
     With ``criterion="likelihood"``, LOCI-M in [1]_, the edge points in the direction whose model
-    has the larger mean log-likelihood, and two that agree to a relative ``1e-3`` give no edge. The
+    has the larger mean log-likelihood, and two that agree to a relative ``1e-9`` give no edge. The
     likelihood identifies the direction consistently when the noise is Gaussian, as the fitted model
     assumes [1]_. In the paper's benchmarks it is ahead of the independence criterion on
     location-scale data and behind it on data outside that model.

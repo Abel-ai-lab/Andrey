@@ -18,6 +18,7 @@ pairwise direction test counts its two directions' values as equal when they agr
 from __future__ import annotations
 
 import hashlib
+import math
 from collections import Counter
 from functools import cmp_to_key
 from itertools import groupby
@@ -76,19 +77,21 @@ def tie_key(value: float) -> float:
 #: ``loci``) count as equal: two log p-values, two test statistics, or two log-likelihoods ``a``
 #: and ``b`` tie when ``|a - b| <= PAIR_RTOL * max(1, |a|, |b|)``. Each direction's fit reads its
 #: rows in one canonical order, so a table whose two columns hold the same values swapped gives
-#: both directions the same numbers bit for bit. The tolerance covers what is left: such a table
-#: with its columns in different units differs in the last bits after standardizing, and an
-#: iterative fit can carry that up to its stopping tolerance and past it. Measured on 6,000 fits of
-#: such tables with 100 to 1,000 rows, the largest relative gap was ``1e-13`` for ``anm``, ``0`` for
-#: ``pnl``, and ``6e-4`` for ``loci``, whose solver stops when the mean log-likelihood changes by
-#: less than ``1e-6``, and whose HSIC test can amplify that; on the quality gate's pairs the two
-#: directions differ by more than ``0.06``.
-PAIR_RTOL = 1e-3
+#: both directions the same numbers bit for bit, and they tie for every method. The tolerance
+#: covers rounding carried through a fit: with such a table's columns in different units, which
+#: changes the last bits of its standardized values, the largest relative gap over 1,840 fits with
+#: 100 to 300 rows was ``1e-13`` for ``anm`` and ``0`` for ``pnl``, while the two directions of
+#: unrelated pairs, which nearly mirror each other, differ by ``4e-6`` and more. ``loci``'s solver
+#: stops when the mean log-likelihood changes by less than ``1e-6``, so its gap on such a table can
+#: reach ``6e-4``, and there the direction follows that difference.
+PAIR_RTOL = 1e-9
 
 
 def tied(a: float, b: float) -> bool:
-    """Whether ``a`` and ``b`` agree within :data:`PAIR_RTOL`; two equal infinities tie."""
-    return a == b or abs(a - b) <= PAIR_RTOL * max(1.0, abs(a), abs(b))
+    """Whether ``a`` and ``b`` agree within :data:`PAIR_RTOL`; an infinity ties only with itself."""
+    if not (math.isfinite(a) and math.isfinite(b)):
+        return a == b
+    return abs(a - b) <= PAIR_RTOL * max(1.0, abs(a), abs(b))
 
 
 def tie_mask(name: str, categorical: npt.ArrayLike | None, d: int) -> np.ndarray:
