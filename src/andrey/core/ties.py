@@ -73,7 +73,7 @@ def tie_key(value: float) -> float:
     return round(value, KEY_DP)
 
 
-#: Relative tolerance under which the two directions of a pairwise direction test (``anm``, ``pnl``,
+#: Tolerance under which the two directions of a pairwise direction test (``anm``, ``pnl``,
 #: ``loci``) count as equal: two log p-values, two test statistics, or two log-likelihoods ``a``
 #: and ``b`` tie when ``|a - b| <= PAIR_RTOL * max(1, |a|, |b|)``. Each direction's fit reads its
 #: rows in one canonical order, so a table whose two columns hold the same values swapped gives

@@ -202,14 +202,14 @@ def anm(
     With ``alpha=None``, the edge points in the direction with the larger p-value. The two are
     compared through their logarithms, which keep their order where both p-values fall below about
     ``1e-308`` and read zero, as on a large sample or a pair that fits neither direction; two
-    logarithms that agree to a relative ``1e-9`` count as equal. Equal p-values leave the choice to
-    the HSIC statistics, each divided by its mean under independence and compared the same way, and
-    the edge points in the direction with the smaller one, the weaker dependence between the
-    proposed cause and its residual. Equal statistics give no edge. The rule therefore produces an
-    edge even for unrelated variables, a deterministic pair whose p-values are both near zero, or a
-    pair whose direction cannot be identified. Mooij et al. (2016) [3]_ compare p-values to avoid
-    choosing a significance level and found the comparison among the best methods in their
-    benchmark.
+    logarithms that differ by at most ``1e-9`` times the larger of 1 and their absolute values count
+    as equal. Equal p-values leave the choice to the HSIC statistics, each divided by its mean under
+    independence and compared the same way, and the edge points in the direction with the smaller
+    one, the weaker dependence between the proposed cause and its residual. Equal statistics give no
+    edge. The rule therefore produces an edge even for unrelated variables, a deterministic pair
+    whose p-values are both near zero, or a pair whose direction cannot be identified. Mooij et al.
+    (2016) [3]_ compare p-values to avoid choosing a significance level and found the comparison
+    among the best methods in their benchmark.
 
     With a significance level, only the p-values decide; a direction passes when its p-value
     exceeds ``alpha``:
@@ -353,14 +353,14 @@ def pnl(
     With ``alpha=None``, the edge points in the direction with the larger p-value. The two are
     compared through their logarithms, which keep their order where both p-values fall below about
     ``1e-308`` and read zero, as on a large sample or a pair that fits neither direction; two
-    logarithms that agree to a relative ``1e-9`` count as equal. Equal p-values leave the choice to
-    the HSIC statistics, each divided by its mean under independence and compared the same way, and
-    the edge points in the direction with the smaller one, the weaker dependence between the
-    proposed cause and its estimated noise. Equal statistics give no edge. The rule therefore
-    produces an edge even for unrelated variables or a pair whose direction cannot be identified,
-    such as a linear Gaussian pair. Mooij et al. (2016) [4]_ compare p-values to avoid choosing a
-    significance level and found the comparison among the best methods in their benchmark of
-    additive-noise models.
+    logarithms that differ by at most ``1e-9`` times the larger of 1 and their absolute values count
+    as equal. Equal p-values leave the choice to the HSIC statistics, each divided by its mean under
+    independence and compared the same way, and the edge points in the direction with the smaller
+    one, the weaker dependence between the proposed cause and its estimated noise. Equal statistics
+    give no edge. The rule therefore produces an edge even for unrelated variables or a pair whose
+    direction cannot be identified, such as a linear Gaussian pair. Mooij et al. (2016) [4]_ compare
+    p-values to avoid choosing a significance level and found the comparison among the best methods
+    in their benchmark of additive-noise models.
 
     With a significance level, only the p-values decide; a direction passes when its p-value
     exceeds ``alpha``:
@@ -524,17 +524,18 @@ def loci(
     ``(y - mu(x)) / sigma(x)`` is tested against the proposed cause by HSIC with Gaussian kernels,
     each bandwidth the median distance between the rows, and a gamma approximation of the null
     distribution [2]_. The p-values then decide as for :func:`~andrey.anm`: with ``alpha=None``, the
-    larger p-value, compared through their logarithms, and on equal p-values the smaller
-    statistic, with no edge when those are equal too, each pair equal when it agrees to a relative
-    ``1e-9``; with a significance level, an edge only when exactly one direction's p-value exceeds
-    it. Mooij et al. (2016) [3]_ compare p-values to avoid choosing a level. The paper proposes this
-    criterion for noise that is not Gaussian.
+    larger p-value, compared through their logarithms, and on equal p-values the smaller statistic,
+    with no edge when those are equal too, two values equal when they differ by at most ``1e-9``
+    times the larger of 1 and their absolute values; with a significance level, an edge only when
+    exactly one direction's p-value exceeds it. Mooij et al. (2016) [3]_ compare p-values to avoid
+    choosing a level. The paper proposes this criterion for noise that is not Gaussian.
 
     With ``criterion="likelihood"``, LOCI-M in [1]_, the edge points in the direction whose model
-    has the larger mean log-likelihood, and two that agree to a relative ``1e-9`` give no edge. The
-    likelihood identifies the direction consistently when the noise is Gaussian, as the fitted model
-    assumes [1]_. In the paper's benchmarks it is ahead of the independence criterion on
-    location-scale data and behind it on data outside that model.
+    has the larger mean log-likelihood, and two that differ by at most ``1e-9`` times the larger of
+    1 and their absolute values give no edge. The likelihood identifies the direction consistently
+    when the noise is Gaussian, as the fitted model assumes [1]_. In the paper's benchmarks it is
+    ahead of the independence criterion on location-scale data and behind it on data outside that
+    model.
 
     Each column is standardized first, as in [1]_, so the result does not depend on the units of
     either variable; the Gaussian marginals of the two standardized causes are then equal, so the
@@ -576,9 +577,12 @@ def loci(
     ``n_samples``; the likelihood fit grows linearly with it. It decides one pair: the paper defines
     no procedure for more variables. A spline at either end of the cause's range covers few rows,
     where the fitted variance can shrink toward zero as the likelihood grows, which only the prior
-    bounds. Missing values are not benchmarked yet; the tests run them on pairs with values missing
-    completely at random. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    bounds. With columns in very different units, the two directions' log p-values of a table that
+    mirrors itself can differ by up to about ``6e-4``, relative to the larger of 1 and their
+    absolute values, through the solver's stopping tolerance, ``1e-6`` as in the paper, so a nearly
+    tied direction can follow that noise. Missing values are not benchmarked yet; the tests run them
+    on pairs with values missing completely at random. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
