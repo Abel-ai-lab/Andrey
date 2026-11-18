@@ -78,6 +78,8 @@ class AndreyCPCM:
         self.family = family if isinstance(family, str) else list(family)
         self.seed = seed
         label = self.family if isinstance(self.family, str) else "_".join(self.family)
+        # A run_id holds the name but not the params, so every setting off its default is named.
+        label += f".seed{seed}" if seed != 0 else ""
         self.name = f"andrey.cpcm.{label}.numpy"
 
     def setup(self) -> None:
@@ -115,6 +117,8 @@ class AndreyCPCMGraph(AndreyCPCM):
         super().__init__(family, seed)
         self.edge_penalty = edge_penalty
         self.name = self.name.replace("andrey.cpcm.", "andrey.cpcm_graph.", 1)
+        if edge_penalty != 2.0:
+            self.name = self.name.replace(".numpy", f".penalty{edge_penalty:g}.numpy")
 
     def setup(self) -> None:
         """Fit a tiny table before timing, so lazy imports and the warning stay out of the fit.
