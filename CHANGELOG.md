@@ -23,10 +23,14 @@ names its pull request.
 
 - With `missing=None` on data with missing values, a method whose tests delete rows logs one notice
   per process that names the handling, test-wise deletion, and when it is valid. Pass
-  `missing="testwise"` to choose it by name. ([#1102])
+  `missing="testwise"` to choose it by name. `bootstrap` logs it once for all of its worker
+  processes. ([#1102])
 - A refusal of missing values leads with what you can do. A time series is pointed to `pcmci`,
   `pcmciplus`, and `lpcmci` in place of filling in the missing steps, and dropping rows is named as
   your own step, with the same rows of every row-aligned argument. ([#1102])
+- The error of a test that cannot run on the rows where its variables are observed advises capping
+  the conditioning sets with `max_depth` first, and says that dropping a column with many missing
+  values can remove a common cause of the columns that stay. ([#1102])
 - `missing="em"` raises `ValueError` when two columns share no observed row, as the data hold no
   covariance for them. Such data ran before, on a covariance the model alone supplied. ([#1102])
 
@@ -36,6 +40,8 @@ names its pull request.
   reason: the cited result covers another procedure. Every method that deletes rows per test now
   states one shared sentence, valid when values are missing completely at random, and the guide's
   text on `None` and on structural EM is corrected. ([#1102])
+- The docs name `normal_scores` among the tests that need `|S| + 3` rows where their variables are
+  observed; they gave it the 2 rows of the other tests. ([#1102])
 
 ## [0.17.1] - 2026-11-12
 

@@ -25,10 +25,15 @@ import numpy as np
 
 from andrey import api
 from andrey.api._adapt import flag, int_in_range
-from andrey.api._method import removed_name_error
+from andrey.api._method import (
+    MISSING_DEFAULT_NOTICE,
+    notice_default_missing,
+    removed_name_error,
+)
 from andrey.core import ARROW, CIRCLE, LATENT, TAIL, GraphStructure, StructureOutput, environments
 from andrey.core import backend as _backend
 from andrey.core._convert import extend_in_order, mag_of_pag, pag_of
+from andrey.core.ci_missing import TESTWISE
 from andrey.core.knowledge import mpdag
 from andrey.core.knowledge import orient as knowledge_orient
 from andrey.core.orient import cpdag_of_pdag
@@ -42,7 +47,7 @@ from andrey.core.structure import (
     is_ancestral_kind,
 )
 from andrey.core.ties import tie_ranks
-from andrey.core.warning_policy import AndreyWarning, warn_once
+from andrey.core.warning_policy import AndreyWarning, mark_logged, warn_once
 from andrey.search._parallel import pick_context
 
 if TYPE_CHECKING:
@@ -900,11 +905,16 @@ _BLAS: object = None  # a held threadpoolctl controller capping this worker's BL
 
 
 def _init_worker(job: Job) -> None:
-    """Pin a worker to one fit at a time on one BLAS thread, with the parent's settings."""
+    """Pin a worker to one fit at a time on one BLAS thread, with the parent's settings.
+
+    A worker logs no notice of a default handling of missing values: :func:`bootstrap` logs it in
+    the calling process, once for every worker.
+    """
     global _JOB, _BLAS
     from threadpoolctl import threadpool_limits
 
     _BLAS = threadpool_limits(limits=1)  # held for the worker's lifetime
+    mark_logged(MISSING_DEFAULT_NOTICE)
     _backend.config.n_jobs = 1
     _backend.config.backend = job.backend
     _backend.config.tie_break = job.tie_break
@@ -1228,6 +1238,12 @@ def bootstrap(
     ranks = _column_ranks(job) if spec.output.graph_kind == "dag" else None
     for category, message in dict.fromkeys(w for _, caught in results for w in caught):
         warnings.warn(message, category, stacklevel=2)
+    fits = [out for out, _ in results]
+    groups = list(zip(*fits)) if spec.output.multi else [fits]
+    if method_kwargs.get("missing") is None and any(
+        out.metadata.get("missing") == TESTWISE for group in groups for out in group
+    ):
+        notice_default_missing(spec.name)
     metadata: dict[str, JSONValue] = {
         "method": spec.name,
         "seed": root,
@@ -1236,8 +1252,6 @@ def bootstrap(
         "sample_fraction": job.sample_fraction if job.resampling == "subsample" else None,
         "block_length": job.block_length,
     }
-    fits = [out for out, _ in results]
-    groups = list(zip(*fits)) if spec.output.multi else [fits]
     outs = [
         BootstrapOutput._count(
             group,

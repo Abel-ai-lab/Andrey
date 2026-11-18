@@ -10,7 +10,11 @@ from __future__ import annotations
 
 import json
 import logging
+import re
+import subprocess
+import sys
 import warnings
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -21,11 +25,18 @@ from andrey.cli import main
 from andrey.core import ci, warning_policy
 from andrey.core.ci import (
     FisherZ,
+    PartialCorrelationTest,
     StudentT,
     make_indep_test,
     register_indep_test,
 )
-from andrey.core.ci_missing import EM_METHODS, TESTWISE_CLAIM, rows_metadata, rows_tested
+from andrey.core.ci_missing import (
+    EM_METHODS,
+    MORE_ROWS,
+    TESTWISE_CLAIM,
+    rows_metadata,
+    rows_tested,
+)
 from andrey.core.score import CopiedColumnsError
 from andrey.spec import REGISTRY
 from andrey.temporal.pcmci import design_test, lagged_design
@@ -97,6 +108,12 @@ TESTS = {
     "cond_gauss": (lambda: _mixed()[0], _mixed()[1]),
 }
 QUERIES = [(0, 3, ()), (3, 0, (2,)), (0, 3, (2, 1)), (1, 2, (3,))]
+#: The shipped partial-correlation tests, whose degrees of freedom set the rows a query needs.
+PARTIAL = [
+    name
+    for name, test in ci._CI_REGISTRY.items()
+    if isinstance(test, type) and issubclass(test, PartialCorrelationTest)
+]
 
 
 def _block(x: np.ndarray, columns: list[int]) -> np.ndarray:
@@ -228,16 +245,39 @@ def test_rows_tested_reports_the_fewest_and_the_median_rows():
 # --- edge cases -----------------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize("page", ["api.md", "guides/getting-started.md"])
+def test_a_page_that_names_the_tests_needing_more_rows_names_each_partial_correlation_test(page):
+    """A partial-correlation test needs ``|S| + 3`` rows; the other tests need 2."""
+    text = " ".join((Path(__file__).parents[2] / "docs" / "docs" / page).read_text().split())
+    spans = re.findall(r"\|S\| \+ 3` for (.*?) and 2 for the other tests", text)
+    assert spans
+    for span in spans:
+        named = set(re.findall(r'`"?(\w+)"?`', span)) & set(ci.SHIPPED_INDEP_TESTS)
+        assert named in (set(), set(PARTIAL))
+
+
+def _advises_more_rows(error) -> None:
+    """The advice caps the conditioning sets first, and says what dropping a column can remove."""
+    advice = str(error.value).partition("; ")[2]
+    assert advice.startswith("cap the conditioning sets with max_depth")
+    assert "or drop a column with many missing values, which can remove a common cause" in advice
+
+
 @pytest.mark.parametrize(
-    ("name", "size", "least"), [("fisherz", 2, 5), ("student_t", 1, 4), ("chisq", 1, 2)]
+    ("name", "size"), [*((name, size) for name in PARTIAL for size in (1, 2)), ("chisq", 1)]
 )
-def test_a_test_with_too_few_rows_raises_naming_its_minimum(name, size, least):
+def test_a_test_with_too_few_rows_raises_naming_its_minimum(name, size):
+    """A partial-correlation test needs ``|S| + 3`` rows, the rows of its degrees of freedom."""
     make, _ = TESTS[name]
+    least = size + 3 if name in PARTIAL else 2
     x = make()[:40]
     x[least - 1 :, 0] = np.nan  # column 0 observed on least - 1 rows
     test = make_indep_test(name, x)
-    with pytest.raises(ValueError, match=rf"on the {least - 1} rows .* needs at least {least}"):
+    with pytest.raises(
+        ValueError, match=rf"on the {least - 1} rows .* needs at least {least}"
+    ) as error:
         test(0, 1, list(range(2, 2 + size)))
+    _advises_more_rows(error)
     x[least - 1, 0] = 1.0  # one row more: the test runs
     assert 0.0 <= make_indep_test(name, x)(0, 1, list(range(2, 2 + size))) <= 1.0
 
@@ -254,6 +294,7 @@ def test_a_small_block_gives_a_p_value_or_raises(name):
                 p = test(0, 1, list(range(2, 2 + size)))
             except ValueError as error:
                 assert f"the {rows} rows where all" in str(error)
+                assert str(error).endswith(MORE_ROWS)
             else:
                 assert 0.0 <= p <= 1.0
 
@@ -284,8 +325,9 @@ def test_a_column_constant_on_a_test_rows_raises_for_a_continuous_test():
     x = _continuous(60)
     x[:30, 1] = 2.0
     x[30:, 0] = np.nan  # the rows where column 0 is observed hold column 1 constant
-    with pytest.raises(ValueError, match="constant on the 30 rows"):
+    with pytest.raises(ValueError, match="constant on the 30 rows") as error:
         make_indep_test("fisherz", x)(0, 1)
+    _advises_more_rows(error)
     assert 0.0 <= make_indep_test("fisherz", x)(1, 2) <= 1.0
 
 
@@ -667,6 +709,32 @@ def test_a_fit_by_em_logs_no_notice_of_a_default(caplog):
     with caplog.at_level(logging.WARNING, logger="andrey"):
         out = andrey.ges(_gaps(_continuous(400), 0.1), missing="em")
     assert out.metadata["missing"] == "em" and not _notices(caplog)
+
+
+_BOOTSTRAP_PROBE = """
+import numpy as np
+
+import andrey
+
+if __name__ == "__main__":
+    rng = np.random.default_rng(0)
+    x = rng.standard_normal((300, 4))
+    x[rng.random(x.shape) < 0.1] = np.nan
+    with andrey.config(n_jobs=2):
+        for _ in range(2):
+            andrey.bootstrap("pc", x, n_resamples=4, seed=0, missing=MISSING)
+"""
+
+
+@pytest.mark.parametrize(("missing", "notices"), [(None, 1), ("testwise", 0)])
+def test_bootstrap_on_worker_processes_logs_the_notice_once_in_all(missing, notices, tmp_path):
+    """The workers of every bootstrap call stay silent; the calling process logs the one notice."""
+    probe = tmp_path / "probe.py"
+    probe.write_text(_BOOTSTRAP_PROBE.replace("MISSING", repr(missing)))
+    run = subprocess.run([sys.executable, str(probe)], capture_output=True, text=True, check=True)
+    assert run.stderr.count("the default handling, test-wise deletion") == notices
+    if notices:
+        assert "andrey.pc: " in run.stderr
 
 
 def _one_category_where_observed() -> np.ndarray:

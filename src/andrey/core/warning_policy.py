@@ -123,6 +123,15 @@ def log_once(logger: logging.Logger, key: str, message: str) -> None:
     logger.warning(message)
 
 
+def mark_logged(key: str) -> None:
+    """Record ``key`` as logged, so :func:`log_once` stays silent for it in this process.
+
+    A worker process calls it for a notice that its parent logs, once for all of its workers.
+    """
+    with _lock:
+        _logged.add(key)
+
+
 def warn_each(message: str, category: type[AndreyWarning]) -> None:
     """Warn with ``message`` every time, at the caller's line, for a warning about one fit."""
     warnings.warn(message, category, stacklevel=_caller_stacklevel())

@@ -606,15 +606,20 @@ def missing_used(
     return {"missing": arguments.get("missing") or TESTWISE}
 
 
+#: The key of :func:`notice_default_missing` in :func:`~andrey.core.warning_policy.log_once`.
+MISSING_DEFAULT_NOTICE = "missing_default"
+
+
 def notice_default_missing(method: str) -> None:
     """Log, once per process, that ``method`` ran test-wise deletion as its default handling.
 
     The notice says which handling ran, when it is valid
-    (:data:`~andrey.core.ci_missing.TESTWISE_CLAIM`), and how to choose it by name.
+    (:data:`~andrey.core.ci_missing.TESTWISE_CLAIM`), and how to choose it by name. The worker
+    processes of :func:`~andrey.bootstrap` log none: the calling process logs it for their fits.
     """
     log_once(
         _log,
-        "missing_default",
+        MISSING_DEFAULT_NOTICE,
         f"andrey.{method}: the data hold missing values and missing=None, so the fit ran the "
         "default handling, test-wise deletion: each test read only the rows where its variables "
         f'are observed. {TESTWISE_CLAIM} Pass missing="testwise" to choose it by name, and read '

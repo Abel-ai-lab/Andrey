@@ -13,13 +13,12 @@ variables allow, where deleting every row with a missing value would drop rows f
 Deleting rows per test is valid when the values are missing completely at random (MCAR): the rows
 a test keeps are then a random sample of all rows, so each test keeps its level; with perfect
 tests FCI then returns the graph it returns on complete data [1]_, and [2]_ argue the same for PC.
-When whether a value is
-missing depends on the variables, the rows a test keeps are a selected sample, and each test
-selects its own. The tests can then find dependence where the full population has none, which
-keeps extra edges [2]_ and can turn orientations wrong; FCI with one test per query is then not
-sound in general [1]_. The procedure that [1]_ proves sound beyond MCAR confirms each independence
-on the rows complete in every column, and is not this one. :data:`TESTWISE_CLAIM` is the sentence
-every method that deletes rows per test states.
+When whether a value is missing depends on the variables, the rows a test keeps are a selected
+sample, and each test selects its own. The tests can then find dependence where the full population
+has none, which keeps extra edges [2]_ and can turn orientations wrong; FCI with one test per query
+is then not sound in general [1]_. The procedure that [1]_ proves sound beyond MCAR confirms each
+independence on the rows complete in every column, and is not this one. :data:`TESTWISE_CLAIM`
+is the sentence every method that deletes rows per test states.
 
 References
 ----------
@@ -83,6 +82,12 @@ TESTWISE_CLAIM = (
     "whether a value is missing depends on no value in the data; the rows a test reads are then a "
     "random sample of all rows, and otherwise they are a selected sample that more rows do not "
     "correct."
+)
+#: What the error of a test without the rows it needs advises: a test over fewer columns keeps more
+#: rows, and a dropped column is no longer there to condition on.
+MORE_ROWS = (
+    "cap the conditioning sets with max_depth where the method has it, or drop a column with many "
+    "missing values, which can remove a common cause of the columns that stay"
 )
 #: Structural EM over the expected covariance (:mod:`andrey.search.em`), which the searches whose
 #: fit reads only a covariance and the row count take.
@@ -200,11 +205,12 @@ class TestwiseDeletion:
     test gets the :class:`GaussianDeletion` subclass, which builds no test per block.
 
     A query raises ``ValueError`` when its block has fewer rows than its test needs: 2, or
-    ``|S| + 3`` for ``"fisherz"`` and ``"student_t"``, the rows their degrees of freedom need; when
-    a continuous column is constant on the block, as a constant column of the data is rejected
-    before a fit; and when the test fails on the block or gives a p-value that is not a number, as
-    a mixed-data test can on a block with fewer rows than columns. A categorical column with one
-    category on the block is left to the test.
+    ``|S| + 3`` for a partial-correlation test (``"fisherz"``, ``"student_t"``, or
+    ``"normal_scores"``), the rows its degrees of freedom need; when a continuous column is constant
+    on the block, as a constant column of the data is rejected before a fit; and when the test fails
+    on the block or gives a p-value that is not a number, as a mixed-data test can on a block with
+    fewer rows than columns. A categorical column with one category on the block is left to the
+    test.
 
     Parameters
     ----------
@@ -306,8 +312,7 @@ class TestwiseDeletion:
         """The error of a test that fails on a block of ``rows`` rows, ``what`` saying how."""
         return ValueError(
             f"indep_test={self._name!r} on the {rows} rows where all the columns of one of its "
-            f"tests are observed{what}; drop the columns with the most missing values, or cap the "
-            "conditioning sets with max_depth where the method has it"
+            f"tests are observed{what}; {MORE_ROWS}"
         )
 
     def _block_test(self, x: int, y: int, cond: list[int]) -> tuple[CITest, list[int], int]:
@@ -340,8 +345,7 @@ class TestwiseDeletion:
             raise ValueError(
                 f"indep_test={self._name!r} tests a pair given {size} conditioning variables on "
                 f"the {block.shape[0]} rows where all of them are observed, and needs at least "
-                f"{least}; drop the columns with the most missing values, or cap the conditioning "
-                "sets with max_depth where the method has it"
+                f"{least}; {MORE_ROWS}"
             )
         # A column can be constant on the block only when one of its values fills every row.
         index = list(columns)
@@ -352,7 +356,7 @@ class TestwiseDeletion:
             raise ValueError(
                 f"indep_test={self._name!r} meets a column that is constant on the "
                 f"{block.shape[0]} rows where all the columns of a test are observed, so the test "
-                "measures no dependence; drop the columns with the most missing values"
+                f"measures no dependence; {MORE_ROWS}"
             )
 
     def _repeats(self, columns: list[int]) -> np.ndarray:

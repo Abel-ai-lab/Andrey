@@ -16,6 +16,7 @@ import pytest
 import andrey
 import scripts.docstring_text as shared
 from andrey.api._method import draws_random_numbers
+from andrey.core import ci
 from andrey.core.ci_missing import TESTWISE_CLAIM
 from andrey.spec import REGISTRY
 from andrey.spec.concepts import CONCEPTS
@@ -62,6 +63,21 @@ def test_a_method_that_deletes_rows_per_test_states_when_that_is_valid_in_the_sh
     notes = " ".join(section(docstring(method), "Notes").split())
     assert notes.count(TESTWISE_CLAIM) == int(deletes)
     assert ("stays sound" in notes) is False
+
+
+@pytest.mark.parametrize("method", [m for m in REGISTRY if REGISTRY[m].data.missing])
+def test_the_rows_a_test_needs_are_given_for_every_partial_correlation_test(method):
+    """Where Notes give ``|S| + 3`` rows to tests by name, they name each test with that floor."""
+    partial = [
+        name
+        for name, test in ci._CI_REGISTRY.items()
+        if isinstance(test, type) and issubclass(test, ci.PartialCorrelationTest)
+    ]
+    notes = " ".join(section(docstring(method), "Notes").split())
+    named = re.findall(r"``\|S\| \+ 3`` for ([^.]*?) and 2 for the other tests", notes)
+    assert len(named) == notes.count("``|S| + 3`` for ")
+    for tests in named:
+        assert all(f'``"{name}"``' in tests for name in partial)
 
 
 def test_the_missing_concept_states_the_shared_sentence():

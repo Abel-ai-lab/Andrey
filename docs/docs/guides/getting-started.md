@@ -727,16 +727,16 @@ its search for those variables can take a long time; `max_depth` bounds it. On l
 deletion in 12 settings, on two sets of datasets each. The
 [0.16.0 release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data) has the numbers.
 
-A test needs enough rows where its variables are observed: `|S| + 3` for `fisherz` and `student_t`,
-with `|S|` the size of its conditioning set, and 2 for the other tests. A test with fewer rows
-raises a `ValueError` that says so. Cap the conditioning sets with `max_depth` (`max_p_global` in
-LPCMCI and the same-step phases of PCMCI+), or drop a column with many missing values, which can
-remove a common cause of the columns that stay. The categorical tests and `degen_gauss` are the
-exception: a test of theirs with zero degrees of freedom, as when a column holds one category on
-the test's rows, returns a p-value of 1, which reads as independence without evidence.
-`metadata["zero_df_tests"]`, present when it is not zero, counts those tests. A column with no
-observed value, or with one value throughout, raises before the fit, and so does infinity, which is
-not a missing value. CD-NOD needs a complete `env`.
+A test needs enough rows where its variables are observed: `|S| + 3` for the partial-correlation
+tests (`fisherz`, `student_t`, and `normal_scores`), with `|S|` the size of its conditioning set,
+and 2 for the other tests. A test with fewer rows raises a `ValueError` that says so. Cap the
+conditioning sets with `max_depth` (`max_p_global` in LPCMCI and the same-step phases of PCMCI+), or
+drop a column with many missing values, which can remove a common cause of the columns that stay.
+The categorical tests and `degen_gauss` are the exception: a test of theirs with zero degrees of
+freedom, as when a column holds one category on the test's rows, returns a p-value of 1, which reads
+as independence without evidence. `metadata["zero_df_tests"]`, present when it is not zero, counts
+those tests. A column with no observed value, or with one value throughout, raises before the fit,
+and so does infinity, which is not a missing value. CD-NOD needs a complete `env`.
 
 The searches whose fit reads the data only through their covariance, {{ em_methods }}, cannot delete
 rows per test. They refuse missing values by default, with a message that names `missing="em"`.
