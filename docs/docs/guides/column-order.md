@@ -66,7 +66,7 @@ Identical columns, copies of a column in other units, and categorical columns th
 alike are the exception for every method: they rank the same, so position decides which comes first,
 and the graph is the same up to swapping them. The methods with a partial-correlation test
 (`fisherz`, `student_t`) or the BIC score, and `icp`, `cam`, `resit`, `score_matching`, `nogam`,
-`camuv`, and `dynotears`, reject columns that copy another up to scale and shift, with a
+`das`, `camuv`, and `dynotears`, reject columns that copy another up to scale and shift, with a
 `ValueError` that names each group of copies; the LiNGAM causal-order search keeps one column per
 group and places the other copies right after it.
 
