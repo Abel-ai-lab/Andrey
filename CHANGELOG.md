@@ -415,6 +415,11 @@ names its pull request.
   targets and contexts with the columns. It exits 1 on a column order when a graph or a causal order
   changes or a weight or metadata value changes by more than rounding, and lists a difference of
   rounding alone, such as the p-values of ICP and J-PCMCI+, as information. ([#1055])
+- `qa/identity.py --shuffle` also refits LDP and LD3, moving each one's treatment and outcome with
+  the columns and naming the original columns again in its `effects` records and `partition`; it
+  leaves out LDP's `metadata["n_tests"]`, which a column order can change. The recovery suite
+  records two more answers: LD3's where the treatment is not a parent of the outcome, and LDP's
+  where no set is returned. ([#1052])
 - `ldecc` keeps the p-values of its queries by conditioning set, built once per call, and ranks each
   node's neighbors once per pass, where it built a sorted key for every lookup and sorted a node's
   neighbors for every pair. A fit at 5,000 rows takes 0.25 s instead of 0.34 s on 100 variables
