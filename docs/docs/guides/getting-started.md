@@ -747,8 +747,9 @@ with `|S|` the size of its conditioning set, and 2 for the other tests. A test w
 raises a `ValueError` that says so. The `total_conditioning` blanket learner, the default of
 `mmb_by_mmb`, conditions every test on all the other variables, so with a partial-correlation test
 (`fisherz`, `student_t`, or `normal_scores`) it needs `d + 2` rows with every variable observed and
-raises before the fit without them. Drop the columns with the most missing values, or cap the
-conditioning sets with `max_depth` (`max_p_global` in LPCMCI and the same-step phases of PCMCI+). A
+raises before the fit without them, unless `max_depth` is below `d - 2` or there is one column,
+where it runs no such test. Drop the columns with the most missing values, or cap the conditioning
+sets with `max_depth` (`max_p_global` in LPCMCI and the same-step phases of PCMCI+). A
 column with no observed value, or with one value throughout, raises before the fit, and so does
 infinity, which is not a missing value. CD-NOD needs a complete `env`.
 
