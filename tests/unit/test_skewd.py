@@ -234,6 +234,22 @@ def test_skewd_mv_breaks_ties_without_overflowing_on_two_huge_columns():
     )
 
 
+@pytest.mark.parametrize("missing_cell", [False, True])
+def test_a_column_that_spans_the_float_range_is_read_without_overflow(missing_cell):
+    # Column 0 holds both signs up to 1.7e308, so its largest value less its smallest overflows.
+    data = _pair()
+    huge = data.copy()
+    huge[:, 0] *= 1.7e308 / np.abs(data[:, 0]).max()
+    if missing_cell:
+        data[3, 1] = huge[3, 1] = np.nan
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        pair = skewd(huge, **SHORT_PAIR)
+        graph = skewd_mv(huge[~np.isnan(huge).any(axis=1)], **SHORT_GRAPH)
+    assert pair.structure.oriented_edges() == skewd(data, **SHORT_PAIR).structure.oriented_edges()
+    assert len(graph.structure.oriented_edges()) == 1
+
+
 def _orient(base: np.ndarray, *edges: tuple[int, int]) -> np.ndarray:
     dag = base.copy()
     for i, j in edges:

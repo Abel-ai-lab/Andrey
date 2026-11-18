@@ -153,10 +153,10 @@ def data_matrix(
         X = _missing_values(data, X, finite, name=name, method=method, missing=missing, fix=fix)
         if method in EM_METHODS:
             X = X[~np.isnan(X).all(axis=1)]
-        spread = np.nanmax(X, axis=0) - np.nanmin(X, axis=0)
+        flat = np.nanmax(X, axis=0) == np.nanmin(X, axis=0)
     else:
-        spread = np.ptp(X, axis=0)
-    constant = [_column_name(data, int(j)) for j in np.flatnonzero(spread == 0)]
+        flat = X.max(axis=0) == X.min(axis=0)  # their difference can pass the largest float
+    constant = [_column_name(data, int(j)) for j in np.flatnonzero(flat)]
     if constant:
         if len(constant) == 1:
             columns, verb, pronoun = f"column {constant[0]}", "is", "it"

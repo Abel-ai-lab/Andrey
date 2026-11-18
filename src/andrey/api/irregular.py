@@ -56,7 +56,7 @@ def _complete_pairs(
         raise ValueError(
             f"{method} needs at least 2 rows where both columns are observed, got {rows}"
         )
-    flat = np.flatnonzero(np.ptp(kept, axis=0) == 0).tolist()
+    flat = np.flatnonzero(kept.max(axis=0) == kept.min(axis=0)).tolist()
     if flat:
         raise ValueError(
             f"{method}: data column {column_namer(labels)(flat[0])} is constant on the {rows} rows "
