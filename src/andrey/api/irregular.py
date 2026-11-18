@@ -747,12 +747,12 @@ def cpcm(
     stays above a floor, without which the likelihood has no maximum where the location fits a row
     exactly: 0.01 of the column's standard deviation under ``"gaussian"``, ``exp(-7)`` of it under
     ``"gumbel"``, and a dispersion of ``exp(-7)`` under ``"gamma"``. The size of
-    ``"negative_binomial"`` is at most ``exp(5)`` times the column's largest count, and between
-    ``exp(12)`` and ``exp(20)``; a size at that bound is read as the Poisson limit, whose variance
-    is then within 1 part in 148 for counts up to ``exp(15)``, about 3.3 million, and less close
-    above. A fit that ends away from a maximum, or at a point where the coefficients are not
-    determined to working precision, raises ``ValueError``. The fit draws no random numbers except
-    a count family's uniforms, which follow ``seed`` and the column's values.
+    ``"negative_binomial"`` has an upper bound of ``exp(5)`` times the column's largest count,
+    kept between ``exp(12)`` and ``exp(20)``; a size at that bound is read as the Poisson limit,
+    whose variance is then within 1 part in 148 for counts up to ``exp(15)``, about 3.3 million,
+    and less close above. A fit that ends away from a maximum, or at a point where the
+    coefficients are not determined to working precision, raises ``ValueError``. The fit draws no
+    random numbers except a count family's uniforms, which follow ``seed`` and the column's values.
 
     **Units.** A column in other units stays in the Gaussian, Gumbel, exponential, and gamma
     families, so under them the result is the same in any units, to rounding. The Gaussian and
