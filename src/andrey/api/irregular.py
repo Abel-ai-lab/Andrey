@@ -516,10 +516,11 @@ def loci(
     ``(y - mu(x)) / sigma(x)`` is tested against the proposed cause by HSIC with Gaussian kernels,
     each bandwidth the median distance between the rows, and a gamma approximation of the null
     distribution [2]_. The p-values then decide as for :func:`~andrey.anm`: with ``alpha=None``, the
-    larger p-value, compared through their logarithms, and on equal p-values the smaller
-    statistic, with no edge when those are equal too; with a significance level, an edge only when
-    exactly one direction's p-value exceeds it. Mooij et al. (2016) [3]_ compare p-values to avoid
-    choosing a level. The paper proposes this criterion for noise that is not Gaussian.
+    larger p-value, compared through their logarithms, and on logarithms equal to nine decimal
+    places the smaller statistic, with no edge when those are equal too; with a significance level,
+    an edge only when exactly one direction's p-value exceeds it. Mooij et al. (2016) [3]_ compare
+    p-values to avoid choosing a level. The paper proposes this criterion for noise that is not
+    Gaussian.
 
     With ``criterion="likelihood"``, LOCI-M in [1]_, the edge points in the direction whose model
     has the larger mean log-likelihood, and equal ones give no edge. The likelihood identifies the

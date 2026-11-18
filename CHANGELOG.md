@@ -299,10 +299,6 @@ names its pull request.
 
 ### Changed
 
-- The pairwise methods that pick the direction with the larger p-value or likelihood (`anm`,
-  `pnl`, `loci`, `cpcm` with `alpha=None`) count values that differ only past 9 decimal places as
-  equal, the tie rule of every other method: two directions that mirror each other give no edge
-  in any units ([#1085]).
 - `iamb` and `inter_iamb` test the candidates of each grow step in one call with a
   partial-correlation test. With Fisher-z, one grow step is 12 to 47 times faster on 400 to 12,800
   variables with blankets of 2 to 10 members. A fit at one target is 1.3 to 4.2 times faster on
@@ -430,6 +426,13 @@ names its pull request.
   rounding alone, such as the p-values of ICP and J-PCMCI+, as information. ([#1055])
 
 ### Fixed
+
+- `anm`, `pnl`, and `loci` with `alpha=None` apply their documented tie rule to p-values and
+  likelihoods that are equal up to rounding: logarithms that differ only past nine decimal places
+  count as equal, so two directions that mirror each other give no edge in any units, where the
+  last bits picked an edge. On 200 seeded pairs per method, 3 `anm` and 4 `loci` results change,
+  all on two-valued pairs, from an edge to no edge; `pnl` on 40 pairs, `loci` with
+  `criterion="likelihood"`, and the recorded outputs do not change ([#1085]).
 
 - `notears(robust=True)` and `dagma(robust=True)` minimize the Gaussian likelihood of the path of
   Deng et al. (2024) without `-log|det(I - W)|`, as its authors' code does. The term is zero

@@ -38,6 +38,8 @@ DECISIONS = [
     (0.30, 0.60, None, (1, 0)),
     (0.40, 0.40, None, None),  # a tie decides nothing
     (0.0, 0.0, None, None),  # nor does a tie at zero, without statistics
+    (1e-20, 1e-30, None, (0, 1)),  # small p-values keep their order
+    (3.4e-26, 3.4e-26 * (1 + 1e-12), None, None),  # equal to rounding: a tie
     (0.23, 0.02, 0.05, (0, 1)),  # forward passes, backward fails
     (0.02, 0.23, 0.05, (1, 0)),
     (0.60, 0.30, 0.05, None),  # both pass: either direction fits

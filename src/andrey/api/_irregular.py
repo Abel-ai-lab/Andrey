@@ -15,6 +15,7 @@ Fitted models are read by attribute name.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from typing import Any
 
@@ -71,11 +72,12 @@ def _direction(
 ) -> int:
     """Return ``1`` for ``x -> y``, ``-1`` for ``y -> x``, or ``0`` for no edge.
 
-    With ``alpha=None``, choose the direction with the larger p-value, which ``pval_*`` may give as
-    its logarithm. Equal p-values, given both test statistics, choose the direction with the
-    smaller statistic, the weaker dependence; equal or missing statistics give no edge. Values that
-    differ only in their last digits are equal (:func:`andrey.core.ties.tie_key`), so two directions
-    that mirror each other give no edge in any units. Otherwise, choose a direction only when its
+    With ``alpha=None``, ``pval_*`` are the p-values' logarithms (or two log-likelihoods), and the
+    direction with the larger one is chosen. Equal ones, given both test statistics, choose the
+    direction with the smaller statistic, the weaker dependence; equal or missing statistics give
+    no edge. Values that differ only past nine decimal places are equal
+    (:func:`andrey.core.ties.tie_key`), so two directions that mirror each other give no edge in
+    any units. Otherwise, choose a direction only when its
     p-value exceeds ``alpha`` and the other does not.
     """
     if alpha is None:
@@ -87,6 +89,11 @@ def _direction(
     else:
         forward, backward = pval_forward > alpha, pval_backward > alpha
     return 1 if forward and not backward else -1 if backward and not forward else 0
+
+
+def _log(p: float) -> float:
+    """Return the natural logarithm of the p-value ``p``: ``-inf`` at ``0``, ``nan`` for ``nan``."""
+    return math.log(p) if p > 0 else -math.inf if p == 0 else math.nan
 
 
 def _pair_dag(direction: int) -> GraphStructure:
@@ -134,12 +141,13 @@ def pairwise_output(
     """Return ANM's or PNL's two-node ``dag`` with the chosen edge and ``float`` p-value metadata.
 
     ``metadata["p_values"]`` maps ``"forward"`` (``x -> y``) and ``"backward"`` to the p-values.
-    ``log_p``, when given, holds the two p-values' natural logarithms, which keep their order where
-    both p-values underflow to ``0``; with ``alpha=None`` they are compared in place of the
-    p-values. Each test statistic, when given, is an HSIC statistic divided by its mean under
-    independence: with ``alpha=None`` the statistics decide a p-value tie, the smaller one winning,
-    and without them a tie gives no edge (:func:`_direction`). They go in ``metadata["statistics"]``
-    under the same keys. A p-value or statistic may be a shape-``(1,)`` array
+    With ``alpha=None`` the p-values are compared through their natural logarithms, so the tie
+    rule of :func:`_direction` holds to nine digits at any size of p-value; ``log_p``, when given,
+    holds those logarithms, which keep their order where both p-values underflow to ``0``. Each
+    test statistic, when given, is an HSIC statistic divided by its mean under independence: with
+    ``alpha=None`` the statistics decide a p-value tie, the smaller one winning, and without them a
+    tie gives no edge (:func:`_direction`). They go in ``metadata["statistics"]`` under the same
+    keys. A p-value or statistic may be a shape-``(1,)`` array
     (:func:`_coerce_float`). ``extra`` adds metadata entries after them, such as ``rows_tested``.
     """
     forward, backward = _coerce_float(pval_forward), _coerce_float(pval_backward)
@@ -149,7 +157,9 @@ def pairwise_output(
             "stat_forward": _coerce_float(stat_forward),
             "stat_backward": _coerce_float(stat_backward),
         }
-    compared = (forward, backward) if log_p is None or alpha is not None else log_p
+    compared = (forward, backward)
+    if alpha is None:
+        compared = log_p if log_p is not None else (_log(forward), _log(backward))
     return structure_output(
         _pair_dag(_direction(*compared, alpha, **stats)),
         labels=labels,
