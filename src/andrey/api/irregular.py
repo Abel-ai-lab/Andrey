@@ -26,6 +26,7 @@ from ._adapt import (
 from ._irregular import (
     adapt_bottom_up_parce,
     adapt_rcd,
+    direction_tables,
     likelihood_output,
     pairwise_output,
 )
@@ -74,7 +75,8 @@ def _pair_matrix(
     ``data`` must be a table of two columns; the table holds the rows where both are observed
     (:func:`_complete_pairs`). With ``standardize``, each column is divided by its largest
     magnitude, so a column in tiny or huge units cannot underflow, and then standardized to zero
-    mean and unit variance.
+    mean and unit variance, its mean and variance summed over its sorted values so that they do not
+    depend on the row order.
     """
     if np.ndim(data) != 2 or np.shape(data)[1] != 2:
         raise ValueError(
@@ -85,26 +87,32 @@ def _pair_matrix(
     X, rows = _complete_pairs(X, labels, method)
     if standardize:
         X = X / np.abs(X).max(axis=0)
-        X = (X - X.mean(axis=0)) / X.std(axis=0)  # data_matrix rejects a constant column
+        ordered = np.sort(X, axis=0)  # data_matrix rejects a constant column
+        X = (X - ordered.mean(axis=0)) / ordered.std(axis=0)
     return X, labels, rows
 
 
 def fit_pair(
     method: str,
     data: npt.ArrayLike,
-    native: Callable[[np.ndarray, np.ndarray], tuple[float, float, float, float]],
+    native: Callable[
+        [tuple[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray]],
+        tuple[float, float, float, float],
+    ],
     alpha: float | None,
     *,
     standardize: bool = False,
 ) -> StructureOutput:
     """Run ``method``'s pairwise test ``native``, ANM's or PNL's, both ways on ``data``.
 
-    The tests read the table :func:`_pair_matrix` returns. ``native`` returns the natural
-    logarithms of the forward and backward p-values, then the two statistics, and the result holds
-    the edge they choose with ``alpha`` (:func:`pairwise_output`).
+    ``native`` reads the ``(cause, effect)`` columns of each direction of the table
+    :func:`_pair_matrix` returns, its rows in that direction's canonical order
+    (:func:`~andrey.api._irregular.direction_tables`). It returns the natural logarithms of the
+    forward and backward p-values, then the two statistics, and the result holds the edge they
+    choose with ``alpha`` (:func:`pairwise_output`).
     """
     X, labels, rows = _pair_matrix(method, data, standardize=standardize)
-    log_p_forward, log_p_backward, stat_forward, stat_backward = native(X[:, 0], X[:, 1])
+    log_p_forward, log_p_backward, stat_forward, stat_backward = native(*direction_tables(X))
     return pairwise_output(
         math.exp(log_p_forward),
         math.exp(log_p_backward),
@@ -193,9 +201,10 @@ def anm(
 
     With ``alpha=None``, the edge points in the direction with the larger p-value. The two are
     compared through their logarithms, which keep their order where both p-values fall below about
-    ``1e-308`` and read zero, as on a large sample or a pair that fits neither direction. Equal
-    p-values leave the choice to the HSIC statistics, each divided by its mean under independence,
-    and the edge points in the direction with the smaller one, the weaker dependence between the
+    ``1e-308`` and read zero, as on a large sample or a pair that fits neither direction; two
+    logarithms that agree to a relative ``1e-3`` count as equal. Equal p-values leave the choice to
+    the HSIC statistics, each divided by its mean under independence and compared the same way, and
+    the edge points in the direction with the smaller one, the weaker dependence between the
     proposed cause and its residual. Equal statistics give no edge. The rule therefore produces an
     edge even for unrelated variables, a deterministic pair whose p-values are both near zero, or a
     pair whose direction cannot be identified. Mooij et al. (2016) [3]_ compare p-values to avoid
@@ -217,7 +226,9 @@ def anm(
     depend on the units of either variable. The regression is a Gaussian process with a scaled RBF
     kernel plus a white-noise term, its hyperparameters fitted by maximum marginal likelihood. The
     HSIC test uses Gaussian kernels and a gamma approximation of its null distribution. The fit is
-    deterministic.
+    deterministic. Each direction is fitted on its rows sorted by its cause, then its effect, so the
+    result does not depend on the order of the rows, and a table whose rows stay the same when its
+    two columns swap gives no edge.
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both tests read only the rows
     where both columns are observed, which for a pair are the rows test-wise deletion keeps;
@@ -341,9 +352,10 @@ def pnl(
 
     With ``alpha=None``, the edge points in the direction with the larger p-value. The two are
     compared through their logarithms, which keep their order where both p-values fall below about
-    ``1e-308`` and read zero, as on a large sample or a pair that fits neither direction. Equal
-    p-values leave the choice to the HSIC statistics, each divided by its mean under independence,
-    and the edge points in the direction with the smaller one, the weaker dependence between the
+    ``1e-308`` and read zero, as on a large sample or a pair that fits neither direction; two
+    logarithms that agree to a relative ``1e-3`` count as equal. Equal p-values leave the choice to
+    the HSIC statistics, each divided by its mean under independence and compared the same way, and
+    the edge points in the direction with the smaller one, the weaker dependence between the
     proposed cause and its estimated noise. Equal statistics give no edge. The rule therefore
     produces an edge even for unrelated variables or a pair whose direction cannot be identified,
     such as a linear Gaussian pair. Mooij et al. (2016) [4]_ compare p-values to avoid choosing a
@@ -365,7 +377,9 @@ def pnl(
     ``metadata``.
 
     PNL fits each transform as a sum of smooth basis functions, so the fit is deterministic but can
-    miss a sharply varying nonlinearity.
+    miss a sharply varying nonlinearity. Each direction is fitted on its rows sorted by its cause,
+    then its effect, so the result does not depend on the order of the rows, and a table whose rows
+    stay the same when its two columns swap gives no edge.
 
     The kernel matrices of the two HSIC tests run on a CUDA GPU, in float64, under the ``cuda``
     backend, or under ``auto`` from ``ANDREY_PNL_GPU_THRESHOLD`` rows squared once the GPU is
@@ -511,15 +525,16 @@ def loci(
     each bandwidth the median distance between the rows, and a gamma approximation of the null
     distribution [2]_. The p-values then decide as for :func:`~andrey.anm`: with ``alpha=None``, the
     larger p-value, compared through their logarithms, and on equal p-values the smaller
-    statistic, with no edge when those are equal too; with a significance level, an edge only when
-    exactly one direction's p-value exceeds it. Mooij et al. (2016) [3]_ compare p-values to avoid
-    choosing a level. The paper proposes this criterion for noise that is not Gaussian.
+    statistic, with no edge when those are equal too, each pair equal when it agrees to a relative
+    ``1e-3``; with a significance level, an edge only when exactly one direction's p-value exceeds
+    it. Mooij et al. (2016) [3]_ compare p-values to avoid choosing a level. The paper proposes this
+    criterion for noise that is not Gaussian.
 
     With ``criterion="likelihood"``, LOCI-M in [1]_, the edge points in the direction whose model
-    has the larger mean log-likelihood, and equal ones give no edge. The likelihood identifies the
-    direction consistently when the noise is Gaussian, as the fitted model assumes [1]_. In the
-    paper's benchmarks it is ahead of the independence criterion on location-scale data and behind
-    it on data outside that model.
+    has the larger mean log-likelihood, and two that agree to a relative ``1e-3`` give no edge. The
+    likelihood identifies the direction consistently when the noise is Gaussian, as the fitted model
+    assumes [1]_. In the paper's benchmarks it is ahead of the independence criterion on
+    location-scale data and behind it on data outside that model.
 
     Each column is standardized first, as in [1]_, so the result does not depend on the units of
     either variable; the Gaussian marginals of the two standardized causes are then equal, so the
@@ -530,7 +545,10 @@ def loci(
     makes it strictly concave [1]_. Projected Newton steps [4]_ maximize it until the mean
     objective changes by less than ``1e-6`` in a full step, or for at most 100 steps; the paper
     takes a closed-form step in ``w_1`` and L-BFGS steps in ``w_2`` in turn, which approach the
-    same maximum in many more steps. The fit draws no random numbers, so it is deterministic.
+    same maximum in many more steps. The fit draws no random numbers, so it is deterministic. Each
+    direction is fitted on its rows sorted by its cause, then its effect, so the result does not
+    depend on the order of the rows, and a table whose rows stay the same when its two columns swap
+    gives no edge.
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits read only the rows
     where both columns are observed, which for a pair are the rows test-wise deletion keeps;
@@ -600,16 +618,16 @@ def loci(
     from andrey.irregular.loci import fit_direction
 
     X, labels, rows = _pair_matrix("loci", data, standardize=True)
-    x, y = X[:, 0], X[:, 1]
+    (x, y), (y_backward, x_backward) = direction_tables(X)
     ll_forward, residual_forward = fit_direction(x, y)
-    ll_backward, residual_backward = fit_direction(y, x)
+    ll_backward, residual_backward = fit_direction(y_backward, x_backward)
     extra = {"log_likelihoods": {"forward": ll_forward, "backward": ll_backward}, **rows}
     if criterion == "likelihood":
         return likelihood_output(ll_forward, ll_backward, labels=labels, extra=extra)
     # The paper leaves the HSIC test's bandwidth, null approximation, and variance open; the
     # comment in hsic_median_statistic_log_p names the source of each choice.
     stat_forward, log_p_forward = hsic_median_statistic_log_p(x, residual_forward)
-    stat_backward, log_p_backward = hsic_median_statistic_log_p(y, residual_backward)
+    stat_backward, log_p_backward = hsic_median_statistic_log_p(y_backward, residual_backward)
     return pairwise_output(
         math.exp(log_p_forward),
         math.exp(log_p_backward),
