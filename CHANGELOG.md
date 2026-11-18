@@ -429,8 +429,8 @@ names its pull request.
 
 - `anm`, `pnl`, and `loci` with `alpha=None` apply their documented tie rule to p-values and
   likelihoods that are equal up to rounding: logarithms that differ only past nine decimal places
-  count as equal, so two directions that mirror each other give no edge in any units, where the
-  last bits picked an edge. On 200 seeded pairs per method, 3 `anm` and 4 `loci` results change,
+  count as equal, so two directions whose p-values agree to rounding give no edge, where the order
+  of their last digits picked one. On 200 seeded pairs per method, 3 `anm` and 4 `loci` results change,
   all on two-valued pairs, from an edge to no edge; `pnl` on 40 pairs, `loci` with
   `criterion="likelihood"`, and the recorded outputs do not change ([#1085]).
 

@@ -366,6 +366,21 @@ def test_the_graph_method_gives_the_same_answer_in_extreme_units():
     np.testing.assert_allclose(rounded.metadata["score"], first.metadata["score"], rtol=1e-9)
 
 
+def test_a_gumbel_graph_with_a_count_parent_keeps_its_graph_in_other_units():
+    # The exception the graph method's Units paragraph states: on 20 seeds of this generator and
+    # four rescales each, this table under y * 1e-7 is the one of 80 whose score moved, by 0.040.
+    rng = np.random.default_rng(5)
+    c = rng.poisson(1.0, 200).astype(float)
+    x = rng.normal(size=200)
+    y = np.sin(x) + 0.5 * c + np.exp(0.3 * x) * 0.5 * rng.normal(size=200)
+    table = np.column_stack([c, x, y])
+    families = ["poisson", "gaussian", "gumbel"]
+    first = cpcm_graph(table, family=families)
+    moved = cpcm_graph(table * np.array([1.0, 1.0, 1e-7]), family=families)
+    assert moved.structure.oriented_edges() == first.structure.oriented_edges()
+    assert abs(moved.metadata["score"] - first.metadata["score"]) <= 0.05
+
+
 def test_a_count_family_repeats_under_its_seed_and_follows_it():
     rng = np.random.default_rng(3)
     x = rng.normal(size=300)

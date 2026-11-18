@@ -771,12 +771,9 @@ def cpcm(
     column per sample, so time and memory grow with the square of ``n_samples``. Under the count
     families the rank-10 spline must follow the mean to within the counts' own noise, about
     ``1 / sqrt(mean)`` of it, which it does for means up to a few hundred: from means of a few
-    thousand that vary strongly with the cause, the true direction's test rejects too. Where the
-    marginal likelihood has narrow dips, as it can for a two-parameter family fitted against the
-    causal direction, the lattice point the smoothing search reaches, and with it a p-value, can
-    move under a change of the data well above rounding, such as noise of 1e-4 of a standard
-    deviation. The family must be chosen: the paper's rule that picks one from each column's
-    support, and its sequential choice between one- and two-parameter families, are not offered.
+    thousand that vary strongly with the cause, the true direction's test rejects too. The family
+    must be chosen: the paper's rule that picks one from each column's support, and its sequential
+    choice between one- and two-parameter families, are not offered.
     The numbers are a reference, not a hard limit: they change with the data generator, the
     density, the method's settings, and the machine.
 

@@ -633,7 +633,10 @@ def cpcm_graph(
 
     **Units.** As for :func:`~andrey.cpcm`: the result does not depend on any column's units under
     the Gaussian, Gumbel, exponential, and gamma families, of which the last two read its origin;
-    ``"pareto"`` and the count families read the units, since they fix a scale.
+    ``"pareto"`` and the count families read the units, since they fix a scale. One exception was
+    measured: with several parents a ``"gumbel"`` fit can reach another maximum of its penalized
+    likelihood under rounding, which moved the score by 0.04, with the same graph, in 1 of 80
+    rescaled tables with a count parent.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows
@@ -647,9 +650,7 @@ def cpcm_graph(
     memory grows with the square of ``n_samples``. Under the count families the rank-10 spline
     must follow the mean to within the counts' own noise, which it does for means up to a few
     hundred: from means of a few thousand that vary strongly with the parents, the true graph's
-    test rejects too. The smoothing search's answer, and with it a score, can move under a change
-    of the data well above rounding where the marginal likelihood has narrow dips, as for
-    :func:`~andrey.cpcm`. The family must be chosen: the paper's choice of a family from each
+    test rejects too. The family must be chosen: the paper's choice of a family from each
     column's support, and its sequential choice between one- and two-parameter families, are not
     offered. The numbers are a reference, not a hard limit: they change with the
     data generator, the density, the method's settings, and the machine.
