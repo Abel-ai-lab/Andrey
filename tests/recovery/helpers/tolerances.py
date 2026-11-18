@@ -54,6 +54,7 @@ SPEC: dict[str, dict] = {
     "CMB": GRAPH_ONLY,
     "LDP": GRAPH_EFFECTS_PARTITION,
     "LD3": GRAPH_EFFECTS_PARTITION,
+    "LD3NoDirect": GRAPH_EFFECTS_PARTITION,
     "LDECC": GRAPH_EFFECTS,
     "LocalOptimalAdjustment": GRAPH_EFFECTS,
     "LocPCCDE": GRAPH_EFFECTS,

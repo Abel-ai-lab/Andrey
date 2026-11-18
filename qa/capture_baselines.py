@@ -102,6 +102,16 @@ def _run_ld3(X: np.ndarray, algorithm: str) -> dict:
     return project_output(out, algorithm)
 
 
+def _run_ld3_no_direct(X: np.ndarray, algorithm: str) -> dict:
+    import andrey
+
+    # The treatment x3 and the outcome x5, a sink whose parents x0, x2, and x4 are all observed;
+    # the treatment is not one of them, though given x0 and x4 alone it stays dependent on x5.
+    column = datagen.column_of("ld3_no_direct_7v")
+    out = andrey.ld3(X, treatment=int(column[3]), outcome=int(column[5]))
+    return project_output(out, algorithm)
+
+
 def _run_ldecc(X: np.ndarray, algorithm: str) -> dict:
     import andrey
 
@@ -214,6 +224,7 @@ ALGORITHMS = {
     "CMB": (_run_target("cmb"), "gauss_5v"),
     "LDP": (_run_ldp, "adjustment_7v"),
     "LD3": (_run_ld3, "adjustment_7v"),
+    "LD3NoDirect": (_run_ld3_no_direct, "ld3_no_direct_7v"),
     "LDECC": (_run_ldecc, "gauss_7v"),
     "LocalOptimalAdjustment": (_run_local_optimal_adjustment, "gauss_7v"),
     "LocPCCDE": (_run_locpc_cde, "gauss_7v"),

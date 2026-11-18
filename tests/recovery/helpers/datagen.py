@@ -431,6 +431,24 @@ CASES: dict[str, dict] = {
             [0.0, 0.0, 0.0, 0.9, 0.0, 0.0, 0.0],
         ],
     },
+    # Linear-Gaussian SEM around the treatment 3 and the outcome 5, a sink the treatment does not
+    # cause directly: the confounder 0, the cause of the treatment only 1, the cause of the
+    # outcome 2, which also causes the child 4 of the treatment (a parent of the outcome), and a
+    # child 6 of the treatment. Given 0 and 4 alone, the path 3 -> 4 <- 2 -> 5 is open.
+    "ld3_no_direct_7v": {
+        "noise": "gaussian",
+        "seed": 20261120,
+        "n_samples": 2000,
+        "weights": [
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.8, 0.7, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.7, 0.8, 0.0, 0.0, 0.0],
+            [0.6, 0.0, 0.7, 0.0, 0.7, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.9, 0.0, 0.0, 0.0],
+        ],
+    },
     # The ``gauss_5v`` model in three environments of 500 rows: the second multiplies the noise
     # standard deviation of variable 3 by 3, the third that of variable 4 - GnIES, which learns
     # those targets with the graph they orient.
