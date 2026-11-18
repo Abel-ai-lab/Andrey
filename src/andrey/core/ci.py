@@ -1374,7 +1374,9 @@ class DGTest:
     correlations of ``x``'s and ``y``'s columns after the linear regression on ``S``'s. Its degrees
     of freedom are the product of the two variables' numbers of columns, and its p-value is the
     chi-square survival function. A direction of ``x`` or ``y`` that ``S`` determines exactly
-    carries no information and adds no degree of freedom; with none left, the p-value is ``1``. On
+    carries no information and adds no degree of freedom; with none left, the p-value is ``1``,
+    which reads as independence without evidence, and a fit on data with missing values counts the
+    test in ``metadata["zero_df_tests"]``. On
     continuous columns only, the statistic is ``-n log(1 - r**2)`` with ``r`` the partial
     correlation.
 

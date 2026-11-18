@@ -114,7 +114,9 @@ def notears(
         expectation-maximization (EM) over the expected covariance of the data, which assumes values
         missing completely at random or at random given observed values. ``None`` refuses missing
         values. On data with missing values, ``metadata["missing"]`` records the handling used and
-        ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
+        ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
+        fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
+        See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Forbidden edges, edges into an
@@ -446,7 +448,9 @@ def dagma(
         structural expectation-maximization (EM) over the expected covariance of the data, which
         assumes values missing completely at random or at random given observed values. ``None``
         refuses missing values. On data with missing values, ``metadata["missing"]`` records the
-        handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
+        handling used and ``metadata["em"]`` the EM record, with the rows dropped for observing no
+        value and the fewest rows two columns share; two columns that share no observed row raise
+        ``ValueError``. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Forbidden edges, edges into an

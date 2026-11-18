@@ -203,7 +203,9 @@ SHARED = {
         "expectation-maximization (EM) over the expected covariance of the data, which assumes "
         "values missing completely at random or at random given observed values. ``None`` refuses "
         'missing values. On data with missing values, ``metadata["missing"]`` records the handling '
-        'used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.',
+        'used and ``metadata["em"]`` the EM record, with the rows dropped for observing no value and '
+        "the fewest rows two columns share; two columns that share no observed row raise "
+        "``ValueError``. See **Missing values.** in Notes.",
         lambda m: m in EM_SUPPORTED,
     ),
     "missing_em_experimental": Shared(
@@ -214,7 +216,9 @@ SHARED = {
         "structural expectation-maximization (EM) over the expected covariance of the data, which "
         "assumes values missing completely at random or at random given observed values. ``None`` "
         'refuses missing values. On data with missing values, ``metadata["missing"]`` records the '
-        'handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.',
+        'handling used and ``metadata["em"]`` the EM record, with the rows dropped for observing no '
+        "value and the fewest rows two columns share; two columns that share no observed row raise "
+        "``ValueError``. See **Missing values.** in Notes.",
         lambda m: m in EM_METHODS and m not in EM_SUPPORTED,
     ),
     # One sentence for every method that deletes rows per test, the pair methods included.

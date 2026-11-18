@@ -10,6 +10,15 @@ names its pull request.
 
 ## [Unreleased]
 
+### Added
+
+- `metadata["zero_df_tests"]` counts the tests of a fit on data with missing values that were
+  answered `p = 1` for having zero degrees of freedom, as the categorical tests and `degen_gauss`
+  do by design. ([#1102])
+- `metadata["em"]` records `rows_dropped`, the rows dropped for observing no value, and
+  `min_shared_rows`, the fewest rows that observe both columns of a pair. A fit whose every missing
+  value sat in a dropped row records its handling too. ([#1102])
+
 ### Changed
 
 - With `missing=None` on data with missing values, a method whose tests delete rows logs one notice
@@ -19,16 +28,7 @@ names its pull request.
   `pcmciplus`, and `lpcmci` in place of filling in the missing steps, and dropping rows is named as
   your own step, with the same rows of every row-aligned argument. ([#1102])
 - `missing="em"` raises `ValueError` when two columns share no observed row, as the data hold no
-  covariance for them. ([#1102])
-
-### Added
-
-- `metadata["zero_df_tests"]` counts the tests of a fit on data with missing values that were
-  answered `p = 1` for having zero degrees of freedom, as the categorical tests and `degen_gauss`
-  do by design. ([#1102])
-- `metadata["em"]` records `rows_dropped`, the rows dropped for observing no value, and
-  `min_shared_rows`, the fewest rows that observe both columns of a pair. A fit whose every missing
-  value sat in a dropped row records its handling too. ([#1102])
+  covariance for them. Such data ran before, on a covariance the model alone supplied. ([#1102])
 
 ### Fixed
 
