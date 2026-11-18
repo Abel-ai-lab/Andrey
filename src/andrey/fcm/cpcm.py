@@ -67,7 +67,8 @@ LOG_SCALE_FLOOR = {"gaussian": math.log(0.01), "gumbel": -7.0, "gamma": -7.0}
 #: the likelihood's terms lose their digits to cancellation.
 NB_LOG_SIZE_MAX = (12.0, 20.0)
 #: The bound is the log of the largest count plus this, so a size at the bound is ``exp(5)`` times
-#: every count or more and the family is within 1 part in 148 of its Poisson limit's variance.
+#: every count or more and the family is within 1 part in 148 of its Poisson limit's variance,
+#: while the largest count is at most ``exp(15)``, where the bound reaches its upper end.
 NB_LOG_SIZE_OVER_MAX = 5.0
 #: A Hessian is singular to working precision if, with its diagonal brought to 1, an eigenvalue is
 #: below this. The coefficients and the log determinant at such a point follow the table's last
@@ -363,7 +364,7 @@ def _term(x: np.ndarray) -> _Term:
     levels = np.unique(x)
     if levels.size <= MAX_LEVELS:
         return _Term((x[:, None] == levels[None, 1:]).astype(np.float64), None, 0)
-    basis = tp_basis(x, RANK)
+    basis = tp_basis(within_one(x)[0], RANK)  # exact, and no overflow near the largest float
     rank = int(np.sum(np.linalg.eigvalsh(basis.S) > 1e-8 * np.abs(basis.S).max()))
     return _Term(basis.X, basis.S, rank)
 
@@ -592,18 +593,22 @@ class _Model:
     def newton(self, beta: np.ndarray, rho: np.ndarray) -> np.ndarray:
         """Minimize the penalized objective from ``beta`` by damped Newton steps.
 
-        A step stops at a coefficient's upper bound, and a coefficient at its bound stays there
-        while the objective still falls beyond it. A trial point counts only with a finite value,
-        gradient, and Hessian. The steps end with the second in a row that lowers the objective by
-        less than the tolerance, which brings the coefficients to rounding at a minimum.
+        Each step is :func:`_newton_solve`'s. A step stops at a coefficient's upper bound, and a
+        coefficient at its bound stays there while the objective still falls beyond it. A trial
+        point counts only with a finite value, gradient, and Hessian. The steps end with the second
+        in a row that lowers the objective by less than the tolerance, which brings the
+        coefficients to rounding at a minimum.
         """
         S = self.penalty(rho)
-        value, grad, H = self.evaluate(beta, S)
+        with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+            value, grad, H = self.evaluate(beta, S)
+        if not (np.isfinite(value) and np.isfinite(grad).all() and np.isfinite(H).all()):
+            return beta  # no step from a point without a finite objective: minimum rejects it
         settled = False
         for _ in range(_MAX_NEWTON):
             free = self.free(beta, grad)
             step = np.zeros(beta.size)
-            step[free] = -_solve_pd(H[np.ix_(free, free)], grad[free])
+            step[free] = -_newton_solve(H[np.ix_(free, free)], grad[free])
             for _ in range(60):
                 trial = np.minimum(beta + step, self.upper)
                 with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
@@ -656,7 +661,7 @@ class _Model:
         free = self.free(fitted, grad)
         H, grad = H[np.ix_(free, free)], grad[free]
         unit = 1.0 / np.sqrt(_diagonal(H))
-        left = 0.5 * float(grad @ _solve_pd(H, grad))
+        left = 0.5 * float(grad @ _newton_solve(H, grad))
         eigenvalues = np.linalg.eigvalsh(H * unit[:, None] * unit)
         if eigenvalues[0] < _SINGULAR or left > _UNFINISHED * (1.0 + abs(value)):
             return None
@@ -678,22 +683,20 @@ def _diagonal(H: np.ndarray) -> np.ndarray:
     return np.maximum(size, max(1e-12 * float(size.max()), 1e-300))
 
 
-def _solve_pd(H: np.ndarray, g: np.ndarray) -> np.ndarray:
-    """Solve ``H x = g``, adding a multiple of ``H``'s diagonal size until it is positive definite.
+def _newton_solve(H: np.ndarray, g: np.ndarray) -> np.ndarray:
+    """Solve ``H x = g`` with each eigenvalue of ``H``, its diagonal brought to 1, replaced by its
+    size and raised to at least :data:`_SINGULAR`.
 
-    The shift follows each coefficient's own scale, so a large penalty on one block does not hold
-    back a coefficient outside it.
+    On a positive definite ``H`` this is the Newton step; along a direction of negative curvature
+    the step still descends. The result is a continuous function of ``H``, so a change of the table
+    within rounding changes each step within rounding, where a shift that grows until a Cholesky
+    factorization succeeds jumps at the point where the factorization starts to fail, and two runs
+    on one table in different units could follow different steps to different minima.
     """
-    shift = 0.0
-    diagonal = np.diag(_diagonal(H))
-    for _ in range(40):
-        try:
-            factor = np.linalg.cholesky(H + shift * diagonal)
-        except np.linalg.LinAlgError:
-            shift = max(2.0 * shift, 1e-10)
-            continue
-        return np.linalg.solve(factor.T, np.linalg.solve(factor, g))
-    return np.linalg.lstsq(H, g, rcond=None)[0]
+    unit = 1.0 / np.sqrt(_diagonal(H))
+    values, vectors = np.linalg.eigh(H * unit[:, None] * unit)
+    values = np.maximum(np.abs(values), _SINGULAR)
+    return unit * (vectors @ ((vectors.T @ (unit * g)) / values))
 
 
 def pair_tests(res: Residuals) -> tuple[tuple[float, float], tuple[float, float], float]:

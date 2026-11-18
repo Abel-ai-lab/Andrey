@@ -749,16 +749,13 @@ def cpcm(
     ``"gumbel"``, and a dispersion of ``exp(-7)`` under ``"gamma"``. The size of
     ``"negative_binomial"`` is at most ``exp(5)`` times the column's largest count, and between
     ``exp(12)`` and ``exp(20)``; a size at that bound is read as the Poisson limit, whose variance
-    is then within 1 part in 148. A fit that ends away from a maximum, or at a point where the
-    coefficients are not determined to working precision, raises ``ValueError``. The fit draws
-    no random numbers except a count family's uniforms, which follow
-    ``seed`` and the column's values.
+    is then within 1 part in 148 for counts up to ``exp(15)``, about 3.3 million, and less close
+    above. A fit that ends away from a maximum, or at a point where the coefficients are not
+    determined to working precision, raises ``ValueError``. The fit draws no random numbers except
+    a count family's uniforms, which follow ``seed`` and the column's values.
 
     **Units.** A column in other units stays in the Gaussian, Gumbel, exponential, and gamma
-    families, so under them the result is the same in any units, to rounding, with one exception:
-    where the penalized likelihood of ``"gaussian"`` or ``"gumbel"`` has several maxima, as it can
-    on heavy-tailed columns, rounding can change the one a fit reaches and so a p-value. The
-    Gaussian and
+    families, so under them the result is the same in any units, to rounding. The Gaussian and
     Gumbel families do not depend on the column's origin either; the exponential and gamma
     families do, since their support starts at 0. ``"pareto"``, whose scale is fixed at 1, and
     the count families, whose values step by 1, read the units: the same column in other units is
@@ -774,12 +771,14 @@ def cpcm(
     column per sample, so time and memory grow with the square of ``n_samples``. Under the count
     families the rank-10 spline must follow the mean to within the counts' own noise, about
     ``1 / sqrt(mean)`` of it, which it does for means up to a few hundred: from means of a few
-    thousand that vary strongly with the cause, the true direction's test rejects too. The
-    family must be
-    chosen: the paper's rule that picks one from each column's support, and its sequential choice
-    between one- and two-parameter families, are not offered. The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    thousand that vary strongly with the cause, the true direction's test rejects too. Where the
+    marginal likelihood has narrow dips, as it can for a two-parameter family fitted against the
+    causal direction, the lattice point the smoothing search reaches, and with it a p-value, can
+    move under a change of the data well above rounding, such as noise of 1e-4 of a standard
+    deviation. The family must be chosen: the paper's rule that picks one from each column's
+    support, and its sequential choice between one- and two-parameter families, are not offered.
+    The numbers are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------

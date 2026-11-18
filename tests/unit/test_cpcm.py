@@ -318,18 +318,12 @@ def test_two_directions_that_mirror_each_other_give_no_edge_in_any_units():
 ROUNDING_FACTORS = ((3.0, 1.0), (1.0, 3.0), (1e6, 1.0), (1.0, 1e-6), (3.7, 3.7), (3.7, 1e-6))
 
 
-#: The families whose penalized likelihood can have several maxima on heavy-tailed columns, where
-#: rounding can change the one a fit reaches (the exception their Units paragraph states).
-SEVERAL_MAXIMA = ("gaussian", "gumbel")
-
-
-@pytest.mark.parametrize(
-    "name", [n for n, f in FAMILIES.items() if not f.reads_units and n not in SEVERAL_MAXIMA]
-)
-@pytest.mark.parametrize("seed", [9, 63, 64])
+@pytest.mark.parametrize("name", [n for n, f in FAMILIES.items() if not f.reads_units])
+@pytest.mark.parametrize("seed", [9, 18, 63, 64])
 def test_a_heavy_tailed_table_gives_the_same_answer_in_any_units(name, seed):
     # Positive columns with a lognormal ratio: the fits are ill-conditioned, with coefficients in
-    # the thousands, and the two smooths' penalties differ by many orders of magnitude.
+    # the thousands, and the two smooths' penalties differ by many orders of magnitude. On seed 18
+    # the Gaussian fit's Hessian is indefinite along the Newton path.
     rng = np.random.default_rng(seed)
     x = rng.normal(size=40)
     table = np.column_stack([np.exp(x), rng.lognormal(0.0, 1.5, size=40) * np.exp(x)])
