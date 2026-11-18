@@ -42,7 +42,7 @@ _MARKED_PAIRS = frozenset({"CAMUV"})
 # DAG and causal-order algorithms: candidate = the DAG and the order.
 _ORDERED_DAG = frozenset({"CAM", "RESIT", "ScoreMatching", "NoGAM", "DAS"})
 # Pairwise direction tests: candidate = the two-node graph, both p-values, and both statistics.
-_PAIRWISE = frozenset({"ANM", "PNL", "LOCI"})
+_PAIRWISE = frozenset({"ANM", "PNL", "LOCI", "CPCM"})
 # The recorded fields of the pairwise tests, by metadata key and direction.
 _PAIRWISE_FIELDS = {
     "pval_forward": ("p_values", "forward"),
@@ -126,6 +126,8 @@ def project_output(out: Any, algorithm: str) -> dict:
             "accepted_sets": out.metadata["accepted_sets"],
             "p_values": out.metadata["p_values"],
         }
+    if algorithm == "CPCMGraph":  # the DAG of lowest score and its residuals' p-value
+        return {"graph": out.structure.to_numpy(), "p_value": out.metadata["p_value"]}
     if algorithm in _PAIRWISE:
         md = out.metadata
         fields = _PAIRWISE_FIELDS | (_LIKELIHOOD_FIELDS if algorithm == "LOCI" else {})

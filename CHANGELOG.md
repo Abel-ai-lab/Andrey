@@ -20,6 +20,15 @@ names its pull request.
   candidate parents screened by Welch tests on its row of the same Stein estimate of the score's
   Jacobian, at most `max_parents=20` per variable, and CAM's smooth-term tests on those candidates
   only, so the pruning no longer fits every variable before a node in the order ([#1082]).
+- `andrey.cpcm` and `andrey.cpcm_graph`, CPCM (Bodik and Chavez-Demoulin 2025), experimental:
+  conditionally parametric causal models, where each variable given its parents follows a chosen
+  family whose parameters are smooth functions of the parents (`family`: `"gaussian"`, the default,
+  with mean and scale, `"gaussian_fixed_scale"`, `"exponential"`, `"pareto"`, `"poisson"`,
+  `"gamma"`, `"gamma_fixed_shape"`, `"gumbel"`, `"gumbel_fixed_scale"`, `"negative_binomial"`, one
+  for every column or one per column). `cpcm` decides a pair by the paper's residual independence
+  tests, `cpcm_graph` returns the DAG of lowest penalized dHSIC score (`edge_penalty=2`) by exact
+  search up to 4 variables and RESIT-greedy search above. A column outside its family's support
+  raises `ValueError` ([#1085]).
 - `andrey.data.load_dataset("tuebingen")` loads the Tübingen cause-effect pairs (Mooij et al. 2016)
   as a `CausePairs` collection of 108 pairs. Each pair is a dataset with its two columns, the
   two-node graph of its reference direction, its weight (pairs from one source share weights that
@@ -79,6 +88,9 @@ names its pull request.
   `lpcmci`, and `jpcmciplus` change, and their graphs do not. The uniformity statistic and p-value
   of `markov_check` change when a test's p-value was `0`, and the stored outputs of its example
   notebook are refreshed. ([#1017])
+- The column ranks that order tied choices (`tie_ranks`) are the same for a column in units near
+  the ends of the float range, such as `2**-1000` or `1e300`, where the squares behind its marginal
+  overflowed or vanished and could reorder the columns ([#1085]).
 - `indep_test="normal_scores"` takes data from one environment. It ranks each column over every
   row its test reads, so over several environments a column mixed their distributions: on two
   simulated environments a true independence given the environment index was rejected in up to 95%
@@ -2680,6 +2692,7 @@ First alpha release.
 [#1070]: https://github.com/Abel-ai-lab/Andrey/pull/1070
 [#1082]: https://github.com/Abel-ai-lab/Andrey/pull/1082
 [#1084]: https://github.com/Abel-ai-lab/Andrey/pull/1084
+[#1085]: https://github.com/Abel-ai-lab/Andrey/pull/1085
 [#1088]: https://github.com/Abel-ai-lab/Andrey/pull/1088
 [#1112]: https://github.com/Abel-ai-lab/Andrey/pull/1112
 [#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043

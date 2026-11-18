@@ -361,7 +361,8 @@ def _marginal_key(col: np.ndarray, is_categorical: bool) -> bytes:
     values = np.sort(col[~np.isnan(col)])
     if values.size == 0 or values[0] == values[-1]:
         return f"V{values.size} constant".encode()
-    z = values - values.mean()
+    z = _within_one(values)
+    z -= z.mean()
     z /= np.sqrt(np.mean(z**2))
     return f"V{values.size} {abs(np.mean(z**3)):.9f} {np.mean(z**4):.9f}".encode()
 
@@ -401,9 +402,17 @@ def _standardized(col: np.ndarray) -> np.ndarray:
     z = np.full(col.shape, np.nan)
     z[present] = 0.0
     if values.size and values.min() != values.max():
-        centered = values - values.mean()
+        centered = _within_one(values)
+        centered -= centered.mean()
         z[present] = centered / np.sqrt(np.mean(centered**2))
     return z
+
+
+def _within_one(values: np.ndarray) -> np.ndarray:
+    """``values`` divided by the power of two that brings them within ``[-1, 1]``: exact, so the
+    keys are the same in any units, and the sums and squares that follow neither overflow nor
+    vanish for values near the largest or smallest float."""
+    return np.ldexp(values, -np.frexp(np.abs(values).max())[1])
 
 
 def _first_difference(a: np.ndarray, b: np.ndarray) -> int:

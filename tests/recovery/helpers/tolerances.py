@@ -215,6 +215,19 @@ SPEC: dict[str, dict] = {
             },
         },
     },
+    # CPCM: the decided graph and both tests' p-values and statistics. The smoothing parameters
+    # stop on a projected LAML gradient of 1e-4, so p-values are compared relatively at 1e-3.
+    "CPCM": {
+        "structural": ["graph"],
+        "numeric": {
+            **{field: {"atol": 0.0, "rtol": 1e-3} for field in ("pval_forward", "pval_backward")},
+            **{field: {"atol": 1e-3, "rtol": 1e-3} for field in ("stat_forward", "stat_backward")},
+        },
+    },
+    "CPCMGraph": {
+        "structural": ["graph"],
+        "numeric": {"p_value": {"atol": 0.0, "rtol": 1e-3}},
+    },
     "RCD": {
         "structural": ["graph"],
         "numeric": {"weighted_adjacency": {"atol": 1e-6, "rtol": 1e-5}},

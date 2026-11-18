@@ -142,6 +142,8 @@ ALGORITHMS = {
     "ANM": (_facade("anm"), "anm_pair_cubic"),
     "PNL": (_facade("pnl"), "anm_pair_cubic"),
     "LOCI": (_facade("loci"), "lsnm_pair"),
+    "CPCM": (_facade("cpcm"), "lsnm_pair"),
+    "CPCMGraph": (_facade("cpcm_graph"), "nonmonotone_4v"),
     "GIN": (_facade("gin"), "measurement_6v"),
     "RESIT": (_facade("resit"), "nonmonotone_4v"),
     "ScoreMatching": (_facade("score_matching"), "rational_chain_4v"),
