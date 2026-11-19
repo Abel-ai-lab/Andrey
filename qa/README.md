@@ -57,8 +57,9 @@ difference and `--shuffle` on a difference beyond rounding:
   `1e-14` because their regressions sum in the order of the columns, is listed as information and
   does not change the exit status. So is a difference that the column-order guide documents,
   listed in `DOCUMENTED` with its reason: any difference of ICA-LiNGAM, whose FastICA can reach
-  another solution, and a difference of PCMCIplus's `p_values` and `statistics` alone, whose
-  recorded tests depend on the order.
+  another solution, and a difference of PCMCIplus's `p_values` and `statistics` alone, which come
+  from the last test of a link, whose conditioning set depends on the order, and from rounding
+  that a statistic near 0 shows beyond the tolerance.
 - `--workers N` refits PC, FCI, FCI-JCI, GFCI, CD-NOD, RSMAX2 (with PC's skeleton), GES, and PNL
   on `N` workers, with every GES pass, every skeleton pass of conditioning size two or more, and
   every possible-d-sep search sent to the worker pool.

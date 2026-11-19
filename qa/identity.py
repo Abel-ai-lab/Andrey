@@ -560,6 +560,7 @@ def unpermute(out: Any, order: np.ndarray) -> Any:
     swapped = len(order) == 2 and order[0] == 1
     metadata = {}
     icp = out.metadata.get("algorithm") == "icp"
+    ut_igsp = out.metadata.get("algorithm") == "ut_igsp"
     for key, value in out.metadata.items():
         if key in NODE_LISTS:
             continue
@@ -567,7 +568,7 @@ def unpermute(out: Any, order: np.ndarray) -> Any:
             value = int(order[value])
         elif icp and key in PER_VARIABLE:
             value = None if value is None else [value[i] for i in back]
-        elif key == "targets" and isinstance(value, Mapping):
+        elif ut_igsp and key == "targets":
             value = {label: sorted(int(order[t]) for t in found) for label, found in value.items()}
         elif isinstance(value, Mapping) and set(value) == set(DIRECTIONS):
             forward, backward = DIRECTIONS
@@ -920,8 +921,9 @@ DOCUMENTED: dict[str, tuple[frozenset[str] | None, str]] = {
     "ICA-LiNGAM": (None, "FastICA can reach another solution under a new column order"),
     "PCMCIplus": (
         frozenset({"metadata.p_values", "metadata.statistics"}),
-        "the graph is order-free; a link's recorded p-value is the one of the test that separated "
-        "it, whose conditioning set depends on the order",
+        "the graph is order-free; a link's recorded p-value and statistic are those of the last "
+        "test, whose conditioning set depends on the order, and a statistic near 0 can round "
+        "beyond the tolerance",
     ),
 }
 #: The relative and absolute differences that count as rounding between two values.
@@ -1222,8 +1224,8 @@ def main(argv: list[str] | None = None) -> int:
         f"\n{len(rows)} fits hashed. Of {refits} refits, {count['graph']} have a different graph, "
         f"{count['structure']} a different structure, {count['values']} different values, and "
         f"{count['bits']} only different bits; {count['digits']} differ only by rounding in their "
-        "weights or metadata under a column order, which does not fail the check, and "
-        f"{count['documented']} differ as the column-order guide documents, which does not either."
+        "weights or metadata under a column order, which does not fail the check. Differences the "
+        f"column-order guide documents, which do not fail it either: {count['documented']}."
     )
     return 1 if any(kind in FAILING for kind, _ in findings) else 0
 
