@@ -33,6 +33,13 @@ names its pull request.
   every blog post and release card ends with a statement of how AI tools were used to write it.
   ([#1090])
 
+### Breaking
+
+- `indep_test="normal_scores"` takes data from one environment: `cdnod`, `fci_jci`, `igsp`,
+  `ut_igsp`, and `jpcmciplus` no longer offer it, and `gfci`, `boss_fci`, and `grasp_fci` raise a
+  `ValueError` for it with an `env`. Ranking each column over several environments mixed their
+  distributions, so true independences given the environment were rejected. ([#1037])
+
 ### Added
 
 - `andrey.dagma` is supported, and the [0.18.0 release card][card-0180-dagma] compares it with its
@@ -76,8 +83,6 @@ names its pull request.
 - `"fisherz"` and `"normal_scores"`, and the HSIC aggregation of `bottom_up_parce_lingam` and the
   Anderson-Darling p-value of `markov_check`, compute a p-value's upper tail directly, so a strong
   dependence keeps a positive p-value down to about `1e-308` instead of tying at `0`. ([#1017])
-- `indep_test="normal_scores"` takes data from one environment only, since ranking each column over
-  several environments mixed their distributions and rejected true independences. ([#1037])
 - `anm`, `pnl`, and `loci` sort each direction's rows before they fit it, so a result no longer
   depends on the order of the rows, and two directions within a relative `1e-9` of each other are a
   tie, which gives no edge. ([#1112])
