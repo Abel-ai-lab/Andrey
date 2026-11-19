@@ -23,7 +23,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -159,6 +161,18 @@ def markdown(summary: dict, records: list[dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def without_nan(value: Any) -> Any:
+    """``value`` with every NaN replaced by ``None``, so ``summary.json`` is strict JSON: a value no
+    pair supports (no finished pair, or no pair every solution finished) is ``null``."""
+    if isinstance(value, dict):
+        return {k: without_nan(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [without_nan(v) for v in value]
+    if isinstance(value, float) and math.isnan(value):
+        return None
+    return value
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Summarize Tuebingen pair runs")
     p.add_argument("runs", nargs="+", type=Path, help="run directories holding records.jsonl")
@@ -167,7 +181,8 @@ def main(argv: list[str] | None = None) -> int:
     records = read_records(args.runs)
     summary = summarize(records)
     args.out.mkdir(parents=True, exist_ok=True)
-    (args.out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    text = json.dumps(without_nan(summary), indent=2, allow_nan=False)
+    (args.out / "summary.json").write_text(text + "\n")
     table = markdown(summary, records)
     (args.out / "summary.md").write_text(table)
     print(table)
