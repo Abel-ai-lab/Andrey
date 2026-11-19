@@ -829,8 +829,10 @@ def _block_correlations(
     ``values`` holds each column's values less its observed mean, ``0`` where unobserved, and
     ``seen`` its observed rows, one row per column. Block ``b`` keeps the rows observed in all of
     ``columns[b]``; its covariances come from the sums over every row with the others zeroed, the
-    sums of its own values only, so a block's matrix does not depend on the others computed with
-    it. Clipped to ``[-1, 1]``, as :func:`numpy.corrcoef` clips.
+    sums of its own values only. Each sum runs along one contiguous row of ``n`` values, in
+    NumPy's pairwise order for that length, the same whatever the BLAS, so a block's matrix has
+    the same bits alone or with any others, in any order. Clipped to ``[-1, 1]``, as
+    :func:`numpy.corrcoef` clips.
     """
     kept = seen[columns[:, 0]].copy()
     for c in range(1, columns.shape[1]):
@@ -838,8 +840,13 @@ def _block_correlations(
     count = np.count_nonzero(kept, axis=1)
     block = values[columns] * kept[:, None, :]
     sums = block.sum(axis=2)
-    # einsum sums each product along its row in NumPy's own loop, the same whatever the BLAS.
-    products = np.einsum("bin,bjn->bij", block, block)
+    k = columns.shape[1]
+    products = np.empty((len(columns), k, k), dtype=np.float64)
+    pair = np.empty((len(columns), block.shape[2]), dtype=np.float64)
+    for i in range(k):
+        for j in range(i, k):
+            np.multiply(block[:, i], block[:, j], out=pair)
+            products[:, i, j] = products[:, j, i] = pair.sum(axis=1)
     cov = products - sums[:, :, None] * sums[:, None, :] / count[:, None, None]
     spread = np.sqrt(np.diagonal(cov, axis1=1, axis2=2))
     return np.clip(cov / spread[:, :, None] / spread[:, None, :], -1.0, 1.0), count

@@ -31,6 +31,7 @@ from andrey.core.ci import (
     register_indep_test,
 )
 from andrey.core.ci_missing import (
+    _STEP_BYTES,
     EM_METHODS,
     MORE_ROWS,
     TESTWISE_CLAIM,
@@ -191,6 +192,48 @@ def test_every_query_path_of_a_partial_correlation_gives_the_same_bits():
     mixed = make_indep_test("fisherz", x).batched_call(0, 3, [(2, 1), (), (1,), (2,)])
     assert mixed[0] == alone[0]
     assert mixed[1:] == [make_indep_test("fisherz", x)(0, 3, cond) for cond in [(), (1,), (2,)]]
+
+
+@pytest.mark.parametrize("name", GAUSSIAN)
+def test_a_query_gives_the_same_bits_alone_and_in_any_batch_on_many_rows(name):
+    # On many rows a sum can run in pieces whose bounds follow the batch; the bits stay the block's.
+    rng = np.random.default_rng(5)
+    n, d = 9_000, 10
+    x = rng.standard_normal((n, d)) @ rng.standard_normal((d, d)) + rng.uniform(-50, 50, d)
+    x[rng.random(x.shape) < 0.15] = np.nan
+    by_size = {}
+    for size in range(1, 5):
+        picks = {
+            tuple(rng.permutation(d)[: size + 2].tolist()) for _ in range(60 if size == 1 else 16)
+        }
+        by_size[size] = sorted(picks)
+    # More new blocks than one step of row values holds, so a batch is computed in several steps.
+    assert len({tuple(sorted(q)) for q in by_size[1]}) > _STEP_BYTES // (8 * 3 * n)
+    alone = {
+        q: make_indep_test(name, x).statistic_pvalue(q[0], q[1], q[2:])
+        for qs in by_size.values()
+        for q in qs
+    }
+    for size, queries in by_size.items():
+        order = [queries[i] for i in rng.permutation(len(queries))]
+        batches = [order[:1], order[1:3], order[3:6], order[6:11], order[11:], order[::-1]]
+        for batch in batches:
+            r, p = make_indep_test(name, x).statistic_pvalues(
+                np.array([q[1] for q in batch]),
+                np.array([q[0] for q in batch]),
+                np.array([q[2:] for q in batch]),
+            )
+            assert list(zip(r.tolist(), p.tolist())) == [alone[q] for q in batch]
+        canonical = make_indep_test(name, x)._canonical_pvalues(
+            np.array([min(q[:2]) for q in order]),
+            np.array([max(q[:2]) for q in order]),
+            np.sort(np.array([q[2:] for q in order]), axis=1),
+        )
+        assert canonical.tolist() == [alone[q][1] for q in order]
+    a, b = by_size[2][0][:2]
+    sets = [q[2:] for qs in by_size.values() for q in qs if a not in q[2:] and b not in q[2:]][::-1]
+    mixed = make_indep_test(name, x).batched_call(a, b, sets)
+    assert mixed == [make_indep_test(name, x).statistic_pvalue(a, b, s)[1] for s in sets]
 
 
 def test_a_registered_test_is_built_on_each_query_block():

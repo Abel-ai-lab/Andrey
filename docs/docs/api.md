@@ -822,7 +822,8 @@ On data with a `NaN`, {py:func}`~andrey.core.ci.make_indep_test` returns a
 {py:class}`~andrey.core.ci_missing.TestwiseDeletion` of the test: each query reads the rows observed
 in all of its columns. `fisherz` and `student_t` compute the query's correlations directly from
 those rows, many queries at once, so the p-value is the one the test gives on that block up to
-rounding in its last digits. Every other test is built on that block, its columns in data order,
+rounding in its last digits; a query gets the same bits asked alone or with any others, in any
+order. Every other test is built on that block, its columns in data order,
 and gives that test's p-value exactly; `normal_scores` therefore ranks each column within the rows
 its query reads; a registered test works the same way, built anew for each
 query.
