@@ -17,6 +17,8 @@ benchmarks/uv.lock
 benchmarks/.r-lib-bench/
 # The authors' RESIT code that benchmarks/start_resit_r.sh fetches, read from disk and never committed.
 benchmarks/.resit-r/
+# The authors' CPCM code that benchmarks/start_cpcm.sh fetches, read from disk and never committed.
+benchmarks/.cpcm-r/
 # The MVPC authors' R code that benchmarks/start_mvpc_r.sh fetches, read from disk and never committed.
 benchmarks/.mvpc-r/
 # MissDAG's code that benchmarks/start_missdag.sh fetches, read from disk and never committed.
@@ -25,6 +27,8 @@ benchmarks/.missdag/
 benchmarks/.tetrad-missing/
 # The authors' LOCI code that benchmarks/start_loci.sh fetches, read from disk and never committed.
 benchmarks/.loci/
+# The authors' SkewD code that benchmarks/start_skewd.sh fetches, read from disk and never committed.
+benchmarks/.skewd/
 # The authors' NOTEARS code that benchmarks/start_notears.sh fetches, read from disk and never
 # committed.
 benchmarks/.notears/
@@ -73,3 +77,5 @@ docs/_static/graph-types-*.html
 .ipynb_checkpoints/
 apps/live-discovery/brand/
 apps/live-discovery/data/
+# The logs and summary benchmarks/run_tests.sh writes, one run's worth.
+benchmarks/.test-logs/

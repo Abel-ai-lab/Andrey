@@ -57,8 +57,8 @@ for Intel GPUs.
 The `main` branch on GitHub holds the latest release:
 
 ```shell
-uv add "andrey-core @ git+https://github.com/Abel-ai-lab/andrey@main"
-pip install "andrey-core @ git+https://github.com/Abel-ai-lab/andrey@main"
+uv add "andrey-core @ git+https://github.com/Abel-ai-lab/Andrey@main"
+pip install "andrey-core @ git+https://github.com/Abel-ai-lab/Andrey@main"
 ```
 
 The distribution is `andrey-core`. After the `@`, name any branch, tag, or commit to install that
@@ -69,14 +69,14 @@ one.
 Build the wheel and the source distribution yourself, then install the wheel:
 
 ```shell
-git clone https://github.com/Abel-ai-lab/andrey
+git clone https://github.com/Abel-ai-lab/Andrey
 cd andrey
 uv build                                  # writes both to dist/
 uv pip install dist/andrey_core-*.whl     # into the active environment
 ```
 
 To work on Andrey itself, `uv sync` in the clone sets up a development environment instead; see
-[CONTRIBUTING](https://github.com/Abel-ai-lab/andrey/blob/main/CONTRIBUTING.md).
+[CONTRIBUTING](https://github.com/Abel-ai-lab/Andrey/blob/main/CONTRIBUTING.md).
 
 ## The data
 
@@ -516,7 +516,7 @@ cause. DirectLiNGAM and multi-group DirectLiNGAM read `required_paths` and `forb
 narrow the causal order, as their paper describes (Shimizu et al., 2011). Every other method raises
 `NotImplementedError` for a part it does not honor, naming the methods that do. The parts are
 supported wherever true claims [measured no
-worse](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
+worse](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
 than the same fit without them and than a reference package given the same knowledge, which is every
 method that honors them except six. Required paths are experimental in Tabu search, MMHC, and
 RSMAX2, where a reference package given the edges those paths imply made fewer errors. Forbidden
@@ -576,8 +576,11 @@ Each test and score reads the columns as one kind of data:
 | Categorical | `chisq`, `gsq` (the default when every column is categorical) | `bdeu` (the default when every column is categorical), `discrete_bic` |
 | Mixed | `degen_gauss`, `cond_gauss` (the default when some columns are categorical) | `cond_gauss` (the default when some columns are categorical), `degen_gauss` |
 
-{{ indep_test_names }} take the tests; {{ score_func_names }} take every score, except
-`normal_scores` in `gies`, which scores each variable on the rows without an intervention on it.
+{{ indep_test_names }} take the tests, except `normal_scores` in `cdnod`, `fci_jci`, `igsp`,
+`ut_igsp`, and `jpcmciplus`, whose tests read several environments at once; {{ score_func_names }}
+take every score, except `normal_scores` in `gies`, which scores each variable on the rows without
+an intervention on it. The ranks of `normal_scores` model one distribution, so neither option takes
+an `env`.
 `gfci`, `boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take a score and a test that read the same
 kind of data, such as `andrey.gfci(data, score_func="bdeu", indep_test="chisq")`; with
 `score_func="normal_scores"` and `indep_test="normal_scores"`, both read each column's normal
@@ -718,7 +721,8 @@ rebuild the data to preserve the independence of each pair tested. When a variab
 the data goes missing because of a common effect of that pair, the extra edge can stay. This occurs
 in the paper's Figure 1c and when two effects of the same causes each cause the other's missingness.
 The paper's density-ratio correction for those cases is not implemented. `andrey.data.missingness`
-simulates data whose missingness graph you know, to see where the correction helps.
+simulates data whose missingness graph you know, to see where the correction helps. The
+[missing values notebook](../examples/missing_values) runs that comparison on one simulated dataset.
 
 On simulated data in the paper's setting, MVPC made fewer errors than test-wise deletion in 10 of
 16 settings where values go missing for a reason and tied in the rest. It also tied where values
@@ -784,7 +788,7 @@ Such a fit logs a warning, and more rows help. A larger `n_em_iterations` runs m
 lets some of these fits settle while others keep changing between graphs; we have not benchmarked
 values other than 10 yet. EM also costs time: with 10 rounds a fit runs the search 10 times and the
 E-step 56 times, and it took 2 to 72 times as long as the same search on complete data. The
-[missing-data comparison](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md)
+[missing-data comparison](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/missing-data.md)
 has every number. In `xges`, `exact_search`, `dagma`, and `calm`, `missing="em"` is experimental: no
 reference implementation exists to compare them with, so the
 [release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data) reports them beside

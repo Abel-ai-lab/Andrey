@@ -45,14 +45,15 @@ def gin(data: npt.ArrayLike, *, alpha: float = 0.05) -> StructureOutput:
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure` over the observed variables (indices
         ``0`` to ``n_variables - 1``) and one latent per cluster, named ``L1``, ``L2``, and so on:
-        the ordered latents first, in causal order, then the unordered ones;
-        ``structure.node_types`` flags the latents. Each latent points to the observed variables in
-        its cluster. An ordered latent also points to every later latent and to every unordered one,
-        and unordered latents have no edge between them: edges between latents follow the order only
-        and do not mean a direct effect was found. An observed variable in no cluster has no edges.
-        ``metadata["algorithm"]`` is ``"gin"``, ``metadata["clusters"]`` lists the clusters as lists
-        of column indices, by smallest member, ``metadata["cluster_order"]`` lists the ordered ones
-        earliest latent first, and ``metadata["unordered"]`` lists the rest by smallest member.
+        the ordered latents first, in causal order, then the unordered ones, by their clusters'
+        lowest-ranked column (see Notes); ``structure.node_types`` flags the latents. Each latent
+        points to the observed variables in its cluster. An ordered latent also points to every
+        later latent and to every unordered one, and unordered latents have no edge between them:
+        edges between latents follow the order only and do not mean a direct effect was found. An
+        observed variable in no cluster has no edges. ``metadata["algorithm"]`` is ``"gin"``,
+        ``metadata["clusters"]`` lists the clusters as lists of column indices, by smallest member,
+        ``metadata["cluster_order"]`` lists the ordered ones earliest latent first, and
+        ``metadata["unordered"]`` lists the rest in the order of their latents.
         ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
         ``andrey.config.tie_break``.
 
@@ -109,10 +110,10 @@ def gin(data: npt.ArrayLike, *, alpha: float = 0.05) -> StructureOutput:
 
     **Column order.** Each column gets a tie rank computed from the data, as for
     :func:`~andrey.hc`, and the search runs on the columns sorted by it: the order of the groups it
-    tests, the member each run of a root test takes, and the choice between root candidates whose
-    lowest p-values agree to nine decimals follow the rank. Reordering the columns therefore
-    relabels the clusters and changes nothing else, unless two columns are identical. The rank is
-    arbitrary with respect to causal structure. The
+    tests, the member each run of a root test takes, the choice between root candidates whose
+    lowest p-values agree to nine decimals, and the numbering of the unordered latents follow the
+    rank. Reordering the columns therefore relabels the clusters and changes nothing else, unless
+    two columns are identical. The rank is arbitrary with respect to causal structure. The
     :doc:`column-order guide </docs/guides/column-order>` says what reordering the columns keeps.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: its tests compare clusters of

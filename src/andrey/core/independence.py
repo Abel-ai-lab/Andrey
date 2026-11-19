@@ -515,3 +515,113 @@ def _log_upper_gamma(a: float, x: float) -> float:
         if abs(delta - 1.0) < _CF_EPS:
             return a * math.log(x) - x - float(gammaln(a)) + math.log(h)
     return math.nan
+
+
+def within_one(
+    values: np.ndarray, *, each_column: bool = False
+) -> tuple[np.ndarray, int | np.ndarray]:
+    """Return ``values`` divided by a power of two that brings them within ``[-1, 1]``.
+
+    The power is the second item.
+
+    The division is exact, so sums and squares that follow keep their digits and neither overflow
+    for values near the largest float nor vanish for values near the smallest. ``each_column``
+    takes one power per column of a matrix, where the default is one for all values.
+    """
+    largest = np.abs(values).max(axis=0) if each_column else np.abs(values).max(initial=0.0)
+    power = np.frexp(largest)[1]
+    return np.ldexp(values, -power), power
+
+
+def dhsic_gram(column: np.ndarray, *, standardize: bool = False) -> np.ndarray:
+    """Return the Gaussian gram of one variable for :func:`dhsic_log_p`.
+
+    ``column`` is one variable or an ``(n, q)`` matrix read jointly through Euclidean distances;
+    with ``standardize`` each of its columns is first scaled to unit standard deviation (a constant
+    column stays as it is), so the joint distances do not depend on the columns' units. The kernel
+    is ``exp(-d^2 / (2 w^2))`` with ``w = sqrt(0.5 m)``, ``m`` the upper median of the squared
+    distances over all pairs of rows, ties included, the rule of Pfister et al. (2018), whose
+    software reads a random subsample of 1,000 rows where this reads every row. When ``m`` is
+    ``0``, as for a column whose rows are mostly tied, ``w`` is 0.001 of the rows' root mean square
+    distance from their mean: the 0.001 of that software for a column of unit standard deviation,
+    and the same kernel in any other units. The distances are formed on :func:`within_one`'s
+    values, so the gram is the same in any units, and a matrix's are summed over its columns'
+    squared differences, so two equal rows are at distance exactly ``0`` and ``m`` is ``0`` when
+    most pairs of rows are equal.
+    """
+    col = within_one(_as_columns(column), each_column=standardize)[0]
+    col = col - col.mean(axis=0)
+    if standardize:
+        sd = col.std(axis=0)
+        col = col / np.where(sd > 0, sd, 1.0)
+    if col.shape[1] == 1:
+        sq = np.maximum(_sq_dists(col), 0.0)
+    else:
+        sq = np.zeros((col.shape[0], col.shape[0]))
+        for values in col.T:
+            difference = values[:, None] - values[None, :]
+            sq += difference * difference
+    upper = _upper(sq)
+    middle = upper.size // 2
+    m = float(np.partition(upper, middle)[middle]) if upper.size else 0.0
+    if m > 0:
+        width = math.sqrt(0.5 * m)
+    else:
+        spread = math.sqrt(float(col.var(axis=0).sum()))
+        width = 0.001 * (spread if spread > 0 else 1.0)
+    sq *= -1.0 / (2.0 * width * width)
+    return np.exp(sq, out=sq)
+
+
+def dhsic_log_p(grams: list[np.ndarray]) -> tuple[float, float]:
+    """Return ``(statistic, log_p)`` of the gamma dHSIC test of joint independence.
+
+    ``grams`` holds one :func:`dhsic_gram` per variable, at least two. The d-variable HSIC
+    V-statistic is matched to a gamma law through its mean and variance under joint independence
+    (Pfister et al. 2018, Section 4.3); ``log_p`` is the natural logarithm of the upper tail at
+    ``n`` times the statistic, finite where the p-value underflows (:func:`_log_upper_gamma`). The
+    returned statistic is the V-statistic divided by its null mean. With two variables this is the
+    HSIC gamma test of Gretton et al. (2007).
+
+    References
+    ----------
+    Pfister, Buhlmann, Scholkopf, and Peters (2018). Kernel-based tests for joint independence.
+    JRSS-B 80(1), 5-31.
+    """
+    d = len(grams)
+    n = grams[0].shape[0]
+    a = np.array([g.sum() for g in grams]) / n**2
+    b = np.array([np.vdot(g, g) for g in grams]) / n**2
+    rows = [g.sum(axis=1) / n for g in grams]
+    c = np.array([float(r @ r) for r in rows]) / n
+    joint = grams[0].copy()
+    for g in grams[1:]:
+        joint *= g
+    row_product = np.prod(np.column_stack(rows), axis=1)
+    statistic = max(joint.sum() / n**2 + float(np.prod(a)) - 2.0 * row_product.mean(), 0.0)
+    prod_a, prod_b, prod_c = float(np.prod(a)), float(np.prod(b)), float(np.prod(c))
+    out_a = np.array([np.prod(np.delete(a, j)) for j in range(d)])
+    out_c = np.array([np.prod(np.delete(c, j)) for j in range(d)])
+    out_d = out_a**2
+    mean = (1.0 - out_a.sum() + (d - 1) * prod_a) / n
+    pairs = sum(
+        2.0 * c[r] * c[s] * float(np.prod(np.delete(a, [r, s]))) ** 2
+        for r in range(d)
+        for s in range(r + 1, d)
+    )
+    terms = (
+        prod_b
+        + (d - 1) ** 2 * prod_a**2
+        + 2.0 * (d - 1) * prod_c
+        + float(b @ out_d)
+        - 2.0 * float(b @ out_c)
+        - 2.0 * (d - 1) * float(c @ out_d)
+        + pairs
+    )
+    factor1, factor2 = float(n - 2 * d), float(n * (n - 1) * (n - 2))
+    for j in range(1, 2 * d - 2):
+        factor1 *= n - 2 * d - j
+        factor2 *= n - 2 - j
+    variance = 2.0 * factor1 / factor2 * terms
+    shape, scale = mean**2 / variance, n * variance / mean
+    return statistic / mean, _log_upper_gamma(shape, n * statistic / scale)

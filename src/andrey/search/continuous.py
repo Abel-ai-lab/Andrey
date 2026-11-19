@@ -69,24 +69,21 @@ _VARIANCE_FLOOR = 1e-12
 
 
 def gaussian_likelihood(cov: np.ndarray, weights: np.ndarray) -> tuple[float, np.ndarray]:
-    """Value and gradient of ``0.5 * sum_j log(((I - W)^T S (I - W))[j, j]) - log|det(I - W)|``.
+    """Value and gradient of ``0.5 * sum_j log(((I - W)^T S (I - W))[j, j])``, for covariance ``S``.
 
     This is the Gaussian negative log-likelihood of the linear model with one noise variance per
-    variable (the variances at their maximum-likelihood values), up to a constant; the determinant
-    term is zero for a DAG. Rescaling a column adds a constant to the value (Deng et al. 2024).
-    A residual variance below ``1e-12`` of its column's variance counts as that much, so the floor
-    rescales with its column. A singular ``I - W`` gives an infinite value and a zero gradient.
+    variable (the variances at their maximum-likelihood values), up to a constant (Deng et al.
+    2024). The term ``-log|det(I - W)|`` is left out: it is zero for every DAG, which the solvers'
+    acyclicity constraints hold the fit to, and its gradient would pull a fit that is still cyclic
+    toward a different graph. Rescaling a column adds a constant to the value. A residual variance
+    below ``1e-12`` of its column's variance counts as that much, so the floor rescales with its
+    column.
     """
-    d = cov.shape[0]
-    residual = np.eye(d) - weights
-    sign, logdet = np.linalg.slogdet(residual)
-    if sign == 0 or not np.isfinite(logdet):
-        return np.inf, np.zeros_like(weights)
+    residual = np.eye(cov.shape[0]) - weights
     product = cov @ residual
     variances = np.einsum("ij,ij->j", residual, product)
     variances = np.maximum(variances, _VARIANCE_FLOOR * np.diagonal(cov))
-    value = 0.5 * float(np.log(variances).sum()) - logdet
-    return value, -product / variances + np.linalg.inv(residual).T
+    return 0.5 * float(np.log(variances).sum()), -product / variances
 
 
 def l1_penalty(lambda1: float) -> Penalty:

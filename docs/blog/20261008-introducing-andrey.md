@@ -11,6 +11,8 @@ redirect: blog/introducing-andrey
 version: 0.1.0
 cover: pair
 cover_caption: "Andrey Markov and Andrey Kolmogorov."
+ai: drafted
+ai_tools: Claude Code and Codex
 ---
 
 # Introducing Andrey
@@ -76,9 +78,9 @@ Then run PC on a real dataset:
 Andrey 0.1.0 is in alpha, the API may change between releases.
 
 When you try it on your own data,
-[tell us what breaks](https://github.com/Abel-ai-lab/andrey/issues/new) or which method you need.
+[tell us what breaks](https://github.com/Abel-ai-lab/Andrey/issues/new) or which method you need.
 We'd welcome a pull request too. The
-[contributing guide](https://github.com/Abel-ai-lab/andrey/blob/main/CONTRIBUTING.md) explains how
+[contributing guide](https://github.com/Abel-ai-lab/Andrey/blob/main/CONTRIBUTING.md) explains how
 to set up.
 
 ---
@@ -88,4 +90,4 @@ to set up.
 - [Demos](../docs/demos/index.md)
 - [Benchmarks](../docs/benchmarks.md)
 - [FAQ](../docs/faq.md)
-- [GitHub](https://github.com/Abel-ai-lab/andrey)
+- [GitHub](https://github.com/Abel-ai-lab/Andrey)

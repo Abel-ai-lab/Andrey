@@ -138,6 +138,12 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {"weighted_adjacency": {"atol": 1e-2, "rtol": 0.0}},
     },
+    # DAGMA: the DAG exactly, the weights within rounding: its Adam steps are smooth in the input,
+    # and a relative 1e-12 change of the input moved them by up to 2e-13 over ten refits.
+    "DAGMA": {
+        "structural": ["graph"],
+        "numeric": {"weighted_adjacency": {"atol": 1e-6, "rtol": 1e-5}},
+    },
     # Granger has no causal order: the per-lag graphs exactly, the weights within rounding.
     "Granger": {
         "structural": ["graph"],
@@ -160,6 +166,11 @@ SPEC: dict[str, dict] = {
     },
     # NoGAM: the DAG and the causal order of its leaf search, both exact.
     "NoGAM": {
+        "structural": ["graph", "causal_order"],
+        "numeric": {},
+    },
+    # DAS: the DAG and the causal order of its leaf search, both exact.
+    "DAS": {
         "structural": ["graph", "causal_order"],
         "numeric": {},
     },
@@ -203,6 +214,21 @@ SPEC: dict[str, dict] = {
                 for field in ("stat_forward", "stat_backward", "ll_forward", "ll_backward")
             },
         },
+    },
+    # CPCM: the decided graph and both tests' p-values and statistics. The smoothing parameters
+    # come from a compass search on a fixed lattice that takes a point only if it lowers the LAML
+    # by more than 1e-6 of its value, so rounding can tip a near-tie between two lattice points;
+    # p-values are compared relatively at 1e-3.
+    "CPCM": {
+        "structural": ["graph"],
+        "numeric": {
+            **{field: {"atol": 0.0, "rtol": 1e-3} for field in ("pval_forward", "pval_backward")},
+            **{field: {"atol": 1e-3, "rtol": 1e-3} for field in ("stat_forward", "stat_backward")},
+        },
+    },
+    "CPCMGraph": {
+        "structural": ["graph"],
+        "numeric": {"p_value": {"atol": 0.0, "rtol": 1e-3}},
     },
     "RCD": {
         "structural": ["graph"],

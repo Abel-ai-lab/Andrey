@@ -957,23 +957,25 @@ def igsp(
         tests, ``metadata["alpha"]``.
     indep_test : str or None, default=None
         The conditional-independence test, on the observational rows. For continuous data, on the
-        partial correlation: ``"fisherz"``, ``"student_t"``, and ``"normal_scores"``; for
-        categorical data coded by whole numbers: ``"chisq"`` and ``"gsq"``; for mixed data, with
-        the categorical columns named by ``categorical``: ``"degen_gauss"`` and ``"cond_gauss"``;
-        for nonlinear effects in continuous data, each far slower: ``"kci"``, ``"rcot"``,
-        ``"cmiknn"``, and ``"gpdc"``, as for :func:`~andrey.pc`. ``None`` picks from the declared
-        column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are,
-        else ``"fisherz"``. ``metadata["indep_test"]`` names the test the fit used.
+        partial correlation: ``"fisherz"`` and ``"student_t"``; for categorical data coded by whole
+        numbers: ``"chisq"`` and ``"gsq"``; for mixed data, with the categorical columns named by
+        ``categorical``: ``"degen_gauss"`` and ``"cond_gauss"``; for nonlinear effects in continuous
+        data, each far slower: ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"``, as for
+        :func:`~andrey.pc`. ``"normal_scores"`` is not offered: the invariance tests compare a
+        setting with the observational rows, and ranked over both, a column's normal scores mix
+        their distributions. ``None`` picks from the declared column types: ``"gsq"`` when every
+        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``.
+        ``metadata["indep_test"]`` names the test the fit used.
     invariance_test : {"gaussian", "indicator"} or None, default=None
         The invariance test, which asks whether a variable's distribution given a set of others is
         the same in a setting as in the observational rows. ``"gaussian"`` compares the linear
-        regressions of the two groups of rows: their coefficients and intercept by the Chow test
-        and their residual variances by an F-test, each at half the level. ``"indicator"`` runs
+        regressions of the two groups of rows: their coefficients and intercept by the Chow test and
+        their residual variances by an F-test, each at half the level. ``"indicator"`` runs
         ``indep_test`` between the variable and a 0/1 indicator of the setting's rows given the
-        others. ``None`` picks ``"gaussian"`` under ``"fisherz"``, ``"student_t"``, and
-        ``"normal_scores"``, else ``"indicator"``. ``"gaussian"`` reads every column as numbers,
-        so with a categorical or mixed-data ``indep_test`` it raises ``ValueError``.
-        ``metadata["invariance_test"]`` names the test the fit used. See Notes.
+        others. ``None`` picks ``"gaussian"`` under ``"fisherz"`` and ``"student_t"``, else
+        ``"indicator"``. ``"gaussian"`` reads every column as numbers, so with a categorical or
+        mixed-data ``indep_test`` it raises ``ValueError``. ``metadata["invariance_test"]`` names
+        the test the fit used. See Notes.
     n_starts : int, default=10
         Number of searches, at least ``1``, each from a minimum-degree order of the variables:
         the first breaks ties by each column's rank, and each later one draws them, and the order
@@ -1093,16 +1095,15 @@ def igsp(
     graph under the targets [3]_.
 
     **Invariance tests.** Under ``"gaussian"``, a variable given a set of others is invariant when
-    the linear regressions with an intercept agree in the two groups of rows: the Chow test of
-    equal coefficients and intercept and the F-test of equal residual variances [4]_, exact under
-    Gaussian noise, each at half the level. With no other variable it compares the means and
-    variances, so it sees a perfect intervention that keeps the mean. A group with no more rows
-    than the regression has parameters leaves nothing to compare, and the variable reads as
-    invariant. Under ``"normal_scores"`` the regressions read every column's normal scores over
-    all rows. Under ``"indicator"``, a variable is invariant when ``indep_test`` finds it
-    independent of a 0/1 indicator of the setting's rows given the others, on the rows of the
-    setting and the observational ones [5]_; under ``"fisherz"`` and ``"student_t"`` this sees a
-    change of the mean alone, which is why ``"gaussian"`` is their default.
+    the linear regressions with an intercept agree in the two groups of rows: the Chow test of equal
+    coefficients and intercept and the F-test of equal residual variances [4]_, exact under Gaussian
+    noise, each at half the level. With no other variable it compares the means and variances, so it
+    sees a perfect intervention that keeps the mean. A group with no more rows than the regression
+    has parameters leaves nothing to compare, and the variable reads as invariant. Under
+    ``"indicator"``, a variable is invariant when ``indep_test`` finds it independent of a 0/1
+    indicator of the setting's rows given the others, on the rows of the setting and the
+    observational ones [5]_; under ``"fisherz"`` and ``"student_t"`` this sees a change of the mean
+    alone, which is why ``"gaussian"`` is their default.
 
     **Environments and targets.** Every environment whose targets are ``[]`` is observational, and
     their rows are pooled. Every other environment is a setting, compared with the observational
@@ -1294,23 +1295,25 @@ def ut_igsp(
         conditional-independence tests, ``metadata["alpha"]``.
     indep_test : str or None, default=None
         The conditional-independence test, on the observational rows. For continuous data, on the
-        partial correlation: ``"fisherz"``, ``"student_t"``, and ``"normal_scores"``; for
-        categorical data coded by whole numbers: ``"chisq"`` and ``"gsq"``; for mixed data, with
-        the categorical columns named by ``categorical``: ``"degen_gauss"`` and ``"cond_gauss"``;
-        for nonlinear effects in continuous data, each far slower: ``"kci"``, ``"rcot"``,
-        ``"cmiknn"``, and ``"gpdc"``, as for :func:`~andrey.pc`. ``None`` picks from the declared
-        column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are,
-        else ``"fisherz"``. ``metadata["indep_test"]`` names the test the fit used.
+        partial correlation: ``"fisherz"`` and ``"student_t"``; for categorical data coded by whole
+        numbers: ``"chisq"`` and ``"gsq"``; for mixed data, with the categorical columns named by
+        ``categorical``: ``"degen_gauss"`` and ``"cond_gauss"``; for nonlinear effects in continuous
+        data, each far slower: ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"``, as for
+        :func:`~andrey.pc`. ``"normal_scores"`` is not offered: the invariance tests compare a
+        setting with the observational rows, and ranked over both, a column's normal scores mix
+        their distributions. ``None`` picks from the declared column types: ``"gsq"`` when every
+        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``.
+        ``metadata["indep_test"]`` names the test the fit used.
     invariance_test : {"gaussian", "indicator"} or None, default=None
         The invariance test, which asks whether a variable's distribution given a set of others is
         the same in a setting as in the observational rows. ``"gaussian"`` compares the linear
-        regressions of the two groups of rows: their coefficients and intercept by the Chow test
-        and their residual variances by an F-test, each at half the level. ``"indicator"`` runs
+        regressions of the two groups of rows: their coefficients and intercept by the Chow test and
+        their residual variances by an F-test, each at half the level. ``"indicator"`` runs
         ``indep_test`` between the variable and a 0/1 indicator of the setting's rows given the
-        others. ``None`` picks ``"gaussian"`` under ``"fisherz"``, ``"student_t"``, and
-        ``"normal_scores"``, else ``"indicator"``. ``"gaussian"`` reads every column as numbers,
-        so with a categorical or mixed-data ``indep_test`` it raises ``ValueError``.
-        ``metadata["invariance_test"]`` names the test the fit used. See Notes.
+        others. ``None`` picks ``"gaussian"`` under ``"fisherz"`` and ``"student_t"``, else
+        ``"indicator"``. ``"gaussian"`` reads every column as numbers, so with a categorical or
+        mixed-data ``indep_test`` it raises ``ValueError``. ``metadata["invariance_test"]`` names
+        the test the fit used. See Notes.
     n_starts : int, default=10
         Number of searches, at least ``1``, each from a minimum-degree order of the variables:
         the first breaks ties by each column's rank, and each later one draws them, and the order
@@ -1440,19 +1443,18 @@ def ut_igsp(
     searches, returned as its interventional essential graph under the targets found [2]_.
 
     **Invariance tests.** Under ``"gaussian"``, a variable given a set of others is invariant when
-    the linear regressions with an intercept agree in the two groups of rows: the Chow test of
-    equal coefficients and intercept and the F-test of equal residual variances [3]_, exact under
-    Gaussian noise, each at half the level, so a variable is a target when either rejects. A
-    regressor constant within a group, as under a hard intervention without noise, costs that
-    group one degree of freedom. A group with no more rows than the regression has parameters, as
-    a setting of 3 rows given 2 other variables, leaves nothing to compare, and the variable reads
-    as invariant: such a setting learns no target from that query and blocks the reversal of an
-    edge from one of its known targets into that variable. Under ``"normal_scores"`` the
-    regressions read every column's normal scores over all rows. Under ``"indicator"``, a variable
-    is invariant when ``indep_test`` finds it independent of a 0/1 indicator of the setting's rows
-    given the others, on the rows of the setting and the observational ones [4]_; under
-    ``"fisherz"`` and ``"student_t"`` this sees a change of the mean alone, which is why
-    ``"gaussian"`` is their default.
+    the linear regressions with an intercept agree in the two groups of rows: the Chow test of equal
+    coefficients and intercept and the F-test of equal residual variances [3]_, exact under Gaussian
+    noise, each at half the level, so a variable is a target when either rejects. A regressor
+    constant within a group, as under a hard intervention without noise, costs that group one degree
+    of freedom. A group with no more rows than the regression has parameters, as a setting of 3 rows
+    given 2 other variables, leaves nothing to compare, and the variable reads as invariant: such a
+    setting learns no target from that query and blocks the reversal of an edge from one of its
+    known targets into that variable. Under ``"indicator"``, a variable is invariant when
+    ``indep_test`` finds it independent of a 0/1 indicator of the setting's rows given the others,
+    on the rows of the setting and the observational ones [4]_; under ``"fisherz"`` and
+    ``"student_t"`` this sees a change of the mean alone, which is why ``"gaussian"`` is their
+    default.
 
     **Environments and targets.** Every environment whose targets are ``[]`` is observational, and
     their rows are pooled. Every other environment is a setting, compared with the observational

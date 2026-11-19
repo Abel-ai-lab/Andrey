@@ -10,6 +10,8 @@ tags: [Engineering, Speed]
 redirect: blog/why-andrey-is-fast
 version: 0.1.0
 cover: lanes
+ai: drafted
+ai_tools: Claude Code and Codex
 ---
 
 # Why Andrey is fast

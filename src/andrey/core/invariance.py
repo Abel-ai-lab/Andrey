@@ -33,8 +33,7 @@ The permutation searches' tests compare two groups:
   group and in the two pooled, and two F-tests compare the groups: the Chow test of equal
   coefficients and intercept, upper tail, and the test of equal residual variances, two-sided
   (Chow 1960). The p-value is twice the smaller of the two, capped at 1, so that rejecting at
-  ``level`` rejects either test at ``level / 2`` (Bonferroni). Under ``indep_test="normal_scores"``
-  every column is first replaced by its normal scores over all rows.
+  ``level`` rejects either test at ``level / 2`` (Bonferroni).
 - ``"indicator"``: the conditional-independence test ``indep_test`` of ``x_y`` and a 0/1 group
   indicator given ``x_S``, on the rows of both groups, with the indicator categorical for the
   categorical and mixed-data tests (Heinze-Deml, Peters, and Meinshausen 2018).
@@ -62,7 +61,6 @@ import numpy.typing as npt
 from scipy import stats
 
 from .ci import MIXED_INDEP_TESTS, make_indep_test
-from .stats import normal_scores
 
 __all__ = [
     "GAUSSIAN_INVARIANCE",
@@ -77,7 +75,7 @@ __all__ = [
 
 #: The tests whose conditional is linear-Gaussian, which ``invariance_test=None`` pairs with
 #: ``"gaussian"``.
-GAUSSIAN_INVARIANCE: tuple[str, ...] = ("fisherz", "student_t", "normal_scores")
+GAUSSIAN_INVARIANCE: tuple[str, ...] = ("fisherz", "student_t")
 #: The shipped two-group tests, the ``invariance_test`` choices of the permutation searches.
 TWO_GROUP_INVARIANCE_TESTS: tuple[str, ...] = ("gaussian", "indicator")
 # A Gram matrix's direction is left out of a regression when its eigenvalue is at most this
@@ -167,8 +165,6 @@ class GaussianInvariance:
 
     def __init__(self, X: np.ndarray, groups: np.ndarray, *, indep_test: str, **_: Any) -> None:
         _two_groups(groups, "gaussian")
-        if indep_test == "normal_scores":
-            X = normal_scores(X)
         read = groups >= 0
         Z = X[read]
         spread = Z.std(axis=0)

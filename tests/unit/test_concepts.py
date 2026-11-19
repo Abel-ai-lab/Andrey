@@ -30,6 +30,7 @@ from andrey.spec.concepts import (
     BOOTSTRAP_PARAMS,
     CI_SEARCHES,
     CONCEPTS,
+    CONTINUOUS_TESTED,
     PCMCI_FAMILY,
     Concept,
 )
@@ -373,11 +374,16 @@ UNIT_CASES = {
     "anm": "anm_pair_cubic",
     "pnl": "anm_pair_cubic",
     "loci": "lsnm_pair",
+    "cpcm": "lsnm_pair",
+    "cpcm_graph": "lsnm_pair",
+    "skewd": "lsnm_pair",
+    "skewd_mv": "nonmonotone_4v",
     "cam": "nonmonotone_4v",
     "resit": "nonmonotone_4v",
     "score_matching": "rational_chain_4v",
     "ages": "gauss_5v",
     "nogam": "rational_chain_4v",
+    "das": "rational_chain_4v",
     "camuv": "nonmonotone_4v",
     "icp": "gauss_5v",
 }
@@ -603,10 +609,10 @@ def required_edge_is_kept(method: str, kind: str) -> bool:
 
 def keeps_the_required_edge(method: str) -> bool:
     """Whether the required edge stays on noise, and, but for the methods whose tests cannot read
-    a constant column, CAM, RESIT, SCORE, NoGAM, and CAM-UV, which need three distinct values per
-    column, and GnIES, which needs every column to vary within each environment, on data where its
-    weight is exactly 0."""
-    smooth = ("cam", "resit", "score_matching", "nogam", "camuv")
+    a constant column, CAM, RESIT, SCORE, NoGAM, DAS, and CAM-UV, which need three distinct values
+    per column, and GnIES, which needs every column to vary within each environment, on data where
+    its weight is exactly 0."""
+    smooth = ("cam", "resit", "score_matching", "nogam", "das", "camuv")
     flat = () if method in (*PCMCI_FAMILY, *smooth, "gnies") else ("flat",)
     return all(required_edge_is_kept(method, kind) for kind in ("noise", *flat))
 
@@ -708,7 +714,12 @@ RANDOMIZED = {
 }
 
 
-@pytest.mark.parametrize("method", SEEDED)
+#: The seeded methods that draw random numbers only under a family of counts, which the shared
+#: frame cannot hold; ``tests/unit/test_cpcm.py`` checks their seeds.
+COUNT_SEEDED = ("cpcm", "cpcm_graph")
+
+
+@pytest.mark.parametrize("method", [m for m in SEEDED if m not in COUNT_SEEDED])
 def test_a_seeded_fit_records_its_seed(method, monkeypatch):
     seed = tagged(CONCEPTS["seed"], method).name  # ty: ignore[possibly-missing-attribute]
     settings = {**SHORT.get(method, {}), **RANDOMIZED.get(method, {})}
@@ -722,7 +733,7 @@ def test_a_seeded_fit_records_its_seed(method, monkeypatch):
 #: The CI searches whose score search visits the variables in a random order on every fit.
 ORDER_SEARCH_FIRST = ("boss_fci", "grasp_fci")
 #: The search whose dummies enter its tests as numeric columns, so it reads continuous data only.
-CONTINUOUS_ONLY = ("jpcmciplus",)
+CONTINUOUS_ONLY = CONTINUOUS_TESTED
 
 
 def test_a_fit_that_draws_no_random_numbers_records_no_seed():

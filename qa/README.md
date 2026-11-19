@@ -43,12 +43,21 @@ uv run python -m qa.identity --compare before.json after.json
 The compare counts the rows whose graph differs and the rows where only bits differ, and lists them,
 the rows in one manifest only, and every count that changed; it exits 1 when a row differs, is in
 one manifest only, or has a count that rose. Two more options refit each draw and list every refit
-whose answer differs from the first fit, with the parts that differ, exiting 1 if there is one:
+whose answer differs from the first fit, with the parts that differ. `--workers` exits 1 on any
+difference and `--shuffle` on a difference beyond rounding:
 
 - `--shuffle K` refits on `K` seeded column orders and maps each answer back to the original
-  columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out. ICP,
-  IGSP, FCI-JCI, and J-PCMCI+ are not refit: their data hold each row's environment in one column,
-  ICP's target is the last variable, and J-PCMCI+'s contexts follow the system variables.
+  columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out, and
+  UT-IGSP's learned targets map back with the columns. ICP's target, IGSP's targets, and
+  J-PCMCI+'s contexts move with the columns, and each row's environment stays with its row. A
+  column order fails the check when a graph, a graph's kind, or the causal order differs, or when an
+  edge weight or metadata value differs by more than rounding (a relative `1e-6`, or an absolute
+  `1e-12` near zero); a boolean that becomes a number or an integer that becomes a float differs.
+  A difference of rounding alone, such as the p-values of ICP and J-PCMCI+, which differ by about
+  `1e-14` because their regressions sum in the order of the columns, is listed as information and
+  does not change the exit status. So is a difference that the column-order guide documents,
+  listed in `DOCUMENTED` with its reason: a difference of ICA-LiNGAM's graph, causal order, or
+  weights, whose FastICA can reach another solution.
 - `--workers N` refits PC, FCI, FCI-JCI, GFCI, CD-NOD, RSMAX2 (with PC's skeleton), GES, and PNL
   on `N` workers, with every GES pass, every skeleton pass of conditioning size two or more, and
   every possible-d-sep search sent to the worker pool.
@@ -155,18 +164,18 @@ such pushes traces back to a run that fitted the methods. A path outside those p
 fails, or no such run, runs the gate.
 
 The gate checks PC, FCI, GFCI, CD-NOD, FCI-JCI, IAMB, Inter-IAMB, MMPC, GES, GIES, GnIES, IGSP, ICP,
-XGES, AGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, NOTEARS, BOSS, GRaSP, BOSS-FCI, GRaSP-FCI,
-UT-IGSP, DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, SCORE, NoGAM,
-CAM-UV, GIN, ANM, PNL, LOCI, PCMCI, PCMCI+, LPCMCI, J-PCMCI+, VARMA-LiNGAM, LongitudinalLiNGAM,
-Granger, and DYNOTEARS on the datasets whose assumptions each method needs, PC with each supported
-nonlinear conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the
-targets UT-IGSP learns:
+XGES, AGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, NOTEARS, DAGMA, BOSS, GRaSP, BOSS-FCI,
+GRaSP-FCI, UT-IGSP, DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM,
+SCORE, NoGAM, CAM-UV, GIN, ANM, PNL, LOCI, PCMCI, PCMCI+, LPCMCI, J-PCMCI+, VARMA-LiNGAM,
+LongitudinalLiNGAM, Granger, and DYNOTEARS on the datasets whose assumptions each method needs, PC
+with each supported nonlinear conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on
+nonlinear data, and the targets UT-IGSP learns:
 
 | Dataset | Draws | Methods |
 |---|---|---|
 | `linear_gauss_er` at `d = 20, 50` | 10 seeds each | PC, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP |
 | `linear_gauss_er` at `d = 10, 15` | 10 seeds each | exact search; CALM at `d = 10` |
-| `notears_paper_standardized` at `d = 50`, `notears_paper_raw` at `d = 10`, `n = 1000` | 10 seeds each | NOTEARS |
+| `notears_paper_standardized` at `d = 50`, `notears_paper_raw` at `d = 10`, `n = 1000` | 10 seeds each | NOTEARS; DAGMA on the raw cell |
 | `ages_paper` with strong and weak shares `(0.1, 0.3)` and `(0.3, 0.3)`, `d = 10`, `n = 10000` | 10 seeds each | AGES |
 | `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI, GFCI, BOSS-FCI, GRaSP-FCI |
 | `anm_er`, `nonmonotone_er` at `d = 5, 10`, `n = 50d` | 10 seeds each | PC with KCI; with RCoT at `d = 10`; with CMIknn and GPDC at `d = 5` |
@@ -240,12 +249,16 @@ targets UT-IGSP learns:
   (`benchmarks/notears_cpu.py`) as two of its comparison's cells: the simulation of Zheng et al.
   (2018), a linear model on an Erdos-Renyi graph with `2d` edges, weights from +/-[0.5, 2], Gaussian
   noise of unit variance, and 1,000 rows. NOTEARS's least-squares fit reads the columns' units, so
-  one cell is standardized and one raw. `notears_paper_standardized` z-scores each column, the
-  scale of the comparison's decision cells, and runs at 50 variables, the published size where the
-  check has power: over the gate's seeds NOTEARS's median SHD is 18.5 against the empty graph's 20
-  at 10 variables and 40 against 40 at 20. `notears_paper_raw` keeps the columns as generated,
-  where the variances grow along the causal order and the fit reads the order from them, at 10
-  variables. A fit at 50 standardized variables takes about half a minute on one core.
+  one cell is standardized and one raw. `notears_paper_standardized` z-scores each column, the scale
+  of the comparison's decision cells, and runs at 50 variables, the published size where the check
+  has power: over the gate's seeds NOTEARS's median SHD is 18.5 against the empty graph's 20 at 10
+  variables and 40 against 40 at 20. `notears_paper_raw` keeps the columns as generated, where the
+  variances grow along the causal order and the fit reads the order from them, at 10 variables. A
+  fit at 50 standardized variables takes about half a minute on one core. DAGMA runs on
+  `notears_paper_raw` only: on standardized columns its median SHD is 18.5 against the empty graph's
+  20 at 10 variables, 41 against 40 at 20, and 114.5 against 100 at 50, so a standardized cell could
+  not tell a broken build from a correct one. A fit at 10 variables takes about 3 seconds on one
+  core.
 - **Linear Gaussian models with weak edges.** AGES's published regime, drawn by its benchmark
   driver (`benchmarks/ages_cpu.py`) as two of its comparison's cells: the simulation of Eigenmann,
   Nandy, and Maathuis (2017) on 10 variables with 10,000 rows, where each pair of variables holds a
@@ -323,9 +336,9 @@ targets UT-IGSP learns:
 
 SHD follows the published summaries: PC, with any test, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu,
 MMHC, RSMAX2, exact search, CALM, BOSS, and GRaSP against the truth's CPDAG, the LiNGAM methods,
-NOTEARS, AGES, ANM, PNL, SCORE, and NoGAM against the DAG, MultiGroupDirectLiNGAM summed over its
-groups, and FCI, GFCI, BOSS-FCI, and GRaSP-FCI by endpoint SHD against the PAG of the observed
-variables.
+NOTEARS, DAGMA, AGES, ANM, PNL, SCORE, and NoGAM against the DAG, MultiGroupDirectLiNGAM summed
+over its groups, and FCI, GFCI, BOSS-FCI, and GRaSP-FCI by endpoint SHD against the PAG of the
+observed variables.
 GIES is scored against the interventional essential graph of the true DAG under the rows' targets,
 IGSP against the one under the settings' targets, GnIES and UT-IGSP against the one under the true
 targets, and CD-NOD against the CPDAG in which the domain index orients the edges it reaches.
@@ -437,7 +450,10 @@ A summary without `parity_rule` (0.1.0 to 0.7.0) keeps the count rule, which fai
 
 A row where either side has no result is skipped. A released summary never changes, so a method
 re-measured against the same reference in a later summary is judged by the later rows only. Where
-a summary has one entry per regime for a method and reference, a row's key names its `regime`.
+a summary has one entry per regime for a method and reference, a row's key names its `regime`. A
+row's key also names its size and its scenario (`ROW_KEYS`: the network, the effect, the hidden
+nodes, and the like), and two failing rows of one comparison with the same key fail whatever the
+allowlist holds.
 
 A row of a reference whose result depends on the column order (`reference_order_dependent`) may
 also hold Andrey's column-order mode on the same datasets (`andrey_column_shd_by_seed`,

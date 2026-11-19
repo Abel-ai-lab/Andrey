@@ -7,6 +7,8 @@ population and the expected graph follows from the process alone, with no sampli
 
 from __future__ import annotations
 
+import hashlib
+
 import numpy as np
 import pytest
 from scipy.linalg import solve_discrete_lyapunov
@@ -249,3 +251,67 @@ def test_pcmciplus_runs_its_phases_on_one_blas_thread(monkeypatch):
     with threadpool_limits(limits=2):  # a count other than 1, set after the pools were found
         pcmciplus(_chain_series(100))
     assert counts == [{1}]
+
+
+@pytest.mark.parametrize("collider_rule", COLLIDER_RULES)
+def test_a_column_order_relabels_every_link_p_value_and_separating_set(collider_rule) -> None:
+    # A chain and a fork at lag 0 over lagged autodependence: links fall at several depths, from
+    # either end of a pair, so the tests a link has and its separating set follow the order the
+    # ends and the neighbors are tried in.
+    rng = np.random.default_rng(3)
+    n_steps, n_vars = 400, 7
+    data = np.zeros((n_steps, n_vars))
+    noise = rng.standard_normal((n_steps, n_vars))
+    for t in range(1, n_steps):
+        x = 0.5 * data[t - 1] + noise[t]
+        x[1] += 0.7 * x[0]
+        x[2] += 0.6 * x[1]
+        x[3] += 0.6 * x[1]
+        x[4] += 0.5 * x[2] - 0.5 * x[3]
+        x[6] += 0.4 * data[t - 1, 5]
+        data[t] = x
+    first = pcmciplus(data, tau_max=2, pc_alpha=0.2, collider_rule=collider_rule)
+    for seed in range(4):
+        order = np.random.default_rng(seed).permutation(n_vars)
+        refit = pcmciplus(data[:, order], tau_max=2, pc_alpha=0.2, collider_rule=collider_rule)
+        back = np.argsort(order)
+        for name in ("adjacency", "p_values", "statistics"):
+            assert np.array_equal(getattr(refit, name)[:, back][:, :, back], getattr(first, name))
+        assert np.array_equal(refit.marks[np.ix_(back, back)], first.marks)
+        assert {
+            (int(order[i]), lag, int(order[j])): sorted(int(order[k]) for k in found)
+            for (i, lag, j), found in refit.sepsets.items()
+        } == {key: sorted(found) for key, found in first.sepsets.items()}
+
+
+class LabelTest:
+    """P-values from the variables a query names, whatever their positions, so two runs differ
+    only where they ask different queries."""
+
+    def __init__(self, labels: np.ndarray) -> None:
+        self.labels = labels
+
+    def _label(self, column: int) -> tuple[int, int]:
+        lag, i = divmod(int(column), len(self.labels))
+        return lag, int(self.labels[i])
+
+    def statistic_pvalues(self, x, y, conditions):
+        p_values = []
+        for a, b, row in zip(x, y, conditions):
+            query = (sorted((self._label(a), self._label(b))), sorted(map(self._label, row)))
+            p_values.append(int(hashlib.sha256(repr(query).encode()).hexdigest()[:12], 16) / 16**12)
+        p_values = np.array(p_values)
+        return 1.0 - p_values, p_values
+
+
+def test_a_pair_is_first_tested_from_its_end_of_higher_rank() -> None:
+    # Each variable keeps its rank under a column order; a link removed from the end tested first
+    # never gets the other end's tests, so its largest p-value follows which end that is.
+    n_vars = 6
+    first = run_phases(LabelTest(np.arange(n_vars)), n_vars, 1, 0.4, "majority", range(n_vars))
+    for seed in range(4):
+        order = np.random.default_rng(seed).permutation(n_vars)
+        refit = run_phases(LabelTest(order), n_vars, 1, 0.4, "majority", order.tolist())
+        back = np.argsort(order)
+        assert np.array_equal(refit.p_values[:, back][:, :, back], first.p_values)
+        assert np.array_equal(refit.adjacency[:, back][:, :, back], first.adjacency)

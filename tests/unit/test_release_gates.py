@@ -578,6 +578,52 @@ def test_parity_allowlist_exempts_only_a_cited_cause_with_the_row_numbers():
     assert len(_failures(row, allowlist=(_entry(), _entry()))) == 1
 
 
+def test_parity_rows_of_one_size_are_keyed_by_their_scenario():
+    from qa import reference_parity
+
+    base = {"d": 18, "n": 5000, "network": "g", "andrey_shd": 5.0, "comparator_shd": 4.0}
+    scenarios = (
+        {},
+        {"effect": "both"},
+        {"hide": "B1"},
+        {"hide": "B1+Z4a"},
+        {"nodes": 50},
+        {"M": 3},
+    )
+    rows = reference_parity.paired_rows("s", _summary(*({**base, **s} for s in scenarios)))
+    assert len({tuple(sorted(r.key.items())) for r in rows}) == len(scenarios)
+    assert rows[2].key == {"d": 18, "n": 5000, "network": "g", "hide": "B1"}
+
+
+def test_parity_allowlist_names_each_scenario_of_one_size_apart():
+    rows = [
+        {"d": 50, "hide": hide, "andrey_shd": 5.0, "comparator_shd": 4.0} for hide in ("B1", "Z1")
+    ]
+    entries = tuple(_entry(row={"d": 50, "hide": hide}) for hide in ("B1", "Z1"))
+    assert _failures(*rows, allowlist=entries) == []
+    assert len(_failures(*rows, allowlist=entries[:1])) == 1
+
+
+def test_two_failing_parity_rows_with_one_key_fail_whatever_the_allowlist_holds():
+    row = {"d": 50, "andrey_shd": 5.0, "comparator_shd": 4.0}
+    failures = _failures(row, row, allowlist=(_entry(),))
+    assert len(failures) == 2
+    assert all("2 failing rows share this key" in line for line in failures)
+
+
+def test_no_two_gated_published_rows_share_a_parity_key():
+    from collections import Counter
+
+    from qa import reference_parity
+
+    seen = Counter(
+        reference_parity._identity(row)
+        for row in reference_parity.published_rows()
+        if not row.reported
+    )
+    assert [key for key, rows in seen.items() if rows > 1] == []
+
+
 def test_parity_allowlist_exempts_a_tie_break_only_when_the_reversed_order_passes():
     # Series counts: the reference has fewer errors on 4 series, Andrey on 0.
     row = {"d": 50, "andrey_fewer_errors": 0, "comparator_fewer_errors": 4}

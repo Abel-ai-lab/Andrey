@@ -91,7 +91,8 @@ We use the two parts of a causal graph as plain marks.
 </ul>
 ```
 
-Each composition has one amber node or edge; everything else is ink, cobalt, and navy.
+Each composition has one amber node or edge; everything else is ink, cobalt, and navy. We generate
+the cover art with the help of AI.
 
 ## Colors
 
@@ -124,4 +125,4 @@ Don't:
 - Use the marks in a way that suggests Andrey endorses you or your product.
 
 The Apache License 2.0 covers Andrey's code, not its name or marks. For questions,
-[open an issue](https://github.com/Abel-ai-lab/andrey/issues/new).
+[open an issue](https://github.com/Abel-ai-lab/Andrey/issues/new).
