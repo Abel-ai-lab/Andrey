@@ -645,7 +645,12 @@ def _coerce(raw: str, param: ParamSpec) -> object:
             )
         return pair
     if kind == "str_list" or (kind == "str_or_list" and value.startswith("[")):
-        return tuple(_bracket_items(value, param.name))
+        items = tuple(_bracket_items(value, param.name))
+        if kind == "str_or_list" and not items:
+            raise CliError(
+                "bad_value", f"{param.name} expects one value or a list like [a,b]", EXIT_USAGE
+            )
+        return items
     return _current_choice(value, param)
 
 
@@ -734,7 +739,7 @@ def _validate_config_value(value: object, param: ParamSpec) -> object:
     if param.type in ("str", "str_or_list") and isinstance(value, str):
         return _current_choice(value, param)
     strings = isinstance(value, (list, tuple)) and all(isinstance(i, str) for i in value)
-    if param.type in ("str_list", "str_or_list") and strings:
+    if strings and (param.type == "str_list" or (param.type == "str_or_list" and value)):
         return tuple(value)
     if param.type in ("str", "str_list", "str_or_list"):
         raise CliError(

@@ -195,6 +195,11 @@ SPEC: dict[str, dict] = {
         "structural": ["graph", "causal_order"],
         "numeric": {},
     },
+    # DAS: the DAG and the causal order of its leaf search, both exact.
+    "DAS": {
+        "structural": ["graph", "causal_order"],
+        "numeric": {},
+    },
     # GIN: the latent graph and the clusters in causal order, both exact.
     "GIN": {
         "structural": ["graph", "causal_order"],
@@ -235,6 +240,21 @@ SPEC: dict[str, dict] = {
                 for field in ("stat_forward", "stat_backward", "ll_forward", "ll_backward")
             },
         },
+    },
+    # CPCM: the decided graph and both tests' p-values and statistics. The smoothing parameters
+    # come from a compass search on a fixed lattice that takes a point only if it lowers the LAML
+    # by more than 1e-6 of its value, so rounding can tip a near-tie between two lattice points;
+    # p-values are compared relatively at 1e-3.
+    "CPCM": {
+        "structural": ["graph"],
+        "numeric": {
+            **{field: {"atol": 0.0, "rtol": 1e-3} for field in ("pval_forward", "pval_backward")},
+            **{field: {"atol": 1e-3, "rtol": 1e-3} for field in ("stat_forward", "stat_backward")},
+        },
+    },
+    "CPCMGraph": {
+        "structural": ["graph"],
+        "numeric": {"p_value": {"atol": 0.0, "rtol": 1e-3}},
     },
     "RCD": {
         "structural": ["graph"],

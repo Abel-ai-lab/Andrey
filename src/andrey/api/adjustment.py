@@ -717,12 +717,12 @@ def ldecc(
     ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
     ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
 
-    **Limitations.** Measured against its authors' code on the graphs of the generator of [1]_
-    (App. C.1) and on the MAGIC-NIAB network at 8,000 to 32,000 rows, with Fisher's z test at the
-    level of their notebooks: its parent sets and effect estimates were as near the truth as the
-    code's in every setting, on 20 datasets and again on 20 fresh ones. Like the code's, its answers
-    scored below the better of abstaining and adjusting for nothing in every setting. The
-    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#ldecc>`_ has the
+    **Limitations.** Measured against its authors' code on the graphs of the generator of [1]_ (App.
+    C.1) and on the MAGIC-NIAB network at 8,000 to 32,000 rows, with Fisher's z test at the level of
+    their notebooks: its parent sets and effect estimates were as near the truth as the code's in
+    every setting, on 20 datasets and again on 20 fresh ones. Like the code's, its answers scored
+    below the better of abstaining and adjusting for nothing in every setting. The `local discovery
+    release card <https://andrey.abel.ai/docs/benchmarks/local-discovery.html#ldecc>`_ has the
     numbers. In some graphs the eager collider checks leave a parent of the treatment undirected
     that the CPDAG directs [2]_ (App. A.2): the answer then lists more parent sets than the CPDAG
     allows, the treatment's true parents among them. When some neighbor stays undirected, the PC
@@ -989,15 +989,15 @@ def local_optimal_adjustment(
     setting, on 20 datasets or again on 20 fresh ones, and its sets nearer the optimal set than the
     empty set. Like the code's, its answers scored below adjusting for nothing in every setting. An
     edge that two v-structures direct both ways is directed as the more clearly separated one asks,
-    and on 11 of those 200 datasets that answered no effect where the truth has one. The
-    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#load>`_ has the
-    numbers. Each local structure tests a pair against the subsets of the neighbors of its ends with
-    no cap, so a variable with many neighbors costs many tests, and the parent sets of a treatment
-    grow with the subsets of its undirected neighbors. A fit ran a median of 1,300 to 14,000 tests,
-    in under 3 seconds, on those graphs. ``"total_conditioning"`` with a partial-correlation test
-    needs at least two more rows than variables, rows with every variable observed, and raises
-    ``ValueError`` below that. The numbers are a reference, not a hard limit: they change with the
-    data generator, the density, the method's settings, and the machine.
+    and on 11 of those 200 datasets that answered no effect where the truth has one. The `local
+    discovery release card <https://andrey.abel.ai/docs/benchmarks/local-discovery.html#load>`_ has
+    the numbers. Each local structure tests a pair against the subsets of the neighbors of its ends
+    with no cap, so a variable with many neighbors costs many tests, and the parent sets of a
+    treatment grow with the subsets of its undirected neighbors. A fit ran a median of 1,300 to
+    14,000 tests, in under 3 seconds, on those graphs. ``"total_conditioning"`` with a
+    partial-correlation test needs at least two more rows than variables, rows with every variable
+    observed, and raises ``ValueError`` below that. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1282,15 +1282,15 @@ def locpc_cde(
     code's in every setting, on 20 datasets each. On pairs whose effect the CPDAG does not identify,
     its verdict, like the code's, was wrong or undecided on 20% to 90% of the datasets; over both
     kinds of pair it beat the constant answer "not identifiable" in every setting but the
-    linear-Gaussian graphs with 200 variables. The
-    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#locpc-cde>`_ has the
-    numbers. Without the paper's early stop (see **When it stops.**), a non-identifiable effect is
-    searched until a hop adds no variable: on the paper's linear-Gaussian graphs with 5,000 rows
-    that ran 12% more tests with 10 variables, 60% more with 50, and 128% more with 100. An
-    unmeasured common cause breaks the claim. A fit ran a median of 90 to 2,700 tests on an
-    identifiable pair and up to 17,000 on one that is not, in under a second, except about 7 seconds
-    on the binary non-identifiable pairs with 200 variables. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    linear-Gaussian graphs with 200 variables. The `local discovery release card
+    <https://andrey.abel.ai/docs/benchmarks/local-discovery.html#locpc-cde>`_ has the numbers.
+    Without the paper's early stop (see **When it stops.**), a non-identifiable effect is searched
+    until a hop adds no variable: on the paper's linear-Gaussian graphs with 5,000 rows that ran 12%
+    more tests with 10 variables, 60% more with 50, and 128% more with 100. An unmeasured common
+    cause breaks the claim. A fit ran a median of 90 to 2,700 tests on an identifiable pair and up
+    to 17,000 on one that is not, in under a second, except about 7 seconds on the binary
+    non-identifiable pairs with 200 variables. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------

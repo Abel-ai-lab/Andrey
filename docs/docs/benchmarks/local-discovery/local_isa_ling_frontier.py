@@ -1,4 +1,5 @@
-"""The 0.18.0 release card's accuracy and cost of local ISA-LiNG, saved as HTML beside this script.
+"""The local discovery release card's accuracy and cost of local ISA-LiNG, saved as HTML beside this
+script.
 
 ``local-isa-ling-frontier.html``: one panel per graph of the local ISA-LiNG paper's simulations,
 the DAGs of mean degree 3 (100 to 10,000 rows) and 5 (2,000 rows) and the graphs with cycles
@@ -8,8 +9,8 @@ blanket; global DirectLiNGAM and ICA-LiNGAM fit all 50 columns and are read at t
 
 The points come from the lane's frontiers (``LANE``); the graphs with cycles come from its
 ``cyclic_context``, whose global fits were timed in one process rather than one fresh process per
-fit. The script runs with
-``uv run python docs/docs/benchmarks/0.18.0/local_isa_ling_frontier.py [local-isa-ling.json]``.
+fit. The script runs with ``uv run python
+docs/docs/benchmarks/local-discovery/local_isa_ling_frontier.py [local-isa-ling.json]``.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from pathlib import Path
 from frontier import BOTTOM, HEIGHT, LEFT, RIGHT, STYLE, TOP, WIDTH, marker
 
 HERE = Path(__file__).parent
-LANE = HERE.parents[3] / "benchmarks" / "published" / "0.18.0" / "local-isa-ling.json"
+LANE = HERE.parents[3] / "benchmarks" / "published" / "local-discovery" / "local-isa-ling.json"
 # The panels: the cell, its title, and what a dataset holds.
 CELLS = {
     "acyclic-d3": ("DAG, mean degree 3", "50 variables, 100 to 10,000 rows"),

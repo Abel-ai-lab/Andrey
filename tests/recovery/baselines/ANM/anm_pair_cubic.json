@@ -25,10 +25,10 @@
         0
       ]
     ],
-    "pval_backward": 0.05718981919445598,
-    "pval_forward": 0.0,
-    "stat_backward": 1.6836339116141026,
-    "stat_forward": 7.53382667005382
+    "pval_backward": 0.057189819194444366,
+    "pval_forward": 1.0827967016836564e-20,
+    "stat_backward": 1.6836339116141554,
+    "stat_forward": 7.533826670052969
   },
   "schema_version": 3
 }

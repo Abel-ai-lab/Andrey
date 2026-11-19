@@ -7,7 +7,7 @@ the authors' code of the reference methods, on models planted as the method's ow
 them, and scores the answers against the truth the method's definition gives.
 
 The seven Andrey methods fill a table row each ([Adding a method](#adding-a-method)). LDECC, LOAD,
-and LocPC-CDE ran in the 0.18.0 campaign ([Results](#results)).
+and LocPC-CDE ran in the local discovery campaign ([Results](#results)).
 
 ## Data
 
@@ -103,13 +103,14 @@ answer.
 
 ## Results
 
-The 0.18.0 campaign ran LDECC, LOAD, and LocPC-CDE against their authors' code on 20 datasets per
-cell, seeds 0-19, and again on seeds 20-39 for a cell worse on the first 20 or below its floor, each
-fit on one core with a cap of 1,800 s. A cell counts as worse when the paired 95% bootstrap interval
-of Andrey's error minus the authors' code's lies above 0 on both seed ranges. Andrey's PC read at the
-pair ran beside them with the same test and level. Every number, per cell and measure, is in
-`benchmarks/published/0.18.0/adjustment.json` (LDECC and LOAD) and
-`benchmarks/published/0.18.0/locpc-cde.json` (LocPC-CDE), and the release card has the tables.
+The local discovery campaign ran LDECC, LOAD, and LocPC-CDE against their authors' code on 20
+datasets per cell, seeds 0-19, and again on seeds 20-39 for a cell worse on the first 20 or below
+its floor, each fit on one core with a cap of 1,800 s. A cell counts as worse when the paired 95%
+bootstrap interval of Andrey's error minus the authors' code's lies above 0 on both seed ranges.
+Andrey's PC read at the pair ran beside them with the same test and level. Every number, per cell
+and measure, is in `benchmarks/published/local-discovery/adjustment.json` (LDECC and LOAD) and
+`benchmarks/published/local-discovery/locpc-cde.json` (LocPC-CDE), and the release card has the
+tables.
 
 - **LDECC** (`ldecc@8000` to `@32000`, `magic-niab@8000` to `@32000`; Fisher's z at
   `0.01 * 32000 / n`, as the authors' notebooks set it): a tie with the authors' code on accuracy,

@@ -314,7 +314,7 @@ citation.
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.17.1},
+  version = {0.18.0},
   url = {https://andrey.abel.ai},
 }
 ```

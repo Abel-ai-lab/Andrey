@@ -1,8 +1,9 @@
-"""Functional-causal-model facades: CAM, RESIT, SCORE, NoGAM, and CAM-UV."""
+"""Functional-causal-model facades: CAM, RESIT, CPCM, SCORE, NoGAM, DAS, and CAM-UV."""
 
 from __future__ import annotations
 
 import logging
+import math
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -313,18 +314,20 @@ def cam(
 MIN_ROWS = 6
 
 
-def _regression_rows(X: np.ndarray, method: str) -> None:
-    """Raise ``ValueError`` when a fit on all the other variables has as many coefficients as rows.
+def _regression_rows(X: np.ndarray, method: str, parents: int | None = None) -> None:
+    """Raise ``ValueError`` when a fit on its most parents has as many coefficients as rows.
 
-    A fit of one variable on the ``d - 1`` others, each smooth term of at least 3 basis functions,
-    2 coefficients after its centering constraint, plus the intercept, has ``2d - 1`` coefficients,
-    which need ``2d`` rows. No fit has more terms.
+    A fit of one variable on ``m`` others, each smooth term of at least 3 basis functions, 2
+    coefficients after its centering constraint, plus the intercept, has ``2m + 1`` coefficients,
+    which need ``2m + 2`` rows. ``m`` is ``parents``, at most ``d - 1``; ``None`` means ``d - 1``.
     """
     n, d = X.shape
-    if n < 2 * d:
+    m = d - 1 if parents is None else min(parents, d - 1)
+    if n < 2 * (m + 1):
+        others = f"the other {d - 1}" if m == d - 1 else f"{m} others"
         raise ValueError(
-            f"data needs at least {2 * d} rows (samples) over {d} variables, got {n}: {method} "
-            f"can regress a variable on the other {d - 1} with a smooth term of at least 2 "
+            f"data needs at least {2 * (m + 1)} rows (samples) over {d} variables, got {n}: "
+            f"{method} can regress a variable on {others} with a smooth term of at least 2 "
             "coefficients each, plus an intercept, which needs more rows than coefficients"
         )
 
@@ -533,6 +536,184 @@ def resit(
     back = np.argsort(order)
     dag = result.dag[np.ix_(back, back)]
     return structure_output(dag_from_adjacency(dag), labels=labels, ordering=order[result.order])
+
+
+@method_spec("cpcm_graph")
+def cpcm_graph(
+    data: npt.ArrayLike,
+    *,
+    family: str | list[str] = "gaussian",
+    edge_penalty: float = 2.0,
+    seed: int | None = None,
+) -> StructureOutput:
+    """Learn a DAG with CPCM, conditionally parametric causal models, by a penalized score.
+
+    CPCM [1]_ models each variable given its parents by a known parametric family whose parameters
+    are smooth functions of the parents, such as a Gaussian whose mean and scale change with them,
+    an exponential or Pareto law whose rate does, or a Poisson count. A DAG's residuals are each
+    variable's values mapped through its fitted distribution function; the score of a DAG is minus
+    the logarithm of the p-value of a test that the residuals are jointly independent [2]_, plus a
+    penalty per edge. The DAG of lowest score is returned.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample, at least 2 columns. Coerced to ``float64``. A
+        DataFrame's column names become the structure's ``labels``.
+    family : str or list of str, default="gaussian"
+        The family of each variable given its parents, one name for every column or a list of one
+        name per column: ``"gaussian"`` (mean and scale change with the parents),
+        ``"gaussian_fixed_scale"`` (the mean alone), ``"exponential"``, ``"pareto"`` (scale 1,
+        values of at least 1), ``"poisson"``, ``"gamma"`` (mean and shape), ``"gamma_fixed_shape"``
+        (the mean alone), ``"gumbel"`` (location and scale), ``"gumbel_fixed_scale"`` (the
+        location alone), or ``"negative_binomial"`` (the mean, one size for all rows). A
+        variable without parents is not modeled. See **Families.** in :func:`~andrey.cpcm`.
+    edge_penalty : float, default=2.0
+        Added to the score per edge, at least ``0``. ``2`` is the paper's value. A larger penalty
+        keeps fewer edges.
+    seed : int or None, default=None
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed for the random draws of the count families,
+        ``"poisson"`` and ``"negative_binomial"``; the other families draw nothing.
+
+    Returns
+    -------
+    StructureOutput
+        Contains a :class:`~andrey.core.GraphStructure` of kind ``dag``. ``metadata["algorithm"]``
+        is ``"cpcm_graph"``, ``metadata["p_value"]`` the p-value of the joint independence test of
+        the returned DAG's residuals, ``metadata["score"]`` its score, ``metadata["search"]``
+        ``"exact"`` or ``"greedy"``, and ``metadata["families"]`` the family of each column.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` has fewer than 2
+        columns, holds ``NaN`` or ``inf``, or has fewer than ``4 d + 12`` rows for ``d`` columns,
+        if ``family`` names an unknown family or does not give one name per column, or if a column
+        holds a value outside its family's support, such as a non-integer under ``"poisson"`` or
+        a value below 1 under ``"pareto"``. Also if a column's residual on a set of parents the
+        search reads is the same on every row, as when the column is an exact function of them,
+        or if a fit ends away from a maximum; the message names the columns.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method is not supported (see Limitations), and its
+        API may change without deprecation.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+
+    Notes
+    -----
+    **When to use.** CPCM learns a small DAG from i.i.d. observations when each variable given its
+    parents follows a known parametric family, with no hidden common cause [1]_. It is designed for
+    effects whose whole distribution changes with their causes, such as counts, positive or
+    heavy-tailed variables, or a mix where each column gets its own family; the paper claims it for
+    graphs of 5 variables [1]_. For a pair, :func:`~andrey.cpcm` runs the paper's pair test; for
+    nonlinear effects with additive noise, use :func:`~andrey.resit` or :func:`~andrey.cam`.
+
+    Each variable with parents is fitted by its family on them and mapped through the fitted
+    distribution function, as in :func:`~andrey.cpcm`; a variable without parents is its own
+    residual. The score of a DAG is ``-log p + edge_penalty * edges``, ``p`` the gamma dHSIC test
+    of the residuals' joint independence with Gaussian kernels whose bandwidth is the median
+    heuristic over all rows [2]_. Up to 4 variables every DAG is scored, the paper's exact search,
+    and the first lowest score wins, the DAGs ordered by their number of edges. Above, the paper's
+    RESIT-greedy search: a causal order from the sink up, each sink the variable whose residual on
+    the remaining ones is most independent of them by the gamma HSIC test, the remaining ones read
+    jointly with each column scaled to unit standard deviation, then the complete DAG of the order
+    loses, one at a time, the edge whose removal lowers the score most, while one does [1]_ [3]_.
+    The columns are read in rank order, so the result does not depend on their order.
+
+    **Units.** As for :func:`~andrey.cpcm`: the result does not depend on any column's units under
+    the Gaussian, Gumbel, exponential, and gamma families, of which the last two read its origin;
+    ``"pareto"`` and the count families read the units, since they fix a scale.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
+    its variables, so a row with a missing value has no place in it. Drop the incomplete rows
+    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** Not benchmarked yet. The paper claims graphs of 5 variables and measures the
+    exact search as feasible to 4 variables; the residual fits grow with the number of parents and
+    the greedy search refits a variable for each parent set it tries. Each test builds matrices with
+    one row and one column per sample, and every distinct residual's matrix is kept for the fit, so
+    memory grows with the square of ``n_samples``. Under the count families the rank-10 spline
+    must follow the mean to within the counts' own noise, which it does for means up to a few
+    hundred: from means of a few thousand that vary strongly with the parents, the true graph's
+    test rejects too. The family must be chosen: the paper's choice of a family from each
+    column's support, and its sequential choice between one- and two-parameter families, are not
+    offered. The numbers are a reference, not a hard limit: they change with the
+    data generator, the density, the method's settings, and the machine.
+
+    References
+    ----------
+    .. [1] Bodik, J., and Chavez-Demoulin, V. (2025). Identifiability of causal graphs under
+       non-additive conditionally parametric causal models. JMLR 26(264), 1-55.
+    .. [2] Pfister, N., Buhlmann, P., Scholkopf, B., and Peters, J. (2018). Kernel-based tests for
+       joint independence. JRSS-B 80(1), 5-31.
+    .. [3] Peters, J., Mooij, J. M., Janzing, D., and Scholkopf, B. (2014). Causal discovery with
+       continuous additive noise models. JMLR 15, 2009-2053.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import cpcm_graph
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.normal(0, 1, 300)
+    >>> y = rng.exponential(1 + x**2)
+    >>> z = rng.exponential(1 + np.sqrt(y))
+    >>> family = ["gaussian_fixed_scale", "exponential", "exponential"]
+    >>> out = cpcm_graph(np.column_stack([x, y, z]), family=family, seed=0)
+    >>> out.structure.oriented_edges()
+    [(0, 1, 'directed'), (1, 2, 'directed')]
+    """
+    from andrey.core.ties import tie_ranks
+    from andrey.fcm.cpcm import Residuals, resolve_families, search
+    from andrey.fcm.cpcm import score as cpcm_score
+
+    X = data_matrix(data, method="cpcm_graph")
+    labels = column_labels(data)
+    min_rows = 4 * X.shape[1] + 12
+    if X.shape[0] < min_rows:
+        raise ValueError(f"data needs at least {min_rows} rows (samples), got {X.shape[0]}")
+    if X.shape[1] < 2:
+        raise ValueError(f"cpcm_graph needs at least 2 columns, got {X.shape[1]}")
+    name = column_namer(labels)
+    families = resolve_families(family, X, "cpcm_graph", name)
+    assert seed is not None  # method_spec resolves it
+    # The fit runs on the columns in rank order, so no step reads their positions.
+    order = np.argsort(tie_ranks(X), kind="stable")
+    res = Residuals(
+        X[:, order],
+        [families[j] for j in order],
+        seed,
+        method="cpcm_graph",
+        name=lambda j: name(int(order[j])),
+    )
+    with one_blas_thread():
+        parents, _, log_p = search(res, edge_penalty)
+        value = cpcm_score(res, parents, edge_penalty)
+    dag = np.zeros((X.shape[1], X.shape[1]), dtype=np.int8)
+    for v, pa in enumerate(parents):
+        for p in pa:
+            dag[order[p], order[v]] = 1
+    return structure_output(
+        dag_from_adjacency(dag),
+        labels=labels,
+        metadata={
+            "p_value": math.exp(log_p),
+            "score": value,
+            "search": "exact" if X.shape[1] <= 4 else "greedy",
+            "families": [f.name for f in families],
+        },
+    )
 
 
 @method_spec("score_matching")
@@ -960,6 +1141,222 @@ def nogam(
     return structure_output(dag_from_adjacency(dag), labels=labels, ordering=order[result.order])
 
 
+@method_spec("das")
+def das(
+    data: npt.ArrayLike,
+    *,
+    alpha: float = 0.001,
+    max_parents: int | None = 20,
+    knowledge: Knowledge | None = None,
+) -> StructureOutput:
+    """Learn a DAG with DAS, SCORE's causal order with edges screened from the score's Jacobian.
+
+    DAS [1]_ (Discovery At Scale) assumes the model of :func:`~andrey.score_matching`: each
+    variable is a nonlinear function of its parents plus Gaussian noise, ``x_j = f_j(parents) +
+    e_j``. It finds SCORE's causal order [2]_ and then reads the edges from the same estimate of
+    the score's Jacobian: for a leaf ``l``, the entry ``d^2 log p(x) / d x_l d x_j`` is zero at
+    every point exactly when ``j`` is not a parent [1]_. Each leaf keeps the variables before it
+    whose entries are clearly above zero, at most ``max_parents`` of them, and the smooth-term
+    tests of CAM [3]_ prune those candidates only, not every variable before it in the order,
+    which makes the pruning fast for many variables. It returns a DAG and a causal order.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    alpha : float, default=0.001
+        Significance level of the pruning test, in ``(0, 1)``: a candidate parent stays when its
+        smooth term's p-value is at most ``alpha``. Neither the causal order nor the edge screen
+        reads it. ``0.001`` is the cutoff of the SCORE experiments the paper follows.
+    max_parents : int or None, default=20
+        A cap on every node's parents, at least ``0``: the edge screen keeps at most
+        ``max_parents`` candidate parents per variable, required edges included, so no node of the
+        returned DAG has more. ``20`` is the paper's value. ``None`` sets no cap.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. A variable is the next leaf only
+        when no remaining variable is in a later tier or is the effect of a required edge out of
+        it. Forbidden edges, edges into an earlier tier, and pairs outside the allowed set are
+        never candidates, but the edge screen still ranks them and may take one as its reference;
+        the score estimate still reads every remaining variable. A required edge is a candidate
+        that the pruning never removes.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
+        ``"das"``. ``ordering`` is the causal order of the leaf search, as a tuple of column
+        indices, causes first; it is the order :func:`~andrey.score_matching` finds on the same
+        data. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a usable 2-D
+        matrix: not numeric, holding ``NaN`` or ``inf``, with fewer than ``2 m + 2`` rows for
+        pruning fits on ``m = min(max_parents, n_variables - 1)`` parents, or with a constant
+        column, a column of fewer than 3 distinct values, or a column that repeats another up to
+        scale and shift, each named in the message; or if more than half of the pairs of rows are
+        equal on the remaining variables at a step, which leaves the kernel no bandwidth. Also if
+        ``knowledge`` names a column ``data`` lacks, contradicts itself, as
+        :class:`~andrey.Knowledge` lists, or requires more than ``max_parents`` parents of a
+        variable.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method is not supported (see Limitations), and its
+        API may change without deprecation.
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+
+    Notes
+    -----
+    **When to use.** DAS suits i.i.d. continuous observational data whose effects are nonlinear in
+    every parent, with additive Gaussian noise and no unmeasured common causes [1]_, when there
+    are too many variables for :func:`~andrey.score_matching`'s pruning: it finds the same causal
+    order and prunes at most ``max_parents`` candidates per variable instead of every variable
+    before it. The paper shows it on 10 to 1,000 variables and 1,000 rows, with a DAG close to
+    SCORE's and a fit several times faster from 20 variables up. With fewer variables
+    :func:`~andrey.score_matching` prunes every edge its order allows; with linear effects and
+    Gaussian noise use :func:`~andrey.pc` or :func:`~andrey.ges`, and for additive noise that is
+    not Gaussian, :func:`~andrey.nogam` or :func:`~andrey.resit`.
+
+    **The steps.** The paper's three phases [1]_:
+
+    1. *Causal order.* The leaf search of :func:`~andrey.score_matching`: the diagonal of the
+       score's Jacobian is estimated at every row of the remaining variables by the Stein
+       estimator of [2]_ (Gaussian kernel at the median distance between the rows), the variable
+       whose entry varies least is the next leaf, and the estimate is made again on the others.
+    2. *Edge screen.* At the step that picks a leaf, the variables left are the leaf and those
+       before it in the order, so the leaf has no children among them, and the leaf's row of the
+       step's estimate gives ``d^2 log p / d x_l d x_j`` at every row. The absolute median of the
+       entry ranks the variables before the leaf. The ``max_parents + 1`` largest are kept and
+       the smallest of them is the reference, standing for a zero entry; each of the others stays
+       as a candidate parent when a one-sided Welch test of equal means of the absolute entries
+       against the reference's gives a p-value at most ``0.01``, the paper's level.
+    3. *Pruning.* Each variable is fit on its candidate parents, an additive model of penalized
+       thin plate regression splines with ten basis functions per parent and smoothing chosen by
+       GCV [4]_, as in :func:`~andrey.score_matching`, and a candidate stays when its smooth term's
+       p-value is at most ``alpha`` [3]_.
+
+    The choices the paper leaves open. It states no pruning cutoff and follows the experiments of
+    [2]_, whose cutoff ``0.001`` is the default. The five largest medians stay without a test, the
+    value of the ``min_parents`` of the code published with the paper: the paper's screen never
+    keeps the reference, so without them a variable all of whose predecessors are parents would
+    lose the weakest one, and a chain of two variables would have no edge. That code counts the
+    leaf's own entry among the ranked ones, so it usually keeps four untested; here the ranking
+    holds only the predecessors, and five stay. The ranking follows that code, the absolute
+    median of the entries, where the paper states the mean of their absolute values. That code
+    estimates the Jacobian once on all the variables; DAS here reads each leaf's row at the step
+    that removes it, as the paper's Algorithm 1 does. A test whose two samples are both constant
+    keeps no edge. The estimator's ridge term and bandwidth are those of
+    :func:`~andrey.score_matching`, whose Notes state them.
+
+    The order search reads the columns centered and divided by their standard deviations, as
+    :func:`~andrey.score_matching` does, so rescaling or shifting a column changes no step; the
+    pruning reads each variable through an affine map to a fixed interval. The paper's
+    experiments run on the columns as simulated. The fit draws no random numbers and runs on one
+    BLAS thread.
+
+    **Ties.** The variances and the medians are compared rounded to 9 decimal places, as
+    :func:`~andrey.hc` compares its score changes per row, so two values that differ only in
+    their rounding tie. A tie goes to the variable with the lower rank computed from the data, as
+    for :func:`~andrey.hc`; the fit runs on the columns in that rank order, so the result does not
+    depend on the column order unless two columns are identical. The
+    :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps under a new
+    column order.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
+    its variables, so a row with a missing value has no place in it. Drop the incomplete rows
+    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** DAS is not benchmarked yet: no campaign has compared its graph with the code
+    published with the paper or with other methods. Its causal order is SCORE's, computed by the
+    same code, so the order's measured limits, which :func:`~andrey.score_matching` states in full,
+    are its own. The order search reads standardized columns, where it orders fewer edges of a
+    sparse graph correctly: on ten graphs of 10 variables with as many edges as variables, it put
+    99% of the true edges in the true direction on the columns as simulated and 80% on
+    standardized columns. Where links have a strong linear part, so that variance builds up along
+    the order, it did no better than a random order (41% to 53% of the true edges on links
+    ``z + sin z``). The leaf rule is exact only for Gaussian noise: under other noise, such as
+    Gumbel noise, a leaf's entry changes with its residual, and :func:`~andrey.nogam` and
+    :func:`~andrey.resit` drop that assumption. An edge the order reverses cannot be recovered,
+    and the screen can drop a true parent whose entries are small next to the reference's, which
+    the pruning cannot add back. Each step factors a matrix with one row and one column per
+    sample, so the order search's time grows with the cube of ``n_samples`` and its memory with
+    the square; the screen adds one solve per step. Binary columns, and any column with fewer than
+    3 distinct values, are not supported: the pruning fits a smooth term of each parent, and such
+    a column raises ``ValueError`` before the fit. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
+
+    References
+    ----------
+    .. [1] Montagna, F., Noceti, N., Rosasco, L., Zhang, K., and Locatello, F. (2023). Scalable
+       causal discovery with score matching. CLeaR, PMLR 213, 752-771.
+    .. [2] Rolland, P., Cevher, V., Kleindessner, M., Russell, C., Janzing, D., Scholkopf, B., and
+       Locatello, F. (2022). Score matching enables causal discovery of nonlinear additive noise
+       models. ICML, PMLR 162, 18741-18753.
+    .. [3] Buhlmann, P., Peters, J., and Ernest, J. (2014). CAM: Causal additive models,
+       high-dimensional order search and penalized regression. Annals of Statistics 42(6),
+       2526-2556.
+    .. [4] Wood, S. N. (2003). Thin plate regression splines. Journal of the Royal Statistical
+       Society B 65(1), 95-114.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import das
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(300)
+    >>> y = np.sin(2 * x) + 0.3 * rng.standard_normal(300)
+    >>> out = das(np.column_stack([x, y]))
+    >>> out.structure.kind, out.ordering
+    ('dag', (0, 1))
+    """
+    from andrey.core.ties import tie_ranks
+    from andrey.fcm.das import das as _das
+
+    X = data_matrix(data, method="das")
+    labels = column_labels(data)
+    _smooth_columns(X, labels, "das")
+    _regression_rows(X, "das", max_parents)
+    constraints = resolve(knowledge, X.shape[1], labels, method="das")
+    # The fit runs on the columns in rank order, so no step reads their positions.
+    order = np.argsort(tie_ranks(X), kind="stable")
+    forbidden = required = precedence = None
+    if constraints is not None:
+        most = int(constraints.required.sum(axis=0).max(initial=0))
+        if max_parents is not None and most > max_parents:
+            raise ValueError(
+                f"das: knowledge requires {most} parents of a variable, more than "
+                f"max_parents={max_parents}"
+            )
+        ranked = constraints.permuted(order)
+        forbidden, required, precedence = ranked.forbidden, ranked.required, ranked.precedence()
+    with one_blas_thread():
+        result = _das(
+            X[:, order],
+            alpha=alpha,
+            max_parents=max_parents,
+            forbidden=forbidden,
+            required=required,
+            precedence=precedence,
+        )
+    back = np.argsort(order)
+    dag = result.dag[np.ix_(back, back)]
+    return structure_output(dag_from_adjacency(dag), labels=labels, ordering=order[result.order])
+
+
 @method_spec("camuv")
 def camuv(
     data: npt.ArrayLike,
@@ -1222,3 +1619,208 @@ def camuv(
     latent = [[int(i), int(j)] for i, j in zip(*np.nonzero(np.triu(pairs)), strict=True)]
     metadata = {"latent_pairs": latent, "cycle_edges": cycle_edges}
     return structure_output(structure, labels=labels, metadata=metadata)
+
+
+@method_spec("skewd_mv")
+def skewd_mv(
+    data: npt.ArrayLike,
+    *,
+    alpha: float = 0.05,
+    indep_test: str | None = "kci",
+    tuning_iter: int = 20,
+    max_iter: int = 3000,
+    max_fits: int | None = 100,
+    seed: int | None = None,
+) -> StructureOutput:
+    """Learn a DAG of a skew-normal location-scale model with SkewD-MV.
+
+    SkewD-MV [1]_ estimates the Markov equivalence class with PC [2]_ and returns the DAG of the
+    class whose skew-normal location-scale models, one per variable given its parents, have the
+    largest likelihood. It is the graph version of :func:`~andrey.skewd`'s likelihood criterion.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    alpha : float, default=0.05
+        Significance level of PC's conditional-independence tests, in ``(0, 1)``.
+    indep_test : {"fisherz", "student_t", "kci", "rcot", "cmiknn", "gpdc"} or None, default="kci"
+        PC's conditional-independence test, a test of continuous data as in :func:`~andrey.pc`, but
+        not ``"normal_scores"``: the likelihood stage reads the values, which ranks would hide. The
+        default is the kernel test [3]_, the authors' choice. ``None`` picks ``"fisherz"``.
+    tuning_iter : int, default=20
+        The penalty settings, at least 1, that the Bayesian optimization scores by
+        cross-validation for each conditional model; the first half, rounded up, are Latin
+        hypercube points.
+    max_iter : int, default=3000
+        The most iterations, at least 1, of the expectation conditional maximization that refines
+        each conditional model.
+    max_fits : int or None, default=100
+        The most conditional models, at least 1, the class's DAGs may need before the call refuses
+        to list more of them (``ValueError``); 100 is the order up to which the paper expects the
+        method to apply [1]_. ``None`` sets no cap, and the call can then run for days.
+        While it is set, a group of undirected edges with more than 65,536 orientations is
+        refused too, and so are groups that share a cycle and have more than 65,536 acyclic
+        combinations.
+    seed : int or None, default=None
+        ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
+        not a fresh random one, so a fit repeats. Seed of PC's randomized tests and of the random
+        draws of each fit.
+
+    Returns
+    -------
+    StructureOutput
+        Contains a :class:`~andrey.core.GraphStructure` of kind ``dag``.
+        ``metadata["algorithm"]`` is ``"skewd_mv"``, ``metadata["candidates"]`` the number of DAGs
+        in the class, and ``metadata["fits"]`` the number of conditional models fitted.
+        ``metadata["indep_test"]`` names the test the fit used and ``metadata["seed"]`` the seed.
+        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a column holds at most 10 distinct whole numbers and so may hold category codes, which
+        the fit reads as numbers. Each message warns once per process.
+    ExperimentalWarning
+        On the first call in a process: the method is not benchmarked yet.
+    SearchLimitWarning
+        When a conditional model's refinement stops at ``max_iter`` rather than on its own rule.
+
+    Notes
+    -----
+    **When to use.** SkewD-MV learns a DAG from continuous variables observed i.i.d. under a
+    location-scale noise model, each variable ``y = f(pa) + g(pa) n`` with ``g > 0``, skew-normal
+    noise ``n`` independent of its parents, and no hidden common cause; it also assumes the
+    faithfulness PC needs, so that the true DAG lies in the estimated class [1]_. It is designed
+    for small graphs, 6 to 10 variables in the paper, whose noise scale changes with the parents,
+    which the additive models of :func:`~andrey.cam` and :func:`~andrey.resit` do not allow.
+
+    Each column is standardized first [1]_. PC, order-independent [2]_, gives the class. Its DAGs
+    orient the undirected edges with no directed cycle and no new collider [1]_, and are every
+    combination of one orientation of each connected group of undirected edges, so each group is
+    listed on its own, one DAG at a time, and the listing stops with an error once the groups need
+    more than ``max_fits`` conditional models or one group has more than 65,536 orientations, so a
+    class too large to score is never listed in full. The edges are oriented in a maximum
+    cardinality search order, so the listing's time does not depend on the column order. When a
+    group has no such orientation, as conflicting colliders can leave, its candidates are every
+    acyclic orientation of its edges. Each variable with an undirected edge is fitted given its
+    parents in each orientation, once per distinct parent set: the standard Gaussian log-likelihood
+    for a variable without parents, and otherwise :func:`~andrey.skewd`'s skew-normal fit with
+    additive B-splines of the parents, 10 location and 7 scale columns per parent and a penalty pair
+    per parent chosen by a 5-fold cross-validation [1]_. A constant moved between two parents'
+    location coefficients changes no fitted value, so the fit leaves it out. Only these variables'
+    terms differ between the DAGs, so their sum decides (Proposition 5.1 of [1]_), and each group
+    contributes its own terms: the returned DAG holds the orientation of each group with the largest
+    sum, the first on a tie, which is the DAG of the class with the largest sum. Where a conflicting
+    graph lets the groups' best orientations close a directed cycle across its directed edges, the
+    search takes the acyclic combination with the largest sum, and a graph with none raises an
+    error. The defaults, 20 candidates of the Bayesian optimization and 3,000 iterations, are those
+    of the paper's runs. The columns are fitted in the order of their values' ranks, so the DAG does
+    not depend on the column order; ties follow ``andrey.config.tie_break``.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
+    its variables, so a row with a missing value has no place in it. Drop the incomplete rows
+    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** Not benchmarked yet. The paper measures it on skew-normal location-scale
+    graphs of 6 and 10 variables with 1,000 rows [1]_. Its cost grows with the number of distinct
+    parent sets the class allows, exponentially in a variable's undirected edges, and each fit
+    takes minutes at the defaults; it refuses a class that needs more than 100 (``max_fits``),
+    where the paper counts parent-child configurations and expects the method to apply while they
+    are in the order of 100. An edge PC misses or misorients stays wrong: the likelihood only
+    chooses among the class's DAGs. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
+
+    References
+    ----------
+    .. [1] Klippert, D., and Marx, A. (2026). Skewness-robust causal discovery in location-scale
+       noise models. ICML, PMLR 306.
+    .. [2] Colombo, D., and Maathuis, M. H. (2014). Order-independent constraint-based causal
+       structure learning. JMLR 15, 3741-3782.
+    .. [3] Zhang, K., Peters, J., Janzing, D., and Scholkopf, B. (2011). Kernel-based conditional
+       independence test and application in causal discovery. UAI, 804-813.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import skewd_mv
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(300)
+    >>> y = np.tanh(2 * x) + (0.4 + 0.2 * np.tanh(x)) * rng.standard_normal(300)
+    >>> z = y + 0.5 * rng.standard_normal(300)
+    >>> data = np.column_stack([x, y, z])
+    >>> out = skewd_mv(data, indep_test="fisherz", tuning_iter=1, max_iter=20, seed=0)
+    >>> out.structure.kind, out.metadata["candidates"]
+    ('dag', 3)
+    """
+    from andrey.api.constraint import pc
+    from andrey.core.ties import tie_ranks
+    from andrey.core.warning_policy import warn_search_limit
+    from andrey.fcm.skewd import (
+        LISTED_DAGS,
+        Budget,
+        class_candidates,
+        class_size,
+        fit,
+        merge_components,
+    )
+
+    X = data_matrix(data, method="skewd_mv", min_rows=MIN_ROWS)
+    labels = column_labels(data)
+    X = X / np.abs(X).max(axis=0)  # divide first, so tiny or huge units cannot overflow the moments
+    order = np.argsort(tie_ranks(X), kind="stable")
+    X = X[:, order]
+    X = (X - X.mean(axis=0)) / X.std(axis=0)
+    assert seed is not None  # method_spec resolves it
+    skeleton = pc(X, alpha=alpha, indep_test=indep_test, seed=seed).structure
+    assert isinstance(skeleton, GraphStructure)
+    marks = skeleton.to_numpy()
+    components, best, fits = class_candidates(marks, max_fits)
+    candidates = class_size(best, components, None if max_fits is None else LISTED_DAGS)
+    if candidates == 0:  # known from the graph alone, so before any model is fitted
+        raise ValueError(
+            "skewd_mv: PC's graph leaves no DAG that keeps its directed edges and adds no collider"
+        )
+    budget = Budget(
+        knots=8, folds=5, tuning_iter=tuning_iter, initial=-(-tuning_iter // 2), max_iter=max_iter
+    )
+    n = X.shape[0]
+    terms: dict[tuple[int, tuple[int, ...]], float] = {}
+    converged = True
+    for y, parents in fits:
+        result = fit(X[:, list(parents)], X[:, y], budget, seed)
+        terms[(y, parents)] = n * result.log_likelihood
+        converged &= result.converged
+    if not converged:
+        warn_search_limit("skewd_mv", "max_iter", max_iter, "ECM iterations")
+    gaussian = -0.5 * n * np.log(2 * np.pi) - 0.5 * (X**2).sum(axis=0)  # a variable with no parent
+
+    def term(dag: np.ndarray, y: int) -> float:
+        parents = tuple(np.flatnonzero(dag[:, y]).tolist())
+        return terms[(y, parents)] if parents else float(gaussian[y])
+
+    # A DAG's likelihood is the sum over its variables, and only the variables of an undirected
+    # component change with that component's orientation, so the best DAG holds each component's
+    # best orientation (the first, on a tie).
+    tables = [
+        [sum(term(member, y) for y in nodes) for member in members] for nodes, members in components
+    ]
+    best = merge_components(best, components, tables)
+    back = np.argsort(order)
+    return structure_output(
+        dag_from_adjacency(best[np.ix_(back, back)]),
+        labels=labels,
+        metadata={"candidates": candidates, "fits": len(fits)},
+    )

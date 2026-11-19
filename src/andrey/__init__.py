@@ -28,7 +28,10 @@ from .api import (
     camuv,
     cdnod,
     cmb,
+    cpcm,
+    cpcm_graph,
     dagma,
+    das,
     direct_lingam,
     dynotears,
     exact_search,
@@ -79,6 +82,8 @@ from .api import (
     resit,
     rsmax2,
     score_matching,
+    skewd,
+    skewd_mv,
     tabu,
     ut_igsp,
     varma_lingam,
@@ -104,7 +109,7 @@ from .core.warning_policy import (
 from .markov import MarkovCheckOutput, markov_check
 from .resample import BootstrapOutput, bootstrap
 
-__version__ = "0.17.1"
+__version__ = "0.18.0"
 
 __all__ = [
     "__version__",
@@ -186,8 +191,11 @@ __all__ = [
     "local_isa_ling",
     "cam",
     "resit",
+    "cpcm_graph",
+    "skewd_mv",
     "score_matching",
     "nogam",
+    "das",
     # Latent-variable structure - observed indicators plus discovered latents in causal order.
     "gin",
     # Multi-output: one StructureOutput per group (shared order, per-group weights).
@@ -205,6 +213,8 @@ __all__ = [
     "anm",
     "pnl",
     "loci",
+    "cpcm",
+    "skewd",
     # Hidden common causes: a PAG over the observed variables.
     "rcd",
     "bottom_up_parce_lingam",

@@ -321,6 +321,28 @@ def test_coerce_bool_pair_list_and_null():
         _coerce("", varma["criterion"])
 
 
+def test_a_str_or_list_value_is_one_string_or_a_bracket_list():
+    """On the command line a bare or quoted value is one string and a bracket list is a tuple; in
+    a config file a string stays one and a list of strings becomes a tuple."""
+    from andrey.cli import CliError, _coerce, _validate_config_value
+    from andrey.spec.models import ParamSpec
+
+    param = ParamSpec(name="names", type="str_or_list", default="a", doc="", nullable=True)
+    assert _coerce("a", param) == "a"
+    assert _coerce('"[a]"', param) == "[a]"  # a quoted value is a literal string
+    assert _coerce("[a,b]", param) == ("a", "b")
+    assert _coerce("[a]", param) == ("a",)
+    assert _coerce("null", param) is None
+    assert _validate_config_value("a", param) == "a"
+    assert _validate_config_value(["a", "b"], param) == ("a", "b")
+    assert _validate_config_value(None, param) is None
+    for bad in (3, ["a", 3], []):
+        with pytest.raises(CliError, match="names in --config is not a valid str_or_list"):
+            _validate_config_value(bad, param)
+    with pytest.raises(CliError, match=r"names expects one value or a list like \[a,b\]"):
+        _coerce("[]", param)
+
+
 def test_coerce_quoted_is_literal_string():
     from andrey.cli import CliError, _coerce
     from andrey.spec import get_spec
@@ -1260,7 +1282,7 @@ def test_a_list_of_targets_in_a_config_file(capsys, tmp_path):
 
 @pytest.mark.parametrize(
     ("target", "code"),
-    [("[]", "bad_value"), ("[c,2]", "bad_value"), ("[a,h]", "unknown_column")],
+    [("[]", "invalid_params"), ("[c,2]", "bad_value"), ("[a,h]", "unknown_column")],
 )
 def test_a_bad_list_of_targets_is_a_usage_error(capsys, tmp_path, target, code):
     """No target, one column twice (by name and by position), and a column the file lacks."""

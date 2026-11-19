@@ -81,11 +81,12 @@ computed from them.
 
 ## Results
 
-Release 0.18.0 judged `andrey.mmb_by_mmb` against the authors' code on the paper's four networks at
-1,000 and 5,000 rows, 20 datasets (seeds 0-19) per setting, at the paper's named targets; FCI, RFCI,
-and the IAMB blanket arm are context. `published/0.18.0/mmb-by-mmb.json` holds every setting, and
-the release summary's MMB-by-MMB rows are built from it by `mmb_by_mmb_summary.py`. The
-[release card](https://andrey.abel.ai/docs/benchmarks/0.18.0.html#mmb-by-mmb) reads it.
+The local discovery campaign judged `andrey.mmb_by_mmb` against the authors' code on the paper's
+four networks at 1,000 and 5,000 rows, 20 datasets (seeds 0-19) per setting, at the paper's named
+targets; FCI, RFCI, and the IAMB blanket arm are context.
+`published/local-discovery/mmb-by-mmb.json` holds every setting, and the release summary's
+MMB-by-MMB rows are built from it by `mmb_by_mmb_summary.py`. The [release
+card](https://andrey.abel.ai/docs/benchmarks/local-discovery.html#mmb-by-mmb) reads it.
 
 Per dataset and solution, each measure is the mean over the targets with a true edge. The judged
 difference is Andrey's minus the authors' code per dataset, with its percentile bootstrap 95%
@@ -148,7 +149,7 @@ so neither is better on accuracy and cost together.
 The ladder holds the cost against the number of variables: a planted core with hidden common
 causes, in which the target has a blanket of 6 variables, among independent variables, with 5
 datasets per row (the medians are shown). An answer is right when the target's edges and marks
-equal the true PAG's. MMB-by-MMB ran on the 0.18.0 release branch of 14 November 2026 and FCI on
+equal the true PAG's. MMB-by-MMB ran on the local discovery branch of 14 November 2026 and FCI on
 that of 12 November 2026; an FCI fit has a cap of 1,800 s, and a fit that reaches it ends the
 ladder for that number of rows.
 

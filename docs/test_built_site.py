@@ -16,6 +16,7 @@ import re
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 from html import unescape
 from html.parser import HTMLParser
 from urllib.parse import urlsplit
@@ -298,12 +299,14 @@ def test_every_homepage_tile_leads_to_details_that_are_built(html):
     assert not problems, "\n".join(problems)
 
 
+# A release card named by its version; a card named for its topic takes its version at the cut.
+VERSION = re.compile(r"\d+\.\d+\.\d+")
 # The section's line icon before a header link's name.
 ICON = r'<svg class="nav-icon[^"]*"[^>]*>.*?</svg>'
 
 
 def test_every_header_leads_home_and_to_each_section(html):
-    cards = (DOCS / "docs" / "benchmarks").glob("*.md")
+    cards = [c for c in (DOCS / "docs" / "benchmarks").glob("*.md") if VERSION.fullmatch(c.stem)]
     newest = max((tuple(map(int, card.stem.split("."))) for card in cards), default=())
     newest = ".".join(map(str, newest))
     problems = []
@@ -458,15 +461,22 @@ def _front_matter(path: pathlib.Path) -> dict[str, str]:
     return dict(re.findall(r"^(\w+): (.*)$", head, re.MULTILINE))
 
 
+def _updates(path: pathlib.Path) -> list[str]:
+    """The dates of a post's `update` notes, as written."""
+    return re.findall(r"^```\{update\} (\S+)$", path.read_text(encoding="utf-8"), re.MULTILINE)
+
+
 def test_the_blog_features_the_newest_post_then_lists_the_others(html):
-    # The newest dated post, by date, version, and file name, leads with its cover and description;
-    # every other dated post follows once, in a row with its cover, newest first.
+    # The newest dated post, by the date of its latest update (its own date when no note is later),
+    # version, and file name, leads with its cover and description; every other dated post follows
+    # once, in a row with its cover, newest first. A post shows its update where it has one.
     posts = {}
     for path in (DOCS / "blog").glob("*.md"):
         meta = _front_matter(path)
         if meta.get("blogpost") == "true" and meta.get("date"):
             version = tuple(int(part) for part in meta.get("version", "").split(".") if part)
-            posts[path.stem] = (meta["date"], version, meta["description"].strip('"'))
+            updated = max([meta["date"], *_updates(path)])
+            posts[path.stem] = (updated, version, meta["description"].strip('"'))
     index = html / "blog" / "index.html"
     parts = re.split(r'<div class="(release-latest|release-row)\b', index.read_text("utf-8"))[1:]
     # Each block runs to the next one or to the end of its section.
@@ -478,6 +488,10 @@ def test_the_blog_features_the_newest_post_then_lists_the_others(html):
         linked = set(re.findall(r'href="([^"/#]+)\.html"', block))
         assert len(linked) == 1 and linked <= posts.keys(), f"a {kind} block links {linked}"
         shown.append(linked.pop())
+        updates = _updates(DOCS / "blog" / f"{shown[-1]}.md")
+        assert ("Updated <time" in block) == bool(updates), f"{shown[-1]} shows its update wrongly"
+        if updates:
+            assert f'Updated <time datetime="{max(updates)}">' in block, shown[-1]
         cover = re.search(r'<img [^>]*src="([^"]+)"', block)
         assert cover and _resolve(html, index, cover[1]).is_file(), f"{shown[-1]} has no cover"
         assert posts[shown[-1]][2] in unescape(block), f"{shown[-1]} lacks its description"
@@ -518,6 +532,65 @@ def test_every_post_shows_its_cover_and_byline_under_its_title(html):
         elif tags and 'class="blog-tags"' not in byline[1]:
             problems.append(f"blog/{post}.html shows no tags under its title")
     assert not problems, "\n".join(problems)
+
+
+def _posts_with_updates() -> dict[str, tuple[dict[str, str], list[str]]]:
+    """Each post's file stem with its front matter and the dates of its `update` notes."""
+    posts = {}
+    for source in (DOCS / "blog").glob("*.md"):
+        meta = _front_matter(source)
+        if meta.get("blogpost") == "true":
+            posts[source.stem] = (meta, _updates(source))
+    return posts
+
+
+def test_a_post_a_later_release_updated_shows_its_update_with_its_date(html):
+    # The byline gives the day the post first appeared, then "Updated" and the day of its latest
+    # `update` note, then the version; a post no release has updated says nothing of an update. Each
+    # note is a titled block in the post, and the post's feed entry carries both days and a summary
+    # that is not a note.
+    atom = "{http://www.w3.org/2005/Atom}"
+    entries = {}
+    for entry in ET.parse(html / "blog" / "atom.xml").getroot().iter(f"{atom}entry"):
+        stem = entry.findtext(f"{atom}id").rsplit("/", 1)[-1].removesuffix(".html")
+        entries[stem] = {tag: entry.findtext(f"{atom}{tag}") for tag in ("published", "updated")}
+        entries[stem]["summary"] = entry.findtext(f"{atom}summary") or ""
+    posts = _posts_with_updates()
+    assert sorted(entries) == sorted(posts)
+    assert any(updates for _, updates in posts.values())
+    for stem, (meta, updates) in posts.items():
+        text = (html / "blog" / f"{stem}.html").read_text(encoding="utf-8")
+        byline = re.search(r'<div class="post-byline">(.*?)</div>', text, re.S)[1]
+        latest = max([meta["date"], *updates])
+        assert byline.count(f'<time datetime="{meta["date"]}">') == 1, stem
+        assert text.count('<p class="admonition-title">Updated on ') == len(updates), stem
+        assert entries[stem]["published"].startswith(meta["date"]), stem
+        assert entries[stem]["updated"].startswith(latest), stem
+        assert not entries[stem]["summary"].startswith("Updated on"), stem
+        if not updates:
+            assert "Updated" not in byline, stem
+        else:
+            assert re.search(
+                rf'<time datetime="{meta["date"]}">[^<]+</time> · <span class="post-updated">'
+                rf'Updated <time datetime="{latest}">[^<]+</time></span> · '
+                rf"Andrey {meta['version']}",
+                byline,
+            ), stem
+
+
+def test_the_release_dot_opens_its_week_on_the_day_the_newest_release_post_was_updated(html):
+    cards = [c for c in (DOCS / "docs" / "benchmarks").glob("*.md") if VERSION.fullmatch(c.stem)]
+    newest = ".".join(map(str, max(tuple(map(int, card.stem.split("."))) for card in cards)))
+    days = [
+        max([meta["date"], *updates])
+        for meta, updates in _posts_with_updates().values()
+        if meta.get("version") == newest
+    ]
+    if not days:
+        pytest.skip(f"no post describes {newest} yet")
+    home = (html / "index.html").read_text(encoding="utf-8")
+    dot = re.search(r'class="nav-new" data-release="([^"]+)" data-date="([^"]+)"', home)
+    assert dot and dot[1] == newest and dot[2] == max(days), dot and dot.groups()
 
 
 def test_a_page_ends_with_one_ai_statement_exactly_when_it_sets_ai(html):

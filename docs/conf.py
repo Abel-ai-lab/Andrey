@@ -9,6 +9,7 @@ surface) and MyST-NB notebooks. Every page shares the pydata-sphinx-theme navbar
 
 from __future__ import annotations
 
+import datetime
 import html
 import importlib.util
 import inspect
@@ -537,6 +538,7 @@ PROSE_NAMES = {
     "resit": "RESIT",
     "score_matching": "SCORE",
     "nogam": "NoGAM",
+    "das": "DAS",
     "varma_lingam": "VARMA-LiNGAM",
     "longitudinal_lingam": "Longitudinal LiNGAM",
     "pcmci": "PCMCI",
@@ -548,10 +550,14 @@ PROSE_NAMES = {
     "anm": "ANM",
     "pnl": "PNL",
     "loci": "LOCI",
+    "skewd": "SkewD",
+    "skewd_mv": "SkewD-MV",
     "gin": "GIN",
     "rcd": "RCD",
     "bottom_up_parce_lingam": "BottomUpParceLiNGAM",
     "camuv": "CAM-UV",
+    "cpcm": "CPCM",
+    "cpcm_graph": "CPCM-graph",
 }
 
 
@@ -1036,10 +1042,11 @@ WHY_FAST_PAGES = {"blog/20261008-why-andrey-is-fast"}
 
 
 def _post_key(post: tuple[str, str, str]) -> tuple[str, tuple[int, ...], str]:
-    """When a post, (docname, ISO date, version), was published: its date, then its version, so a
-    later version breaks a tie in date, then its docname. A post without a version ("") comes
-    before one with. A post's file name starts with the date it first appeared, so of the posts a
-    release updates, which share its date and version, the one first published last leads."""
+    """When a post, (docname, ISO date, version), was last published: its date, which is its latest
+    update's (``_dated_posts``), then its version, so a later version breaks a tie in date, then
+    its docname. A post without a version ("") comes before one with. A post's file name starts
+    with the date it first appeared, so of the posts a release updates, which share its date and
+    version, the one first published last leads."""
     return post[1], tuple(int(part) for part in post[2].split(".") if part), post[0]
 
 
@@ -1069,11 +1076,13 @@ def _newest_first(posts: list[tuple[str, str, str]]) -> list[str]:
 
 
 def _dated_posts(app) -> list[tuple[str, str, str]]:  # noqa: ANN001
-    """Every dated blog post as (docname, ISO date, version), the version "" where it has none."""
+    """Every dated blog post as (docname, ISO date, version), the version "" where it has none. The
+    date is the post's latest update, which ABlog reads from its ``update`` notes and which is the
+    post's own date until one is later, so the listings lead with a post a release has updated."""
     return [
         (
             post.docname,
-            f"{post.date:%Y-%m-%d}",
+            f"{post.update:%Y-%m-%d}",
             str(app.env.metadata[post.docname].get("version") or ""),
         )
         for post in _blog(app).posts
@@ -1089,9 +1098,11 @@ def _release_post(app) -> tuple[str, str]:  # noqa: ANN001
 
 def _newest_card() -> str:
     """The version of the newest release card under ``docs/benchmarks/``, which the navbar's dot on
-    Release cards names; a card can land before its release's post."""
+    Release cards names; a card can land before its release's post. A card named for its topic
+    gets its version when its release is cut, so it counts only from then."""
     cards = (HERE / "docs" / "benchmarks").glob("*.md")
-    return ".".join(map(str, max(tuple(map(int, card.stem.split("."))) for card in cards)))
+    versions = (card.stem.split(".") for card in cards)
+    return ".".join(map(str, max(tuple(map(int, v)) for v in versions if all(map(str.isdigit, v)))))
 
 
 def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa: ANN001
@@ -1100,11 +1111,11 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
     Page styles load after the shared ones (priority 900), so they win a tie.
     """
     # The navbar's dot on Release cards (_templates/site-nav.html) names the latest release and the
-    # date of its post, which opens the dot's week.
+    # date of its post, its latest update, which opens the dot's week.
     context["release_version"] = _newest_card()
     posts = _dated_posts(app)
-    release_doc = next((doc for doc, _, v in posts if v == context["release_version"]), None)
-    release_doc = release_doc or _release_post(app)[0]
+    at_version = [post for post in posts if post[2] == context["release_version"]]
+    release_doc = (_newest_post(at_version) if at_version else _release_post(app))[0]
     context["release_date"] = next(d for doc, d, _ in posts if doc == release_doc)
     css, js = [], []
     if pagename == "index":
@@ -1388,11 +1399,29 @@ def _summary_headers(app, doctree, docname) -> None:  # noqa: ANN001 -- Sphinx e
         tgroup.insert(tgroup.index(tbody), nodes.thead("", row))
 
 
+def _post_days(app, post) -> str:  # noqa: ANN001
+    """A post's date and, when an ``update`` note dates it later, "Updated" and that date, each date
+    in a ``<time>`` element."""
+
+    def day(when: datetime.datetime) -> str:
+        return (
+            f'<time datetime="{when:%Y-%m-%d}">{when.strftime(app.config.post_date_format)}</time>'
+        )
+
+    updated = (
+        f' · <span class="post-updated">Updated {day(post.update)}</span>'
+        if post.update != post.date
+        else ""
+    )
+    return day(post.date) + updated
+
+
 def _post_byline(app, doctree, docname) -> None:  # noqa: ANN001
     """Put a post's cover and then its authors, date, the Andrey version it was written for, and its
-    tags under its title, where a reader looks for them and where they stay on a narrow screen. A
-    post describes the release its version names, so the version dates what it says. ABlog has read
-    the posts' front matter by now."""
+    tags under its title, where a reader looks for them and where they stay on a narrow screen. The
+    date is the post's first release, and "Updated" and a date follow it once a later release has
+    updated the post (``_post_days``). A post describes the release its version names, so the
+    version dates what it says. ABlog has read the posts' front matter by now."""
     blog = _blog(app)
     if app.builder.format != "html" or docname not in blog:
         return
@@ -1405,12 +1434,7 @@ def _post_byline(app, doctree, docname) -> None:  # noqa: ANN001
         f"{html.escape(str(author))}</a>"
         for author in post.author or ()
     )
-    day = (
-        f'<time datetime="{post.date:%Y-%m-%d}">'
-        f"{post.date.strftime(app.config.post_date_format)}</time>"
-        if post.date
-        else "Draft"
-    )
+    day = _post_days(app, post) if post.date else "Draft"
     version = app.env.metadata.get(docname, {}).get("version")
     written_for = f" · Andrey {html.escape(str(version))}" if version else ""
     byline = (
@@ -1450,7 +1474,7 @@ def _ai_statement(app, doctree) -> None:  # noqa: ANN001
     read from the page, where ``author`` is a node of its own.
     """
     docname = app.env.docname
-    card = re.fullmatch(r"docs/benchmarks/\d+\.\d+\.\d+", docname)
+    card = re.fullmatch(r"docs/benchmarks/[^/]+", docname)
     info = next(doctree.findall(nodes.docinfo), nodes.docinfo())
     meta = {field[0].astext(): field[1].astext() for field in info.findall(nodes.field)}
     if "ai" not in meta or not (card or "blogpost" in meta):
@@ -1533,9 +1557,8 @@ def _newest_post_card(app) -> str:  # noqa: ANN001
         f'<img src="{image}" alt="{html.escape(cards.cover_alt(_cover_kind(app, docname)))}" '
         f'width="{cards.COVER_W}" height="{cards.COVER_H}" '
         'loading="lazy"><span class="band-post-body"><span class="band-post-kicker">Latest post · '
-        f'<time datetime="{post.date:%Y-%m-%d}">{post.date.strftime(app.config.post_date_format)}'
-        f'</time></span><span class="band-post-title">{html.escape(post.title)}</span>'
-        f"<span>{description}</span></span></a>"
+        f'{_post_days(app, post)}</span><span class="band-post-title">'
+        f"{html.escape(post.title)}</span><span>{description}</span></span></a>"
     )
 
 
@@ -1598,10 +1621,7 @@ def _blog_index(app, doctree, docname) -> None:  # noqa: ANN001
             raise ValueError(f"{name} sets no description, which the blog's front page shows")
         href = app.builder.get_relative_uri(docname, name)
         title = html.escape(post.title)
-        day = (
-            f'<time datetime="{post.date:%Y-%m-%d}">'
-            f"{post.date.strftime(app.config.post_date_format)}</time>"
-        )
+        day = _post_days(app, post)
         read = f'<a href="{href}">Read the post<span class="visually-hidden">: {title}</span></a>'
         tags = _tag_list(app, docname, post)
         # The title links to the post, so the cover's link is for the pointer only.

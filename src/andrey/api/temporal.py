@@ -945,15 +945,15 @@ def pcmciplus(
     phase starts from those lagged links and from a link between every two variables at the same
     step. Round ``p = 0, 1, ...`` tests each linked pair given each subset of ``p`` same-step
     neighbors of the later end, with the lagged parents of both ends added, and removes the link
-    at the first p-value above ``alpha``. A same-step pair is tested from both ends, first
-    given the neighbors of its higher-numbered variable, and the neighbor sets stay fixed during a
-    round, so the links found do not depend on the order of the variables. The collider phase
-    orients the unshielded triples by ``collider_rule``, and the rule phase applies Meek's rules
-    R1 to R3 to the same-step links until none applies. Each collider or rule pass collects its
-    orientations before applying them, and marks a link that gets both orientations as a
-    conflict. With the ``"majority"`` or ``"conservative"`` rule the orientations do not depend on
-    the order of the variables either; ``"sepsets"`` reads the one separating set the skeleton phase
-    stored, which can change with the order.
+    at the first p-value above ``alpha``. A same-step pair is tested from both ends, first given
+    the neighbors of its end of higher rank, and the neighbor sets stay fixed during a round and
+    are sorted by strength, equal strengths by rank. Every test reads the variables in rank order,
+    so a link's tests, its reported p-value and statistic (those of the largest of its tests), and
+    the separating set it stores do not depend on the order of the variables. The collider phase
+    orients the unshielded triples by ``collider_rule``, and the rule phase applies Meek's rules R1
+    to R3 to the same-step links until none applies. Each collider or rule pass collects its
+    orientations before applying them, and marks a link that gets both orientations as a conflict,
+    so the orientations do not depend on the order of the variables either.
 
     **Choosing fdr_method.** The skeleton phase tests each lagged link at level ``alpha`` and keeps
     the links whose tests all stay at or below it, so absent links are kept by chance, more of them

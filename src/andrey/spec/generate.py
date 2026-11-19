@@ -114,7 +114,12 @@ KNOWLEDGE_NOTE = (
 def _param_schema(p: ParamSpec) -> dict:
     schema = dict(_JSON_TYPES[p.type])
     if p.choices:  # a nullable choice param must admit null as a valid enum member (its default)
-        schema["enum"] = [*p.choices, None] if p.nullable else list(p.choices)
+        enum = [*p.choices, None] if p.nullable else list(p.choices)
+        if p.type == "str_or_list":  # one of the choices, or a list whose items each are one
+            schema["items"] = {**schema["items"], "enum": list(p.choices)}
+            schema["anyOf"] = [{"enum": enum}, {"type": "array"}]
+        else:
+            schema["enum"] = enum
     if p.nullable:
         kinds = schema["type"]
         schema["type"] = [*([kinds] if isinstance(kinds, str) else kinds), "null"]
@@ -166,7 +171,7 @@ def grammar_default(p: ParamSpec) -> str:
         return "null"
     if p.type == "int_pair":
         return "[" + ",".join(str(i) for i in d) + "]"
-    if p.type == "str_list":
+    if p.type == "str_list" or (p.type == "str_or_list" and not isinstance(d, str)):
         return "[" + ",".join(d) + "]"
     if p.type == "bool":
         return "true" if d else "false"
@@ -195,7 +200,7 @@ def grammar_example(p: ParamSpec) -> str:
 def _example_token(p: ParamSpec) -> str:
     """One `key=value` example token; list values are quoted so a shell keeps the brackets."""
     val = grammar_example(p)
-    return f"'{p.name}={val}'" if p.type in ("int_pair", "str_list") else f"{p.name}={val}"
+    return f"'{p.name}={val}'" if val.startswith("[") else f"{p.name}={val}"
 
 
 def cli_example(spec: MethodSpec, command: str = "run", *, files: bool = False) -> str:

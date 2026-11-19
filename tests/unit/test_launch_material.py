@@ -82,20 +82,26 @@ def test_the_readme_package_card_counts_the_registry_in_both_themes(monkeypatch)
 
 
 def test_every_post_is_dated_once_and_names_its_version():
-    # ABlog lists a post from its front-matter date; a post without one stays a draft. A post is not
-    # updated later, so it names the Andrey version it was written for.
+    # ABlog lists a post from its front-matter date; a post without one stays a draft. The date is
+    # the day the post first appeared, which its file name starts with. A later release that updates
+    # the post moves its version and adds an `update` note with the release's date, newest first;
+    # the notes are the only other dates the page states.
     posts = [p for p in POSTS.glob("*.md") if front_matter(p).get("blogpost") == "true"]
     assert posts
     authors = re.search(r"blog_authors = \{(.*?)\}", CONF)[1]
     for post in posts:
         meta = front_matter(post)
-        datetime.date.fromisoformat(meta["date"])
+        date = datetime.date.fromisoformat(meta["date"])
+        assert post.name.startswith(f"{date:%Y%m%d}-"), post.name
         assert re.fullmatch(r"\d+\.\d+\.\d+", meta.get("version", "")), post.name
         for author in meta["author"].split(", "):
             assert f'"{author}"' in authors, post.name
-        # The page states no date of its own beside the front matter's.
         body = post.read_text().split("---\n", 2)[2]
-        assert not re.search(r"\b20\d\d-\d\d-\d\d\b|<time", body), post.name
+        notes = re.findall(r"^```\{update\} (\S+)$", body, re.M)
+        assert notes == sorted(notes, reverse=True), post.name
+        assert all(datetime.date.fromisoformat(note) > date for note in notes), post.name
+        text = re.sub(r"^```\{update\} .*$", "", body, flags=re.M)
+        assert not re.search(r"\b20\d\d-\d\d-\d\d\b|<time", text), post.name
         # Later builds leave it as its version rendered it: the numbers are text, and every file it
         # includes is stored under blog/<version>/.
         assert "{{" not in body, post.name

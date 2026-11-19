@@ -1,5 +1,5 @@
-"""The 0.18.0 release card's accuracy and cost of MB-by-MB and LocPC-CDE, saved as HTML beside this
-script.
+"""The local discovery release card's accuracy and cost of MB-by-MB and LocPC-CDE, saved as HTML
+beside this script.
 
 ``mb-by-mb-frontier.html``: one panel per network of the MB-by-MB paper, Alarm, Hailfinder, and the
 45 x 45 chessboard, each cell (rows, level) a point per method: the mean SHD per target against
@@ -15,7 +15,8 @@ binary, each graph size a point per method: the verdict error over the identifia
 non-identifiable pair of each seed against the median CI tests of one fit, on a log scale. The
 points come from the ``pooled_verdict_floor`` rows of the LocPC-CDE lane (``PAIR_LANE``).
 
-The script runs with ``uv run python docs/docs/benchmarks/0.18.0/frontier.py [direct.json]``.
+The script runs with
+``uv run python docs/docs/benchmarks/local-discovery/frontier.py [direct.json]``.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ from html import escape
 from pathlib import Path
 
 HERE = Path(__file__).parent
-LANE = HERE.parents[3] / "benchmarks" / "published" / "0.18.0" / "direct.json"
+LANE = HERE.parents[3] / "benchmarks" / "published" / "local-discovery" / "direct.json"
 PAIR_LANE = LANE.with_name("locpc-cde.json")
 # The LocPC-CDE panels, by the lane's family, and its series, as ``SERIES`` gives them.
 FAMILIES = {

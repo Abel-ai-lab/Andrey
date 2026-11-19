@@ -47,17 +47,20 @@ whose answer differs from the first fit, with the parts that differ. `--workers`
 difference and `--shuffle` on a difference beyond rounding:
 
 - `--shuffle K` refits on `K` seeded column orders and maps each answer back to the original
-  columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out. ICP's
-  target, IGSP's targets, and J-PCMCI+'s contexts move with the columns, and each row's environment
-  stays with its row. MB-by-MB, CMB, MMB-by-MMB, local ISA-LiNG, LDECC, LOAD, and LocPC-CDE are not
-  refit: the target of MB-by-MB, CMB, MMB-by-MMB, and local ISA-LiNG is the last variable, LDECC's
-  treatment and outcome and LOAD's two variables are the last and the first, and LocPC-CDE's
-  treatment and outcome are the first and the last. A column order fails the check when a graph, a
-  graph's kind, or the causal order differs, or when an edge weight or metadata value differs by
-  more than rounding (a relative `1e-6`, or an absolute `1e-12` near zero); a boolean that becomes a
-  number or an integer that becomes a float differs. A difference of rounding alone, such as the
-  p-values of ICP and J-PCMCI+, which differ by about `1e-14` because their regressions sum in the
-  order of the columns, is listed as information and does not change the exit status.
+  columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out, and
+  UT-IGSP's learned targets map back with the columns. ICP's target, IGSP's targets, and
+  J-PCMCI+'s contexts move with the columns, and each row's environment stays with its row.
+  MB-by-MB, CMB, MMB-by-MMB, local ISA-LiNG, LDECC, LOAD, and LocPC-CDE are not refit: the target
+  of MB-by-MB, CMB, MMB-by-MMB, and local ISA-LiNG is the last variable, LDECC's treatment and
+  outcome and LOAD's two variables are the last and the first, and LocPC-CDE's treatment and outcome
+  are the first and the last. A column order fails the check when a graph, a graph's kind, or the
+  causal order differs, or when an edge weight or metadata value differs by more than rounding (a
+  relative `1e-6`, or an absolute `1e-12` near zero); a boolean that becomes a number or an integer
+  that becomes a float differs. A difference of rounding alone, such as the p-values of ICP and
+  J-PCMCI+, which differ by about `1e-14` because their regressions sum in the order of the columns,
+  is listed as information and does not change the exit status. So is a difference that the
+  column-order guide documents, listed in `DOCUMENTED` with its reason: a difference of
+  ICA-LiNGAM's graph, causal order, or weights, whose FastICA can reach another solution.
 - `--workers N` refits PC, FCI, FCI-JCI, GFCI, CD-NOD, RSMAX2 (with PC's skeleton), GES, and PNL
   on `N` workers, with every GES pass, every skeleton pass of conditioning size two or more, and
   every possible-d-sep search sent to the worker pool.
@@ -344,7 +347,7 @@ CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
   out: at its last column, jnk, each finds at most one of the two edges, as PC does, so none scores
   below the empty answer there. Local ISA-LiNG leaves it out too: at jnk its local structure makes
   4 errors against the empty answer's 2; at its paper's Sachs targets it matches the authors' code
-  on the 0.18.0 release card.
+  on the local discovery release card.
 
 SHD follows the published summaries: PC, with any test, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC,
 HITON-PC, HITON-MB, MMMB, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, BOSS, and

@@ -2608,15 +2608,16 @@ def y_structures(
     the 7-node graph and random graphs with 8 and 16 variables, with and without selection. Under
     selection the tests' errors make many claims wrong: on the graphs with 16 variables 35 of 65
     claims were true (133 of 475 with ``extended=True``), where 12% of ordered pairs are ancestral;
-    the `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#y-structures>`_ has
-    every setting. Tested with exact d-separation on the examples of [3]_ and on random graphs with
-    a selection node, where it made no wrong claim. A claim says that ``x`` is an ancestor of ``y``,
-    not that it is a direct cause. A pair without a claim may still be causal: the method claims
-    only what a pattern shows, and a pair no pattern surrounds gets no claim. On finite data a pair
-    can be claimed both ways, which no graph explains; both claims are then kept. The fit runs one
-    marginal test per pair and, for each ``x``, up to one test per pair of the other variables, so
-    its cost grows with the cube of the number of variables. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    the `local discovery release card
+    <https://andrey.abel.ai/docs/benchmarks/local-discovery.html#y-structures>`_ has every setting.
+    Tested with exact d-separation on the examples of [3]_ and on random graphs with a selection
+    node, where it made no wrong claim. A claim says that ``x`` is an ancestor of ``y``, not that it
+    is a direct cause. A pair without a claim may still be causal: the method claims only what a
+    pattern shows, and a pair no pattern surrounds gets no claim. On finite data a pair can be
+    claimed both ways, which no graph explains; both claims are then kept. The fit runs one marginal
+    test per pair and, for each ``x``, up to one test per pair of the other variables, so its cost
+    grows with the cube of the number of variables. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
