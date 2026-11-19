@@ -38,7 +38,7 @@ import subprocess
 import sys
 import threading
 import traceback
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -108,14 +108,32 @@ _R_RUNTIME = (
     "print(json.dumps({'R': str(ro.r('R.version.string')[0]), 'rpy2': m.version('rpy2')}))"
 )
 
+#: Prints, as JSON, the Andrey an Andrey arm's fit interpreter imports: its version and the SHA-256
+#: of its source files, which tells apart two builds that carry one version string.
+_ANDREY_BUILD = """
+import hashlib, json
+from pathlib import Path
+import andrey
 
-def preflight(adapters: dict[str, Any]) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
+root = Path(andrey.__file__).parent
+digest = hashlib.sha256()
+for path in sorted(root.rglob("*.py")):
+    digest.update(str(path.relative_to(root)).encode() + b"\\0" + path.read_bytes())
+print(json.dumps({"version": andrey.__version__, "andrey_source_sha256": digest.hexdigest()}))
+"""
+
+
+def preflight(
+    adapters: dict[str, Any], cap_wall_s: float, cap_mem_mb: float | None
+) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
     """Check every fit interpreter, every reference's code folder, and one small fit per solution
     before the campaign, so a setup problem stops the run once instead of failing every unit.
 
-    Returns ``{solution: version}``, the version of the package each solution's fits run, Andrey's
-    read from the interpreter that runs them, and ``{solution: runtime}``, the Python, NumPy, SciPy,
-    and scikit-learn of that interpreter and, for an R solution, the R and rpy2 it embeds.
+    The small fits run under the campaign's caps. Returns ``{solution: version}``, the version of
+    the package each solution's fits run, Andrey's read from the interpreter that runs them, and
+    ``{solution: runtime}``, the Python, NumPy, SciPy, and scikit-learn of that interpreter and, for
+    an Andrey arm, the digest of the Andrey source it imports, or, for an R solution, the R and rpy2
+    it embeds.
     """
     from importlib import import_module
 
@@ -140,16 +158,26 @@ def preflight(adapters: dict[str, Any]) -> tuple[dict[str, str], dict[str, dict[
     versions = {}
     runtimes = {}
     for name, adapter in adapters.items():
+        runtimes[name] = json.loads(ask(name, _PYTHON_RUNTIME))
         versions[name] = adapter.package_version
         if adapter.package == "andrey":
-            versions[name] = ask(name, "import andrey; print(andrey.__version__)")
-        codes = [_PYTHON_RUNTIME] + ([_R_RUNTIME] if isinstance(adapter, RAdapter) else [])
-        runtimes[name] = {k: v for code in codes for k, v in json.loads(ask(name, code)).items()}
+            build = json.loads(ask(name, _ANDREY_BUILD))
+            versions[name] = build.pop("version")
+            runtimes[name] |= build
+        if isinstance(adapter, RAdapter):
+            runtimes[name] |= json.loads(ask(name, _R_RUNTIME))
     # 250 rows: enough for QCCD's seven quantile levels at the wrapper's default.
     pair = tiny_table(n=250)[:, :2]
     for name, adapter in adapters.items():
         [measure] = run_task(
-            adapter, pair, adapter.params(), cap_wall_s=CAP_WALL_S, repeats=1, warmup=0, threads=1
+            adapter,
+            pair,
+            adapter.params(),
+            cap_wall_s=cap_wall_s,
+            cap_mem_mb=cap_mem_mb,
+            repeats=1,
+            warmup=0,
+            threads=1,
         )
         if measure.get("status") != "ok":
             text = str(measure.get("error_text") or measure.get("stderr") or "").strip()
@@ -262,7 +290,7 @@ def main(argv: list[str] | None = None) -> int:
     if not pairs:
         p.error(f"--pairs {args.pairs} names no pair with one column per side")
     adapters = {name: make_solution(name) for name in args.solutions}
-    versions, runtimes = preflight(adapters)
+    versions, runtimes = preflight(adapters, args.cap_wall_s, args.cap_mem_mb)
     params = {name: json.loads(json.dumps(a.params(), default=str)) for name, a in adapters.items()}
     records = args.out / "records.jsonl"
     check_resumption(
@@ -343,7 +371,9 @@ def main(argv: list[str] | None = None) -> int:
 
     pool = ThreadPoolExecutor(max_workers=max(1, args.workers))
     try:
-        list(pool.map(run, tasks))
+        # As each fit completes, so the first failure stops the queue at once.
+        for future in as_completed([pool.submit(run, task) for task in tasks]):
+            future.result()
     except BaseException as exc:
         # An interrupt or a failed unit drops the queued fits instead of running them all first.
         pool.shutdown(wait=False, cancel_futures=True)
