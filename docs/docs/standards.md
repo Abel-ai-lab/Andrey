@@ -87,7 +87,8 @@ result, and the [column-order table](guides/column-order.md#each-method) prints 
 `qa/identity.py` runs by hand; the last release card that reports a run is
 [0.9.0](benchmarks/0.9.0.md)'s. A column order fails it when a graph or a causal order changes
 or a value changes by more than rounding; the last digits of a p-value, which depend on the order a
-sum runs in, are listed and do not fail it.
+sum runs in, are listed and do not fail it. Nor do the differences the table's notes document:
+ICA-LiNGAM's FastICA solution, and PCMCIplus's recorded p-values and statistics.
 
 ## Units and transforms
 

@@ -47,14 +47,19 @@ whose answer differs from the first fit, with the parts that differ. `--workers`
 difference and `--shuffle` on a difference beyond rounding:
 
 - `--shuffle K` refits on `K` seeded column orders and maps each answer back to the original
-  columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out. ICP's
-  target, IGSP's targets, and J-PCMCI+'s contexts move with the columns, and each row's environment
-  stays with its row. A column order fails the check when a graph, a graph's kind, or the causal
-  order differs, or when an edge weight or metadata value differs by more than rounding (a relative
-  `1e-6`, or an absolute `1e-12` near zero); a boolean that becomes a number or an integer that
-  becomes a float differs. A difference of rounding alone, such as the p-values of ICP and
-  J-PCMCI+, which differ by about `1e-14` because their regressions sum in the order of the
-  columns, is listed as information and does not change the exit status.
+  columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out, and
+  UT-IGSP's learned targets map back with the columns. ICP's target, IGSP's targets, and
+  J-PCMCI+'s contexts move with the columns, and each row's environment stays with its row. A
+  column order fails the check when a graph, a graph's kind, or the causal order differs, or when an
+  edge weight or metadata value differs by more than rounding (a relative `1e-6`, or an absolute
+  `1e-12` near zero); a boolean that becomes a number or an integer that becomes a float differs.
+  A difference of rounding alone, such as the p-values of ICP and J-PCMCI+, which differ by about
+  `1e-14` because their regressions sum in the order of the columns, is listed as information and
+  does not change the exit status. So is a difference that the column-order guide documents,
+  listed in `DOCUMENTED` with its reason: a difference of ICA-LiNGAM's graph, causal order, or
+  weights, whose FastICA can reach another solution, and a difference of PCMCIplus's `p_values` and
+  `statistics` alone, which come from the tests a removed link had, which depend on the order, and
+  from rounding that a statistic near 0 shows beyond the tolerance.
 - `--workers N` refits PC, FCI, FCI-JCI, GFCI, CD-NOD, RSMAX2 (with PC's skeleton), GES, and PNL
   on `N` workers, with every GES pass, every skeleton pass of conditioning size two or more, and
   every possible-d-sep search sent to the worker pool.

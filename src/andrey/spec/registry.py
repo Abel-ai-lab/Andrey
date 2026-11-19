@@ -2410,7 +2410,10 @@ _add(
         status="supported",
         column_order="relabels",
         tie_break=True,
-        order_note='With `collider_rule="sepsets"`, the orientations can follow the column order.',
+        order_note='With `collider_rule="sepsets"`, the orientations can follow the column order. '
+        "The links do not change, but the `p_values` and `statistics` of a removed link come from "
+        "the tests it had before one removed it, which depend on which end of a same-step pair "
+        "the skeleton phase tests first, so they can differ beyond rounding.",
         params=(
             concept_param(
                 "tau_max",
