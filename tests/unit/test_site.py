@@ -1400,10 +1400,10 @@ def test_a_post_shows_its_update_after_its_date_only_when_a_later_one_dates_it(c
     post = types.SimpleNamespace(date=first, update=first)
     date = '<time datetime="2026-10-15">October 15, 2026</time>'
     assert conf["_post_days"](app, post) == date
-    post.update = datetime.datetime(2026, 11, 18)
+    post.update = datetime.datetime(2026, 11, 19)
     assert conf["_post_days"](app, post) == (
         f'{date} · <span class="post-updated">Updated '
-        '<time datetime="2026-11-18">November 18, 2026</time></span>'
+        '<time datetime="2026-11-19">November 19, 2026</time></span>'
     )
 
 
