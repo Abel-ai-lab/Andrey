@@ -827,7 +827,7 @@ class GaussianDeletion(PartialCorrelationDeletion):
             else:
                 stack, rows = self._submatrices(columns)
             short = rows < self.least_rows(size)
-            flagged = (rows[:, None] <= self._most[columns]).any(axis=1)
+            flagged = np.asarray((rows[:, None] <= self._most[columns]).any(axis=1))
             flagged |= ~np.isfinite(stack).all(axis=(1, 2))
             if self._check_copies:
                 i, j = _apart(size + 2)
@@ -1017,9 +1017,9 @@ def _block_correlations(
     ``values`` holds each column's values less its observed mean, ``0`` where unobserved, one row
     per column. Block ``b`` keeps the rows ``kept[b]`` marks, the ``count[b]`` rows observed in
     all of ``columns[b]``; its covariances come from the sums over every row with the others
-    zeroed, the sums of its own values only. Each sum runs along one contiguous row of ``n`` values, in
-    NumPy's pairwise order for that length, the same whatever the BLAS, so a block's matrix has
-    the same bits alone or with any others, in any order. Clipped to ``[-1, 1]``, as
+    zeroed, the sums of its own values only. Each sum runs along one contiguous row of ``n``
+    values, in NumPy's pairwise order for that length, the same whatever the BLAS, so a block's
+    matrix has the same bits alone or with any others, in any order. Clipped to ``[-1, 1]``, as
     :func:`numpy.corrcoef` clips.
     """
     block = values[columns] * kept[:, None, :]

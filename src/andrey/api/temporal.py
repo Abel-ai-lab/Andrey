@@ -15,7 +15,7 @@ import numpy as np
 
 from andrey.api._method import drop_unmet, method_spec
 from andrey.core.backend import one_blas_thread
-from andrey.core.ci_missing import rows_metadata, rows_tested
+from andrey.core.ci_missing import named_pairs, rows_metadata, rows_tested
 from andrey.core.knowledge import Knowledge, KnowledgeError, resolve_lagged
 from andrey.core.score import copies_error, copy_groups
 
@@ -731,7 +731,13 @@ def pcmci(
             categorical=mask,
             seed=seed,
         )
-    metadata = {**categorical_metadata(mask, data), **rows_metadata(rows)}
+    undecided = np.zeros((tau_max + 1, *result.p_values.shape[1:]), dtype=bool)
+    undecided[1:] = np.isnan(result.p_values)
+    metadata = {
+        **categorical_metadata(mask, data),
+        **rows_metadata(rows),
+        **undecided_links(undecided, labels),
+    }
     return with_labels(adapt_pcmci(result, metadata), labels)
 
 
@@ -1055,7 +1061,11 @@ def pcmciplus(
             categorical=mask,
             seed=seed,
         )
-    metadata = {**categorical_metadata(mask, data), **rows_metadata(rows)}
+    metadata = {
+        **categorical_metadata(mask, data),
+        **rows_metadata(rows),
+        **undecided_links(result.undecided, labels),
+    }
     return with_labels(adapt_pcmciplus(result, metadata), labels)
 
 
@@ -1655,7 +1665,14 @@ def lpcmci(
             categorical=mask,
             seed=seed,
         )
-    metadata = {**categorical_metadata(mask, data), **rows_metadata(rows)}
+    undecided = np.zeros(result.p_values.shape, dtype=bool)
+    for i, j, lag in result.undecided:
+        undecided[lag, i, j] = True
+    metadata = {
+        **categorical_metadata(mask, data),
+        **rows_metadata(rows),
+        **undecided_links(undecided, labels),
+    }
     out = with_labels(adapt_lpcmci(result, metadata), labels)
     if constraints is None or constraints.required_paths is None:
         return out
@@ -2295,3 +2312,25 @@ def check_series_rows(X: np.ndarray, tau_max: int, min_rows: int) -> None:
             f"data needs at least {min_rows} rows (time steps) for tau_max={tau_max} over "
             f"{X.shape[1]} variables, got {X.shape[0]}"
         )
+
+
+def undecided_links(undecided: np.ndarray | None, labels: tuple[str, ...] | None) -> dict:
+    """``{"undecided_pairs": ...}`` for the links ``undecided[lag, i, j]`` marks, or ``{}``.
+
+    A link ``X^i_{t-lag} -> X^j_t`` is the pair of its ends, a lagged end named as
+    :func:`~andrey.temporal.pcmci.design_column_name` names it (``"A at lag 1"``), a column
+    without a label by its 0-based position as text, listed as
+    :func:`~andrey.core.ci_missing.named_pairs` lists pairs; a lag-0 link appears once.
+    """
+    from andrey.temporal.pcmci import design_column_name
+
+    if undecided is None or not undecided.any():
+        return {}
+    n = undecided.shape[1]
+    name = design_column_name(n, str if labels is None else labels.__getitem__)
+    lags, sources, targets = np.nonzero(undecided)
+    pairs = {
+        (lag * n + i, j) for lag, i, j in zip(lags.tolist(), sources.tolist(), targets.tolist())
+    }
+    named = named_pairs(pairs, name)
+    return {"undecided_pairs": [pair for k, pair in enumerate(named) if pair not in named[:k]]}

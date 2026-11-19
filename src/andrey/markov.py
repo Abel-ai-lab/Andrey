@@ -22,7 +22,7 @@ from .api._adapt import (
     default_test,
 )
 from .core.ci import make_indep_test
-from .core.ci_missing import rows_metadata, rows_tested
+from .core.ci_missing import not_tested, rows_metadata, rows_tested
 from .core.output import StructureOutput
 from .core.seeding import resolve_seed
 from .core.structure import GraphStructure, topological_order
@@ -319,12 +319,15 @@ def markov_check(
 
     with copies_named(column_labels(data)), rows_tested() as rows:
         p_values = _p_values(X, mask, columns, facts, test_name, sample_fraction, seed)
-    if not np.all((p_values >= 0) & (p_values <= 1)):  # also catches NaN
+    tested = ~not_tested(p_values)  # a fact without the rows its test needs reads NaN
+    if not np.all((p_values[tested] >= 0) & (p_values[tested] <= 1)):
         raise ValueError(f"markov_check: the {test_name!r} test returned a p-value outside [0, 1]")
     if test_name in TABLE_TESTS:
         _warn_sparse(X, columns, facts, test_name, rows_per_test)
 
-    statistic, p_uniform = anderson_darling_uniform(p_values) if facts else (None, None)
+    statistic, p_uniform = (
+        anderson_darling_uniform(p_values[tested]) if tested.any() else (None, None)
+    )
     labels = dag.labels
     metadata: dict[str, Any] = {
         "indep_test": test_name,
