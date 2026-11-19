@@ -195,8 +195,8 @@ class RankedDesignTest:
 
     ``by_rank[k]`` is the data column at position ``k`` of the test's data. A query's design column
     ``lag * n + i`` reaches ``test`` as ``lag * n + back[i]``, where ``back`` inverts ``by_rank``,
-    so every column order of the data asks ``test`` the same queries over the same matrix and gets
-    the same bits back.
+    each conditioning set sorted, so every column order of the data asks ``test`` the same queries
+    over the same matrix and gets the same bits back.
     """
 
     def __init__(self, test: LinkTest, by_rank: np.ndarray) -> None:
@@ -212,7 +212,8 @@ class RankedDesignTest:
         self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
     ) -> tuple[np.ndarray, np.ndarray]:
         """Test ``x[i]`` against ``y[i]`` given the columns ``conditions[i]``, for every row."""
-        return self.test.statistic_pvalues(self._moved(x), self._moved(y), self._moved(conditions))
+        moved = np.sort(self._moved(conditions), axis=1)
+        return self.test.statistic_pvalues(self._moved(x), self._moved(y), moved)
 
 
 def ranked_design_test(
