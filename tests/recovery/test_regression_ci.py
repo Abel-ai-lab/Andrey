@@ -1,8 +1,9 @@
-"""PC with the regression-based tests GCM, wGCM, and PCM: ground truth on an additive-noise graph,
+"""PC with the regression-based tests GCM, wGCM, and PCM: ground truth on planted nonlinear graphs,
 the case of independent columns, and graphs that depend on neither the column order nor the run.
 
-The ground truth runs each test at its default regression, the setting its paper claims; the other
-checks reach the same code paths with least-squares regressions, which keeps them fast.
+The ground truth runs each test at its default regression, the setting its paper claims: GCM and
+wGCM on an additive-noise graph, PCM on a nonlinear chain. The other checks reach the same code
+paths with least-squares regressions, which keeps them fast.
 """
 
 from __future__ import annotations
@@ -61,6 +62,17 @@ def test_pc_recovers_the_additive_noise_graph(indep_test):
     x, truth = _additive_noise_case(200, 0)
     assert shd(andrey.pc(x).structure, truth) >= 2  # partial correlation errs here
     assert shd(andrey.pc(x, indep_test=indep_test).structure, truth) <= 1
+
+
+def test_pc_with_pcm_recovers_a_nonlinear_chain():
+    """``x0 -> x1 -> x2`` with smooth nonlinear links: the conditional means change along the chain
+    in both directions, so the test finds each link whichever variable it takes as the response."""
+    rng = np.random.default_rng(0)
+    x0 = rng.standard_normal(300)
+    x1 = x0 + np.sin(2 * x0) + 0.5 * rng.standard_normal(300)
+    x2 = np.tanh(x1) + 0.3 * rng.standard_normal(300)
+    out = andrey.pc(np.column_stack([x0, x1, x2]), indep_test="pcm")
+    assert out.structure.oriented_edges() == [(0, 1, "undirected"), (1, 2, "undirected")]
 
 
 # ---- fixed cases -------------------------------------------------------------------------------
