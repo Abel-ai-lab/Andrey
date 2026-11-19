@@ -840,7 +840,7 @@ _add(
         "score already holds independent given one's parents in a graph of the current class, "
         "then deletes and reverses edges as GES and GIES do; fewer extra edges than GES on sparse "
         "linear-Gaussian graphs. insertion=conservative also skips a pair when any of its "
-        "additions lowers the score. BIC by default, BDeu when every column is categorical, "
+        "additions worsens the score. BIC by default, BDeu when every column is categorical, "
         "conditional Gaussian when some are. Returns a CPDAG + score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
@@ -864,9 +864,9 @@ _add(
                 default="safe",
                 choices=("safe", "conservative"),
                 doc="Which pairs an edge addition skips: safe (SafeInsert) skips a pair when one "
-                "graph of the current class scores higher without the edge, and recovers the true "
+                "graph of the current class scores better without the edge, and recovers the true "
                 "class as the rows grow; conservative (ConservativeInsert) also skips it when any "
-                "valid addition of the edge lowers the score, with fewer errors in the paper's "
+                "valid addition of the edge worsens the score, with fewer errors in the paper's "
                 "simulations and no such proof.",
             ),
             _CATEGORICAL,

@@ -2,9 +2,9 @@
 
 The search runs three phases once, each until no move improves the score: Insert, Delete, then
 turning. The Insert phase is less greedy than that of GES: at each step it reads one DAG ``G`` of
-the current class and leaves out every pair ``(x, y)`` for which ``G`` scores higher than ``G``
+the current class and leaves out every pair ``(x, y)`` for which ``G`` scores better than ``G``
 with ``x -> y`` added (SafeInsert); under ``insertion="conservative"`` it also leaves out a pair
-when any valid ``Insert(x, y, T)`` lowers the score (ConservativeInsert). The Delete phase is that
+when any valid ``Insert(x, y, T)`` worsens the score (ConservativeInsert). The Delete phase is that
 of GES (:func:`~andrey.search._parallel_ges.backward_chunk_best`) and the turning phase that of
 GIES on observational data (:func:`~andrey.search.gies._turning_best`). The algorithm, its
 settings, and its reference are described on :func:`andrey.lges`.
@@ -67,7 +67,7 @@ def insert_moves(
             if x == y or x in adj_sets[y]:
                 continue
             if score.score(y, sorted(dag_pa | {x})) > dag_base:
-                continue  # SafeInsert: G scores higher without x -> y
+                continue  # SafeInsert: G scores better without x -> y
             na = nbr[y] & adj_sets[x]
             t0 = sorted(nbr[y] - adj_sets[x])
             moves: list[tuple[float, int, int, tuple[int, ...]]] = []

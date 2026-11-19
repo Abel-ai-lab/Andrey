@@ -729,8 +729,8 @@ experimental until its comparison with the authors' code is published.
 
 LGES, less greedy equivalence search (Ejaz and Bareinboim 2025), {py:func}`~andrey.lges`, is GES
 with fewer edge additions: it adds no edge between two variables when one graph of the current
-class scores higher without it (SafeInsert), and with `insertion="conservative"` also when any
-valid addition of the edge lowers the score (ConservativeInsert). It then deletes and reverses
+class scores better without it (SafeInsert), and with `insertion="conservative"` also when any
+valid addition of the edge worsens the score (ConservativeInsert). It then deletes and reverses
 edges as GES and GIES do, and returns a CPDAG. On the paper's linear-Gaussian simulation it returns
 the authors' CPDAGs when both read the same graph of each class; it is experimental until it is
 benchmarked in that setting.

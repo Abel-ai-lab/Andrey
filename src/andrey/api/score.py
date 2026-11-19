@@ -1701,10 +1701,10 @@ def lges(
         ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     insertion : {"safe", "conservative"}, default="safe"
         Which pairs of variables an edge addition leaves out (see Notes). ``"safe"`` (SafeInsert)
-        leaves out a pair when one graph of the current class scores higher without the edge; the
+        leaves out a pair when one graph of the current class scores better without the edge; the
         paper proves that the search then recovers the true class as the rows grow [1]_.
         ``"conservative"`` (ConservativeInsert) also leaves out a pair when any valid addition of
-        the edge lowers the score; it made fewer errors in the paper's simulations, with no such
+        the edge worsens the score; it made fewer errors in the paper's simulations, with no such
         proof.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
@@ -1771,10 +1771,10 @@ def lges(
     turning phase of GIES [3]_. The deletions and reversals are those of GES and GIES. Each step of
     the first phase takes one DAG ``G`` of the current class and, for each pair ``(x, y)`` of
     non-adjacent variables, compares the score of ``y`` given its parents in ``G`` with the score
-    given those parents and ``x``. When the edge lowers the score, the score holds ``y`` independent
-    of ``x`` given those parents, and the step adds no edge between ``x`` and ``y``
+    given those parents and ``x``. When the edge worsens the score, the score holds ``y``
+    independent of ``x`` given those parents, and the step adds no edge between ``x`` and ``y``
     (SafeInsert). With ``insertion="conservative"`` it also adds no edge between them when any
-    valid addition ``x -> y`` of GES lowers the score (ConservativeInsert). Of the additions left,
+    valid addition ``x -> y`` of GES worsens the score (ConservativeInsert). Of the additions left,
     the step takes the one that improves the score most, as GES does. ``G`` is the DAG that orients
     the class by removing, while one is left, the first sink whose neighbors are adjacent to each
     other, in the order of the columns' ranks
