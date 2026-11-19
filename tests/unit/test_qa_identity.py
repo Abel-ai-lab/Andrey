@@ -333,15 +333,11 @@ def test_a_different_graph_or_causal_order_fails_under_a_column_order() -> None:
 
 
 def test_a_documented_exception_is_expected_only_in_the_parts_it_names() -> None:
-    p_values = ["metadata.p_values", "metadata.statistics"]
-    assert identity.documented("PCMCIplus", p_values)
-    assert identity.documented("PCMCIplus", p_values[:1])
-    assert identity.documented("PCMCIplus", [*p_values, "graph"]) is None
-    assert identity.documented("PCMCIplus", ["ordering"]) is None
-    assert identity.documented("PCMCIplus", []) is None
-    assert identity.documented("PC", p_values) is None
     # FastICA's solution decides the graph, the causal order, and the weights, not the stamps
     assert identity.documented("ICA-LiNGAM", ["graph", "ordering", "weights"])
+    assert identity.documented("ICA-LiNGAM", ["ordering"])
+    assert identity.documented("ICA-LiNGAM", []) is None
+    assert identity.documented("PC", ["graph", "ordering"]) is None
     assert identity.documented("ICA-LiNGAM", ["metadata.seed"]) is None
     assert identity.documented("ICA-LiNGAM", ["ordering", "metadata.tie_break"]) is None
     assert "documented" not in identity.FAILING
@@ -361,11 +357,14 @@ def test_a_documented_exception_is_not_a_failure_under_a_column_order(monkeypatc
         return outputs[len(calls) > 1]  # the first fit, then the column-order refit
 
     monkeypatch.setitem(identity.FITS, "PCMCIplus", identity.Fit(call))
+    monkeypatch.setitem(
+        identity.DOCUMENTED, "PCMCIplus", (frozenset({"metadata.p_values"}), "a documented reason")
+    )
     draw = iter([("PCMCIplus", "d", 0, np.zeros((3, 2)))])
     monkeypatch.setattr(identity, "corpus", lambda methods, seeds: draw)
     _, findings = identity.run(["PCMCIplus"], 1, shuffle=1)
     assert [kind for kind, _ in findings] == ["documented"]
-    assert "recorded p-value" in findings[0][1]
+    assert "a documented reason" in findings[0][1]
     assert not any(kind in identity.FAILING for kind, _ in findings)
 
 

@@ -922,12 +922,6 @@ DOCUMENTED: dict[str, tuple[frozenset[str], str]] = {
         frozenset({"graph", "edges", "structure", "ordering", "weights"}),
         "FastICA can reach another solution under a new column order",
     ),
-    "PCMCIplus": (
-        frozenset({"metadata.p_values", "metadata.statistics"}),
-        "the graph is order-free; a removed link's recorded p-value and statistic come from the "
-        "tests it had before one removed it, which depend on the order, and a statistic near 0 "
-        "can round beyond the tolerance",
-    ),
 }
 #: The relative and absolute differences that count as rounding between two values.
 RTOL, ATOL = 1e-6, 1e-12
