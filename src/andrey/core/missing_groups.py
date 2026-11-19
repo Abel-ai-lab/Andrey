@@ -274,21 +274,25 @@ class GroupedSums:
     def cheaper(self, columns: np.ndarray) -> np.ndarray:
         """Which blocks, rows of ``columns``, the groups compute for less than the per-row sums.
 
-        A block's correction reads each row missing two or more of its columns once; their count
-        is at most the rows missing both of each pair of its columns, summed over its groups (the
-        columns are sorted, so each pair's count sits above the diagonal). A
-        block takes the grouped sums when that bound is at most half the rows, which the per-row
-        sums read in full. The choice depends on the block and the data alone.
+        In each of its groups, a block of ``k`` columns scans the rows missing two or more columns
+        of the group, ``k`` bytes a row where the per-row sums take about ``k^2`` products, and
+        corrects each row missing two or more of its own columns, at most the rows missing both of
+        each pair of them (the columns are sorted, so each pair's count sits above the diagonal).
+        A block takes the grouped sums when the scanned rows over ``k`` plus that bound, summed
+        over its groups, are at most a quarter of the rows the per-row sums read. The choice
+        depends on the block and the data alone.
         """
+        k = columns.shape[1]
         bound = np.zeros(len(columns))
         inside = np.asarray(self.observed[:, columns].all(axis=2))
-        i, j = np.triu_indices(columns.shape[1], 1)
+        i, j = np.triu_indices(k, 1)
         for g, pairs in enumerate(self.pairs):
             at = np.flatnonzero(inside[g])
             if len(at):
                 local = self.local[g][columns[at]]
                 bound[at] += pairs[local[:, i], local[:, j]].sum(axis=1)
-        return 2 * bound <= self.n
+                bound[at] += self.twice_missed[g].shape[1] / k
+        return 4 * bound <= self.n
 
     def counts(self, columns: np.ndarray) -> np.ndarray:
         """The most rows each block, a row of ``columns``, can hold: those of its groups."""

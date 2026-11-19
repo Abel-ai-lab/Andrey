@@ -15,7 +15,7 @@ from andrey.constraint._parallel_skeleton import (
 )
 from andrey.core.backend import GPU_THRESHOLDS
 from andrey.core.env import SEED_MAX
-from andrey.core.missing_groups import GROUP_BYTES, GROUP_MAX_SCATTER, MAX_GROUPS
+from andrey.core.missing_groups import GROUP_BYTES, GROUP_MAX_SCATTER, MAX_GROUPS, MIN_COLUMNS
 from andrey.lingam.pwling import MIN_PRUNE_WORK
 from andrey.search._parallel_ges import MIN_POOL_GES_WORK
 
@@ -155,7 +155,8 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "come from the groups' tables, only when those tables fit in this many bytes, the "
             f"patterns form at most {MAX_GROUPS} groups, and the scattered share stays within "
             "`ANDREY_TESTWISE_GROUP_MAX_SCATTER`; otherwise each block is summed over every row. "
-            "The path is chosen once per test from the data. The two paths agree up to rounding. "
+            "The path is chosen once per test from the data, for a test over at least "
+            f"{MIN_COLUMNS} columns. The two paths count the same rows and agree up to rounding. "
             "`0` keeps every test on the per-row path."
         ),
         group="backend",

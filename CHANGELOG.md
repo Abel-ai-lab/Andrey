@@ -36,6 +36,13 @@ names its pull request.
 
 ### Changed
 
+- With `fisherz` and `student_t` on data with missing values, test-wise deletion groups the rows by
+  their missingness patterns once and computes each test's sums from the groups' tables, removing
+  the scattered missing cells exactly. On synthetic merged cohorts, with or without a few rows that
+  observe every column, `pc` runs 3 to 7 times faster and `iamb` 1.4 to 3.5 times faster, with the
+  same graphs, the same row counts, and the same tests not tested. P-values change in their last
+  digits. `ANDREY_TESTWISE_GROUP_BYTES` and `ANDREY_TESTWISE_GROUP_MAX_SCATTER` set when the path is
+  used; data without such patterns keep the per-row sums. ([#PR_GROUPED])
 - With `missing=None` on data with missing values, a method whose tests delete rows logs one notice
   per process that names the handling, test-wise deletion, and when it is valid. Pass
   `missing="testwise"` to choose it by name. `bootstrap` logs it once for all of its worker

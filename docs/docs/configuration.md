@@ -100,8 +100,10 @@ With `fisherz` or `student_t` on data with missing values, a test reads the rows
 one of its columns. When the rows fall into a few missingness patterns, as in data merged from
 cohorts that each measure their own variables, the rows are grouped by pattern once, and each
 test's sums come from the groups' tables instead of from every row. The groups follow the
-patterns, not the row or the column order. Each test object takes one path, chosen from the data,
-and the two paths agree up to the last digits of the p-values.
+patterns, not the row or the column order. A test over at least 8 columns takes this path when the
+two variables below allow it, chosen once from the data; within it, a test whose rows missing
+several of its columns are many still sums every row. The two paths count the same rows and agree
+up to the last digits of the p-values.
 
 - `ANDREY_TESTWISE_GROUP_BYTES`: the grouped path is used only when its tables fit in this many
   bytes (default `268435456`, 256 MiB) and the patterns form at most 64 groups; `0` keeps every
