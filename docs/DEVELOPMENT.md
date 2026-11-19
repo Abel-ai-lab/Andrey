@@ -204,10 +204,11 @@ When a later release makes a feature post wrong or incomplete, the post is rewri
 that release, and its `version` moves to it. Its `date` stays the day it first appeared, and a
 fenced `{update}` block under the introduction, above the earlier ones, gives the release's date and
 one or two plain sentences on what it added (the release PR sets the final date). ABlog takes the
-post's update date from its latest block, which the byline, the blog's listings, the navbar's dot,
-and the feed read. Its file name and address stay. Its files move to the new release's folder, named
-apart from any other post's files there, and an example is run again on the new release. A number
-the new release did not measure names the release that did, such as "in the 0.4.0 benchmarks".
+post's update date from its latest block, which the byline, the blog's front page, the homepage's
+latest post, the navbar's dot, and the feed read. Its file name and address stay. Its files move to
+the new release's folder, named apart from any other post's files there, and an example is run again
+on the new release. A number the new release did not measure names the release that did, such as "in
+the 0.4.0 benchmarks".
 
 Every post states how AI tools were used to write it. Its front matter sets `ai`, and `ai_tools`
 (each tool, and its model or version when the author knows it) unless `ai` is `none`; each value

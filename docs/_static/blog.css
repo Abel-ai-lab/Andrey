@@ -39,11 +39,6 @@
   font-size: 0.95rem;
 }
 
-/* "Updated" and the date of a post's latest update stay on one line when the byline wraps. */
-.post-updated {
-  white-space: nowrap;
-}
-
 /* ---------- the blog's front page (docs/conf.py, _blog_index) ---------- */
 /* The Release cards page's blocks (benchmarks.css), with each post's art in place of the stipple
    ground: the newest post's cover across its block, above its TL;DR, and a small copy in each
@@ -168,6 +163,11 @@
   .release-row.blog-row {
     grid-template-columns: 6.5rem minmax(0, 1fr);
   }
+}
+
+/* A row's date, and the date of its latest update, wrap onto two lines on a narrow screen. */
+.blog-row .release-meta > p {
+  white-space: normal;
 }
 
 /* A post's tags, each a link to the posts that share it. */
