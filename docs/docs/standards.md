@@ -170,5 +170,6 @@ environments, since continuous integration runs only some of them.
 
 | Release | Outputs against the release before | Quality gate | Reference comparisons | Harness tests |
 |---|---|---|---|---|
+| 0.18.0 | 49 methods, 1,963 outputs, 124 changed (6 GIN graphs, a renumbering of latents; 118 p-values and statistics of ANM, PNL, LOCI, PCMCI+, and J-PCMCI+); 1 method new | 146 checks, 0 failed | 3,031 rows, 0 failed | 1,570 passed, 0 failed, 1 skipped |
 | 0.17.1 | 49 methods, 1,963 outputs, none changed | 145 checks, 0 failed | 2,971 rows, 0 failed | 1,519 passed, 0 failed, 20 skipped |
 | 0.17.0 | 45 methods, 1,819 outputs, none changed; 4 methods new | 145 checks, 0 failed | 2,971 rows, 0 failed | 1,519 passed, 0 failed, 20 skipped |
