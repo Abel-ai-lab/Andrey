@@ -270,6 +270,19 @@ def test_no_two_indexable_pages_share_a_title(html):
     assert not {title: names for title, names in pages.items() if len(names) > 1}
 
 
+def test_the_notebooks_the_changelog_and_the_blog_index_have_written_descriptions(html):
+    # Their own words, not a first paragraph cut short: a notebook's from its metadata.
+    pages = {"docs/changelog.html": None, "blog/index.html": None}
+    for notebook in (ROOT / "examples").glob("*.ipynb"):
+        written = json.loads(notebook.read_text(encoding="utf-8"))["metadata"]["description"]
+        pages[f"docs/examples/{notebook.stem}.html"] = written
+    for name, written in pages.items():
+        text = (html / name).read_text(encoding="utf-8")
+        description = unescape(re.search(r'<meta name="description" content="([^"]*)"', text)[1])
+        assert 70 <= len(description) <= 160 and "…" not in description, name
+        assert written is None or description == written, name
+
+
 def test_the_docs_home_says_what_the_docs_cover(html):
     text = (html / "docs" / "index.html").read_text(encoding="utf-8")
     title = unescape(re.search(r"<title>(.*?)</title>", text, re.S)[1])
@@ -726,14 +739,14 @@ def test_the_organization_logo_is_a_png_search_results_can_show(html):
         assert logo.format == "PNG" and min(logo.size) >= 112, logo.size
 
 
-def test_a_post_carries_the_date_authors_and_release_of_its_front_matter(html):
+def test_a_post_carries_the_date_and_authors_of_its_front_matter_and_its_update(html):
     for source in (DOCS / "blog").glob("*.md"):
         content = source.read_text()
         if "blogpost: true" not in content:
             continue
         nodes = _discovery_graph((html / "blog" / (source.stem + ".html")).read_text())
         article = nodes["BlogPosting"]
-        front = {key: re.search(rf"^{key}: (.+)$", content, re.M)[1] for key in ("date", "version")}
+        front = {"date": re.search(r"^date: (.+)$", content, re.M)[1]}
         assert article["datePublished"] == front["date"], source.name
         # Every post is about the one software node, at the current release.
         assert nodes["SoftwareSourceCode"]["@id"] == "https://andrey.abel.ai/#software"
