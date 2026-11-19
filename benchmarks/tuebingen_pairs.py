@@ -102,9 +102,9 @@ _R_RUNTIME = (
 def preflight(adapters: dict[str, Any]) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
     """Check every fit interpreter and every reference's code folder before any fit runs.
 
-    Returns ``{solution: version}``, the version of the package each solution's fits run, read from
-    the interpreter that runs them when it is not the driver's, and ``{solution: runtime}``, the
-    Python and NumPy of that interpreter and, for an R solution, the R and rpy2 it embeds.
+    Returns ``{solution: version}``, the version of the package each solution's fits run, Andrey's
+    read from the interpreter that runs them, and ``{solution: runtime}``, the Python and NumPy of
+    that interpreter and, for an R solution, the R and rpy2 it embeds.
     """
     from importlib import import_module
 
@@ -115,7 +115,7 @@ def preflight(adapters: dict[str, Any]) -> tuple[dict[str, str], dict[str, dict[
     versions = {}
     for name, adapter in adapters.items():
         versions[name] = adapter.package_version
-        if adapter.package == "andrey" and getattr(adapter, "python_env", None):
+        if adapter.package == "andrey":
             command = [
                 str(interpreters[adapter.name]),
                 "-c",
