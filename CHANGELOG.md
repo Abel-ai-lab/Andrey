@@ -25,7 +25,7 @@ names its pull request.
   next to `ges` and `xges` that adds no edge between two variables the score already holds
   independent given the parents of one of them in a graph of the current class, then deletes and
   reverses edges as GES and GIES do. `insertion` picks SafeInsert, the default, or
-  ConservativeInsert. It takes the scores of `ges`. ([#PRNUM])
+  ConservativeInsert. It takes the scores of `ges`. ([#1146])
 
 ### Changed
 
@@ -2719,7 +2719,7 @@ First alpha release.
 [#1122]: https://github.com/Abel-ai-lab/Andrey/pull/1122
 [#1127]: https://github.com/Abel-ai-lab/Andrey/pull/1127
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
-[#PRNUM]: https://github.com/Abel-ai-lab/Andrey/pull/PRNUM
+[#1146]: https://github.com/Abel-ai-lab/Andrey/pull/1146
 [#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
 [#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
 [#1068]: https://github.com/Abel-ai-lab/Andrey/pull/1068
