@@ -79,6 +79,12 @@ names its pull request.
   targets and contexts with the columns. It exits 1 on a column order when a graph or a causal order
   changes or a weight or metadata value changes by more than rounding, and lists a difference of
   rounding alone, such as the p-values of ICP and J-PCMCI+, as information. ([#1055])
+- `qa/identity.py --shuffle` maps UT-IGSP's learned targets back to the original columns, and
+  lists the column-order differences the column-order guide documents, ICA-LiNGAM's FastICA
+  solution and PCMCIplus's recorded `p_values` and `statistics`, as expected instead of failing.
+  The column-order table's note and the docstring of `pcmciplus` say that a link's p-value and
+  statistic are those of its last test, whose conditioning set follows which end of a same-step
+  pair is tested first; its links and graph do not change. ([#1120])
 - The Limitations of `notears` and `dagma` are one sentence: the result depends on the data's scale,
   after Reisach, Seiler and Weichwald (2021), with a link to the release card. The registry and the
   docstrings no longer say that the robust fit does not depend on the scale of the columns: its first
@@ -2708,6 +2714,7 @@ First alpha release.
 [#1085]: https://github.com/Abel-ai-lab/Andrey/pull/1085
 [#1088]: https://github.com/Abel-ai-lab/Andrey/pull/1088
 [#1112]: https://github.com/Abel-ai-lab/Andrey/pull/1112
+[#1120]: https://github.com/Abel-ai-lab/Andrey/pull/1120
 [#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
 [#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
 [card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
