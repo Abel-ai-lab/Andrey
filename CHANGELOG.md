@@ -21,6 +21,12 @@ names its pull request.
 
 ### Changed
 
+- The website is easier to find and quote in search and AI answers. The homepage's description, its
+  structured data, and `llms.txt` say what Andrey is, starting with the speed claim; `llms.txt` also
+  links the methods and comparison pages, says how to cite Andrey, and marks each experimental
+  method; a post a release updated carries its update date, also in the sitemap; the general index
+  and the source-code pages are not indexed; and the docs home, the example notebooks, the
+  changelog, and the blog index have their own titles and descriptions. ([#1132])
 - `iamb` and `inter_iamb` order the candidates of each grow step by their p-values to nine
   significant digits, where they compared p-values rounded to nine decimals, which tied every
   p-value below 5e-10 and left the choice to a rank computed from the data. On categorical data
@@ -2395,6 +2401,7 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
+[Unreleased]: https://github.com/Abel-ai-lab/Andrey/compare/v0.18.0...HEAD
 [0.18.0]: https://github.com/Abel-ai-lab/Andrey/compare/v0.17.1...v0.18.0
 [0.17.1]: https://github.com/Abel-ai-lab/Andrey/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/Abel-ai-lab/Andrey/compare/v0.16.0...v0.17.0
@@ -2698,6 +2705,7 @@ First alpha release.
 [#1112]: https://github.com/Abel-ai-lab/Andrey/pull/1112
 [#1120]: https://github.com/Abel-ai-lab/Andrey/pull/1120
 [#1122]: https://github.com/Abel-ai-lab/Andrey/pull/1122
+[#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
 [#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
 [#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
 [#1068]: https://github.com/Abel-ai-lab/Andrey/pull/1068
