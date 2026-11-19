@@ -1474,7 +1474,7 @@ def _ai_statement(app, doctree) -> None:  # noqa: ANN001
     read from the page, where ``author`` is a node of its own.
     """
     docname = app.env.docname
-    card = re.fullmatch(r"docs/benchmarks/\d+\.\d+\.\d+", docname)
+    card = re.fullmatch(r"docs/benchmarks/[^/]+", docname)
     info = next(doctree.findall(nodes.docinfo), nodes.docinfo())
     meta = {field[0].astext(): field[1].astext() for field in info.findall(nodes.field)}
     if "ai" not in meta or not (card or "blogpost" in meta):

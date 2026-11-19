@@ -299,12 +299,14 @@ def test_every_homepage_tile_leads_to_details_that_are_built(html):
     assert not problems, "\n".join(problems)
 
 
+# A release card named by its version; a card named for its topic takes its version at the cut.
+VERSION = re.compile(r"\d+\.\d+\.\d+")
 # The section's line icon before a header link's name.
 ICON = r'<svg class="nav-icon[^"]*"[^>]*>.*?</svg>'
 
 
 def test_every_header_leads_home_and_to_each_section(html):
-    cards = (DOCS / "docs" / "benchmarks").glob("*.md")
+    cards = [c for c in (DOCS / "docs" / "benchmarks").glob("*.md") if VERSION.fullmatch(c.stem)]
     newest = max((tuple(map(int, card.stem.split("."))) for card in cards), default=())
     newest = ".".join(map(str, newest))
     problems = []
@@ -577,7 +579,7 @@ def test_a_post_a_later_release_updated_shows_its_update_with_its_date(html):
 
 
 def test_the_release_dot_opens_its_week_on_the_day_the_newest_release_post_was_updated(html):
-    cards = (DOCS / "docs" / "benchmarks").glob("*.md")
+    cards = [c for c in (DOCS / "docs" / "benchmarks").glob("*.md") if VERSION.fullmatch(c.stem)]
     newest = ".".join(map(str, max(tuple(map(int, card.stem.split("."))) for card in cards)))
     days = [
         max([meta["date"], *updates])
