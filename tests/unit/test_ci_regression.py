@@ -66,6 +66,22 @@ def test_gcm_statistic_on_fixed_residuals():
     assert products.mean() == 1.25
 
 
+def test_a_covariance_without_noise_is_a_dependence():
+    x = np.repeat([-1.0, 1.0], 30)
+    data = np.column_stack([x, x, np.random.default_rng(0).standard_normal(60)])
+    for test in (cr.GCM(data, regression="linear"), cr.WGCM(data, regression="linear")):
+        assert test(0, 1, []) == 0.0
+    statistic, p = cr._fixed_answer(np.ones(8), np.arange(8.0)[:, None], np.ones((8, 9)))
+    assert statistic == np.inf
+    assert p == 0.1
+
+
+def test_pcm_needs_rows_for_a_split_in_each_half():
+    with pytest.raises(ValueError, match="10"):
+        cr.PCM(_chain(9))
+    assert 0.0 <= cr.PCM(_chain(10), n_splits=1)(0, 1, []) <= 1.0
+
+
 def test_one_sided_statistics_report_zero_below_the_null():
     statistic, p = cr._estimated_answer(np.array([1.0, -2.0, -1.0, 0.5]), np.ones(4))
     assert statistic == 0.0

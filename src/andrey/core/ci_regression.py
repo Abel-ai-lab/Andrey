@@ -15,6 +15,7 @@ query's p-value does not depend on which queries came before it.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Iterable
 
 import numpy as np
@@ -124,10 +125,12 @@ class _RegressionTest:
 
     pin_blas = True  # read by pins_blas: the skeleton scans run it on one BLAS thread
 
-    def __init__(self, data: np.ndarray, *, regression: str, seed: int | None, name: str) -> None:
+    def __init__(
+        self, data: np.ndarray, *, regression: str, seed: int | None, name: str, min_rows: int = 4
+    ) -> None:
         if regression not in REGRESSIONS:
             raise ValueError(f"regression must be one of {REGRESSIONS}, got {regression!r}")
-        arr = stats.checked_matrix(data, f"run a {name} test", min_rows=4)
+        arr = stats.checked_matrix(data, f"run a {name} test", min_rows=min_rows)
         # The test holds data column j at index _tie_rank[j], and the rows in lexicographic order
         # of those columns, so a query reads the same values whatever the column or row order.
         self._tie_rank = tie_ranks(arr).tolist()
@@ -190,14 +193,15 @@ class _RegressionTest:
 
 
 def _normalized_mean(products: np.ndarray) -> float:
-    """``sqrt(n)`` times the mean of ``products`` over their standard deviation, or ``nan``.
+    """``sqrt(n)`` times the mean of ``products`` over their standard deviation.
 
-    The standard deviation divides by ``n``; ``nan`` when it is zero.
+    The standard deviation divides by ``n``. Constant products give ``nan`` when they are zero, no
+    covariance to detect, and an infinity of their sign otherwise, a covariance without noise.
     """
     mean = float(np.mean(products))
     var = float(np.mean(products * products)) - mean * mean
     if not var > 1e-300:
-        return float("nan")
+        return float("nan") if mean == 0.0 else math.copysign(math.inf, mean)
     return float(np.sqrt(products.size) * mean / np.sqrt(var))
 
 
@@ -250,17 +254,17 @@ class GCM(_RegressionTest):
     mean of ``R`` over its standard deviation (dividing by ``n``), and the p-value is twice the
     standard normal tail beyond its absolute value [1]_. An empty conditioning set uses ``x`` and
     ``y`` minus their means. A residual depends only on the variable and the conditioning set, so
-    it is kept on the test object and reused by every later query on the same pair of them. A
-    constant product gives the statistic ``0`` and the p-value ``1``.
+    it is kept on the test object and reused by every later query on the same pair of them.
+    Products that are all zero give the statistic ``0`` and the p-value ``1``; products that are
+    one nonzero constant, a covariance without noise, give an infinite statistic and the p-value
+    ``0``.
 
     **Limitations.** Not benchmarked yet. The tests run it on up to 4 variables and 400 rows. A
-    ``"boosting"`` regression fits 51 boosted models, which takes about a second at 300 rows, once
-    per variable and conditioning set. Its level depends on the regressions: a conditional mean the
-    method cannot learn, such as a function of several variables of ``z`` jointly under
-    ``"linear"``, leaves a covariance in the residuals and reads as dependence. With an empty
-    conditioning set the test is a test of correlation: a dependence without one, such as
-    ``y = x**2`` for a symmetric ``x``, goes unseen. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    ``"boosting"`` regression fits 51 boosted models, once per variable and conditioning set. Its
+    level depends on the regressions: a conditional mean the method cannot learn, such as a function
+    of several variables of ``z`` jointly under ``"linear"``, leaves a covariance in the residuals
+    and reads as dependence. With an empty conditioning set the test is a test of correlation: a
+    dependence without one, such as ``y = x**2`` for a symmetric ``x``, goes unseen.
 
     References
     ----------
@@ -351,11 +355,9 @@ class WGCM(_RegressionTest):
 
     **Limitations.** Not benchmarked yet. The tests run it on up to 4 variables and 400 rows.
     ``"est"`` tests on 70% of the rows, and its p-value changes with the seed. A ``"boosting"``
-    regression fits 51 boosted models, about a second at 300 rows; ``"est"`` fits five per query,
+    regression fits 51 boosted models; ``"est"`` fits five per query,
     of which four are kept for later queries on the same variables. ``"fix"`` uses 7 weights per
     conditioning variable, so with many conditioning variables the maximum spreads its power thin.
-    The numbers are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
 
     References
     ----------
@@ -447,6 +449,8 @@ def _fixed_answer(
     weighted = products[:, None] * weights
     std = weighted.std(axis=0)
     keep = std > 1e-300
+    if (~keep & (weighted.mean(axis=0) != 0.0)).any():
+        return math.inf, 1.0 / (multipliers.shape[1] + 1)  # a covariance without noise
     if not keep.any():
         return 0.0, 1.0
     normalized = weighted[:, keep] / std[keep]
@@ -490,7 +494,7 @@ class PCM(_RegressionTest):
     Raises
     ------
     ValueError
-        If ``data`` is not 2-D, has fewer than 4 rows, contains NaN or infinity, or has values too
+        If ``data`` is not 2-D, has fewer than 10 rows, contains NaN or infinity, or has values too
         large or too small to standardize, ``regression`` is not one of the choices, or
         ``n_splits`` is below 1.
 
@@ -514,17 +518,16 @@ class PCM(_RegressionTest):
     and the statistic is the GCM statistic of the products of their residuals. The ``n_splits``
     statistics are averaged and the p-value is the standard normal tail above the average, the
     one-sided test of Algorithm 1DR with its threshold at the normal quantile [1]_. The reported
-    statistic is the average or ``0``, whichever is larger. A split whose products are constant
-    adds ``0``. The splits are drawn once from ``seed``.
+    statistic is the average or ``0``, whichever is larger. A split whose products are all zero adds
+    ``0``, and one whose products are one nonzero constant an infinity of its sign. The splits are
+    drawn once from ``seed``.
 
     **Limitations.** Not benchmarked yet. The tests run it on up to 4 variables and 400 rows. Each
-    query fits 30 regressions with the default 6 splits, 24 of them for the pair, so a forest test
-    takes about 14 seconds per query at 200 rows. The variance floor of 0.01, in units of the
+    query fits 30 regressions with the default 6 splits, 24 of them for the pair, each of 500 trees
+    under ``"forest"``. The variance floor of 0.01, in units of the
     standardized response, is the authors' code's value; the paper sets none. The test detects a
     dependence of the mean of ``y`` on ``x``; one that changes only the spread of ``y`` goes unseen,
-    as does a dependence of the mean of ``x`` on ``y`` that leaves the mean of ``y`` unchanged. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density,
-    the method's settings, and the machine.
+    as does a dependence of the mean of ``x`` on ``y`` that leaves the mean of ``y`` unchanged.
 
     References
     ----------
@@ -543,7 +546,10 @@ class PCM(_RegressionTest):
     ) -> None:
         if n_splits < 1:
             raise ValueError(f"n_splits must be at least 1, got {n_splits}")
-        super().__init__(data, regression=regression, seed=seed, name="PCM")
+        # Each half needs the rows a forest splits, so the learned function can vary.
+        super().__init__(
+            data, regression=regression, seed=seed, name="PCM", min_rows=2 * _FOREST_MIN_SPLIT
+        )
         n = self._n
         rng = np.random.default_rng([self._seed, n, 2])
         self._splits = []
@@ -556,6 +562,8 @@ class PCM(_RegressionTest):
         mean = float(
             np.mean([self._split_statistic(b, y, x, cond) for b in range(len(self._splits))])
         )
+        if np.isnan(mean):  # splits of opposite noiseless signs: no direction to report
+            mean = 0.0
         return max(mean, 0.0), float(ndtr(-mean))
 
     def _split_statistic(self, split: int, response: int, predictor: int, cond: list[int]) -> float:
