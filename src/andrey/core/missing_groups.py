@@ -60,6 +60,11 @@ GROUP_MAX_SCATTER = 0.15
 #: rows, where the grouped sums cannot help, cost little to rule out.
 MAX_GROUPS = 64
 
+#: The fewest columns a test's data need for the grouped sums: a test over fewer columns, such as
+#: one built for a single query, asks few distinct blocks, each summed once, so the groups cannot
+#: repay their setup.
+MIN_COLUMNS = 8
+
 #: A pattern opens its own group when joining any group would add more work than this: the rows
 #: missing two or more columns of the group, which the block step scans, plus the pairs of columns
 #: each such row misses. A group costs the block step about as much as scanning this many rows.
@@ -105,10 +110,19 @@ def pattern_groups(observed: np.ndarray, ranks: np.ndarray) -> Grouping | None:
     """
     n, d = observed.shape
     packed = np.packbits(observed, axis=1)
-    patterns, first, inverse, counts = np.unique(
-        packed, axis=0, return_index=True, return_inverse=True, return_counts=True
-    )
-    masks = observed[first]
+    words = np.zeros((n, -(-packed.shape[1] // 8) * 8), dtype=np.uint8)
+    words[:, : packed.shape[1]] = packed
+    words = words.view(np.uint64)  # each row's pattern as whole words, sorted far faster
+    by_word = np.lexsort(words.T[::-1])
+    ranked = words[by_word]
+    new = np.ones(n, dtype=bool)
+    new[1:] = (ranked[1:] != ranked[:-1]).any(axis=1)
+    starts = np.flatnonzero(new)
+    inverse = np.empty(n, dtype=np.intp)
+    inverse[by_word] = np.cumsum(new) - 1
+    counts = np.diff(np.append(starts, n))
+    patterns = packed[by_word[starts]]
+    masks = observed[by_word[starts]]
     sizes = masks.sum(axis=1)
     by_rank = np.packbits(masks[:, np.argsort(ranks, kind="stable")], axis=1)
     keys = [by_rank[:, i] for i in range(by_rank.shape[1] - 1, -1, -1)]
@@ -155,7 +169,7 @@ def pattern_groups(observed: np.ndarray, ranks: np.ndarray) -> Grouping | None:
         lean[best] += count if a <= 1 else 0
         single[best] += count if a == 1 else 0
         assign[p] = best
-    group = assign[inverse.ravel()]
+    group = assign[inverse]
     width = packed.shape[1]
     held = np.unpackbits(
         np.frombuffer(b"".join(s.to_bytes(width, "big") for s in sets), dtype=np.uint8).reshape(
@@ -170,15 +184,16 @@ def pattern_groups(observed: np.ndarray, ranks: np.ndarray) -> Grouping | None:
 def grouping_for(observed: np.ndarray, ranks: np.ndarray) -> Grouping | None:
     """The groups the grouped sums use on ``observed``, or ``None`` for the per-row path.
 
-    The grouped sums are used when the patterns form at most :data:`MAX_GROUPS` groups, their
-    scattered share is at most ``ANDREY_TESTWISE_GROUP_MAX_SCATTER``, and their tables fit in
-    ``ANDREY_TESTWISE_GROUP_BYTES``. The choice depends on the data alone.
+    The grouped sums are used when the data have at least :data:`MIN_COLUMNS` columns, the
+    patterns form at most :data:`MAX_GROUPS` groups, their scattered share is at most
+    ``ANDREY_TESTWISE_GROUP_MAX_SCATTER``, and their tables fit in ``ANDREY_TESTWISE_GROUP_BYTES``.
+    The choice depends on the data alone.
     """
     budget = env.TESTWISE_GROUP_BYTES.read()
     budget = GROUP_BYTES if budget is None else budget
     scatter = env.TESTWISE_GROUP_MAX_SCATTER.read()
     scatter = GROUP_MAX_SCATTER if scatter is None else scatter
-    if budget <= 0 or observed.all():
+    if budget <= 0 or observed.shape[1] < MIN_COLUMNS or observed.all():
         return None
     grouping = pattern_groups(observed, ranks)
     if grouping is None:
