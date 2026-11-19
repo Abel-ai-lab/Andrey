@@ -39,6 +39,10 @@ names its pull request.
   build each chunk of conditioning sets as the rows of an int array from cached combination
   tables, where they built tuples and converted each chunk back. Every output,
   `metadata["n_tests"]` included, is the same bit for bit. ([#1036], [#1042])
+- `indep_test="kci"` keeps the kernel of each column for the queries without a conditioning set
+  (up to 256 MB, as its other matrix caches do), so `pc`, `fci`, and `cdnod` with it run faster on
+  many variables at few rows. Every graph, p-value, and `metadata["n_tests"]` is the same bit for
+  bit. ([#1072], [#1073])
 
 ### Fixed
 
@@ -2721,3 +2725,5 @@ First alpha release.
 [#1019]: https://github.com/Abel-ai-lab/Andrey/pull/1019
 [#1036]: https://github.com/Abel-ai-lab/Andrey/pull/1036
 [#1042]: https://github.com/Abel-ai-lab/Andrey/pull/1042
+[#1072]: https://github.com/Abel-ai-lab/Andrey/issues/1072
+[#1073]: https://github.com/Abel-ai-lab/Andrey/pull/1073
