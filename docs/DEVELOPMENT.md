@@ -378,21 +378,31 @@ On a remote machine, keep the server on `127.0.0.1` and forward the port:
 ## Search and answer engines
 
 [`discovery.py`](discovery.py) writes what search and AI answer engines read. Each page's head
-carries its Twitter card fields and one JSON-LD graph: the organization (Abel's logomark,
-`site/brand/abel-symbol-night.svg`, drawn as `_static/abel-symbol.png`), the website, the software
-(Andrey's icon) at the page's release, the page, a `BlogPosting` for a post, and the breadcrumbs.
-The search and 404 pages (`UNINDEXED`) and the blog's generated pages (All Posts, the years, the
-archive, the tags, and the authors; `_blog_collection`) are `noindex` and name no canonical
-address, so the sitemap leaves them out: they only list the posts again. Every title but the
-homepage's ends with `html_title`, "Andrey causal discovery", so a page matches what Andrey does and
-not only a name that is also a person's. In the structured data, `alternateName` and `sameAs` tie
-the website, the package, the repository, and Abel's GitHub profile to one product. After the
-build, `_write_discovery` in `conf.py` writes `llms.txt` (the pages in `LLMS_SECTIONS`, then every
-release card and post) and `sitemap.xml` (every indexable page); `robots.txt` is a plain file
-(`_extra/robots.txt`). A page in `LLMS_SECTIONS` that is renamed or removed fails the build until
-the list is updated. Once a tagged release is live, `.github/workflows/indexnow.yml` submits every
-address in the sitemap to IndexNow for Bing and other participating engines. Its public key is
-served at `_extra/<key>.txt`. Google reads the sitemap directly.
+carries its Twitter card fields, its preview image's text alternative, and one JSON-LD graph: the
+organization (Abel's logomark, `site/brand/abel-symbol-night.svg`, drawn as
+`_static/abel-symbol.png`), the website, the software, the page, a `BlogPosting` for a post, and the
+breadcrumbs, which pass through Docs or Blog. Every page, a post or a release card too, is about one
+software node, `#software`, at the current release, with its PyPI download address, Andrey's icon as
+a PNG (`SOFTWARE_ICON`), and the homepage's description (`PAGE_DESCRIPTION` in `site/build.py`),
+which opens with the speed claim and gives no number. A post that a later release updated carries
+the day of its latest update (`dateModified`, `article:modified_time`). The search, 404, and general
+index pages (`UNINDEXED`), the source-code pages (`UNINDEXED_FOLDER`), and the blog's generated
+pages (All Posts, the years, the archive, the tags, and the authors; `_blog_collection`) are
+`noindex` and name no canonical address, so the sitemap leaves them out: they have no content of
+their own. Every title but the homepage's ends with `html_title`, "Andrey causal discovery", so a
+page matches what Andrey does and not only a name that is also a person's, and no two indexable
+pages share a title. In the structured data, `alternateName` and `sameAs` tie the website, the
+package, the repository, and Abel's GitHub profile to one product. After the build,
+`_write_discovery` in `conf.py` writes `llms.txt` (a summary that opens with the speed claim and
+counts the supported methods from the registry, `_llms_summary`; how to cite Andrey, from
+`CITATION.cff`; the facts at a glance, with the method counts by status from the registry; the pages
+in `LLMS_SECTIONS`, then every release card and post) and `sitemap.xml` (every indexable page, a
+post with its latest day as `lastmod`); `robots.txt` is a plain file (`_extra/robots.txt`). A page
+in `LLMS_SECTIONS` that is renamed or removed fails the build until the list is updated. Once a
+tagged release is live, `.github/workflows/indexnow.yml` submits every address in the sitemap to
+IndexNow for Bing and other participating engines; when the production deploy still waits for
+approval after two hours, it ends with a notice, and a manual run submits the site. Its public key
+is served at `_extra/<key>.txt`. Google reads the sitemap directly.
 
 ## Validation
 
@@ -411,8 +421,8 @@ at most 160 characters; the navbar's links; the favicon and the link-preview car
 page and each post's cover and byline; each post's and card's AI statement; every site address in
 the README, the project URLs, and the citation; each page's structured data against its link
 preview and each post's front matter; `llms.txt`, `sitemap.xml`, and `robots.txt`; that only the
-search page, the 404 page, and the blog's generated pages are `noindex`; each title's ending; and
-that the 404 page's links resolve from the site's root. External links: `uv run --group docs
+pages with no content of their own are `noindex`; each title's ending and that no two titles match;
+and that the 404 page's links resolve from the site's root. External links: `uv run --group docs
 sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 
 ## How the site is wired
