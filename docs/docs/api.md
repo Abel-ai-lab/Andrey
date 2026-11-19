@@ -153,6 +153,16 @@ the test's statistic, as tigramite does: the partial correlation, the chi-square
 likelihood ratio, CMIknn's conditional mutual information estimate, or GPDC's distance correlation.
 A test you register that reports only p-values is ordered by its p-value, smallest first.
 
+% concept: degrees_of_freedom
+`pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
+`mmhc`, `rsmax2`, `igsp`, `ut_igsp`, `pcmci`, `pcmciplus`, and `lpcmci` take `degrees_of_freedom`,
+the degrees of freedom of the categorical tests, `"chisq"` and `"gsq"`: `"mean"`, the default, is
+the mean of the statistic when `y` is shuffled within each configuration of the conditioning set,
+and `"nonempty"` is `(r_x - 1) * (r_y - 1)` per configuration over the values of `x` and `y`
+present in it, the table's empty rows and columns struck (Spirtes, Glymour and Scheines 1993). The
+two differ only on sparse tables. Only `"chisq"` and `"gsq"` read it, so passing
+`degrees_of_freedom` with another test raises a `ValueError`.
+
 % concept: knowledge
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
 `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`,

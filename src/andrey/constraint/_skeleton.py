@@ -38,8 +38,9 @@ if TYPE_CHECKING:
 #: One removed pair: ``(x, y, separating set, the largest p-value among its separating sets)``; the
 #: p-value is ``None`` when the scan does not record it.
 Removal = tuple[int, int, tuple[int, ...], float | None]
-# A pair's subsets that one call evaluates: ``(the pair's position, x, y, subsets)``, ``x < y``.
-_Chunk = tuple[int, int, int, Sequence[tuple[int, ...]]]
+# A pair's subsets that one call evaluates: ``(the pair's position, x, y, subsets)``, ``x < y``,
+# the subsets the rows of an ``(N, size)`` int array.
+_Chunk = tuple[int, int, int, np.ndarray]
 
 # One batched_call evaluates a chunk of subsets together; cap how many subsets a chunk holds so a
 # huge C(|nbr|, k) neighborhood is consumed in bounded chunks, not one array. Each subset's p-value
@@ -70,6 +71,7 @@ def scan_conditioning_sets(
     skip_within: set[int] | None = None,
     trace: list[dict] | None = None,
     largest: list[float] | None = None,
+    visit: Callable[[np.ndarray, Sequence[float]], None] | None = None,
 ) -> bool:
     """Test every size-``size`` subset of ``candidates`` as a conditioning set for ``(a, b)``.
 
@@ -86,16 +88,20 @@ def scan_conditioning_sets(
 
     ``candidates`` are ascending and exclude ``a`` and ``b``, so every subset is a sorted, distinct
     conditioning set. A test that exposes ``batched_call(a, b, condition_sets)`` evaluates the
-    subsets in size-bounded chunks through it; otherwise each subset is tested with a scalar
+    subsets in size-bounded chunks (:func:`subset_rows`) through it, a FisherZ, StudentT, or
+    NormalScores test each chunk as one ``(N, size)`` int array and any other test as a list of
+    tuples; otherwise each subset is tested with a scalar
     ``test(a, b, subset)`` call, or ``test._bounded_pvalue(a, b, subset, alpha, exact_above)``
     where the test has one, with ``exact_above`` true when ``largest`` is given. Both paths visit
     the same subsets in the same order and take the same ``p > alpha`` decisions, so the
     accumulated ``separating``, the largest p-value, and the return value are identical.
 
     With ``trace`` given, one record per test is appended (see :func:`record_tests`); the check
-    runs once per chunk.
+    runs once per chunk. With ``visit`` given, it is called with each chunk of subsets, as the rows
+    of an ``(N, size)`` int array, and their p-values, so a caller can count the tests or keep a few
+    of them without storing a record per test.
     """
-    subsets = _subsets(candidates, size, skip_within)
+    whole = canonical_capable(test)
     # CMIknn's _bounded_pvalue stops its shuffles once the side of alpha is certain; a p-value
     # above alpha that `largest` records comes from every shuffle.
     bounded = getattr(test, "_bounded_pvalue", None)
@@ -107,33 +113,54 @@ def scan_conditioning_sets(
     )
     found = False
     top = 0.0
-    while True:
-        chunk = list(islice(subsets, CHUNK))
-        if not chunk:
-            break
-        pvalues = batched(a, b, chunk)
+    for rows in subset_rows(candidates, size, skip_within):
+        pvalues = batched(a, b, rows if whole else [tuple(s) for s in rows.tolist()])
         if trace is not None:
-            record_tests(trace, size, a, b, chunk, pvalues, alpha)
-        for subset, p in zip(chunk, pvalues):
-            if p > alpha:
-                found = True
-                separating.update(subset)
-                if largest is not None and p > top:
-                    top = float(p)
+            record_tests(trace, size, a, b, rows.tolist(), pvalues, alpha)
+        if visit is not None:
+            visit(rows, pvalues)
+        values = np.asarray(pvalues, dtype=np.float64)
+        passing = np.flatnonzero(values > alpha)
+        if passing.size:
+            found = True
+            separating.update(rows[passing].ravel().tolist())
+            top = max(top, float(values[passing].max()))
     if found and largest is not None:
         largest.append(top)
     return found
 
 
-def _subsets(
-    candidates: list[int], size: int, skip_within: set[int] | None
-) -> Iterator[tuple[int, ...]]:
+def subset_rows(
+    candidates: Sequence[int], size: int, skip_within: set[int] | None
+) -> Iterator[np.ndarray]:
     """The size-``size`` subsets of ``candidates`` in ``combinations`` order, less those lying
-    entirely inside ``skip_within`` when it is given."""
-    subsets = combinations(candidates, size)
+    entirely inside ``skip_within`` when it is given and holds ``size`` members or more, as the
+    rows of ``(N, size)`` int arrays of ``CHUNK`` rows each, the last one fewer and none empty.
+
+    The rows come from the cached position tables a block at a time (:func:`blocks`,
+    :func:`block_positions`), so no subset passes through a tuple.
+    """
+    labels = np.asarray(candidates, dtype=np.intp)
+    n = len(labels)
+    inside = None
     if skip_within is not None and len(skip_within) >= size:
-        subsets = (s for s in subsets if not skip_within.issuperset(s))
-    return subsets
+        inside = np.isin(labels, np.fromiter(skip_within, np.intp, len(skip_within)))
+    held: list[np.ndarray] = []
+    count = 0
+    for block in blocks(n, size, CHUNK):
+        rows = block_positions(n, block)
+        if inside is not None:
+            rows = rows[~inside[rows].all(axis=1)]
+            if not len(rows):
+                continue
+        held.append(rows)
+        count += len(rows)
+        while count >= CHUNK:
+            rows = np.concatenate(held)
+            yield labels[rows[:CHUNK]]
+            held, count = [rows[CHUNK:]], count - CHUNK
+    if count:
+        yield labels[np.concatenate(held)]
 
 
 def canonical_capable(test: CITest) -> bool:
@@ -182,26 +209,25 @@ def is_rcot(test: CITest) -> bool:
 
 
 def _query_arrays(
-    size: int, queries: Sequence[tuple[int, int, Sequence[tuple[int, ...]]]]
+    size: int, queries: Sequence[tuple[int, int, np.ndarray]]
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """The canonical query arrays ``(x, y, conditions)`` of ``queries``, in order.
 
-    Each query is ``(x, y, subsets)`` with ``x < y`` and the pair tested against every subset, each
-    of ``size`` members, sorted and distinct. The arrays hold one row per subset.
+    Each query is ``(x, y, subsets)`` with ``x < y`` and the pair tested against every subset, a
+    row of the ``(N, size)`` int array ``subsets``, sorted and distinct. The arrays hold one row
+    per subset.
     """
     counts = [len(subsets) for _, _, subsets in queries]
-    rows = sum(counts)
     xs = np.repeat(np.array([x for x, _, _ in queries], dtype=np.intp), counts)
     ys = np.repeat(np.array([y for _, y, _ in queries], dtype=np.intp), counts)
-    members = chain.from_iterable(chain.from_iterable(subsets for _, _, subsets in queries))
-    zs = np.fromiter(members, np.intp, rows * size).reshape(rows, size)
+    zs = np.concatenate([subsets for _, _, subsets in queries]).reshape(sum(counts), size)
     return xs, ys, zs
 
 
 def _canonical_chunk(
-    pvalues: Callable[..., np.ndarray], size: int, a: int, b: int, chunk: Sequence[tuple[int, ...]]
+    pvalues: Callable[..., np.ndarray], size: int, a: int, b: int, chunk: np.ndarray
 ) -> np.ndarray:
-    """``pvalues`` of the pair ``(a, b)`` given each subset of ``chunk``: ``size`` members, sorted
+    """``pvalues`` of the pair ``(a, b)`` given each row of ``chunk``: ``size`` members, sorted
     and distinct, as the subsets of ascending candidates are."""
     return pvalues(*_query_arrays(size, [(min(a, b), max(a, b), chunk)]))
 
@@ -242,8 +268,9 @@ def separating_subsets(
         return [cond for cond in subsets if test(x, y, cond) > alpha]
     found: list[tuple[int, ...]] = []
     while chunk := list(islice(subsets, CHUNK)):
+        rows = np.fromiter(chain.from_iterable(chunk), np.intp, len(chunk) * size)
         try:
-            pvalues = _canonical_chunk(canonical, size, x, y, chunk)
+            pvalues = _canonical_chunk(canonical, size, x, y, rows.reshape(len(chunk), size))
         except Exception:
             pvalues = [test(x, y, cond) for cond in chunk]
         found.extend(cond for cond, p in zip(chunk, pvalues) if p > alpha)
@@ -344,54 +371,52 @@ def first_order_removals(
         _stacked_first_order(canonical, queries)
         if canonical is not None
         else (
-            (x, y, subsets, test.first_order_pvalues(x, y, c))  # ty: ignore[unresolved-attribute]
-            for x, y, c, subsets in queries
+            (x, y, c, test.first_order_pvalues(x, y, c))  # ty: ignore[unresolved-attribute]
+            for x, y, c in queries
         )
     )
     removals: list[Removal] = []
-    for x, y, subsets, pvals in tested:
+    for x, y, candidates, pvals in tested:
         if trace is not None:
-            record_tests(trace, 1, x, y, subsets, pvals, alpha)
+            record_tests(trace, 1, x, y, [(z,) for z in candidates], pvals, alpha)
         passing = np.flatnonzero(pvals > alpha)
         if passing.size:
             # Some candidate separates, so the largest p-value is a separating one.
             p = max(pvals.tolist()) if record_pvalues else None
-            removals.append((x, y, tuple(subsets[k][0] for k in passing.tolist()), p))
+            removals.append((x, y, tuple(candidates[k] for k in passing.tolist()), p))
     return removals
 
 
 def _first_order_queries(
     pairs: list[tuple[int, int]], neighbors: list[np.ndarray]
-) -> Iterator[tuple[int, int, list[int], list[tuple[int]]]]:
-    """Yield ``(x, y, candidates, subsets)`` for each of ``pairs`` with a candidate, in order.
-
-    The candidates are the ascending conditioners of :func:`first_order_removals`, and ``subsets``
-    the same as one-member conditioning sets, shared across the pairs.
-    """
-    singles = [(z,) for z in range(len(neighbors))]
+) -> Iterator[tuple[int, int, list[int]]]:
+    """Yield ``(x, y, candidates)`` for each of ``pairs`` with a candidate, in order: the
+    ascending conditioners of :func:`first_order_removals`."""
     for x, y in pairs:
         candidates = sorted((set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y})
         if candidates:
-            yield x, y, candidates, [singles[z] for z in candidates]
+            yield x, y, candidates
 
 
 def _stacked_first_order(
     pvalues: Callable[..., np.ndarray],
-    queries: Iterable[tuple[int, int, list[int], list[tuple[int]]]],
-) -> Iterator[tuple[int, int, Sequence[tuple[int, ...]], np.ndarray]]:
-    """Yield each query of :func:`_first_order_queries` as ``(x, y, subsets, p-values)``, the
-    p-values those of its ``subsets`` in order.
+    queries: Iterable[tuple[int, int, list[int]]],
+) -> Iterator[tuple[int, int, list[int], np.ndarray]]:
+    """Yield each query of :func:`_first_order_queries` as ``(x, y, candidates, p-values)``, the
+    p-values those of its candidates in order.
 
     ``pvalues`` takes canonical query arrays. Consecutive queries are stacked, whole, as size-1
     chunks (:func:`_stacks`); the first-order closed form is elementwise, so each p-value is the one
     a query evaluated alone gets.
     """
-    chunks = ((i, x, y, subsets) for i, (x, y, _, subsets) in enumerate(queries))
+    chunks = (
+        (i, x, y, np.array(c, dtype=np.intp).reshape(-1, 1)) for i, (x, y, c) in enumerate(queries)
+    )
     for stack, values in _stacks(pvalues, 1, chunks):
         stop = 0
-        for _, x, y, subsets in stack:
-            start, stop = stop, stop + len(subsets)
-            yield x, y, subsets, values[start:stop]
+        for _, x, y, rows in stack:
+            start, stop = stop, stop + len(rows)
+            yield x, y, rows[:, 0].tolist(), values[start:stop]
 
 
 def scan_pairs(
@@ -472,13 +497,12 @@ def stacked_scan(
         passing = values > alpha
         if trace is not None:
             for (_, x, y, chunk), start, stop in zip(stack, bounds, bounds[1:]):
-                record_tests(trace, size, x, y, chunk, values[start:stop], alpha)
+                record_tests(trace, size, x, y, chunk.tolist(), values[start:stop], alpha)
         for k in np.flatnonzero(np.logical_or.reduceat(passing, bounds[:-1])).tolist():
             i, _, _, chunk = stack[k]
             rows = np.flatnonzero(passing[bounds[k] : bounds[k + 1]])
             members, tops = separated.setdefault(i, (set(), []))
-            for row in rows.tolist():
-                members.update(chunk[row])
+            members.update(chunk[rows].ravel().tolist())
             if record_pvalues:
                 tops.append(float(values[bounds[k] + rows].max()))
     removals: list[Removal] = []
@@ -496,8 +520,7 @@ def _pair_chunks(
     for i, (a, b) in enumerate(pairs):
         x, y = min(a, b), max(a, b)
         for _, _, candidates, seen in _sides(neighbors, a, b, size):
-            subsets = _subsets(candidates, size, seen)
-            while chunk := list(islice(subsets, CHUNK)):
+            for chunk in subset_rows(candidates, size, seen):
                 yield i, x, y, chunk
 
 
@@ -594,8 +617,8 @@ def blocks(n: int, size: int, most: int) -> Iterator[Block]:
 
 @cache
 def _combination_table(m: int, r: int) -> np.ndarray:
-    """``combinations(range(m), r)`` as a ``(comb(m, r), r)`` array. A block holds at most a few
-    thousand subsets, and ``m`` is at most :data:`MASK_BITS`, so the tables stay small."""
+    """``combinations(range(m), r)`` as a ``(comb(m, r), r)`` array, for ``r`` other than 1. A block
+    holds at most a few thousand subsets, so the tables stay small."""
     count = comb(m, r)
     flat = np.fromiter(chain.from_iterable(combinations(range(m), r)), np.intp, count * r)
     return flat.reshape(count, r)
@@ -605,7 +628,11 @@ def block_positions(n: int, block: Block) -> np.ndarray:
     """The subsets of ``block`` of ``n`` candidates as rows of positions, in order."""
     prefix, rest = block
     start = prefix[-1] + 1 if prefix else 0
-    tail = _combination_table(n - start, rest)
+    tail = (
+        np.arange(n - start, dtype=np.intp)[:, None]
+        if rest == 1
+        else _combination_table(n - start, rest)
+    )
     rows = np.empty((len(tail), len(prefix) + rest), dtype=np.intp)
     rows[:, : len(prefix)] = prefix
     rows[:, len(prefix) :] = tail + start

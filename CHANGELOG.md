@@ -12,6 +12,12 @@ names its pull request.
 
 ### Added
 
+- `degrees_of_freedom`, an argument of every method that takes the categorical tests, `"chisq"` and
+  `"gsq"`, and of `ChiSquare`: `"mean"`, the default and the rule so far, is the mean of the
+  statistic when `y` is shuffled within each configuration of the conditioning set; `"nonempty"` is
+  `(r_x - 1) * (r_y - 1)` per configuration over the values present, each table's empty rows and
+  columns struck (Spirtes, Glymour, and Scheines 1993). The two differ only on sparse tables.
+  Passing it with another test raises `ValueError`. ([#981])
 - For contributors, a benchmark lane runs `anm`, `pnl`, `loci`, and `resit` beside the authors'
   code of QCCD, HECI, and GRCI on the Tübingen cause-effect pairs, and a summary script turns its
   records into a weighted-accuracy table. ([#1127])
@@ -24,6 +30,21 @@ names its pull request.
   method; a post a release updated carries its update date, also in the sitemap; the general index
   and the source-code pages are not indexed; and the docs home, the example notebooks, the
   changelog, and the blog index have their own titles and descriptions. ([#1132])
+- `iamb` and `inter_iamb` order the candidates of each grow step by their p-values to nine
+  significant digits, where they compared p-values rounded to nine decimals, which tied every
+  p-value below 5e-10 and left the choice to a rank computed from the data. On categorical data
+  their blankets can change for some targets, and so can the graphs of `rsmax2` with
+  `restrict="iamb"` or `"inter_iamb"`; results on continuous data do not change. ([#969])
+- The skeleton scans of `pc` and `fci` and the conditioning-set scans of the blanket learners
+  build each chunk of conditioning sets as the rows of an int array from cached combination
+  tables, where they built tuples and converted each chunk back. Every output,
+  `metadata["n_tests"]` included, is the same bit for bit. ([#1036], [#1042])
+
+### Fixed
+
+- The backward phase of `mmpc` keeps the best separating set of each size it tests, not a record
+  of every set, so its memory no longer grows with the number of sets. Answers are unchanged.
+  ([#1019])
 
 ## [0.18.0] - 2026-11-19
 
@@ -2695,3 +2716,8 @@ First alpha release.
 [#1090]: https://github.com/Abel-ai-lab/Andrey/pull/1090
 [#1099]: https://github.com/Abel-ai-lab/Andrey/pull/1099
 [card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
+[#969]: https://github.com/Abel-ai-lab/Andrey/pull/969
+[#981]: https://github.com/Abel-ai-lab/Andrey/pull/981
+[#1019]: https://github.com/Abel-ai-lab/Andrey/pull/1019
+[#1036]: https://github.com/Abel-ai-lab/Andrey/pull/1036
+[#1042]: https://github.com/Abel-ai-lab/Andrey/pull/1042
