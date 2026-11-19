@@ -807,7 +807,8 @@ def _counted(
 # The run and the manifest
 # ==================================================================================================
 
-#: The environment variables that set thread and worker counts, recorded in the header.
+#: The environment variables that set thread and worker counts, recorded in the header, and
+#: ``ANDREY_SHARED_SCAN_MIN_WORK``, which picks between two paths whose p-values agree to rounding.
 THREAD_VARIABLES = (
     "OMP_NUM_THREADS",
     "OPENBLAS_NUM_THREADS",
@@ -815,6 +816,7 @@ THREAD_VARIABLES = (
     "VECLIB_MAXIMUM_THREADS",
     "ANDREY_N_JOBS",
     "ANDREY_GES_PARALLEL_MIN_WORK",
+    "ANDREY_SHARED_SCAN_MIN_WORK",
 )
 ROOT = Path(__file__).resolve().parents[1]
 

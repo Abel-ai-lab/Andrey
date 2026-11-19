@@ -119,6 +119,9 @@ BOUND_MARGIN = 1e4
 # On one core the factor is slower than the per-query inversions below a work of about 64 and faster
 # from 128 at every set size sampled (2 to 12).
 MIN_SHARED_FACTOR_WORK = 128
+# The most submatrix entries statistic_pvalues_given hands statistic_pvalues in one call when it
+# does not factor, 8 MB of float64, so a large scan whose factor is declined runs in chunks.
+FALLBACK_STACK_ENTRIES = 1 << 20
 # The LAPACK Cholesky factor and triangular solve of statistic_pvalues_given, called directly: on
 # the small scans it serves, the checks of scipy.linalg's wrappers would take most of the time.
 _POTRF, _TRTRS = get_lapack_funcs(("potrf", "trtrs"), (np.empty((1, 1)),))
@@ -417,7 +420,8 @@ class PartialCorrelationTest:
         columns, so a matrix that is not exactly symmetric gives each pair one answer whichever
         column is ``x``.
 
-        The other calls take :meth:`statistic_pvalues`, which answers or raises as it does: a
+        The other calls take :meth:`statistic_pvalues`, in chunks of at most
+        ``FALLBACK_STACK_ENTRIES`` submatrix entries, which answers or raises as it does: a
         smaller set, fewer candidates, and any call with a block that the factor does not show to
         be well inside the nonsingular range of :func:`_invert_nonsingular`, so that every block
         the current rule calls singular, such as a candidate that copies ``x`` or a member of the
@@ -436,7 +440,15 @@ class PartialCorrelationTest:
                 p = np.asarray(self._pvalue(r, df), dtype=np.float64)
                 return r, p
         xs = np.full(len(cols), x, dtype=np.intp)
-        return self.statistic_pvalues(xs, cols, np.tile(cond, (len(cols), 1)))
+        sets = np.tile(cond, (len(cols), 1))
+        step = max(1, FALLBACK_STACK_ENTRIES // (len(cond) + 2) ** 2)
+        if len(cols) <= step:
+            return self.statistic_pvalues(xs, cols, sets)
+        parts = [
+            self.statistic_pvalues(xs[i : i + step], cols[i : i + step], sets[i : i + step])
+            for i in range(0, len(cols), step)
+        ]
+        return np.concatenate([r for r, _ in parts]), np.concatenate([p for _, p in parts])
 
     def _schur_partial_correlations(
         self, x: int, ys: np.ndarray, cond: np.ndarray

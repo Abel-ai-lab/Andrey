@@ -391,6 +391,30 @@ def test_the_shared_scan_setting_moves_the_cutoff_in_both_directions(monkeypatch
         assert factored == expected, (setting, len(scan))
 
 
+def test_a_declined_factor_runs_the_per_query_path_in_chunks(monkeypatch):
+    """A large scan whose factor is declined is answered by ``statistic_pvalues`` in chunks of at
+    most ``FALLBACK_STACK_ENTRIES`` submatrix entries, with the bits of one call over the whole
+    scan."""
+    test = FisherZ(_forty_columns())
+    cond = [3, 4, 5]
+    ys = [y for y in range(1, 40) if y not in cond]
+    monkeypatch.setattr(ci.PartialCorrelationTest, "_schur_partial_correlations", lambda *a: None)
+    monkeypatch.setattr(ci, "FALLBACK_STACK_ENTRIES", 5 * 25)  # five candidates of block size 5
+    calls = []
+    real = ci.PartialCorrelationTest.statistic_pvalues
+    monkeypatch.setattr(
+        ci.PartialCorrelationTest,
+        "statistic_pvalues",
+        lambda self, x, y, c: calls.append(len(y)) or real(self, x, y, c),
+    )
+    r, p = test.statistic_pvalues_given(0, ys, cond)
+    assert calls == [5] * (len(ys) // 5) + ([len(ys) % 5] if len(ys) % 5 else [])
+    want_r, want_p = real(
+        test, np.zeros(len(ys), dtype=np.intp), np.array(ys), np.tile(cond, (len(ys), 1))
+    )
+    assert r.tobytes() == want_r.tobytes() and p.tobytes() == want_p.tobytes()
+
+
 def test_a_bad_shared_scan_setting_raises_naming_the_variable(monkeypatch):
     monkeypatch.setenv("ANDREY_SHARED_SCAN_MIN_WORK", "many")
     with pytest.raises(ValueError, match="ANDREY_SHARED_SCAN_MIN_WORK must be an integer"):
