@@ -10,6 +10,12 @@ names its pull request.
 
 ## [Unreleased]
 
+### Added
+
+- For contributors, a benchmark lane runs `anm`, `pnl`, `loci`, and `resit` beside the authors'
+  code of QCCD, HECI, and GRCI on the Tübingen cause-effect pairs, and a summary script turns its
+  records into a weighted-accuracy table. ([#1127])
+
 ### Changed
 
 - The website is easier to find and quote in search and AI answers. The homepage's description, its
@@ -2681,6 +2687,7 @@ First alpha release.
 [#1112]: https://github.com/Abel-ai-lab/Andrey/pull/1112
 [#1120]: https://github.com/Abel-ai-lab/Andrey/pull/1120
 [#1122]: https://github.com/Abel-ai-lab/Andrey/pull/1122
+[#1127]: https://github.com/Abel-ai-lab/Andrey/pull/1127
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
 [#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
 [#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
