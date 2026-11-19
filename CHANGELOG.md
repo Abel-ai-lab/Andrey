@@ -44,6 +44,9 @@ names its pull request.
   values can remove a common cause of the columns that stay. ([#1102])
 - `missing="em"` raises `ValueError` when two columns share no observed row, as the data hold no
   covariance for them. Such data ran before, on a covariance the model alone supplied. ([#1102])
+- On data with missing values, `fisherz` and `student_t` p-values with a conditioning set can
+  differ from 0.18.0 in the last digits (relative change up to about 1e-11 measured), as each
+  block's sums run in a fixed order; graphs are unchanged on the fits compared. ([#1142])
 
 ### Fixed
 
@@ -53,6 +56,9 @@ names its pull request.
   text on `None` and on structural EM is corrected. ([#1102])
 - The docs name `normal_scores` among the tests that need `|S| + 3` rows where their variables are
   observed; they gave it the 2 rows of the other tests. ([#1102])
+- On data with missing values, a `fisherz` or `student_t` query gets the same statistic and
+  p-value, bit for bit, whether it is asked alone or with other queries, in any order. On more
+  than 8,192 rows the last bits followed the queries computed with it. ([#1142])
 
 ## [0.18.0] - 2026-11-19
 
@@ -2721,6 +2727,7 @@ First alpha release.
 [#1090]: https://github.com/Abel-ai-lab/Andrey/pull/1090
 [#1099]: https://github.com/Abel-ai-lab/Andrey/pull/1099
 [card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
+[#1142]: https://github.com/Abel-ai-lab/Andrey/pull/1142
 [#1102]: https://github.com/Abel-ai-lab/Andrey/pull/1102
 [#1094]: https://github.com/Abel-ai-lab/Andrey/pull/1094
 [#1095]: https://github.com/Abel-ai-lab/Andrey/pull/1095
