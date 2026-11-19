@@ -618,17 +618,6 @@ class PartialCorrelationDeletion(TestwiseDeletion):
             r[k], p[k] = rk[0], pk[0]
         return r, p
 
-    def _grouped_sums(self) -> GroupedSums | None:
-        """The grouped sums of :mod:`~andrey.core.missing_groups` when the data take that path
-        (:func:`~andrey.core.missing_groups.grouping_for`), else ``None`` for the per-row sums;
-        chosen from the data at the first block, so every block of the test takes one path."""
-        if self._grouped is False:
-            from .ties import tie_ranks
-
-            grouping = grouping_for(self._observed, tie_ranks(self._data))
-            self._grouped = None if grouping is None else GroupedSums(self._values, grouping)
-        return cast("GroupedSums | None", self._grouped)
-
     def copies(self) -> tuple[tuple[int, ...], ...]:
         """The groups of columns that repeat one another up to scale and shift.
 
@@ -706,7 +695,8 @@ class GaussianDeletion(PartialCorrelationDeletion):
         self._pairs: tuple[np.ndarray, np.ndarray] | None = None
         self._blocks: OrderedDict[tuple[int, ...], tuple[np.ndarray, int]] = OrderedDict()
         self._kept = 0
-        self._grouped: GroupedSums | None | bool = False  # False until the path is chosen
+        self._grouped: GroupedSums | None = None
+        self._chosen = False  # whether the path is chosen
         self._repeats(list(range(data.shape[1])))
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
@@ -944,12 +934,13 @@ class GaussianDeletion(PartialCorrelationDeletion):
         """The grouped sums of :mod:`~andrey.core.missing_groups` when the data take that path
         (:func:`~andrey.core.missing_groups.grouping_for`), else ``None`` for the per-row sums;
         chosen from the data at the first block, so every block of the test takes one path."""
-        if self._grouped is False:
+        if not self._chosen:
             from .ties import tie_ranks
 
             grouping = grouping_for(self._observed, tie_ranks(self._data))
             self._grouped = None if grouping is None else GroupedSums(self._values, grouping)
-        return cast("GroupedSums | None", self._grouped)
+            self._chosen = True
+        return self._grouped
 
     def copies(self) -> tuple[tuple[int, ...], ...]:
         """The groups of columns that repeat one another up to scale and shift.

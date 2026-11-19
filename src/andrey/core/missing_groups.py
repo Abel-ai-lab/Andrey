@@ -267,7 +267,7 @@ class GroupedSums:
         count = np.zeros(b, dtype=np.int64)
         sums = np.zeros((b, k))
         cross = np.zeros((b, k, k))
-        inside = self.observed[:, columns].all(axis=2)
+        inside = np.asarray(self.observed[:, columns].all(axis=2))
         for g in range(len(self.rows)):
             at = np.flatnonzero(inside[g])
             if not len(at):
