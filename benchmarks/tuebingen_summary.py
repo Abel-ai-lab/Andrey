@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """Summarize ``tuebingen_pairs.py`` runs: weighted accuracy with an interval, coverage, and time.
 
-Reads ``records.jsonl`` and, where the driver wrote it, ``pairs.json`` (the pairs the run was asked
-for) from each run directory, and writes ``summary.md`` and ``summary.json`` to ``--out``. For each
+Reads ``records.jsonl`` and, where the driver wrote it, ``manifest.json`` (the pairs and solutions
+the run was asked for) from each run directory, and writes ``summary.md`` and ``summary.json`` to ``--out``. For each
 solution it reports:
 
 - **coverage**: the pairs whose fit finished (``ok``), as a count and as the share of the pairs'
@@ -36,24 +36,44 @@ RESAMPLES = 10_000
 LEVEL = 0.95
 
 
-def read_manifest(runs: list[Path]) -> dict[str, float]:
-    """The pairs the runs were asked for, ``{pair: weight}``, from each run's ``pairs.json``."""
-    expected: dict[str, float] = {}
+def read_manifest(runs: list[Path]) -> tuple[dict[str, float], list[str]]:
+    """The pairs (``{pair: weight}``) and solutions the runs were asked for, from each run's
+    ``manifest.json``."""
+    pairs: dict[str, float] = {}
+    solutions: set[str] = set()
     for run in runs:
-        path = run / "pairs.json"
+        path = run / "manifest.json"
         if path.is_file():
-            expected.update(json.loads(path.read_text()))
-    return expected
+            manifest = json.loads(path.read_text())
+            pairs.update(manifest["pairs"])
+            solutions.update(manifest["solutions"])
+    return pairs, sorted(solutions)
 
 
 def read_records(runs: list[Path]) -> list[dict]:
-    """Every fit record of the run directories; a repeated (pair, solution) keeps the last one."""
-    latest: dict[tuple[str, str], dict] = {}
+    """Every fit record of the run directories, refusing runs that cannot be pooled.
+
+    A solution's records must agree on its build, parameters, and caps, and a (pair, solution)
+    unit may appear once, so a row never mixes builds or budgets.
+    """
+    units: dict[tuple[str, str], dict] = {}
+    identity: dict[str, tuple] = {}
     for run in runs:
         for line in (run / "records.jsonl").read_text().splitlines():
             record = json.loads(line)
-            latest[(record["pair"], record["method"])] = record
-    return list(latest.values())
+            unit = (record["pair"], record["method"])
+            if unit in units:
+                raise SystemExit(f"{unit[1]} on {unit[0]} appears twice; summarize one record each")
+            units[unit] = record
+            key = (
+                record.get("package_version"),
+                json.dumps(record.get("params"), sort_keys=True),
+                record.get("cap_wall_s"),
+                record.get("cap_mem_mb"),
+            )
+            if identity.setdefault(unit[1], key) != key:
+                raise SystemExit(f"{unit[1]}: records differ in build, parameters, or caps")
+    return list(units.values())
 
 
 def weighted(correct: np.ndarray, weights: np.ndarray) -> float:
@@ -68,17 +88,22 @@ def interval(draws: np.ndarray) -> tuple[float, float]:
     return float(lo), float(hi)
 
 
-def summarize(records: list[dict], expected: dict[str, float] | None = None, seed: int = 0) -> dict:
+def summarize(
+    records: list[dict],
+    expected: dict[str, float] | None = None,
+    solutions: list[str] | None = None,
+    seed: int = 0,
+) -> dict:
     """The tables of the module docstring as a dict, from the fit records.
 
-    ``expected`` (``{pair: weight}``) adds the pairs a run was asked for: a pair with no record of a
-    solution counts as ``missing`` for it, unfinished.
+    ``expected`` (``{pair: weight}``) and ``solutions`` add the pairs and solutions a run was asked
+    for: a unit with no record counts as ``missing``, unfinished.
     """
     weights = dict(expected or {})
     weights.update({r["pair"]: r["weight"] for r in records})
     pairs = sorted(weights)
     weight = np.array([weights[p] for p in pairs])
-    seen = {r["method"] for r in records}
+    seen = {r["method"] for r in records} | set(solutions or ())
     methods = [m for m in METHOD_ORDER if m in seen] + sorted(seen - set(METHOD_ORDER))
     index = {p: i for i, p in enumerate(pairs)}
     ok = {m: np.zeros(len(pairs), dtype=bool) for m in methods}
@@ -200,7 +225,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", required=True, type=Path)
     args = p.parse_args(argv)
     records = read_records(args.runs)
-    summary = summarize(records, read_manifest(args.runs))
+    summary = summarize(records, *read_manifest(args.runs))
     args.out.mkdir(parents=True, exist_ok=True)
     text = json.dumps(without_nan(summary), indent=2, allow_nan=False)
     (args.out / "summary.json").write_text(text + "\n")
