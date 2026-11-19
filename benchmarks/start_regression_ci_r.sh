@@ -2,7 +2,7 @@
 # Installs the authors' code of the GCM, wGCM, and PCM tests, the references of Andrey's "gcm",
 # "wgcm", and "pcm", for `benchmarks/regression_ci_agreement.py`.
 #
-#   benchmarks/start_regression_ci_r.sh <folder for the PCM authors' code>
+#   benchmarks/start_regression_ci_r.sh <folder for the PCM simulation code>
 #
 # GeneralisedCovarianceMeasure 0.2.0 left CRAN and weightedGCM 0.1.0 is the version its paper ran,
 # so both come from the CRAN archive with their SHA-256 checked, with xgboost 1.7.8.1, a
@@ -16,7 +16,7 @@ set -euo pipefail
 REPO="$(git rev-parse --show-toplevel)"
 R_MODULE="${ANDREY_BENCH_R_MODULE:-gcc-12.1.0-gcc-11.2.0 r-4.6.1-gcc-12.1.0}"
 R_LIBS="${ANDREY_BENCH_R_LIBS:-$REPO/benchmarks/.r-lib-regression-ci}"
-PCM_CODE="${1:?usage: start_regression_ci_r.sh <folder for the PCM authors' code>}"
+PCM_CODE="${1:?usage: start_regression_ci_r.sh <folder for the PCM simulation code>}"
 ARCHIVE="https://cran.r-project.org/src/contrib/Archive"
 TARBALLS=(
     "GeneralisedCovarianceMeasure/GeneralisedCovarianceMeasure_0.2.0.tar.gz 8ea9f6e913be11b5d2725d9aad27c523190963e4c5b70ecbadb68e7e99abfd75"
