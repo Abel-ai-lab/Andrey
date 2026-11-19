@@ -1591,11 +1591,14 @@ def test_a_cover_that_is_not_in_the_brand_kit_fails(cards):
 
 
 def _release_covers():
-    """Each release cover and tile in the Release cards page, the cards, and the example in
-    ``docs/DEVELOPMENT.md``: how many folders deep its page is built, its classes, and its body's
-    paragraphs. The example is the Release cards page's cover."""
+    """Each release cover and tile in the Release cards page, the cards named by a version, and the
+    example in ``docs/DEVELOPMENT.md``: how many folders deep its page is built, its classes, and
+    its body's paragraphs. The example is the Release cards page's cover. A card named for its
+    topic shows the topic on its cover until its release is cut and numbers both."""
     docs = ROOT / "docs"
-    pages = [docs / "docs" / "benchmarks.md", *sorted((docs / "docs" / "benchmarks").glob("*.md"))]
+    cards = (docs / "docs" / "benchmarks").glob("*.md")
+    versioned = sorted(card for card in cards if re.fullmatch(r"\d+\.\d+\.\d+", card.stem))
+    pages = [docs / "docs" / "benchmarks.md", *versioned]
     for page in [*pages, docs / "DEVELOPMENT.md"]:
         depth = max(len(page.relative_to(docs).parts) - 1, 1)
         text = page.read_text(encoding="utf-8")

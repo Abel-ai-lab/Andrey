@@ -510,7 +510,7 @@ _CONCEPTS = (
             choices=DEGREES_OF_FREEDOM,
         ),
         fragment="degrees of freedom",
-        suitable=tuple(m for m in TESTED if m != "jpcmciplus"),
+        suitable=tuple(m for m in TESTED if m not in CONTINUOUS_TESTED),
         others_exempt="Takes no categorical conditional-independence test.",
         deviations=(
             Deviation(

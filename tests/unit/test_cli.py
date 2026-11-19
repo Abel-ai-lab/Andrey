@@ -1282,7 +1282,7 @@ def test_a_list_of_targets_in_a_config_file(capsys, tmp_path):
 
 @pytest.mark.parametrize(
     ("target", "code"),
-    [("[]", "bad_value"), ("[c,2]", "bad_value"), ("[a,h]", "unknown_column")],
+    [("[]", "invalid_params"), ("[c,2]", "bad_value"), ("[a,h]", "unknown_column")],
 )
 def test_a_bad_list_of_targets_is_a_usage_error(capsys, tmp_path, target, code):
     """No target, one column twice (by name and by position), and a column the file lacks."""
