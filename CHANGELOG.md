@@ -92,7 +92,7 @@ names its pull request.
 
 - `pcmciplus` returns the same `p_values`, `statistics`, and separating sets under any column
   order: its skeleton phase tests a same-step pair first from the end of higher `tie_ranks`, orders
-  equal neighbor strengths by rank, and reads the variables in rank order. ([#PRNUM])
+  equal neighbor strengths by rank, and reads the variables in rank order. ([#1122])
 - A column that holds both signs near the largest float no longer raises a `RuntimeWarning`
   in the check for constant columns, which compared a difference that overflowed; every
   method reads its data through that check. ([#1083])
@@ -2715,6 +2715,7 @@ First alpha release.
 [#1088]: https://github.com/Abel-ai-lab/Andrey/pull/1088
 [#1112]: https://github.com/Abel-ai-lab/Andrey/pull/1112
 [#1120]: https://github.com/Abel-ai-lab/Andrey/pull/1120
+[#1122]: https://github.com/Abel-ai-lab/Andrey/pull/1122
 [#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
 [#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
 [card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
