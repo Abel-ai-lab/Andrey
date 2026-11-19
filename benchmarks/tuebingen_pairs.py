@@ -35,7 +35,9 @@ import os
 import platform
 import socket
 import subprocess
+import sys
 import threading
+import traceback
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
@@ -319,10 +321,19 @@ def main(argv: list[str] | None = None) -> int:
     pool = ThreadPoolExecutor(max_workers=max(1, args.workers))
     try:
         list(pool.map(run, tasks))
-    except BaseException:
+    except BaseException as exc:
         # An interrupt or a failed unit drops the queued fits instead of running them all first.
         pool.shutdown(wait=False, cancel_futures=True)
-        raise
+        # A running fit holds its worker thread until it ends or reaches the cap, and the
+        # interpreter joins those threads on exit. Leaving at once closes each fit's death pipe
+        # instead, so its supervisor kills the fit's process group; holding the lock lets a record
+        # being written finish first.
+        lock.acquire()
+        if not isinstance(exc, KeyboardInterrupt):
+            traceback.print_exception(exc)
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(130 if isinstance(exc, KeyboardInterrupt) else 1)
     pool.shutdown()
     return 0
 
