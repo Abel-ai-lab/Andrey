@@ -86,11 +86,21 @@ def make_solution(name: str) -> Any:
     return getattr(import_module(module), cls)()
 
 
-#: Prints, as JSON, the Python and NumPy of the interpreter that runs a solution's fits.
-_PYTHON_RUNTIME = (
-    "import json, platform, numpy; "
-    "print(json.dumps({'python': platform.python_version(), 'numpy': numpy.__version__}))"
-)
+#: Prints, as JSON, the Python of the interpreter that runs a solution's fits and the version of
+#: each numeric package the fits may import (``null`` where it is not installed).
+_PYTHON_RUNTIME = """
+import json, platform
+from importlib import metadata
+
+def version(name):
+    try:
+        return metadata.version(name)
+    except metadata.PackageNotFoundError:
+        return None
+
+names = ("numpy", "scipy", "scikit-learn")
+print(json.dumps({"python": platform.python_version(), **{n: version(n) for n in names}}))
+"""
 
 #: Prints, as JSON, the R and rpy2 that an R solution's fit interpreter embeds.
 _R_RUNTIME = (
@@ -100,38 +110,51 @@ _R_RUNTIME = (
 
 
 def preflight(adapters: dict[str, Any]) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
-    """Check every fit interpreter and every reference's code folder before any fit runs.
+    """Check every fit interpreter, every reference's code folder, and one small fit per solution
+    before the campaign, so a setup problem stops the run once instead of failing every unit.
 
     Returns ``{solution: version}``, the version of the package each solution's fits run, Andrey's
-    read from the interpreter that runs them, and ``{solution: runtime}``, the Python and NumPy of
-    that interpreter and, for an R solution, the R and rpy2 it embeds.
+    read from the interpreter that runs them, and ``{solution: runtime}``, the Python, NumPy, SciPy,
+    and scikit-learn of that interpreter and, for an R solution, the R and rpy2 it embeds.
     """
     from importlib import import_module
+
+    from andrey_bench.adapters.fcm_warm import tiny_table
 
     interpreters = check_interpreters(list(adapters.values()))
     for name in adapters:
         if name in REFERENCES:
             import_module(REFERENCES[name][0]).code_dir()
+
+    def ask(name: str, code: str) -> str:
+        """The last line ``code`` prints in solution ``name``'s fit interpreter."""
+        command = [str(interpreters[adapters[name].name]), "-c", code]
+        run = subprocess.run(command, capture_output=True, text=True)
+        if run.returncode != 0:
+            lines = run.stderr.strip().splitlines()
+            raise SystemExit(
+                f"{name}: {command[0]} fails: {lines[-1] if lines else run.returncode}"
+            )
+        return run.stdout.strip().splitlines()[-1]
+
     versions = {}
+    runtimes = {}
     for name, adapter in adapters.items():
         versions[name] = adapter.package_version
         if adapter.package == "andrey":
-            command = [
-                str(interpreters[adapter.name]),
-                "-c",
-                "import andrey; print(andrey.__version__)",
-            ]
-            run = subprocess.run(command, capture_output=True, text=True, check=True)
-            versions[name] = run.stdout.strip()
-    runtimes = {}
-    for name, adapter in adapters.items():
-        runtime = {}
+            versions[name] = ask(name, "import andrey; print(andrey.__version__)")
         codes = [_PYTHON_RUNTIME] + ([_R_RUNTIME] if isinstance(adapter, RAdapter) else [])
-        for code in codes:
-            command = [str(interpreters[adapter.name]), "-c", code]
-            run = subprocess.run(command, capture_output=True, text=True, check=True)
-            runtime.update(json.loads(run.stdout.strip().splitlines()[-1]))
-        runtimes[name] = runtime
+        runtimes[name] = {k: v for code in codes for k, v in json.loads(ask(name, code)).items()}
+    # 250 rows: enough for QCCD's seven quantile levels at the wrapper's default.
+    pair = tiny_table(n=250)[:, :2]
+    for name, adapter in adapters.items():
+        [measure] = run_task(
+            adapter, pair, adapter.params(), cap_wall_s=CAP_WALL_S, repeats=1, warmup=0, threads=1
+        )
+        if measure.get("status") != "ok":
+            text = str(measure.get("error_text") or measure.get("stderr") or "").strip()
+            last = text.splitlines()[-1] if text else measure.get("status")
+            raise SystemExit(f"{name} cannot fit a small pair here: {last}")
     return versions, runtimes
 
 
