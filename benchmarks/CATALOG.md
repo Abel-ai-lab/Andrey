@@ -124,6 +124,7 @@ rows are in
 
 | Release | Release card | Summary |
 |---|---|---|
+| 0.18.0 | [0.18.0 release card](../docs/docs/benchmarks/0.18.0.md) | [`published/0.18.0/summary.json`](published/0.18.0/summary.json) |
 | 0.17.0 | [0.17.0 release card](../docs/docs/benchmarks/0.17.0.md) | [`published/0.17.0/summary.json`](published/0.17.0/summary.json) |
 | 0.16.0 | [0.16.0 release card](../docs/docs/benchmarks/0.16.0.md) | [`published/0.16.0/summary.json`](published/0.16.0/summary.json) |
 | 0.15.0 | [Multi-domain data](../docs/docs/benchmarks/0.15.0.md) | [`published/0.15.0/summary.json`](published/0.15.0/summary.json) |

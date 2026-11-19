@@ -20,18 +20,18 @@ banner links the website's homepage. -->
 
 ---
 
-## ⭐ What's new in 0.17.1
+## ⭐ What's new in 0.18.0
 
-0.17.1 makes Andrey easier to enter and states its standards. The homepage shows one method per
-family, and a Methods page lists every method by the kind of data it reads. A standards page says
-what we require of every method and how we check it, with new tests that rescale each column and
-require the same graph. The docs gain a concepts guide and a learning path, and
-`score_func="normal_scores"`, experimental, keeps a search's graph under increasing transforms of a
-column. 0.17.0 added SCORE, NoGAM, and AGES.
+0.18.0 makes DAGMA supported, with its gap stated: its result depends on the data's scale. Against
+its authors' package on its paper's simulation, it made no more errors in any of 42 settings of raw
+and z-scored columns. DAS, SkewD, and CPCM, experimental, extend functional causal modeling, for
+larger graphs, skewed noise, and effects with a chosen distribution such as counts. `load_dataset`
+loads the Tübingen cause-effect pairs, and ANM, PNL, and LOCI return the same direction under any
+order of the rows.
 
-**[Methods](https://andrey.abel.ai/docs/methods.html)** ·
-**[Standards](https://andrey.abel.ai/docs/standards.html)** ·
-**[0.17.0 release card](https://andrey.abel.ai/docs/benchmarks/0.17.0.html)**
+**[0.18.0 release card](https://andrey.abel.ai/docs/benchmarks/0.18.0.html)** · Posts:
+**[Functional causal models](https://andrey.abel.ai/blog/20261103-andrey-0-13-0.html)** ·
+**[Pairwise direction](https://andrey.abel.ai/blog/20261015-andrey-0-4-0.html)**
 
 ---
 
