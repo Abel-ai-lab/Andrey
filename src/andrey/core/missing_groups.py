@@ -279,7 +279,7 @@ class GroupedSums:
         corrects each row missing two or more of its own columns, at most the rows missing both of
         each pair of them (the columns are sorted, so each pair's count sits above the diagonal).
         A block takes the grouped sums when the scanned rows over ``k`` plus that bound, summed
-        over its groups, are at most a quarter of the rows the per-row sums read. The choice
+        over its groups, are at most half the rows the per-row sums read. The choice
         depends on the block and the data alone.
         """
         k = columns.shape[1]
@@ -292,7 +292,7 @@ class GroupedSums:
                 local = self.local[g][columns[at]]
                 bound[at] += pairs[local[:, i], local[:, j]].sum(axis=1)
                 bound[at] += self.twice_missed[g].shape[1] / k
-        return 4 * bound <= self.n
+        return 2 * bound <= self.n
 
     def counts(self, columns: np.ndarray) -> np.ndarray:
         """The most rows each block, a row of ``columns``, can hold: those of its groups."""
