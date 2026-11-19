@@ -1538,6 +1538,28 @@ code.literal {
   padding: 0.1em 0.35em;
 }
 
+/* ---------- the AI statement ---------- */
+/* The last paragraph of a post or a release card: how AI tools were used to write it
+   (docs/conf.py, _ai_statement). */
+.bd-article p.ai-statement {
+  margin: 2.5rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--andrey-line);
+  color: var(--andrey-muted);
+  font-size: 0.85rem;
+}
+
+.bd-article p.ai-statement a {
+  font-weight: 600;
+}
+
+/* ---------- a post's update date ---------- */
+/* "Updated" and the date of a post's latest update stay together where a line of dates wraps: the
+   byline, the blog's front page, and the homepage's latest post (docs/conf.py, _post_days). */
+.post-updated {
+  white-space: nowrap;
+}
+
 /* ---------- math ---------- */
 /* KaTeX's hidden MathML copy is absolutely positioned; anchored to its formula, it cannot sit past
    the right edge of a phone screen and widen the page. */

@@ -15,6 +15,7 @@ from andrey.constraint._parallel_skeleton import (
 )
 from andrey.core.backend import GPU_THRESHOLDS
 from andrey.core.env import SEED_MAX
+from andrey.lingam.pwling import MIN_PRUNE_WORK
 from andrey.search._parallel_ges import MIN_POOL_GES_WORK
 
 from .models import EnvVarSpec
@@ -57,9 +58,9 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "Worker processes for GES, GFCI (its GES phase), the fits of `andrey.bootstrap`, "
             "the skeleton searches of PC, FCI, GFCI, BOSS-FCI, GRaSP-FCI, CD-NOD, and RSMAX2 "
             '(`restrict="pc"`) with `fisherz`, `student_t`, `normal_scores`, or `rcot`, and the '
-            "possible-d-separation searches of FCI, FCI-JCI, and GFCI with `fisherz`, `student_t`, "
-            "or `normal_scores`, and worker threads for the two directions of `pnl`; `0` or `1` "
-            "runs serially. "
+            "possible-d-separation searches of FCI and GFCI with `fisherz`, `student_t`, or "
+            "`normal_scores` and of FCI-JCI with `fisherz` or `student_t`, and worker threads for "
+            "the two directions of `pnl`; `0` or `1` runs serially. "
             "Separate from `ANDREY_BACKEND`, which picks the numeric code."
         ),
         group="backend",
@@ -99,12 +100,13 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         values="integer (subsets per possible-d-separation search)",
         default=str(MIN_POOL_DSEP_SUBSETS),
         effect=(
-            "Per-search crossover gate for the parallel possible-d-separation step of FCI, "
-            "FCI-JCI, and GFCI with `fisherz`, `student_t`, or `normal_scores`: a pair's search "
-            "runs on the worker pool only when its candidate set has at least this many subsets, "
-            "counted over every size it tests, else in-process. `0` sends every search to the "
-            "pool. The default was measured on an AMD EPYC server running Linux with 4 and 8 "
-            "workers. No effect unless the worker count (`n_jobs` / `ANDREY_N_JOBS`) is above 1. "
+            "Per-search crossover gate for the parallel possible-d-separation step of FCI and "
+            "GFCI with `fisherz`, `student_t`, or `normal_scores`, and of FCI-JCI with `fisherz` "
+            "or `student_t`: a pair's search runs on the worker pool only when its candidate set "
+            "has at least this many subsets, counted over every size it tests, else in-process. "
+            "`0` sends every search to the pool. The default was measured on an AMD EPYC server "
+            "running Linux with 4 and 8 workers. No effect unless the worker count (`n_jobs` / "
+            "`ANDREY_N_JOBS`) is above 1. "
             "A fit with more than one worker warns once on the default when a search reaches a "
             "tenth of it; `andrey calibrate --method possible_dsep` measures a value for your "
             "machine."
@@ -124,6 +126,21 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "worker count (`n_jobs` / `ANDREY_N_JOBS`) is above 1. A fit with more than one "
             "worker warns once on the default when a pass reaches a tenth of it; `andrey "
             "calibrate --method rcot` measures a value for your machine."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_LINGAM_PRUNE_MIN_WORK",
+        values="integer (rows times ordered pairs of candidates per step)",
+        default=str(MIN_PRUNE_WORK),
+        effect=(
+            "Per-step gate for the `pwling` causal-order search of DirectLiNGAM, "
+            "MultiGroupDirectLiNGAM, VARMA-LiNGAM, and longitudinal LiNGAM: a step stops scoring "
+            "a candidate once its partial score shows it cannot be picked only when the rows "
+            "times the ordered pairs of candidates reach this value, else it scores every "
+            "candidate in full. Both give the same order bit for bit. `0` prunes every step. The "
+            "default was measured on an AMD EPYC 7713 server running Linux on one core, where "
+            "pruning broke even at 60,000 to 80,000."
         ),
         group="backend",
     ),

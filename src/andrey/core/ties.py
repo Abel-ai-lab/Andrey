@@ -10,12 +10,15 @@ position, and :func:`resolve_collider_order`, :func:`resolve_in_column_order`, a
 
 Scores and p-values that differ only in their last bits count as equal: a method compares them
 rounded to :data:`KEY_DP` decimal places (:func:`tie_key`, :func:`stable_key`), and a greedy search
-counts a move as improving only when it lowers the score by more than :data:`EPS_IMPROVE`.
+counts a move as improving only when it lowers the score by more than :data:`EPS_IMPROVE`. A
+pairwise direction test counts its two directions' values as equal when they agree within
+:data:`PAIR_RTOL` (:func:`tied`).
 """
 
 from __future__ import annotations
 
 import hashlib
+import math
 from collections import Counter
 from functools import cmp_to_key
 from itertools import groupby
@@ -68,6 +71,29 @@ def stable_key(delta: float, n: int) -> float:
 def tie_key(value: float) -> float:
     """``value``, such as a log p-value, rounded to :data:`KEY_DP` decimal places."""
     return round(value, KEY_DP)
+
+
+#: Tolerance under which the two directions of a pairwise direction test (``anm``, ``pnl``,
+#: ``loci``, ``cpcm``) count as equal: two log p-values, two test statistics, or two
+#: log-likelihoods ``a`` and ``b`` tie when ``|a - b| <= PAIR_RTOL * max(1, |a|, |b|)``. For
+#: ``anm``, ``pnl`` and ``loci`` each direction's fit reads its rows in one canonical order, so a
+#: table whose two columns hold the same values swapped gives both directions the same numbers bit
+#: for bit, and they tie. ``cpcm`` fits both directions on the rows as given; on such tables in
+#: other row orders and units its two directions differed by at most ``1e-13``. The tolerance
+#: covers rounding carried through a fit: with such a table's columns in different units, which
+#: changes the last bits of its standardized values, the largest relative gap over 1,840 fits with
+#: 100 to 300 rows was ``1e-13`` for ``anm`` and ``0`` for ``pnl``, while for ``anm`` the two
+#: directions of 50 unrelated pairs, which nearly mirror each other, differ by ``2e-8`` and more.
+#: ``loci``'s solver stops when the mean log-likelihood changes by less than ``1e-6``, so its gap on
+#: such a table can reach ``6e-4``, and there the direction follows that difference.
+PAIR_RTOL = 1e-9
+
+
+def tied(a: float, b: float) -> bool:
+    """Whether ``a`` and ``b`` agree within :data:`PAIR_RTOL`; an infinity ties only with itself."""
+    if not (math.isfinite(a) and math.isfinite(b)):
+        return a == b
+    return abs(a - b) <= PAIR_RTOL * max(1.0, abs(a), abs(b))
 
 
 def tie_mask(name: str, categorical: npt.ArrayLike | None, d: int) -> np.ndarray:
@@ -337,7 +363,8 @@ def _marginal_key(col: np.ndarray, is_categorical: bool) -> bytes:
     values = np.sort(col[~np.isnan(col)])
     if values.size == 0 or values[0] == values[-1]:
         return f"V{values.size} constant".encode()
-    z = values - values.mean()
+    z = _within_one(values)
+    z -= z.mean()
     z /= np.sqrt(np.mean(z**2))
     return f"V{values.size} {abs(np.mean(z**3)):.9f} {np.mean(z**4):.9f}".encode()
 
@@ -377,9 +404,17 @@ def _standardized(col: np.ndarray) -> np.ndarray:
     z = np.full(col.shape, np.nan)
     z[present] = 0.0
     if values.size and values.min() != values.max():
-        centered = values - values.mean()
+        centered = _within_one(values)
+        centered -= centered.mean()
         z[present] = centered / np.sqrt(np.mean(centered**2))
     return z
+
+
+def _within_one(values: np.ndarray) -> np.ndarray:
+    """``values`` divided by the power of two that brings them within ``[-1, 1]``: exact, so the
+    keys are the same in any units, and the sums and squares that follow neither overflow nor
+    vanish for values near the largest or smallest float."""
+    return np.ldexp(values, -np.frexp(np.abs(values).max())[1])
 
 
 def _first_difference(a: np.ndarray, b: np.ndarray) -> int:

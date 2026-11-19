@@ -294,7 +294,10 @@ class DSepOracle:
     ``0.0`` otherwise, so it drops into the FCI orientation rules in place of a data CI test; alpha
     is therefore irrelevant. Queries are memoized (FCI re-asks pairs constantly). Query index
     ``k`` names the DAG node ``nodes[k]``, or ``k`` itself when ``nodes`` is ``None``, and every
-    query also conditions on the DAG nodes ``given``.
+    query also conditions on the DAG nodes ``given``. A search that visits the variables in another
+    order than the data's builds its test again over the reordered columns, so registered by name
+    (:func:`~andrey.core.ci.register_indep_test`), the oracle's factory sets ``nodes`` from the
+    matrix it receives.
 
     Notes
     -----

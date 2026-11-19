@@ -197,7 +197,7 @@ is supported in GES, hill climbing, Tabu search, BOSS, GRaSP, and NOTEARS, where
 alternating scheme: 10 searches unless you pass `n_em_iterations`, with 5 parameter-only EM steps
 before each after the first. It is experimental in the others, which have no reference
 implementation to compare with; the
-[missing-data comparison](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md)
+[missing-data comparison](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/missing-data.md)
 has what we measured.
 The other methods refuse missing values with an error that says what to do
 instead, and [Missing values](guides/getting-started.md#missing-values) explains each handling.
@@ -277,7 +277,7 @@ in any release.
 ### What is planned next?
 
 The [roadmap](roadmap.md) lists the planned work in order, starting with the major methods of each
-family. The [roadmap issue](https://github.com/Abel-ai-lab/andrey/issues/1) on GitHub tracks the
+family. The [roadmap issue](https://github.com/Abel-ai-lab/Andrey/issues/1) on GitHub tracks the
 progress of each stage.
 
 ### What is the license?
@@ -306,12 +306,12 @@ We named the package for both, and built it to make their ideas fast enough to u
 
 ### How do I report a bug or ask for a method?
 
-Open an issue on [GitHub](https://github.com/Abel-ai-lab/andrey/issues/new).
+Open an issue on [GitHub](https://github.com/Abel-ai-lab/Andrey/issues/new).
 
 ### How do I cite it?
 
 Cite the software with this BibTeX entry; the repository's
-[`CITATION.cff`](https://github.com/Abel-ai-lab/andrey/blob/main/CITATION.cff) has the same
+[`CITATION.cff`](https://github.com/Abel-ai-lab/Andrey/blob/main/CITATION.cff) has the same
 citation.
 
 ```bibtex
@@ -319,7 +319,7 @@ citation.
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.17.1},
+  version = {0.18.0},
   url = {https://andrey.abel.ai},
 }
 ```

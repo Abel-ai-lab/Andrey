@@ -58,6 +58,8 @@ def leaf_order(
     unit: np.ndarray,
     criterion: Callable[[np.ndarray], np.ndarray],
     precedence: np.ndarray | None = None,
+    *,
+    on_leaf: Callable[[list[int], int], None] | None = None,
 ) -> np.ndarray:
     """Find a causal order from the leaf up.
 
@@ -74,6 +76,10 @@ def leaf_order(
     precedence : np.ndarray or None
         ``(d, d)`` bool; ``precedence[a, b]`` puts ``a`` before ``b``, so ``a`` is a candidate
         only once ``b`` has left.
+    on_leaf : callable or None
+        Called as ``on_leaf(remaining, leaf)`` once each step picks its leaf, before the leaf
+        leaves: ``remaining`` lists the columns of the step, in the order of the criterion's last
+        call, ``unit[:, remaining]``, and holds ``leaf``.
 
     Returns
     -------
@@ -91,6 +97,8 @@ def leaf_order(
         ]
         value, leaf = min(candidates)
         _log.debug("%d remaining: leaf %d, criterion %.9g", len(remaining), leaf, value)
+        if on_leaf is not None:
+            on_leaf(remaining, leaf)
         remaining.remove(leaf)
         leaves.append(leaf)
     return np.array([*remaining, *reversed(leaves)], dtype=np.int64)

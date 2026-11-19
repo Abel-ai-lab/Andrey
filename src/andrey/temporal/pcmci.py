@@ -67,7 +67,7 @@ from andrey.core.ci import (
 )
 from andrey.core.ci_missing import PartialCorrelationDeletion, testwise_deletion
 from andrey.core.fdr import check_fdr_method, corrected_pvalues
-from andrey.core.score import copies_error
+from andrey.core.score import CopiedColumnsError, copies_error
 from andrey.core.ties import KEY_DP, tie_ranks
 
 if TYPE_CHECKING:
@@ -188,6 +188,62 @@ def design_test(
     mask = None if categorical is None else np.tile(categorical, 2 * tau_max + 1)
     design = lagged_design(data, 2 * tau_max)
     return column_test(indep_test, design, data.shape[1], categorical=mask, seed=seed)
+
+
+class RankedDesignTest:
+    """A test over the lagged design of the data's columns in rank order, asked in data columns.
+
+    ``by_rank[k]`` is the data column at position ``k`` of the test's data. A query's design column
+    ``lag * n + i`` reaches ``test`` as ``lag * n + back[i]``, where ``back`` inverts ``by_rank``,
+    each conditioning set sorted, so every column order of the data asks ``test`` the same queries
+    over the same matrix and gets the same bits back.
+    """
+
+    def __init__(self, test: LinkTest, by_rank: np.ndarray) -> None:
+        self.test = test
+        self.n_vars = len(by_rank)
+        self.back = np.argsort(by_rank)
+
+    def _moved(self, columns: np.ndarray) -> np.ndarray:
+        lag, i = np.divmod(np.asarray(columns, dtype=np.intp), self.n_vars)
+        return lag * self.n_vars + self.back[i]
+
+    def statistic_pvalues(
+        self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Test ``x[i]`` against ``y[i]`` given the columns ``conditions[i]``, for every row."""
+        moved = np.sort(self._moved(conditions), axis=1)
+        return self.test.statistic_pvalues(self._moved(x), self._moved(y), moved)
+
+
+def ranked_design_test(
+    indep_test: str,
+    data: np.ndarray,
+    tau_max: int,
+    ranks: Sequence[int],
+    *,
+    categorical: np.ndarray | None = None,
+    seed: int | None = None,
+) -> RankedDesignTest:
+    """:func:`design_test` over ``data``'s columns sorted by ``ranks``, their
+    :func:`~andrey.core.ties.tie_ranks`, asked in ``data``'s columns (:class:`RankedDesignTest`).
+
+    The copies error names ``data``'s design columns.
+    """
+    by_rank = np.argsort(np.asarray(ranks), kind="stable")
+    mask = None if categorical is None else np.asarray(categorical)[by_rank]
+    n_vars = len(by_rank)
+    try:
+        test = design_test(
+            indep_test, np.ascontiguousarray(data[:, by_rank]), tau_max, categorical=mask, seed=seed
+        )
+    except CopiedColumnsError as error:
+        moved = [
+            sorted((c // n_vars) * n_vars + int(by_rank[c % n_vars]) for c in group)
+            for group in error.groups
+        ]
+        raise copies_error(sorted(moved), design_column_name(n_vars)) from None
+    return RankedDesignTest(test, by_rank)
 
 
 def column_test(

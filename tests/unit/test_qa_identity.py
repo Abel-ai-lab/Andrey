@@ -8,6 +8,7 @@ import pkgutil
 import struct
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -111,6 +112,276 @@ def test_permuted_moves_each_block_of_variables_alike() -> None:
     order = np.array([3, 1, 0, 2])
     expected = [3, 1, 0, 2, 7, 5, 4, 6, 11, 9, 8, 10]
     assert identity.permuted(x, order, 3).ravel().tolist() == expected
+
+
+def spy(monkeypatch: pytest.MonkeyPatch, name: str) -> list[tuple[tuple, dict]]:
+    """Record each call's arguments to ``andrey.<name>``, which still fits."""
+    calls: list[tuple[tuple, dict]] = []
+    fit = getattr(andrey, name)
+
+    def recorded(*args, **kwargs):
+        calls.append((args, kwargs))
+        return fit(*args, **kwargs)
+
+    monkeypatch.setattr(andrey, name, recorded)
+    return calls
+
+
+def test_icp_moves_its_target_with_the_columns_and_keeps_its_environments(monkeypatch) -> None:
+    rng = np.random.default_rng(0)
+    x = np.column_stack([np.arange(120) * 3 // 120, rng.standard_normal((120, 4))])
+    x[:, 4] += x[:, 2]  # the target, the last variable, follows variable 1
+    calls = spy(monkeypatch, "icp")
+    refit = identity.FITS["ICP"].refit
+    assert refit is not None
+    refit(x, np.random.default_rng(5))
+    order = np.random.default_rng(5).permutation(4)
+    (samples, env), kwargs = calls[0]
+    assert np.array_equal(samples, x[:, 1:][:, order])
+    assert np.array_equal(env, x[:, 0])
+    assert np.array_equal(samples[:, kwargs["target"]], x[:, -1])
+
+
+def test_igsp_moves_its_targets_with_the_columns_and_keeps_its_environments(monkeypatch) -> None:
+    rng = np.random.default_rng(1)
+    samples = rng.standard_normal((150, 4))
+    env = np.arange(150) * 3 // 150
+    x = qg.known_target_stack(samples, env, [[1], [2, 3]])
+    calls = spy(monkeypatch, "igsp")
+    refit = identity.FITS["IGSP"].refit
+    assert refit is not None
+    refit(x, np.random.default_rng(5))
+    order = np.random.default_rng(5).permutation(4)
+    (moved, moved_env), kwargs = calls[0]
+    assert np.array_equal(moved, samples[:, order])
+    assert np.array_equal(moved_env, env)
+    # the columns each setting names are the original targets
+    assert {k: sorted(int(order[j]) for j in v) for k, v in kwargs["targets"].items()} == {
+        0: [],
+        1: [1],
+        2: [2, 3],
+    }
+
+
+def test_fci_jci_keeps_its_environment_column_last(monkeypatch) -> None:
+    rng = np.random.default_rng(2)
+    x = np.column_stack([rng.standard_normal((150, 4)), np.arange(150) * 2 // 150])
+    calls = spy(monkeypatch, "fci_jci")
+    refit = identity.FITS["FCI-JCI"].refit
+    assert refit is not None
+    refit(x, np.random.default_rng(5))
+    order = np.random.default_rng(5).permutation(4)
+    (moved, env), _ = calls[0]
+    assert np.array_equal(moved, x[:, order])
+    assert np.array_equal(env, x[:, -1])
+
+
+@pytest.mark.filterwarnings("ignore::andrey.DataTypeWarning")
+def test_jpcmciplus_names_the_contexts_new_columns(monkeypatch) -> None:
+    rng = np.random.default_rng(3)
+    x = rng.standard_normal((2, 60, qg.CONTEXT_SYSTEM + 2))  # one time and one space context
+    x[..., 5] = rng.standard_normal(60)  # the time context is the same in every dataset
+    x[..., 6] = np.arange(2)[:, None]  # the space context is constant within a dataset
+    contexts = qg.context_columns(x)
+    assert contexts == {"time_contexts": [5], "space_contexts": [6]}
+    calls = spy(monkeypatch, "jpcmciplus")
+    refit = identity.FITS["J-PCMCI+"].refit
+    assert refit is not None
+    refit(x, np.random.default_rng(5))
+    order = np.random.default_rng(5).permutation(qg.CONTEXT_SYSTEM + 2)
+    (moved,), kwargs = calls[0]
+    for dataset, original in zip(moved, x, strict=True):
+        assert np.array_equal(dataset, original[:, order])
+        assert np.array_equal(dataset[:, kwargs["time_contexts"]], original[:, [5]])
+        assert np.array_equal(dataset[:, kwargs["space_contexts"]], original[:, [6]])
+
+
+def test_icps_target_and_per_variable_metadata_map_back() -> None:
+    marks = np.zeros((3, 3), dtype=np.int8)
+    marks[1, 2], marks[2, 1] = 1, 2  # 1 -> 2, the target
+    meta = {
+        "algorithm": "icp",
+        "target": 2,
+        "parents": [1],
+        "p_values": [0.2, 0.01, None],
+        "confidence_intervals": [[-1.0, 1.0], [0.5, 0.9], None],
+        "accepted_sets": [[1], [0, 1]],
+    }
+    order = np.array([2, 0, 1])  # permuted column k is original column order[k]
+    back = np.argsort(order)
+    fitted = StructureOutput.new(  # the same answer, as a fit on x[:, order] gives it
+        GraphStructure.from_numpy(marks[np.ix_(order, order)], kind="dag"),
+        metadata={
+            **meta,
+            "target": int(back[2]),
+            "p_values": [meta["p_values"][i] for i in order],
+            "confidence_intervals": [meta["confidence_intervals"][i] for i in order],
+            "accepted_sets": [[0], [0, 2]],  # laid out in the order of the columns
+        },
+    )
+    original = StructureOutput.new(GraphStructure.from_numpy(marks, kind="dag"), metadata=meta)
+    assert identity.digest(identity.unpermute(fitted, order)) == identity.digest(
+        identity.unpermute(original, np.arange(3))
+    )
+
+
+def test_a_rejected_icp_fit_keeps_its_missing_intervals() -> None:
+    """ICP sets ``confidence_intervals`` to ``None`` when it rejects every candidate set."""
+    meta = {"algorithm": "icp", "target": 1, "p_values": [0.0, None], "confidence_intervals": None}
+    out = StructureOutput.new(
+        GraphStructure.from_numpy(np.zeros((2, 2), dtype=np.int8), kind="dag"), metadata=meta
+    )
+    back = identity.unpermute(out, np.array([1, 0]))
+    assert back.metadata["confidence_intervals"] is None
+    assert back.metadata["p_values"] == [None, 0.0]
+    assert back.metadata["target"] == 0
+
+
+def test_ut_igsps_targets_map_back_to_the_original_columns() -> None:
+    original = {0: [], 1: [2], 2: [0, 3]}
+    order = np.array([2, 3, 1, 0])  # permuted column k is original column order[k]
+    back = np.argsort(order)
+    fitted = {label: sorted(int(back[t]) for t in found) for label, found in original.items()}
+    assert fitted == {0: [], 1: [0], 2: [1, 3]}
+
+    def output(targets: dict[int, list[int]]) -> StructureOutput:
+        return StructureOutput.new(
+            GraphStructure.from_numpy(np.zeros((4, 4), dtype=np.int8), kind="cpdag"),
+            metadata={"algorithm": "ut_igsp", "targets": targets},
+        )
+
+    mapped = identity.unpermute(output(fitted), order)
+    assert mapped.metadata["targets"] == original
+    assert identity.digest(mapped) == identity.digest(
+        identity.unpermute(output(original), np.arange(4))
+    )
+
+
+def _output(p_value: float, *, ordering: list[int] | None = None, edge: bool = True):
+    marks = np.zeros((3, 3), dtype=np.int8)
+    if edge:
+        marks[0, 1], marks[1, 0] = 1, 2  # 0 -> 1
+    return StructureOutput.new(
+        GraphStructure.from_numpy(marks, kind="dag"),
+        ordering=ordering,
+        metadata={"algorithm": "test", "p_values": [p_value]},
+    )
+
+
+def test_the_last_bits_of_a_value_differ_under_a_column_order_without_failing() -> None:
+    first, refit = _output(0.25), _output(float(np.nextafter(0.25, 1.0)))
+    assert identity.classify(first, refit, column_order=False) == ("bits", ["metadata.p_values"])
+    assert identity.classify(first, refit, column_order=True) == ("digits", ["metadata.p_values"])
+    assert identity.classify(first, first, column_order=True) is None
+    assert "digits" not in identity.FAILING and "bits" in identity.FAILING
+
+
+def test_a_value_that_changes_by_more_than_rounding_fails_under_a_column_order() -> None:
+    kind, changed = identity.classify(_output(0.25), _output(0.9), column_order=True)
+    assert (kind, changed) == ("values", ["metadata.p_values"])
+    assert "values" in identity.FAILING
+
+
+def test_an_integer_that_becomes_a_float_is_not_rounding() -> None:
+    first = StructureOutput.new(
+        GraphStructure.from_numpy(np.zeros((2, 2), dtype=np.int8), kind="dag"),
+        metadata={"score": 1, "counts": [1, 2]},
+    )
+    refit = StructureOutput.new(
+        GraphStructure.from_numpy(np.zeros((2, 2), dtype=np.int8), kind="dag"),
+        metadata={"score": 1.0, "counts": [1.0, 2.0]},
+    )
+    assert identity.classify(first, refit, column_order=True) == (
+        "values",
+        ["metadata.counts", "metadata.score"],
+    )
+
+
+def test_a_boolean_that_becomes_a_number_is_not_rounding() -> None:
+    def output(flag: object) -> StructureOutput:
+        graph = GraphStructure.from_numpy(np.zeros((2, 2), dtype=np.int8), kind="dag")
+        return StructureOutput.new(graph, metadata={"flag": flag})
+
+    for first, refit in ((True, 1), (1, True), (False, 0), (True, 1.0)):
+        kind, changed = identity.classify(output(first), output(refit), column_order=True)
+        assert (kind, changed) == ("values", ["metadata.flag"])
+    assert identity.classify(output(True), output(True), column_order=True) is None
+
+
+def test_a_time_series_weights_differ_by_rounding_or_more() -> None:
+    def output(lag, time=None, lags=(1,)):
+        structure = SimpleNamespace(
+            lags=lags, times=(0,), lag_weights=lag, lag_weights_ma=None, time_weights=time
+        )
+        return SimpleNamespace(structure=structure, weighted_adjacency=None, metadata={})
+
+    base = output(np.array([[[0.5, 0.0], [0.25, 0.0]]]), np.full((1, 1, 2, 2), np.nan))
+    rounded = output(base.structure.lag_weights * (1 + 1e-13), base.structure.time_weights)
+    assert identity._rounded(base, rounded)
+    assert not identity._rounded(base, output(base.structure.lag_weights * 1.1))
+    assert not identity._rounded(base, output(base.structure.lag_weights, np.zeros((1, 1, 2, 2))))
+    assert not identity._rounded(base, output(base.structure.lag_weights, lags=(2,)))
+
+
+def test_a_different_graph_or_causal_order_fails_under_a_column_order() -> None:
+    first = _output(0.25, ordering=[0, 1, 2])
+    kind, changed = identity.classify(_output(0.25, edge=False), first, column_order=True)
+    assert kind == "graph" and "graph" in changed
+    kind, changed = identity.classify(_output(0.25, ordering=[1, 0, 2]), first, column_order=True)
+    assert (kind, changed) == ("structure", ["ordering"])
+    assert {"graph", "structure"} <= set(identity.FAILING)
+
+
+def test_a_documented_exception_is_expected_only_in_the_parts_it_names() -> None:
+    # FastICA's solution decides the graph, the causal order, and the weights, not the stamps
+    assert identity.documented("ICA-LiNGAM", ["graph", "ordering", "weights"])
+    assert identity.documented("ICA-LiNGAM", ["ordering"])
+    assert identity.documented("ICA-LiNGAM", []) is None
+    assert identity.documented("PC", ["graph", "ordering"]) is None
+    assert identity.documented("ICA-LiNGAM", ["metadata.seed"]) is None
+    assert identity.documented("ICA-LiNGAM", ["ordering", "metadata.tie_break"]) is None
+    assert "documented" not in identity.FAILING
+    assert set(identity.DOCUMENTED) <= set(identity.FITS)
+
+
+def test_a_documented_exception_is_not_a_failure_under_a_column_order(monkeypatch) -> None:
+    graph = GraphStructure.from_numpy(np.zeros((2, 2), dtype=np.int8), kind="dag")
+    outputs = {
+        False: StructureOutput.new(graph, metadata={"p_values": [[[1.0, 0.5], [0.5, 1.0]]]}),
+        True: StructureOutput.new(graph, metadata={"p_values": [[[1.0, 0.9], [0.9, 1.0]]]}),
+    }
+    calls = []
+
+    def call(x):
+        calls.append(x)
+        return outputs[len(calls) > 1]  # the first fit, then the column-order refit
+
+    monkeypatch.setitem(identity.FITS, "PCMCIplus", identity.Fit(call))
+    monkeypatch.setitem(
+        identity.DOCUMENTED, "PCMCIplus", (frozenset({"metadata.p_values"}), "a documented reason")
+    )
+    draw = iter([("PCMCIplus", "d", 0, np.zeros((3, 2)))])
+    monkeypatch.setattr(identity, "corpus", lambda methods, seeds: draw)
+    _, findings = identity.run(["PCMCIplus"], 1, shuffle=1)
+    assert [kind for kind, _ in findings] == ["documented"]
+    assert "a documented reason" in findings[0][1]
+    assert not any(kind in identity.FAILING for kind, _ in findings)
+
+
+@pytest.mark.parametrize(
+    ("kind", "code"),
+    [("digits", 0), ("documented", 0), ("bits", 1), ("values", 1), ("structure", 1), ("graph", 1)],
+)
+def test_the_exit_status_fails_on_a_structural_difference_and_reports_the_rest(
+    kind, code, monkeypatch, capsys
+) -> None:
+    monkeypatch.setattr(
+        identity, "run", lambda *args: ([], [(kind, "PC d seed 0 permutation 1: x")])
+    )
+    assert identity.main(["PC", "--shuffle", "1"]) == code
+    out = capsys.readouterr().out
+    assert identity.LABELS[kind] + ": PC d seed 0 permutation 1: x" in out
+    assert (f"{identity.LABELS[kind]}" in out) and "does not fail the check" in out
 
 
 def test_counts_separation_and_distinct_conditioning_sets() -> None:
