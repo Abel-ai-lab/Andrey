@@ -915,15 +915,18 @@ STRUCTURE = ("graph", "kind", "edges", "ordering")
 #: (:data:`DOCUMENTED`). The last two do not fail the check.
 FAILING = ("graph", "structure", "bits", "values")
 #: The column-order differences the column-order guide documents, by method: the parts of an output
-#: (:func:`parts`) a column order may change, ``None`` for any, and why. A column-order refit that
-#: differs only in those parts is expected.
-DOCUMENTED: dict[str, tuple[frozenset[str] | None, str]] = {
-    "ICA-LiNGAM": (None, "FastICA can reach another solution under a new column order"),
+#: (:func:`parts`) a column order may change, and why. A column-order refit that differs only in
+#: those parts is expected.
+DOCUMENTED: dict[str, tuple[frozenset[str], str]] = {
+    "ICA-LiNGAM": (
+        frozenset({"graph", "edges", "structure", "ordering", "weights"}),
+        "FastICA can reach another solution under a new column order",
+    ),
     "PCMCIplus": (
         frozenset({"metadata.p_values", "metadata.statistics"}),
-        "the graph is order-free; a link's recorded p-value and statistic are those of the last "
-        "test, whose conditioning set depends on the order, and a statistic near 0 can round "
-        "beyond the tolerance",
+        "the graph is order-free; a removed link's recorded p-value and statistic come from the "
+        "tests it had before one removed it, which depend on the order, and a statistic near 0 "
+        "can round beyond the tolerance",
     ),
 }
 #: The relative and absolute differences that count as rounding between two values.
@@ -1001,7 +1004,7 @@ def documented(method: str, changed: list[str]) -> str | None:
     """Return why a column-order refit of ``method`` that differs in the parts ``changed`` is
     expected (:data:`DOCUMENTED`), or ``None`` when it is not."""
     allowed, reason = DOCUMENTED.get(method, (frozenset(), ""))
-    return reason if allowed is None or (changed and set(changed) <= allowed) else None
+    return reason if changed and set(changed) <= allowed else None
 
 
 def run(

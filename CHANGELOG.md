@@ -82,9 +82,9 @@ names its pull request.
 - `qa/identity.py --shuffle` maps UT-IGSP's learned targets back to the original columns, and
   lists the column-order differences the column-order guide documents, ICA-LiNGAM's FastICA
   solution and PCMCIplus's recorded `p_values` and `statistics`, as expected instead of failing.
-  The column-order table's note and the docstring of `pcmciplus` say that a link's p-value and
-  statistic are those of its last test, whose conditioning set follows which end of a same-step
-  pair is tested first; its links and graph do not change. ([#1120])
+  The column-order table's note and the docstring of `pcmciplus` say that a removed link's p-value
+  and statistic come from the tests it had before one removed it, which follow which end of a
+  same-step pair is tested first; its links and graph do not change. ([#1120])
 - The Limitations of `notears` and `dagma` are one sentence: the result depends on the data's scale,
   after Reisach, Seiler and Weichwald (2021), with a link to the release card. The registry and the
   docstrings no longer say that the robust fit does not depend on the scale of the columns: its first

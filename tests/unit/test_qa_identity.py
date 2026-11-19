@@ -340,8 +340,10 @@ def test_a_documented_exception_is_expected_only_in_the_parts_it_names() -> None
     assert identity.documented("PCMCIplus", ["ordering"]) is None
     assert identity.documented("PCMCIplus", []) is None
     assert identity.documented("PC", p_values) is None
-    # FastICA's solution decides every part of an output
+    # FastICA's solution decides the graph, the causal order, and the weights, not the stamps
     assert identity.documented("ICA-LiNGAM", ["graph", "ordering", "weights"])
+    assert identity.documented("ICA-LiNGAM", ["metadata.seed"]) is None
+    assert identity.documented("ICA-LiNGAM", ["ordering", "metadata.tie_break"]) is None
     assert "documented" not in identity.FAILING
     assert set(identity.DOCUMENTED) <= set(identity.FITS)
 
