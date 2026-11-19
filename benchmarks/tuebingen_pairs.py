@@ -130,14 +130,24 @@ def machine() -> dict[str, str]:
     }
 
 
-def done_units(path: Path) -> set[tuple[str, str]]:
-    """The ``(pair, solution)`` units already in ``path``."""
+def identity(record: dict[str, Any]) -> str:
+    """What a record must share with the other records of its solution to be pooled with them."""
+    keys = ("package_version", "params", "cap_wall_s", "cap_mem_mb")
+    return json.dumps({k: record.get(k) for k in keys}, sort_keys=True, default=str)
+
+
+def done_units(path: Path, current: dict[str, str]) -> set[tuple[str, str]]:
+    """The ``(pair, method)`` units already in ``path``, refusing a resume whose build, parameters,
+    or caps (``current``, by method) differ from those of the records there."""
     if not path.is_file():
         return set()
     units = set()
     for line in path.read_text().splitlines():
         record = json.loads(line)
-        units.add((record["pair"], record["solution"]))
+        method = record["method"]
+        if method in current and identity(record) != current[method]:
+            raise SystemExit(f"{path} holds {method} records of another build, parameters, or caps")
+        units.add((record["pair"], method))
     return units
 
 
@@ -171,25 +181,39 @@ def main(argv: list[str] | None = None) -> int:
     wanted = parse_pairs(args.pairs)
     # One column per side: the six multivariate pairs (52 to 55, 71, 105) are left out.
     pairs = [q for q in collection if not q.multivariate and int(q.name[4:]) in wanted]
-    args.out.mkdir(parents=True, exist_ok=True)
-    records = args.out / "records.jsonl"
-    done = done_units(records)
+    if not pairs:
+        p.error(f"--pairs {args.pairs} names no two-column pair")
     adapters = {name: make_solution(name) for name in args.solutions}
     versions = preflight(adapters)
-    # The selected pairs and solutions, so the summary counts a unit no fit reached as unfinished.
+    current = {
+        name: identity(
+            {
+                "package_version": versions[name],
+                "params": dict(adapter.params()),
+                "cap_wall_s": args.cap_wall_s,
+                "cap_mem_mb": args.cap_mem_mb,
+            }
+        )
+        for name, adapter in adapters.items()
+    }
+    args.out.mkdir(parents=True, exist_ok=True)
+    records = args.out / "records.jsonl"
+    done = done_units(records, current)
+    # The requested units, so the summary counts a unit no fit reached as unfinished.
     path = args.out / "manifest.json"
-    manifest = json.loads(path.read_text()) if path.is_file() else {"pairs": {}, "solutions": []}
+    manifest = json.loads(path.read_text()) if path.is_file() else {"pairs": {}, "units": []}
     manifest["pairs"] = dict(
         sorted({**manifest["pairs"], **{q.name: q.weight for q in pairs}}.items())
     )
-    manifest["solutions"] = sorted({*manifest["solutions"], *args.solutions})
+    asked = {(q.name, name) for q in pairs for name in adapters}
+    manifest["units"] = sorted({*map(tuple, manifest["units"]), *asked})
     path.write_text(json.dumps(manifest, indent=1) + "\n")
     # Largest pairs first, so a worker is not left with the slow fits at the end.
     tasks = [
         (q, name)
         for q in sorted(pairs, key=lambda q: -len(q.data))
         for name in adapters
-        if (q.name, adapters[name].name) not in done
+        if (q.name, name) not in done
     ]
     lock = threading.Lock()
     host = machine()
