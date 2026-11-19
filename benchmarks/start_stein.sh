@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Fetches the authors' SCORE code and builds the environment of the Stein-score screen's references.
+# Fetches the authors' SCORE code and builds the environment of the Stein-score lane's references.
 #
 #   benchmarks/start_r.sh        # first: the R lane, whose module supplies Rscript
-#   benchmarks/start_stein.sh    # then: SCORE, NoGAM, and R2-SortnRegress, read by stein_cpu.py
+#   benchmarks/start_stein.sh    # then: SCORE, NoGAM, DAS, and R2-SortnRegress, read by stein_cpu.py
 #
 # SCORE is paulrolland1307/SCORE (Apache-2.0) at the commit below. The script downloads its files
 # one by one, checks each file's SHA-256, and writes them under `$ANDREY_BENCH_SCORE_DIR` (default
-# `benchmarks/.score`); the benchmark imports them from there and copies none of them. NoGAM is the
-# first author's code in dodiscover (MIT), which has no release with it, installed at a pinned
-# commit; R2-SortnRegress is CausalDisco 0.3.0 (BSD-3-Clause). requirements-stein.txt pins every
-# package of the environment, `.venv-stein`: the SCORE code imports GPy, the Causal Discovery
-# Toolbox, igraph, matplotlib, and torch at the top of its modules, and both it and dodiscover need
-# NumPy 1. The environment imports none of Andrey; the driver scores the results in bench-env.
+# `benchmarks/.score`); the benchmark imports them from there and copies none of them. NoGAM and DAS
+# are the first author's code in dodiscover (MIT), which has no release with them, installed at a
+# pinned commit; R2-SortnRegress is CausalDisco 0.3.0 (BSD-3-Clause). requirements-stein.txt pins
+# every package of the environment, `$ANDREY_BENCH_STEIN_VENV` (default `benchmarks/.venv-stein`):
+# the SCORE code imports GPy, the Causal Discovery Toolbox, igraph, matplotlib, and torch at the top
+# of its modules, and both it and dodiscover need NumPy 1. The environment imports none of Andrey; the driver scores the results in bench-env.
 # SCORE prunes with `mgcv` through Rscript, so the script installs `mgcv` into the R library.
 # Export what it prints before running stein_cpu.py.
 
@@ -21,7 +21,7 @@ REPO="$(git rev-parse --show-toplevel)"
 R_MODULE="${ANDREY_BENCH_R_MODULE:-gcc-12.1.0-gcc-11.2.0 r-4.6.1-gcc-12.1.0}"
 R_LIBS="${ANDREY_BENCH_R_LIBS:-$REPO/benchmarks/.r-lib-bench}"
 DEST="${ANDREY_BENCH_SCORE_DIR:-$REPO/benchmarks/.score}"
-VENV="$REPO/benchmarks/.venv-stein"
+VENV="${ANDREY_BENCH_STEIN_VENV:-$REPO/benchmarks/.venv-stein}"
 LOCK="$REPO/benchmarks/requirements-stein.txt"
 COMMIT="c2c2b8e0645b1a2a3970b5a16710ee776c4ed801"
 URL="https://raw.githubusercontent.com/paulrolland1307/SCORE/$COMMIT"
@@ -76,13 +76,14 @@ sys.path.insert(0, sys.argv[1])
 import numpy as np
 
 from andrey_bench.adapters.causaldisco_r2sort import CausalDiscoR2SortnRegress
+from andrey_bench.adapters.dodiscover_das import DodiscoverDAS
 from andrey_bench.adapters.dodiscover_nogam import DodiscoverNoGAM
 from andrey_bench.adapters.fcm_warm import tiny_table
 from andrey_bench.adapters.rolland_score import RollandSCORE
 
 x = tiny_table()
 edges = {}
-for adapter in (RollandSCORE(), DodiscoverNoGAM(), CausalDiscoR2SortnRegress()):
+for adapter in (RollandSCORE(), DodiscoverNoGAM(), DodiscoverDAS(), CausalDiscoR2SortnRegress()):
     adjacency = adapter.fit(x, adapter.params())
     edges[adapter.name] = sorted((int(i), int(j)) for i, j in zip(*np.nonzero(adjacency)))
 print(

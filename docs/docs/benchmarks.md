@@ -19,9 +19,9 @@ posts of the features it changes. A card keeps the numbers its release published
 :::::{div} release-latest
 
 :::{card}
-:link: benchmarks/0.17.0
+:link: benchmarks/0.18.0
 :link-type: doc
-:link-alt: The 0.17.0 release card
+:link-alt: The 0.18.0 release card
 :class-card: release-cover release-default
 :shadow: none
 :margin: 0
@@ -31,25 +31,57 @@ Release card
 <p class="sd-card-text"><img class="dark-light" src="../_static/wordmark-dark.svg" alt="Andrey"
 width="190" height="40"></p>
 
-0.17.0
+0.18.0
 :::
 
 ::::{div} release-tldr
 
-0.17.0 is here. SCORE and NoGAM read a causal order from the score of nonlinear data with additive
-noise, and neither made more errors than its reference implementation. NOTEARS and AGES are
-supported, and so is EM for missing data in GES, BOSS, and GRaSP. Path and confounder claims are
-supported in more methods, and `andrey.data` draws more noise families and mechanisms.
+0.18.0 is here. DAGMA is supported, with its gap stated: its result depends on the data's scale. Its
+`robust=True` path and that of NOTEARS follow the authors' code. DAS, SkewD, and CPCM, experimental,
+extend functional causal modeling, `load_dataset` loads the Tübingen cause-effect pairs, and ANM,
+PNL, and LOCI return the same direction under any order of the rows.
 
 :::{div} release-actions
-[Read the release card](benchmarks/0.17.0.md)
+[Read the release card](benchmarks/0.18.0.md)
 [Post: Functional causal models](../blog/20261103-andrey-0-13-0.md)
-[Post: Ready for real data](../blog/20261029-andrey-0-11-0.md)
+[Post: Pairwise direction](../blog/20261015-andrey-0-4-0.md)
 :::
 ::::
 :::::
 
 ## Earlier releases
+
+::::{div} release-row
+
+:::{card}
+:link: benchmarks/0.17.0
+:link-type: doc
+:link-alt: The 0.17.0 release card: SCORE, NoGAM, NOTEARS, and AGES
+:class-card: release-tile release-default
+:shadow: none
+:margin: 0
+
+0.17.0
+:::
+
+:::{div} release-body
+<h3>SCORE, NoGAM, NOTEARS, and AGES</h3>
+
+SCORE against its authors' code and NoGAM against dodiscover, NOTEARS against its authors' code,
+AGES against pcalg, and EM and path claims in more methods.
+
+- NoGAM made fewer errors than dodiscover in **16 of 24** settings, and more in none
+- AGES returned pcalg's graph on **1,378 of 1,380** datasets
+:::
+
+:::{div} release-meta
+Released November 11, 2026
+
+- [Release card<span class="visually-hidden"> 0.17.0</span>](benchmarks/0.17.0.md)
+- [Post: Functional causal models](../blog/20261103-andrey-0-13-0.md)
+- [Post: Ready for real data](../blog/20261029-andrey-0-11-0.md)
+:::
+::::
 
 ::::{div} release-row
 
@@ -551,6 +583,7 @@ The homepage's speed claim and charts come from these release cards.
 ```{toctree}
 :hidden:
 
+0.18.0 <benchmarks/0.18.0>
 0.17.0 <benchmarks/0.17.0>
 0.16.0 <benchmarks/0.16.0>
 0.15.0: multi-domain data <benchmarks/0.15.0>

@@ -92,10 +92,11 @@ you. Every method that takes `indep_test`, with a partial-correlation test, `"fi
 `"student_t"`, rejects copies the same way before any test runs, and so do `icp` and `dynotears`.
 `pcmci`, `pcmciplus`, and `lpcmci` with those tests also reject a series that repeats another up to
 `2 * tau_max` steps back and name its lagged value, such as `'a' at lag 1 repeats 'd'`. `cam`,
-`resit`, `score_matching`, `nogam`, and `camuv` reject copies the same way, and a column of fewer
-than 3 distinct values, such as a binary one, on which no smooth term can be fit; `resit`,
-`score_matching`, `nogam`, and `camuv` also need at least twice as many rows as columns, and `camuv`
-rejects a column that is a linear function of other columns, such as a total, as the BIC methods do.
+`resit`, `score_matching`, `nogam`, `das`, and `camuv` reject copies the same way, and a column of
+fewer than 3 distinct values, such as a binary one, on which no smooth term can be fit; `resit`,
+`score_matching`, `nogam`, and `camuv` also need at least twice as many rows as columns (`das`
+twice as many as `max_parents + 1`), and `camuv` rejects a column that is a linear function of
+other columns, such as a total, as the BIC methods do.
 Other data raises a `ValueError` that names the argument and, for a bad cell, its row and column. A
 single column gives a one-node graph.
 
@@ -103,9 +104,10 @@ single column gives a one-node graph.
 `pc`, `fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, and `lpcmci`
 accept missing values, a `NaN` cell, pandas' `NA`, or an empty, `NA`, or `N/A` field of a CSV file:
 each conditional-independence test reads only the rows where all of its variables are observed
-(test-wise deletion), and so do the pair tests `anm`, `pnl`, and `loci`, which read the rows where
-both columns are observed; `metadata["rows_tested"]` gives the fewest (`min`) and the median rows a
-test read. Their argument `missing` names the handling: `"testwise"` is test-wise deletion, and
+(test-wise deletion), and so do the pair tests `anm`, `pnl`, `loci`, and `skewd`, which read the
+rows where both columns are observed; `metadata["rows_tested"]` gives the fewest (`min`) and the
+median rows a test read.
+Their argument `missing` names the handling: `"testwise"` is test-wise deletion, and
 `None`, the default, picks the method's default handling, `"testwise"`; `metadata["missing"]`
 records the one a fit used. `pc` also takes `missing="mvpc"`: Missing-Value PC (Tu et al., 2019)
 finds the parents of each missingness indicator and tests again the edges they could have kept.
@@ -119,7 +121,7 @@ round changed it logs a warning. A row that observes no value is dropped first. 
 `score_func="bic"` only and no `env`, and it assumes values missing completely at random or at
 random given observed values. `missing="mvpc"` is supported, and so is `missing="em"` in `ges`,
 `hc`, `tabu`, `boss`, `grasp`, and `notears`: in the
-[missing-data comparison](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/missing-data.md),
+[missing-data comparison](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/missing-data.md),
 none was less accurate than its reference implementation in a setting that repeated on fresh
 datasets. For `ges`, `boss`, and `grasp` the reference estimates one covariance by EM before its
 search, a simpler method than structural EM, and the comparison is at `ebic_gamma=0.0`, up to 50
@@ -144,16 +146,17 @@ choices: `"fisherz"`, `"student_t"`, and `"normal_scores"` for continuous data, 
 tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` ([Conditional-independence
 tests](#conditional-independence-tests)). `None`, the default, picks from the declared column types,
 `"fisherz"` for continuous data. `jpcmciplus` takes the continuous and nonlinear tests, as its
-dummies enter a test as numeric columns. `pcmci`, `pcmciplus`, `jpcmciplus`, and `lpcmci` run each
-test on the lagged values of the series, and order the candidate conditions by the test's statistic,
-as tigramite does: the partial correlation, the chi-square statistic, the likelihood ratio, CMIknn's
-conditional mutual information estimate, or GPDC's distance correlation. A test you register that
-reports only p-values is ordered by its p-value, smallest first.
+dummies enter a test as numeric columns. `skewd_mv` takes them without `"normal_scores"`, as its
+likelihood stage reads the values, and its default is `"kci"`. `pcmci`, `pcmciplus`, `jpcmciplus`,
+and `lpcmci` run each test on the lagged values of the series, and order the candidate conditions by
+the test's statistic, as tigramite does: the partial correlation, the chi-square statistic, the
+likelihood ratio, CMIknn's conditional mutual information estimate, or GPDC's distance correlation.
+A test you register that reports only p-values is ordered by its p-value, smallest first.
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
 `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`,
-`exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`, `nogam`,
+`exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`, `nogam`, `das`,
 `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`,
 `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`,
 `bottom_up_parce_lingam`, and `camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
@@ -176,7 +179,7 @@ These marks and checks assume no selection bias. `lpcmci` takes each claim with 
 order search's prior knowledge (Shimizu et al. 2011, Section 3.4).
 
 These parts are supported wherever [true claims measured no
-worse](https://github.com/Abel-ai-lab/andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
+worse](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
 than the same fit without them and than a reference package given the same knowledge: in every
 method that honors them except six. `required_paths` is experimental in `tabu`, `mmhc`, and
 `rsmax2`, where a reference package given the required edges those paths imply made fewer errors,
@@ -308,27 +311,31 @@ details.
 
 % concept: max_parents
 `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, `rsmax2`,
-`gfci`, `boss_fci`, `grasp_fci`, `cam`, and `icp` take `max_parents`, a cap on every node's parents:
-no DAG the returned graph represents gives a node more than that many parents. `None`, the default,
-sets no cap. `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, and the score phase of `mmhc` and
-`rsmax2` take no move past the cap, `boss` and `grasp` grow no parent set past it, `exact_search`
-scores only the parent sets within it, and `cam`'s order search adds no edge past it. `icp` tests
-only the sets of at most that many variables, and its guarantee then needs the target to have no
-more parents. `gfci`, `boss_fci`, and `grasp_fci` cap their GES, BOSS, or GRaSP phase; the PAG their
-tests then orient can put more arrowheads at a node.
+`gfci`, `boss_fci`, `grasp_fci`, `cam`, `das`, and `icp` take `max_parents`, a cap on every node's
+parents: no DAG the returned graph represents gives a node more than that many parents. `None`, the
+default, sets no cap, except in `das`, whose default is its paper's 20. `ges`, `gies`, `gnies`,
+`xges`, `hc`, `tabu`, and the score phase of `mmhc` and `rsmax2` take no move past the cap, `boss`
+and `grasp` grow no parent set past it, `exact_search` scores only the parent sets within it,
+`cam`'s order search adds no edge past it, and `das`'s edge screen keeps no candidate past it.
+`icp` tests only the sets of at most that many variables, and its guarantee then needs the target
+to have no more parents. `gfci`, `boss_fci`, and `grasp_fci` cap their GES, BOSS, or GRaSP phase;
+the PAG their tests then orient can put more arrowheads at a node.
 
 % concept: seed
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
 `mmhc`, `rsmax2`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`,
-`hc`, `tabu`, `calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes
-their random draws. `None`, the default, is the configured seed, `ANDREY_SEED` or 0 when it is
-unset, not a fresh random one, so a call repeats exactly. Apart from `boss_fci` and `grasp_fci`,
-whose BOSS or GRaSP phase visits the variables in a random order on every fit, the methods that test
-independence draw random numbers only under `indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `pc` also
-with `missing="mvpc"` on data with missing values, `igsp` and `ut_igsp` also with `n_starts` above
-1, and `hc` and `tabu` only with `n_starts` above 1; otherwise `seed` changes nothing, and
-`metadata["seed"]` is not set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every
-other method is deterministic and takes no seed.
+`hc`, `tabu`, `calm`, `ica_lingam`, `cpcm`, `cpcm_graph`, `skewd`, and `skewd_mv` take `seed`, a
+whole number from 0 to 2**32 - 1 that fixes their random draws. `None`, the default, is the
+configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh random one, so a call repeats
+exactly. Apart from `boss_fci` and `grasp_fci`, whose BOSS or GRaSP phase visits the variables in a
+random order on every fit, the methods that test independence draw random numbers only under
+`indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `pc` also with `missing="mvpc"` on data with missing
+values, `igsp` and `ut_igsp` also with `n_starts` above 1, `hc` and `tabu` only with `n_starts`
+above 1, and `cpcm` and `cpcm_graph` only for a column under `family="poisson"` or
+`"negative_binomial"`; `skewd` and `skewd_mv` draw in every fit, in their Bayesian optimization and
+CMA-ES, whatever test PC runs. Otherwise `seed` changes nothing, and `metadata["seed"]` is not set.
+A call that gives `seed` does not depend on `ANDREY_SEED`. Every other method is deterministic and
+takes no seed.
 
 % concept: n_starts
 `boss`, `grasp`, `boss_fci`, `grasp_fci`, `igsp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the
@@ -437,6 +444,7 @@ variable.
    exact_search
    calm
    notears
+   dagma
    mmhc
    rsmax2
    boss
@@ -473,13 +481,15 @@ CALM is a continuous-optimization method in the line of NOTEARS ({py:func}`~andr
 {py:func}`~andrey.dagma`): it minimizes a Gaussian likelihood with L0 gates under a smooth
 acyclicity constraint, within an estimated moral graph.
 
-NOTEARS (Zheng et al. 2018), {py:func}`~andrey.notears`, fits a weighted DAG by minimizing the
-least-squares loss of a linear model with an `l1` penalty under a smooth acyclicity constraint, with
-NumPy and SciPy only. It returns a DAG with the coefficient of each edge, and its fit reads the
-columns' units, and on standardized columns its result depends on the `l1` penalty. `robust=True`
-follows the first fit with a refit under the Gaussian likelihood (Deng et al. 2024). The
-[0.17.0](benchmarks/0.17.0.md#notears) release card measures it from 10 to 100 variables against
-the authors' code.
+NOTEARS (Zheng et al. 2018), {py:func}`~andrey.notears`, and DAGMA (Bello et al. 2022),
+{py:func}`~andrey.dagma`, fit a weighted DAG by minimizing the least-squares loss of a linear model
+with an `l1` penalty under a smooth acyclicity constraint, with NumPy and SciPy only. They return a
+DAG with the coefficient of each edge. Their fits read the columns' units, so their results depend
+on the data's scale (Reisach, Seiler, and Weichwald 2021). `robust=True` follows the first fit with
+a refit under the Gaussian likelihood (Deng et al. 2024). The
+[0.17.0](benchmarks/0.17.0.md#notears) release card measures NOTEARS from 10 to 100 variables
+against the authors' code, and the [0.18.0](benchmarks/0.18.0.md#dagma) release card measures both
+on measured data.
 
 AGES, aggregative greedy equivalence search (Eigenmann, Nandy, and Maathuis 2017),
 {py:func}`~andrey.ages`, is for linear-Gaussian data with weak edges. A weak edge that closes a
@@ -662,17 +672,48 @@ in a process.
    :toctree: api
    :nosignatures:
 
-   dagma
+   skewd
+   skewd_mv
+   das
+   cpcm
+   cpcm_graph
 ```
 
-DAGMA (Bello et al. 2022) is a continuous-optimization learner in the line of NOTEARS: it fits a
-weighted DAG by minimizing a loss under a smooth acyclicity constraint, with NumPy and SciPy only.
-It is for data whose units are meaningful: on the usual simulated data its accuracy comes from the
-columns' variances following the causal order, and on standardized columns it does no better than
-the empty graph at its default settings, which is why it is experimental. The
-[0.17.0](benchmarks/0.17.0.md#dagma) release card has the numbers. `robust=True` follows the first
-fit with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
-(Deng et al. 2024).
+DAS (Montagna et al. 2023), {py:func}`~andrey.das`, finds SCORE's causal order with the same Stein
+estimator and then reads the edges from it: for a leaf, the second derivative of the log density in
+the leaf and another variable is zero at every point unless that variable is a parent. Each leaf
+keeps the variables before it whose derivatives are clearly above zero, at most `max_parents=20`
+of them by Welch tests at 0.01, and CAM's smooth-term tests at `alpha=0.001` prune only those, so
+its pruning does not grow with every variable before a node in the order. It returns a DAG and
+SCORE's causal order. It is experimental until its comparison with the authors' code is published.
+
+CPCM, conditionally parametric causal models (Bodik and Chavez-Demoulin 2025), models each
+variable given its parents by a parametric family whose parameters are smooth functions of the
+parents: Gaussian with mean and scale (the default), Gaussian with the mean alone, exponential,
+Pareto, Poisson, gamma, Gumbel, or negative binomial, one family for every column or one per
+column. Each variable's values mapped through its fitted distribution function are independent of
+its causes only in the causal direction. {py:func}`~andrey.cpcm` decides a pair by an HSIC test of
+that residual in each direction; {py:func}`~andrey.cpcm_graph` returns the DAG whose residuals a
+dHSIC test finds most jointly independent, with a penalty of 2 per edge, by exact search up to 4
+variables and RESIT's order with greedy edge removal above. A column outside its family's support,
+such as a non-integer under `"poisson"`, raises `ValueError`. Both are experimental until their
+comparison with the authors' code is published.
+
+SkewD (Klippert and Marx 2026), {py:func}`~andrey.skewd`, decides the direction of a variable pair
+whose noise is skewed, in the location-scale model of LOCI with a skew-normal noise. It fits the
+model in each direction, the location and the log scale smooth functions of the proposed cause and
+the shape one number, with penalties chosen by Bayesian optimization of a cross-validated
+likelihood, then decides by an HSIC test of the scaled residual against the cause
+(`criterion="independence"`, the default) or by the larger likelihood (`criterion="likelihood"`). At
+the defaults a pair takes tens of minutes. It is experimental until its comparison with the authors'
+code is published.
+
+SkewD-MV, {py:func}`~andrey.skewd_mv`, is the graph version: it learns the Markov equivalence class
+with PC and returns the DAG of the class whose skew-normal location-scale models, one per variable
+given its parents, have the largest likelihood. It suits a few variables: it fits one model per
+distinct parent set the class allows, and `max_fits` (100 by default, the order up to which the
+paper expects it to apply) makes it refuse a class that needs more, before it fits any. It is
+experimental until its comparison with the authors' code is published.
 
 A method becomes supported once it has:
 
@@ -700,6 +741,14 @@ A method becomes supported once it has:
 | `"cmiknn"` | Nearest-neighbor conditional mutual information, with a local permutation null | Supported |
 | `"gpdc"` | Gaussian-process regression, then a distance-correlation test of the residuals | Supported |
 
+`normal_scores` ranks each column over every row its test reads, and its model is one distribution.
+Ranked over the rows of several environments, a column mixes their distributions, and its scores
+are no longer Gaussian. So `cdnod`, `fci_jci`, `igsp`, `ut_igsp`, and `jpcmciplus`, whose tests
+always read several environments, do not offer it, and `gfci`, `boss_fci`, and `grasp_fci` raise a
+`ValueError` for it with an `env`, as they do for `score_func="normal_scores"`. Scores ranked within
+each environment would not help: they center and scale every column in each environment, so no
+variable would depend on the environment.
+
 The nonlinear tests, the last four, detect nonlinear dependence that partial correlation misses,
 at a far higher cost per test. They are benchmarked and checked in the release quality gate. Inside
 the search, KCI uses every BLAS thread from 2,000 rows and the other tests use one. On every thread,
@@ -725,6 +774,34 @@ andrey.pc(data, indep_test="cmiknn_k5")
 
 {py:meth}`CMIknn.statistic <andrey.core.ci_cmiknn.CMIknn.statistic>` returns the conditional
 mutual information estimate the test's p-value is built on, a dependence measure of its own.
+
+Every index a registered test is queried with is a column position of the matrix its factory
+received, and a search can ask the factory again for the same columns in another order: by default
+the possible-d-separation step of FCI, FCI-JCI, and GFCI builds its test over the columns sorted by
+their ranks (`possible_dsep="order_free"`). A test computed from its matrix, as every shipped test
+is, needs nothing more. A test that does not read its matrix, such as an oracle that answers by
+d-separation in a known graph (`andrey.data.latent.DSepOracle`), must find which variable each
+column of the matrix it receives holds:
+
+```python
+import numpy as np
+
+import andrey
+from andrey.core.ci import register_indep_test
+from andrey.data.latent import DSepOracle
+
+# `dag` is a networkx DiGraph over the column numbers of `data`, plus any hidden nodes.
+def factory(columns):
+    nodes = [
+        next(j for j in range(data.shape[1]) if np.array_equal(c, data[:, j])) for c in columns.T
+    ]
+    return DSepOracle(dag, nodes=nodes)
+
+register_indep_test("dsep", factory)
+andrey.fci(data, indep_test="dsep")  # the PAG of the observed columns
+```
+
+With `possible_dsep="fast"` the step keeps the columns in data order.
 
 On data with a `NaN`, {py:func}`~andrey.core.ci.make_indep_test` returns a
 {py:class}`~andrey.core.ci_missing.TestwiseDeletion` of the test: each query reads the rows observed
@@ -1011,6 +1088,7 @@ name.
 | Name | Variables | Edges | Data |
 |---|---|---|---|
 | `sachs` | 11 | 17 | Measured: 853 observational cells, or 7,466 in nine conditions (Sachs et al., 2005) |
+| `tuebingen` | 2 per pair | 1 per pair | Measured: 108 cause-effect pairs, each with its direction and weight (Mooij et al., 2016) |
 | `asia` | 8 | 8 | Simulated on the published network (bnlearn) |
 | `child` | 20 | 25 | Simulated on the published network (bnlearn) |
 | `insurance` | 27 | 52 | Simulated on the published network (bnlearn) |
@@ -1050,6 +1128,27 @@ rows = np.isin(pooled.env, list(known))
 andrey.gies(pooled.data[rows], pooled.env[rows], targets=known)
 ```
 
+`load_dataset("tuebingen")` loads the Tübingen cause-effect pairs (Mooij et al., 2016) as a
+collection: iterating it gives 108 pairs, each a dataset with the two columns `x` and `y` in the
+file's order, the two-node `graph` of its reference direction (the cause is `x` in some pairs and
+`y` in others), and its `name`, `weight`, `cause`, and `effect`. The collection gives the pairs of
+one source weights that sum to 1, so weigh each pair's outcome by its `weight` when you average
+over pairs. Six pairs (52 to 55, 71, and 105) have a block of several columns, marked
+`multivariate`; five of them have weight 0. The other 102 are the two-column pairs the pairwise
+methods (`anm`, `pnl`, `loci`) read. The collection states no license, and its pairs come from
+other collections with their own terms, so Andrey does not redistribute it: the first load downloads
+the archive from its original server and checks its SHA-256, and a changed archive is refused:
+
+```python
+pairs = load_dataset("tuebingen")
+usable = [p for p in pairs if not p.multivariate and p.weight > 0]
+correct = [
+    andrey.anm(p.data, alpha=None).structure.oriented_edges() == p.graph.oriented_edges()
+    for p in usable
+]
+accuracy = np.average(correct, weights=[p.weight for p in usable])
+```
+
 ```{eval-rst}
 .. currentmodule:: andrey.data
 
@@ -1060,6 +1159,8 @@ andrey.gies(pooled.data[rows], pooled.env[rows], targets=known)
    load_dataset
    list_datasets
    RealDataset
+   CausePairs
+   CausePair
 ```
 
 ### Simulators

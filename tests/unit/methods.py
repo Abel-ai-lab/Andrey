@@ -12,8 +12,11 @@ import numpy as np
 #: package-wide tests check do not depend on the fit converging.
 SHORT = {
     "calm": {"max_iter": 1, "subproblem_iter": 20},
+    "skewd": {"tuning_iter": 1, "max_iter": 5},
+    "skewd_mv": {"tuning_iter": 1, "max_iter": 5, "indep_test": "fisherz"},
     "varma_lingam": {"max_iter": 1},
     "jpcmciplus": {"time_dummy": False},
+    "cpcm_graph": {"family": "gaussian_fixed_scale"},
 }
 #: The arguments a method needs beyond its inputs: ICP's target, by position.
 REQUIRED = {"icp": {"target": 2}}

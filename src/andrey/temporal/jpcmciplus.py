@@ -475,6 +475,7 @@ def run_phases(
         parents,
         tau_max,
         pc_alpha,
+        ranks,
         _pass_constraints(free, kept, known),
         max_p_global,
     )
@@ -490,6 +491,7 @@ def run_phases(
         parents,
         tau_max,
         pc_alpha,
+        ranks,
         _pass_constraints(free, kept, known),
         max_p_global,
         pool=system,
@@ -505,6 +507,7 @@ def run_phases(
         parents,
         tau_max,
         pc_alpha,
+        ranks,
         _pass_constraints(free, kept, known),
         max_p_global,
         pool=system,

@@ -15,10 +15,23 @@ from andrey.core.knowledge import EDGE_PARTS, PATH_PARTS, KnowledgePart
 from andrey.core.score import RANK_SCORES, SCORES
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
-from .concepts import CONCEPTS, concept_param
+from .concepts import CONCEPTS, UNRANKED_TESTS, concept_param
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
 
 # Shared inputs and parameters; a parameter that implements a concept comes from its template.
+#: The conditional families of cpcm and cpcm_graph.
+_CPCM_FAMILIES = (
+    "gaussian",
+    "gaussian_fixed_scale",
+    "exponential",
+    "pareto",
+    "poisson",
+    "gamma",
+    "gamma_fixed_shape",
+    "gumbel",
+    "gumbel_fixed_scale",
+    "negative_binomial",
+)
 _DATA_MATRIX = InputSpec(
     name="data",
     kind="matrix",
@@ -31,21 +44,33 @@ _DECLARED = (
     "cond_gauss when some are, else {fallback}. A column is declared categorical by categorical "
     "or a DataFrame category, bool, or text type, never by its values."
 )
+#: The indep_test doc: the partial-correlation tests, then the others.
+_PARTIAL_CORRELATION = (
+    "Conditional-independence test. For continuous data, on the partial correlation: "
+    "fisherz = Fisher's z-transform and the normal distribution; student_t = the Student-t "
+    "distribution, exact for Gaussian data at any sample size"
+)
+_OTHER_TESTS = (
+    "For categorical data coded by whole numbers: chisq = Pearson's chi-square; gsq = G-square. "
+    "For mixed data, with the categorical columns named by categorical: degen_gauss = degenerate "
+    "Gaussian and cond_gauss = conditional Gaussian likelihood ratio. For nonlinear effects in "
+    "continuous data, each far slower per test: kci = kernel test; rcot = its random-feature "
+    "approximation; cmiknn = nearest-neighbor conditional mutual information; gpdc = "
+    "Gaussian-process regression and distance correlation. These four rank the columns as the "
+    "searches do, so ANDREY_TIE_BREAK=position makes their p-values depend on the column order. "
+    + _DECLARED.format(every="gsq", fallback="fisherz")
+)
 _INDEP_TEST = concept_param(
     "indep_test",
-    doc="Conditional-independence test. For continuous data, on the partial correlation: "
-    "fisherz = Fisher's z-transform and the normal distribution; student_t = the Student-t "
-    "distribution, exact for Gaussian data at any sample size; normal_scores = fisherz on each "
-    "column's normal scores, for data whose columns are monotone transformations of Gaussian "
-    "variables. For categorical data coded by whole "
-    "numbers: chisq = Pearson's chi-square; gsq = G-square. For mixed data, with the categorical "
-    "columns named by categorical: degen_gauss = degenerate Gaussian and "
-    "cond_gauss = conditional Gaussian likelihood ratio. For nonlinear effects in continuous "
-    "data, each far slower per test: kci = kernel test; rcot = its random-feature approximation; "
-    "cmiknn = nearest-neighbor conditional mutual information; "
-    "gpdc = Gaussian-process regression and distance correlation. These four rank the columns as "
-    "the searches do, so ANDREY_TIE_BREAK=position makes their p-values depend on the column "
-    "order. " + _DECLARED.format(every="gsq", fallback="fisherz"),
+    doc=_PARTIAL_CORRELATION + "; normal_scores = fisherz on each column's normal scores, for data "
+    "whose columns are monotone transformations of Gaussian variables. " + _OTHER_TESTS,
+)
+#: indep_test of a method whose tests always read several environments: no normal_scores.
+_POOLED_INDEP_TEST = concept_param(
+    "indep_test",
+    choices=UNRANKED_TESTS,
+    doc=_PARTIAL_CORRELATION + ". normal_scores is not offered: ranked over the rows of every "
+    "environment, a column's normal scores mix their distributions. " + _OTHER_TESTS,
 )
 _CATEGORICAL = concept_param("categorical")
 _COLLIDER_RULE = concept_param("collider_rule")
@@ -350,7 +375,7 @@ _add(
         ),
         params=(
             _ALPHA,
-            _INDEP_TEST,
+            _POOLED_INDEP_TEST,
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
             _CATEGORICAL,
@@ -416,7 +441,7 @@ _add(
         ),
         params=(
             _ALPHA,
-            _INDEP_TEST,
+            _POOLED_INDEP_TEST,
             _COLLIDER_RULE,
             _CATEGORICAL,
             _POSSIBLE_DSEP,
@@ -1170,8 +1195,7 @@ _add(
         family="score",
         summary="NOTEARS: least squares with an l1 penalty under the acyclicity equation "
         "tr(exp(W*W)) = d, by L-BFGS-B. Returns a weighted DAG. robust=true adds the likelihood "
-        "path of Deng et al. 2024, which does not depend on the scale of the columns. "
-        "Deterministic; no torch.",
+        "path of Deng et al. 2024. Reads the columns' units. Deterministic; no torch.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=_CONTINUOUS_OUTPUT,
         accel="numpy",
@@ -1230,12 +1254,11 @@ _add(
         family="score",
         summary="DAGMA: least squares with an l1 penalty and a log-determinant acyclicity barrier "
         "lowered along a central path, by Adam. Returns a weighted DAG. robust=true adds the "
-        "likelihood path of Deng et al. 2024, which does not depend on the scale of the columns. "
-        "Deterministic; no torch.",
+        "likelihood path of Deng et al. 2024. Reads the columns' units. Deterministic; no torch.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=_CONTINUOUS_OUTPUT,
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         reads_units=True,
         tie_break=True,
@@ -1643,7 +1666,7 @@ _add(
                 exclusive_maximum=True,
                 nullable=True,
             ),
-            _INDEP_TEST,
+            _POOLED_INDEP_TEST,
             concept_param("invariance_test"),
             concept_param(
                 "n_starts",
@@ -1735,7 +1758,7 @@ _add(
                 exclusive_maximum=True,
                 nullable=True,
             ),
-            _INDEP_TEST,
+            _POOLED_INDEP_TEST,
             concept_param("invariance_test"),
             concept_param(
                 "n_starts",
@@ -1930,6 +1953,134 @@ _add(
 )
 _add(
     MethodSpec(
+        name="cpcm_graph",
+        family="functional",
+        summary="Conditionally parametric causal models (CPCM) for small graphs: each variable "
+        "given its parents follows a chosen parametric family (Gaussian location-scale, "
+        "exponential, Pareto, Poisson, gamma, Gumbel, negative binomial); the DAG minimizing "
+        "minus the log p-value of a dHSIC test of the residuals' joint independence plus a "
+        "penalty per edge, by exact search up to 4 variables and RESIT order with greedy edge "
+        "removal above. Returns a DAG.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            doc="DAG of lowest score; metadata p_value is the joint independence p-value of its "
+            "residuals, score its score, search exact or greedy, families each column's family.",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            ParamSpec(
+                name="family",
+                type="str_or_list",
+                default="gaussian",
+                choices=_CPCM_FAMILIES,
+                doc="The family of each variable given its parents: one name for every column or a "
+                "list of one name per column. gaussian = mean and scale change with the parents; "
+                "gaussian_fixed_scale = the mean alone; exponential; pareto = scale 1, values of "
+                "at least 1; poisson; gamma = mean and shape; gamma_fixed_shape = the mean alone; "
+                "gumbel = location and scale; gumbel_fixed_scale = the location alone; "
+                "negative_binomial = the mean, one size for all rows. A column outside its "
+                "family's support raises ValueError.",
+            ),
+            ParamSpec(
+                name="edge_penalty",
+                type="float",
+                default=2.0,
+                minimum=0,
+                doc="Added to the score per edge. 2 is the paper's value; a larger penalty keeps "
+                "fewer edges.",
+            ),
+            concept_param(
+                "seed",
+                doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
+                "random one, so a fit repeats. Seed for the random draws of the count families, "
+                "poisson and negative_binomial; the other families draw nothing.",
+            ),
+        ),
+        references=(
+            "Bodik & Chavez-Demoulin 2025",
+            "Pfister et al. 2018",
+            "Peters, Mooij, Janzing & Scholkopf 2014",
+        ),
+    )
+)
+_add(
+    MethodSpec(
+        name="skewd_mv",
+        family="functional",
+        summary="SkewD-MV for nonlinear effects with skew-normal location-scale noise on a few "
+        "variables: PC's Markov equivalence class, then the class's DAG whose skew-normal "
+        "location-scale models of each variable given its parents have the largest likelihood. "
+        "Returns a DAG. No torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            doc="DAG of the class with the largest likelihood; metadata candidates is the number "
+            "of DAGs scored and fits the number of conditional models fitted.",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "alpha", doc="Significance level of PC's conditional-independence tests."
+            ),
+            concept_param(
+                "indep_test",
+                default="kci",
+                choices=tuple(t for t in CONTINUOUS_INDEP_TESTS if t in UNRANKED_TESTS),
+                doc="PC's conditional-independence test, one of continuous data and not "
+                "normal_scores, as the likelihood stage reads the values: fisherz = Fisher's "
+                "z-transform of the partial correlation; student_t = its Student-t form; for "
+                "nonlinear effects, each far slower per test: kci = kernel test, the authors' "
+                "choice; rcot = its random-feature approximation; cmiknn = nearest-neighbor "
+                "conditional mutual information; gpdc = Gaussian-process regression and distance "
+                "correlation. null picks fisherz.",
+            ),
+            ParamSpec(
+                name="tuning_iter",
+                type="int",
+                default=20,
+                minimum=1,
+                doc="The penalty settings the Bayesian optimization scores by cross-validation for "
+                "each conditional model, at least 1; the first half, rounded up, are Latin "
+                "hypercube points. 20 is the value of the paper's runs.",
+            ),
+            concept_param(
+                "max_iter",
+                default=3000,
+                doc="Most iterations of the expectation conditional maximization of each "
+                "conditional model, at least 1; 3000 is the value of the paper's runs. Reaching it "
+                "warns with SearchLimitWarning.",
+            ),
+            ParamSpec(
+                name="max_fits",
+                type="int",
+                default=100,
+                nullable=True,
+                minimum=1,
+                doc="The most conditional models the class's DAGs may need, at least 1; more is a "
+                "ValueError, raised once they are found, before any is fitted. 100 is the order up "
+                "to which the paper expects the method to apply. null sets no cap.",
+            ),
+            concept_param(
+                "seed",
+                doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
+                "random one, so a fit repeats. Seed for PC's randomized tests and the random draws "
+                "of each fit.",
+            ),
+        ),
+        references=("Klippert & Marx 2026", "Colombo & Maathuis 2014", "Zhang et al. 2011"),
+    )
+)
+_add(
+    MethodSpec(
         name="score_matching",
         family="functional",
         summary="SCORE for nonlinear effects with additive Gaussian noise: a causal order from the "
@@ -1994,6 +2145,51 @@ _add(
         references=(
             "Montagna et al. 2023",
             "Li & Turner 2018",
+            "Buhlmann, Peters & Ernest 2014",
+        ),
+    )
+)
+
+_add(
+    MethodSpec(
+        name="das",
+        family="functional",
+        summary="DAS for nonlinear effects with additive Gaussian noise, at scale: SCORE's causal "
+        "order from the leaf up, then each leaf's candidate parents screened by Welch tests on its "
+        "row of the same Stein estimate of the score's Jacobian, at most max_parents of them, and "
+        "only those pruned by smooth-term tests. Returns a DAG and a causal order. Deterministic; "
+        "no torch.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            has_ordering=True,
+            doc="DAG after the screen and the pruning; ordering is the causal order of the leaf "
+            "search.",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            concept_param(
+                "alpha",
+                default=0.001,
+                doc="Significance level of the pruning test: a candidate parent stays when its "
+                "smooth term's p-value is at most alpha. 0.001 is the cutoff of the SCORE "
+                "experiments the paper follows.",
+            ),
+            concept_param(
+                "max_parents",
+                default=20,
+                doc="A cap on every node's parents, at least 0: the edge screen keeps at most "
+                "max_parents candidate parents per variable, required edges included. 20 is the "
+                "paper's value. null sets no cap.",
+            ),
+        ),
+        references=(
+            "Montagna et al. 2023",
+            "Rolland et al. 2022",
             "Buhlmann, Peters & Ernest 2014",
         ),
     )
@@ -2214,7 +2410,6 @@ _add(
         status="supported",
         column_order="relabels",
         tie_break=True,
-        order_note='With `collider_rule="sepsets"`, the orientations can follow the column order.',
         params=(
             concept_param(
                 "tau_max",
@@ -2345,9 +2540,10 @@ _add(
             ),
             concept_param(
                 "indep_test",
-                choices=CONTINUOUS_INDEP_TESTS,
+                choices=tuple(t for t in CONTINUOUS_INDEP_TESTS if t in UNRANKED_TESTS),
                 doc="Conditional-independence test, as in pcmciplus: a test of continuous data, as "
-                "the dummies enter it as numeric one-hot columns. null picks fisherz.",
+                "the dummies enter it as numeric one-hot columns, but not normal_scores, whose "
+                "ranks over the rows of every dataset mix their distributions. null picks fisherz.",
             ),
             _TEST_SEED,
             concept_param(
@@ -2713,6 +2909,159 @@ _add(
     )
 )
 
+_add(
+    MethodSpec(
+        name="cpcm",
+        family="pairwise",
+        summary="Conditionally parametric causal model (CPCM) pairwise direction test: the effect "
+        "given its cause follows a chosen parametric family (Gaussian location-scale, "
+        "exponential, Pareto, Poisson, gamma, Gumbel, negative binomial) whose parameters are "
+        "smooth functions of the cause; decides whether column 0 causes column 1, the reverse, "
+        "or neither, from a two-column table.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data",
+                    kind="matrix",
+                    doc="The two variables, one per column: column 0 is x, column 1 is y.",
+                ),
+            ),
+            layout="(n_samples, 2), rows are samples",
+        ),
+        params=(
+            ParamSpec(
+                name="alpha",
+                type="float",
+                default=None,
+                doc="How the two p-values decide the edge. null: the direction with the larger "
+                "p-value, or with the smaller HSIC statistic when the p-values are equal (the "
+                "forced estimate). A level such as 0.05: no edge when the two columns test "
+                "independent, else an edge only when exactly one direction's p-value is above it "
+                "(the conservative estimate).",
+                nullable=True,
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+                concept="alpha",
+            ),
+            ParamSpec(
+                name="family",
+                type="str_or_list",
+                default="gaussian",
+                choices=_CPCM_FAMILIES,
+                doc="The family of each variable given its parents: one name for every column or a "
+                "list of one name per column. gaussian = mean and scale change with the parents; "
+                "gaussian_fixed_scale = the mean alone; exponential; pareto = scale 1, values of "
+                "at least 1; poisson; gamma = mean and shape; gamma_fixed_shape = the mean alone; "
+                "gumbel = location and scale; gumbel_fixed_scale = the location alone; "
+                "negative_binomial = the mean, one size for all rows. A column outside its "
+                "family's support raises ValueError.",
+            ),
+            concept_param(
+                "seed",
+                doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
+                "random one, so a fit repeats. Seed for the random draws of the count families, "
+                "poisson and negative_binomial; the other families draw nothing.",
+            ),
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            doc="two-node graph with the decided edge, or none; metadata p_values and statistics "
+            "map forward (x->y) and backward (y->x) to the p-value and the HSIC statistic, divided "
+            "by its mean under independence, of each residual test; independence_p_value is the "
+            "p-value of the test that x and y are independent; families is each column's family.",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        references=("Bodik & Chavez-Demoulin 2025", "Gretton et al. 2008", "Pfister et al. 2018"),
+    )
+)
+
+_TUNING_ITER = ParamSpec(
+    name="tuning_iter",
+    type="int",
+    default=60,
+    minimum=1,
+    doc="The penalty settings the Bayesian optimization scores by cross-validation in each "
+    "direction, at least 1; the first two thirds, rounded up, are Latin hypercube points. 60 is "
+    "the value of the paper's runs.",
+)
+
+_add(
+    MethodSpec(
+        name="skewd",
+        family="pairwise",
+        summary="Skew-normal location-scale pairwise direction test (SkewD): decides whether "
+        "column 0 causes column 1, the reverse, or neither, from a two-column table whose noise "
+        "may be skewed.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data",
+                    kind="matrix",
+                    doc="The two variables, one per column: column 0 is x, column 1 is y.",
+                ),
+            ),
+            layout="(n_samples, 2), rows are samples",
+            missing=True,
+        ),
+        params=(
+            ParamSpec(
+                name="alpha",
+                type="float",
+                default=None,
+                doc="How the two p-values decide the edge under criterion independence. null: the "
+                "direction with the larger p-value, or with the smaller HSIC statistic when the "
+                "p-values are equal. A level such as 0.05: an edge only when exactly one "
+                "direction's p-value is above it. Must be null under criterion likelihood.",
+                nullable=True,
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+                concept="alpha",
+            ),
+            ParamSpec(
+                name="criterion",
+                type="str",
+                default="independence",
+                choices=("independence", "likelihood"),
+                doc="independence = an HSIC test of each direction's scaled residual against its "
+                "proposed cause decides (SkewD-IT); likelihood = the direction whose model has the "
+                "larger likelihood (SkewD-LL).",
+            ),
+            _TUNING_ITER,
+            concept_param(
+                "max_iter",
+                default=5000,
+                doc="Most iterations of the expectation conditional maximization in each "
+                "direction, at least 1; 5000 is the value of the paper's runs. Reaching it warns "
+                "with SearchLimitWarning.",
+            ),
+            concept_param(
+                "seed",
+                doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
+                "random one, so a fit repeats. Seed for the random draws of the optimization.",
+            ),
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            doc="two-node graph with the decided edge, or none; metadata log_likelihoods maps "
+            "forward (x->y) and backward (y->x) to each model's mean log-likelihood, and under "
+            "criterion independence p_values and statistics map them to the p-value and the HSIC "
+            "statistic, divided by its mean under independence, of each test.",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        references=("Klippert & Marx 2026", "Gretton et al. 2008"),
+    )
+)
+
 # --- latent-variable family -----------------------------------------------------------------------
 
 _add(
@@ -2731,11 +3080,11 @@ _add(
         ),
         accel="numpy",
         status="supported",
-        column_order="can_change",
+        column_order="relabels",
         tie_break=True,
         order_note=(
-            "Reordering whole clusters relabels the result; reordering the columns inside a "
-            "cluster can change the latents' order."
+            '`tie_break="position"` breaks ties between root candidates, and numbers the unordered '
+            "latents, in column order."
         ),
         params=(
             concept_param(
@@ -3012,6 +3361,10 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "pairs outside the allowed set are in no pruning fit and never in the result; the score "
     "estimate and the residual regressions still read every remaining variable. The pruning never "
     "removes a required edge.",
+    "das": "A variable is the next leaf only when no remaining variable is in a later tier or is "
+    "the effect of a required edge out of it. Forbidden edges, edges into an earlier tier, and "
+    "pairs outside the allowed set are never candidates; the score estimate still reads every "
+    "remaining variable. A required edge is a candidate that the pruning never removes.",
     "direct_lingam": _ORDER_RULE + _REGRESSION_RULE,
     "ica_lingam": "The order search reads every forbidden edge's unmixing weight as 0. "
     + _ORDER_RULE
@@ -3292,6 +3645,10 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "lpcmci": ("links", "p_values", "statistics", "parents", "conflicts"),
     **dict.fromkeys(("anm", "pnl"), ("p_values", "statistics")),
     "loci": ("log_likelihoods", "p_values", "statistics"),
+    "cpcm": ("p_values", "statistics", "independence_p_value", "families"),
+    "cpcm_graph": ("p_value", "score", "search", "families"),
+    "skewd": ("log_likelihoods", "p_values", "statistics"),
+    "skewd_mv": ("candidates", "fits"),
     "gin": ("clusters", "cluster_order", "unordered"),
     "rcd": ("confounded_pairs",),
     "bottom_up_parce_lingam": ("partial_order",),

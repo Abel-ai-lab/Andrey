@@ -407,29 +407,53 @@ def check_argument(param: ParamSpec, value: Any, method: str) -> object:
 
     Raises what :meth:`~andrey.spec.models.ParamSpec.check` raises; when ``value`` is a choice that
     a release removed, the ``ValueError`` adds what the choice is called now
-    (:func:`~andrey.core.removed.removal_hint`).
+    (:func:`~andrey.core.removed.removal_hint`), and when it is a choice of the shared parameter
+    that this method does not offer, why not (:class:`~andrey.spec.concepts.Deviation`).
     """
     try:
         return param.check(value, method, choices=runtime_choices(param))
     except ValueError as error:
         hint = removal_hint(method, param.name, value)
-        if hint is None:
+        if hint is not None:
+            raise ValueError(f"{error}; {hint}") from None
+        reason = withheld_reason(param, value, method)
+        if reason is None:
             raise
-        raise ValueError(f"{error}; {hint}") from None
+        raise ValueError(f"{error}. {reason}") from None
+
+
+def withheld_reason(param: ParamSpec, value: Any, method: str) -> str | None:
+    """Why ``method`` does not offer ``value``, a choice of the concept ``param`` implements.
+
+    ``None`` when the concept offers no such choice or no deviation of the method withholds it.
+    """
+    from andrey.spec.concepts import CONCEPTS
+
+    concept = CONCEPTS.get(param.concept) if param.concept else None
+    if concept is None or concept.param is None or value not in (concept.param.choices or ()):
+        return None
+    for deviation in concept.deviations:
+        if deviation.method == method and value not in (deviation.choices or (value,)):
+            return deviation.reason
+    return None
 
 
 def draws_random_numbers(spec: MethodSpec, arguments: dict[str, Any]) -> bool:
     """Whether a fit of the seeded method ``spec`` with ``arguments`` draws random numbers.
 
-    A method with an ``indep_test`` draws them only under a randomized test
+    A method that takes ``tuning_iter`` always does: its optimization draws in every fit, whatever
+    test it runs. A method with an ``indep_test`` draws them only under a randomized test
     (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`) or, when it takes ``n_starts``, for the starts
     after the first, with ``n_starts`` above 1, unless it also takes a ``score_func``: then a
     search over variable orders, visited in a random order, runs before the tests (``boss_fci``,
     ``grasp_fci``), and it always does. A method with ``n_perturbations`` draws them only for the
-    random changes before a later start, with ``n_starts`` above 1; every other seeded method
-    always does. ``pc``'s ``missing="mvpc"`` draws them only on data with missing values, which
-    this check does not read: ``pc`` records its seed itself when the correction ran.
+    random changes before a later start, with ``n_starts`` above 1; a method with a ``family``
+    draws them only for a count family (the randomized probability transform); every other seeded
+    method always does. ``pc``'s ``missing="mvpc"`` draws them only on data with missing values,
+    which this check does not read: ``pc`` records its seed itself when the correction ran.
     """
+    if any(p.name == "tuning_iter" for p in spec.params):
+        return True
     test = next((p for p in spec.params if p.name == "indep_test"), None)
     starts = next((p for p in spec.params if p.name == "n_starts"), None)
     order_search = starts is not None and any(p.name == "score_func" for p in spec.params)
@@ -438,6 +462,13 @@ def draws_random_numbers(spec: MethodSpec, arguments: dict[str, Any]) -> bool:
         return later or arguments.get("indep_test", test.default) in STOCHASTIC_INDEP_TESTS
     if any(p.concept == "n_perturbations" for p in spec.params):
         return later
+    family = next((p for p in spec.params if p.name == "family"), None)
+    if family is not None:
+        from andrey.fcm.cpcm import FAMILIES
+
+        named = arguments.get("family", family.default)
+        names = named if isinstance(named, (list, tuple)) else [named]
+        return any(FAMILIES[n].counts for n in names if isinstance(n, str) and n in FAMILIES)
     return True
 
 
@@ -465,7 +496,9 @@ def chosen_settings(spec: MethodSpec, arguments: dict[str, Any]) -> dict[str, st
         pick = CHOSEN.get(concept)
         if pick is None:
             continue
-        name, columns[concept] = pick(data, arguments.get(param.name), categorical=declared)
+        name, columns[concept] = pick(
+            data, arguments.get(param.name, param.default), categorical=declared
+        )
         arguments[param.name] = chosen[param.name] = name
     if columns:
         arguments["categorical"] = columns.get("indep_test", columns.get("score_func"))

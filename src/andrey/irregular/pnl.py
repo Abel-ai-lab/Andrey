@@ -12,7 +12,8 @@ convex program. Each variable is first mapped to normal scores by rank.
 :func:`pnl_pairs` runs the test on many pairs of one table's columns. The ordered pairs are grouped
 by cause, so a column's normal scores, basis designs, and centered HSIC kernel are computed once and
 shared by every pair that uses it, and each kernel is built in row blocks into reused buffers. On
-the ``numpy`` backend, each pair's four numbers equal :func:`pnl`'s on that pair, bit for bit.
+the ``numpy`` backend, each pair's four numbers equal :func:`pnl`'s on that pair with its rows in
+the same order, bit for bit.
 
 On the ``cuda`` backend, or under ``auto`` from ``ANDREY_PNL_GPU_THRESHOLD`` rows squared, the
 kernels and their sums run in float64 torch on the device, a batch of disturbances at a time; the
@@ -359,23 +360,28 @@ def _ordered_tests(
     }
 
 
-def pnl(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float, float]:
-    """Return ``(log_p_forward, log_p_backward, stat_forward, stat_backward)`` for ``x, y``.
+def pnl(
+    forward: tuple[np.ndarray, np.ndarray], backward: tuple[np.ndarray, np.ndarray]
+) -> tuple[float, float, float, float]:
+    """Return ``(log_p_forward, log_p_backward, stat_forward, stat_backward)`` for a pair.
 
-    ``log_p_forward`` is the natural logarithm of the HSIC independence p-value between ``x`` and
-    the disturbance recovered under the ``x -> y`` post-nonlinear model; ``log_p_backward`` is the
-    same quantity under the ``y -> x`` model. A larger p-value means the assumed cause and the
-    recovered disturbance are more independent, so it favors that direction; the logarithms keep
-    their order where the p-values underflow (:mod:`andrey.core.independence`). ``stat_forward``
-    and ``stat_backward`` are the HSIC statistics of the same two tests, each divided by its mean
-    under independence; a smaller value means weaker dependence. ``x`` and ``y`` are 1-D arrays of
-    equal length.
+    ``forward`` holds the ``(cause, effect)`` columns of the ``x -> y`` hypothesis and ``backward``
+    those of ``y -> x``, each a pair of 1-D arrays of equal length; the caller orders each
+    direction's rows (:func:`andrey.api._irregular.direction_tables`). ``log_p_forward`` is the
+    natural logarithm of the HSIC independence p-value between ``x`` and the disturbance recovered
+    under the ``x -> y`` post-nonlinear model; ``log_p_backward`` is the same quantity under the
+    ``y -> x`` model. A larger p-value means the assumed cause and the recovered disturbance are
+    more independent, so it favors that direction; the logarithms keep their order where the
+    p-values underflow (:mod:`andrey.core.independence`). ``stat_forward`` and ``stat_backward``
+    are the HSIC statistics of the same two tests, each divided by its mean under independence; a
+    smaller value means weaker dependence. The two tests run in one call of the task runner, so
+    two directions given the same arrays return the same numbers bit for bit.
     """
-    columns = {0: _column(x), 1: _column(y)}
+    columns = {k: _column(values) for k, values in enumerate((*forward, *backward))}
     n = columns[0].standardized.shape[0]
     dev = backend.select_by_size("pnl", env.PNL_GPU_THRESHOLD, n * n, amortized=False)
-    tests = _ordered_tests(columns, [(0, 1), (1, 0)], backend.worker_count(), dev)
-    (stat_forward, log_p_forward), (stat_backward, log_p_backward) = tests[0, 1], tests[1, 0]
+    tests = _ordered_tests(columns, [(0, 1), (2, 3)], backend.worker_count(), dev)
+    (stat_forward, log_p_forward), (stat_backward, log_p_backward) = tests[0, 1], tests[2, 3]
     return log_p_forward, log_p_backward, stat_forward, stat_backward
 
 
@@ -388,9 +394,11 @@ def pnl_pairs(
     """Return :func:`pnl`'s four numbers for pairs of ``data``'s columns, one row per pair.
 
     Row ``k`` is ``(log_p_forward, log_p_backward, stat_forward, stat_backward)`` for the ``k``-th
-    pair ``(i, j)``, where forward means column ``i`` -> column ``j``; on the ``numpy`` backend it
-    equals ``pnl(data[:, i], data[:, j])`` bit for bit, and on a torch device to rounding, because
-    a device sums a batch of a cause's pairs in another order than a single pair. ``pairs``
+    pair ``(i, j)``, where forward means column ``i`` -> column ``j``, with the rows in the order
+    given. On the ``numpy`` backend a row equals
+    ``pnl((data[:, i], data[:, j]), (data[:, j], data[:, i]))`` bit for bit, and on a torch device
+    to rounding, because a device sums a batch of a cause's pairs in another order than a single
+    pair. ``pairs``
     defaults to every ``i < j`` in lexicographic order. ``n_jobs`` worker threads share the
     ordered pairs (``None`` reads ``andrey.config`` and ``ANDREY_N_JOBS``, ``-1`` uses every
     usable core); each holds three ``n x n`` float64 matrices, so a count whose matrices would

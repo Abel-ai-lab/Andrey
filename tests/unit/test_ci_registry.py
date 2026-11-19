@@ -86,12 +86,17 @@ def test_registry_surface(clean_registry):
     assert isinstance(ci.make_indep_test("normal_scores", _chain_data()), ci.NormalScores)
 
 
-@pytest.mark.parametrize("indep_test", ["student_t", "normal_scores"])
 @pytest.mark.parametrize(
-    "facade",
+    ("facade", "indep_test"),
     [
-        *("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci"),
-        *("iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"),
+        (facade, test)
+        for facade in (
+            *("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci"),
+            *("iamb", "inter_iamb", "mmpc", "mmhc", "rsmax2"),
+        )
+        for test in ("student_t", "normal_scores")
+        # The rank-based test is not offered where every test reads several environments.
+        if not (test == "normal_scores" and facade in ("cdnod", "fci_jci"))
     ],
 )
 def test_a_partial_correlation_test_is_selectable_by_every_constraint_facade(facade, indep_test):

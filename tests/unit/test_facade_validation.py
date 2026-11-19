@@ -82,6 +82,7 @@ SINGLE = {
     "resit": andrey.resit,
     "score_matching": andrey.score_matching,
     "nogam": andrey.nogam,
+    "das": andrey.das,
     "camuv": andrey.camuv,
     "boss": andrey.boss,
     "grasp": andrey.grasp,
@@ -241,6 +242,7 @@ COPY_CHECKED = [
     "resit",
     "score_matching",
     "nogam",
+    "das",
     "camuv",
     "icp",
 ]

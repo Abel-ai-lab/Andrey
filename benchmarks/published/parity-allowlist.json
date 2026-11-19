@@ -196,7 +196,7 @@
       "summary": "0.13.0",
       "method": "IAMB, moral graph, discrete networks",
       "comparator": "bnlearn",
-      "row": {"regime": "discrete_networks_chisq", "d": 70, "n": 5000},
+      "row": {"regime": "discrete_networks_chisq", "d": 70, "n": 5000, "network": "hepar2"},
       "andrey_errors": 125.6,
       "comparator_errors": 115.3,
       "cause": "correct-by-paper",
