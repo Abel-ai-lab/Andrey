@@ -4,8 +4,8 @@ anm  dag  |  2 nodes  |  1 edges (1 directed)
 
   x -> y
 
-  p_values: forward 0.02921, backward 3.968e-31
-  statistics: forward 1.726, backward 11.33
+  p_values: forward 0.02928, backward 3.968e-31
+  statistics: forward 1.725, backward 11.33
 
 pnl  dag  |  2 nodes  |  1 edges (1 directed)
 

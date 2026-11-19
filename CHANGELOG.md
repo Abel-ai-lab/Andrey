@@ -17,13 +17,13 @@ names its pull request.
   in the simulation's own units. As with `notears`, its result depends on the data's scale
   (Reisach, Seiler and Weichwald 2021), and the `robust=True` path of both now follows its authors'
   code. The [0.18.0 release card][card-0180-dagma] has the numbers and a check of both methods on
-  the Sachs data. ([#1043], [#1046])
-- DAS, SkewD, and CPCM, experimental, extend the functional causal models. `das` (Montagna et al.
-  2023) prunes SCORE's causal order at scale; `skewd` and `skewd_mv` (Klippert and Marx 2026) read
-  the direction of a pair, and a small DAG, whose noise is skewed and changes scale with the cause;
-  and `cpcm` and `cpcm_graph` (Bodik and Chavez-Demoulin 2025) do so where each variable given its
-  causes follows a chosen parametric family, such as counts or positive values. ([#1082], [#1083],
-  [#1085], [#1088])
+  the Sachs data. ([#1046])
+- DAS, SkewD-MV, and CPCM's graph search join the functional causal models, and the pair tests of
+  SkewD and CPCM the pairwise methods, all experimental. `das` (Montagna et al. 2023) prunes
+  SCORE's causal order at scale; `skewd` and `skewd_mv` (Klippert and Marx 2026) read the direction
+  of a pair, and a small DAG, whose noise is skewed and changes scale with the cause; and `cpcm` and
+  `cpcm_graph` (Bodik and Chavez-Demoulin 2025) do so where each variable given its causes follows a
+  chosen parametric family, such as counts or positive values. ([#1082], [#1083], [#1085], [#1088])
 - `andrey.data.load_dataset("tuebingen")` loads the 108 Tübingen cause-effect pairs (Mooij et al.
   2016), each with its reference direction and weight. ([#1084])
 - `anm`, `pnl`, and `loci` return the same direction under any order of the rows, and every pairwise
@@ -42,19 +42,17 @@ names its pull request.
 
 ### Added
 
-- `andrey.dagma` is supported, and the [0.18.0 release card][card-0180-dagma] compares it with its
-  authors' package on raw, rescaled, and z-scored columns and fits it and `notears` on the Sachs
-  data. ([#1043], [#1046])
 - `andrey.das`, DAS (Montagna et al. 2023), experimental, takes SCORE's causal order and screens
   each leaf's candidate parents on the same estimate of the score's Jacobian, at most
-  `max_parents=20` per variable, before CAM's pruning. ([#1082], [#1088])
+  `max_parents=20` per variable, before CAM's pruning; a column that knowledge forbids as a parent
+  never takes a true parent's place in that screen. ([#1082], [#1088])
 - `andrey.skewd` and `andrey.skewd_mv`, SkewD and SkewD-MV (Klippert and Marx 2026), experimental,
   decide a pair's direction, and choose a DAG in PC's equivalence class, under location-scale noise
   that follows a skew-normal distribution. ([#1083])
 - `andrey.cpcm` and `andrey.cpcm_graph`, CPCM (Bodik and Chavez-Demoulin 2025), experimental, decide
-  a pair's direction, and learn a DAG of up to a few variables, where each variable given its causes
-  follows a chosen family (`family`, one for every column or a list, one per column, also on the
-  command line). ([#1085], [#1099])
+  a pair's direction, and learn a small DAG (exact search up to 4 variables, greedy search above),
+  where each variable given its causes follows a chosen family (`family`, one for every column or a
+  list, one per column, also on the command line). ([#1085], [#1099])
 - `andrey.data.load_dataset("tuebingen")` loads the Tübingen cause-effect pairs (Mooij et al. 2016)
   as a `CausePairs` collection of 108 pairs, each with its two columns, the graph of its reference
   direction, its weight, and its `cause` and `effect` columns, downloaded from the original server
@@ -69,12 +67,15 @@ names its pull request.
 
 ### Changed
 
+- `dagma` is supported, and the [0.18.0 release card][card-0180-dagma] compares it with its authors'
+  package on raw, rescaled, and z-scored columns and fits it and `notears` on the Sachs data.
+  ([#1046])
 - The causal-order search of `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and
   `longitudinal_lingam` with `measure="pwling"` stops scoring a candidate that can be neither picked
-  nor tied, so `direct_lingam` on 50 and 70 variables is 2.0 and 2.4 times as fast, with every
-  output the same bit for bit. ([#1045], [#1051])
+  nor tied, so `direct_lingam` on 50 variables at 2,500 rows and 70 at 3,500 is 2.0 and 2.4 times
+  as fast, with every output the same bit for bit. ([#1051])
 - The Limitations of `notears` and `dagma` state in one sentence that their result depends on the
-  data's scale, and link the release card. ([#1043], [#1046])
+  data's scale, and link the release card. ([#1046])
 - For contributors, `qa/identity.py --shuffle` also refits ICP, IGSP, FCI-JCI, and J-PCMCI+, moving
   their targets and contexts with the columns. ([#1055])
 
@@ -84,13 +85,13 @@ names its pull request.
   Anderson-Darling p-value of `markov_check`, compute a p-value's upper tail directly, so a strong
   dependence keeps a positive p-value down to about `1e-308` instead of tying at `0`. ([#1017])
 - `anm`, `pnl`, and `loci` sort each direction's rows before they fit it, so a result no longer
-  depends on the order of the rows, and two directions within a relative `1e-9` of each other are a
-  tie, which gives no edge. ([#1112])
+  depends on the order of the rows. With `alpha=None`, two log p-values, statistics, or
+  log-likelihoods that differ by at most `1e-9` times the larger of 1 and their absolute values are
+  equal, and a pair equal in both p-values and statistics gives no edge. ([#1112])
 - `notears(robust=True)` and `dagma(robust=True)` minimize the likelihood of the path of Deng et al.
   (2024) without `-log|det(I - W)|`, as its authors' code does, which moved their errors on the
-  paper's simulation close to that code's. ([#1043], [#1046])
-- `das` ranks the columns that knowledge forbids as parents with the others in its edge screen, so
-  correct forbidden edges no longer remove a true parent. ([#1088])
+  paper's simulation close to that code's. They fell in every setting but `notears` on z-scored
+  columns, where they rose to that code's. ([#1046])
 - `gin` numbers the latents it leaves unordered by their clusters' lowest-ranked column, so a new
   column order relabels the graph and no longer renumbers them. ([#1067])
 - The column ranks that order tied choices are the same for a column in units near the ends of the
@@ -2649,7 +2650,6 @@ First alpha release.
 [#920]: https://github.com/Abel-ai-lab/Andrey/pull/920
 [#1017]: https://github.com/Abel-ai-lab/Andrey/pull/1017
 [#1037]: https://github.com/Abel-ai-lab/Andrey/pull/1037
-[#1045]: https://github.com/Abel-ai-lab/Andrey/issues/1045
 [#1051]: https://github.com/Abel-ai-lab/Andrey/pull/1051
 [#1059]: https://github.com/Abel-ai-lab/Andrey/pull/1059
 [#1055]: https://github.com/Abel-ai-lab/Andrey/pull/1055
@@ -2661,7 +2661,6 @@ First alpha release.
 [#1085]: https://github.com/Abel-ai-lab/Andrey/pull/1085
 [#1088]: https://github.com/Abel-ai-lab/Andrey/pull/1088
 [#1112]: https://github.com/Abel-ai-lab/Andrey/pull/1112
-[#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
 [#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
 [#1068]: https://github.com/Abel-ai-lab/Andrey/pull/1068
 [#1090]: https://github.com/Abel-ai-lab/Andrey/pull/1090

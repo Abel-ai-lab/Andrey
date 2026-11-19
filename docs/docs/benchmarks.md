@@ -36,10 +36,10 @@ width="190" height="40"></p>
 
 ::::{div} release-tldr
 
-0.18.0 is here. DAGMA is supported, with its gap stated, and its `robust=True` path and that of
-NOTEARS follow the authors' code. DAS, SkewD, and CPCM join the functional causal models as
-experimental methods, `load_dataset` loads the Tübingen cause-effect pairs, and ANM, PNL, and LOCI
-return the same direction under any order of the rows.
+0.18.0 is here. DAGMA is supported, with its gap stated: its result depends on the data's scale. Its
+`robust=True` path and that of NOTEARS follow the authors' code. DAS, SkewD, and CPCM, experimental,
+extend functional causal modeling, `load_dataset` loads the Tübingen cause-effect pairs, and ANM,
+PNL, and LOCI return the same direction under any order of the rows.
 
 :::{div} release-actions
 [Read the release card](benchmarks/0.18.0.md)

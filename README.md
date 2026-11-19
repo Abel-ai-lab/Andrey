@@ -22,11 +22,12 @@ banner links the website's homepage. -->
 
 ## ⭐ What's new in 0.18.0
 
-0.18.0 makes DAGMA supported, with its gap stated: against its authors' package on its paper's
-simulation, it made no more errors in any of 42 settings of raw and z-scored columns. DAS, SkewD,
-and CPCM join the functional causal models as experimental methods, for larger graphs, skewed
-noise, and effects with a chosen distribution such as counts. `load_dataset` loads the Tübingen
-cause-effect pairs, and ANM, PNL, and LOCI return the same direction under any order of the rows.
+0.18.0 makes DAGMA supported, with its gap stated: its result depends on the data's scale. Against
+its authors' package on its paper's simulation, it made no more errors in any of 42 settings of raw
+and z-scored columns. DAS, SkewD, and CPCM, experimental, extend functional causal modeling, for
+larger graphs, skewed noise, and effects with a chosen distribution such as counts. `load_dataset`
+loads the Tübingen cause-effect pairs, and ANM, PNL, and LOCI return the same direction under any
+order of the rows.
 
 **[0.18.0 release card](https://andrey.abel.ai/docs/benchmarks/0.18.0.html)** · Posts:
 **[Functional causal models](https://andrey.abel.ai/blog/20261103-andrey-0-13-0.html)** ·
