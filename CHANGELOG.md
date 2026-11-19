@@ -78,6 +78,12 @@ names its pull request.
   data's scale, and link the release card. ([#1046])
 - For contributors, `qa/identity.py --shuffle` also refits ICP, IGSP, FCI-JCI, and J-PCMCI+, moving
   their targets and contexts with the columns. ([#1055])
+- `qa/identity.py --shuffle` maps UT-IGSP's learned targets back to the original columns, and
+  lists the column-order differences the column-order guide documents, ICA-LiNGAM's FastICA
+  solution and PCMCIplus's recorded `p_values` and `statistics`, as expected instead of failing.
+  The column-order table's note and the docstring of `pcmciplus` say that a removed link's p-value
+  and statistic come from the tests it had before one removed it, which follow which end of a
+  same-step pair is tested first; its links and graph do not change. ([#1120])
 
 ### Fixed
 
@@ -2661,6 +2667,7 @@ First alpha release.
 [#1085]: https://github.com/Abel-ai-lab/Andrey/pull/1085
 [#1088]: https://github.com/Abel-ai-lab/Andrey/pull/1088
 [#1112]: https://github.com/Abel-ai-lab/Andrey/pull/1112
+[#1120]: https://github.com/Abel-ai-lab/Andrey/pull/1120
 [#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
 [#1068]: https://github.com/Abel-ai-lab/Andrey/pull/1068
 [#1090]: https://github.com/Abel-ai-lab/Andrey/pull/1090

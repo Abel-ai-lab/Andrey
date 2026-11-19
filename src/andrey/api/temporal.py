@@ -929,13 +929,15 @@ def pcmciplus(
     neighbors of the later end, with the lagged parents of both ends added, and removes the link
     at the first p-value above ``alpha``. A same-step pair is tested from both ends, first
     given the neighbors of its higher-numbered variable, and the neighbor sets stay fixed during a
-    round, so the links found do not depend on the order of the variables. The collider phase
-    orients the unshielded triples by ``collider_rule``, and the rule phase applies Meek's rules
-    R1 to R3 to the same-step links until none applies. Each collider or rule pass collects its
-    orientations before applying them, and marks a link that gets both orientations as a
-    conflict. With the ``"majority"`` or ``"conservative"`` rule the orientations do not depend on
-    the order of the variables either; ``"sepsets"`` reads the one separating set the skeleton phase
-    stored, which can change with the order.
+    round, so the links found do not depend on the order of the variables. The tests a link has
+    had before one removes it do, so its reported p-value and statistic, those of the largest of
+    its tests, can differ with the order. The collider phase orients the unshielded triples by
+    ``collider_rule``, and the rule phase applies Meek's rules R1 to R3 to the same-step links
+    until none applies. Each collider or rule pass collects its orientations before applying them,
+    and marks a link that gets both orientations as a conflict. With the ``"majority"`` or
+    ``"conservative"`` rule the orientations do not depend on the order of the variables either;
+    ``"sepsets"`` reads the one separating set the skeleton phase stored, which can change with the
+    order.
 
     **Choosing fdr_method.** The skeleton phase tests each lagged link at level ``alpha`` and keeps
     the links whose tests all stay at or below it, so absent links are kept by chance, more of them
