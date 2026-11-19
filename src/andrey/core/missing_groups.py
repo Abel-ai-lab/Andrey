@@ -98,7 +98,7 @@ class Grouping:
             members = self.missed[self.group == g][:, columns]
             spread = int(members.any(axis=0).sum())
             twice = int((members.sum(axis=1) >= 2).sum())
-            total += 8 * (1 + o + o * o) * (1 + spread) + 9 * o * twice
+            total += 8 * (1 + o + o * o) * (2 + spread) + 9 * o * twice
         return total
 
 
@@ -234,6 +234,7 @@ class GroupedSums:
         self.lost_s: list[np.ndarray] = []
         self.lost_c: list[np.ndarray] = []
         self.twice_values: list[np.ndarray] = []
+        self.pairs: list[np.ndarray] = []  # rows missing both of two columns, per pair
         self.twice_missed: list[np.ndarray] = []
         with np.errstate(all="ignore"), backend.one_blas_thread():
             for g, held in enumerate(grouping.observed):
@@ -266,6 +267,28 @@ class GroupedSums:
                 self.lost_c.append(lost_c)
                 self.twice_values.append(np.ascontiguousarray(x[:, twice]))
                 self.twice_missed.append(np.ascontiguousarray(missed[:, twice]).view(np.uint8))
+                both = missed[:, twice].astype(np.float64)
+                self.pairs.append(np.triu(np.rint(both @ both.T), 1))
+        self.n = int(len(grouping.group))
+
+    def cheaper(self, columns: np.ndarray) -> np.ndarray:
+        """Which blocks, rows of ``columns``, the groups compute for less than the per-row sums.
+
+        A block's correction reads each row missing two or more of its columns once; their count
+        is at most the rows missing both of each pair of its columns, summed over its groups (the
+        columns are sorted, so each pair's count sits above the diagonal). A
+        block takes the grouped sums when that bound is at most half the rows, which the per-row
+        sums read in full. The choice depends on the block and the data alone.
+        """
+        bound = np.zeros(len(columns))
+        inside = np.asarray(self.observed[:, columns].all(axis=2))
+        i, j = np.triu_indices(columns.shape[1], 1)
+        for g, pairs in enumerate(self.pairs):
+            at = np.flatnonzero(inside[g])
+            if len(at):
+                local = self.local[g][columns[at]]
+                bound[at] += pairs[local[:, i], local[:, j]].sum(axis=1)
+        return 2 * bound <= self.n
 
     def counts(self, columns: np.ndarray) -> np.ndarray:
         """The most rows each block, a row of ``columns``, can hold: those of its groups."""

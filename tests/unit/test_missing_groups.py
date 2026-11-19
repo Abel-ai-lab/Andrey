@@ -121,12 +121,17 @@ def test_grouped_sums_answer_as_the_per_row_sums_up_to_rounding(monkeypatch, gro
         test = make_indep_test(name, x)
         found = {}
         for queries in _queries(x.shape[1]).values():
-            q = np.array(queries)
-            found[len(q[0])] = test.statistic_pvalues(q[:, 0], q[:, 1], q[:, 2:])
+            q = np.sort(np.array(queries), axis=1)  # canonical: x < y, the set sorted
+            lo, hi, conds = q[:, 0], q[:, 1], q[:, 2:]
+            found[len(q[0])] = (
+                *test.statistic_pvalues(lo, hi, conds),
+                test._fast(lo, hi, conds)[2],
+            )
         assert (test._grouped_sums() is not None) == (path == "grouped")
         paths[path] = found
-    for size, (r, p) in paths["grouped"].items():
-        r_ref, p_ref = paths["per-row"][size]
+    for size, (r, p, rows) in paths["grouped"].items():
+        r_ref, p_ref, rows_ref = paths["per-row"][size]
+        assert np.array_equal(rows, rows_ref)  # the same row counts, short blocks included
         assert np.array_equal(np.isnan(p), np.isnan(p_ref))  # the same queries not tested
         assert np.allclose(r, r_ref, rtol=RTOL, atol=1e-12, equal_nan=True)
         assert np.allclose(p, p_ref, rtol=RTOL, atol=1e-12, equal_nan=True)

@@ -891,31 +891,26 @@ class GaussianDeletion(PartialCorrelationDeletion):
         new = list(dict.fromkeys(key for key in keys if key not in self._blocks))
         least = self.least_rows(k - 2)
         grouped = self._grouped_sums()
-        if grouped is None:
-            step = max(1, _STEP_BYTES // (8 * k * self._data.shape[0]))
-        else:
-            step = max(1, _STEP_BYTES // (32 * k * k))
-        for start in range(0, len(new), step):
-            chunk = np.array(new[start : start + step], dtype=np.intp)
+        step = len(new) if grouped is None else max(1, _STEP_BYTES // (32 * k * k))
+        for start in range(0, len(new), max(step, 1)):
+            chunk = np.array(new[start : start + step], dtype=np.intp).reshape(-1, k)
+            # The per-row path also counts the blocks too short for the groups to hold enough rows.
+            per_row = (
+                np.ones(len(chunk), dtype=bool)
+                if grouped is None
+                else ~grouped.cheaper(chunk) | (grouped.counts(chunk) < least)
+            )
             blocks = np.full((len(chunk), k, k), np.nan)
-            if grouped is None:
-                kept = self._seen[chunk[:, 0]].copy()
-                for c in range(1, k):
-                    kept &= self._seen[chunk[:, c]]
-                counts = np.count_nonzero(kept, axis=1)
-                enough = counts >= least
-                if enough.any():
-                    blocks[enough] = _block_correlations(
-                        self._values, kept[enough], chunk[enough], counts[enough]
-                    )
-            else:
-                counts = np.zeros(len(chunk), dtype=np.int64)
-                enough = grouped.counts(chunk) >= least
-                if enough.any():
-                    count, sums, products = grouped.blocks(chunk[enough])
-                    counts[enough] = count
-                    blocks[enough] = _correlations(products, sums, count)
-                blocks[counts < least] = np.nan
+            counts = np.zeros(len(chunk), dtype=np.int64)
+            if per_row.any():
+                blocks[per_row], counts[per_row] = self._summed(chunk[per_row], least)
+            if grouped is not None and not per_row.all():
+                at = np.flatnonzero(~per_row)
+                count, sums, products = grouped.blocks(chunk[at])
+                counts[at] = count
+                blocks[at] = np.where(
+                    (count >= least)[:, None, None], _correlations(products, sums, count), np.nan
+                )
             for key, block, count in zip(map(tuple, chunk.tolist()), blocks, counts.tolist()):
                 self._blocks[key] = (block, count)
                 self._kept += block.nbytes + _ENTRY_BYTES
@@ -929,6 +924,28 @@ class GaussianDeletion(PartialCorrelationDeletion):
         at = np.arange(len(columns))[:, None, None]
         stack = ordered[at, rank[:, :, None], rank[:, None, :]]
         return stack, np.array([count for _, count in found], dtype=np.int64)
+
+    def _summed(self, columns: np.ndarray, least: int) -> tuple[np.ndarray, np.ndarray]:
+        """The correlation matrices and row counts of the blocks ``columns`` summed over every row,
+        in steps of at most ``_STEP_BYTES`` of row values; a block with fewer than ``least`` rows
+        is never summed and its matrix is ``NaN``."""
+        b, k = columns.shape
+        blocks = np.full((b, k, k), np.nan)
+        counts = np.zeros(b, dtype=np.int64)
+        step = max(1, _STEP_BYTES // (8 * k * self._data.shape[0]))
+        for start in range(0, b, step):
+            chunk = columns[start : start + step]
+            kept = self._seen[chunk[:, 0]].copy()
+            for c in range(1, k):
+                kept &= self._seen[chunk[:, c]]
+            count = np.count_nonzero(kept, axis=1)
+            counts[start : start + step] = count
+            enough = count >= least
+            if enough.any():
+                blocks[start + np.flatnonzero(enough)] = _block_correlations(
+                    self._values, kept[enough], chunk[enough], count[enough]
+                )
+        return blocks, counts
 
     def _grouped_sums(self) -> GroupedSums | None:
         """The grouped sums of :mod:`~andrey.core.missing_groups` when the data take that path
