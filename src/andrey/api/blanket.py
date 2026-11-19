@@ -910,11 +910,11 @@ def gs(
     **Limitations.** Measured at alpha 0.05 on one core, every variable a target, on samples of four
     published networks, alarm, child, insurance, and hepar2 (20 to 70 variables), at 1,000, 5,000,
     and 20,000 rows with ``"gsq"``, and on linear-Gaussian graphs with 20, 50, and 100 variables at
-    1,000 and 5,000 rows with ``"fisherz"``, as the `0.18.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#gs>`_ shows; the benchmark scores the set at
-    each target, not the graphs the sets give. The sets have fewer errors, missing plus extra
-    members, than the empty set in every measured setting except hepar2, where they have more at
-    every size, 5.5, 5.0, and 4.7 per target against 4.5, as those of :func:`~andrey.iamb` do. On
+    1,000 and 5,000 rows with ``"fisherz"``, as the `local discovery release card
+    <https://andrey.abel.ai/docs/benchmarks/local-discovery.html#gs>`_ shows; the benchmark scores
+    the set at each target, not the graphs the sets give. The sets have fewer errors, missing plus
+    extra members, than the empty set in every measured setting except hepar2, where they have more
+    at every size, 5.5, 5.0, and 4.7 per target against 4.5, as those of :func:`~andrey.iamb` do. On
     hepar2, with 70 variables, 2.7 to 3.4 members per target are extra, close to ``alpha`` times the
     variables outside the blanket, while 1.3 to 2.8 of its 4.5 members are missed. The median fit
     for every target took 1.0 to 28 s on the networks and 0.46 to 5.2 s on the Gaussian graphs.
@@ -1188,11 +1188,11 @@ def fast_iamb(
     **Limitations.** Measured at alpha 0.05 on one core, every variable a target, on samples of four
     published networks, alarm, child, insurance, and hepar2 (20 to 70 variables), at 1,000, 5,000,
     and 20,000 rows with ``"gsq"``, and on linear-Gaussian graphs with 20, 50, and 100 variables at
-    1,000 and 5,000 rows with ``"fisherz"``, as the `0.18.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#fast-iamb>`_ shows; the benchmark scores the
-    set at each target, not the graphs the sets give. The sets have fewer errors, missing plus extra
-    members, than the empty set in every measured setting except hepar2, where they have more at
-    every size, 5.4, 4.9, and 4.7 per target against 4.5, and the Gaussian graphs with 100
+    1,000 and 5,000 rows with ``"fisherz"``, as the `local discovery release card
+    <https://andrey.abel.ai/docs/benchmarks/local-discovery.html#fast-iamb>`_ shows; the benchmark
+    scores the set at each target, not the graphs the sets give. The sets have fewer errors, missing
+    plus extra members, than the empty set in every measured setting except hepar2, where they have
+    more at every size, 5.4, 4.9, and 4.7 per target against 4.5, and the Gaussian graphs with 100
     variables, where they have as many. There, 2.5 to 3.2 members per target on hepar2 and 3.8 on
     the Gaussian graphs are extra, close to ``alpha`` times the variables outside the blanket,
     against blankets of 4.5 and 3.9 members. It ran 42% to 73% of the tests of :func:`~andrey.iamb`
@@ -1761,23 +1761,23 @@ def hiton_pc(
     published networks, alarm, child, insurance, and hepar2 (20 to 70 variables), at 200, 500, and
     5,000 rows with ``"gsq"``, and on linear-Gaussian graphs with 20, 50, and 100 variables at 1,000
     and 5,000 rows with ``"fisherz"``. The numbers here are for the default ``max_depth=3``; the
-    comparison on the `0.18.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#hiton-pc>`_ runs ``max_depth=None``. The
-    benchmark scores the set at each target, not the graphs the sets give. In every setting the sets
-    have fewer errors, missing plus extra members, than the empty set: on hepar2, 3.4, 3.0, and 1.8
-    per target against 3.5 at 200, 500, and 5,000 rows. The median fit for every target took 1.4 to
-    16 s on the networks and 0.43 to 4.3 s on the Gaussian graphs. Tested with exact d-separation on
-    15 variables. Missing values are not benchmarked; the tests run them on up to 20 variables with
-    up to a fifth of the values missing completely at random. A newcomer is tested only against the
-    members before it, so a member that a later one separates stays until the last candidate has
-    joined and enlarges the conditioning sets until then. Under the default ``max_depth=3``, a
-    variable that only a larger conditioning set separates from the target stays [1]_. Each
-    candidate takes up to one test per subset of the current set, so the cost grows with the size of
-    the set, up to ``max_depth`` members at a time, and the symmetry check runs the search once more
-    for each member. The CPDAG tests every subset of the smaller blanket for each unshielded triple,
-    so a triple whose smaller blanket holds ``m`` variables takes up to ``2**m`` tests. The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    comparison on the `local discovery release card
+    <https://andrey.abel.ai/docs/benchmarks/local-discovery.html#hiton-pc>`_ runs
+    ``max_depth=None``. The benchmark scores the set at each target, not the graphs the sets give.
+    In every setting the sets have fewer errors, missing plus extra members, than the empty set: on
+    hepar2, 3.4, 3.0, and 1.8 per target against 3.5 at 200, 500, and 5,000 rows. The median fit for
+    every target took 1.4 to 16 s on the networks and 0.43 to 4.3 s on the Gaussian graphs. Tested
+    with exact d-separation on 15 variables. Missing values are not benchmarked; the tests run them
+    on up to 20 variables with up to a fifth of the values missing completely at random. A newcomer
+    is tested only against the members before it, so a member that a later one separates stays until
+    the last candidate has joined and enlarges the conditioning sets until then. Under the default
+    ``max_depth=3``, a variable that only a larger conditioning set separates from the target stays
+    [1]_. Each candidate takes up to one test per subset of the current set, so the cost grows with
+    the size of the set, up to ``max_depth`` members at a time, and the symmetry check runs the
+    search once more for each member. The CPDAG tests every subset of the smaller blanket for each
+    unshielded triple, so a triple whose smaller blanket holds ``m`` variables takes up to ``2**m``
+    tests. The numbers are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------
@@ -2042,24 +2042,25 @@ def hiton_mb(
     20, 50, and 100 variables at 1,000 and 5,000 rows with ``"fisherz"``. Against its authors'
     HITON-MB, the sets were closer to the true ones in 11 of 13 settings and further at 5,000 rows
     on hailfinder and insurance, where the symmetry check drops members the authors' code keeps
-    (`0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#hiton-mb>`_). On
-    hailfinder at 200 and 500 rows the sets have more errors, missing plus extra members, than the
-    empty set, 4.0 and 4.4 per target against 3.7 and 3.3, since the rule of five rows per cell
-    leaves many of the tests there unrun. The parents and children come from HITON-PC, with its
-    limits: a newcomer is tested only against the members before it, so a member that a later one
-    separates stays until the last candidate has joined and enlarges the conditioning sets until
-    then. A spouse is found only through a child that the search found, so an edge its tests miss
-    also hides that child's other parents, and each spouse's verdict rests on the one separating
-    set HITON-PC recorded for it. On the linear-Gaussian data above, the moral graph had up to about
-    a third as many wrong pairs as true ones, most of them spouses behind missed edges, and the
-    paper found that HITON-MB needs more rows than HITON-PC [1]_. Under the default
-    ``max_depth=3``, a variable that only a larger conditioning set separates stays, and a spouse
-    whose separating set holds three variables does not join. The search runs HITON-PC for the
-    target, for each of its parents and children, and, for the symmetry check, for each of their
-    members, so its cost grows with the sets two steps from the target. The CPDAG tests every subset
-    of the smaller blanket for each unshielded triple, so a triple whose smaller blanket holds ``m``
-    variables takes up to ``2**m`` tests. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    (`local discovery release card
+    <https://andrey.abel.ai/docs/benchmarks/local-discovery.html#hiton-mb>`_). On hailfinder at 200
+    and 500 rows the sets have more errors, missing plus extra members, than the empty set, 4.0 and
+    4.4 per target against 3.7 and 3.3, since the rule of five rows per cell leaves many of the
+    tests there unrun. The parents and children come from HITON-PC, with its limits: a newcomer is
+    tested only against the members before it, so a member that a later one separates stays until
+    the last candidate has joined and enlarges the conditioning sets until then. A spouse is found
+    only through a child that the search found, so an edge its tests miss also hides that child's
+    other parents, and each spouse's verdict rests on the one separating set HITON-PC recorded for
+    it. On the linear-Gaussian data above, the moral graph had up to about a third as many wrong
+    pairs as true ones, most of them spouses behind missed edges, and the paper found that HITON-MB
+    needs more rows than HITON-PC [1]_. Under the default ``max_depth=3``, a variable that only a
+    larger conditioning set separates stays, and a spouse whose separating set holds three variables
+    does not join. The search runs HITON-PC for the target, for each of its parents and children,
+    and, for the symmetry check, for each of their members, so its cost grows with the sets two
+    steps from the target. The CPDAG tests every subset of the smaller blanket for each unshielded
+    triple, so a triple whose smaller blanket holds ``m`` variables takes up to ``2**m`` tests. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -2335,16 +2336,16 @@ def mmmb(
     set comes from MMPC rather than a fresh search. On hailfinder at 5,000 rows the authors' code
     also runs a test only with at least five rows per cell, which this search does not, and the sets
     stay further than that code's. In every setting the sets had fewer errors, missing plus extra
-    members, than the authors' code's and than the empty set's
-    (`0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#mmmb>`_). A spouse is
-    found only through a child that the search found, so an edge its tests miss also hides that
-    child's other parents, and each spouse's verdict rests on the one separating set MMPC recorded
-    for it. The search runs MMPC for the target, for each of its parents and children, and, for the
-    symmetry check, for each of their members, so its cost grows with the sets two steps from the
-    target. The CPDAG tests every subset of the smaller blanket for each unshielded triple, so a
-    triple whose smaller blanket holds ``m`` variables takes up to ``2**m`` tests. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    members, than the authors' code's and than the empty set's (`local discovery release card
+    <https://andrey.abel.ai/docs/benchmarks/local-discovery.html#mmmb>`_). A spouse is found only
+    through a child that the search found, so an edge its tests miss also hides that child's other
+    parents, and each spouse's verdict rests on the one separating set MMPC recorded for it. The
+    search runs MMPC for the target, for each of its parents and children, and, for the symmetry
+    check, for each of their members, so its cost grows with the sets two steps from the target. The
+    CPDAG tests every subset of the smaller blanket for each unshielded triple, so a triple whose
+    smaller blanket holds ``m`` variables takes up to ``2**m`` tests. The numbers are a reference,
+    not a hard limit: they change with the data generator, the density, the method's settings, and
+    the machine.
 
     References
     ----------
@@ -2633,17 +2634,18 @@ def pcmb(
     0.06, 0.04, and 0.04 below the paper's at a precision within 0.01 of it. Its errors, the members
     missed plus those added, were below the empty answer's in every setting, and a fit for every
     variable took a median of 2.6 to 7.6 s on Alarm and 3 to 17 minutes on Pigs on one core. The
-    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#pcmb>`_ has the table
-    beside the paper's. Tested with exact d-separation on 15 variables, on simulated linear-Gaussian
-    data with 20 variables and 2,000 rows, and on categorical data with 10 variables and 3,000 rows;
-    missing values on up to 20 variables with up to a fifth of the values missing completely at
-    random. A spouse is found only through a child that the search found, so an edge its tests miss
-    also hides that child's other parents, and each spouse's verdict rests on the one separating set
-    GetPCD recorded for it. GetPCD tests every candidate against every subset of the current set, so
-    a set of ``m`` members takes up to ``2**m`` tests per candidate; the search runs it for the
-    target, for each of its parents and children, and, for the symmetry check, for each of their
-    members, so its cost grows with the sets two steps from the target. The CPDAG tests every subset
-    of the smaller blanket for each unshielded triple, so a triple whose smaller blanket holds ``m``
+    `local discovery release card
+    <https://andrey.abel.ai/docs/benchmarks/local-discovery.html#pcmb>`_ has the table beside the
+    paper's. Tested with exact d-separation on 15 variables, on simulated linear-Gaussian data with
+    20 variables and 2,000 rows, and on categorical data with 10 variables and 3,000 rows; missing
+    values on up to 20 variables with up to a fifth of the values missing completely at random. A
+    spouse is found only through a child that the search found, so an edge its tests miss also hides
+    that child's other parents, and each spouse's verdict rests on the one separating set GetPCD
+    recorded for it. GetPCD tests every candidate against every subset of the current set, so a set
+    of ``m`` members takes up to ``2**m`` tests per candidate; the search runs it for the target,
+    for each of its parents and children, and, for the symmetry check, for each of their members, so
+    its cost grows with the sets two steps from the target. The CPDAG tests every subset of the
+    smaller blanket for each unshielded triple, so a triple whose smaller blanket holds ``m``
     variables takes up to ``2**m`` tests. The numbers are a reference, not a hard limit: they change
     with the data generator, the density, the method's settings, and the machine.
 

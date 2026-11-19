@@ -2,10 +2,11 @@
 
 This campaign compares Andrey's `gs`, `fast_iamb`, and `hiton_pc` with bnlearn 5.2.1's `gs`,
 `fast.iamb`, and `si.hiton.pc` on the set each learns at every target, on four published networks
-and on linear-Gaussian graphs. `blanket_cpu.py` fits the solutions, as
-[Markov blankets](blankets.md) describes, and `blanket_summary.py` judges each cell. The rows are in
-[`published/0.18.0/gs-fast-iamb-hiton-pc.json`](../published/0.18.0/gs-fast-iamb-hiton-pc.json),
-and the [0.18.0 release card](../../docs/docs/benchmarks/0.18.0.md) summarizes them.
+and on linear-Gaussian graphs. `blanket_cpu.py` fits the solutions, as [Markov
+blankets](blankets.md) describes, and `blanket_summary.py` judges each cell. The rows are in
+[`published/local-discovery/gs-fast-iamb-hiton-pc.json`](../published/local-discovery/gs-fast-iamb-hiton-pc.json),
+and the [local discovery release card](../../docs/docs/benchmarks/local-discovery.md) summarizes
+them.
 
 ## Data
 
@@ -73,9 +74,9 @@ method passes the floor when the interval of its errors minus the empty set's li
 The tests per target are the mean number of tests of a search for one target, and a fit's time is
 the median over the datasets of the wall time of the search for every target.
 
-## Results (0.18.0)
+## Results (local discovery)
 
-Andrey is the 0.18.0 release branch with `gs`, `fast_iamb`, and `hiton_pc` merged; bnlearn is 5.2.1
+Andrey is the local discovery branch with `gs`, `fast_iamb`, and `hiton_pc` merged; bnlearn is 5.2.1
 on R 4.6.1, and every fit ran on one core of an AMD EPYC 7713. Andrey's `gs` fits ran after the
 others, in separate runs on shared nodes, so the times of GS are indicative.
 

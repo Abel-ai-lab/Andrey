@@ -293,18 +293,17 @@ def mb_by_mb(
     45 x 45 chessboard) it made fewer errors at the target than the empty answer, with a small
     fraction of the tests of one :func:`~andrey.pc` fit; that fit made fewer errors in a few cells,
     among them Alarm at 5,000 rows with alpha 0.05 and Hailfinder at 500 rows with alpha 0.05, and
-    on the chessboard. The `0.18.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#mb-by-mb>`_ has the numbers. Each local
-    structure tests every pair of a blanket against every subset of the rest, up to
+    on the chessboard. The `local discovery release card
+    <https://andrey.abel.ai/docs/benchmarks/local-discovery.html#mb-by-mb>`_ has the numbers. Each
+    local structure tests every pair of a blanket against every subset of the rest, up to
     ``local_max_depth`` members, so a blanket of ``m`` variables takes up to about ``m**2 * 2**m``
     tests without the cap. Under the default ``local_max_depth=5``, a pair that only a larger set
     separates keeps its edge. The default blanket learner never drops a variable it added, so a
     large sample, in which more variables test dependent, gives larger blankets, and each test of
     the blanket learner conditions on the whole set so far. ``"total_conditioning"`` with a
     partial-correlation test needs at least two more rows than variables, rows with every variable
-    observed, and raises ``ValueError`` below that. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    observed, and raises ``ValueError`` below that. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -614,9 +613,9 @@ def mmb_by_mmb(
     **Limitations.** On the paper's four networks with hidden nodes, at 1,000 and 5,000 rows and the
     paper's targets, its edges and marks were better than those of the authors' code in five of
     eight settings and no worse in the rest, and its errors at the target were below the empty
-    answer's in all eight; the
-    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#mmb-by-mmb>`_ has the
-    numbers. Two adjacent variables that both have very wide blankets can still take long.
+    answer's in all eight; the `local discovery release card
+    <https://andrey.abel.ai/docs/benchmarks/local-discovery.html#mmb-by-mmb>`_ has the numbers. Two
+    adjacent variables that both have very wide blankets can still take long.
     ``"total_conditioning"`` needs continuous data with linear effects, and with a
     partial-correlation test at least two more rows than variables, rows with every variable
     observed, or it raises ``ValueError``; on other data or with fewer rows, choose another learner.
@@ -877,15 +876,15 @@ def cmb(
     **Limitations.** Measured on samples of the Alarm network (37 variables) at 1,000 rows with
     G-square tests at alpha 0.02, every variable a target, as its paper ran it: its edges at the
     target were nearer the true CPDAG's than those of :func:`~andrey.pc` on the same data and than
-    the empty answer, on 20 datasets and again on 20 fresh ones. The
-    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#cmb>`_ has the
-    numbers. With exact tests and exact blankets, every edge and every direction it returns is the
-    true CPDAG's, but it can leave undirected an edge the CPDAG directs: one whose direction follows
-    from a separating set its steps never test, or from directions its visits do not find. Over
-    every target of 100 random graphs of 6 to 20 variables, that happened at 2%, 5%, and 20% of
-    targets at an average of 1.5, 2.5, and 4 neighbors per variable, and on Alarm to 0.09 edges per
-    target. The numbers are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    the empty answer, on 20 datasets and again on 20 fresh ones. The `local discovery release card
+    <https://andrey.abel.ai/docs/benchmarks/local-discovery.html#cmb>`_ has the numbers. With exact
+    tests and exact blankets, every edge and every direction it returns is the true CPDAG's, but it
+    can leave undirected an edge the CPDAG directs: one whose direction follows from a separating
+    set its steps never test, or from directions its visits do not find. Over every target of 100
+    random graphs of 6 to 20 variables, that happened at 2%, 5%, and 20% of targets at an average of
+    1.5, 2.5, and 4 neighbors per variable, and on Alarm to 0.09 edges per target. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------

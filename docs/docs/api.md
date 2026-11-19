@@ -96,10 +96,11 @@ The local methods, which compute only the rows of the correlation matrix their s
 copies among columns whose rows are never computed do not raise.
 `pcmci`, `pcmciplus`, and `lpcmci` with those tests also reject a series that repeats another up to
 `2 * tau_max` steps back and name its lagged value, such as `'a' at lag 1 repeats 'd'`. `cam`,
-`resit`, `score_matching`, `nogam`, and `camuv` reject copies the same way, and a column of fewer
-than 3 distinct values, such as a binary one, on which no smooth term can be fit; `resit`,
-`score_matching`, `nogam`, and `camuv` also need at least twice as many rows as columns, and `camuv`
-rejects a column that is a linear function of other columns, such as a total, as the BIC methods do.
+`resit`, `score_matching`, `nogam`, `das`, and `camuv` reject copies the same way, and a column of
+fewer than 3 distinct values, such as a binary one, on which no smooth term can be fit; `resit`,
+`score_matching`, `nogam`, and `camuv` also need at least twice as many rows as columns (`das`
+twice as many as `max_parents + 1`), and `camuv` rejects a column that is a linear function of
+other columns, such as a total, as the BIC methods do.
 Other data raises a `ValueError` that names the argument and, for a bad cell, its row and column. A
 single column gives a one-node graph.
 
@@ -109,19 +110,19 @@ single column gives a one-node graph.
 `local_optimal_adjustment`, `locpc_cde`, `pcmci`, `pcmciplus`, and `lpcmci` accept missing values, a
 `NaN` cell, pandas' `NA`, or an empty, `NA`, or `N/A` field of a CSV file: each
 conditional-independence test reads only the rows where all of its variables are observed (test-wise
-deletion), and so do the pair tests `anm`, `pnl`, and `loci`, which read the rows where both columns
-are observed; `metadata["rows_tested"]` gives the fewest (`min`) and the median rows a test read.
-Their argument `missing` names the handling: `"testwise"` is test-wise deletion, and `None`, the
-default, picks the method's default handling, `"testwise"`; `metadata["missing"]` records the one a
-fit used. `pc` also takes `missing="mvpc"`: Missing-Value PC (Tu et al., 2019) finds the parents of
-each missingness indicator and tests again the edges they could have kept. `ges`, `xges`, `hc`,
-`tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm`, whose fits read the data
-only through their covariance, refuse missing values under `None` and take `missing="em"`:
-structural EM runs the search on the expected covariance of the data 10 times, refitting a
-linear-Gaussian model of each graph it returns, with 5 parameter-only EM steps on that graph before
-the next search (Friedman's alternating scheme). `metadata["em"]` records the rounds, the
-observed-data log-likelihood after each, and whether each changed the graph; a fit whose last round
-changed it logs a warning. A row that observes no value is dropped first. It takes
+deletion), and so do the pair tests `anm`, `pnl`, `loci`, and `skewd`, which read the rows where
+both columns are observed; `metadata["rows_tested"]` gives the fewest (`min`) and the median rows a
+test read. Their argument `missing` names the handling: `"testwise"` is test-wise deletion, and
+`None`, the default, picks the method's default handling, `"testwise"`; `metadata["missing"]`
+records the one a fit used. `pc` also takes `missing="mvpc"`: Missing-Value PC (Tu et al., 2019)
+finds the parents of each missingness indicator and tests again the edges they could have kept.
+`ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm`, whose
+fits read the data only through their covariance, refuse missing values under `None` and take
+`missing="em"`: structural EM runs the search on the expected covariance of the data 10 times,
+refitting a linear-Gaussian model of each graph it returns, with 5 parameter-only EM steps on that
+graph before the next search (Friedman's alternating scheme). `metadata["em"]` records the rounds,
+the observed-data log-likelihood after each, and whether each changed the graph; a fit whose last
+round changed it logs a warning. A row that observes no value is dropped first. It takes
 `score_func="bic"` only and no `env`, and it assumes values missing completely at random or at
 random given observed values. `missing="mvpc"` is supported, and so is `missing="em"` in `ges`,
 `hc`, `tabu`, `boss`, `grasp`, and `notears`: in the [missing-data
@@ -154,11 +155,12 @@ method's Notes say why.
 the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` ([Conditional-independence
 tests](#conditional-independence-tests)). `None`, the default, picks from the declared column types,
 `"fisherz"` for continuous data. `jpcmciplus` takes the continuous and nonlinear tests, as its
-dummies enter a test as numeric columns. `pcmci`, `pcmciplus`, `jpcmciplus`, and `lpcmci` run each
-test on the lagged values of the series, and order the candidate conditions by the test's statistic,
-as tigramite does: the partial correlation, the chi-square statistic, the likelihood ratio, CMIknn's
-conditional mutual information estimate, or GPDC's distance correlation. A test you register that
-reports only p-values is ordered by its p-value, smallest first.
+dummies enter a test as numeric columns. `skewd_mv` takes them without `"normal_scores"`, as its
+likelihood stage reads the values, and its default is `"kci"`. `pcmci`, `pcmciplus`, `jpcmciplus`,
+and `lpcmci` run each test on the lagged values of the series, and order the candidate conditions by
+the test's statistic, as tigramite does: the partial correlation, the chi-square statistic, the
+likelihood ratio, CMIknn's conditional mutual information estimate, or GPDC's distance correlation.
+A test you register that reports only p-values is ordered by its p-value, smallest first.
 
 % concept: degrees_of_freedom
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
@@ -178,7 +180,7 @@ another test raises a `ValueError`.
 `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
 `locpc_cde`, `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`,
 `igsp`, `ut_igsp`, `exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`,
-`nogam`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`,
+`nogam`, `das`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`,
 `longitudinal_lingam`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`,
 `bottom_up_parce_lingam`, and `camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
 and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's `knowledge`
@@ -344,29 +346,32 @@ details.
 
 % concept: max_parents
 `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, `rsmax2`,
-`gfci`, `boss_fci`, `grasp_fci`, `cam`, and `icp` take `max_parents`, a cap on every node's parents:
-no DAG the returned graph represents gives a node more than that many parents. `None`, the default,
-sets no cap. `ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, and the score phase of `mmhc` and
-`rsmax2` take no move past the cap, `boss` and `grasp` grow no parent set past it, `exact_search`
-scores only the parent sets within it, and `cam`'s order search adds no edge past it. `icp` tests
-only the sets of at most that many variables, and its guarantee then needs the target to have no
-more parents. `gfci`, `boss_fci`, and `grasp_fci` cap their GES, BOSS, or GRaSP phase; the PAG their
-tests then orient can put more arrowheads at a node.
+`gfci`, `boss_fci`, `grasp_fci`, `cam`, `das`, and `icp` take `max_parents`, a cap on every node's
+parents: no DAG the returned graph represents gives a node more than that many parents. `None`, the
+default, sets no cap, except in `das`, whose default is its paper's 20. `ges`, `gies`, `gnies`,
+`xges`, `hc`, `tabu`, and the score phase of `mmhc` and `rsmax2` take no move past the cap, `boss`
+and `grasp` grow no parent set past it, `exact_search` scores only the parent sets within it,
+`cam`'s order search adds no edge past it, and `das`'s edge screen keeps no candidate past it.
+`icp` tests only the sets of at most that many variables, and its guarantee then needs the target
+to have no more parents. `gfci`, `boss_fci`, and `grasp_fci` cap their GES, BOSS, or GRaSP phase;
+the PAG their tests then orient can put more arrowheads at a node.
 
 % concept: seed
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
 `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
 `mmhc`, `rsmax2`, `y_structures`, `ldp`, `ld3`, `ldecc`, `local_optimal_adjustment`, `locpc_cde`,
 `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, `tabu`,
-`calm`, and `ica_lingam` take `seed`, a whole number from 0 to 2**32 - 1 that fixes their random
-draws. `None`, the default, is the configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh
-random one, so a call repeats exactly. Apart from `boss_fci` and `grasp_fci`, whose BOSS or GRaSP
-phase visits the variables in a random order on every fit, the methods that test independence draw
-random numbers only under `indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `pc` also with
-`missing="mvpc"` on data with missing values, `igsp` and `ut_igsp` also with `n_starts` above 1, and
-`hc` and `tabu` only with `n_starts` above 1; otherwise `seed` changes nothing, and
-`metadata["seed"]` is not set. A call that gives `seed` does not depend on `ANDREY_SEED`. Every
-other method is deterministic and takes no seed.
+`calm`, `ica_lingam`, `cpcm`, `cpcm_graph`, `skewd`, and `skewd_mv` take `seed`, a whole number from
+0 to 2**32 - 1 that fixes their random draws. `None`, the default, is the configured seed,
+`ANDREY_SEED` or 0 when it is unset, not a fresh random one, so a call repeats exactly. Apart from
+`boss_fci` and `grasp_fci`, whose BOSS or GRaSP phase visits the variables in a random order on
+every fit, the methods that test independence draw random numbers only under `indep_test="rcot"`,
+`"cmiknn"`, or `"gpdc"`, `pc` also with `missing="mvpc"` on data with missing values, `igsp` and
+`ut_igsp` also with `n_starts` above 1, `hc` and `tabu` only with `n_starts` above 1, and `cpcm` and
+`cpcm_graph` only for a column under `family="poisson"` or `"negative_binomial"`; `skewd` and
+`skewd_mv` draw in every fit, in their Bayesian optimization and CMA-ES, whatever test PC runs.
+Otherwise `seed` changes nothing, and `metadata["seed"]` is not set. A call that gives `seed` does
+not depend on `ANDREY_SEED`. Every other method is deterministic and takes no seed.
 
 % concept: n_starts
 `boss`, `grasp`, `boss_fci`, `grasp_fci`, `igsp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the
@@ -562,13 +567,13 @@ partially directed graph tagged `cpdag`, and `metadata["path_penalties"]` lists 
 [0.17.0](benchmarks/0.17.0.md#ages) release card measures it on the paper's 10-variable
 simulation against pcalg.
 
-PCMB, parents-and-children based Markov boundary (Pena et al. 2007), {py:func}`~andrey.pcmb`,
-learns a variable's Markov blanket from the parents and children of the target and of each of them,
-found by GetPCD and a symmetry check, and then admits each child's other parent with one
-conditional-independence test. Without a `target` it joins the blankets into a CPDAG, a skeleton,
-or a moral graph, as `iamb` does. On categorical data it counts degrees of freedom as Spirtes,
-Glymour, and Scheines (1993) do (`degrees_of_freedom="nonempty"`). No reference implementation
-exists, so the [0.18.0](benchmarks/0.18.0.md#pcmb) release card sets its results on two published
+PCMB, parents-and-children based Markov boundary (Pena et al. 2007), {py:func}`~andrey.pcmb`, learns
+a variable's Markov blanket from the parents and children of the target and of each of them, found
+by GetPCD and a symmetry check, and then admits each child's other parent with one
+conditional-independence test. Without a `target` it joins the blankets into a CPDAG, a skeleton, or
+a moral graph, as `iamb` does. On categorical data it counts degrees of freedom as Spirtes, Glymour,
+and Scheines (1993) do (`degrees_of_freedom="nonempty"`). No reference implementation exists, so the
+[local discovery](benchmarks/local-discovery.md#pcmb) release card sets its results on two published
 networks beside those of its paper.
 
 MB-by-MB (Wang et al. 2014), {py:func}`~andrey.mb_by_mb`, answers for one `target`: it learns the
@@ -576,33 +581,33 @@ target's Markov blanket and the local structure over it, then a neighbor's, one 
 until no further blanket can direct an edge at the target, and returns the edges the target has in
 the CPDAG with their directions. `metadata["parents"]`, `metadata["children"]`, and
 `metadata["undirected"]` list the columns joined to the target, and `metadata["blankets_learned"]`
-the variables whose blanket it learned, in order. No reference implementation exists, so the
-[0.18.0](benchmarks/0.18.0.md#mb-by-mb) release card compares its accuracy and its tests per target
-with global PC read at the target, on its paper's Alarm, Hailfinder, and chessboard settings.
+the variables whose blanket it learned, in order. No reference implementation exists, so the [local
+discovery](benchmarks/local-discovery.md#mb-by-mb) release card compares its accuracy and its tests
+per target with global PC read at the target, on its paper's Alarm, Hailfinder, and chessboard
+settings.
 
 CMB, causal Markov blanket (Gao and Ji 2015), {py:func}`~andrey.cmb`, learns the edges at one
 variable and their directions without the whole graph: from the target's Markov blanket, learned
 with HITON-MB by default, it labels each neighbor a parent or a child by how its dependence on the
 others changes once the target is conditioned on, then visits the undecided neighbors in turn and
-directs the target's edges from what their blankets show. No reference implementation exists, so
-the [0.18.0](benchmarks/0.18.0.md#cmb) release card compares it with global PC read at the target,
-on its paper's Alarm setting.
+directs the target's edges from what their blankets show. No reference implementation exists, so the
+[local discovery](benchmarks/local-discovery.md#cmb) release card compares it with global PC read at
+the target, on its paper's Alarm setting.
 
 MMB-by-MMB (Xie et al. 2024), {py:func}`~andrey.mmb_by_mmb`, learns the edges at one variable and
-their marks when unmeasured common causes may exist, without the whole graph: it learns the
-target's Markov blanket, then a neighbor's, one blanket at a time, until the FCI rules decide the
-marks at the target, and returns the edges the target has in the PAG. The authors' code is its
-reference: the [0.18.0](benchmarks/0.18.0.md#mmb-by-mmb) release card compares them on its paper's
-four networks with hidden variables.
+their marks when unmeasured common causes may exist, without the whole graph: it learns the target's
+Markov blanket, then a neighbor's, one blanket at a time, until the FCI rules decide the marks at
+the target, and returns the edges the target has in the PAG. The authors' code is its reference: the
+[local discovery](benchmarks/local-discovery.md#mmb-by-mmb) release card compares them on its
+paper's four networks with hidden variables.
 
 LDECC, local discovery using eager collider checks (Gupta et al. 2023), {py:func}`~andrey.ldecc`,
 answers for one `treatment` and `outcome`: it learns the treatment's Markov blanket with `blanket`,
 `"iamb"` by default, and its neighbors among it, then reads the tests of the PC algorithm over the
 other pairs as they come, directing the treatment's parents, and stops once every neighbor is
-directed. Its graph is a CPDAG that holds only the edges at the treatment, and
-`metadata["effects"]` holds the locally valid parent sets, one for each effect the local structure
-allows. The [0.18.0](benchmarks/0.18.0.md#ldecc) release card measures it against the authors'
-code.
+directed. Its graph is a CPDAG that holds only the edges at the treatment, and `metadata["effects"]`
+holds the locally valid parent sets, one for each effect the local structure allows. The [local
+discovery](benchmarks/local-discovery.md#ldecc) release card measures it against the authors' code.
 
 LOAD, local optimal adjustments discovery (Schubert, Claassen and Magliacane 2026),
 {py:func}`~andrey.local_optimal_adjustment`, answers for two `variables` given in any order, without
@@ -611,8 +616,8 @@ MB-by-MB does, and tests from them whether one is an ancestor of the other. `met
 holds one record per direction: the optimal adjustment set for the total effect when it is
 identifiable, and the parent sets of the treatment that its edges allow, one estimate each, when it
 is not. The graph holds only the edges at the two variables, and `metadata["blankets_learned"]`
-lists the variables whose blanket it learned, in order. The [0.18.0](benchmarks/0.18.0.md#load)
-release card measures it against the authors' code.
+lists the variables whose blanket it learned, in order. The [local
+discovery](benchmarks/local-discovery.md#load) release card measures it against the authors' code.
 
 LocPC-CDE (Loranchet and Assaad 2026), {py:func}`~andrey.locpc_cde`, answers for one `treatment` and
 `outcome`: it learns the graph around the outcome one hop at a time with PC's tests, run only near
@@ -621,7 +626,8 @@ adjustment set for the controlled direct effect, or until a larger hop adds no v
 once when the treatment is not adjacent to the outcome or is its child. `metadata["effects"]` holds
 the answer with the paper's reason, the graph is the local essential graph it learned, and
 `metadata["hop"]`, `metadata["visited"]`, and `metadata["double_bar"]` describe the search. The
-[0.18.0](benchmarks/0.18.0.md#locpc-cde) release card measures it against the authors' code.
+[local discovery](benchmarks/local-discovery.md#locpc-cde) release card measures it against the
+authors' code.
 
 CAM, the causal additive model (Buhlmann, Peters, and Ernest 2014), fits each variable as a sum of
 smooth functions of its parents plus noise, with the paper's settings: boosting preselects each
@@ -679,21 +685,23 @@ at once when a test finds it dependent given the blanket so far, in passes until
 `iamb` adds the most dependent variable at each step. It then removes each member a test finds
 independent given the others, starting again from the first member after each removal. Without a
 `target` it joins the blankets into the same CPDAG, skeleton, or moral graph. The
-[0.18.0](benchmarks/0.18.0.md#gs) release card measures it against bnlearn's `gs`.
+[local discovery](benchmarks/local-discovery.md#gs) release card measures it against bnlearn's `gs`.
 
 Fast-IAMB (Yaramakala and Margaritis 2005) learns the same blanket with fewer tests: each round
 tests every variable outside the blanket, adds all those that test dependent at once, the most
 dependent first, while the data hold more than five rows per cell of the next test's table on
-categorical data, and then shrinks the blanket. It takes the arguments of `iamb`. The
-[0.18.0](benchmarks/0.18.0.md#fast-iamb) release card measures it against bnlearn's `fast.iamb`.
+categorical data, and then shrinks the blanket. It takes the arguments of `iamb`. The [local
+discovery](benchmarks/local-discovery.md#fast-iamb) release card measures it against bnlearn's
+`fast.iamb`.
 
 HITON-PC (Aliferis et al. 2010) learns a variable's parents and children as `mmpc` does and takes
 the same arguments, with `max_depth` 3 by default. It orders the candidates once by their
 unconditional association with the target and lets them join one at a time, testing only the
 newcomer against the subsets of the members before it; once all have joined, it tests every member
 again, and a symmetry check keeps a member only when the target is in that member's own set. Without
-a `target` it joins the sets into the same skeleton or CPDAG. The
-[0.18.0](benchmarks/0.18.0.md#hiton-pc) release card measures it against bnlearn's `si.hiton.pc`.
+a `target` it joins the sets into the same skeleton or CPDAG. The [local
+discovery](benchmarks/local-discovery.md#hiton-pc) release card measures it against bnlearn's
+`si.hiton.pc`.
 
 FCI, GFCI, BOSS-FCI, GRaSP-FCI, and FCI-JCI use uncovered paths for their R5, R9, and R10 tail
 orientations: nodes two steps apart on each path must be non-adjacent. R5 considers every circle
@@ -801,25 +809,25 @@ links in `metadata["context_links"]` and the dummies' links in `metadata["index_
 `metadata["time_index_edges"]`. The [0.15.0](benchmarks/0.15.0.md#j-pcmci) release card
 measures it against tigramite, the package of its authors.
 
-Y-structures (Mani et al. 2006; Mooij and Cremers 2015) claim that one variable is a causal
-ancestor of another from a pattern of four variables, and the claims hold when the rows were
-selected by a mechanism the variables affect, with hidden common causes allowed (Versteeg et al.
-2022). `y_structures` returns a graph with no edges: each claim is a record in
-`metadata["effects"]` with its score and the patterns behind it, and `variables` limits the claims
-to pairs of the columns it names. `extended=True` tests the extended Y-structure, which finds more
-patterns. The [0.18.0](benchmarks/0.18.0.md#y-structures) release card measures both against the
+Y-structures (Mani et al. 2006; Mooij and Cremers 2015) claim that one variable is a causal ancestor
+of another from a pattern of four variables, and the claims hold when the rows were selected by a
+mechanism the variables affect, with hidden common causes allowed (Versteeg et al. 2022).
+`y_structures` returns a graph with no edges: each claim is a record in `metadata["effects"]` with
+its score and the patterns behind it, and `variables` limits the claims to pairs of the columns it
+names. `extended=True` tests the extended Y-structure, which finds more patterns. The [local
+discovery](benchmarks/local-discovery.md#y-structures) release card measures both against the
 authors' code.
 
 Local ISA-LiNG (Dai et al. 2024) answers for one `target` in a linear model with non-Gaussian noise
 whose graph may hold cycles: from the target and its Markov blanket alone, it returns the weighted
-edges into the target and into each of its children as a `digraph`. A cycle through the target or
-a child leaves several models the data cannot tell apart; `metadata["equivalent_models"]` lists
-them, stable ones first, and the graph holds the first. `acyclic=True` reads the edges more cheaply
-when neither the target nor a child lies on a cycle. Its use is graphs with cycles: data without
-cycles, small samples among them, are outside its claim, and `direct_lingam` read at the target is
-more accurate and faster from 300 rows up.
-The [0.18.0](benchmarks/0.18.0.md#local-isa-ling) release card measures it against the authors'
-code on its paper's simulations.
+edges into the target and into each of its children as a `digraph`. A cycle through the target or a
+child leaves several models the data cannot tell apart; `metadata["equivalent_models"]` lists them,
+stable ones first, and the graph holds the first. `acyclic=True` reads the edges more cheaply when
+neither the target nor a child lies on a cycle. Its use is graphs with cycles: data without cycles,
+small samples among them, are outside its claim, and `direct_lingam` read at the target is more
+accurate and faster from 300 rows up. The [local
+discovery](benchmarks/local-discovery.md#local-isa-ling) release card measures it against the
+authors' code on its paper's simulations.
 
 ### Experimental methods
 
@@ -835,6 +843,11 @@ in a process.
    :toctree: api
    :nosignatures:
 
+   skewd
+   skewd_mv
+   das
+   cpcm
+   cpcm_graph
    ldp
    ld3
 ```
@@ -851,6 +864,42 @@ columns: it finds the parents of the outcome and whether the treatment is one of
 structural direct criterion), with the other parents as the adjustment set for the direct effect, in
 `metadata["effects"]`. Its graph holds the edges into the outcome, and `metadata["partition"]` the
 labels. It is experimental until its comparison with the authors' code is published.
+
+DAS (Montagna et al. 2023), {py:func}`~andrey.das`, finds SCORE's causal order with the same Stein
+estimator and then reads the edges from it: for a leaf, the second derivative of the log density in
+the leaf and another variable is zero at every point unless that variable is a parent. Each leaf
+keeps the variables before it whose derivatives are clearly above zero, at most `max_parents=20`
+of them by Welch tests at 0.01, and CAM's smooth-term tests at `alpha=0.001` prune only those, so
+its pruning does not grow with every variable before a node in the order. It returns a DAG and
+SCORE's causal order. It is experimental until its comparison with the authors' code is published.
+
+CPCM, conditionally parametric causal models (Bodik and Chavez-Demoulin 2025), models each
+variable given its parents by a parametric family whose parameters are smooth functions of the
+parents: Gaussian with mean and scale (the default), Gaussian with the mean alone, exponential,
+Pareto, Poisson, gamma, Gumbel, or negative binomial, one family for every column or one per
+column. Each variable's values mapped through its fitted distribution function are independent of
+its causes only in the causal direction. {py:func}`~andrey.cpcm` decides a pair by an HSIC test of
+that residual in each direction; {py:func}`~andrey.cpcm_graph` returns the DAG whose residuals a
+dHSIC test finds most jointly independent, with a penalty of 2 per edge, by exact search up to 4
+variables and RESIT's order with greedy edge removal above. A column outside its family's support,
+such as a non-integer under `"poisson"`, raises `ValueError`. Both are experimental until their
+comparison with the authors' code is published.
+
+SkewD (Klippert and Marx 2026), {py:func}`~andrey.skewd`, decides the direction of a variable pair
+whose noise is skewed, in the location-scale model of LOCI with a skew-normal noise. It fits the
+model in each direction, the location and the log scale smooth functions of the proposed cause and
+the shape one number, with penalties chosen by Bayesian optimization of a cross-validated
+likelihood, then decides by an HSIC test of the scaled residual against the cause
+(`criterion="independence"`, the default) or by the larger likelihood (`criterion="likelihood"`). At
+the defaults a pair takes tens of minutes. It is experimental until its comparison with the authors'
+code is published.
+
+SkewD-MV, {py:func}`~andrey.skewd_mv`, is the graph version: it learns the Markov equivalence class
+with PC and returns the DAG of the class whose skew-normal location-scale models, one per variable
+given its parents, have the largest likelihood. It suits a few variables: it fits one model per
+distinct parent set the class allows, and `max_fits` (100 by default, the order up to which the
+paper expects it to apply) makes it refuse a class that needs more, before it fits any. It is
+experimental until its comparison with the authors' code is published.
 
 A method becomes supported once it has:
 
@@ -1240,6 +1289,7 @@ name.
 | Name | Variables | Edges | Data |
 |---|---|---|---|
 | `sachs` | 11 | 17 | Measured: 853 observational cells, or 7,466 in nine conditions (Sachs et al., 2005) |
+| `tuebingen` | 2 per pair | 1 per pair | Measured: 108 cause-effect pairs, each with its direction and weight (Mooij et al., 2016) |
 | `asia` | 8 | 8 | Simulated on the published network (bnlearn) |
 | `child` | 20 | 25 | Simulated on the published network (bnlearn) |
 | `insurance` | 27 | 52 | Simulated on the published network (bnlearn) |
@@ -1279,6 +1329,27 @@ rows = np.isin(pooled.env, list(known))
 andrey.gies(pooled.data[rows], pooled.env[rows], targets=known)
 ```
 
+`load_dataset("tuebingen")` loads the Tübingen cause-effect pairs (Mooij et al., 2016) as a
+collection: iterating it gives 108 pairs, each a dataset with the two columns `x` and `y` in the
+file's order, the two-node `graph` of its reference direction (the cause is `x` in some pairs and
+`y` in others), and its `name`, `weight`, `cause`, and `effect`. The collection gives the pairs of
+one source weights that sum to 1, so weigh each pair's outcome by its `weight` when you average
+over pairs. Six pairs (52 to 55, 71, and 105) have a block of several columns, marked
+`multivariate`; five of them have weight 0. The other 102 are the two-column pairs the pairwise
+methods (`anm`, `pnl`, `loci`) read. The collection states no license, and its pairs come from
+other collections with their own terms, so Andrey does not redistribute it: the first load downloads
+the archive from its original server and checks its SHA-256, and a changed archive is refused:
+
+```python
+pairs = load_dataset("tuebingen")
+usable = [p for p in pairs if not p.multivariate and p.weight > 0]
+correct = [
+    andrey.anm(p.data, alpha=None).structure.oriented_edges() == p.graph.oriented_edges()
+    for p in usable
+]
+accuracy = np.average(correct, weights=[p.weight for p in usable])
+```
+
 ```{eval-rst}
 .. currentmodule:: andrey.data
 
@@ -1289,6 +1360,8 @@ andrey.gies(pooled.data[rows], pooled.env[rows], targets=known)
    load_dataset
    list_datasets
    RealDataset
+   CausePairs
+   CausePair
 ```
 
 ### Simulators

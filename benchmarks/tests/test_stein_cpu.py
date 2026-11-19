@@ -19,12 +19,14 @@ import stein_cpu
 
 from andrey_bench import datasets, gp_models, runner, score_oracle
 from andrey_bench.adapters.andrey_cam import AndreyCAMOrder
+from andrey_bench.adapters.andrey_das import AndreyDAS
 from andrey_bench.adapters.andrey_nogam import AndreyNoGAM, AndreyNoGAMOrder
 from andrey_bench.adapters.andrey_score_matching import (
     AndreyScoreMatching,
     AndreyScoreMatchingOrder,
 )
 from andrey_bench.adapters.causaldisco_r2sort import CausalDiscoR2Sort, CausalDiscoR2SortnRegress
+from andrey_bench.adapters.dodiscover_das import DodiscoverDAS
 from andrey_bench.adapters.dodiscover_nogam import DodiscoverNoGAM, DodiscoverNoGAMOrder
 from andrey_bench.adapters.order_dag import order_dag
 from andrey_bench.adapters.rolland_score import CODE_ENV, RollandSCORE, RollandSCOREOrder
@@ -190,6 +192,22 @@ def test_andreys_stein_arms_return_the_facades_dag_and_the_full_dag_of_its_order
     assert graph.name == f"andrey.{method}.numpy" and order.name == f"andrey.{method}.order.numpy"
 
 
+def test_andreys_das_arm_returns_the_facades_dag() -> None:
+    import andrey
+
+    data, _, _ = _sample(d=4, n=300, seed=1)
+    out = andrey.das(data, alpha=0.001, max_parents=20)
+    np.testing.assert_array_equal(AndreyDAS().fit(data, {}), out.structure.to_numpy())
+    assert AndreyDAS().params() == {"alpha": 0.001, "max_parents": 20}
+    assert AndreyDAS.name == "andrey.das.numpy"
+
+
+def test_the_authors_das_runs_at_the_papers_screen_level_and_pruning_cutoff() -> None:
+    params = DodiscoverDAS().params()
+    assert params["das_cutoff"] == 0.01 and params["alpha"] == 0.001
+    assert params["max_parents"] == 20 and params["min_parents"] == 5
+
+
 # --- the oracle arm --------------------------------------------------------------------------------
 
 
@@ -294,7 +312,7 @@ def test_the_driver_scores_every_solution_on_the_same_datasets(monkeypatch, tmp_
         ("andrey.score_matching.numpy", "andrey.score_matching.order.numpy"),
         ("andrey.nogam.numpy", "andrey.nogam.order.numpy"),
     ]
-    solutions = [name for pair in pairs for name in pair] + ["baseline.empty"]
+    solutions = [name for pair in pairs for name in pair] + ["andrey.das.numpy", "baseline.empty"]
     argv = ["--out", str(tmp_path), "--regimes", "score_paper_standardized", "--ladder", "5"]
     code = stein_cpu.main([*argv, "--densities", "er1", "--seeds", "1", "--solutions", *solutions])
     assert code == 0
@@ -319,7 +337,7 @@ def test_the_references_run_there_and_return_a_dag(monkeypatch, tmp_path: Path) 
     key = _key("score2022", "gaussian", "standardized", d=4, n=200, seed=0)
     datasets.materialize([key], tmp_path)
     field = [RollandSCOREOrder(), DodiscoverNoGAMOrder(), CausalDiscoR2Sort()]
-    field += [DodiscoverNoGAM(), CausalDiscoR2SortnRegress()]
+    field += [DodiscoverNoGAM(), DodiscoverDAS(), CausalDiscoR2SortnRegress()]
     if shutil.which("Rscript") and os.environ.get("R_LIBS_USER"):
         field.append(RollandSCORE())  # its pruning needs Rscript with mgcv
     for adapter in field:

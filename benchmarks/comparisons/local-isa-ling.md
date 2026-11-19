@@ -68,11 +68,11 @@ answer's, which a solution passes when its interval lies wholly below 0.
 
 ## Results
 
-Release 0.18.0 judged `andrey.local_isa_ling` against the authors' code in every cell, 20 datasets
-(seeds 0-19) each, and reran each cell worse on seeds 0-19 on seeds 20-39.
-`published/0.18.0/local-isa-ling.json` holds every cell, and the release summary's Local ISA-LiNG
-rows are built from it; the method's claim is graphs with cycles, so the DAG rows are reported, not
-gated. The [release card][card] reads it.
+The local discovery campaign judged `andrey.local_isa_ling` against the authors' code in every cell,
+20 datasets (seeds 0-19) each, and reran each cell worse on seeds 0-19 on seeds 20-39.
+`published/local-discovery/local-isa-ling.json` holds every cell, and the release summary's Local
+ISA-LiNG rows are built from it; the method's claim is graphs with cycles, so the DAG rows are
+reported, not gated. The [release card][card] reads it.
 
 | Graph | Rows | Blanket | Datasets | SHD, Andrey | SHD, authors | Distance, Andrey | Distance, authors | Result | SHD, empty answer |
 |---|---:|---|---:|---:|---:|---:|---:|---|---:|
@@ -157,4 +157,4 @@ target, the time, the answer's local weights and blanket, and the measures above
 record replaces an earlier one's in the summary, so a rerun of some solutions is listed after the
 run it updates.
 
-[card]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#local-isa-ling
+[card]: https://andrey.abel.ai/docs/benchmarks/local-discovery.html#local-isa-ling

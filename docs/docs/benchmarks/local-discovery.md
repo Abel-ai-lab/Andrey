@@ -1,0 +1,867 @@
+---
+name: benchmarks-local-discovery
+description: "The Andrey local causal discovery release card: the local causal discovery methods, from GS to
+  LocPC-CDE and local ISA-LiNG, against references."
+meta:
+  type: guide
+  tags: [benchmarks, local causal discovery, Markov blanket, GS, Fast-IAMB, HITON-PC, HITON-MB,
+    MMMB, PCMB, CMB, MB-by-MB, MMB-by-MMB, Y-structures, LDECC, LOAD, LocPC-CDE, local ISA-LiNG]
+ai: drafted
+ai_tools: Claude Code and Codex
+---
+
+# Local causal discovery release card
+
+:::::{div} release-opening
+
+:::{card}
+:class-card: release-cover release-default
+:shadow: none
+
+Release card
+
+<p class="sd-card-text"><img class="dark-light" src="../../_static/wordmark-dark.svg" alt="Andrey"
+width="190" height="40"></p>
+
+Local causal discovery
+:::
+
+::::{div} release-opening-text
+
+This release is about local causal discovery: the structure around one target variable, learned without
+the whole graph. GS, Fast-IAMB, HITON-PC, HITON-MB, MMMB, and PCMB, which learn a target's Markov
+blanket or its parents and children, are supported. Against bnlearn on four published networks and
+on linear-Gaussian graphs, GS was better in 13 of 20 settings and worse in none, Fast-IAMB better in
+10 and worse in 3, and HITON-PC better in 13 and worse in none. Against its authors' Causal Explorer
+on five networks at its paper's sizes, HITON-MB was better in 11 of 13 settings and worse in 2, and
+on its own paper's five networks and sizes MMMB was better in 8 of 21, tied in 3, and worse in 10,
+with fewer errors than the toolbox in all 21. PCMB has no reference implementation, so its paper's
+published results are the comparison: on samples of the Alarm and Pigs networks its mean distance
+from perfect precision and recall was at most 0.01 above the paper's from 1,000 rows on Alarm and at
+every size on Pigs, and its mean recall on Alarm at 100, 200, and 500 rows was 0.06, 0.04, and 0.04
+below the paper's. CMB, which learns the edges at a target and their directions, is supported too:
+on its paper's Alarm setting it made fewer errors at the target than global PC read there, on 20
+datasets and again on 20 fresh ones. MB-by-MB, which learns the same edges one Markov blanket at a
+time, is supported as well: on Alarm and Hailfinder an answer took 279 to 930 tests, against 3,954
+to 14,070 for one fit of PC, and made fewer errors than bnlearn's `pc.stable` in all 16 settings;
+Andrey's PC made fewer errors in two of them and on the chessboard. So is MMB-by-MMB, which learns
+the edges at a target and their marks when unmeasured common causes may exist: on its paper's four
+networks with hidden variables it was better than its authors' code in 5 of 8 settings and no worse
+in the other 3. Y-structures, which claim ancestors from rows that may have been selected, are
+supported as well: on the datasets of their authors' simulation script, both forms made the same
+claims as the authors' code on every dataset. Under selection many of their claims are wrong at
+10,000 rows, as the authors' code's are. LDECC and LOAD, which find the adjustment sets for one
+treatment's effect on one outcome, are supported: against their authors' code on the models their
+papers plant, neither was worse in any setting on 20 datasets and again on 20 fresh ones. So is
+LocPC-CDE, which finds whether one treatment's direct effect on one outcome is identifiable and the
+outcome's parents as its adjustment set: against its authors' code on its paper's random graphs with
+10 to 200 variables, it was worse in no setting and better in 4 of 32.
+
+On hepar2, GS and Fast-IAMB make more errors than the empty set at every size we measured, as the
+supported IAMB does; HITON-PC stays below it there. HITON-MB makes more errors than the empty set on
+hailfinder at 200 and 500 rows, and its authors' code more still. On pairs whose direct effect the
+true CPDAG does not identify, LocPC-CDE's verdict is wrong more often than the constant answer "not
+identifiable", as its authors' code's is.
+
+::::
+:::::
+
+## The benchmarks
+
+The earlier release cards keep the numbers of the builds they measured. This release's summary adds
+the comparison of GS, Fast-IAMB, and HITON-PC with bnlearn 5.2.1 on the set each learns at a target
+([GS](#gs), [Fast-IAMB](#fast-iamb), [HITON-PC](#hiton-pc)), of HITON-MB with its authors' code
+([HITON-MB](#hiton-mb)), of MMMB with its authors' code ([MMMB](#mmmb)), of PCMB with the published
+results of its paper ([PCMB](#pcmb)), of CMB and MB-by-MB with global PC at a target ([CMB](#cmb),
+[MB-by-MB](#mb-by-mb)), of MMB-by-MMB with its authors' code on networks with hidden variables
+([MMB-by-MMB](#mmb-by-mmb)), of Y-structures with their authors' code
+([Y-structures](#y-structures)), of LDECC and LOAD with theirs ([LDECC](#ldecc), [LOAD](#load)), of
+LocPC-CDE with its authors' code ([LocPC-CDE](#locpc-cde)), and of local ISA-LiNG with its authors'
+code on graphs with cycles and on DAGs ([Local ISA-LiNG](#local-isa-ling)).
+
+We ran each method on samples of four published networks, alarm (37 variables), child (20),
+insurance (27), and hepar2 (70), and on linear-Gaussian graphs with 20, 50, and 100 variables and
+mean degree 2, and 50 variables and mean degree 4, at 1,000 and 5,000 rows. Every setting had 20
+datasets, and every variable was a target. On the networks,
+Andrey's G-square test ran against bnlearn's `mi-adf`, which also counts the degrees of freedom
+from the configurations that occur in the data; on the Gaussian graphs both sides ran Fisher's z.
+Per dataset we averaged, over the targets, the distance of the set's precision and recall from
+perfect and the set's F1. A setting counts as worse when the paired interval of either measure lies
+on Andrey's worse side on the first 20 datasets and again on 20 fresh ones. The floor is the empty
+set, whose errors are the true set's size: a method passes when its missing plus extra members are
+fewer.
+
+| Method | Better | Tie | Worse | Errors below the empty set's |
+|---|---:|---:|---:|---|
+| GS | 13 | 7 | 0 | every setting but hepar2 |
+| Fast-IAMB | 10 | 7 | 3 | every setting but hepar2 and the graphs with 100 variables |
+| HITON-PC | 13 | 7 | 0 | every setting |
+
+On the networks, Andrey's fits took longer than bnlearn's; on the Gaussian graphs with 50 or 100
+variables and 5,000 rows, GS and HITON-PC were 3 to 31 times faster. The [comparison page][bl] has
+every setting and number.
+
+## GS
+
+`andrey.gs` is the Grow-Shrink Markov blanket learner (Margaritis and Thrun, 2000). It visits the
+other variables in one order, the most dependent first, adds each that tests dependent given the
+blanket so far, and then removes the members that test independent given the others. Without a
+target it joins the blankets into a CPDAG, a skeleton, or a moral graph. It is supported. The
+[API reference](../api.md#supported-methods) describes it.
+
+We compared it with bnlearn's `gs` at 1,000, 5,000, and 20,000 rows of each network and on the
+eight Gaussian settings. It was better in 13 of the 20 settings, tied in 7, and worse in none. It
+was better in all 12 network settings, where bnlearn's `gs` with `mi-adf` makes more errors than the
+empty set; against bnlearn's plain `mi` it was better in 9 of the 12. The paper states the shrink
+phase as removing a member while one tests independent given the others, without saying which goes
+first; Andrey's GS starts again from the first member after each removal, as bnlearn's does. On the
+Gaussian graphs with 50 variables and mean degree 4, its distance is no larger than bnlearn's at
+5,000 rows and 0.016 larger [0.004, 0.029] at 1,000 rows on the first datasets, a tie on the fresh
+ones.
+
+On hepar2, GS makes more errors than the empty set at every size: 5.5, 5.0, and 4.7 per target at
+1,000, 5,000, and 20,000 rows, against 4.5. IAMB does too (5.7, 5.2, and 4.9). In every other
+setting its errors are below the empty set's. Beside IAMB, GS ran 40% to 64% of its tests, tied it
+in 14 of the 20 settings, was better in 4, and was worse in 2: alarm at 5,000 rows and child at
+1,000.
+
+A median fit, answering for every variable on one core, took 1.0 to 28 s on the networks, 3.5 to 16
+times as long as bnlearn's, and 0.46 to 5.2 s on the Gaussian graphs, where bnlearn's took 0.17 to
+162 s.
+
+## Fast-IAMB
+
+`andrey.fast_iamb` is Fast-IAMB (Yaramakala and Margaritis, 2005), a Markov blanket learner. Each
+round tests every variable outside the blanket and adds those that test dependent together, the most
+dependent first, while a categorical test's table holds more than five rows per cell, then removes
+the members that test independent given the others. It is supported. The
+[API reference](../api.md#supported-methods) describes it.
+
+We compared it with bnlearn's `fast.iamb` on the same data as GS. It was better in 10 of the 20
+settings, tied in 7, and worse in 3:
+
+- **alarm at 1,000 rows**, with a distance 0.023 larger [0.009, 0.038] and an F1 0.019 lower [0.009,
+  0.029] on the fresh datasets. Both packages compute the same G-square statistic but count its
+  degrees of freedom differently on sparse tables, and the paper gives none. With
+  `degrees_of_freedom="nonempty"`, which counts them as bnlearn does, `fast_iamb` returns bnlearn's
+  sets on 97% of the targets and the gap closes. The same swap turns Andrey's lead into a tie on
+  child and a small deficit on insurance, and cuts it on hepar2.
+- **the Gaussian graphs with 100 variables at 1,000 and 5,000 rows**, with a distance 0.002 larger
+  and an F1 0.002 lower on the first and the fresh datasets. The difference is which variables
+  each round tests. The paper's next round tests every variable outside the blanket, as Andrey's
+  does; bnlearn's no longer tests one that was in the blanket at the end of an earlier round. In
+  Andrey's search, a variable the shrink removed can test dependent again and rejoin, and on these
+  graphs most that rejoin are not in the true blanket. With bnlearn's rule in Andrey's search, the
+  gap closes on both sets of datasets; on the graphs with 50 variables and mean degree 4 at 1,000
+  rows, the paper's rule has the smaller distance, by 0.003.
+
+On hepar2, Fast-IAMB makes more errors than the empty set at every size, 5.4, 4.9, and 4.7 per
+target against 4.5, and on the Gaussian graphs with 100 variables its errors tie the empty set's,
+as bnlearn's do. Its paper claims fewer tests than IAMB at the same accuracy. It ran 42% to 73% of
+IAMB's tests, but it was less accurate than IAMB in every alarm, child, insurance, and Gaussian
+setting, with an F1 0.054 to 0.106 lower on those networks and 0.010 to 0.052 lower on the Gaussian
+graphs; it tied IAMB on hepar2.
+
+A median fit took 0.78 to 16 s on the networks, 4.1 to 6.5 times as long as bnlearn's, and 0.35 to
+3.5 s on the Gaussian graphs, where bnlearn's took 0.08 to 4.1 s.
+
+## HITON-PC
+
+`andrey.hiton_pc` is the semi-interleaved HITON-PC (Aliferis et al., 2010), which learns a target's
+parents and children. It orders the candidates once, tests each newcomer against the subsets of the
+members before it, and tests every member again once all have joined. On categorical data a test
+runs only with at least five rows per cell of its table, the rule of its paper. It is supported.
+The [API reference](../api.md#supported-methods) describes it.
+
+We compared it with bnlearn's `si.hiton.pc` at 200, 500, and 5,000 rows of each network, the sizes
+of the paper's experiments, and on the eight Gaussian settings, with no limit on the conditioning
+set (`max_depth=None`), since bnlearn's limit also caps the candidate set. It was better in 13 of
+the 20 settings, tied in 7, and worse in none: better in all 12 network settings, with bnlearn's
+`mi-adf` and with its plain `mi`. Its errors are below the empty set's in every setting, hepar2
+included.
+
+At its default, `max_depth=3`, HITON-PC tied the unlimited search in 17 settings and was better in
+3. Beside MMPC it was better in 9, tied in 9, and worse in 2 on the first datasets, alarm at 500
+rows and child at 200. Without its rows-per-cell rule it was worse in 9 of the 12 network settings
+and better only on child at 200 rows.
+
+A median fit took 1.7 to 18 s on the networks, 3.6 to 12 times as long as bnlearn's, and 0.42 to
+4.3 s on the Gaussian graphs, where bnlearn's took 0.17 to 97 s. At `max_depth=3` it took 1.4 to
+16 s on the networks.
+
+## HITON-MB
+
+`andrey.hiton_mb` is the semi-interleaved HITON-MB (Aliferis et al., 2010), which learns a target's
+Markov blanket: HITON-PC's parents and children of the target and of each of them, with the
+symmetry check of the paper's definition, then each child's other parents. It is supported. The
+[API reference](../api.md#supported-methods) describes it.
+
+We compared it with HITON-MB in Causal Explorer 1.5, its authors' code, on the networks and sizes
+of the paper's experiments: child, insurance, alarm, and hailfinder at 200, 500, and 5,000 rows,
+every variable a target, and pigs (441 variables) at 500 rows with 50 targets, both at the default
+cap of 3 on the conditioning set. It was better in 11 of the 13 settings and worse in 2, hailfinder
+and insurance at 5,000 rows, on the first datasets and again on fresh ones. The toolbox runs no
+symmetry check; without it, Andrey's sets tie the toolbox's in both settings, so the check, which
+the paper's definition includes, accounts for the gap. Andrey's errors are below the toolbox's in
+every setting.
+
+On hailfinder at 200 and 500 rows its errors, 4.0 and 4.4 per target, are above the empty set's, 3.7
+and 3.3, and the toolbox's are 15.7 and 9.2. There the rule of five rows per cell leaves many tests
+unrun; without the rule the errors fall below the empty set's, but at 500 rows the F1 of the sets on
+hailfinder and insurance falls below the toolbox's. In every other setting, and on the eight
+Gaussian settings, where the toolbox does not run, the errors are below the empty set's.
+
+A median fit took 2.2 to 16 s on the four networks and 91 s on pigs, where the toolbox's took 21
+to 420 s and 150 s. The [comparison page][hm] has every setting and number.
+
+## MMMB
+
+`andrey.mmmb` is MMMB (Tsamardinos et al., 2003) in its authors' corrected form, which learns a
+target's Markov blanket: MMPC's parents and children of the target and of each of them, with the
+symmetry check its authors added to MMPC (Tsamardinos et al., 2006), then each child's other
+parents. It is supported. The [API reference](../api.md#supported-methods) describes it.
+
+We compared it with MMMB in Causal Explorer 1.5, its authors' code, on the networks and sizes of its
+paper's experiments: alarm, hailfinder, insurance, and win95pts at 300, 500, 700, 1,000, and 5,000
+rows, every variable a target, and pigs (441 variables) at 500 rows with 50 targets, with no cap on
+the conditioning set. It was better in 8 of the 21 settings, tied in 3, and worse in 10, on the
+first datasets and again on fresh ones: hailfinder from 500 rows, insurance at 5,000 rows, and
+win95pts at every size. A trace that replays the toolbox's tests with Andrey's finds three
+differences. The toolbox runs no symmetry check; without it, Andrey's sets tie or beat the toolbox's
+on hailfinder at 500 to 1,000 rows, insurance at 5,000, and win95pts at 500. Where two columns are
+copies of each other in the data, a test given one of them has no degrees of freedom: Andrey reads
+it as independence, which holds in the data, and the toolbox returns no answer and never separates
+there. For a spouse, the toolbox searches afresh for a separating set, where Andrey takes the one
+MMPC recorded. With all three set the toolbox's way, Andrey's sets tie the toolbox's on win95pts at
+300, 700, 1,000, and 5,000 rows. On hailfinder at 5,000 rows they still fall short in distance, and
+equal the toolbox's only when a test also runs only with at least five rows per cell, as in the
+toolbox and the paper's experiments; Andrey runs every test. There Andrey's errors are 2.1 per
+target, and 6.9, the toolbox's level, with all four set the toolbox's way. Andrey's errors are below
+the toolbox's in every setting, and below the empty set's in all 21.
+
+As in its paper, its distance was no worse than IAMB's and GS's on alarm and insurance at every
+size. A median fit took 1.2 to 13 s on the four networks and 39 s on pigs, where the toolbox's took
+23 to 552 s and 71 s. The [comparison page][mm] has every setting and number.
+
+## PCMB
+
+`andrey.pcmb` is PCMB (Pena et al., 2007), a Markov blanket learner. It finds the parents and
+children of a target and of each of them, then admits each child's other parents. It is supported.
+The [API reference](../api.md#supported-methods) describes it.
+
+No reference implementation exists, so we ran it as its paper did and set the results beside the
+paper's Table 6: samples of the Alarm (37 variables) and Pigs (441) networks, every variable a
+target, G-square tests at alpha 0.01, no limit on the conditioning set, and, on categorical data,
+the degrees of freedom of Spirtes, Glymour, and Scheines (1993), which `pcmb` uses by default. Each
+Alarm size has 20 datasets and each Pigs size 10, the paper's number. A target whose answer is empty
+has no precision or distance and counts in the recall as 0, and a column that holds one value is
+left out of the fit and answers the empty set. Each entry is Andrey's mean over the datasets, then
+the paper's mean over its 10 databases and, in parentheses, their standard deviation; the distance
+is the Euclidean distance of the precision and recall from perfect.
+
+| Network | Rows | Datasets | Distance | Precision | Recall |
+|---|---:|---:|---|---|---|
+| Alarm | 100 | 20 | 0.560 / 0.51 (0.04) | 0.79 / 0.79 (0.04) | 0.43 / 0.49 (0.05) |
+| Alarm | 200 | 20 | 0.416 / 0.38 (0.06) | 0.94 / 0.95 (0.03) | 0.52 / 0.56 (0.05) |
+| Alarm | 500 | 20 | 0.292 / 0.26 (0.03) | 0.93 / 0.94 (0.01) | 0.68 / 0.72 (0.04) |
+| Alarm | 1,000 | 20 | 0.173 / 0.18 (0.02) | 1.00 / 0.99 (0.01) | 0.77 / 0.79 (0.01) |
+| Alarm | 2,000 | 20 | 0.115 / 0.14 (0.01) | 1.00 / 1.00 (0.00) | 0.85 / 0.83 (0.02) |
+| Alarm | 5,000 | 20 | 0.086 / 0.11 (0.02) | 1.00 / 1.00 (0.00) | 0.89 / 0.86 (0.02) |
+| Pigs | 100 | 10 | 0.300 / 0.29 (0.02) | 0.82 / 0.83 (0.01) | 0.81 / 0.82 (0.02) |
+| Pigs | 200 | 10 | 0.073 / 0.07 (0.01) | 0.97 / 0.97 (0.01) | 0.96 / 0.96 (0.01) |
+| Pigs | 500 | 10 | 0.020 / 0.02 (0.00) | 0.98 / 0.98 (0.00) | 1.00 / 1.00 (0.00) |
+
+From 1,000 rows on Alarm and at every size on Pigs, Andrey's mean distance is at most 0.01 above the
+paper's mean, and on Alarm at 1,000 rows and more it is below it. On Alarm at 100, 200, and 500 rows
+its mean recall is 0.06, 0.04, and 0.04 below the paper's at a precision within 0.01 of it, and its
+mean distance 0.05, 0.04, and 0.03 above; its errors, the members it misses plus those it adds, are
+below the empty answer's in every row. The [comparison page][blankets] has the other reading of an
+empty answer, the errors, and the fit times.
+
+## CMB
+
+`andrey.cmb` is CMB (Gao and Ji, 2015), which learns the edges at one variable and their directions
+from the Markov blankets of the target and of the variables it visits, without the whole graph. It
+is supported. The [API reference](../api.md#supported-methods) describes it.
+
+No reference implementation exists, so we ran it as its paper did and compared it with global PC
+read at the target, as the paper does: samples of the Alarm network (37 variables) at 1,000 rows,
+every variable a target, G-square tests at alpha 0.02 with no limit on the conditioning set, and
+HITON-MB, CMB's default blanket learner. Andrey's PC ran with the same test and level, and bnlearn
+5.2.1's `pc.stable` with `mi-adf`. At each target we counted the edges missing or extra against
+the true CPDAG and those whose direction differs from it, an edge the CPDAG directs and the answer
+leaves undirected included; a dataset's value is the mean over its targets. A setting counts as
+worse when the paired interval lies on CMB's worse side on the first 20 datasets and again on 20
+fresh ones. The floor is the empty answer, whose errors are the target's degree.
+
+| Answer | Extra | Missing | Reversed | Total | CMB minus this answer |
+|---|---:|---:|---:|---:|---|
+| CMB | 0.019 | 0.403 | 0.330 | 0.751 | |
+| Andrey's PC | 0.011 | 0.551 | 0.435 | 0.997 | -0.246 [-0.368, -0.118] |
+| bnlearn `pc.stable` | 0.003 | 1.108 | 0.689 | 1.800 | -1.049 [-1.137, -0.962] |
+| The empty answer | 0 | 2.486 | 0 | 2.486 | -1.735 [-1.812, -1.653] |
+| CMB in its paper | 0.69 | 0.61 | 0.51 | 1.81 | |
+
+Each entry is the mean over the 20 datasets of the errors per target, and the last column the mean
+paired difference in the total with its 95% bootstrap interval. CMB made fewer errors than both PCs
+and the empty answer, and so it did on the 20 fresh datasets: 0.689 against 0.954 for Andrey's PC
+(-0.265 [-0.400, -0.132]). Leaving out the edges an answer leaves undirected, CMB's errors were
+0.430 against 0.638. Its total is below its paper's 1.81, most of all in extra edges, 0.02 against
+0.69; without the symmetry check of its blanket learner, CMB added 0.21 extra edges per target, so
+part of that difference lies in how the blankets are learned. With exact tests, CMB's only errors
+on Alarm were 0.09 edges per target left undirected that the CPDAG directs. The answers for every
+target of a dataset took a median of 7.8 s on one core, and one fit of Andrey's PC 0.42 s. The
+[comparison page][direct] describes the lane.
+
+## MB-by-MB
+
+`andrey.mb_by_mb` is MB-by-MB (Wang et al., 2014), which learns the edges at one variable and their
+directions one Markov blanket at a time, growing outward from the target until no further blanket
+can direct an edge at it. It is supported. The [API reference](../api.md#supported-methods)
+describes it.
+
+No reference implementation exists, so we ran it as its paper did and compared it with global PC
+read at the target, as the paper does, and with CMB. The samples are of the Alarm (37 variables) and
+Hailfinder (56) networks, every variable a target, and of the 45 x 45 chessboard (2,025 binary
+variables) with its 10 fixed targets, at 500, 1,000, 2,000, and 5,000 rows, with G-square tests at
+alpha 0.01 and 0.05, IAMB's grow phase for the blankets, and at most 5 conditioning variables in the
+local structures, the paper's cap. Andrey's PC and bnlearn 5.2.1's `pc.stable` with `mi-adf` ran
+with the same test, level, and cap; CMB ran on Alarm and Hailfinder with HITON-MB, its default. At
+each target we counted the edges missing or extra against the true DAG, those whose direction
+differs from it, and those the answer leaves undirected; their sum is the SHD, and a dataset's value
+is the mean over its targets. Each Alarm and Hailfinder cell has 20 datasets and 20 fresh ones, each
+chessboard cell 10 and 10, with fresh PC fits at 500 and 1,000 rows only. A cell counts as worse
+when the paired interval lies on MB-by-MB's worse side on the first datasets and again on the fresh
+ones. The floor is the empty answer, whose errors are the target's degree.
+
+A different method is judged on accuracy against cost, not on agreement. We also counted the CI
+tests an answer took: MB-by-MB's or CMB's at the one target, and for a global PC its whole fit,
+which answers every target at once. A method is dominated in a cell when another is more accurate
+there and takes fewer tests per answer. Each entry below is the mean SHD per target and the mean
+tests per answer; the last columns give the verdict of the paired comparison, and the paper column
+the mean SHD of its Tables 1 to 3.
+
+### Alarm
+
+| Rows | Level | MB-by-MB | CMB | Andrey's PC | `pc.stable` | Paper | Against Andrey's PC | Against CMB |
+|---:|---:|---|---|---|---|---:|---|---|
+| 500 | 0.01 | 1.27 / 343 | 1.74 / 742 | 1.52 / 3,954 | 2.25 / 2,596 | 1.92 | better | better |
+| 500 | 0.05 | 1.28 / 510 | 1.60 / 960 | 1.34 / 5,074 | 2.23 / 3,002 | 1.89 | tie | better |
+| 1,000 | 0.01 | 1.04 / 388 | 0.98 / 836 | 1.15 / 4,764 | 1.91 / 3,096 | 1.40 | better | tie |
+| 1,000 | 0.05 | 1.10 / 613 | 0.91 / 1,013 | 1.09 / 5,806 | 1.82 / 3,521 | 1.45 | tie | worse |
+| 2,000 | 0.01 | 0.98 / 452 | 0.77 / 944 | 0.98 / 5,533 | 1.71 / 3,673 | 0.99 | tie | worse |
+| 2,000 | 0.05 | 0.99 / 688 | 0.77 / 1,179 | 0.91 / 6,581 | 1.78 / 4,112 | 1.11 | tie | worse |
+| 5,000 | 0.01 | 0.82 / 576 | 0.58 / 1,129 | 0.67 / 6,264 | 1.05 / 4,155 | 0.63 | tie | worse |
+| 5,000 | 0.05 | 0.79 / 930 | 0.61 / 1,350 | 0.51 / 7,355 | 1.04 / 4,622 | 0.78 | worse | worse |
+
+### Hailfinder
+
+| Rows | Level | MB-by-MB | CMB | Andrey's PC | `pc.stable` | Paper | Against Andrey's PC | Against CMB |
+|---:|---:|---|---|---|---|---:|---|---|
+| 500 | 0.01 | 1.66 / 279 | 3.76 / 3,271 | 1.69 / 4,976 | 2.05 / 3,767 | 2.51 | tie | better |
+| 500 | 0.05 | 1.72 / 354 | 3.94 / 5,170 | 1.69 / 7,576 | 2.09 / 4,203 | 2.51 | worse | better |
+| 1,000 | 0.01 | 1.50 / 284 | 3.00 / 3,480 | 1.60 / 6,515 | 1.87 / 4,357 | 2.31 | better | better |
+| 1,000 | 0.05 | 1.54 / 369 | 3.13 / 4,394 | 1.60 / 9,451 | 1.89 / 4,983 | 2.30 | better | better |
+| 2,000 | 0.01 | 1.44 / 315 | 2.11 / 870 | 1.52 / 8,223 | 1.72 / 5,099 | 1.95 | better | better |
+| 2,000 | 0.05 | 1.51 / 426 | 2.17 / 1,215 | 1.57 / 11,423 | 1.85 / 5,879 | 2.02 | better | better |
+| 5,000 | 0.01 | 1.38 / 405 | 1.43 / 506 | 1.45 / 10,720 | 1.66 / 5,985 | 1.44 | better | better |
+| 5,000 | 0.05 | 1.38 / 553 | 1.53 / 646 | 1.58 / 14,070 | 1.82 / 6,892 | 1.51 | better | better |
+
+### Chessboard
+
+| Rows | Level | MB-by-MB | Andrey's PC | Paper | Against Andrey's PC |
+|---:|---:|---|---|---:|---|
+| 500 | 0.01 | 2.15 / 33,460 | 1.88 / 4,401,237 | 2.05 | worse |
+| 500 | 0.05 | 2.07 / 43,894 | 1.72 / 29,944,954 | 2.25 | worse |
+| 1,000 | 0.01 | 1.64 / 27,446 | 1.35 / 4,994,681 | 1.72 | worse |
+| 1,000 | 0.05 | 1.66 / 38,655 | 1.17 / 32,041,490 | 2.20 | worse |
+| 2,000 | 0.01 | 1.47 / 34,173 | 0.98 / 5,798,347 | 1.27 | worse, first only |
+| 2,000 | 0.05 | 1.44 / 51,206 | 1.07 / 34,874,902 | 1.51 | worse, first only |
+| 5,000 | 0.01 | 1.13 / 56,447 | 0.61 / 7,196,775 | 0.82 | worse, first only |
+| 5,000 | 0.05 | 1.02 / 92,788 | 0.74 / 39,111,227 | 1.47 | worse, first only |
+
+```{raw} html
+:file: local-discovery/mb-by-mb-frontier.html
+```
+
+No cell is dominated per answer. On Alarm and Hailfinder an answer took 279 to 930 tests, against
+3,954 to 14,070 for one fit of Andrey's PC and 2,596 to 6,892 for one of `pc.stable`, and 0.03 to
+0.17 s against 0.33 to 1.22 s and 0.49 to 2.25 s; on the chessboard it took 27,446 to 92,788 tests
+against 4,401,237 to 39,111,227 for a PC fit, and 4.5 to 19.9 s against 69 to 729 s. The times are
+indicative: the runs shared nodes. Against `pc.stable`, MB-by-MB was better in all 16 Alarm and
+Hailfinder cells. Against Andrey's PC it was better in 8 of them, tied in 6, and worse in two, Alarm
+at 5,000 rows and alpha 0.05 and Hailfinder at 500 rows and alpha 0.05. On the chessboard Andrey's
+PC made fewer errors in all 8 cells, by 0.27 to 0.52 SHD on the first datasets and again on the
+fresh ones at 500 and 1,000 rows; no fresh PC fit was run at 2,000 and 5,000 rows. A PC fit takes
+millions of tests there, so the lower accuracy is a trade-off for an answer at a fraction of the
+cost.
+
+For every target at once, one PC fit costs fewer tests in total than MB-by-MB on Alarm and
+Hailfinder: the 37 or 56 walks took 12,703 to 34,417 tests, more than the fit in every cell. One PC
+fit is better on both accuracy and tests for Alarm at 5,000 rows and alpha 0.05 and for Hailfinder
+at 500 rows and alpha 0.05. On the chessboard the 10 targets together took 274,465 to 927,882 tests
+against 4,401,237 to 39,111,227 for one fit.
+
+CMB, which also answers one target, took 506 to 5,170 tests per target, 1.2 to 14.6 times
+MB-by-MB's. It was more accurate than MB-by-MB in 5 of 8 Alarm cells and 0 of 8 Hailfinder cells,
+tied in 1 of 8 Alarm cells and 0 of 8 Hailfinder cells, and less accurate in 2 of 8 Alarm cells and
+8 of 8 Hailfinder cells, so on the frontier neither dominates the other.
+
+MB-by-MB's SHD is below the empty answer's in all 24 cells and below the paper's in 19 of them, at
+most 0.31 above it in the rest. With exact independence answers, its edges and their directions at
+every target equaled the true CPDAG's, on 1,480 Alarm and 2,240 Hailfinder targets (40 column orders
+each). An edge that the v-structures of two blankets direct in opposite ways stays undirected.
+
+## MMB-by-MMB
+
+`andrey.mmb_by_mmb` is MMB-by-MMB (Xie et al., 2024), which learns the edges at one variable and
+their marks when unmeasured common causes may exist, one Markov blanket at a time outward from the
+target, without the whole graph. It is supported. The [API reference](../api.md#supported-methods)
+describes it.
+
+We ran it on its paper's setting and compared it with the authors' code, run unmodified with `maxK`
+10: the networks MILDEW (35 variables), ALARM (37), WIN95PTS (76), and ANDES (223) as
+linear-Gaussian models with random weights, 4, 4, 6, and 10 random hidden variables, 1,000 and
+5,000 rows, Fisher's z test at alpha 0.01, and the paper's named targets (4, 4, 5, and 7). Every
+setting had 20 datasets. At a target an edge counts as right only when both its marks match the PAG
+of the observed variables. Per dataset we averaged, over the targets, the F1 of the edges and their
+distance from perfect precision and recall. A setting counts as worse when the paired interval lies
+on Andrey's worse side on the first 20 datasets and again on 20 fresh ones. The floor is the empty
+answer, whose errors are the target's degree.
+
+| Network | Rows | F1, Andrey | F1, authors | Distance, Andrey | Distance, authors | Result | Errors at the target, Andrey | Errors, empty answer |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| MILDEW | 1,000 | 0.968 | 0.939 | 0.048 | 0.088 | better | 0.19 | 3.14 |
+| MILDEW | 5,000 | 0.982 | 0.949 | 0.027 | 0.073 | better | 0.11 | 3.14 |
+| ALARM | 1,000 | 0.867 | 0.774 | 0.195 | 0.323 | better | 0.76 | 4.29 |
+| ALARM | 5,000 | 0.894 | 0.844 | 0.153 | 0.222 | better | 0.59 | 4.29 |
+| WIN95PTS | 1,000 | 0.889 | 0.843 | 0.161 | 0.219 | better | 0.72 | 3.90 |
+| WIN95PTS | 5,000 | 0.953 | 0.941 | 0.068 | 0.084 | tie | 0.34 | 3.90 |
+| ANDES | 1,000 | 0.819 | 0.844 | 0.256 | 0.221 | tie | 0.56 | 3.04 |
+| ANDES | 5,000 | 0.888 | 0.890 | 0.158 | 0.156 | tie | 0.35 | 3.04 |
+
+MMB-by-MMB was better than the authors' code in 5 of 8 settings and worse in none. ANDES at 1,000
+rows was worse on the first 20 datasets (F1 0.819 against 0.844, distance 0.256 against 0.221) and
+level on the 20 fresh ones (F1 0.847 against 0.844), so it counts as a tie. Its errors at the target
+were below the empty answer's in every setting, and its adjacencies and marks beat the floor of
+`andrey.metrics` too. Its fits took 0.3 to 0.5 s at the median and at most 8.1 s, and the authors'
+code 0.07 to 58 s at the median and at most 358 s. MMB-by-MMB ran 2 to 21 times as many tests per
+fit as the authors' code, whose search tests fewer subsets of a blanket.
+
+The paper's Tables 7 to 10 report the F1 of MMB-by-MMB at these targets: at 1,000 and 5,000 rows,
+0.93 and 0.967 on MILDEW, 0.91 and 0.943 on ALARM, 0.88 and 0.914 on WIN95PTS, and 0.909 and 0.976
+on ANDES. Ours were above them on MILDEW and WIN95PTS and below on ALARM and ANDES, where the
+authors' code ran below them too (0.774 and 0.844 on ALARM, 0.844 and 0.890 on ANDES). The paper
+repeats each setting 100 times with its own hidden nodes, so the numbers differ for more reasons
+than the code.
+
+### Accuracy against cost
+
+Global FCI and RFCI learn the whole PAG, so reading them at a target is the other way to its edges.
+In every setting both were less accurate than MMB-by-MMB, so neither beats it on accuracy and cost
+together. Each cell below holds the F1 and, in parentheses, the conditional-independence tests and
+the seconds of one fit. MMB-by-MMB and the authors' code fit once per target, FCI and RFCI once per
+dataset, read at every target; Andrey's fits ran apart from the others, on shared nodes, so the
+seconds are indicative, and Andrey's FCI reports no test count.
+
+| Network | Rows | MMB-by-MMB | Authors' code | Andrey's FCI | pcalg's RFCI |
+|---|---:|---|---|---|---|
+| MILDEW | 1,000 | 0.968 (2,014; 0.43) | 0.939 (561; 0.07) | 0.778 (-; 0.29) | 0.603 (4,923; 0.13) |
+| MILDEW | 5,000 | 0.982 (5,572; 0.48) | 0.949 (911; 0.27) | 0.875 (-; 0.30) | 0.793 (8,752; 0.24) |
+| ALARM | 1,000 | 0.867 (1,664; 0.33) | 0.774 (522; 0.10) | 0.734 (-; 0.23) | 0.634 (3,770; 0.14) |
+| ALARM | 5,000 | 0.894 (2,629; 0.35) | 0.844 (661; 0.52) | 0.833 (-; 0.25) | 0.816 (5,135; 0.20) |
+| WIN95PTS | 1,000 | 0.889 (19,146; 0.51) | 0.843 (3,051; 1.07) | 0.723 (-; 0.29) | 0.682 (12,691; 0.53) |
+| WIN95PTS | 5,000 | 0.953 (125,086; 0.64) | 0.941 (6,079; 4.98) | 0.812 (-; 0.55) | 0.778 (21,723; 1.07) |
+| ANDES | 1,000 | 0.819 (7,341; 0.52) | 0.844 (3,679; 17.91) | 0.663 (-; 0.77) | 0.635 (162,615; 6.10) |
+| ANDES | 5,000 | 0.888 (18,112; 0.44) | 0.890 (4,740; 73.99) | 0.724 (-; 1.28) | 0.707 (328,354; 13.68) |
+
+The cost of a whole-graph method grows with the number of variables, a local one's with the
+target's blanket. We planted a core with hidden common causes, in which the target's blanket has
+6 variables, among independent variables, from 30 to 3,000 in all. Each row is the median of 5
+datasets; an answer is right when the target's edges and marks equal the PAG's. MMB-by-MMB ran on
+the local discovery branch of 14 November 2026, FCI on that of 12 November 2026.
+
+| Rows | Variables | MMB-by-MMB tests | seconds | answers right | FCI tests | seconds | answers right |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 2,000 | 30 | 632 | 0.03 | 5 of 5 | 7,080 | 0.03 | 5 of 5 |
+| 2,000 | 100 | 1,402 | 0.06 | 5 of 5 | 443,673 | 0.82 | 5 of 5 |
+| 2,000 | 300 | 3,589 | 0.21 | 5 of 5 | 7.6 million | 7.20 | 4 of 5 |
+| 2,000 | 1,000 | 11,220 | 1.91 | 2 of 5 | 115.6 million | 64 | 5 of 5 |
+| 2,000 | 3,000 | needs rows > variables |  |  | 1,302 million | 1,345 | 0 of 2 |
+| 10,000 | 30 | 632 | 0.05 | 5 of 5 | 13,096 | 0.08 | 5 of 5 |
+| 10,000 | 100 | 1,402 | 0.11 | 5 of 5 | 1.1 million | 1.63 | 5 of 5 |
+| 10,000 | 300 | 3,602 | 0.42 | 5 of 5 | 28.2 million | 35 | 4 of 5 |
+| 10,000 | 1,000 | 11,319 | 3.13 | 4 of 5 | timed out (1,800 s) |  |  |
+| 10,000 | 3,000 | 33,302 | 29 | 5 of 5 | not run |  |  |
+
+From 100 to 1,000 variables at 2,000 rows, FCI's tests grew from 0.4 million to 116 million and
+MMB-by-MMB's from 1,400 to 11,000. At 2,000 rows and 1,000 variables FCI was right in all 5 datasets
+and MMB-by-MMB in 2, with about a ten-thousandth of FCI's tests. At 10,000 rows MMB-by-MMB was right
+in 4 of 5 datasets there and in 5 of 5 with 3,000 variables; FCI timed out at 1,000 variables and
+was not run beyond. The [comparison page][mmb] has every setting and number.
+
+## Y-structures
+
+`andrey.y_structures` claims that one variable is a causal ancestor of another from a pattern of
+four variables (Versteeg, Zhang, and Mooij, 2022): `x` makes `v` and `y` independent and `v` and `w`
+dependent, a pattern only an ancestor `x` of `y` explains, also when the rows were selected by a
+mechanism the variables affect. `extended=True` tests the extended pattern, which finds more. It is
+supported. The [API reference](../api.md#supported-methods) describes it.
+
+We ran both forms on the datasets of the authors' simulation script: linear-Gaussian models, a
+7-node graph and random graphs with 8 and 16 system variables, each with 10,000 rows kept by
+selection and 10,000 rows without it, Fisher's z tests at alpha 0.01, and 20 datasets per setting.
+The reference is the authors' R code, run unmodified at the same level. Per dataset we counted the
+claim errors, the false claims plus the true ancestral pairs not claimed, and took 1 minus the
+average precision of the claims' scores. A setting counts as worse when the paired interval lies on
+Andrey's worse side on the first 20 datasets and again on 20 fresh ones. The floor is the precision
+of the claims above the share of ancestral pairs, the precision of claiming every pair, with the
+interval over the datasets above 0.
+
+Both forms made the same claims as the authors' code on every dataset, so they tied it on both
+measures in all 12 settings, with a mean difference of 0, and on the 20 fresh datasets too. The
+claims of the 20 datasets, pooled, were:
+
+| Graph | Selection | Form | True / false claims | Precision | Ancestral pairs | Datasets with a claim | Average precision |
+|---|---|---|---:|---:|---:|---:|---:|
+| 7 nodes | with | Y-structure | 20 / 0 | 1.00 | 0.13 | 20 | 0.350 |
+| 7 nodes | with | extended | 20 / 0 | 1.00 | 0.13 | 20 | 0.350 |
+| 7 nodes | without | Y-structure | 19 / 0 | 1.00 | 0.13 | 19 | 0.339 |
+| 7 nodes | without | extended | 20 / 1 | 0.95 | 0.13 | 20 | 0.350 |
+| 8 variables | with | Y-structure | 7 / 0 | 1.00 | 0.20 | 5 | 0.223 |
+| 8 variables | with | extended | 32 / 22 | 0.59 | 0.20 | 15 | 0.284 |
+| 8 variables | without | Y-structure | 14 / 2 | 0.88 | 0.20 | 9 | 0.240 |
+| 8 variables | without | extended | 25 / 18 | 0.58 | 0.20 | 15 | 0.262 |
+| 16 variables | with | Y-structure | 35 / 30 | 0.54 | 0.12 | 18 | 0.166 |
+| 16 variables | with | extended | 133 / 342 | 0.28 | 0.12 | 20 | 0.209 |
+| 16 variables | without | Y-structure | 62 / 5 | 0.93 | 0.12 | 18 | 0.207 |
+| 16 variables | without | extended | 137 / 139 | 0.50 | 0.12 | 20 | 0.267 |
+
+The precision of the claims was above the share of ancestral pairs in every setting: the floor's
+interval lay above 0 in all 12, its lower end lowest, 0.12, for the extended form on the graphs
+with 16 variables, with selection. The mean claim errors were below the empty answer's, the
+number of true pairs, in 10 of the 12 settings; the extended form on the graphs with 16 variables
+made more, 39.0 against 28.6 with selection and 28.7 against 28.6 without, and so did the authors'
+code. Under selection the dependences a pattern needs are often too weak for a test at one level
+to see at 10,000 rows, and a missed dependence makes a false pattern: on the graphs with 16
+variables, 35 of 65 claims were true, and 46 of 97 on the fresh datasets; for the extended form,
+133 of 475 and 147 of 565.
+
+A harder setting draws every selection variable among the leaves below the colliders. There too
+both forms made the same claims as the authors' code on every dataset. With selection on the
+graphs with 16 variables, 26 of 112 claims of the Y-structure were true, and 105 of 559 of the
+extended form, where 10% of the pairs are ancestral; on the graphs with 8 variables the
+Y-structure's 12 claims split 6 and 6, too few for the interval of its precision over the share to
+lie above 0. We report this setting and do not judge it.
+
+A median fit took 5 to 21 ms, 2.1 to 3.9 times as fast as the authors' code at the same level; the
+times come from shared nodes and are indicative. The [comparison page][ys] has every setting and
+number.
+
+## LDECC
+
+`andrey.ldecc` is LDECC (Gupta, Childers, and Lipton, 2023), which finds the parent sets that adjust
+for one treatment's effect on one outcome from the structure around the treatment, with eager
+collider checks that direct its parents. It is supported. The
+[API reference](../api.md#supported-methods) describes it.
+
+We ran it against the authors' code (commit 605d8d1), with the same Fisher's z test at the level of
+their notebooks, 0.01 x 32,000 / rows, on the paper's two settings: its generator of 25-variable
+graphs (Appendix C.1) and the fitted MAGIC-NIAB network (44 variables, treatment G266, outcome HT),
+at 8,000 to 32,000 rows, with the columns in an order drawn from each dataset's seed. Neither side
+stopped at a cap on the tests; the paper's runs stopped at 7,000. Per dataset we scored whether the
+parent sets are the family the true CPDAG allows (accuracy), whether the treatment's true parents
+are among them (recall), the squared Hausdorff distance of the estimated effects from the family's
+population effects, and the effect error on a fresh sample. A setting counts as worse when the
+paired interval of a measure lies on Andrey's worse side on the first 20 datasets and again on 20
+fresh ones. The floor is the empty adjustment set.
+
+| Setting | Accuracy | Recall | Effect error | Empty set's error | Tests | Seconds |
+|---|---|---|---|---:|---|---|
+| Generator, 8,000 rows | 0.30 / 0.40 | 0.35 / 0.45 | 0.112 / 0.089 | 0.213 | 501 / 462 | 0.03 / 0.75 |
+| Generator, 16,000 rows | 0.35 / 0.40 | 0.50 / 0.55 | 0.092 / 0.100 | 0.216 | 544 / 494 | 0.05 / 1.70 |
+| Generator, 24,000 rows | 0.45 / 0.50 | 0.55 / 0.60 | 0.079 / 0.073 | 0.212 | 571 / 452 | 0.06 / 1.63 |
+| Generator, 32,000 rows | 0.40 / 0.45 | 0.55 / 0.60 | 0.071 / 0.076 | 0.212 | 566 / 496 | 0.09 / 2.77 |
+| MAGIC-NIAB, 8,000 rows | 0.60 / 0.55 | 0.95 / 0.85 | 0.006 / 0.006 | 0.006 | 72,425 / 2,129 | 4.5 / 6.4 |
+| MAGIC-NIAB, 16,000 rows | 0.65 / 0.55 | 0.90 / 0.90 | 0.007 / 0.007 | 0.006 | 91,409 / 2,232 | 6.0 / 8.9 |
+| MAGIC-NIAB, 24,000 rows | 0.85 / 0.85 | 1.00 / 1.00 | 0.006 / 0.006 | 0.005 | 84,449 / 2,097 | 5.5 / 13.1 |
+| MAGIC-NIAB, 32,000 rows | 0.90 / 0.85 | 1.00 / 1.00 | 0.005 / 0.005 | 0.005 | 166,226 / 2,092 | 11.0 / 18.8 |
+
+Each pair is Andrey / the authors' code: the means over 20 datasets, and the medians for tests and
+seconds per fit. Every setting was a tie on every measure, and again on the 20 fresh datasets. On
+the generator's graphs both sides' effect errors were below the empty set's. On MAGIC-NIAB the
+empty set is a valid adjustment set, and neither side's error was below it. With exact tests, LDECC
+gave the true CPDAG's family on 3,000 graphs of the paper's generator and 1,000 random graphs with
+30 variables. On the paper's own draws, where the columns
+come in the order its generator draws them and the authors' code visits variables in that order,
+the authors' accuracy was 0.42 to 0.52 and Andrey's 0.38 to 0.42; with the same columns shuffled,
+the authors' was 0.38 to 0.47.
+
+Global PC read at the pair, with the same test and level, was never better on both effect error and
+time: on the generator's graphs it gave no effect on 11 to 15 of 20 datasets and took 0.45 to 0.52
+s, and on MAGIC-NIAB it matched LDECC's effect error in 0.53 to 0.57 s. The [comparison page][adj]
+has every setting and number.
+
+## LOAD
+
+`andrey.local_optimal_adjustment` is LOAD (Schubert, Claassen, and Magliacane, 2026), which finds
+whether one of two variables causes the other and the optimal adjustment set for that effect from
+structures learned one Markov blanket at a time. It is supported. The
+[API reference](../api.md#supported-methods) describes it.
+
+We ran it against the authors' code (commit 7febfc6), with the same Fisher's z test at their level,
+0.01, on the paper's random graphs (100 to 1,000 variables, mean degree 2, an identifiable pair) and
+on pairs drawn from the MAGIC-NIAB network, at 10,000 rows. Per dataset we scored the F1 of the
+returned set against the optimal set for the pair asked (no set counts 0) and the effect error on a
+fresh sample. A setting counts as worse as for LDECC. The floor is the empty set: its errors are the
+optimal set's size.
+
+| Setting | Set F1 | Effect error | Set errors (empty set's) | Tests | Seconds |
+|---|---|---|---|---|---|
+| Random graphs, 100 variables | 0.90 / 0.90 | 0.017 / 0.017 | 0.00 (2.17) | 1,277 / 863 | 0.10 / 0.05 |
+| Random graphs, 200 variables | 0.98 / 0.97 | 0.003 / 0.003 | 0.10 (1.90) | 2,410 / 1,704 | 0.21 / 0.11 |
+| Random graphs, 400 variables | 0.92 / 0.92 | 0.002 / 0.002 | 0.30 (2.80) | 4,818 / 3,851 | 0.60 / 0.30 |
+| Random graphs, 1,000 variables | 0.93 / 0.93 | 0.053 / 0.015 | 0.20 (2.35) | 14,118 / 11,087 | 2.14 / 1.19 |
+| MAGIC-NIAB, random pairs | 0.74 / 0.88 | 0.021 / 0.009 | 1.94 (7.50) | 4,602 / 2,580 | 0.08 / 0.09 |
+
+Each pair is Andrey / the authors' code, as for LDECC; the set errors are Andrey's missing plus
+extra members where both answers hold one set. Every setting was a tie on the first 20 datasets but
+the set F1 on MAGIC-NIAB, which tied on the 20 fresh ones (0.67 against 0.73 for the authors). The
+set errors were below the empty set's in every setting. With exact tests, LOAD gave the true
+relation, identifiability, and optimal set on 9,600 pairs in random graphs of 5 to 20 variables.
+When two v-structures direct one edge both ways, LOAD directs it as the one whose pair the tests
+separated most clearly asks; on these 200 datasets that brought its answers nearer the authors' (the
+same direction on 168 against 154), and on 11 it answered "no effect" where the truth has one.
+
+Global PC read at the pair was never better on both effect error and time: its error tied LOAD's on
+the random graphs, where LOAD was faster, and on MAGIC-NIAB its error was lower, 0.007, and it took
+0.50 s against LOAD's 0.08 s.
+
+## LocPC-CDE
+
+`andrey.locpc_cde` is LocPC-CDE (Loranchet and Assaad, 2026), which finds whether the controlled
+direct effect of one treatment on one outcome is identifiable from the graph it learns around the
+outcome one hop at a time, and the outcome's parents as its adjustment set. It is supported. The
+[API reference](../api.md#supported-methods) describes it.
+
+We ran it against the authors' code (pyCIPHOD, commit 37a62c9), with the same tests at alpha 0.05,
+on the paper's setting: random graphs with 10 to 200 variables and two neighbors on average, either
+linear-Gaussian with Fisher's z test or the paper's logistic model of binary variables with the
+G-square test, 5,000 rows, and a pair whose direct effect the true CPDAG identifies, or does not,
+with the columns in an order drawn from each dataset's seed. The authors' code's graph depends on
+Python's string hash seed, so it ran with `PYTHONHASHSEED=0`. Per dataset we scored whether the
+verdict, identifiable or not, matches the true CPDAG's (the paper's identifiable proportion is 1
+minus this error), on identifiable pairs whether the set is the outcome's true parents other than
+the treatment, and on linear-Gaussian identifiable pairs the effect error on a fresh sample. A
+setting counts as worse when the paired interval of a measure lies on Andrey's worse side on the
+first 20 datasets and again on 20 fresh ones. The floors are the constant answer "not identifiable"
+for the verdict, the empty set for the set, and the unadjusted regression for the effect.
+
+| Variables | Gaussian, identifiable | Gaussian, not identifiable | Binary, identifiable | Binary, not identifiable |
+|---:|---|---|---|---|
+| 10 | 0.00 / 0.00 | 0.20 / 0.25 | 0.10 / 0.05 | 0.25 / 0.35 |
+| 20 | 0.05 / 0.05 | 0.35 / 0.40 | 0.15 / 0.10 | 0.25 / 0.30 |
+| 30 | 0.00 / 0.00 | 0.45 / 0.55 | 0.10 / 0.10 | 0.45 / 0.50 |
+| 40 | 0.05 / 0.05 | 0.50 / 0.55 | 0.15 / 0.15 | 0.35 / 0.55 (better) |
+| 50 | 0.05 / 0.05 | 0.50 / 0.65 | 0.05 / 0.05 | 0.55 / 0.55 |
+| 100 | 0.00 / 0.00 | 0.40 / 0.65 (better) | 0.00 / 0.00 | 0.60 / 0.65 |
+| 150 | 0.00 / 0.00 | 0.75 / 0.75 | 0.00 / 0.00 | 0.70 / 0.70 |
+| 200 | 0.00 / 0.00 | 0.90 / 0.95 | 0.05 / 0.05 | 0.45 / 0.65 (better) |
+
+| Variables | Set error, Gaussian | Set error, binary | Effect error, Gaussian | Unadjusted regression's error |
+|---:|---|---|---|---:|
+| 10 | 0.10 / 0.25 | 0.15 / 0.20 | 0.007 / 0.014 | 0.039 |
+| 20 | 0.20 / 0.25 | 0.30 / 0.35 | 0.028 / 0.039 | 0.055 |
+| 30 | 0.15 / 0.15 | 0.40 / 0.35 | 0.017 / 0.019 | 0.018 |
+| 40 | 0.25 / 0.30 | 0.30 / 0.35 | 0.027 / 0.032 | 0.042 |
+| 50 | 0.30 / 0.40 | 0.25 / 0.25 | 0.023 / 0.024 | 0.017 |
+| 100 | 0.35 / 0.35 | 0.10 / 0.15 | 0.016 / 0.016 | 0.030 |
+| 150 | 0.30 / 0.30 | 0.25 / 0.45 (better) | 0.043 / 0.043 | 0.030 |
+| 200 | 0.45 / 0.55 | 0.40 / 0.45 | 0.019 / 0.019 | 0.006 |
+
+Each pair is Andrey / the authors' code, the means over 20 datasets; "better" marks a setting where
+the paired interval lies on Andrey's better side. No setting was worse on any measure, and 4 of the
+32 were better: the verdict on pairs the CPDAG does not identify, in linear-Gaussian graphs with 100
+variables and binary ones with 40 and 200, and the set in binary graphs with 150 variables. On the
+graphs with up to 100 variables, 37 of the 40 linear-Gaussian answers that differ and 25 of the 36
+binary ones trace to how the authors' code runs: it learns each new hop on the graph it kept from
+the last one, with its marks, and it visits variables in the order of their names; 2 more binary
+ones trace to how its G-square test counts degrees of freedom. With exact tests, LocPC-CDE gave the
+true verdict on all 665 pairs of 60 random graphs with 6 to 12 variables.
+
+Over the two pairs of each seed, LocPC-CDE's verdict error was below the constant answer's, 0.500,
+in every setting but the linear-Gaussian graphs with 200 variables: 0.450 there, on the first 20
+seeds and again on 20 fresh ones, with intervals that reach 0.500, against the authors' code's
+0.475 and 0.500. Taken alone, the pairs the CPDAG does not identify always favor the constant
+answer, and both sides fall short of it there: LocPC-CDE's verdict was wrong or undecided on 20% to
+90% of them, the authors' code's on 25% to 95%. On identifiable pairs its sets had fewer missing
+plus extra members than the empty set in every setting but those with 200 variables, as the
+authors' code's did; its effect error was below the unadjusted regression's with 10 variables only,
+and the authors' code's in no setting. With the authors' code at another hash seed, 79 of its 80
+answers in the 4 better settings stayed the same, and the binary graphs with 40 variables became a
+tie. Three fits of the authors' code passed the cap of 1,800 s with 200 binary variables and were
+rerun with a cap of 3,600 s.
+
+### Verdicts against cost
+
+Global PC read at the pair, with the same test and level, is the other way to the verdict: the
+effect is identifiable when PC's CPDAG directs every edge at the outcome. Each cell below holds the
+verdict error over both kinds of pair, 40 datasets, where the constant answer "not identifiable"
+scores 0.500, and, in parentheses, the median tests and seconds of one fit. LocPC-CDE counts the
+tests it evaluated, so a cached repeat is not a new test; PC counts every query its tests evaluated,
+and the authors' code every test it ran. Every method ran on a dataset in one job on shared nodes,
+so the seconds are indicative.
+
+| Data | Variables | LocPC-CDE | Authors' code | Andrey's PC |
+|---|---:|---|---|---|
+| Gaussian | 10 | 0.100 (108; 0.01) | 0.125 (110; 0.09) | 0.175 (161; 0.44) |
+| Gaussian | 20 | 0.200 (255; 0.02) | 0.225 (296; 0.17) | 0.200 (683; 0.38) |
+| Gaussian | 30 | 0.225 (530; 0.02) | 0.275 (780; 0.46) | 0.225 (1,961; 0.43) |
+| Gaussian | 40 | 0.275 (558; 0.03) | 0.300 (798; 0.49) | 0.300 (3,744; 0.44) |
+| Gaussian | 50 | 0.275 (1,000; 0.04) | 0.350 (1,168; 0.62) | 0.325 (5,516; 0.45) |
+| Gaussian | 100 | 0.200 (1,666; 0.07) | 0.325 (1,977; 1.15) | 0.375 (22,918; 0.49) |
+| Gaussian | 150 | 0.375 (1,920; 0.10) | 0.375 (2,499; 1.87) | 0.625 (47,930; 0.57) |
+| Gaussian | 200 | 0.450 (3,190; 0.16) | 0.475 (3,585; 2.19) | 0.800 (89,808; 0.60) |
+| Binary | 10 | 0.175 (100; 0.05) | 0.200 (106; 1.46) | 0.100 (140; 0.41) |
+| Binary | 20 | 0.200 (214; 0.13) | 0.200 (221; 3.25) | 0.175 (542; 0.43) |
+| Binary | 30 | 0.275 (284; 0.13) | 0.300 (440; 5.03) | 0.175 (1,456; 0.40) |
+| Binary | 40 | 0.250 (349; 0.16) | 0.350 (322; 3.78) | 0.250 (2,682; 0.51) |
+| Binary | 50 | 0.300 (480; 0.21) | 0.300 (542; 6.09) | 0.300 (3,882; 0.57) |
+| Binary | 100 | 0.300 (720; 0.45) | 0.325 (910; 15.54) | 0.275 (15,963; 1.17) |
+| Binary | 150 | 0.350 (1,146; 0.57) | 0.350 (1,186; 13.58) | 0.225 (35,068; 1.74) |
+| Binary | 200 | 0.250 (1,981; 1.00) | 0.350 (1,768; 20.80) | 0.275 (66,146; 2.72) |
+
+```{raw} html
+:file: local-discovery/locpc-cde-frontier.html
+```
+
+PC was never better on both. On linear-Gaussian data its verdict error was never below
+LocPC-CDE's, and from 100 variables it was 0.175 to 0.350 higher. On binary data it was lower in 5
+of 8 sizes, by 0.025 to 0.125, with 1.4 to 31 times the tests and 2.6 to 7.8 times the seconds.
+LocPC-CDE ran fewer tests than the authors' code in 14 of 16 settings and took 8 to 39 times less
+time. The [comparison page][adj] has every setting and number.
+
+## Local ISA-LiNG
+
+`andrey.local_isa_ling` is local ISA-LiNG (Dai, Ng, Zheng, Gao, and Zhang, 2024), which learns the
+weighted edges into one variable and into each of its children in a linear model with non-Gaussian
+noise whose graph may hold cycles, from the variable and its Markov blanket alone. It is supported
+for graphs with cycles; the cells without cycles are outside its claim, so we report them and do
+not gate on them. The [API reference](../api.md#supported-methods) describes it.
+
+We ran it on the simulations of its paper: linear models on 50 variables, weights of magnitude 0.5
+to 0.9 with a random sign, and noise uniform on `[-c, c]` raised to the fifth power; graphs with
+disjoint stable cycles and a target on a cycle, and Erdos-Renyi DAGs of mean degree 3 and 5, each
+at 2,000 rows, and the DAGs of degree 3 also at 100, 300, 1,000, 3,000, and 10,000 rows, with 20
+datasets per cell. The reference is the authors' code, run unmodified, each side once with its own
+Lasso blanket and once with the true blanket. On the graphs with cycles the authors' code runs its
+Algorithm 1 only up to 10 local variables, so with its own blanket 12 of the 20 datasets are
+paired. Per dataset we counted the paper's SHD of the local graph, the edges into and out of the
+target and into each of its children, and took the Euclidean distance between the estimated and
+the true weights. A cell counts as worse when the paired interval of either measure lies on
+Andrey's worse side on the first 20 datasets and again on 20 fresh ones. The floor is the empty
+answer, whose SHD is the number of true local edges.
+
+| Graph | Rows | Blanket | Datasets | SHD, Andrey | SHD, authors | Distance, Andrey | Distance, authors | Result | SHD, empty answer |
+|---|---:|---|---:|---:|---:|---:|---:|---|---:|
+| Cycles | 2,000 | own | 12 | 0.92 | 1.00 | 0.55 | 0.46 | tie | 5.12 |
+| Cycles | 2,000 | true | 20 | 0.25 | 0.15 | 0.19 | 0.15 | tie | 4.80 |
+| DAG, degree 3 | 100 | own | 20 | 10.55 | 9.65 | 2.35 | 2.21 | tie | 14.30 |
+| DAG, degree 3 | 100 | true | 20 | 7.15 | 6.45 | 1.95 | 1.95 | worse, on both seed sets | 14.30 |
+| DAG, degree 3 | 300 | own | 20 | 8.00 | 8.75 | 2.10 | 2.14 | tie | 14.30 |
+| DAG, degree 3 | 300 | true | 20 | 6.05 | 4.65 | 1.84 | 1.76 | worse, on both seed sets | 14.30 |
+| DAG, degree 3 | 1,000 | own | 20 | 6.15 | 8.05 | 1.80 | 2.16 | better | 14.30 |
+| DAG, degree 3 | 1,000 | true | 20 | 3.95 | 2.85 | 1.60 | 1.43 | tie (worse on seeds 0-19 only) | 14.30 |
+| DAG, degree 3 | 2,000 | own | 20 | 5.65 | 7.25 | 1.58 | 2.35 | better | 14.30 |
+| DAG, degree 3 | 2,000 | true | 20 | 4.20 | 4.70 | 1.30 | 1.65 | better | 14.30 |
+| DAG, degree 3 | 3,000 | own | 20 | 5.80 | 6.20 | 1.55 | 2.17 | better | 14.30 |
+| DAG, degree 3 | 3,000 | true | 20 | 2.90 | 1.95 | 0.98 | 1.40 | tie (worse on seeds 0-19 only) | 14.30 |
+| DAG, degree 3 | 10,000 | own | 20 | 4.70 | 5.20 | 1.48 | 1.59 | tie | 14.30 |
+| DAG, degree 3 | 10,000 | true | 20 | 2.45 | 2.30 | 0.85 | 0.81 | tie | 14.30 |
+| DAG, degree 5 | 2,000 | own | 20 | 15.00 | 17.00 | 2.69 | 3.08 | tie | 24.75 |
+| DAG, degree 5 | 2,000 | true | 20 | 9.95 | 9.85 | 2.42 | 2.61 | tie | 24.75 |
+
+On the graphs with cycles, its claimed setting, it tied the authors' code with both blankets, and
+both made far fewer errors than the empty answer. The DAG cells are outside the claim. With its own
+blanket, the blanket the public function learns, it was better than the authors' code in 3 of 7
+cells and tied in 4; with the true blanket it was better in 1, tied in 4, and worse in 2, at 100
+and 300 rows, on both seed sets, so the small samples without cycles are outside the claim. It made
+fewer errors than the empty answer in every cell, and its weights were closer to the truth than the
+empty answer's in every cell but the DAGs at 100 rows with its own blanket.
+
+When no column of the demixing matrix is a sink, which a DAG rules out but an estimate allows, the
+paper gives no rule, and Andrey takes its authors' code's: the column with the fewest nonzero
+entries. Applied to Andrey's own matrices, the authors' code's rule gave the same answer as Andrey
+on every dataset we traced, so the differences that remain come from the demixing matrices of the
+two sparse ICAs. On the fits without a sink, the rule made fewer errors than running Algorithm 1
+on the matrix from 2,000 rows and at degree 5, and more at 100 and 300 rows.
+
+### Accuracy against cost
+
+Global DirectLiNGAM and ICA-LiNGAM are a different method: they fit all 50 columns and are read at
+the target. Each cell holds the mean SHD and the median seconds of one answer, each method with its
+own blanket or none; a point is dominated when another method is more accurate and faster at once.
+
+| Graph | Rows | Local ISA-LiNG | DirectLiNGAM, global | ICA-LiNGAM, global | Empty |
+|---|---:|---|---|---|---:|
+| DAG, degree 3 | 100 | 10.55 / 5.6 s | 24.25 / 2.9 s (dominated) | 36.80 / 2.1 s (dominated) | 14.30 |
+| DAG, degree 3 | 300 | 8.00 / 9.0 s (dominated) | 6.80 / 6.7 s | 42.10 / 2.3 s (dominated) | 14.30 |
+| DAG, degree 3 | 1,000 | 6.15 / 16.6 s (dominated) | 1.85 / 6.7 s | 2.15 / 1.8 s | 14.30 |
+| DAG, degree 3 | 2,000 | 5.65 / 27.4 s (dominated) | 1.25 / 7.7 s (dominated) | 1.10 / 1.7 s | 14.30 |
+| DAG, degree 3 | 3,000 | 5.80 / 43.7 s (dominated) | 0.60 / 12.9 s | 0.65 / 2.6 s | 14.30 |
+| DAG, degree 3 | 10,000 | 4.70 / 137.4 s (dominated) | 0.15 / 31.0 s (dominated) | 0.15 / 3.2 s | 14.30 |
+| DAG, degree 5 | 2,000 | 15.00 / 37.0 s (dominated) | 1.30 / 10.6 s | 3.60 / 2.2 s | 24.75 |
+| Cycles | 2,000 | 0.60 / 28.6 s | 4.40 / 4.6 s | 7.25 / 0.7 s | 4.80 |
+
+```{raw} html
+:file: local-discovery/local-isa-ling-frontier.html
+```
+
+On the DAGs from 300 rows up, global DirectLiNGAM read at the target was more accurate and faster
+than local ISA-LiNG in every cell, and from 1,000 rows global ICA-LiNGAM too: at 2,000 rows and
+degree 3 they made 1.25 and 1.10 errors in 7.7 and 1.7 s, against 5.65 in 27 s. At 100 rows both
+global fits made more errors than the empty answer, and local ISA-LiNG was the most accurate. On
+the graphs with cycles, which global LiNGAM does not model, DirectLiNGAM made 4.40 errors and
+ICA-LiNGAM 7.25 on the same 20 datasets, against local ISA-LiNG's 0.60 and the empty answer's 4.80;
+their times there come from one process and are indicative. So for data without cycles we
+recommend DirectLiNGAM from 300 rows up, and local ISA-LiNG for graphs with cycles.
+
+On Sachs, at the paper's targets PIP2, PIP3, and Akt, local ISA-LiNG made 2, 2, and 1 errors with
+either blanket, as the authors' code did, against the paper's 1 each and the empty answer's 2, 3,
+and 2. The times come from shared nodes and are indicative. The [comparison page][lil] has every
+cell and number.
+
+## Reproduce
+
+You can find environment setup, campaign drivers, and scores in the [benchmark harness
+guide][harness]. To rerun the comparisons, install Andrey (andrey-core) in the harness's
+environment, and for the comparisons with bnlearn, bnlearn 5.2.1 with R 4.6.1 in its R environment;
+for HITON-MB and MMMB, Causal Explorer 1.5 with MATLAB.
+Times will differ with the hardware and build; the sets should match closely.
+
+| Comparison | Lane | Sizes | Datasets x repeats | Wall cap (s) |
+|---|---|---|---|---:|
+| GS and Fast-IAMB against bnlearn 5.2.1 | `blanket_cpu.py`, judged by `blanket_summary.py` | alarm, child, insurance, and hepar2 at 1,000, 5,000, and 20,000 rows; Gaussian graphs with 20, 50, and 100 variables at 1,000 and 5,000 rows | 20 x 1, and 20 fresh x 1 for a worse setting | 1,800 |
+| HITON-PC against bnlearn 5.2.1 | `blanket_cpu.py`, judged by `blanket_summary.py` | the four networks at 200, 500, and 5,000 rows; the same Gaussian graphs | 20 x 1 | 1,800 |
+| HITON-MB against Causal Explorer 1.5 | `blanket_cpu.py`, judged by `blanket_summary.py` | child, insurance, alarm, and hailfinder at 200, 500, and 5,000 rows; pigs at 500 rows | 20 x 1, and 20 fresh x 1 for a worse setting | 1,800 (3,600 on pigs) |
+| MMMB against Causal Explorer 1.5 | `blanket_cpu.py`, judged by `blanket_summary.py` | alarm, hailfinder, insurance, and win95pts at 300, 500, 700, 1,000, and 5,000 rows; pigs at 500 rows | 20 x 1, and 20 fresh x 1 for a worse setting | 1,800 (3,600 on pigs) |
+| PCMB beside the results of its paper | `blanket_cpu.py`, summarized by `pcmb_summary.py` | alarm at 100, 200, 500, 1,000, 2,000, and 5,000 rows; pigs at 100, 200, and 500 rows | 20 x 1 on alarm, 10 x 1 on pigs | 14,400 |
+| CMB against global PC at a target | `direct_cpu.py --paper cmb`, judged by `direct_summary.py` | alarm at 1,000 rows | 20 x 1, and 20 fresh x 1 | 1,800 |
+| MB-by-MB against global PC and CMB at a target | `direct_cpu.py --paper mb_by_mb`, judged by `direct_summary.py` | alarm and hailfinder at 500, 1,000, 2,000, and 5,000 rows with alpha 0.01 and 0.05; the 45 x 45 chessboard | 20 x 1, and 20 fresh x 1; chessboard 10 x 1, and 10 fresh x 1 | 1,800; 3,600 on the chessboard |
+| MMB-by-MMB against its authors' code | `mmb_by_mmb_cpu.py`, judged by `mmb_by_mmb_summary.py` | mildew, alarm, win95pts, and andes with hidden variables at 1,000 and 5,000 rows | 20 x 1, and 20 fresh x 1 on andes and win95pts at 1,000 rows | 1,800, and 3,600 on win95pts at 5,000 rows |
+| Y-structures against the authors' code | `y_structures_cpu.py`, judged by `y_structures_summary.py` | the 7-node graph and random graphs with 8 and 16 variables, with and without selection, at 10,000 rows | 20 x 1, and 20 fresh x 1 | 1,800 |
+| LDECC against the authors' code | `adjustment_cpu.py` with `ldecc` and `magic-niab` cells | the generator's graphs and MAGIC-NIAB at 8,000, 16,000, 24,000, and 32,000 rows | 20 x 1, and 20 fresh x 1 | 1,800 |
+| LOAD against the authors' code | `adjustment_cpu.py` with `random-graph` and `magic-niab` cells | random graphs with 100, 200, 400, and 1,000 variables and MAGIC-NIAB pairs at 10,000 rows | 20 x 1, and 20 fresh x 1 | 1,800 |
+| LocPC-CDE against the authors' code | `adjustment_cpu.py` with `locpc-identifiable` and `locpc-nonidentifiable` cells | random graphs with 10, 20, 30, 40, 50, 100, 150, and 200 variables, linear-Gaussian and binary, at 5,000 rows | 20 x 1, and 20 fresh x 1 with 200 variables | 1,800, and 3,600 for three fits of the authors' code |
+| Local ISA-LiNG against the authors' code | `local_lingam_cpu.py`, judged by `local_lingam_summary.py` | the paper's graphs with cycles and DAGs of degree 3 and 5 with 50 variables at 2,000 rows; the DAGs of degree 3 at 100, 300, 1,000, 3,000, and 10,000 rows; Sachs at three targets | 20 x 1, and 20 fresh x 1 | 1,800, and 3,600 at degree 5 and at 10,000 rows |
+
+[harness]: https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/README.md
+[bl]: https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/gs-fast-iamb-hiton-pc.md
+[blankets]: https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/blankets.md
+[hm]: https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/hiton-mb.md
+[mm]: https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/mmmb.md
+[direct]: https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/target-edges.md
+[adj]: https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/adjustment.md
+[mmb]: https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/mmb-by-mmb.md
+[ys]: https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/y-structures.md
+[lil]: https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/local-isa-ling.md

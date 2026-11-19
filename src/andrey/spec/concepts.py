@@ -170,14 +170,15 @@ _POOLED_RANKS = (
 #: The methods that take a conditional-independence test.
 TESTED = (
     *(*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp", "y_structures"),
-    *("ldp", "ld3", "ldecc", "local_optimal_adjustment", "locpc_cde"),
+    *("ldp", "ld3", "ldecc", "local_optimal_adjustment", "locpc_cde", "skewd_mv"),
 )
+#: The tested methods that read continuous data only, so take the tests of continuous data.
+CONTINUOUS_TESTED = ("jpcmciplus", "skewd_mv")
 #: The methods with no edge to name in knowledge, ICP, whose tests take none, and the methods that
 #: take none yet.
 NO_KNOWLEDGE = (
-    *("gin", "anm", "pnl", "loci", "icp", "ages", "y_structures", "ldp", "ld3", "ldecc"),
-    "local_isa_ling",
-    "local_optimal_adjustment",
+    *("gin", "anm", "pnl", "loci", "icp", "ages", "cpcm", "cpcm_graph", "skewd", "skewd_mv"),
+    *("y_structures", "ldp", "ld3", "ldecc", "local_isa_ling", "local_optimal_adjustment"),
 )
 #: The methods whose main loop a cap can stop early.
 CAPPED_LOOPS = (
@@ -190,6 +191,8 @@ CAPPED_LOOPS = (
     "ica_lingam",
     "varma_lingam",
     "dynotears",
+    "skewd",
+    "skewd_mv",
 )
 #: Every method, in ``andrey.api.__all__`` order.
 ALL_METHODS: tuple[str, ...] = tuple(api.__all__)
@@ -218,9 +221,13 @@ _CONCEPTS = (
             *RESIDUAL,
             "cam",
             "resit",
+            "skewd",
+            "skewd_mv",
             "score_matching",
             "nogam",
+            "das",
             "camuv",
+            "cpcm",
             "icp",
             "igsp",
             "ut_igsp",
@@ -234,6 +241,11 @@ _CONCEPTS = (
         ),
         exempt=(
             *_exempt("A score search: no test decides an edge.", *PURE_SCORE, "gnies", "ages"),
+            *_exempt(
+                "Its score is the p-value of the residuals' joint independence test plus a "
+                "penalty per edge: no test at a level decides an edge.",
+                "cpcm_graph",
+            ),
             *_exempt("Continuous optimization: no test decides an edge.", *CONTINUOUS, "dynotears"),
             *_exempt(
                 "Its edges come from the gated likelihood; its moral-graph screen is a step "
@@ -326,7 +338,7 @@ _CONCEPTS = (
                     fragment="p-value",
                     reason="None decides without a level: the direction with the larger p-value.",
                 )
-                for m in ("anm", "pnl", "loci")
+                for m in ("anm", "pnl", "loci", "cpcm", "skewd")
             ),
             Deviation(
                 method="cam",
@@ -348,6 +360,14 @@ _CONCEPTS = (
                 default=0.001,
                 reason="0.001 is the cutoff of the pruning tests in the method's published "
                 "experiments (Montagna et al. 2023, Section 6).",
+            ),
+            Deviation(
+                method="das",
+                name="alpha",
+                default=0.001,
+                reason="0.001 is the cutoff of the pruning tests in the published experiments the "
+                "method's paper follows (Rolland et al. 2022, Section 4.1); its own paper states "
+                "none.",
             ),
             Deviation(
                 method="camuv",
@@ -402,7 +422,10 @@ _CONCEPTS = (
                 "It tests the independence of residuals as part of its own model.",
                 *RESIDUAL,
                 "resit",
+                "skewd",
                 "camuv",
+                "cpcm",
+                "cpcm_graph",
             ),
             *_exempt(
                 "No conditional-independence test.",
@@ -419,6 +442,7 @@ _CONCEPTS = (
                 "cam",
                 "score_matching",
                 "nogam",
+                "das",
             ),
             *_exempt(
                 "It tests the invariance of regressions across environments, invariance_test.",
@@ -455,6 +479,15 @@ _CONCEPTS = (
                 reason="The dummies enter every test as numeric one-hot columns, so it takes the "
                 "tests of continuous data, but not normal_scores, which ranks each column over the "
                 "rows of every dataset and so mixes their distributions.",
+            ),
+            Deviation(
+                method="skewd_mv",
+                name="indep_test",
+                default="kci",
+                choices=tuple(t for t in CONTINUOUS_INDEP_TESTS if t in UNRANKED_TESTS),
+                reason="Its likelihood stage models continuous values, so it takes the tests of "
+                "continuous data, but not normal_scores, which would make its skeleton blind to "
+                "monotone changes the likelihood stage reads; the authors' code runs PC with kci.",
             ),
         ),
     ),
@@ -763,6 +796,7 @@ _CONCEPTS = (
                 "resit",
                 "score_matching",
                 "nogam",
+                "das",
                 *CONTINUOUS,
                 *LINGAM,
                 "granger",
@@ -772,7 +806,11 @@ _CONCEPTS = (
                 "anm",
                 "pnl",
                 "loci",
+                "cpcm",
+                "cpcm_graph",
+                "skewd",
             ),
+            *_exempt("Runs PC at no depth limit, as its paper does.", "skewd_mv"),
             *_exempt(
                 "No conditional-independence tests; max_parents caps the sets it tests.", "icp"
             ),
@@ -873,7 +911,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="parents",
-        suitable=(*SCORE_SEARCHES, "cam", "gnies", "icp"),
+        suitable=(*SCORE_SEARCHES, "cam", "das", "gnies", "icp"),
         exempt=(
             *_exempt(
                 "Reads the parents from the nonzero entries of the demixing matrix.",
@@ -922,6 +960,14 @@ _CONCEPTS = (
                 "granger",
                 *RESIDUAL,
                 "resit",
+                "cpcm",
+                "skewd",
+                "skewd_mv",
+            ),
+            *_exempt(
+                "Its search scores every DAG, or removes edges from the complete DAG of a causal "
+                "order, and sets no cap on a node's parents.",
+                "cpcm_graph",
             ),
             *_exempt(
                 "An order search with no search over parent sets: the pruning starts from every "
@@ -939,6 +985,15 @@ _CONCEPTS = (
                 "sets no cap.",
                 "igsp",
                 "ut_igsp",
+            ),
+        ),
+        deviations=(
+            Deviation(
+                method="das",
+                name="max_parents",
+                default=20,
+                reason="20 is the paper's cap K on the candidate parents its edge screen keeps "
+                "(Montagna et al. 2023, Section 4).",
             ),
         ),
     ),
@@ -1004,6 +1059,10 @@ _CONCEPTS = (
             "ldecc",
             "local_optimal_adjustment",
             "locpc_cde",
+            "cpcm",
+            "cpcm_graph",
+            "skewd",
+            "skewd_mv",
         ),
         exempt=(
             *_exempt(
@@ -1020,6 +1079,7 @@ _CONCEPTS = (
                 "resit",
                 "score_matching",
                 "nogam",
+                "das",
                 "direct_lingam",
                 "multi_group_direct_lingam",
                 "varma_lingam",
@@ -1210,8 +1270,15 @@ _CONCEPTS = (
             ),
             *_exempt("Its edges run from latent variables, which Knowledge cannot name.", "gin"),
             *_exempt(
-                "Two variables: knowledge of the edge would be the answer.", "anm", "pnl", "loci"
+                "Two variables: knowledge of the edge would be the answer.",
+                *("anm", "pnl", "loci", "cpcm", "skewd"),
             ),
+            *_exempt(
+                "The paper gives no rule for background knowledge: its search scores every DAG, "
+                "or removes edges from the complete DAG of a causal order.",
+                "cpcm_graph",
+            ),
+            *_exempt("Its paper gives no rule for background knowledge.", "skewd_mv"),
             *_exempt(
                 "Its tests read each set of the target's predictors as the data give it; no "
                 "knowledge of edges enters an invariance test.",
@@ -1250,8 +1317,8 @@ _CONCEPTS = (
                     for m in NO_KNOWLEDGE
                     if m
                     not in (
-                        *("icp", "ages", "y_structures", "ldp", "ld3", "ldecc", "local_isa_ling"),
-                        "local_optimal_adjustment",
+                        *("icp", "ages", "cpcm_graph", "y_structures", "ldp", "ld3", "ldecc"),
+                        *("local_isa_ling", "local_optimal_adjustment"),
                     )
                 ),
             ),
@@ -1259,6 +1326,7 @@ _CONCEPTS = (
                 "Takes no knowledge (the knowledge concept).",
                 "icp",
                 "ages",
+                "cpcm_graph",
                 "y_structures",
                 "ldp",
                 "ld3",
@@ -1357,6 +1425,7 @@ _CONCEPTS = (
             "anm",
             "pnl",
             "loci",
+            "skewd",
             *EM_METHODS,
             "local_optimal_adjustment",
         ),
@@ -1383,8 +1452,12 @@ _CONCEPTS = (
                 "A score or a regression reads every column.",
                 "cam",
                 "resit",
+                "skewd_mv",
                 "score_matching",
                 "nogam",
+                "das",
+                "cpcm",
+                "cpcm_graph",
                 *LINGAM,
                 "gin",
                 "rcd",
@@ -1587,7 +1660,8 @@ _CONCEPTS = (
             *_exempt(
                 "Its regressions fit smooth functions of continuous causes, which an environment "
                 "label is not.",
-                *("cam", "resit", "score_matching", "nogam", "camuv", "anm", "pnl", "loci"),
+                *("cam", "resit", "score_matching", "nogam", "das", "camuv", "anm", "pnl", "loci"),
+                *("cpcm", "cpcm_graph", "skewd", "skewd_mv"),
             ),
         ),
     ),

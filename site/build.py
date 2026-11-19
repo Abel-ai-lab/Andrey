@@ -69,6 +69,7 @@ RELEASES = (
     "0.15.0",
     "0.16.0",
     "0.17.0",
+    "0.18.0",
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 

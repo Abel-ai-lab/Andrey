@@ -10,10 +10,12 @@ PCMCI+ extends PCMCI to links within one time step (lag 0). It works on the copi
    ``(X^i_{t-tau}, X^j_t)`` given each subset ``S`` of ``p`` lag-0 neighbors of ``X^j_t``, with
    ``B(j)`` (without ``X^i_{t-tau}``) and ``B(i)`` shifted ``tau`` steps back added to every
    conditioning set. The first p-value above ``pc_alpha`` removes the link and stores ``S`` as its
-   separating set. A lag-0 pair is tested from both ends, the ordered pairs ``(X^i_t, X^j_t)`` in
-   order of ``(i, j)``. The neighbor sets stay fixed during a round and are re-sorted after it,
-   strongest link first, by the smallest absolute statistic each link has had. The rounds stop
-   when no linked pair has ``p`` neighbors left to condition on.
+   separating set. A lag-0 pair is tested from both ends, first from the end with the higher
+   :func:`~andrey.core.ties.tie_ranks`, given that end's neighbors. The neighbor sets stay fixed
+   during a round and are re-sorted after it, strongest link first, by the smallest absolute
+   statistic each link has had; statistics equal to ``KEY_DP`` decimals are ordered by the
+   neighbors' :func:`~andrey.core.ties.tie_ranks`. The rounds stop when no linked pair has ``p``
+   neighbors left to condition on.
 3. **Colliders.** Each unshielded triple ``X^i_{t-tau} - X^k_t - X^j_t`` with a lag-0 link
    ``X^k_t - X^j_t`` is a collider, ``X^i_{t-tau} -> X^k_t <- X^j_t``, by ``collider_rule``:
    ``"sepsets"`` when ``X^k_t`` is not in the separating set; ``"majority"`` and ``"conservative"``
@@ -32,7 +34,9 @@ PCMCI+ extends PCMCI to links within one time step (lag 0). It works on the copi
 Lagged links always point forward in time. Phases 3 and 4 collect the orientations of a pass from
 the graph as it stood before the pass, then apply them together; a link that gets both orientations
 is marked as a conflict and takes no part in later rules. Every test reads the lagged design of
-:func:`~andrey.temporal.pcmci.lagged_design`, as in PCMCI.
+:func:`~andrey.temporal.pcmci.lagged_design`, as in PCMCI, built from the variables sorted by
+:func:`~andrey.core.ties.tie_ranks` (:func:`~andrey.temporal.pcmci.ranked_design_test`), so a test
+gives the same bits under any order of the variables.
 
 References
 ----------
@@ -56,8 +60,8 @@ from andrey.core import backend
 from andrey.core.fdr import check_fdr_method, corrected_pvalues
 from andrey.core.knowledge import orient as orient_known
 from andrey.core.structure import ARROW, NULL, TAIL
-from andrey.core.ties import tie_ranks
-from andrey.temporal.pcmci import Link, LinkTest, design_test, pc1
+from andrey.core.ties import KEY_DP, tie_ranks
+from andrey.temporal.pcmci import Link, LinkTest, pc1, ranked_design_test
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import LaggedConstraints
@@ -175,17 +179,21 @@ def skeleton(
     parents: tuple[tuple[Link, ...], ...],
     tau_max: int,
     pc_alpha: float,
+    ranks: Sequence[int],
     constraints: LaggedConstraints | None = None,
     max_p_global: int | None = None,
     pool: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[tuple[int, int, int], tuple[int, ...]]]:
     """Phase 2: return ``(adjacency, largest p-values, their statistics, sepsets)``.
 
-    The p-value array holds ``-1`` for a link phase 2 never tested. With ``constraints``, the lag-0
-    links start from the pairs they allow, and no required link is tested or removed. Every test
-    conditions on the entries of ``parents`` for both ends and on a subset of the lag-0 neighbors;
-    ``max_p_global`` caps the size of that subset, the conditions beyond the parents. ``pool``, a
-    mask over the variables, limits the neighbors a subset draws from.
+    The p-value array holds ``-1`` for a link phase 2 never tested. ``ranks`` holds each
+    variable's :func:`~andrey.core.ties.tie_ranks`: a lag-0 pair is tested first from its end of
+    higher rank, and neighbors of equal strength are ordered by rank, so the tests a link has, and
+    the p-value it reports, do not depend on the order of the variables. With ``constraints``, the
+    lag-0 links start from the pairs they allow, and no required link is tested or removed. Every
+    test conditions on the entries of ``parents`` for both ends and on a subset of the lag-0
+    neighbors; ``max_p_global`` caps the size of that subset, the conditions beyond the parents.
+    ``pool``, a mask over the variables, limits the neighbors a subset draws from.
     """
     shape = (tau_max + 1, n_vars, n_vars)
     adjacency = np.zeros(shape, dtype=bool)
@@ -203,6 +211,7 @@ def skeleton(
     strength = np.full(shape, np.inf)
     sepsets: dict[tuple[int, int, int], tuple[int, ...]] = {}
     pool = np.ones(n_vars, dtype=bool) if pool is None else pool
+    order = sorted(range(n_vars), key=lambda k: (ranks[k], k))
     neighbors = [tuple(np.flatnonzero(adjacency[0, :, j] & pool).tolist()) for j in range(n_vars)]
     p = 0
     while max_p_global is None or p <= max_p_global:
@@ -212,9 +221,9 @@ def skeleton(
             for i, lag in parents[j]
             if adjacency[lag, i, j] and not kept[lag, i, j] and len(neighbors[j]) >= p
         ] + [
-            (i, 0, j)  # in order of (i, j): a pair first meets its higher variable's neighbors
-            for i in range(n_vars)
-            for j in range(n_vars)
+            (i, 0, j)  # by rank: a pair first meets the neighbors of its higher-ranked end
+            for i in order
+            for j in order
             if adjacency[0, i, j] and not kept[0, i, j] and len(neighbors[j]) - int(pool[i]) >= p
         ]
         if not pairs:
@@ -247,7 +256,7 @@ def skeleton(
             tuple(
                 sorted(
                     np.flatnonzero(adjacency[0, :, j] & pool).tolist(),
-                    key=lambda k: -strength[0, k, j],
+                    key=lambda k: (-round(float(strength[0, k, j]), KEY_DP), ranks[k], k),
                 )
             )
             for j in range(n_vars)
@@ -483,23 +492,23 @@ def pcmciplus(
     ``constraints``, background knowledge over lags ``0`` to ``tau_max``, reach every phase
     (:func:`run_phases`). ``max_depth`` caps phase 1's conditioning sets and ``max_p_global`` the
     conditions phases 2 and 3 take beyond the lagged parents. ``categorical``, ``seed``, and
-    ``degrees_of_freedom`` reach
-    :func:`~andrey.temporal.pcmci.design_test`, which raises on an ``indep_test`` it cannot build.
-    Raises :class:`ValueError` when ``collider_rule`` is not one of
-    :data:`~andrey.constraint._skeleton.COLLIDER_RULES`.
+    ``degrees_of_freedom`` reach :func:`~andrey.temporal.pcmci.ranked_design_test`, which raises on
+    an ``indep_test`` it cannot build. Raises :class:`ValueError` when ``collider_rule`` is not one
+    of :data:`~andrey.constraint._skeleton.COLLIDER_RULES`.
     """
     check_collider_rule(collider_rule)
     check_fdr_method(fdr_method)
     data = np.asarray(data, dtype=np.float64)
-    test = design_test(
+    ranks = tie_ranks(data, categorical).tolist()
+    test = ranked_design_test(
         indep_test,
         data,
         tau_max,
+        ranks,
         categorical=categorical,
         seed=seed,
         degrees_of_freedom=degrees_of_freedom,
     )
-    ranks = tie_ranks(data, categorical).tolist()
     with backend.one_blas_thread():  # the stacked inversions then give the same bits on any host
         return run_phases(
             test,
@@ -530,10 +539,11 @@ def run_phases(
     """Run the four phases with ``test`` over the columns of the lagged design.
 
     ``ranks`` holds each variable's :func:`~andrey.core.ties.tie_ranks`, which orders PC1's equal
-    strengths. With ``constraints``, no phase tests a forbidden or a required link: phase 1 leaves
-    out the forbidden lagged links and keeps the required ones, phase 2 starts the lag-0 links
-    from the allowed pairs and removes no required link, and phase 3 directs the lag-0 links the
-    knowledge decides before the colliders, which do not reverse them. A link no phase tested
+    strengths and the ends and equal neighbors of phase 2 (:func:`skeleton`). With
+    ``constraints``, no phase tests a forbidden or a required link: phase 1 leaves out the
+    forbidden lagged links and keeps the required ones, phase 2 starts the lag-0 links from the
+    allowed pairs and removes no required link, and phase 3 directs the lag-0 links the knowledge
+    decides before the colliders, which do not reverse them. A link no phase tested
     reports p-value 1 and statistic 0, or 0 and 1 when it is required. ``max_depth`` caps phase 1's
     conditioning sets; ``max_p_global`` caps the subsets of lag-0 neighbors that phase 2 conditions
     on beyond the lagged parents of both ends, and the subsets the collider votes of phase 3 read.
@@ -543,7 +553,7 @@ def run_phases(
     recorder = Recorder(test)
     parents = lagged_parents(recorder, n_vars, tau_max, pc_alpha, ranks, constraints, max_depth)
     adjacency, p_values, statistics, sepsets = skeleton(
-        test, n_vars, parents, tau_max, pc_alpha, constraints, max_p_global
+        test, n_vars, parents, tau_max, pc_alpha, ranks, constraints, max_p_global
     )
     for (x, j), (statistic, p_value) in recorder.largest.items():
         lag, i = divmod(x, n_vars)

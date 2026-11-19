@@ -2706,5 +2706,846 @@
     "failures": 0
    }
   }
- ]
+ ],
+ "likelihood_path": {
+  "about": "robust=True of andrey.dagma and andrey.notears, the likelihood path of Deng et al. (2024) after the least-squares fit, before and after the term -log|det(I - W)| left its likelihood, beside the same path run with the authors' code and the empty graph, on the same datasets. One row per method, graph, size and scale; every value is a mean over the row's datasets",
+  "generated": "2026-11-15",
+  "data": "the simulation of Deng et al. (2024), Appendix D.1, drawn with the simulator of the authors' package dagrad: linear Gaussian models, weights uniform on +-[0.5, 1.5], one noise standard deviation per variable uniform on [0.1, 0.7], 1,000 rows, Erdos-Renyi (er2) and scale-free (sf2) graphs with 2 d edges, columns shuffled; standardized z-scores each column of the drawn sample",
+  "metric": "SHD between the CPDAG of the estimate and the CPDAG of the true DAG, the measure of Deng et al. (2024)",
+  "arms": {
+   "empty": "the graph without edges",
+   "before": "Andrey pre-release build of 14 November 2026, whose robust=True likelihood includes the term -log|det(I - W)|; the method at its defaults with robust=True",
+   "now": "Andrey pre-release build of 15 November 2026, whose continuous fits are those of the 0.18.0 release: the likelihood of robust=True without the term -log|det(I - W)|; the method at its defaults with robust=True",
+   "reference": "Algorithm 1 of Deng et al. (2024) as printed, around the unmodified single fits of the authors' package dagrad (commit 4ce4c5a): the warm start is dagrad's least-squares fit at its defaults, each step solves loss_fn='logll' with reg='mcp' from the last accepted weights at lambda 0.4 and delta 0.2, both times 0.8 after each accepted step, a step is accepted while the Gaussian negative log-likelihood strictly falls, and each fit is thresholded at 0.3, dagrad's default. For dagma rows the solver is method='dagma'; for notears rows method='notears' with optimizer='adam'. The paper gives no cap on the steps; the run allowed 50, which no fit reached. A cyclic output is repaired outside the authors' code by dropping the weakest edges until no cycle is left (reference_outputs_repaired counts the datasets)"
+  },
+  "comparison": "per dataset D = SHD(a) - SHD(b); bootstrap_95 is the 95% percentile-bootstrap interval of mean D over 10,000 resamples of the datasets, default_rng(0); better when it lies wholly below 0, worse when wholly above, a tie otherwise",
+  "packages": {
+   "dagrad": "0.0.1 at commit 4ce4c5a",
+   "dagma (called by dagrad)": "1.1.1",
+   "NumPy (reference)": "2.5.4",
+   "NumPy (Andrey)": "2.4.6"
+  },
+  "protocol": "each fit in its own process with one BLAS thread, on nodes of AMD EPYC processors of the Zen 3 generation; a cap per fit of 2,400 s (the fits of the build after, and NOTEARS's of the build before) or 1,800 s (DAGMA's of the build before, and the reference's), which no fit reached; times are not published",
+  "rows": [
+   {
+    "method": "dagma",
+    "graph": "er2",
+    "d": 10,
+    "scale": "standardized",
+    "datasets": 20,
+    "seeds": "0-19",
+    "empty": 20.0,
+    "before": 23.05,
+    "now": 21.3,
+    "reference": 20.05,
+    "before_vs_empty": {
+     "paired": 20,
+     "mean_D": 3.05,
+     "bootstrap_95": [
+      1.45,
+      4.8
+     ],
+     "verdict": "worse"
+    },
+    "now_vs_empty": {
+     "paired": 20,
+     "mean_D": 1.3,
+     "bootstrap_95": [
+      -0.3,
+      2.9
+     ],
+     "verdict": "tie"
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      -2.05,
+      2.1
+     ],
+     "verdict": "tie"
+    },
+    "now_vs_reference": {
+     "paired": 20,
+     "mean_D": 1.25,
+     "bootstrap_95": [
+      -0.2,
+      2.7
+     ],
+     "verdict": "tie"
+    },
+    "reference_outputs_repaired": 0
+   },
+   {
+    "method": "dagma",
+    "graph": "er2",
+    "d": 20,
+    "scale": "standardized",
+    "datasets": 20,
+    "seeds": "0-19",
+    "empty": 40.0,
+    "before": 44.25,
+    "now": 39.95,
+    "reference": 42.4,
+    "before_vs_empty": {
+     "paired": 20,
+     "mean_D": 4.25,
+     "bootstrap_95": [
+      1.65,
+      6.75
+     ],
+     "verdict": "worse"
+    },
+    "now_vs_empty": {
+     "paired": 20,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -2.75,
+      2.65
+     ],
+     "verdict": "tie"
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 2.4,
+     "bootstrap_95": [
+      -0.45,
+      5.45
+     ],
+     "verdict": "tie"
+    },
+    "now_vs_reference": {
+     "paired": 20,
+     "mean_D": -2.45,
+     "bootstrap_95": [
+      -4.65,
+      -0.5
+     ],
+     "verdict": "better"
+    },
+    "reference_outputs_repaired": 0
+   },
+   {
+    "method": "dagma",
+    "graph": "sf2",
+    "d": 10,
+    "scale": "standardized",
+    "datasets": 20,
+    "seeds": "0-19",
+    "empty": 17.0,
+    "before": 23.5,
+    "now": 17.9,
+    "reference": 18.15,
+    "before_vs_empty": {
+     "paired": 20,
+     "mean_D": 6.5,
+     "bootstrap_95": [
+      4.45,
+      8.6
+     ],
+     "verdict": "worse"
+    },
+    "now_vs_empty": {
+     "paired": 20,
+     "mean_D": 0.9,
+     "bootstrap_95": [
+      -1.5,
+      3.45
+     ],
+     "verdict": "tie"
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 1.15,
+     "bootstrap_95": [
+      -0.9512,
+      3.3
+     ],
+     "verdict": "tie"
+    },
+    "now_vs_reference": {
+     "paired": 20,
+     "mean_D": -0.25,
+     "bootstrap_95": [
+      -1.55,
+      1.1
+     ],
+     "verdict": "tie"
+    },
+    "reference_outputs_repaired": 0
+   },
+   {
+    "method": "dagma",
+    "graph": "sf2",
+    "d": 20,
+    "scale": "standardized",
+    "datasets": 20,
+    "seeds": "0-19",
+    "empty": 37.0,
+    "before": 54.05,
+    "now": 39.05,
+    "reference": 39.35,
+    "before_vs_empty": {
+     "paired": 20,
+     "mean_D": 17.05,
+     "bootstrap_95": [
+      14.2,
+      19.7
+     ],
+     "verdict": "worse"
+    },
+    "now_vs_empty": {
+     "paired": 20,
+     "mean_D": 2.05,
+     "bootstrap_95": [
+      -1.8,
+      6.05
+     ],
+     "verdict": "tie"
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": 2.35,
+     "bootstrap_95": [
+      -0.95,
+      5.85
+     ],
+     "verdict": "tie"
+    },
+    "now_vs_reference": {
+     "paired": 20,
+     "mean_D": -0.3,
+     "bootstrap_95": [
+      -4.05,
+      3.1
+     ],
+     "verdict": "tie"
+    },
+    "reference_outputs_repaired": 0
+   },
+   {
+    "method": "notears",
+    "graph": "er2",
+    "d": 10,
+    "scale": "standardized",
+    "datasets": 20,
+    "seeds": "0-19",
+    "empty": 20.0,
+    "before": 16.6,
+    "now": 18.5,
+    "reference": 18.45,
+    "before_vs_empty": {
+     "paired": 20,
+     "mean_D": -3.4,
+     "bootstrap_95": [
+      -5.0,
+      -1.75
+     ],
+     "verdict": "better"
+    },
+    "now_vs_empty": {
+     "paired": 20,
+     "mean_D": -1.5,
+     "bootstrap_95": [
+      -3.25,
+      0.4
+     ],
+     "verdict": "tie"
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -1.55,
+     "bootstrap_95": [
+      -3.35,
+      0.35
+     ],
+     "verdict": "tie"
+    },
+    "now_vs_reference": {
+     "paired": 20,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      0.0,
+      0.15
+     ],
+     "verdict": "tie"
+    },
+    "reference_outputs_repaired": 0
+   },
+   {
+    "method": "notears",
+    "graph": "er2",
+    "d": 10,
+    "scale": "raw",
+    "datasets": 20,
+    "seeds": "0-19",
+    "empty": 20.0,
+    "before": 13.25,
+    "now": 11.8,
+    "reference": 11.75,
+    "before_vs_empty": {
+     "paired": 20,
+     "mean_D": -6.75,
+     "bootstrap_95": [
+      -8.85,
+      -4.7488
+     ],
+     "verdict": "better"
+    },
+    "now_vs_empty": {
+     "paired": 20,
+     "mean_D": -8.2,
+     "bootstrap_95": [
+      -10.2,
+      -6.3
+     ],
+     "verdict": "better"
+    },
+    "reference_vs_empty": {
+     "paired": 20,
+     "mean_D": -8.25,
+     "bootstrap_95": [
+      -10.2,
+      -6.35
+     ],
+     "verdict": "better"
+    },
+    "now_vs_reference": {
+     "paired": 20,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      0.0,
+      0.15
+     ],
+     "verdict": "tie"
+    },
+    "reference_outputs_repaired": 0
+   }
+  ]
+ },
+ "sachs": {
+  "about": "andrey.dagma and andrey.notears, at their defaults and with robust=True, beside andrey.pc and andrey.ges at their defaults, on the Sachs data, raw and with every column z-scored. One row per method, sample and scale: all_rows is the error of the fit on every row, and resample_mean the mean error over 10 resamples of the rows",
+  "generated": "2026-11-15",
+  "data": "andrey.load_dataset('sachs'): 11 proteins and phospholipids; 853 observational measurements (conditions=False) and the 7,466 measurements of all nine experimental conditions (conditions=True), read as one sample",
+  "truth": "the consensus network of the dataset, 17 edges",
+  "metric": "SHD between the CPDAG of the estimate and the CPDAG of the consensus network; pc and ges return a CPDAG, which is compared as returned",
+  "empty_graph": 17,
+  "resampling": "rows drawn with replacement to the sample's size, default_rng(b) for b = 0 to 9; a standardized fit z-scores the resampled rows",
+  "varsortability": {
+   "what": "varsortability of the consensus network on the 853 observational measurements (Reisach et al., 2021)",
+   "raw": 0.6667,
+   "standardized": 0.5
+  },
+  "build": "Andrey pre-release build of 15 November 2026, whose continuous fits are those of the 0.18.0 release: the likelihood of robust=True without the term -log|det(I - W)|",
+  "packages": {
+   "NumPy": "2.4.6"
+  },
+  "protocol": "each fit in its own process with one BLAS thread, on a node of AMD EPYC processors of the Zen 3 generation; a cap of 900 s per fit, which no fit reached; no fit failed; times are not published",
+  "rows": [
+   {
+    "method": "dagma",
+    "setting": "defaults",
+    "measurements": 853,
+    "scale": "raw",
+    "all_rows": 13,
+    "resamples": 10,
+    "resample_mean": 14.2,
+    "resample_values": [
+     14,
+     15,
+     14,
+     11,
+     13,
+     14,
+     17,
+     16,
+     14,
+     14
+    ]
+   },
+   {
+    "method": "dagma",
+    "setting": "defaults",
+    "measurements": 853,
+    "scale": "standardized",
+    "all_rows": 13,
+    "resamples": 10,
+    "resample_mean": 12.1,
+    "resample_values": [
+     12,
+     12,
+     12,
+     13,
+     13,
+     12,
+     12,
+     11,
+     11,
+     13
+    ]
+   },
+   {
+    "method": "dagma",
+    "setting": "defaults",
+    "measurements": 7466,
+    "scale": "raw",
+    "all_rows": 12,
+    "resamples": 10,
+    "resample_mean": 12.1,
+    "resample_values": [
+     12,
+     12,
+     12,
+     12,
+     12,
+     12,
+     13,
+     12,
+     12,
+     12
+    ]
+   },
+   {
+    "method": "dagma",
+    "setting": "defaults",
+    "measurements": 7466,
+    "scale": "standardized",
+    "all_rows": 13,
+    "resamples": 10,
+    "resample_mean": 12.6,
+    "resample_values": [
+     12,
+     12,
+     12,
+     13,
+     13,
+     13,
+     13,
+     13,
+     12,
+     13
+    ]
+   },
+   {
+    "method": "dagma",
+    "setting": "robust=True",
+    "measurements": 853,
+    "scale": "raw",
+    "all_rows": 13,
+    "resamples": 10,
+    "resample_mean": 12.5,
+    "resample_values": [
+     12,
+     13,
+     14,
+     10,
+     13,
+     13,
+     15,
+     10,
+     13,
+     12
+    ]
+   },
+   {
+    "method": "dagma",
+    "setting": "robust=True",
+    "measurements": 853,
+    "scale": "standardized",
+    "all_rows": 13,
+    "resamples": 10,
+    "resample_mean": 12.6,
+    "resample_values": [
+     12,
+     13,
+     13,
+     13,
+     13,
+     13,
+     12,
+     12,
+     12,
+     13
+    ]
+   },
+   {
+    "method": "dagma",
+    "setting": "robust=True",
+    "measurements": 7466,
+    "scale": "raw",
+    "all_rows": 13,
+    "resamples": 10,
+    "resample_mean": 13.1,
+    "resample_values": [
+     13,
+     13,
+     13,
+     14,
+     13,
+     13,
+     13,
+     13,
+     13,
+     13
+    ]
+   },
+   {
+    "method": "dagma",
+    "setting": "robust=True",
+    "measurements": 7466,
+    "scale": "standardized",
+    "all_rows": 15,
+    "resamples": 10,
+    "resample_mean": 15.8,
+    "resample_values": [
+     13,
+     14,
+     14,
+     17,
+     20,
+     20,
+     14,
+     16,
+     15,
+     15
+    ]
+   },
+   {
+    "method": "notears",
+    "setting": "defaults",
+    "measurements": 853,
+    "scale": "raw",
+    "all_rows": 14,
+    "resamples": 10,
+    "resample_mean": 16.0,
+    "resample_values": [
+     16,
+     17,
+     14,
+     15,
+     16,
+     15,
+     19,
+     15,
+     15,
+     18
+    ]
+   },
+   {
+    "method": "notears",
+    "setting": "defaults",
+    "measurements": 853,
+    "scale": "standardized",
+    "all_rows": 13,
+    "resamples": 10,
+    "resample_mean": 12.7,
+    "resample_values": [
+     12,
+     13,
+     13,
+     13,
+     13,
+     13,
+     12,
+     12,
+     13,
+     13
+    ]
+   },
+   {
+    "method": "notears",
+    "setting": "defaults",
+    "measurements": 7466,
+    "scale": "raw",
+    "all_rows": 21,
+    "resamples": 10,
+    "resample_mean": 22.6,
+    "resample_values": [
+     24,
+     21,
+     24,
+     21,
+     24,
+     23,
+     23,
+     23,
+     21,
+     22
+    ]
+   },
+   {
+    "method": "notears",
+    "setting": "defaults",
+    "measurements": 7466,
+    "scale": "standardized",
+    "all_rows": 13,
+    "resamples": 10,
+    "resample_mean": 13.0,
+    "resample_values": [
+     12,
+     13,
+     14,
+     14,
+     13,
+     13,
+     13,
+     13,
+     13,
+     12
+    ]
+   },
+   {
+    "method": "notears",
+    "setting": "robust=True",
+    "measurements": 853,
+    "scale": "raw",
+    "all_rows": 14,
+    "resamples": 10,
+    "resample_mean": 14.3,
+    "resample_values": [
+     13,
+     14,
+     14,
+     13,
+     14,
+     16,
+     17,
+     11,
+     14,
+     17
+    ]
+   },
+   {
+    "method": "notears",
+    "setting": "robust=True",
+    "measurements": 853,
+    "scale": "standardized",
+    "all_rows": 13,
+    "resamples": 10,
+    "resample_mean": 12.6,
+    "resample_values": [
+     12,
+     13,
+     13,
+     13,
+     13,
+     13,
+     12,
+     12,
+     12,
+     13
+    ]
+   },
+   {
+    "method": "notears",
+    "setting": "robust=True",
+    "measurements": 7466,
+    "scale": "raw",
+    "all_rows": 18,
+    "resamples": 10,
+    "resample_mean": 18.0,
+    "resample_values": [
+     18,
+     18,
+     18,
+     17,
+     17,
+     18,
+     18,
+     19,
+     20,
+     17
+    ]
+   },
+   {
+    "method": "notears",
+    "setting": "robust=True",
+    "measurements": 7466,
+    "scale": "standardized",
+    "all_rows": 18,
+    "resamples": 10,
+    "resample_mean": 16.7,
+    "resample_values": [
+     13,
+     20,
+     14,
+     14,
+     20,
+     20,
+     14,
+     18,
+     15,
+     19
+    ]
+   },
+   {
+    "method": "pc",
+    "setting": "defaults",
+    "measurements": 853,
+    "scale": "raw",
+    "all_rows": 11,
+    "resamples": 10,
+    "resample_mean": 14.5,
+    "resample_values": [
+     14,
+     14,
+     17,
+     13,
+     13,
+     12,
+     15,
+     17,
+     15,
+     15
+    ]
+   },
+   {
+    "method": "pc",
+    "setting": "defaults",
+    "measurements": 853,
+    "scale": "standardized",
+    "all_rows": 11,
+    "resamples": 10,
+    "resample_mean": 14.5,
+    "resample_values": [
+     14,
+     14,
+     17,
+     13,
+     13,
+     12,
+     15,
+     17,
+     15,
+     15
+    ]
+   },
+   {
+    "method": "pc",
+    "setting": "defaults",
+    "measurements": 7466,
+    "scale": "raw",
+    "all_rows": 29,
+    "resamples": 10,
+    "resample_mean": 27.7,
+    "resample_values": [
+     31,
+     27,
+     27,
+     26,
+     27,
+     30,
+     27,
+     27,
+     28,
+     27
+    ]
+   },
+   {
+    "method": "pc",
+    "setting": "defaults",
+    "measurements": 7466,
+    "scale": "standardized",
+    "all_rows": 29,
+    "resamples": 10,
+    "resample_mean": 27.7,
+    "resample_values": [
+     31,
+     27,
+     27,
+     26,
+     27,
+     30,
+     27,
+     27,
+     28,
+     27
+    ]
+   },
+   {
+    "method": "ges",
+    "setting": "defaults",
+    "measurements": 853,
+    "scale": "raw",
+    "all_rows": 11,
+    "resamples": 10,
+    "resample_mean": 14.4,
+    "resample_values": [
+     11,
+     14,
+     14,
+     16,
+     13,
+     17,
+     11,
+     18,
+     18,
+     12
+    ]
+   },
+   {
+    "method": "ges",
+    "setting": "defaults",
+    "measurements": 853,
+    "scale": "standardized",
+    "all_rows": 11,
+    "resamples": 10,
+    "resample_mean": 14.4,
+    "resample_values": [
+     11,
+     14,
+     14,
+     16,
+     13,
+     17,
+     11,
+     18,
+     18,
+     12
+    ]
+   },
+   {
+    "method": "ges",
+    "setting": "defaults",
+    "measurements": 7466,
+    "scale": "raw",
+    "all_rows": 36,
+    "resamples": 10,
+    "resample_mean": 36.7,
+    "resample_values": [
+     37,
+     37,
+     37,
+     36,
+     38,
+     39,
+     34,
+     35,
+     36,
+     38
+    ]
+   },
+   {
+    "method": "ges",
+    "setting": "defaults",
+    "measurements": 7466,
+    "scale": "standardized",
+    "all_rows": 36,
+    "resamples": 10,
+    "resample_mean": 36.7,
+    "resample_values": [
+     37,
+     37,
+     37,
+     36,
+     38,
+     39,
+     34,
+     35,
+     36,
+     38
+    ]
+   }
+  ]
+ }
 }

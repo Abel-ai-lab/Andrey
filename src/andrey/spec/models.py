@@ -120,6 +120,9 @@ class ParamSpec(Spec):
     def _check_aliases(self) -> ParamSpec:
         if self.name in self.aliases:
             raise ValueError(f"{self.name}: a parameter is not its own alias")
+        if self.type == "str_or_list" and self.choice_aliases:
+            # A former value is mapped for one string; nothing maps the items of a list.
+            raise ValueError(f"{self.name}: a str_or_list parameter takes no choice aliases")
         for old, new in self.choice_aliases:
             if not self.choices or new not in self.choices or old in self.choices:
                 raise ValueError(f"{self.name}: choice alias {old!r} -> {new!r} is not a rename")
@@ -148,15 +151,24 @@ class ParamSpec(Spec):
         Checks the type, the bounds, and the choices: an int is an ``int`` or a NumPy integer, not
         a ``bool``; a float is any real number but ``NaN`` and infinity; a bool is ``True`` or
         ``False``. ``None`` passes when the parameter is nullable. Column labels or positions,
-        which only the data can check, pass unchanged: a ``str_list``, a ``str_or_list``, a
-        ``knowledge``, a ``targets``, and a ``str`` without choices. ``choices`` replaces the
-        spec's choices when the accepted values change at run time. The message names ``method``,
-        the parameter, what it accepts (:meth:`accepted`), and the value.
+        which only the data can check, pass unchanged: a ``str_list``, a ``knowledge``, a
+        ``targets``, and a ``str`` or ``str_or_list`` without choices. A ``str_or_list`` with
+        choices is one of them or a list of at least one, each one of them. ``choices`` replaces
+        the spec's choices when the accepted values change at run time. The message names
+        ``method``, the parameter, what it accepts (:meth:`accepted`), and the value.
         """
         if choices is not None:
             return self.model_copy(update={"choices": choices}).check(value, method)
         if value is None and self.nullable:
             return None
+        if self.type == "str_or_list" and self.choices:
+            names = [value] if isinstance(value, str) else value
+            message = f"{method}: {self.name} must be {self.accepted()}, got {reprlib.repr(value)}"
+            if not isinstance(names, (list, tuple)) or not all(isinstance(n, str) for n in names):
+                raise TypeError(message)
+            if not names or any(n not in self.choices for n in names):
+                raise ValueError(message)
+            return value
         if self.type in ("str_list", "str_or_list", "knowledge", "targets") or (
             self.type == "str" and not self.choices
         ):
@@ -183,6 +195,8 @@ class ParamSpec(Spec):
         """What the parameter accepts, in words: ``one of 'a', 'b'``, ``an int at least 1``."""
         if self.choices:
             text = "one of " + ", ".join(repr(c) for c in self.choices)
+            if self.type == "str_or_list":
+                text += ", or a list of them"
         else:
             bounded = self.minimum is not None or self.maximum is not None
             kind = {

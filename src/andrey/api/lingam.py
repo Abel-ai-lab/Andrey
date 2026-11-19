@@ -691,17 +691,17 @@ def local_isa_ling(
     them. Drop the incomplete rows first, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Its claim is graphs with cycles, where it tied the authors' code on the
-    paper's simulations. Data without cycles are outside the claim, small samples among them. On
-    the paper's 50-variable DAGs, global :func:`~andrey.direct_lingam` read at the target was both
-    more accurate and faster from 300 rows up; the `0.18.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#local-isa-ling>`_ has the numbers. The
-    blanket step keeps every column whose standardized Lasso coefficient exceeds 0.01, often many
-    more than the true blanket, and the time grows with them. Algorithm 1 tries every assignment of
-    the demixing matrix's rows to the local variables that its zero pattern allows, a number that
-    grows quickly with the blanket when the matrix is dense. The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    **Limitations.** Its claim is graphs with cycles, where it tied the authors' code on the paper's
+    simulations. Data without cycles are outside the claim, small samples among them. On the paper's
+    50-variable DAGs, global :func:`~andrey.direct_lingam` read at the target was both more accurate
+    and faster from 300 rows up; the `local discovery release card
+    <https://andrey.abel.ai/docs/benchmarks/local-discovery.html#local-isa-ling>`_ has the numbers.
+    The blanket step keeps every column whose standardized Lasso coefficient exceeds 0.01, often
+    many more than the true blanket, and the time grows with them. Algorithm 1 tries every
+    assignment of the demixing matrix's rows to the local variables that its zero pattern allows, a
+    number that grows quickly with the blanket when the matrix is dense. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
