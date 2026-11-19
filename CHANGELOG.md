@@ -79,14 +79,13 @@ names its pull request.
 - For contributors, `qa/identity.py --shuffle` also refits ICP, IGSP, FCI-JCI, and J-PCMCI+, moving
   their targets and contexts with the columns. ([#1055])
 - `qa/identity.py --shuffle` maps UT-IGSP's learned targets back to the original columns, and
-  lists the column-order differences the column-order guide documents, ICA-LiNGAM's FastICA
-  solution and PCMCIplus's recorded `p_values` and `statistics`, as expected instead of failing.
-  The column-order table's note and the docstring of `pcmciplus` say that a removed link's p-value
-  and statistic come from the tests it had before one removed it, which follow which end of a
-  same-step pair is tested first; its links and graph do not change. ([#1120])
+  lists the column-order difference the column-order guide documents, ICA-LiNGAM's FastICA
+  solution, as expected instead of failing. ([#1120])
 
 ### Fixed
 
+- `pcmciplus` returns the same `p_values`, `statistics`, and separating sets under any column
+  order. ([#1122])
 - `"fisherz"` and `"normal_scores"`, and the HSIC aggregation of `bottom_up_parce_lingam` and the
   Anderson-Darling p-value of `markov_check`, compute a p-value's upper tail directly, so a strong
   dependence keeps a positive p-value down to about `1e-308` instead of tying at `0`. ([#1017])
@@ -2668,6 +2667,8 @@ First alpha release.
 [#1088]: https://github.com/Abel-ai-lab/Andrey/pull/1088
 [#1112]: https://github.com/Abel-ai-lab/Andrey/pull/1112
 [#1120]: https://github.com/Abel-ai-lab/Andrey/pull/1120
+[#1122]: https://github.com/Abel-ai-lab/Andrey/pull/1122
+[#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
 [#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
 [#1068]: https://github.com/Abel-ai-lab/Andrey/pull/1068
 [#1090]: https://github.com/Abel-ai-lab/Andrey/pull/1090
