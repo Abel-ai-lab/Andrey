@@ -8,6 +8,14 @@ and, when a change breaks the API, Breaking, and from 0.11.0 it closes with New 
 someone contributes for the first time, sections Keep a Changelog does not define; each change
 names its pull request.
 
+## [Unreleased]
+
+### Added
+
+- For contributors, a benchmark lane runs `anm`, `pnl`, `loci`, and `resit` beside the authors'
+  code of QCCD, HECI, and GRCI on the Tübingen cause-effect pairs, and a summary script turns its
+  records into a weighted-accuracy table. ([#1127])
+
 ## [0.18.0] - 2026-11-19
 
 ### Highlights
@@ -2669,6 +2677,7 @@ First alpha release.
 [#1112]: https://github.com/Abel-ai-lab/Andrey/pull/1112
 [#1120]: https://github.com/Abel-ai-lab/Andrey/pull/1120
 [#1122]: https://github.com/Abel-ai-lab/Andrey/pull/1122
+[#1127]: https://github.com/Abel-ai-lab/Andrey/pull/1127
 [#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
 [#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
 [#1068]: https://github.com/Abel-ai-lab/Andrey/pull/1068
