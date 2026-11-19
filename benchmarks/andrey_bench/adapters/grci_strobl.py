@@ -147,6 +147,8 @@ class StroblGRCI(RAdapter):
             "commit": COMMIT,
             "seed": 0,
             "RANN": rsession.package_version("RANN"),
+            "Rfast": rsession.package_version("Rfast"),
+            "DirichletReg": rsession.package_version("DirichletReg"),
         }
 
     def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:

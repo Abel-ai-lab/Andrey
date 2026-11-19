@@ -42,7 +42,7 @@ from andrey_bench.adapters.andrey_anm import AndreyANM
 from andrey_bench.adapters.andrey_loci import AndreyLOCI, AndreyLOCILikelihood
 from andrey_bench.adapters.andrey_pnl import AndreyPNL
 from andrey_bench.adapters.andrey_resit import AndreyRESIT
-from andrey_bench.runner import run_task
+from andrey_bench.runner import check_interpreters, run_task
 
 #: The authors' code, as ``(module, class)`` of its adapter; imported only when it is asked for.
 REFERENCES = {
@@ -148,6 +148,8 @@ def main(argv: list[str] | None = None) -> int:
     records = args.out / "records.jsonl"
     done = done_units(records)
     adapters = {name: make_solution(name) for name in args.solutions}
+    # A missing interpreter fails here, before any fit runs.
+    check_interpreters(list(adapters.values()))
     # Largest pairs first, so a worker is not left with the slow fits at the end.
     tasks = [
         (q, name)
@@ -187,6 +189,9 @@ def main(argv: list[str] | None = None) -> int:
             "wall_s": measure.get("wall_s"),
             "cpu_s": measure.get("cpu_s"),
             "peak_rss_mb": measure.get("peak_rss_mb"),
+            "cap_wall_s": measure.get("cap_wall_s"),
+            "cap_mem_mb": measure.get("cap_mem_mb"),
+            "mem_route": measure.get("mem_route"),
             "truth": truth,
             "when": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             **host,
