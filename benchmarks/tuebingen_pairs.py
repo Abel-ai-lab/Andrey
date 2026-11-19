@@ -30,6 +30,8 @@ test; the example sets it to the bench environment's, as the other Andrey arms u
 from __future__ import annotations
 
 import argparse
+import hashlib
+import inspect
 import json
 import os
 import platform
@@ -123,6 +125,15 @@ print(json.dumps({"version": andrey.__version__, "andrey_source_sha256": digest.
 """
 
 
+def harness_digest(adapter: Any) -> str:
+    """The SHA-256 of this driver and of the module that defines ``adapter``'s wrapper, so records
+    written by another version of either are not pooled."""
+    digest = hashlib.sha256()
+    for path in (Path(__file__), Path(inspect.getfile(type(adapter)))):
+        digest.update(path.name.encode() + b"\0" + path.read_bytes())
+    return digest.hexdigest()
+
+
 def preflight(
     adapters: dict[str, Any], cap_wall_s: float, cap_mem_mb: float | None
 ) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
@@ -133,7 +144,7 @@ def preflight(
     the package each solution's fits run, Andrey's read from the interpreter that runs them, and
     ``{solution: runtime}``, the Python, NumPy, SciPy, and scikit-learn of that interpreter and, for
     an Andrey arm, the digest of the Andrey source it imports, or, for an R solution, the R and rpy2
-    it embeds.
+    it embeds, and the :func:`harness_digest` of its wrapper.
     """
     from importlib import import_module
 
@@ -166,6 +177,7 @@ def preflight(
             runtimes[name] |= build
         if isinstance(adapter, RAdapter):
             runtimes[name] |= json.loads(ask(name, _R_RUNTIME))
+        runtimes[name]["harness_sha256"] = harness_digest(adapter)
     # 250 rows: enough for QCCD's seven quantile levels at the wrapper's default.
     pair = tiny_table(n=250)[:, :2]
     for name, adapter in adapters.items():
@@ -324,10 +336,11 @@ def main(argv: list[str] | None = None) -> int:
         pair, name = task
         adapter = adapters[name]
         x = np.asarray(pair.data, dtype=np.float64)
+        given = adapter.params()
         [measure] = run_task(
             adapter,
             x,
-            adapter.params(),
+            given,
             cap_wall_s=args.cap_wall_s,
             cap_mem_mb=args.cap_mem_mb,
             repeats=1,
@@ -343,7 +356,7 @@ def main(argv: list[str] | None = None) -> int:
             "method": name,
             "package": adapter.package,
             "package_version": versions[name],
-            "params": dict(adapter.params()),
+            "params": json.loads(json.dumps(given, default=str)),
             "runtime": runtimes[name],
             "status": measure.get("status"),
             "wall_s": measure.get("wall_s"),
