@@ -1747,7 +1747,8 @@ def lges(
     Warns
     -----
     ExperimentalWarning
-        On every call: the method is experimental.
+        On the first call in a process: the method is not supported (see Limitations), and its
+        API may change without deprecation.
     DataTypeWarning
         When a mixed-data score finds no declared categorical column and so runs as the
         linear-Gaussian form, or when a setting reads columns that look like category codes as
@@ -1785,7 +1786,10 @@ def lges(
     deletes and reverses before each addition, and its LGES+ variant also retries each deletion;
     neither is implemented here. The paper's pseudocode leaves out a pair ``(x, y)`` also when
     ``x`` is a descendant of ``y`` in ``G``, where adding ``x -> y`` to ``G`` would close a cycle;
-    the published code compares the two scores for every pair, and so does this search. The
+    the published code compares the two scores for every pair, and so does this search. A move
+    counts as improving when it lowers the score by more than ``1e-9``, the rule of every greedy
+    search here; the published code applies a move when it raises its score, ``-1/2`` of this one
+    up to a constant, by more than ``1e-6``. The
     paper's prior knowledge, which orders the additions by required and forbidden edges and lets
     the data overrule them, and its orientation of the result with interventional data are not
     implemented.
@@ -1801,13 +1805,14 @@ def lges(
     Drop the incomplete rows first, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on up to 30 variables with up to 5,000
-    rows, and it was compared with the authors' code on the paper's linear-Gaussian simulation with
-    up to 50 variables and 10,000 rows. The paper proves the recovery of the true class as the rows
-    grow only for ``insertion="safe"``. Each step of the first phase scores every pair of
-    non-adjacent variables, and every valid addition for each pair it keeps, in one process. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density,
-    the method's settings, and the machine.
+    **Limitations.** Not benchmarked yet. Its tests run it on up to 20 variables with 5,000 rows,
+    and it was compared with the authors' code, with the linear-Gaussian BIC, on the paper's
+    simulation with up to 50 variables and 10,000 rows. The categorical and mixed-data scores were
+    not compared: the package's checks run them on small tables only. The paper proves the recovery
+    of the true class as the rows grow only for ``insertion="safe"``. Each step of the first phase
+    scores every pair of non-adjacent variables, and every valid addition for each pair it keeps, in
+    one process. The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     References
     ----------
