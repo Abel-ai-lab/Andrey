@@ -253,8 +253,8 @@ class GCM(_RegressionTest):
     it is kept on the test object and reused by every later query on the same pair of them. A
     constant product gives the statistic ``0`` and the p-value ``1``.
 
-    **Limitations.** Not benchmarked yet. The tests run it on up to 5 variables and 500 rows. A
-    ``"boosting"`` regression fits 51 boosted models, which takes about a second at 500 rows, once
+    **Limitations.** Not benchmarked yet. The tests run it on up to 4 variables and 400 rows. A
+    ``"boosting"`` regression fits 51 boosted models, which takes about a second at 300 rows, once
     per variable and conditioning set. Its level depends on the regressions: a conditional mean the
     method cannot learn, such as a function of several variables of ``z`` jointly under
     ``"linear"``, leaves a covariance in the residuals and reads as dependence. With an empty
@@ -348,9 +348,9 @@ class WGCM(_RegressionTest):
     statistic or ``0``, whichever is larger, so a larger statistic always means a smaller p-value.
     The split and the multiplier draws are drawn once from ``seed``.
 
-    **Limitations.** Not benchmarked yet. The tests run it on up to 5 variables and 500 rows.
+    **Limitations.** Not benchmarked yet. The tests run it on up to 4 variables and 400 rows.
     ``"est"`` tests on 70% of the rows, and its p-value changes with the seed. A ``"boosting"``
-    regression fits 51 boosted models, about a second at 500 rows; ``"est"`` fits five per query,
+    regression fits 51 boosted models, about a second at 300 rows; ``"est"`` fits five per query,
     of which four are kept for later queries on the same variables. ``"fix"`` uses 7 weights per
     conditioning variable, so with many conditioning variables the maximum spreads its power thin.
 
@@ -514,8 +514,8 @@ class PCM(_RegressionTest):
     statistic is the average or ``0``, whichever is larger. A split whose products are constant
     adds ``0``. The splits are drawn once from ``seed``.
 
-    **Limitations.** Not benchmarked yet. The tests run it on up to 5 variables and 500 rows. Each
-    query fits 25 regressions with the default 6 splits, 24 of them for the pair, so a forest test
+    **Limitations.** Not benchmarked yet. The tests run it on up to 4 variables and 400 rows. Each
+    query fits 30 regressions with the default 6 splits, 24 of them for the pair, so a forest test
     takes seconds per query at 500 rows. The variance floor of 0.01, in units of the standardized
     response, is the authors' code's value; the paper sets none. The test detects a dependence of
     the mean of ``y`` on ``x``; one that changes only the spread of ``y`` goes unseen, as does a

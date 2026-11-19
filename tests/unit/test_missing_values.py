@@ -100,6 +100,12 @@ TESTS = {
     "cond_gauss": (lambda: _mixed()[0], _mixed()[1]),
 }
 QUERIES = [(0, 3, ()), (3, 0, (2,)), (0, 3, (2, 1)), (1, 2, (3,))]
+#: Settings that keep the regression tests fast; the wrapping does not depend on the regression.
+OPTIONS = {
+    "gcm": {"regression": "linear"},
+    "wgcm": {"regression": "linear"},
+    "pcm": {"regression": "linear", "n_splits": 1},
+}
 
 
 def _block(x: np.ndarray, columns: list[int]) -> np.ndarray:
@@ -111,12 +117,14 @@ def _block(x: np.ndarray, columns: list[int]) -> np.ndarray:
 def test_a_test_on_missing_values_is_the_test_on_the_rows_its_variables_share(name):
     make, mask = TESTS[name]
     x = _gaps(make(), 0.1)
-    test = make_indep_test(name, x, categorical=mask)
+    test = make_indep_test(name, x, categorical=mask, **OPTIONS.get(name, {}))
     for a, b, cond in QUERIES:
         columns = sorted({a, b, *cond})
         at = {c: i for i, c in enumerate(columns)}
         sub_mask = None if mask is None else mask[columns]
-        alone = make_indep_test(name, _block(x, columns), categorical=sub_mask)
+        alone = make_indep_test(
+            name, _block(x, columns), categorical=sub_mask, **OPTIONS.get(name, {})
+        )
         want = alone(at[a], at[b], [at[c] for c in cond])
         if name in GAUSSIAN:
             assert test(a, b, cond) == pytest.approx(want, rel=RTOL, abs=0)

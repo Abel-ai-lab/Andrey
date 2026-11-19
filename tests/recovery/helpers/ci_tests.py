@@ -15,6 +15,7 @@ from andrey.core.ci import FisherZ
 from andrey.core.ci_cmiknn import CMIknn
 from andrey.core.ci_gpdc import GPDC
 from andrey.core.ci_kernel import KCI, RCoT
+from andrey.core.ci_regression import GCM, PCM, WGCM
 from tests.recovery.helpers import datagen
 
 #: Recorded-output name -> ``indep_test`` name and the factory the tests build it with.
@@ -23,6 +24,13 @@ CI_TESTS = {
     "RCoT": ("rcot", partial(RCoT, seed=0)),
     "CMIknn": ("cmiknn", partial(CMIknn, n_permutations=100, seed=0)),
     "GPDC": ("gpdc", partial(GPDC, n_null=300, seed=0)),
+}
+#: The regression-based tests, whose recorded outputs are kept apart from the graph checks above: a
+#: covariance test does not see the nonmonotone links. PCM averages one split, not six.
+REGRESSION_CI_TESTS = {
+    "GCM": ("gcm", partial(GCM, seed=0)),
+    "WGCM": ("wgcm", partial(WGCM, seed=0)),
+    "PCM": ("pcm", partial(PCM, n_splits=1, seed=0)),
 }
 
 
@@ -48,7 +56,7 @@ def recorded_pvalues(algorithm: str, data: np.ndarray, case: str) -> dict:
     ``data`` is the case's input. A query names variables as the case defines them and is asked of
     the columns that hold them.
     """
-    test = CI_TESTS[algorithm][1](data)
+    test = {**CI_TESTS, **REGRESSION_CI_TESTS}[algorithm][1](data)
     column = datagen.column_of(case)
     return {
         "pvalues": np.asarray(

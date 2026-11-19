@@ -885,6 +885,13 @@ def test_a_fit_the_tie_break_cannot_change_records_none(method):
 # --- randomness -----------------------------------------------------------------------------------
 
 STOCHASTIC = ci.STOCHASTIC_INDEP_TESTS
+#: Least-squares regressions and one split keep the regression tests fast where only the seed
+#: they receive matters.
+FAST_SETTINGS = {
+    "gcm": {"regression": "linear"},
+    "wgcm": {"regression": "linear"},
+    "pcm": {"regression": "linear", "n_splits": 1},
+}
 
 
 def takes_a_seed(test: str) -> bool:
@@ -917,11 +924,14 @@ def test_the_stochastic_tests_give_other_p_values_for_another_seed():
     data = inputs("pc", codes=False)[0].to_numpy()
     queries = [(0, 2, ()), (0, 1, ()), (0, 2, (1,)), (1, 2, (0,))]
     for name in STOCHASTIC:
+        # The least-squares regressions of GCM draw nothing; its folds draw under boosting.
+        options = {} if name == "gcm" else FAST_SETTINGS.get(name, {})
         draws = {
-            seed: [ci.make_indep_test(name, data, seed=seed)(*q) for q in queries]
+            seed: [ci.make_indep_test(name, data, seed=seed, **options)(*q) for q in queries]
             for seed in (7, 8)
         }
-        assert draws[7] == [ci.make_indep_test(name, data, seed=7)(*q) for q in queries], name
+        again = [ci.make_indep_test(name, data, seed=7, **options)(*q) for q in queries]
+        assert draws[7] == again, name
         assert draws[7] != draws[8], name
 
 
@@ -970,15 +980,6 @@ def test_every_search_with_a_ci_test_accepts_a_registered_test(method, settings,
     out, _ = fit(method, codes=False, gaps=gaps, indep_test="p_value_only", **settings)
     assert PValueOnly.queries > 0
     assert out.structure == expected.structure
-
-
-#: Least-squares regressions and one split keep the regression tests fast where only the seed
-#: they receive matters.
-FAST_SETTINGS = {
-    "gcm": {"regression": "linear"},
-    "wgcm": {"regression": "linear"},
-    "pcm": {"regression": "linear", "n_splits": 1},
-}
 
 
 @pytest.fixture

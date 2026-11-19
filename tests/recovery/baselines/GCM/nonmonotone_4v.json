@@ -1,0 +1,29 @@
+{
+  "algorithm": "GCM",
+  "case": "nonmonotone_4v",
+  "input": {
+    "case": "nonmonotone_4v",
+    "column_order": [
+      2,
+      3,
+      0,
+      1
+    ],
+    "seed": 20261014,
+    "sha256": "1242fad5f9dc6bf9ab2ce6d9b0ce40603bde039838d85e873e9d052e7878b9ee",
+    "shape": [
+      400,
+      4
+    ]
+  },
+  "output": {
+    "pvalues": [
+      0.04344691860690293,
+      0.11330159319947407,
+      0.009069943278621987,
+      0.046508169160758,
+      2.1350311279346537e-06
+    ]
+  },
+  "schema_version": 3
+}

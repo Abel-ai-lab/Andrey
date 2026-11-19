@@ -243,4 +243,7 @@ SPEC: dict[str, dict] = {
     "RCoT": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
     "CMIknn": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
     "GPDC": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
+    "GCM": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
+    "WGCM": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
+    "PCM": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
 }
