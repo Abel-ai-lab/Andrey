@@ -54,9 +54,9 @@ names its pull request.
   where each variable given its causes follows a chosen family (`family`, one for every column or a
   list, one per column, also on the command line). ([#1085], [#1099])
 - `andrey.data.load_dataset("tuebingen")` loads the Tübingen cause-effect pairs (Mooij et al. 2016)
-  as a `CausePairs` collection of 108 pairs, each with its two columns, the graph of its reference
-  direction, its weight, and its `cause` and `effect` columns, downloaded from the original server
-  and checked by SHA-256. ([#1084])
+  as a `CausePairs` collection of 108 pairs, each with its data, the graph of its reference
+  direction, its weight, and its `cause` and `effect` columns, six of them multivariate, downloaded
+  from the original server and checked by SHA-256. ([#1084])
 - An example notebook on missing values, `examples/missing_values.ipynb`, scores `pc` with its
   default handling and with `missing="mvpc"`, and `ges` with `missing="em"`, on data whose values go
   missing depending on another variable. ([#1059])
