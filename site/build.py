@@ -23,6 +23,7 @@ import math
 import re
 import runpy
 import tempfile
+import tomllib
 import warnings
 import xml.etree.ElementTree as ET
 from collections import Counter
@@ -2004,6 +2005,22 @@ def agent_pill() -> str:
     )
 
 
+def hero_summary() -> str:
+    """The line under the headline: what Andrey is, in one plain sentence that readers, search
+    engines, and answer engines can quote. The method counts come from the registry and the license
+    from ``pyproject.toml``."""
+    specs = list_specs()
+    supported = sum(spec.status == "supported" for spec in specs)
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    return (
+        '<p class="hero-summary">Andrey is a Python package for causal discovery with '
+        f"{len(specs)} methods ({supported} supported, {len(specs) - supported} experimental), "
+        f'open source under the <span class="nowrap">{escape(project["license"])}</span> license '
+        "and installed with "
+        f"<code>pip install {escape(project['name'])}</code>.</p>"
+    )
+
+
 def hero_chips() -> str:
     """The buttons beside the install line: Get started, and the live demo once its Space is
     public."""
@@ -2707,6 +2724,7 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "agent_pill": agent_pill(),
         # The first screen's art, which the page asks for before its stylesheets load.
         "hero_image": f"_static/art-{HERO_ART}.avif",
+        "hero_summary": hero_summary(),
         "hero_chips": hero_chips(),
         "hero_art": hero_art(),
         "tile_art": tile_art,

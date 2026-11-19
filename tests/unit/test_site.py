@@ -519,6 +519,19 @@ def test_the_description_states_the_speed_claim_and_the_method_count(monkeypatch
     assert len(description) <= 160
 
 
+# The registry as it is, and with one supported method left out: the counts follow the registry.
+@pytest.mark.parametrize("dropped", [None, "pc"])
+def test_the_line_under_the_headline_counts_the_methods_from_the_registry(monkeypatch, dropped):
+    specs = [s for s in list_specs() if s.name != dropped]
+    monkeypatch.setattr(build, "list_specs", lambda: specs)
+    text = html.unescape(re.sub(r"<[^>]+>", "", build.hero_summary()))
+    supported = sum(s.status == "supported" for s in specs)
+    assert text.startswith("Andrey is a Python package for causal discovery with ")
+    counts = f"{len(specs)} methods ({supported} supported, {len(specs) - supported} experimental)"
+    assert counts in text
+    assert "Apache-2.0 license" in text and text.endswith("pip install andrey-core.")
+
+
 @pytest.mark.parametrize("name", ["pc", "ges", "fci"])
 def test_the_description_names_only_registered_methods(monkeypatch, name):
     summaries = placeholder_summaries()

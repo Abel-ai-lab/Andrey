@@ -50,15 +50,16 @@ the hero's art, the sections' claims and tiles, the figures, and the tables.
 never meet. `site/assets/figures.css` and `figures.js` draw the timing comparison and the
 speed charts, which the posts and the release cards share.
 
-The hero is one screen: the headline, "Accelerated, accurate, agentic causal discovery.", the
-install lines, each with a copy button that `prompt.js` shows (without script the command is
-plain text), Get started, and a card per section. A pill above the headline copies the prompt
-that installs the agent skill (`AGENT_PROMPT`, `site/assets/prompt.js`), the one the README and
-the FAQ give, beside the marks of coding agents and open models (`AGENTS`, Lobe Icons in
+The hero is one screen: the headline, "Accelerated, accurate, agentic causal discovery.", a line
+that says what Andrey is (`hero_summary`: the method counts from the registry, the license, and the
+install command), the install lines, each with a copy button that `prompt.js` shows (without script
+the command is plain text), Get started, and a card per section. A pill above the headline copies
+the prompt that installs the agent skill (`AGENT_PROMPT`, `site/assets/prompt.js`), the one the
+README and the FAQ give, beside the marks of coding agents and open models (`AGENTS`, Lobe Icons in
 `site/agents/`, MIT). The sections follow the headline's words, then All-in-one (`ACTS` in
-`site/build.py`). Each opens on its art at full bleed with its title and its claim
-(`act_covers()`), then shows its evidence: tiles, each with a figure of its own, and a note in
-plain type beside a figure (`bento-note`).
+`site/build.py`). Each opens on its art at full bleed with its title and its claim (`act_covers()`),
+then shows its evidence: tiles, each with a figure of its own, and a note in plain type beside a
+figure (`bento-note`).
 The hero and Accelerated share the fast lanes (`HERO_ART`, `.run` in `site.css`), which stay on the
 screen as Accelerated's title appears, until the speed panel rises over the art.
 
@@ -378,21 +379,28 @@ On a remote machine, keep the server on `127.0.0.1` and forward the port:
 ## Search and answer engines
 
 [`discovery.py`](discovery.py) writes what search and AI answer engines read. Each page's head
-carries its Twitter card fields and one JSON-LD graph: the organization (Abel's logomark,
-`site/brand/abel-symbol-night.svg`, drawn as `_static/abel-symbol.png`), the website, the software
-(Andrey's icon) at the page's release, the page, a `BlogPosting` for a post, and the breadcrumbs.
-The search and 404 pages (`UNINDEXED`) and the blog's generated pages (All Posts, the years, the
-archive, the tags, and the authors; `_blog_collection`) are `noindex` and name no canonical
-address, so the sitemap leaves them out: they only list the posts again. Every title but the
+carries its Twitter card fields, its preview image's text alternative, and one JSON-LD graph: the
+organization (Abel's logomark, `site/brand/abel-symbol-night.svg`, drawn as
+`_static/abel-symbol.png`), the website, the software, the page, a `BlogPosting` for a post, and the
+breadcrumbs, which pass through Docs or Blog. Every page, a post or a release card too, is about one
+software node, `#software`, at the current release, with its PyPI download address and Andrey's icon
+as a PNG (`SOFTWARE_ICON`). A post that a later release updated carries the day of its latest update
+(`dateModified`, `article:modified_time`). The search, 404, and general index pages (`UNINDEXED`),
+the source-code pages (`UNINDEXED_FOLDER`), and the blog's generated pages (All Posts, the years,
+the archive, the tags, and the authors; `_blog_collection`) are `noindex` and name no canonical
+address, so the sitemap leaves them out: they have no content of their own. Every title but the
 homepage's ends with `html_title`, "Andrey causal discovery", so a page matches what Andrey does and
-not only a name that is also a person's. In the structured data, `alternateName` and `sameAs` tie
-the website, the package, the repository, and Abel's GitHub profile to one product. After the
-build, `_write_discovery` in `conf.py` writes `llms.txt` (the pages in `LLMS_SECTIONS`, then every
-release card and post) and `sitemap.xml` (every indexable page); `robots.txt` is a plain file
-(`_extra/robots.txt`). A page in `LLMS_SECTIONS` that is renamed or removed fails the build until
-the list is updated. Once a tagged release is live, `.github/workflows/indexnow.yml` submits every
-address in the sitemap to IndexNow for Bing and other participating engines. Its public key is
-served at `_extra/<key>.txt`. Google reads the sitemap directly.
+not only a name that is also a person's, and no two indexable pages share a title. In the
+structured data, `alternateName` and `sameAs` tie the website, the package, the repository, and
+Abel's GitHub profile to one product. After the build, `_write_discovery` in `conf.py` writes
+`llms.txt` (how to cite Andrey, from `CITATION.cff`; the facts at a glance, with the method counts
+by status from the registry; the pages in `LLMS_SECTIONS`, then every release card and post) and
+`sitemap.xml` (every indexable page, a post with its latest day as `lastmod`); `robots.txt` is a
+plain file (`_extra/robots.txt`). A page in `LLMS_SECTIONS` that is renamed or removed fails the
+build until the list is updated. Once a tagged release is live, `.github/workflows/indexnow.yml`
+submits every address in the sitemap to IndexNow for Bing and other participating engines; when the
+production deploy still waits for approval after two hours, it ends with a notice, and a manual run
+submits the site. Its public key is served at `_extra/<key>.txt`. Google reads the sitemap directly.
 
 ## Validation
 
@@ -411,8 +419,8 @@ at most 160 characters; the navbar's links; the favicon and the link-preview car
 page and each post's cover and byline; each post's and card's AI statement; every site address in
 the README, the project URLs, and the citation; each page's structured data against its link
 preview and each post's front matter; `llms.txt`, `sitemap.xml`, and `robots.txt`; that only the
-search page, the 404 page, and the blog's generated pages are `noindex`; each title's ending; and
-that the 404 page's links resolve from the site's root. External links: `uv run --group docs
+pages with no content of their own are `noindex`; each title's ending and that no two titles match;
+and that the 404 page's links resolve from the site's root. External links: `uv run --group docs
 sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 
 ## How the site is wired
