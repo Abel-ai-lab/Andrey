@@ -193,7 +193,7 @@ def cam(
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows
-    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The numbers below were measured on simulated data with 1,000 rows from
@@ -443,7 +443,7 @@ def resit(
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows
-    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Its accuracy holds up to 10 variables: at 20 variables, on Gaussian
@@ -637,7 +637,7 @@ def cpcm_graph(
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows
-    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Not benchmarked yet. The paper claims graphs of 5 variables and measures the
@@ -833,7 +833,7 @@ def score_matching(
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows
-    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The numbers below were measured on the paper's simulation with standardized
@@ -1051,7 +1051,7 @@ def nogam(
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows
-    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The numbers below were measured on the paper's simulation with standardized
@@ -1277,7 +1277,7 @@ def das(
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows
-    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** DAS is not benchmarked yet: no campaign has compared its graph with the code
@@ -1510,7 +1510,7 @@ def camuv(
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows
-    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Binary columns, and any column with fewer than 3 distinct values, are not
@@ -1731,7 +1731,7 @@ def skewd_mv(
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows
-    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Not benchmarked yet. The paper measures it on skew-normal location-scale

@@ -194,7 +194,8 @@ _add(
             "data with missing values, metadata['missingness_parents'] maps each column whose "
             "missingness indicator has parents to them, and metadata['corrected_edges'] lists the "
             "edges tested again (retested), removed (removed), and left with a test that had too "
-            "few rows to correct (uncorrected), by name or 0-based position",
+            "few rows to correct (uncorrected), by name or 0-based position, and the fewest and "
+            "the median rows a corrected test read (rows_tested)",
         ),
         accel="numpy",
         status="supported",
@@ -3526,24 +3527,26 @@ for _name in CONCEPTS["missing"].conforming:
 
 #: Structural EM on the searches whose fit reads only a covariance and the row count, after their
 #: categorical columns where they have them: supported in EM_SUPPORTED, experimental in the others.
+#: The number of its rounds follows it.
 _MISSING_EM = {
     supported: concept_param(
         "missing",
         choices=(EM,),
         doc=f"How missing values (NaN) are handled: em = {status}structural EM, which alternates "
         "the search on the expected covariance of the data with linear-Gaussian fits of the "
-        "graph it returns: 10 searches, with 5 parameter-only EM steps on the current graph "
-        "before each after the first; it assumes values missing completely at random or at "
-        "random given observed values. null refuses missing values.",
+        "graph it returns: n_em_iterations searches, with 5 parameter-only EM steps on the "
+        "current graph before each after the first; it assumes values missing completely at "
+        "random or at random given observed values. null refuses missing values.",
     )
     for supported, status in ((True, ""), (False, "experimental "))
 }
+_N_EM_ITERATIONS = concept_param("n_em_iterations")
 for _name in EM_METHODS:
     _params = REGISTRY[_name].params
     _cut = next((i + 1 for i, p in enumerate(_params) if p.name == "categorical"), len(_params))
     _missing_em = _MISSING_EM[_name in EM_SUPPORTED]
     REGISTRY[_name] = REGISTRY[_name].model_copy(
-        update={"params": (*_params[:_cut], _missing_em, *_params[_cut:])}
+        update={"params": (*_params[:_cut], _missing_em, _N_EM_ITERATIONS, *_params[_cut:])}
     )
 
 #: The path and confounder parts a method honors as supported: the method ran in the lanes of
@@ -3696,7 +3699,7 @@ for _name, _spec in REGISTRY.items():
         ),
         *(("tie_break",) if _spec.tie_break else ()),
         *(("categorical",) if "categorical" in _concepts else ()),
-        *(("rows_tested",) if _spec.data.missing else ()),
+        *(("rows_tested", "p_one_tests") if _spec.data.missing else ()),
         *(("missing",) if "missing" in _concepts else ()),
         *(("em",) if _name in EM_METHODS else ()),
         *(("ambiguous_triples",) if "collider_rule" in _concepts else ()),

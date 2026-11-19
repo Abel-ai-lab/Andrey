@@ -20,8 +20,9 @@ from andrey.core.knowledge import Knowledge, KnowledgeError, resolve_lagged
 from andrey.core.score import copies_error, copy_groups
 
 from ._adapt import (
+    DROP_DATASETS,
     DROP_UNITS,
-    FILL_STEPS,
+    KEEP_STEPS,
     categorical_metadata,
     checked_data,
     column_labels,
@@ -204,9 +205,9 @@ def varma_lingam(
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the VARMA fit and the LiNGAM
     step on its residuals read every time step, so a step with a missing value has no place in them.
-    Fill in the missing steps first, as dropping one would join the steps around it, or use
-    :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete
-    rows per test.
+    Use :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests
+    delete rows per test and keep every time step, as dropping a step would join the steps around
+    it.
 
     **Limitations.** Measured on simulated linear non-Gaussian VARMA time series, of ``max(1000, 4 *
     (d + 1))`` time steps for ``d`` variables and of five times as many, with ``prune=True``, on 4
@@ -251,7 +252,7 @@ def varma_lingam(
     """
     from andrey.temporal.varma import varma_lingam as _native
 
-    X = data_matrix(data, method="varma_lingam", fix=FILL_STEPS)
+    X = data_matrix(data, method="varma_lingam", fix=KEEP_STEPS)
     if X.shape[1] < 2:
         raise ValueError(f"data needs at least 2 columns (variables), got {X.shape[1]}")
     if tuple(order) == (0, 0):
@@ -639,10 +640,12 @@ def pcmci(
     that reads it holds it, and each test reads only the design rows where all of its lagged
     variables are observed (test-wise deletion) [2]_ [3]_, so the tests no longer share one set of
     time steps; ``metadata["rows_tested"]`` gives the fewest and the median design rows a test read.
-    When values are missing completely at random, the rows a test keeps are a random sample, so each
-    test keeps its level [3]_. A partial-correlation test with fewer than ``|S| + 3`` rows, another
-    test with fewer than ``2``, or a test with a continuous column constant on its rows raises
-    ``ValueError``. The categorical, mixed-data, and nonlinear tests delete rows the same way.
+    A partial-correlation test with fewer than ``|S| + 3`` rows, another test with fewer than ``2``,
+    or a test with a continuous column constant on its rows raises ``ValueError``. The categorical,
+    mixed-data, and nonlinear tests delete rows the same way. Test-wise deletion is valid when
+    values are missing completely at random, which means that whether a value is missing depends on
+    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
+    they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured with ``fdr_method="none"`` on simulated linear-Gaussian time series
     with lagged links, of ``max(1000, 8 * (d + 1))`` time steps for ``d`` variables and of five
@@ -984,10 +987,12 @@ def pcmciplus(
     that reads it holds it, and each test reads only the design rows where all of its lagged
     variables are observed (test-wise deletion) [2]_ [3]_, so the tests no longer share one set of
     time steps; ``metadata["rows_tested"]`` gives the fewest and the median design rows a test read.
-    When values are missing completely at random, the rows a test keeps are a random sample, so each
-    test keeps its level [3]_. A partial-correlation test with fewer than ``|S| + 3`` rows, another
-    test with fewer than ``2``, or a test with a continuous column constant on its rows raises
-    ``ValueError``. The categorical, mixed-data, and nonlinear tests delete rows the same way.
+    A partial-correlation test with fewer than ``|S| + 3`` rows, another test with fewer than ``2``,
+    or a test with a continuous column constant on its rows raises ``ValueError``. The categorical,
+    mixed-data, and nonlinear tests delete rows the same way. Test-wise deletion is valid when
+    values are missing completely at random, which means that whether a value is missing depends on
+    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
+    they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian time series with lagged and same-step
     links, of ``max(1000, 20 * (d + 1))`` time steps for ``d`` variables and of five times as many,
@@ -1250,9 +1255,9 @@ def jpcmciplus(
     dataset or step, and a context is fixed given its dummy, so it leaves the conditions.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the stacked design reads every
-    step. Fill in the missing steps first, as dropping one would join the steps around it, or use
-    :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete
-    rows per test.
+    step. No method that accepts missing values reads several datasets with their contexts, as
+    :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, and :func:`~andrey.lpcmci` read one series, so
+    drop the datasets that hold one.
 
     **Limitations.** Measured on the linear model of its authors' experiment script [1]_, with both
     dummies at ``tau_max=2`` and ``alpha=0.05``, on one core: 5 system variables with lagged links
@@ -1589,10 +1594,12 @@ def lpcmci(
     that reads it holds it, and each test reads only the design rows where all of its lagged
     variables are observed (test-wise deletion) [2]_ [3]_, so the tests no longer share one set of
     time steps; ``metadata["rows_tested"]`` gives the fewest and the median design rows a test read.
-    When values are missing completely at random, the rows a test keeps are a random sample, so each
-    test keeps its level [3]_. A partial-correlation test with fewer than ``|S| + 3`` rows, another
-    test with fewer than ``2``, or a test with a continuous column constant on its rows raises
-    ``ValueError``. The categorical, mixed-data, and nonlinear tests delete rows the same way.
+    A partial-correlation test with fewer than ``|S| + 3`` rows, another test with fewer than ``2``,
+    or a test with a continuous column constant on its rows raises ``ValueError``. The categorical,
+    mixed-data, and nonlinear tests delete rows the same way. Test-wise deletion is valid when
+    values are missing completely at random, which means that whether a value is missing depends on
+    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
+    they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian time series with 30% of the series
     unobserved, of ``max(1000, 12 * (d + 1))`` time steps for ``d`` variables and of five times as
@@ -1807,10 +1814,9 @@ def granger(
     shown to be.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: each variable's regression
-    reads every row of the lagged design, so a step with a missing value has no place in it. Fill
-    in the missing steps first, as dropping one would join the steps around it, or use
+    reads every row of the lagged design, so a step with a missing value has no place in it. Use
     :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete
-    rows per test.
+    rows per test and keep every time step, as dropping a step would join the steps around it.
 
     **Limitations.** On 20 simulated linear-Gaussian VAR series per cell, with 2 expected parents of
     each variable at each lag, no same-step links, and standardized, from 5 to 80 variables, with
@@ -1855,7 +1861,7 @@ def granger(
     """
     from andrey.temporal.granger import granger_f_test
 
-    X = data_matrix(data, min_rows=2, method="granger", fix=FILL_STEPS)
+    X = data_matrix(data, min_rows=2, method="granger", fix=KEEP_STEPS)
     if X.shape[1] < 2:
         raise ValueError(f"data needs at least 2 columns (variables), got {X.shape[1]}")
     min_rows = (X.shape[1] + 1) * tau_max + 2  # a degree of freedom left in every regression
@@ -2044,10 +2050,10 @@ def dynotears(
     instead. The fit draws no random numbers and runs on one BLAS thread, so the host's thread count
     does not change it.
 
-    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the loss fits every step on
-    the steps before it, so a step with a missing value has no place in it. Fill in the missing
-    steps first, as dropping one would join the steps around it, or use :func:`~andrey.pcmci`,
-    :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete rows per test.
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the loss fits every step on the
+    steps before it, so a step with a missing value has no place in it. Use :func:`~andrey.pcmci`,
+    :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete rows per test and keep
+    every time step, as dropping a step would join the steps around it.
 
     **Limitations.** The least-squares score with an ``l1`` penalty and the weight thresholds read
     the data's units, as in NOTEARS [4]_ [5]_: rescaling a column changes the fit, and on series
@@ -2101,7 +2107,7 @@ def dynotears(
     """
     from andrey.temporal.dynotears import dynotears as _native
 
-    X = data_matrix(data, method="dynotears", fix=FILL_STEPS)
+    X = data_matrix(data, method="dynotears", fix=KEEP_STEPS)
     if X.shape[0] < tau_max + 2:
         raise ValueError(
             f"dynotears: data needs at least tau_max + 2 = {tau_max + 2} rows (time steps), so "
@@ -2206,7 +2212,7 @@ def context_inputs(
         import pandas as pd
 
         stacked = pd.DataFrame(stacked, columns=list(labels))
-    stacked = data_matrix(stacked, method="jpcmciplus", fix=FILL_STEPS)
+    stacked = data_matrix(stacked, method="jpcmciplus", fix=DROP_DATASETS)
     lengths = [len(table) for table in tables]
     blocks = np.split(stacked, np.cumsum(lengths)[:-1])
     d = stacked.shape[1]

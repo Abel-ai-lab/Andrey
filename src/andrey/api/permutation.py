@@ -56,6 +56,7 @@ def boss(
     max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
+    n_em_iterations: int = 10,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with BOSS (Best Order Score Search).
@@ -142,7 +143,15 @@ def boss(
         expectation-maximization (EM) over the expected covariance of the data, which assumes values
         missing completely at random or at random given observed values. ``None`` refuses missing
         values. On data with missing values, ``metadata["missing"]`` records the handling used and
-        ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
+        ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
+        fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
+        See **Missing values.** in Notes.
+    n_em_iterations : int, default=10
+        The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
+        1. Each round runs the search once, so the time grows with them. A fit whose last round
+        still changed the graph logs a warning; more rounds let some such fits settle on a graph,
+        and others keep changing between graphs. Values other than 10 are not benchmarked yet.
+        Changes nothing on complete data or with ``missing=None``. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Each variable's parents exclude the
@@ -305,27 +314,29 @@ def boss(
     their conditional means and covariances give the expected covariance of the data (the E-step);
     the search runs on it over every row, with all of its settings, and the model's coefficients and
     noise variances are fit again by least squares on a DAG of the graph it returns (the M-step). A
-    row that observes no value is dropped first: it holds no information on the model. It runs 10
-    rounds, as Gao et al. [9]_ do, from no edges and each column's mean and variance over its
-    observed values, and it alternates as Friedman [8]_ describes: before each search after the
-    first, 5 parameter steps refit the current graph's coefficients and noise variances, each on the
-    expected covariance under the step before it. Friedman [8]_ leaves the number of parameter steps
-    open. The first search reads the expected covariance under the model with no edge, where every
-    covariance is shrunk toward zero. Measured with ``ges``, ``boss``, and ``grasp`` at 2,000 rows,
-    the first search returned many extra edges; with one refit per round the later rounds removed
-    them slowly and the graph was still changing after 10 rounds, and with 5 parameter steps it had
-    settled within them in most fits. ``metadata["em"]`` records ``iterations``, the rounds;
-    ``parameter_steps``, the parameter steps before each search after the first; ``log_likelihood``,
-    the observed-data log-likelihood of the model after each round, which can fall in a round that
-    changes the graph; and ``graph_changed``, whether each round's search returned another graph
-    than the round before. When the last round changed the graph, EM has not settled on one, which
-    is more common with few rows, and the fit logs a warning. ``metadata["score"]`` is the score of
-    the result on the last round's expected covariance. EM holds when values are missing completely
-    at random or at random given observed values; when whether a value is missing depends on the
-    missing values themselves, the expected covariance is biased, and the data cannot show it. On
-    complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete
-    rows first, which suits values missing completely at random, or use :func:`~andrey.pc` or
-    :func:`~andrey.fci`, whose tests delete rows per test.
+    row that observes no value is dropped first: it holds no information on the model. It runs
+    ``n_em_iterations`` rounds, by default the 10 that Gao et al. [9]_ run, from no edges and each
+    column's mean and variance over its observed values, and it alternates as Friedman [8]_
+    describes: before each search after the first, 5 parameter steps refit the current graph's
+    coefficients and noise variances, each on the expected covariance under the step before it.
+    Friedman [8]_ leaves the number of parameter steps open. The first search reads the expected
+    covariance under the model with no edge, where every covariance is shrunk toward zero. Measured
+    with ``ges``, ``boss``, and ``grasp`` at 2,000 rows, the first search returned many extra edges;
+    with one refit per round the later rounds removed them slowly and the graph was still changing
+    after 10 rounds, and with 5 parameter steps it had settled within them in most fits.
+    ``metadata["em"]`` records ``iterations``, the rounds; ``parameter_steps``, the parameter steps
+    before each search after the first; ``log_likelihood``, the observed-data log-likelihood of the
+    model after each round, which can fall in a round that changes the graph; and ``graph_changed``,
+    whether each round's search returned another graph than the round before. When the last round
+    changed the graph, EM has not settled on one, which is more common with few rows, and the fit
+    logs a warning that names ``n_em_iterations``: more rounds let some such fits settle on a graph,
+    others keep changing between graphs, and values other than 10 are not benchmarked yet.
+    ``metadata["score"]`` is the score of the result on the last round's expected covariance. EM
+    holds when values are missing completely at random or at random given observed values; when
+    whether a value is missing depends on the missing values themselves, the expected covariance is
+    biased, and the data cannot show it. On complete data, ``"em"`` gives the complete-data result.
+    Without ``"em"``, drop the incomplete rows yourself, which suits values missing completely at
+    random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for ``ebic_gamma=0.0``. Measured on
     simulated linear-Gaussian data from Erdos-Renyi graphs, with ``penalty_discount=4.0``, on 4
@@ -432,6 +443,7 @@ def boss(
         categorical=categorical,
         knowledge=knowledge,
         missing=missing,
+        n_em_iterations=n_em_iterations,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
         equivalent_sample_size=equivalent_sample_size,
@@ -456,6 +468,7 @@ def grasp(
     max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
+    n_em_iterations: int = 10,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with GRaSP.
@@ -551,7 +564,15 @@ def grasp(
         expectation-maximization (EM) over the expected covariance of the data, which assumes values
         missing completely at random or at random given observed values. ``None`` refuses missing
         values. On data with missing values, ``metadata["missing"]`` records the handling used and
-        ``metadata["em"]`` the EM record. See **Missing values.** in Notes.
+        ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
+        fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
+        See **Missing values.** in Notes.
+    n_em_iterations : int, default=10
+        The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
+        1. Each round runs the search once, so the time grows with them. A fit whose last round
+        still changed the graph logs a warning; more rounds let some such fits settle on a graph,
+        and others keep changing between graphs. Values other than 10 are not benchmarked yet.
+        Changes nothing on complete data or with ``missing=None``. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Each variable's parents exclude the
@@ -727,27 +748,29 @@ def grasp(
     their conditional means and covariances give the expected covariance of the data (the E-step);
     the search runs on it over every row, with all of its settings, and the model's coefficients and
     noise variances are fit again by least squares on a DAG of the graph it returns (the M-step). A
-    row that observes no value is dropped first: it holds no information on the model. It runs 10
-    rounds, as Gao et al. [9]_ do, from no edges and each column's mean and variance over its
-    observed values, and it alternates as Friedman [8]_ describes: before each search after the
-    first, 5 parameter steps refit the current graph's coefficients and noise variances, each on the
-    expected covariance under the step before it. Friedman [8]_ leaves the number of parameter steps
-    open. The first search reads the expected covariance under the model with no edge, where every
-    covariance is shrunk toward zero. Measured with ``ges``, ``boss``, and ``grasp`` at 2,000 rows,
-    the first search returned many extra edges; with one refit per round the later rounds removed
-    them slowly and the graph was still changing after 10 rounds, and with 5 parameter steps it had
-    settled within them in most fits. ``metadata["em"]`` records ``iterations``, the rounds;
-    ``parameter_steps``, the parameter steps before each search after the first; ``log_likelihood``,
-    the observed-data log-likelihood of the model after each round, which can fall in a round that
-    changes the graph; and ``graph_changed``, whether each round's search returned another graph
-    than the round before. When the last round changed the graph, EM has not settled on one, which
-    is more common with few rows, and the fit logs a warning. ``metadata["score"]`` is the score of
-    the result on the last round's expected covariance. EM holds when values are missing completely
-    at random or at random given observed values; when whether a value is missing depends on the
-    missing values themselves, the expected covariance is biased, and the data cannot show it. On
-    complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete
-    rows first, which suits values missing completely at random, or use :func:`~andrey.pc` or
-    :func:`~andrey.fci`, whose tests delete rows per test.
+    row that observes no value is dropped first: it holds no information on the model. It runs
+    ``n_em_iterations`` rounds, by default the 10 that Gao et al. [9]_ run, from no edges and each
+    column's mean and variance over its observed values, and it alternates as Friedman [8]_
+    describes: before each search after the first, 5 parameter steps refit the current graph's
+    coefficients and noise variances, each on the expected covariance under the step before it.
+    Friedman [8]_ leaves the number of parameter steps open. The first search reads the expected
+    covariance under the model with no edge, where every covariance is shrunk toward zero. Measured
+    with ``ges``, ``boss``, and ``grasp`` at 2,000 rows, the first search returned many extra edges;
+    with one refit per round the later rounds removed them slowly and the graph was still changing
+    after 10 rounds, and with 5 parameter steps it had settled within them in most fits.
+    ``metadata["em"]`` records ``iterations``, the rounds; ``parameter_steps``, the parameter steps
+    before each search after the first; ``log_likelihood``, the observed-data log-likelihood of the
+    model after each round, which can fall in a round that changes the graph; and ``graph_changed``,
+    whether each round's search returned another graph than the round before. When the last round
+    changed the graph, EM has not settled on one, which is more common with few rows, and the fit
+    logs a warning that names ``n_em_iterations``: more rounds let some such fits settle on a graph,
+    others keep changing between graphs, and values other than 10 are not benchmarked yet.
+    ``metadata["score"]`` is the score of the result on the last round's expected covariance. EM
+    holds when values are missing completely at random or at random given observed values; when
+    whether a value is missing depends on the missing values themselves, the expected covariance is
+    biased, and the data cannot show it. On complete data, ``"em"`` gives the complete-data result.
+    Without ``"em"``, drop the incomplete rows yourself, which suits values missing completely at
+    random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for ``ebic_gamma=0.0``. Measured on
     simulated linear-Gaussian data from Erdos-Renyi graphs, with ``penalty_discount=4.0``, on 4
@@ -858,6 +881,7 @@ def grasp(
         categorical=categorical,
         knowledge=knowledge,
         missing=missing,
+        n_em_iterations=n_em_iterations,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
         equivalent_sample_size=equivalent_sample_size,
@@ -1843,9 +1867,9 @@ def boss_fci(
     mixed-data settings each label as a category, as for :func:`~andrey.fci_jci`.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``, as for :func:`~andrey.gfci`:
-    its BOSS phase scores every variable over the same rows. Drop the incomplete rows first, which
-    suits values missing completely at random, or use :func:`~andrey.fci`, whose tests delete rows
-    per test.
+    its BOSS phase scores every variable over the same rows. Drop the incomplete rows yourself,
+    which suits values missing completely at random, or use :func:`~andrey.fci`, whose tests delete
+    rows per test.
 
     **Limitations.** Measured on its authors' simulation [1]_, linear-Gaussian data with hidden
     common causes: 20 measured variables with 0, 4, or 8 hidden, mean degree 2, 4, or 6, and 200 to
@@ -2179,9 +2203,9 @@ def grasp_fci(
     mixed-data settings each label as a category, as for :func:`~andrey.fci_jci`.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``, as for :func:`~andrey.gfci`:
-    its GRaSP phase scores every variable over the same rows. Drop the incomplete rows first, which
-    suits values missing completely at random, or use :func:`~andrey.fci`, whose tests delete rows
-    per test.
+    its GRaSP phase scores every variable over the same rows. Drop the incomplete rows yourself,
+    which suits values missing completely at random, or use :func:`~andrey.fci`, whose tests delete
+    rows per test.
 
     **Limitations.** Measured on its authors' simulation [1]_, linear-Gaussian data with hidden
     common causes: 20 measured variables with 0, 4, or 8 hidden, mean degree 2, 4, or 6, and 200 to

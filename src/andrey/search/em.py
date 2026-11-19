@@ -19,7 +19,8 @@ The model starts from ``B = 0`` and each column's mean and variance over its obs
 available cases; Little and Rubin 2019), which are the maximum-likelihood parameters of the graph
 with no edge, so the first round is an E-step and a structure step. Each later round runs an
 E-step, then :data:`PARAMETER_STEPS` times a parameter step and an E-step, then a structure step.
-:data:`ITERATIONS` rounds run, the number Gao et al. (2022) run.
+:data:`ITERATIONS` rounds run unless a fit asks for another number (the facades'
+``n_em_iterations``), the number Gao et al. (2022) run.
 
 Friedman (1997) repeats the parameter steps "until convergence or" a largest count and the rounds
 "until convergence", and leaves the count open. The first search reads the expected covariance
@@ -74,12 +75,14 @@ __all__ = [
     "expected_moments",
     "fit_dag",
     "observed_copies",
+    "shared_rows",
     "structural_em",
 ]
 
 _log = logging.getLogger(__name__)
 
-#: The rounds, each with one structure step, as Gao et al. (2022) run them.
+#: The rounds, each with one structure step, as Gao et al. (2022) run them; the default of the
+#: facades' ``n_em_iterations``.
 ITERATIONS = 10
 #: The parameter steps on the current graph before each structure step after the first. Friedman
 #: (1997) leaves the count open ("until convergence or" a largest count, or "some specified number
@@ -139,6 +142,16 @@ def expected_moments(
     return expected_mean, (centered.T @ centered + extra) / n, loglik
 
 
+def shared_rows(X: np.ndarray) -> np.ndarray:
+    """The ``(d, d)`` counts of the rows of ``X`` that observe both columns of each pair.
+
+    Two columns that share no row have no covariance in the data: any value EM gave it would come
+    from the model alone, so :func:`~andrey.api._adapt.fit_missing` refuses such data.
+    """
+    both = (~np.isnan(X)).astype(np.float64)
+    return both.T @ both
+
+
 def observed_copies(X: np.ndarray) -> tuple[tuple[int, ...], ...]:
     """The groups of columns of ``X`` that repeat one another up to scale and shift where observed.
 
@@ -151,7 +164,7 @@ def observed_copies(X: np.ndarray) -> tuple[tuple[int, ...], ...]:
     observed = ~np.isnan(X)
     centered = np.where(observed, X - np.nanmean(X, axis=0), 0.0)
     both = observed.astype(np.float64)
-    count = both.T @ both  # count[i, j]: the rows that observe columns i and j
+    count = shared_rows(X)  # count[i, j]: the rows that observe columns i and j
     sums = centered.T @ both  # sums[i, j]: column i summed over those rows
     squares = (centered**2).T @ both
     rows = np.maximum(count, 1.0)
@@ -216,7 +229,8 @@ def structural_em(
       the round before, the first round against the graph with no edge.
 
     A last round that changed the graph logs a warning: the rounds ended before EM settled on a
-    graph. A row that observes no value counts in the number of rows and adds the model's
+    graph, and the warning names ``n_em_iterations``, the facades' argument for ``iterations``. A
+    row that observes no value counts in the number of rows and adds the model's
     covariance to the expected covariance, so the facades drop such rows first
     (:func:`~andrey.api._adapt.data_matrix`).
     """
@@ -250,7 +264,9 @@ def structural_em(
     if changed[-1]:
         _log.warning(
             "structural EM: the graph still changed in the last of %d rounds, so EM has not "
-            "settled on a graph; the result is the last round's",
+            "settled on a graph; the result is the last round's, and n_em_iterations above %d "
+            "runs more rounds",
+            iterations,
             iterations,
         )
     return result, {

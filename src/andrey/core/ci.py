@@ -873,7 +873,8 @@ class ChiSquare:
     the configurations, each table's empty rows and columns struck: the degrees of freedom of
     Spirtes et al. [1]_, less one for each cell with no expected count, in the exact form for cells
     of an empty row or column [6]_. The two rules differ only on sparse tables, and the statistic
-    is the same under both. With zero degrees of freedom the p-value is ``1``.
+    is the same under both. With zero degrees of freedom the p-value is ``1``: the rows hold no
+    evidence for or against independence, and the answer reads as independence.
 
     **Limitations.** Referring the statistic to ``(r_x - 1) * (r_y - 1)`` degrees of freedom
     over-rejects a true independence once the table is sparse, G-square more than Pearson [5]_.
@@ -1421,9 +1422,9 @@ class DGTest:
     correlations of ``x``'s and ``y``'s columns after the linear regression on ``S``'s. Its degrees
     of freedom are the product of the two variables' numbers of columns, and its p-value is the
     chi-square survival function. A direction of ``x`` or ``y`` that ``S`` determines exactly
-    carries no information and adds no degree of freedom; with none left, the p-value is ``1``. On
-    continuous columns only, the statistic is ``-n log(1 - r**2)`` with ``r`` the partial
-    correlation.
+    carries no information and adds no degree of freedom; with none left, the p-value is ``1``,
+    which reads as independence without evidence. On continuous columns only, the statistic is
+    ``-n log(1 - r**2)`` with ``r`` the partial correlation.
 
     The statistic does not depend on the columns' units, and queries are canonicalized as
     :class:`FisherZ`'s are, so the p-value does not depend on the argument order.

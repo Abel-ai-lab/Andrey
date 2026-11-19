@@ -60,6 +60,7 @@ def test_a_seeded_fit_of_figure_1b_records_its_output():
             "retested": [[0, 1], [0, 2], [1, 2]],
             "removed": [[0, 1]],
             "uncorrected": [],
+            "rows_tested": {"min": 1796, "median": 1796.0},
         },
         "seed": 0,
         "indep_test": "fisherz",
