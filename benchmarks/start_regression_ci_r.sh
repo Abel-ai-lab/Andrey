@@ -5,7 +5,7 @@
 #   benchmarks/start_regression_ci_r.sh <folder for the PCM authors' code>
 #
 # GeneralisedCovarianceMeasure 0.2.0 left CRAN and weightedGCM 0.1.0 is the version its paper ran,
-# so both come from the CRAN archive with their SHA-256 checked, with xgboost 1.7.8.1, the last
+# so both come from the CRAN archive with their SHA-256 checked, with xgboost 1.7.8.1, a
 # release whose interface they call. The PCM authors' simulation code, which loads vimp and the
 # archived CondIndTests, is cloned at a fixed commit into the folder given; it carries no license,
 # so it stays outside the repository. The library is `$ANDREY_BENCH_R_LIBS`; put it first on

@@ -259,7 +259,8 @@ class GCM(_RegressionTest):
     method cannot learn, such as a function of several variables of ``z`` jointly under
     ``"linear"``, leaves a covariance in the residuals and reads as dependence. With an empty
     conditioning set the test is a test of correlation: a dependence without one, such as
-    ``y = x**2`` for a symmetric ``x``, goes unseen.
+    ``y = x**2`` for a symmetric ``x``, goes unseen. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -353,6 +354,8 @@ class WGCM(_RegressionTest):
     regression fits 51 boosted models, about a second at 300 rows; ``"est"`` fits five per query,
     of which four are kept for later queries on the same variables. ``"fix"`` uses 7 weights per
     conditioning variable, so with many conditioning variables the maximum spreads its power thin.
+    The numbers are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------
@@ -516,10 +519,12 @@ class PCM(_RegressionTest):
 
     **Limitations.** Not benchmarked yet. The tests run it on up to 4 variables and 400 rows. Each
     query fits 30 regressions with the default 6 splits, 24 of them for the pair, so a forest test
-    takes seconds per query at 500 rows. The variance floor of 0.01, in units of the standardized
-    response, is the authors' code's value; the paper sets none. The test detects a dependence of
-    the mean of ``y`` on ``x``; one that changes only the spread of ``y`` goes unseen, as does a
-    dependence of the mean of ``x`` on ``y`` that leaves the mean of ``y`` unchanged.
+    takes about 14 seconds per query at 200 rows. The variance floor of 0.01, in units of the
+    standardized response, is the authors' code's value; the paper sets none. The test detects a
+    dependence of the mean of ``y`` on ``x``; one that changes only the spread of ``y`` goes unseen,
+    as does a dependence of the mean of ``x`` on ``y`` that leaves the mean of ``y`` unchanged. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density,
+    the method's settings, and the machine.
 
     References
     ----------

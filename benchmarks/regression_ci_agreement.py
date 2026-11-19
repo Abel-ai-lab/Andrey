@@ -2,7 +2,8 @@
 
 Each case is drawn here, put into the layout the Andrey test holds (standardized columns, rows in
 its canonical order), and written to a folder that `benchmarks/regression_ci_reference.R` reads,
-so both sides test the same numbers. Two layers are compared:
+so both sides test the same numbers. PCM is compared in its paper's direction, the mean of y given
+(x, z). Two layers are compared:
 
 - the statistic: Andrey's statistic and p-value computed from the residuals, weights, and sample
   split the reference produced, which isolates the test from the regressions;
@@ -204,8 +205,7 @@ def pcm(folder: Path) -> None:
                     test = cr.PCM(
                         data, regression=regression, n_splits=6 if forest else 1, seed=seed
                     )
-                    response = 1 if test._tie_rank[1] > test._tie_rank[0] else 0
-                    write_case(folder, name, test, response=response)
+                    write_case(folder, name, test, response=1)  # the paper's Y
                     tests[name] = (setting, n, seed, test)
                     names.append(name)
                     seeds.append(seed)
@@ -220,7 +220,18 @@ def pcm(folder: Path) -> None:
             ]
             stat_ref = float(np.mean([-ndtri(r[f"p{b + 1}"]) for b in range(len(test._splits))]))
             p_ref = float(ndtr(-stat_ref))
-            mean = float(-ndtri(test._statistic_pvalue(0, 1, list(range(2, 9)))[1]))
+            # The paper's direction, y given (x, z), whichever variable the query would make the
+            # response; the last column says whether the query does.
+            rank = test._tie_rank
+            cond = sorted(rank[2:])
+            mean = float(
+                np.mean(
+                    [
+                        test._split_statistic(b, rank[1], rank[0], cond)
+                        for b in range(len(test._splits))
+                    ]
+                )
+            )
             out.append(
                 [
                     setting,
@@ -232,6 +243,7 @@ def pcm(folder: Path) -> None:
                     p_ref,
                     float(ndtr(-mean)),
                     (ndtr(-mean) < 0.05) == (p_ref < 0.05),
+                    rank[1] > rank[0],
                 ]
             )
         label = "random forests, 6 splits" if forest else "least squares, 1 split"
@@ -248,6 +260,7 @@ def pcm(folder: Path) -> None:
                     "reference p",
                     "Andrey p",
                     "same decision at 0.05",
+                    "query takes y as the response",
                 ],
                 out,
             )
