@@ -7,7 +7,7 @@ Every number on the homepage comes from a release's published benchmark summary 
 from the method registry. A method measured against the same package in two summaries shows the
 newer summary's rows (:func:`newest`). The speed and accuracy sections show one method per
 registry family, the one :func:`featured_methods` picks, beside every package compared with it. The
-README, the live demo, and the homepage's description state ``CLAIM``, which carries no number;
+README and the live demo state ``CLAIM``, and the homepage's description its words, with no number;
 :func:`claim_sentence` words the first summary's headline. The method counts come from the method
 registry. A summary outside ``benchmarks/published/`` loads only as a placeholder, which marks
 the page as not for release. Links are relative to the site root.
@@ -976,7 +976,7 @@ def speed_claim(summaries: list[dict]) -> tuple[str, str]:
     return lead, rest
 
 
-# The speed claim the README, the live demo, and the homepage's description state.
+# The speed claim the README and the live demo state; the homepage's description opens with it.
 CLAIM = "The fastest causal discovery package."
 
 
@@ -2656,20 +2656,12 @@ def homepage_code_css() -> str:
     return code_css("", "light") + "\n" + code_css('html[data-theme="dark"] ', "dark")
 
 
-# The methods the homepage's description names; every other registered method counts as "more".
-DESCRIPTION_METHODS = ("PC", "GES", "FCI")
-
-
-def page_description(summaries: list[dict]) -> str:
-    """The homepage's summary for search results and link previews, as plain text."""
-    registered = {spec.name for spec in list_specs()}
-    if missing := [m for m in DESCRIPTION_METHODS if m.lower() not in registered]:
-        raise ValueError(f"the description names unregistered methods: {', '.join(missing)}")
-    named, more = ", ".join(DESCRIPTION_METHODS), len(registered) - len(DESCRIPTION_METHODS)
-    return (
-        f"Causal discovery for Python and AI agents. Learn causal graphs with {named} and "
-        f"{more} more methods, on CPU or GPU. {CLAIM}"
-    )
+# The homepage's summary for search results, link previews, and the software's structured data,
+# under 160 characters: the speed claim with no number, then what else Andrey is.
+PAGE_DESCRIPTION = (
+    "The fastest causal discovery package for Python: accurate, built for agents, one API for "
+    "observational, interventional, time-series and hidden-variable data."
+)
 
 
 def abel_mark() -> str:
@@ -2701,7 +2693,7 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
     return {
         "title": escape(SEARCH_TITLE),
         # Plain text: docs/conf.py escapes it into the page's description and link-preview tags.
-        "description": page_description(summaries),
+        "description": PAGE_DESCRIPTION,
         "robots": '<meta name="robots" content="noindex">' if placeholder else "",
         "banner": banner if placeholder else "",
         "agent_pill": agent_pill(),

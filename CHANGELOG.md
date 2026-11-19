@@ -12,12 +12,12 @@ names its pull request.
 
 ### Changed
 
-- The website is easier to find and quote in search and AI answers. The homepage says in one line
-  what Andrey is, with its method counts, license, and install command; `llms.txt` links the
-  methods and comparison pages, says how to cite Andrey, and marks each experimental method; a post
-  a release updated carries its update date, also in the sitemap; the general index and the
-  source-code pages are not indexed; and the docs home, the example notebooks, the changelog, and
-  the blog index have their own titles and descriptions. ([#1132])
+- The website is easier to find and quote in search and AI answers. The homepage's description, its
+  structured data, and `llms.txt` say what Andrey is, starting with the speed claim; `llms.txt` also
+  links the methods and comparison pages, says how to cite Andrey, and marks each experimental
+  method; a post a release updated carries its update date, also in the sitemap; the general index
+  and the source-code pages are not indexed; and the docs home, the example notebooks, the
+  changelog, and the blog index have their own titles and descriptions. ([#1132])
 
 ## [0.18.0] - 2026-11-19
 

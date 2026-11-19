@@ -283,6 +283,23 @@ def test_the_notebooks_the_changelog_and_the_blog_index_have_written_description
         assert written is None or description == written, name
 
 
+def test_the_speed_claim_reaches_search_and_answer_engines_without_a_number(html):
+    # The homepage's description, its previews, and the software node open with "fastest" and give
+    # no number; llms.txt's summary also counts the supported methods from the registry.
+    home = (html / "index.html").read_text(encoding="utf-8")
+    head = _head_meta(home)
+    description = head["description"]
+    assert description.startswith("The fastest causal discovery package for Python")
+    assert not re.search(r"\d", description) and len(description) <= 160
+    assert description == head["og:description"] == head["twitter:description"]
+    assert _discovery_graph(home)["SoftwareSourceCode"]["description"] == description
+    summary = (html / "llms.txt").read_text().split("\n\n", 2)[1]
+    supported = sum(spec.status == "supported" for spec in andrey.spec.list_specs())
+    assert summary.startswith("> Andrey is the fastest open-source Python package")
+    assert f" {supported} supported methods." in summary
+    assert set(re.findall(r"\d+", summary)) == {str(supported)}
+
+
 def test_the_docs_home_says_what_the_docs_cover(html):
     text = (html / "docs" / "index.html").read_text(encoding="utf-8")
     title = unescape(re.search(r"<title>(.*?)</title>", text, re.S)[1])

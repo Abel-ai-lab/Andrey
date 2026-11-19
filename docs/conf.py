@@ -504,6 +504,19 @@ def _facts() -> list[str]:
     ]
 
 
+def _llms_summary() -> str:
+    """``llms.txt``'s opening summary, the first lines an answer engine reads: the speed claim with
+    no number, then accuracy, agents, and the kinds of data, with the count of supported methods
+    from the registry."""
+    supported = sum(spec.status == "supported" for spec in list_specs())
+    return (
+        "Andrey is the fastest open-source Python package for causal discovery. It is accurate "
+        "(each method checked against its authors' code), built for agents (a CLI with JSON "
+        "output and introspection), and covers observational, interventional, time-series, "
+        f"hidden-variable and two-variable data with {supported} supported methods."
+    )
+
+
 def _cite() -> str:
     """How to cite Andrey, in one line: the authors, title, version, and address of
     ``CITATION.cff``, and the FAQ's answer that gives the BibTeX entry."""
@@ -884,7 +897,8 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
     ]
     software = {
         "name": app.config.project,
-        "description": PACKAGE["description"],
+        # The homepage's summary, which opens with the speed claim.
+        "description": app.andrey_home["description"],
         "version": release,
         "license": {
             "@type": "CreativeWork",
@@ -1024,7 +1038,7 @@ def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event ar
     try:
         entries = discovery.read_pages(outdir, [n for _, documents in sections for n in documents])
         text = discovery.llms_index(
-            app.andrey_home["description"],
+            _llms_summary(),
             entries,
             sections,
             site_url=SITE_URL,
