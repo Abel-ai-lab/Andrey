@@ -30,7 +30,7 @@ names its pull request.
   2024), which tests whether one variable improves a random-forest prediction of the other. Each
   takes `regression="boosting"`, `"forest"`, or `"linear"`; the sample splits and folds are drawn
   from `seed` over rows held in an order of their values, so a p-value depends on neither the row
-  nor the column order. A contributor's script compares them with the authors' code. ([#PR])
+  nor the column order. A contributor's script compares them with the authors' code. ([#1147])
 
 ### Changed
 
@@ -2723,6 +2723,7 @@ First alpha release.
 [#1120]: https://github.com/Abel-ai-lab/Andrey/pull/1120
 [#1122]: https://github.com/Abel-ai-lab/Andrey/pull/1122
 [#1127]: https://github.com/Abel-ai-lab/Andrey/pull/1127
+[#1147]: https://github.com/Abel-ai-lab/Andrey/pull/1147
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
 [#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
 [#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
