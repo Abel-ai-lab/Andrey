@@ -7,6 +7,8 @@ population and the expected graph follows from the process alone, with no sampli
 
 from __future__ import annotations
 
+import hashlib
+
 import numpy as np
 import pytest
 from scipy.linalg import solve_discrete_lyapunov
@@ -280,3 +282,36 @@ def test_a_column_order_relabels_every_link_p_value_and_separating_set(collider_
             (int(order[i]), lag, int(order[j])): sorted(int(order[k]) for k in found)
             for (i, lag, j), found in refit.sepsets.items()
         } == {key: sorted(found) for key, found in first.sepsets.items()}
+
+
+class LabelTest:
+    """P-values from the variables a query names, whatever their positions, so two runs differ
+    only where they ask different queries."""
+
+    def __init__(self, labels: np.ndarray) -> None:
+        self.labels = labels
+
+    def _label(self, column: int) -> tuple[int, int]:
+        lag, i = divmod(int(column), len(self.labels))
+        return lag, int(self.labels[i])
+
+    def statistic_pvalues(self, x, y, conditions):
+        p_values = []
+        for a, b, row in zip(x, y, conditions):
+            query = (sorted((self._label(a), self._label(b))), sorted(map(self._label, row)))
+            p_values.append(int(hashlib.sha256(repr(query).encode()).hexdigest()[:12], 16) / 16**12)
+        p_values = np.array(p_values)
+        return 1.0 - p_values, p_values
+
+
+def test_a_pair_is_first_tested_from_its_end_of_higher_rank() -> None:
+    # Each variable keeps its rank under a column order; a link removed from the end tested first
+    # never gets the other end's tests, so its largest p-value follows which end that is.
+    n_vars = 6
+    first = run_phases(LabelTest(np.arange(n_vars)), n_vars, 1, 0.4, "majority", range(n_vars))
+    for seed in range(4):
+        order = np.random.default_rng(seed).permutation(n_vars)
+        refit = run_phases(LabelTest(order), n_vars, 1, 0.4, "majority", order.tolist())
+        back = np.argsort(order)
+        assert np.array_equal(refit.p_values[:, back][:, :, back], first.p_values)
+        assert np.array_equal(refit.adjacency[:, back][:, :, back], first.adjacency)
