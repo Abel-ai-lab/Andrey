@@ -18,6 +18,9 @@ names its pull request.
   `(r_x - 1) * (r_y - 1)` per configuration over the values present, each table's empty rows and
   columns struck (Spirtes, Glymour, and Scheines 1993). The two differ only on sparse tables.
   Passing it with another test raises `ValueError`. ([#981])
+- For contributors, a benchmark lane runs `anm`, `pnl`, `loci`, and `resit` beside the authors'
+  code of QCCD, HECI, and GRCI on the Tübingen cause-effect pairs, and a summary script turns its
+  records into a weighted-accuracy table. ([#1127])
 
 ### Changed
 
@@ -2705,6 +2708,7 @@ First alpha release.
 [#1112]: https://github.com/Abel-ai-lab/Andrey/pull/1112
 [#1120]: https://github.com/Abel-ai-lab/Andrey/pull/1120
 [#1122]: https://github.com/Abel-ai-lab/Andrey/pull/1122
+[#1127]: https://github.com/Abel-ai-lab/Andrey/pull/1127
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
 [#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
 [#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
