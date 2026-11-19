@@ -11,6 +11,7 @@ import json
 import re
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import tuebingen_pairs
@@ -105,3 +106,35 @@ def test_the_printed_library_export_keeps_the_path_already_set(script, before, a
     shell = f'eval "$(printf \'{fmt}\' /lib/new)"; printf %s "$R_LIBS_USER"'
     run = subprocess.run(["bash", "-c", shell], env=env, capture_output=True, text=True, check=True)
     assert run.stdout == after
+
+
+def test_records_from_another_runtime_are_not_pooled(tmp_path) -> None:
+    a, b = _record("pair0001", "heci"), _record("pair0002", "heci")
+    a["runtime"], b["runtime"] = {"numpy": "2.3.0"}, {"numpy": "2.4.0"}
+    runs = [_run(tmp_path / "a", ["pair0001"], ["heci"], [a])]
+    runs.append(_run(tmp_path / "b", ["pair0002"], ["heci"], [b]))
+    with pytest.raises(SystemExit, match="runtime"):
+        tuebingen_summary.read_records(runs)
+
+
+def test_a_resumption_with_another_identity_stops_before_any_fit(tmp_path) -> None:
+    record = _record("pair0001", "anm") | {"runtime": {"numpy": "2.4.0"}}
+    run = _run(tmp_path / "a", ["pair0001"], ["anm"], [record])
+    same = {k: record[k] for k in ("package_version", "params", "cap_wall_s", "cap_mem_mb")}
+    same["runtime"] = record["runtime"]
+    tuebingen_pairs.check_resumption(run / "records.jsonl", {"anm": same})
+    tuebingen_pairs.check_resumption(run / "records.jsonl", {"qccd": same | {"cap_wall_s": 60.0}})
+    with pytest.raises(SystemExit, match="new directory"):
+        tuebingen_pairs.check_resumption(
+            run / "records.jsonl", {"anm": same | {"cap_wall_s": 60.0}}
+        )
+
+
+def test_a_selection_with_no_two_column_pair_is_refused(monkeypatch, tmp_path) -> None:
+    import andrey.data
+
+    pair = SimpleNamespace(name="pair0052", multivariate=True)
+    monkeypatch.setattr(andrey.data, "load_dataset", lambda *args, **kwargs: [pair])
+    with pytest.raises(SystemExit):
+        tuebingen_pairs.main(["--out", str(tmp_path / "run"), "--pairs", "52"])
+    assert not (tmp_path / "run").exists()

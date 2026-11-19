@@ -51,14 +51,25 @@ def read_manifest(runs: list[Path]) -> tuple[dict[str, float], set[tuple[str, st
     return pairs, units
 
 
+def identity(record: dict) -> tuple:
+    """What a solution's records must share to be pooled: build, parameters, caps, and runtime."""
+    return (
+        record.get("package_version"),
+        json.dumps(record.get("params"), sort_keys=True),
+        record.get("cap_wall_s"),
+        record.get("cap_mem_mb"),
+        json.dumps(record.get("runtime"), sort_keys=True),
+    )
+
+
 def read_records(runs: list[Path]) -> list[dict]:
     """Every fit record of the run directories, refusing runs that cannot be pooled.
 
-    A solution's records must agree on its build, parameters, and caps, and a (pair, solution)
-    unit may appear once, so a row never mixes builds or budgets.
+    A solution's records must agree on its :func:`identity`, and a (pair, solution) unit may appear
+    once, so a row never mixes builds or budgets.
     """
     units: dict[tuple[str, str], dict] = {}
-    identity: dict[str, tuple] = {}
+    identities: dict[str, tuple] = {}
     for run in runs:
         path = run / "records.jsonl"
         if not path.is_file() and not (run / "manifest.json").is_file():
@@ -70,14 +81,10 @@ def read_records(runs: list[Path]) -> list[dict]:
             if unit in units:
                 raise SystemExit(f"{unit[1]} on {unit[0]} appears twice; summarize one record each")
             units[unit] = record
-            key = (
-                record.get("package_version"),
-                json.dumps(record.get("params"), sort_keys=True),
-                record.get("cap_wall_s"),
-                record.get("cap_mem_mb"),
-            )
-            if identity.setdefault(unit[1], key) != key:
-                raise SystemExit(f"{unit[1]}: records differ in build, parameters, or caps")
+            if identities.setdefault(unit[1], identity(record)) != identity(record):
+                raise SystemExit(
+                    f"{unit[1]}: records differ in build, parameters, caps, or runtime"
+                )
     return list(units.values())
 
 

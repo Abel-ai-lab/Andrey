@@ -14,9 +14,10 @@ local download.
 Each fit runs in its own process with one numeric thread under a per-fit wall cap (30 minutes by
 default); a fit past the cap is recorded as ``timeout`` and has no decision. ``--workers`` fits run
 at once, so a job packs many pairs: give it that many cores. One JSON line per fit goes to
-``<out>/records.jsonl``, with the machine, so the summary can state the hardware; a rerun skips the
-(pair, solution) units already there. ``tuebingen_summary.py`` turns the records of one or more runs
-into the table.
+``<out>/records.jsonl``, with the machine and the fit interpreter's runtime, so the summary can
+state the hardware. A rerun skips the (pair, solution) units already there, and stops before any fit
+when the records there were made with another build, parameters, caps, or runtime.
+``tuebingen_summary.py`` turns the records of one or more runs into the table.
 
     ANDREY_BENCH_PYTHON=... $ANDREY_BENCH_PYTHON benchmarks/tuebingen_pairs.py --prepare-only
     ANDREY_BENCH_PYTHON=... $ANDREY_BENCH_PYTHON benchmarks/tuebingen_pairs.py --out outputs/tue-a \\
@@ -38,11 +39,13 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from tuebingen_summary import identity
 
 from andrey_bench.adapters.andrey_anm import AndreyANM
 from andrey_bench.adapters.andrey_loci import AndreyLOCI, AndreyLOCILikelihood
 from andrey_bench.adapters.andrey_pnl import AndreyPNL
 from andrey_bench.adapters.andrey_resit import AndreyRESIT
+from andrey_bench.adapters.r_adapter import RAdapter
 from andrey_bench.runner import check_interpreters, run_task
 
 #: The authors' code, as ``(module, class)`` of its adapter; imported only when it is asked for.
@@ -78,11 +81,25 @@ def make_solution(name: str) -> Any:
     return getattr(import_module(module), cls)()
 
 
-def preflight(adapters: dict[str, Any]) -> dict[str, str]:
+#: Prints, as JSON, the Python and NumPy of the interpreter that runs a solution's fits.
+_PYTHON_RUNTIME = (
+    "import json, platform, numpy; "
+    "print(json.dumps({'python': platform.python_version(), 'numpy': numpy.__version__}))"
+)
+
+#: Prints, as JSON, the R and rpy2 that an R solution's fit interpreter embeds.
+_R_RUNTIME = (
+    "import json, importlib.metadata as m, rpy2.robjects as ro; "
+    "print(json.dumps({'R': str(ro.r('R.version.string')[0]), 'rpy2': m.version('rpy2')}))"
+)
+
+
+def preflight(adapters: dict[str, Any]) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
     """Check every fit interpreter and every reference's code folder before any fit runs.
 
-    Returns ``{solution: version}``: the version of the package each solution's fits run, read from
-    the interpreter that runs them when it is not the driver's.
+    Returns ``{solution: version}``, the version of the package each solution's fits run, read from
+    the interpreter that runs them when it is not the driver's, and ``{solution: runtime}``, the
+    Python and NumPy of that interpreter and, for an R solution, the R and rpy2 it embeds.
     """
     from importlib import import_module
 
@@ -101,7 +118,34 @@ def preflight(adapters: dict[str, Any]) -> dict[str, str]:
             ]
             run = subprocess.run(command, capture_output=True, text=True, check=True)
             versions[name] = run.stdout.strip()
-    return versions
+    runtimes = {}
+    for name, adapter in adapters.items():
+        runtime = {}
+        codes = [_PYTHON_RUNTIME] + ([_R_RUNTIME] if isinstance(adapter, RAdapter) else [])
+        for code in codes:
+            command = [str(interpreters[adapter.name]), "-c", code]
+            run = subprocess.run(command, capture_output=True, text=True, check=True)
+            runtime.update(json.loads(run.stdout.strip().splitlines()[-1]))
+        runtimes[name] = runtime
+    return versions, runtimes
+
+
+def check_resumption(path: Path, current: dict[str, dict]) -> None:
+    """Refuse to resume ``path`` when a solution's records there differ from this run's identity.
+
+    ``current`` holds, per solution, the fields of a record that :func:`tuebingen_summary.identity`
+    reads. A mismatch stops the run before any fit, instead of leaving a mix the summary refuses.
+    """
+    if not path.is_file():
+        return
+    for line in path.read_text().splitlines():
+        record = json.loads(line)
+        expected = current.get(record["method"])
+        if expected is not None and identity(record) != identity(expected):
+            raise SystemExit(
+                f"{path} holds {record['method']} records with another build, parameters, caps, or "
+                "runtime: write this run to a new directory"
+            )
 
 
 def parse_pairs(text: str) -> set[int]:
@@ -187,11 +231,27 @@ def main(argv: list[str] | None = None) -> int:
     wanted = parse_pairs(args.pairs)
     # One column per side: the six multivariate pairs (52 to 55, 71, 105) are left out.
     pairs = [q for q in collection if not q.multivariate and int(q.name[4:]) in wanted]
-    args.out.mkdir(parents=True, exist_ok=True)
-    records = args.out / "records.jsonl"
-    done = done_units(records)
+    if not pairs:
+        p.error(f"--pairs {args.pairs} names no pair with one column per side")
     adapters = {name: make_solution(name) for name in args.solutions}
-    versions = preflight(adapters)
+    versions, runtimes = preflight(adapters)
+    params = {name: json.loads(json.dumps(a.params(), default=str)) for name, a in adapters.items()}
+    records = args.out / "records.jsonl"
+    check_resumption(
+        records,
+        {
+            name: {
+                "package_version": versions[name],
+                "params": params[name],
+                "cap_wall_s": args.cap_wall_s,
+                "cap_mem_mb": args.cap_mem_mb,
+                "runtime": runtimes[name],
+            }
+            for name in adapters
+        },
+    )
+    args.out.mkdir(parents=True, exist_ok=True)
+    done = done_units(records)
     update_manifest(args.out / "manifest.json", {q.name: q.weight for q in pairs}, args.solutions)
     # Largest pairs first, so a worker is not left with the slow fits at the end.
     tasks = [
@@ -228,6 +288,7 @@ def main(argv: list[str] | None = None) -> int:
             "package": adapter.package,
             "package_version": versions[name],
             "params": dict(adapter.params()),
+            "runtime": runtimes[name],
             "status": measure.get("status"),
             "wall_s": measure.get("wall_s"),
             "cpu_s": measure.get("cpu_s"),
