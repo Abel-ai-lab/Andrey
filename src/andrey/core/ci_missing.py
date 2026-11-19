@@ -64,6 +64,7 @@ from .ci import (
     p_value_statistics,
     per_query,
 )
+from .missing_groups import GroupedSums, grouping_for
 from .score import (
     ZERO_RESIDUAL,
     CopiedColumnsError,
@@ -617,6 +618,17 @@ class PartialCorrelationDeletion(TestwiseDeletion):
             r[k], p[k] = rk[0], pk[0]
         return r, p
 
+    def _grouped_sums(self) -> GroupedSums | None:
+        """The grouped sums of :mod:`~andrey.core.missing_groups` when the data take that path
+        (:func:`~andrey.core.missing_groups.grouping_for`), else ``None`` for the per-row sums;
+        chosen from the data at the first block, so every block of the test takes one path."""
+        if self._grouped is False:
+            from .ties import tie_ranks
+
+            grouping = grouping_for(self._observed, tie_ranks(self._data))
+            self._grouped = None if grouping is None else GroupedSums(self._values, grouping)
+        return cast("GroupedSums | None", self._grouped)
+
     def copies(self) -> tuple[tuple[int, ...], ...]:
         """The groups of columns that repeat one another up to scale and shift.
 
@@ -652,12 +664,17 @@ class GaussianDeletion(PartialCorrelationDeletion):
     :meth:`statistic_pvalues`, and the canonical query arrays the skeleton searches pass) gives it
     the same bits.
 
+    When the rows fall into a few missingness patterns, the sums come from tables kept once per
+    group of patterns instead of from every row (:mod:`~andrey.core.missing_groups`); the path is
+    chosen once per test, from the data, and the two paths give the same row counts and agree up to
+    rounding.
+
     A query whose block has fewer rows than the test needs is not tested: its rows are counted from
-    the observed masks and its block is never summed. A query with a continuous column that may be
-    constant on the block, columns within ``_MARGIN`` of a copy, a correlation submatrix within
-    ``_MARGIN`` of the singular bound, or a partial correlation or p-value that is not a number is
-    answered by :class:`PartialCorrelationDeletion` instead, which raises where it raises. So every
-    error is the exact path's, at the same query.
+    the observed masks, or from the groups, and its block is never summed. A query with a continuous
+    column that may be constant on the block, columns within ``_MARGIN`` of a copy, a correlation
+    submatrix within ``_MARGIN`` of the singular bound, or a partial correlation or p-value that is
+    not a number is answered by :class:`PartialCorrelationDeletion` instead, which raises where it
+    raises. So every error is the exact path's, at the same query.
     """
 
     def __init__(
@@ -689,6 +706,7 @@ class GaussianDeletion(PartialCorrelationDeletion):
         self._pairs: tuple[np.ndarray, np.ndarray] | None = None
         self._blocks: OrderedDict[tuple[int, ...], tuple[np.ndarray, int]] = OrderedDict()
         self._kept = 0
+        self._grouped: GroupedSums | None | bool = False  # False until the path is chosen
         self._repeats(list(range(data.shape[1])))
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
@@ -881,20 +899,33 @@ class GaussianDeletion(PartialCorrelationDeletion):
         k = columns.shape[1]
         keys = [tuple(row) for row in np.sort(columns, axis=1).tolist()]
         new = list(dict.fromkeys(key for key in keys if key not in self._blocks))
-        step = max(1, _STEP_BYTES // (8 * k * self._data.shape[0]))
         least = self.least_rows(k - 2)
+        grouped = self._grouped_sums()
+        if grouped is None:
+            step = max(1, _STEP_BYTES // (8 * k * self._data.shape[0]))
+        else:
+            step = max(1, _STEP_BYTES // (32 * k * k))
         for start in range(0, len(new), step):
             chunk = np.array(new[start : start + step], dtype=np.intp)
-            kept = self._seen[chunk[:, 0]].copy()
-            for c in range(1, k):
-                kept &= self._seen[chunk[:, c]]
-            counts = np.count_nonzero(kept, axis=1)
             blocks = np.full((len(chunk), k, k), np.nan)
-            enough = counts >= least
-            if enough.any():
-                blocks[enough] = _block_correlations(
-                    self._values, kept[enough], chunk[enough], counts[enough]
-                )
+            if grouped is None:
+                kept = self._seen[chunk[:, 0]].copy()
+                for c in range(1, k):
+                    kept &= self._seen[chunk[:, c]]
+                counts = np.count_nonzero(kept, axis=1)
+                enough = counts >= least
+                if enough.any():
+                    blocks[enough] = _block_correlations(
+                        self._values, kept[enough], chunk[enough], counts[enough]
+                    )
+            else:
+                counts = np.zeros(len(chunk), dtype=np.int64)
+                enough = grouped.counts(chunk) >= least
+                if enough.any():
+                    count, sums, products = grouped.blocks(chunk[enough])
+                    counts[enough] = count
+                    blocks[enough] = _correlations(products, sums, count)
+                blocks[counts < least] = np.nan
             for key, block, count in zip(map(tuple, chunk.tolist()), blocks, counts.tolist()):
                 self._blocks[key] = (block, count)
                 self._kept += block.nbytes + _ENTRY_BYTES
@@ -908,6 +939,17 @@ class GaussianDeletion(PartialCorrelationDeletion):
         at = np.arange(len(columns))[:, None, None]
         stack = ordered[at, rank[:, :, None], rank[:, None, :]]
         return stack, np.array([count for _, count in found], dtype=np.int64)
+
+    def _grouped_sums(self) -> GroupedSums | None:
+        """The grouped sums of :mod:`~andrey.core.missing_groups` when the data take that path
+        (:func:`~andrey.core.missing_groups.grouping_for`), else ``None`` for the per-row sums;
+        chosen from the data at the first block, so every block of the test takes one path."""
+        if self._grouped is False:
+            from .ties import tie_ranks
+
+            grouping = grouping_for(self._observed, tie_ranks(self._data))
+            self._grouped = None if grouping is None else GroupedSums(self._values, grouping)
+        return cast("GroupedSums | None", self._grouped)
 
     def copies(self) -> tuple[tuple[int, ...], ...]:
         """The groups of columns that repeat one another up to scale and shift.
@@ -1031,6 +1073,13 @@ def _block_correlations(
         for j in range(i, k):
             np.multiply(block[:, i], block[:, j], out=pair)
             products[:, i, j] = products[:, j, i] = pair.sum(axis=1)
+    return _correlations(products, sums, count)
+
+
+def _correlations(products: np.ndarray, sums: np.ndarray, count: np.ndarray) -> np.ndarray:
+    """The correlation matrices of blocks from their cross products ``(B, k, k)``, sums ``(B,
+    k)``, and row counts ``(B,)`` of values less each column's observed mean, clipped to ``[-1,
+    1]``, as :func:`numpy.corrcoef` clips."""
     cov = products - sums[:, :, None] * sums[:, None, :] / count[:, None, None]
     spread = np.sqrt(np.diagonal(cov, axis1=1, axis2=2))
     return np.clip(cov / spread[:, :, None] / spread[:, None, :], -1.0, 1.0)

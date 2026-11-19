@@ -94,6 +94,22 @@ forkserver, as on Linux from Python 3.14; otherwise it keeps the default.
   ordered pairs of candidates reach this value (default `100000`, about the break-even on one core
   of an AMD EPYC 7713); the order is the same bit for bit either way, and `0` prunes every step.
 
+## Test-wise deletion
+
+With `fisherz` or `student_t` on data with missing values, a test reads the rows observed in every
+one of its columns. When the rows fall into a few missingness patterns, as in data merged from
+cohorts that each measure their own variables, the rows are grouped by pattern once, and each
+test's sums come from the groups' tables instead of from every row. The groups follow the
+patterns, not the row or the column order. Each test object takes one path, chosen from the data,
+and the two paths agree up to the last digits of the p-values.
+
+- `ANDREY_TESTWISE_GROUP_BYTES`: the grouped path is used only when its tables fit in this many
+  bytes (default `268435456`, 256 MiB) and the patterns form at most 64 groups; `0` keeps every
+  test on the per-row path.
+- `ANDREY_TESTWISE_GROUP_MAX_SCATTER`: the grouped path is used only when the cells a row misses
+  among its group's columns are at most this share of those cells (default `0.15`). Above it,
+  correcting for the rows that miss several columns of a test costs more than summing every row.
+
 ## GPU dispatch
 
 - `ANDREY_COV_GPU_THRESHOLD`: under `auto`, covariance and correlation run on `cuda` from this many

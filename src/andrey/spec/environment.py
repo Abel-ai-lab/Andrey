@@ -15,6 +15,7 @@ from andrey.constraint._parallel_skeleton import (
 )
 from andrey.core.backend import GPU_THRESHOLDS
 from andrey.core.env import SEED_MAX
+from andrey.core.missing_groups import GROUP_BYTES, GROUP_MAX_SCATTER, MAX_GROUPS
 from andrey.lingam.pwling import MIN_PRUNE_WORK
 from andrey.search._parallel_ges import MIN_POOL_GES_WORK
 
@@ -141,6 +142,34 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "candidate in full. Both give the same order bit for bit. `0` prunes every step. The "
             "default was measured on an AMD EPYC 7713 server running Linux on one core, where "
             "pruning broke even at 60,000 to 80,000."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_TESTWISE_GROUP_BYTES",
+        values="integer (bytes)",
+        default=str(GROUP_BYTES),
+        effect=(
+            "Path gate for test-wise deletion with `fisherz` or `student_t` on data with missing "
+            "values: the rows are grouped by their missingness patterns, and each block's sums "
+            "come from the groups' tables, only when those tables fit in this many bytes, the "
+            f"patterns form at most {MAX_GROUPS} groups, and the scattered share stays within "
+            "`ANDREY_TESTWISE_GROUP_MAX_SCATTER`; otherwise each block is summed over every row. "
+            "The path is chosen once per test from the data. The two paths agree up to rounding. "
+            "`0` keeps every test on the per-row path."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_TESTWISE_GROUP_MAX_SCATTER",
+        values="number from 0 to 1 (share of cells)",
+        default=str(GROUP_MAX_SCATTER),
+        effect=(
+            "Path gate for test-wise deletion with `fisherz` or `student_t` (see "
+            "`ANDREY_TESTWISE_GROUP_BYTES`): the grouped path is used only when the cells a row "
+            "misses within its group's columns are at most this share of those columns' cells. "
+            "Above it, the corrections for rows missing several columns of a block cost more "
+            "than summing every row."
         ),
         group="backend",
     ),

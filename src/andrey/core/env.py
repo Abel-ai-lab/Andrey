@@ -68,6 +68,17 @@ def parse_int(value: str, source: str) -> int:
         raise ValueError(f"{source} must be an integer, got {value!r}") from exc
 
 
+def parse_share(value: str, source: str) -> float:
+    """Return ``value`` as a share: a number from ``0`` to ``1``."""
+    try:
+        share = float(value)
+    except ValueError as exc:
+        raise ValueError(f"{source} must be a number from 0 to 1, got {value!r}") from exc
+    if not 0.0 <= share <= 1.0:
+        raise ValueError(f"{source} must be a number from 0 to 1, got {value!r}")
+    return share
+
+
 def parse_seed(value: str, source: str) -> int:
     """Return a seed: an integer from ``0`` to ``SEED_MAX``."""
     seed = parse_int(value, source)
@@ -114,6 +125,8 @@ SKELETON_PARALLEL_MIN_WORK = Setting("ANDREY_SKELETON_PARALLEL_MIN_WORK", parse_
 POSSIBLE_DSEP_PARALLEL_MIN_WORK = Setting("ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK", parse_int)
 RCOT_PARALLEL_MIN_WORK = Setting("ANDREY_RCOT_PARALLEL_MIN_WORK", parse_int)
 LINGAM_PRUNE_MIN_WORK = Setting("ANDREY_LINGAM_PRUNE_MIN_WORK", parse_int)
+TESTWISE_GROUP_BYTES = Setting("ANDREY_TESTWISE_GROUP_BYTES", parse_int)
+TESTWISE_GROUP_MAX_SCATTER = Setting("ANDREY_TESTWISE_GROUP_MAX_SCATTER", parse_share)
 COV_GPU_THRESHOLD = Setting("ANDREY_COV_GPU_THRESHOLD", parse_int)
 ENTROPY_GPU_THRESHOLD = Setting("ANDREY_ENTROPY_GPU_THRESHOLD", parse_int)
 KCI_GPU_THRESHOLD = Setting("ANDREY_KCI_GPU_THRESHOLD", parse_int)
@@ -136,6 +149,8 @@ SETTINGS: dict[str, Setting] = {
         POSSIBLE_DSEP_PARALLEL_MIN_WORK,
         RCOT_PARALLEL_MIN_WORK,
         LINGAM_PRUNE_MIN_WORK,
+        TESTWISE_GROUP_BYTES,
+        TESTWISE_GROUP_MAX_SCATTER,
         COV_GPU_THRESHOLD,
         ENTROPY_GPU_THRESHOLD,
         KCI_GPU_THRESHOLD,
