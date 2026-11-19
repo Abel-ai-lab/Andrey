@@ -43,7 +43,7 @@ names its pull request.
   `fci` ran 1.6 to 3.9 times faster and `iamb` 1.1 to 3.6 times, with the same graphs, the same row
   counts, and the same tests not tested; on data missing completely at random the time stayed
   about the same. P-values change in their last digits. `ANDREY_TESTWISE_GROUP_BYTES` and
-  `ANDREY_TESTWISE_GROUP_MAX_SCATTER` set when the path is used. ([#PR_GROUPED])
+  `ANDREY_TESTWISE_GROUP_MAX_SCATTER` set when the path is used. ([#1148])
 - With `missing=None` on data with missing values, a method whose tests delete rows logs one notice
   per process that names the handling, test-wise deletion, and when it is valid. Pass
   `missing="testwise"` to choose it by name. `bootstrap` logs it once for all of its worker
@@ -2744,5 +2744,6 @@ First alpha release.
 [card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
 [#1142]: https://github.com/Abel-ai-lab/Andrey/pull/1142
 [#1102]: https://github.com/Abel-ai-lab/Andrey/pull/1102
+[#1148]: https://github.com/Abel-ai-lab/Andrey/pull/1148
 [#1094]: https://github.com/Abel-ai-lab/Andrey/pull/1094
 [#1095]: https://github.com/Abel-ai-lab/Andrey/pull/1095
