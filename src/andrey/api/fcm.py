@@ -637,7 +637,7 @@ def cpcm_graph(
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows
-    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Not benchmarked yet. The paper claims graphs of 5 variables and measures the
@@ -1277,7 +1277,7 @@ def das(
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows
-    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** DAS is not benchmarked yet: no campaign has compared its graph with the code
@@ -1731,7 +1731,7 @@ def skewd_mv(
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows
-    first, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Not benchmarked yet. The paper measures it on skew-normal location-scale

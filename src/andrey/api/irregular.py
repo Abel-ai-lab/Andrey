@@ -796,8 +796,8 @@ def cpcm(
     the same in any unit.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
-    both columns, so a row with a missing value has no place in it. Drop the incomplete rows first,
-    which suits values missing completely at random, or use :func:`~andrey.pc` or
+    both columns, so a row with a missing value has no place in it. Drop the incomplete rows
+    yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Not benchmarked yet. Each HSIC test builds matrices with one row and one
@@ -984,9 +984,12 @@ def skewd(
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits read only the rows
     where both columns are observed, which for a pair are the rows test-wise deletion keeps;
-    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. When values are
-    missing completely at random, those rows are a random sample of all rows. Fewer than 8 such
+    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. Fewer than 8 such
     rows (one for each cross-validation fold), or a column constant on them, raises ``ValueError``.
+    Test-wise deletion is valid when values are missing completely at random, which means that
+    whether a value is missing depends on no value in the data; the rows a test reads are then a
+    random sample of all rows, and otherwise they are a selected sample that more rows do not
+    correct.
 
     **Limitations.** Not benchmarked yet. The paper measures it on skewed location-scale pairs of
     1,000 rows and on established pair benchmarks [1]_. A fit at the defaults runs about 490
