@@ -80,11 +80,8 @@ names its pull request.
   changes or a weight or metadata value changes by more than rounding, and lists a difference of
   rounding alone, such as the p-values of ICP and J-PCMCI+, as information. ([#1055])
 - `qa/identity.py --shuffle` maps UT-IGSP's learned targets back to the original columns, and
-  lists the column-order differences the column-order guide documents, ICA-LiNGAM's FastICA
-  solution and PCMCIplus's recorded `p_values` and `statistics`, as expected instead of failing.
-  The column-order table's note and the docstring of `pcmciplus` say that a removed link's p-value
-  and statistic come from the tests it had before one removed it, which follow which end of a
-  same-step pair is tested first; its links and graph do not change. ([#1120])
+  lists the column-order difference the column-order guide documents, ICA-LiNGAM's FastICA
+  solution, as expected instead of failing. ([#1120])
 - The Limitations of `notears` and `dagma` are one sentence: the result depends on the data's scale,
   after Reisach, Seiler and Weichwald (2021), with a link to the release card. The registry and the
   docstrings no longer say that the robust fit does not depend on the scale of the columns: its first
@@ -93,6 +90,9 @@ names its pull request.
 
 ### Fixed
 
+- `pcmciplus` returns the same `p_values`, `statistics`, and separating sets under any column
+  order: its skeleton phase tests a same-step pair first from the end of higher `tie_ranks`, orders
+  equal neighbor strengths by rank, and reads the variables in rank order. ([#PRNUM])
 - A column that holds both signs near the largest float no longer raises a `RuntimeWarning`
   in the check for constant columns, which compared a difference that overflowed; every
   method reads its data through that check. ([#1083])
