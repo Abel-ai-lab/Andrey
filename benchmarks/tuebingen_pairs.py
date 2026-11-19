@@ -176,11 +176,14 @@ def main(argv: list[str] | None = None) -> int:
     done = done_units(records)
     adapters = {name: make_solution(name) for name in args.solutions}
     versions = preflight(adapters)
-    # The selected pairs, so the summary counts a pair no fit reached as unfinished.
-    manifest = args.out / "pairs.json"
-    expected = json.loads(manifest.read_text()) if manifest.is_file() else {}
-    expected.update({q.name: q.weight for q in pairs})
-    manifest.write_text(json.dumps(dict(sorted(expected.items())), indent=1) + "\n")
+    # The selected pairs and solutions, so the summary counts a unit no fit reached as unfinished.
+    path = args.out / "manifest.json"
+    manifest = json.loads(path.read_text()) if path.is_file() else {"pairs": {}, "solutions": []}
+    manifest["pairs"] = dict(
+        sorted({**manifest["pairs"], **{q.name: q.weight for q in pairs}}.items())
+    )
+    manifest["solutions"] = sorted({*manifest["solutions"], *args.solutions})
+    path.write_text(json.dumps(manifest, indent=1) + "\n")
     # Largest pairs first, so a worker is not left with the slow fits at the end.
     tasks = [
         (q, name)
@@ -240,8 +243,14 @@ def main(argv: list[str] | None = None) -> int:
                 sink.write(json.dumps(record, default=str) + "\n")
             print(pair.name, name, record["status"], record.get("decision"), flush=True)
 
-    with ThreadPoolExecutor(max_workers=max(1, args.workers)) as pool:
+    pool = ThreadPoolExecutor(max_workers=max(1, args.workers))
+    try:
         list(pool.map(run, tasks))
+    except BaseException:
+        # An interrupt or a failed unit drops the queued fits instead of running them all first.
+        pool.shutdown(wait=False, cancel_futures=True)
+        raise
+    pool.shutdown()
     return 0
 
 
