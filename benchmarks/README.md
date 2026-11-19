@@ -195,7 +195,9 @@ QCCD runs at the paper's setting, `m = 3`, and, as a sensitivity row, at the wra
 `m = 7`.
 `load_dataset("tuebingen")` downloads the pairs from their original server, and
 `tuebingen_summary.py` turns the records of the runs into the weighted accuracy with a paired
-bootstrap interval, the coverage, and the time per pair.
+bootstrap interval, the coverage, and the time per pair. The `resit` arm reads its interpreter from
+`$ANDREY_BENCH_RESIT_PYTHON`; set it to `$ANDREY_BENCH_PYTHON` to measure the bench environment's
+build, as the other Andrey arms do.
 
 The missing-value lanes (`missing_cpu.py`) run two authors' codes that carry no license, unmodified
 and outside the package. Each script downloads its pinned commit, checks the archive's SHA-256, and

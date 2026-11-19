@@ -5,8 +5,8 @@ Reads ``records.jsonl`` and, where the driver wrote it, ``manifest.json`` (the p
 (pair, solution) units the run was asked for) from each run directory, and writes ``summary.md``
 and ``summary.json`` to ``--out``. For each solution it reports:
 
-- **coverage**: the pairs whose fit finished (``ok``), as a count and as the share of the pairs'
-  total weight. A timeout, a memory kill, an error, or a requested pair with no record is not an
+- **coverage**: the pairs whose fit finished (``ok``), out of the pairs the solution was asked to
+  run, and the weight of the finished pairs. A timeout, a memory kill, an error, or a requested pair with no record is not an
   answer: it is not scored as a guess and not counted in the accuracy, and the column says how much
   of the set the accuracy covers.
 - **accuracy**: the weighted share of finished pairs whose decision names the true direction, with
@@ -122,10 +122,14 @@ def summarize(
     ok = {m: np.zeros(len(pairs), dtype=bool) for m in methods}
     right = {m: np.zeros(len(pairs)) for m in methods}
     wall = {m: np.full(len(pairs), np.nan) for m in methods}
+    asked = {m: np.zeros(len(pairs), dtype=bool) for m in methods}
+    for p, m in units:
+        asked[m][index[p]] = True
     statuses: dict[str, dict[str, int]] = {m: {} for m in methods}
     undecided = {m: 0 for m in methods}
     for r in records:
         m, i = r["method"], index[r["pair"]]
+        asked[m][i] = True
         statuses[m][r["status"]] = statuses[m].get(r["status"], 0) + 1
         if r["status"] == "ok":
             ok[m][i] = True
@@ -162,6 +166,7 @@ def summarize(
         diff = boot(m, common) - boot(base, common)
         d_lo, d_hi = interval(diff)
         out["solutions"][m] = {
+            "requested": int(asked[m].sum()),
             "finished": int(done.sum()),
             "finished_weight": float(weight[done].sum()),
             "statuses": statuses[m],
@@ -203,7 +208,7 @@ def markdown(summary: dict, records: list[dict]) -> str:
         d = s["common_difference_from_first"]
         median = "-" if s["median_wall_s"] is None else f"{s['median_wall_s']:.2f}"
         lines.append(
-            f"| {m} | {s['finished']}/{summary['pairs']} | {s['finished_weight']:.3f} | "
+            f"| {m} | {s['finished']}/{s['requested']} | {s['finished_weight']:.3f} | "
             f"{s['undecided']} | {s['accuracy']:.3f} [{s['accuracy_ci'][0]:.3f}, {s['accuracy_ci'][1]:.3f}] | "
             f"{s['common_accuracy']:.3f} [{s['common_accuracy_ci'][0]:.3f}, {s['common_accuracy_ci'][1]:.3f}] | "
             f"{d[0]:+.3f} [{d[1]:+.3f}, {d[2]:+.3f}] | {median} | {s['total_wall_s']:.0f} |"

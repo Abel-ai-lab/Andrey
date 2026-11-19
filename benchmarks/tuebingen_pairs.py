@@ -19,9 +19,12 @@ state the hardware. A rerun skips the (pair, solution) units already there, and 
 when the records there were made with another build, parameters, caps, or runtime.
 ``tuebingen_summary.py`` turns the records of one or more runs into the table.
 
-    ANDREY_BENCH_PYTHON=... $ANDREY_BENCH_PYTHON benchmarks/tuebingen_pairs.py --prepare-only
-    ANDREY_BENCH_PYTHON=... $ANDREY_BENCH_PYTHON benchmarks/tuebingen_pairs.py --out outputs/tue-a \\
-        --pairs 1-20 --workers 8
+``resit`` runs its fits in the interpreter ``$ANDREY_BENCH_RESIT_PYTHON`` names, the build under
+test; the example sets it to the bench environment's, as the other Andrey arms use.
+
+    export ANDREY_BENCH_PYTHON=... ANDREY_BENCH_RESIT_PYTHON=$ANDREY_BENCH_PYTHON
+    $ANDREY_BENCH_PYTHON benchmarks/tuebingen_pairs.py --prepare-only
+    $ANDREY_BENCH_PYTHON benchmarks/tuebingen_pairs.py --out outputs/tue-a --pairs 1-20 --workers 8
 """
 
 from __future__ import annotations

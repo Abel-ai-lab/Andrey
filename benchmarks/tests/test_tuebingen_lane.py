@@ -66,6 +66,8 @@ def test_pooled_runs_count_no_unit_that_was_never_asked(tmp_path) -> None:
     )
     for method in ("anm", "qccd"):
         assert summary["solutions"][method]["statuses"] == {"ok": 1}
+        assert summary["solutions"][method]["requested"] == 1
+    assert "| anm | 1/1 |" in tuebingen_summary.markdown(summary, [])
 
 
 def test_a_run_with_no_fit_finished_yet_reads_as_every_unit_missing(tmp_path) -> None:
