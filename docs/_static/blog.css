@@ -39,6 +39,11 @@
   font-size: 0.95rem;
 }
 
+/* "Updated" and the date of a post's latest update stay on one line when the byline wraps. */
+.post-updated {
+  white-space: nowrap;
+}
+
 /* ---------- the blog's front page (docs/conf.py, _blog_index) ---------- */
 /* The Release cards page's blocks (benchmarks.css), with each post's art in place of the stipple
    ground: the newest post's cover across its block, above its TL;DR, and a small copy in each

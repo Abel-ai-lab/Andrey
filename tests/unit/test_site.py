@@ -6,6 +6,7 @@ The tests that fill the page's template need Jinja, from the docs group; without
 from __future__ import annotations
 
 import copy
+import datetime
 import html
 import importlib.util
 import json
@@ -1391,6 +1392,19 @@ def test_the_blog_lists_the_newest_post_first(conf):
     assert newest_first([*posts, ("blog/later", "2026-10-13", "")])[0] == "blog/later"
     assert newest_first([*posts, ("blog/same-day", "2026-10-12", "")])[2] == "blog/same-day"
     assert newest_first(posts[1::-1]) == newest_first(posts[:2])
+
+
+def test_a_post_shows_its_update_after_its_date_only_when_a_later_one_dates_it(conf):
+    app = types.SimpleNamespace(config=types.SimpleNamespace(post_date_format="%B %-d, %Y"))
+    first = datetime.datetime(2026, 10, 15)
+    post = types.SimpleNamespace(date=first, update=first)
+    date = '<time datetime="2026-10-15">October 15, 2026</time>'
+    assert conf["_post_days"](app, post) == date
+    post.update = datetime.datetime(2026, 11, 18)
+    assert conf["_post_days"](app, post) == (
+        f'{date} · <span class="post-updated">Updated '
+        '<time datetime="2026-11-18">November 18, 2026</time></span>'
+    )
 
 
 def test_the_hero_grain_is_small_and_the_same_on_every_build(cards):

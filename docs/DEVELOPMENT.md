@@ -189,9 +189,10 @@ leaves out; a dated post is published in every build, even before its date.
 The blog's front page lists the dated posts from their front matter (the `blog-index` directive in
 `blog/index.md`, filled by `_blog_index` in `conf.py`): the newest post with its cover, title,
 date, tags, and description, then the earlier ones, newest first, each with a small copy of its art
-(`thumb_jpeg` in `site/cards.py`). Newest means the latest date, a later version breaking a tie,
-and then the later file name, which starts with the date the post first appeared: of the posts a
-release updates, the one first published last leads. A new post needs no change to the page.
+(`thumb_jpeg` in `site/cards.py`). Newest means the latest date, a post's last update counting as
+its date, a later version breaking a tie, and then the later file name, which starts with the date
+the post first appeared: of the posts a release updates, the one first published last leads. A new
+post needs no change to the page.
 
 A post's cover is its art alone; an art with a centered version (`CENTERED` in `site/cards.py`)
 shows the version on its cover and thumbnail. Its link preview is the banner, the art with the
@@ -200,10 +201,13 @@ its `version` front matter, and later builds leave it as that release rendered i
 typed text, and every file it includes is stored under `blog/<version>/`.
 
 When a later release makes a feature post wrong or incomplete, the post is rewritten to describe
-that release, and its `version` and `date` move to it (the release PR sets the final date). Its
-file name and address stay. Its files move to the new release's folder, named apart from any other
-post's files there, and an example is run again on the new release. A number the new release did
-not measure names the release that did, such as "in the 0.4.0 benchmarks".
+that release, and its `version` moves to it. Its `date` stays the day it first appeared, and a
+fenced `{update}` block under the introduction, above the earlier ones, gives the release's date and
+one or two plain sentences on what it added (the release PR sets the final date). ABlog takes the
+post's update date from its latest block, which the byline, the blog's listings, the navbar's dot,
+and the feed read. Its file name and address stay. Its files move to the new release's folder, named
+apart from any other post's files there, and an example is run again on the new release. A number
+the new release did not measure names the release that did, such as "in the 0.4.0 benchmarks".
 
 Every post states how AI tools were used to write it. Its front matter sets `ai`, and `ai_tools`
 (each tool, and its model or version when the author knows it) unless `ai` is `none`; each value
