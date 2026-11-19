@@ -27,6 +27,7 @@ estimators, a quantile forest and a quantile neural network, are not run.
 
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
 from typing import Any, Mapping
@@ -78,6 +79,19 @@ def code_dir() -> Path:
     return root
 
 
+def source_sha256() -> str:
+    """The SHA-256 of the files :data:`REQUIRED_FILES` names, as read now, so a record names the code
+    that ran even if the folder changed after setup; ``unknown`` when they are missing."""
+    root = Path(os.environ.get(CODE_ENV, "").strip())
+    digest = hashlib.sha256()
+    for name in REQUIRED_FILES:
+        path = root / name
+        if not path.is_file():
+            return "unknown"
+        digest.update(name.encode() + b"\0" + path.read_bytes())
+    return digest.hexdigest()
+
+
 class TagasovskaQCCD(RAdapter):
     """The authors' R implementation of QCCD through the embedded R session.
 
@@ -115,6 +129,7 @@ class TagasovskaQCCD(RAdapter):
         """The wrapper's arguments and the versions fits ran with."""
         return {
             "commit": COMMIT,
+            "source_sha256": source_sha256(),
             "type": "QCCD",
             "m": self.levels,
             "rvinecopulib": rsession.package_version("rvinecopulib"),

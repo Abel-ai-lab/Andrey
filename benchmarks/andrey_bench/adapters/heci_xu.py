@@ -24,6 +24,7 @@ through.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import os
 from pathlib import Path
@@ -57,6 +58,19 @@ def code_dir() -> Path:
     if missing:
         raise SystemExit(f"${CODE_ENV}={raw!r} lacks {', '.join(missing)}")
     return root
+
+
+def source_sha256() -> str:
+    """The SHA-256 of the files :data:`REQUIRED_FILES` names, as read now, so a record names the code
+    that ran even if the folder changed after setup; ``unknown`` when they are missing."""
+    root = Path(os.environ.get(CODE_ENV, "").strip())
+    digest = hashlib.sha256()
+    for name in REQUIRED_FILES:
+        path = root / name
+        if not path.is_file():
+            return "unknown"
+        digest.update(name.encode() + b"\0" + path.read_bytes())
+    return digest.hexdigest()
 
 
 def archive_sha256() -> str:
@@ -124,7 +138,12 @@ class XuHECI:
 
     def params(self) -> dict[str, Any]:
         """The two arguments the adapter passes, the code's defaults, and the archive checksum."""
-        return {"archive_sha256": archive_sha256(), "n_bins": 20, "standardize": False}
+        return {
+            "archive_sha256": archive_sha256(),
+            "source_sha256": source_sha256(),
+            "n_bins": 20,
+            "standardize": False,
+        }
 
     def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
         """Run the authors' HECI; return the 0/1 DAG adjacency. The only timed region."""

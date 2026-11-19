@@ -36,6 +36,7 @@ itself and stops when the library path loads another ``RANN``.
 
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
 from typing import Any, Mapping
@@ -112,6 +113,19 @@ def code_dir() -> Path:
     return root
 
 
+def source_sha256() -> str:
+    """The SHA-256 of the files :data:`REQUIRED_FILES` names, as read now, so a record names the code
+    that ran even if the folder changed after setup; ``unknown`` when they are missing."""
+    root = Path(os.environ.get(CODE_ENV, "").strip())
+    digest = hashlib.sha256()
+    for name in REQUIRED_FILES:
+        path = root / name
+        if not path.is_file():
+            return "unknown"
+        digest.update(name.encode() + b"\0" + path.read_bytes())
+    return digest.hexdigest()
+
+
 class StroblGRCI(RAdapter):
     """The authors' R implementation of GRCI's pair direction through the embedded R session.
 
@@ -145,6 +159,7 @@ class StroblGRCI(RAdapter):
         """The seed the wrapper sets and the versions fits ran with; the code has no arguments."""
         return {
             "commit": COMMIT,
+            "source_sha256": source_sha256(),
             "seed": 0,
             "RANN": rsession.package_version("RANN"),
             "Rfast": rsession.package_version("Rfast"),
