@@ -168,8 +168,7 @@ def test_a_partial_correlation_matches_the_test_on_its_block_on_random_gaps(name
                 at = {c: i for i, c in enumerate(columns)}
                 block = _block(x, columns)
                 if len(block) < size + 3:
-                    with pytest.raises(ValueError, match="needs at least"):
-                        test.statistic_pvalue(a, b, cond)
+                    assert np.isnan(test.statistic_pvalue(a, b, cond)).all()  # not tested
                     continue
                 alone = make_indep_test(name, block)
                 want_r, want_p = alone.statistic_pvalue(at[a], at[b], [at[c] for c in cond])
@@ -310,18 +309,22 @@ def _advises_more_rows(error) -> None:
 @pytest.mark.parametrize(
     ("name", "size"), [*((name, size) for name in PARTIAL for size in (1, 2)), ("chisq", 1)]
 )
-def test_a_test_with_too_few_rows_raises_naming_its_minimum(name, size):
+def test_a_test_with_too_few_rows_is_not_tested_and_counted(name, size):
     """A partial-correlation test needs ``|S| + 3`` rows, the rows of its degrees of freedom."""
     make, _ = TESTS[name]
     least = size + 3 if name in PARTIAL else 2
     x = make()[:40]
     x[least - 1 :, 0] = np.nan  # column 0 observed on least - 1 rows
     test = make_indep_test(name, x)
-    with pytest.raises(
-        ValueError, match=rf"on the {least - 1} rows .* needs at least {least}"
-    ) as error:
-        test(0, 1, list(range(2, 2 + size)))
-    _advises_more_rows(error)
+    with rows_tested() as rows:
+        assert np.isnan(test(0, 1, list(range(2, 2 + size))))
+    assert test.least_rows(size) == least
+    assert rows.not_tested == {(0, 1): 1} and not rows  # counted apart, reading no rows
+    assert rows_metadata(rows, 0.05) == {
+        "rows_tested": {"min": 0, "median": 0},
+        "not_tested": 1,
+        "undecided_pairs": [[0, 1]],
+    }
     x[least - 1, 0] = 1.0  # one row more: the test runs
     assert 0.0 <= make_indep_test(name, x)(0, 1, list(range(2, 2 + size))) <= 1.0
 

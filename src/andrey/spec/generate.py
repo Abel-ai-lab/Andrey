@@ -583,7 +583,11 @@ def render_skill() -> str:
         "reading the rows observed in all of its variables. `metadata.rows_tested` gives the "
         "fewest (`min`) and the median rows a test read, `metadata.missing` the handling, and "
         "`metadata.p_one_tests`, present when it is not zero, the number of tests that returned "
-        "p = 1, whichever test it is; a test with zero degrees of freedom answers so. A fit "
+        "p = 1, whichever test it is; a test with zero degrees of freedom answers so. A test with "
+        "fewer rows than it needs is not tested: it never separates a pair and never confirms a "
+        "link. `metadata.not_tested` counts those tests, `metadata.undecided_pairs` lists the "
+        "pairs one of them might have separated, and `metadata.never_observed_together` the pairs "
+        "of columns no row observes together. A fit "
         "that runs the deletion under `null` logs one notice per process that names it. They are "
         + ", ".join(f"`{s.name}`" for s in REGISTRY.values() if s.data.missing)
         + f". {TESTWISE_CLAIM} The searches whose fit "

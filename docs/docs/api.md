@@ -113,7 +113,11 @@ correct. Their argument `missing` names the handling: `"testwise"` is test-wise 
 `None`, the default, picks the method's default handling, `"testwise"`, and logs one notice per
 process that names it; `metadata["missing"]` records the one a fit used. A test with zero degrees of
 freedom returns a p-value of 1, and `metadata["p_one_tests"]`, present when it is not zero, counts
-every test of the fit that returned a p-value of 1, whichever test it is. `pc` also takes
+every test of the fit that returned a p-value of 1, whichever test it is. A test with fewer rows
+than it needs is not tested: it never separates a pair and never confirms a link.
+`metadata["not_tested"]` counts those tests, `metadata["undecided_pairs"]` lists the pairs one of
+them might have separated, and `metadata["never_observed_together"]` the pairs of columns no row
+observes together. `pc` also takes
 `missing="mvpc"`: Missing-Value PC (Tu et al., 2019) finds the parents of each missingness indicator
 and tests again the edges they could have kept; `metadata["corrected_edges"]["rows_tested"]` gives
 the fewest and the median rows such a test read.

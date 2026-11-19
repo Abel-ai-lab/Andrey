@@ -3677,7 +3677,17 @@ for _name, _spec in REGISTRY.items():
         ),
         *(("tie_break",) if _spec.tie_break else ()),
         *(("categorical",) if "categorical" in _concepts else ()),
-        *(("rows_tested", "p_one_tests") if _spec.data.missing else ()),
+        *(
+            (
+                "rows_tested",
+                "p_one_tests",
+                "not_tested",
+                "undecided_pairs",
+                "never_observed_together",
+            )
+            if _spec.data.missing
+            else ()
+        ),
         *(("missing",) if "missing" in _concepts else ()),
         *(("em",) if _name in EM_METHODS else ()),
         *(("ambiguous_triples",) if "collider_rule" in _concepts else ()),

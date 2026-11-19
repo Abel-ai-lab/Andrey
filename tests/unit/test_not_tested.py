@@ -1,0 +1,154 @@
+"""A test-wise query without the rows its test needs is not tested, in every search family.
+
+The fixed case is a merged-cohort table: one cohort observes ``{S1, S2, S3, A}``, another
+``{S1, S2, S3, B}``, and ``k`` rows observe every column. The truth is ``S2 -> S1``, ``S1 -> A``,
+``S1 -> B``, ``S1 -> S3``, so ``A`` and ``B`` are separated by ``{S1}`` only on the ``k`` rows.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+import pytest
+
+import andrey
+from andrey.core import ARROW
+
+COHORT = 300
+
+
+def _cohorts(k: int, seed: int = 0) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    n = 2 * COHORT + k
+    s2 = rng.normal(size=n)
+    s1 = 0.8 * s2 + rng.normal(size=n)
+    df = pd.DataFrame(
+        {
+            "S1": s1,
+            "S2": s2,
+            "S3": 0.7 * s1 + rng.normal(size=n),
+            "A": 0.9 * s1 + rng.normal(size=n),
+            "B": -0.9 * s1 + rng.normal(size=n),
+        }
+    )
+    df.loc[: COHORT - 1, "B"] = np.nan  # cohort 1 never measures B
+    df.loc[COHORT : 2 * COHORT - 1, "A"] = np.nan  # cohort 2 never measures A
+    return df
+
+
+def _series(k: int, seed: int = 0, steps: int = 400) -> pd.DataFrame:
+    """A VAR(1) series: A observed in the first half, B in the second, A also at k steps there."""
+    rng = np.random.default_rng(seed)
+    x = np.zeros((steps, 4))
+    for t in range(1, steps):
+        e = rng.normal(size=4)
+        s1 = 0.5 * x[t - 1, 0] + e[0]
+        x[t] = (
+            s1,
+            0.5 * x[t - 1, 1] + 0.4 * s1 + e[1],
+            0.6 * x[t - 1, 0] + 0.3 * x[t - 1, 2] + e[2],
+            0.6 * x[t - 1, 0] + 0.3 * x[t - 1, 3] + e[3],
+        )
+    df = pd.DataFrame(x, columns=["S1", "S2", "A", "B"])
+    half = steps // 2
+    df.loc[half:, "A"] = np.nan
+    df.loc[: half + 1, "B"] = np.nan
+    for j in range(k):
+        df.loc[half + 20 + 10 * j, "A"] = x[half + 20 + 10 * j, 2]
+    return df
+
+
+def _env(df: pd.DataFrame) -> np.ndarray:
+    """An environment that varies inside every cohort, so no block holds it constant."""
+    return np.arange(len(df)) % 2
+
+
+TABLE_METHODS = {
+    "pc": lambda df: andrey.pc(df),
+    "pc_student_t": lambda df: andrey.pc(df, indep_test="student_t"),
+    "pc_normal_scores": lambda df: andrey.pc(df, indep_test="normal_scores"),
+    "pc_mvpc": lambda df: andrey.pc(df, missing="mvpc"),
+    "fci": lambda df: andrey.fci(df),
+    "fci_fast": lambda df: andrey.fci(df, possible_dsep="fast"),
+    "cdnod": lambda df: andrey.cdnod(df, _env(df)),
+    "fci_jci": lambda df: andrey.fci_jci(df, _env(df)),
+    "iamb": lambda df: andrey.iamb(df),
+    "inter_iamb": lambda df: andrey.inter_iamb(df),
+    "mmpc": lambda df: andrey.mmpc(df),
+}
+SKELETON = ("pc", "pc_student_t", "pc_normal_scores", "pc_mvpc", "fci", "fci_fast", "cdnod")
+SERIES_METHODS = {
+    "pcmci": lambda df: andrey.pcmci(df, tau_max=1),
+    "pcmciplus": lambda df: andrey.pcmciplus(df, tau_max=1),
+    "lpcmci": lambda df: andrey.lpcmci(df, tau_max=1),
+}
+
+
+def _adjacent(out, a: str, b: str) -> bool:
+    labels = list(out.structure.labels)
+    return bool(out.structure.adjacency[labels.index(a), labels.index(b)])
+
+
+@pytest.mark.parametrize("k", [0, 1, 2, 3])
+@pytest.mark.parametrize("name", list(TABLE_METHODS))
+def test_every_table_method_runs_when_a_pair_shares_few_or_no_rows(name, k):
+    out = TABLE_METHODS[name](_cohorts(k))
+    assert out.metadata["missing"] in ("testwise", "mvpc")
+    if k == 0:
+        assert out.metadata["never_observed_together"] == [["A", "B"]]
+        assert ["A", "B"] in out.metadata["undecided_pairs"]
+        assert out.metadata["not_tested"] > 0
+    else:
+        assert "never_observed_together" not in out.metadata
+
+
+@pytest.mark.parametrize("name", SKELETON)
+def test_a_pair_never_observed_together_stays_adjacent_and_keeps_the_true_edges(name):
+    out = TABLE_METHODS[name](_cohorts(0))
+    for a, b in (("A", "B"), ("A", "S1"), ("B", "S1")):
+        assert _adjacent(out, a, b), (a, b)
+
+
+@pytest.mark.parametrize("name", list(TABLE_METHODS))
+def test_no_collider_rests_on_a_pair_never_observed_together(name):
+    out = TABLE_METHODS[name](_cohorts(0))
+    if not _adjacent(out, "A", "B") and _adjacent(out, "A", "S1") and _adjacent(out, "B", "S1"):
+        into = [out.structure.endpoints(v, "S1")[1] == ARROW for v in ("A", "B")]
+        assert not all(into)
+
+
+@pytest.mark.parametrize("k", [0, 1, 2, 3])
+@pytest.mark.parametrize("name", list(SERIES_METHODS))
+def test_a_link_between_columns_never_observed_together_is_undecided_not_found(name, k):
+    out = SERIES_METHODS[name](_series(k))
+    assert out.metadata["missing"] == "testwise"
+    if k == 0:
+        assert out.metadata["never_observed_together"] == [["A", "B"]]
+        undecided = out.metadata["undecided_pairs"]
+        assert ["A at lag 1", "B"] in undecided or ["A", "B at lag 1"] in undecided
+        p = np.asarray(out.metadata["p_values"], dtype=np.float64)
+        labels = list(out.structure.labels)
+        a, b = labels.index("A"), labels.index("B")
+        assert not (p[..., a, b] <= 0.05).any() and not (p[..., b, a] <= 0.05).any()
+
+
+@pytest.mark.parametrize("name", ["pc", "fci", "iamb", "mmpc"])
+def test_row_and_column_order_change_neither_the_graph_nor_the_metadata(name):
+    df = _cohorts(0)
+    out = TABLE_METHODS[name](df)
+    rows = TABLE_METHODS[name](df.sample(frac=1.0, random_state=1).reset_index(drop=True))
+    columns = TABLE_METHODS[name](df[["B", "S3", "A", "S2", "S1"]])
+    for other in (rows, columns):
+        order = [list(other.structure.labels).index(v) for v in out.structure.labels]
+        moved = np.asarray(other.structure.adjacency)[np.ix_(order, order)]
+        assert np.array_equal(moved, out.structure.adjacency)
+        for key in ("undecided_pairs", "never_observed_together", "not_tested"):
+            assert other.metadata[key] == out.metadata[key], key
+
+
+def test_markov_check_leaves_facts_not_tested_out_of_the_uniformity_test():
+    df = _cohorts(1)
+    dag = andrey.pc(df.fillna(0.0))
+    out = andrey.markov_check(dag, df, seed=0)
+    p = np.asarray(out.p_values, dtype=np.float64)
+    assert np.isnan(p).sum() == out.metadata["not_tested"]
