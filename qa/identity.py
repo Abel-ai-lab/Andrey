@@ -550,7 +550,8 @@ def unpermute(out: Any, order: np.ndarray) -> Any:
     original column: the graphs, the time series's weights, the causal order, the edge weights,
     and the metadata in :data:`LAG_MATRICES`. Hidden nodes after the observed ones keep their
     places, a swapped pair's :data:`DIRECTIONS` trade places, ICP's target and its metadata in
-    :data:`PER_VARIABLE` move back, and the metadata in :data:`NODE_LISTS` is left out."""
+    :data:`PER_VARIABLE` move back, UT-IGSP's targets move back with each setting's list sorted
+    again, and the metadata in :data:`NODE_LISTS` is left out."""
     if isinstance(out, list):
         return [unpermute(o, order) for o in out]
     order = np.concatenate([order, np.arange(len(order), out.structure.n_nodes)])
@@ -566,6 +567,8 @@ def unpermute(out: Any, order: np.ndarray) -> Any:
             value = int(order[value])
         elif icp and key in PER_VARIABLE:
             value = None if value is None else [value[i] for i in back]
+        elif key == "targets" and isinstance(value, Mapping):
+            value = {label: sorted(int(order[t]) for t in found) for label, found in value.items()}
         elif isinstance(value, Mapping) and set(value) == set(DIRECTIONS):
             forward, backward = DIRECTIONS
             value = {forward: value[backward], backward: value[forward]} if swapped else value
@@ -907,8 +910,20 @@ STRUCTURE = ("graph", "kind", "edges", "ordering")
 #: marks, or causal order; ``"bits"``, only different bits in a refit on workers; ``"values"``,
 #: edge weights or metadata values of a column-order refit that differ by more than rounding;
 #: ``"digits"``, edge weights or metadata values of a column-order refit that differ by rounding
-#: only. The last does not fail the check.
+#: only; ``"documented"``, a column-order difference the column-order guide documents
+#: (:data:`DOCUMENTED`). The last two do not fail the check.
 FAILING = ("graph", "structure", "bits", "values")
+#: The column-order differences the column-order guide documents, by method: the parts of an output
+#: (:func:`parts`) a column order may change, ``None`` for any, and why. A column-order refit that
+#: differs only in those parts is expected.
+DOCUMENTED: dict[str, tuple[frozenset[str] | None, str]] = {
+    "ICA-LiNGAM": (None, "FastICA can reach another solution under a new column order"),
+    "PCMCIplus": (
+        frozenset({"metadata.p_values", "metadata.statistics"}),
+        "the graph is order-free; a link's recorded p-value is the one of the test that separated "
+        "it, whose conditioning set depends on the order",
+    ),
+}
 #: The relative and absolute differences that count as rounding between two values.
 RTOL, ATOL = 1e-6, 1e-12
 
@@ -980,6 +995,13 @@ def classify(first: Any, refit: Any, *, column_order: bool) -> tuple[str, list[s
     return ("digits" if _rounded(first, refit) else "values"), changed
 
 
+def documented(method: str, changed: list[str]) -> str | None:
+    """Return why a column-order refit of ``method`` that differs in the parts ``changed`` is
+    expected (:data:`DOCUMENTED`), or ``None`` when it is not."""
+    allowed, reason = DOCUMENTED.get(method, (frozenset(), ""))
+    return reason if allowed is None or (changed and set(changed) <= allowed) else None
+
+
 def run(
     methods: list[str], seeds: int, shuffle: int = 0, workers: int = 1
 ) -> tuple[list[dict], list[tuple[str, str]]]:
@@ -1028,7 +1050,10 @@ def run(
                 rows.append(row(method, dataset, seed, permutation, n_workers, refit))
                 if found := classify(first, refit, column_order=permutation > 0):
                     kind, changed = found
-                    findings.append((kind, f"{_label(rows[-1])}: {', '.join(changed)}"))
+                    line = f"{_label(rows[-1])}: {', '.join(changed)}"
+                    if kind in FAILING and permutation > 0 and (why := documented(method, changed)):
+                        kind, line = "documented", f"{line} ({why})"
+                    findings.append((kind, line))
     return rows, findings
 
 
@@ -1162,6 +1187,7 @@ LABELS = {
     "bits": "only bits differ",
     "values": "weights or metadata differ by more than rounding",
     "digits": "weights or metadata differ by rounding only (not a failure)",
+    "documented": "differs as the column-order guide documents (not a failure)",
 }
 
 
@@ -1196,7 +1222,8 @@ def main(argv: list[str] | None = None) -> int:
         f"\n{len(rows)} fits hashed. Of {refits} refits, {count['graph']} have a different graph, "
         f"{count['structure']} a different structure, {count['values']} different values, and "
         f"{count['bits']} only different bits; {count['digits']} differ only by rounding in their "
-        "weights or metadata under a column order, which does not fail the check."
+        "weights or metadata under a column order, which does not fail the check, and "
+        f"{count['documented']} differ as the column-order guide documents, which does not either."
     )
     return 1 if any(kind in FAILING for kind, _ in findings) else 0
 
