@@ -327,9 +327,9 @@ class WGCM(_RegressionTest):
     Raises
     ------
     ValueError
-        If ``data`` is not 2-D, has fewer than 4 rows, contains NaN or infinity, or has values too
-        large or too small to standardize, or ``variant`` or ``regression`` is not one of the
-        choices.
+        If ``data`` is not 2-D, has fewer than 14 rows (4 for ``"fix"``), contains NaN or
+        infinity, or has values too large or too small to standardize, or ``variant`` or
+        ``regression`` is not one of the choices.
 
     Notes
     -----
@@ -379,7 +379,9 @@ class WGCM(_RegressionTest):
     ) -> None:
         if variant not in WGCM_VARIANTS:
             raise ValueError(f"variant must be one of {WGCM_VARIANTS}, got {variant!r}")
-        super().__init__(data, regression=regression, seed=seed, name="wGCM")
+        # "est" needs the rows a forest splits in its 30% part: ceil(0.3 n) >= 5.
+        min_rows = 14 if variant == "est" else 4
+        super().__init__(data, regression=regression, seed=seed, name="wGCM", min_rows=min_rows)
         self._variant = variant
         n = self._n
         n_estimate = int(np.ceil(_WEIGHT_FRACTION * n))

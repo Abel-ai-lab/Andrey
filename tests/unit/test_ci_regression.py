@@ -82,6 +82,13 @@ def test_pcm_needs_rows_for_a_split_in_each_half():
     assert 0.0 <= cr.PCM(_chain(10), n_splits=1)(0, 1, []) <= 1.0
 
 
+def test_wgcm_est_needs_rows_for_a_split_in_its_estimation_part():
+    with pytest.raises(ValueError, match="14"):
+        cr.WGCM(_chain(13))
+    assert 0.0 <= cr.WGCM(_chain(14), regression="linear")(0, 1, [2]) <= 1.0
+    assert 0.0 <= cr.WGCM(_chain(4), regression="linear", variant="fix")(0, 1, [2]) <= 1.0
+
+
 def test_one_sided_statistics_report_zero_below_the_null():
     statistic, p = cr._estimated_answer(np.array([1.0, -2.0, -1.0, 0.5]), np.ones(4))
     assert statistic == 0.0
