@@ -96,5 +96,5 @@ Rscript --vanilla -e '
 
 printf 'export ANDREY_BENCH_GRCI=%q\n' "$CODE"
 echo "module load $R_MODULE"
-printf 'export R_LIBS_USER=%q\n' "$R_LIBS"
+printf 'export R_LIBS_USER=%q${R_LIBS_USER:+:$R_LIBS_USER}\n' "$R_LIBS"
 echo ">> done"

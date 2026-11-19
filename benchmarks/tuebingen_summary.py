@@ -36,18 +36,18 @@ RESAMPLES = 10_000
 LEVEL = 0.95
 
 
-def read_manifest(runs: list[Path]) -> tuple[dict[str, float], list[str]]:
-    """The pairs (``{pair: weight}``) and solutions the runs were asked for, from each run's
-    ``manifest.json``."""
+def read_manifest(runs: list[Path]) -> tuple[dict[str, float], set[tuple[str, str]]]:
+    """The pairs (``{pair: weight}``) and the ``(pair, solution)`` units the runs were asked for,
+    from each run's ``manifest.json``: each run asks for its own pairs times its own solutions."""
     pairs: dict[str, float] = {}
-    solutions: set[str] = set()
+    units: set[tuple[str, str]] = set()
     for run in runs:
         path = run / "manifest.json"
         if path.is_file():
             manifest = json.loads(path.read_text())
             pairs.update(manifest["pairs"])
-            solutions.update(manifest["solutions"])
-    return pairs, sorted(solutions)
+            units.update((p, m) for p in manifest["pairs"] for m in manifest["solutions"])
+    return pairs, units
 
 
 def read_records(runs: list[Path]) -> list[dict]:
@@ -59,7 +59,9 @@ def read_records(runs: list[Path]) -> list[dict]:
     units: dict[tuple[str, str], dict] = {}
     identity: dict[str, tuple] = {}
     for run in runs:
-        for line in (run / "records.jsonl").read_text().splitlines():
+        path = run / "records.jsonl"
+        # A run stopped before its first fit finished has a manifest and no records yet.
+        for line in path.read_text().splitlines() if path.is_file() else []:
             record = json.loads(line)
             unit = (record["pair"], record["method"])
             if unit in units:
@@ -91,19 +93,20 @@ def interval(draws: np.ndarray) -> tuple[float, float]:
 def summarize(
     records: list[dict],
     expected: dict[str, float] | None = None,
-    solutions: list[str] | None = None,
+    units: set[tuple[str, str]] | None = None,
     seed: int = 0,
 ) -> dict:
     """The tables of the module docstring as a dict, from the fit records.
 
-    ``expected`` (``{pair: weight}``) and ``solutions`` add the pairs and solutions a run was asked
-    for: a unit with no record counts as ``missing``, unfinished.
+    ``expected`` (``{pair: weight}``) and ``units`` (``(pair, solution)``) add what the runs were
+    asked for: a requested unit with no record counts as ``missing``, unfinished.
     """
     weights = dict(expected or {})
     weights.update({r["pair"]: r["weight"] for r in records})
     pairs = sorted(weights)
     weight = np.array([weights[p] for p in pairs])
-    seen = {r["method"] for r in records} | set(solutions or ())
+    units = units or set()
+    seen = {r["method"] for r in records} | {m for _, m in units}
     methods = [m for m in METHOD_ORDER if m in seen] + sorted(seen - set(METHOD_ORDER))
     index = {p: i for i, p in enumerate(pairs)}
     ok = {m: np.zeros(len(pairs), dtype=bool) for m in methods}
@@ -119,10 +122,9 @@ def summarize(
             right[m][i] = float(bool(r.get("correct")))
             wall[m][i] = r["wall_s"]
             undecided[m] += r.get("decision") in ("none", "other")
-    for m in methods:
-        missing = len(pairs) - sum(statuses[m].values())
-        if missing:
-            statuses[m]["missing"] = missing
+    recorded = {(r["pair"], r["method"]) for r in records}
+    for _, m in units - recorded:
+        statuses[m]["missing"] = statuses[m].get("missing", 0) + 1
     rng = np.random.default_rng(seed)
     draws = rng.integers(0, len(pairs), size=(RESAMPLES, len(pairs)))
     common = np.logical_and.reduce([ok[m] for m in methods])
