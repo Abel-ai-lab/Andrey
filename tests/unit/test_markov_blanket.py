@@ -185,9 +185,9 @@ def test_a_non_collider_stops_at_its_first_separating_chunk(monkeypatch, kind, f
     tested = []
     weakest = blanket._weakest
 
-    def counted(test, target, xs, conds):
+    def counted(test, target, xs, conds, *args, **kwargs):
         tested.append(len(conds))
-        return weakest(test, target, xs, conds)
+        return weakest(test, target, xs, conds, *args, **kwargs)
 
     monkeypatch.setattr(blanket, "_weakest", counted)
     with rows_tested() as rows:
