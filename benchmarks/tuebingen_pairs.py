@@ -142,7 +142,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.out is None:
         p.error("--out is required unless --prepare-only")
     wanted = parse_pairs(args.pairs)
-    # One column per side; weight 0 is the collection's own exclusion from averages.
+    # One column per side: the six multivariate pairs (52 to 55, 71, 105) are left out.
     pairs = [q for q in collection if not q.multivariate and int(q.name[4:]) in wanted]
     args.out.mkdir(parents=True, exist_ok=True)
     records = args.out / "records.jsonl"
