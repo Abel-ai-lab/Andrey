@@ -12,7 +12,8 @@
 # of the file a fit sources are checked. The script writes the code and the R library under
 # `$ANDREY_BENCH_QCCD_DIR` (default `benchmarks/.qccd`); export what it prints before running the
 # solution. The library is its own (`$ANDREY_BENCH_QCCD_R_LIBS`, default `$DIR/rlib`) so it neither
-# changes nor depends on the R lane's: join the libraries with a colon when one job loads several.
+# changes nor depends on the R lane's; the printed export puts it in front of the `R_LIBS_USER`
+# already set, so one shell can evaluate the exports of several setup scripts.
 
 set -euo pipefail
 

@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 """Summarize ``tuebingen_pairs.py`` runs: weighted accuracy with an interval, coverage, and time.
 
-Reads ``records.jsonl`` and, where the driver wrote it, ``manifest.json`` (the pairs and solutions
-the run was asked for) from each run directory, and writes ``summary.md`` and ``summary.json`` to ``--out``. For each
-solution it reports:
+Reads ``records.jsonl`` and, where the driver wrote it, ``manifest.json`` (the pairs and the
+(pair, solution) units the run was asked for) from each run directory, and writes ``summary.md``
+and ``summary.json`` to ``--out``. For each solution it reports:
 
 - **coverage**: the pairs whose fit finished (``ok``), as a count and as the share of the pairs'
-  total weight. A timeout, a memory kill, an error, or a pair with no record is not an answer: it is not scored as a guess
-  and not counted in the accuracy, and the column says how much of the set the accuracy covers.
+  total weight. A timeout, a memory kill, an error, or a requested pair with no record is not an
+  answer: it is not scored as a guess and not counted in the accuracy, and the column says how much
+  of the set the accuracy covers.
 - **accuracy**: the weighted share of finished pairs whose decision names the true direction, with
   the collection's weights; a finished fit with no edge counts as wrong, and ``undecided`` counts
   them. The interval is a percentile bootstrap over pairs: the same resamples of the pair set for
@@ -38,7 +39,7 @@ LEVEL = 0.95
 
 def read_manifest(runs: list[Path]) -> tuple[dict[str, float], set[tuple[str, str]]]:
     """The pairs (``{pair: weight}``) and the ``(pair, solution)`` units the runs were asked for,
-    from each run's ``manifest.json``: each run asks for its own pairs times its own solutions."""
+    from each run's ``manifest.json``, each unit as the driver recorded it."""
     pairs: dict[str, float] = {}
     units: set[tuple[str, str]] = set()
     for run in runs:
@@ -46,7 +47,7 @@ def read_manifest(runs: list[Path]) -> tuple[dict[str, float], set[tuple[str, st
         if path.is_file():
             manifest = json.loads(path.read_text())
             pairs.update(manifest["pairs"])
-            units.update((p, m) for p in manifest["pairs"] for m in manifest["solutions"])
+            units.update((p, m) for p, m in manifest["units"])
     return pairs, units
 
 
@@ -60,6 +61,8 @@ def read_records(runs: list[Path]) -> list[dict]:
     identity: dict[str, tuple] = {}
     for run in runs:
         path = run / "records.jsonl"
+        if not path.is_file() and not (run / "manifest.json").is_file():
+            raise SystemExit(f"{run} holds neither records.jsonl nor manifest.json")
         # A run stopped before its first fit finished has a manifest and no records yet.
         for line in path.read_text().splitlines() if path.is_file() else []:
             record = json.loads(line)

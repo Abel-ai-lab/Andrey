@@ -16,7 +16,8 @@
 # The repository bundles `RANN-master.zip`, the nearest-neighbor package its README tells the reader
 # to install before GRCI, so that is what the script installs, from the zip, in place of CRAN's
 # RANN. The library is its own (`$ANDREY_BENCH_GRCI_R_LIBS`, default `$DIR/rlib`) so that package
-# never reaches the R lane's: join the libraries with a colon when one job loads several.
+# never reaches the R lane's. The printed export puts it in front of the `R_LIBS_USER` already set:
+# evaluate this script's exports after the other setup scripts', so its RANN is the one R finds.
 
 set -euo pipefail
 

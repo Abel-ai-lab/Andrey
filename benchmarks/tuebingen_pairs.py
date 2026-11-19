@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 """Run the pairwise methods and the authors' code of QCCD, HECI, and GRCI on the Tuebingen pairs.
 
-``andrey.load_dataset("tuebingen")`` gives the cause-effect pairs of Mooij et al. (2016). The lane
-runs every solution (:data:`SOLUTIONS`; ``--solutions`` picks some) on each pair that has one column
-per side, in a forced decision: ``x -> y``, ``y -> x``, or no decision. Andrey's ``anm``, ``pnl``,
-``loci`` (both criteria), and ``resit`` are the Andrey arms; ``qccd`` (the paper's ``m = 3``),
-``qccd_m7`` (the wrapper's default ``m = 7``), ``heci``, and ``grci`` are the authors' code, each
-unmodified and read from the directory an environment variable names (each
+``andrey.data.load_dataset("tuebingen")`` gives the cause-effect pairs of Mooij et al. (2016). The
+lane runs every solution (:data:`SOLUTIONS`; ``--solutions`` picks some) on each pair that has one
+column per side, in a forced decision: ``x -> y``, ``y -> x``, or no decision. Andrey's ``anm``,
+``pnl``, ``loci`` (both criteria), and ``resit`` are the Andrey arms; ``qccd`` (the paper's
+``m = 3``), ``qccd_m7`` (the wrapper's default ``m = 7``), ``heci``, and ``grci`` are the authors'
+code, each unmodified and read from the directory an environment variable names (each
 ``benchmarks/start_<name>.sh`` downloads it and prints the export). Nothing of the authors' code is
 copied into this repository, and GRCI's license (CC BY-NC 4.0) limits it to benchmark runs from a
 local download.
@@ -141,6 +141,22 @@ def done_units(path: Path) -> set[tuple[str, str]]:
     return units
 
 
+def update_manifest(path: Path, pairs: dict[str, float], solutions: list[str]) -> None:
+    """Add the run's pairs (``{pair: weight}``) and its ``(pair, solution)`` units to ``path``.
+
+    The summary counts a requested unit that no fit reached as unfinished. The units are kept as
+    asked, never as all pairs times all solutions, so a rerun into the same directory with other
+    pairs or solutions requests only what it asked for.
+    """
+    manifest = json.loads(path.read_text()) if path.is_file() else {"pairs": {}, "units": []}
+    units = {tuple(u) for u in manifest["units"]} | {(p, m) for p in pairs for m in solutions}
+    manifest = {
+        "pairs": dict(sorted({**manifest["pairs"], **pairs}.items())),
+        "units": sorted(units),
+    }
+    path.write_text(json.dumps(manifest, indent=1) + "\n")
+
+
 def decision(adapter: Any, adj: Any) -> str:
     """Name the fit's edge on the pair's two columns: ``x->y``, ``y->x``, or ``none``."""
     estimate = adapter.to_structure(np.asarray(adj))
@@ -176,14 +192,7 @@ def main(argv: list[str] | None = None) -> int:
     done = done_units(records)
     adapters = {name: make_solution(name) for name in args.solutions}
     versions = preflight(adapters)
-    # The selected pairs and solutions, so the summary counts a unit no fit reached as unfinished.
-    path = args.out / "manifest.json"
-    manifest = json.loads(path.read_text()) if path.is_file() else {"pairs": {}, "solutions": []}
-    manifest["pairs"] = dict(
-        sorted({**manifest["pairs"], **{q.name: q.weight for q in pairs}}.items())
-    )
-    manifest["solutions"] = sorted({*manifest["solutions"], *args.solutions})
-    path.write_text(json.dumps(manifest, indent=1) + "\n")
+    update_manifest(args.out / "manifest.json", {q.name: q.weight for q in pairs}, args.solutions)
     # Largest pairs first, so a worker is not left with the slow fits at the end.
     tasks = [
         (q, name)

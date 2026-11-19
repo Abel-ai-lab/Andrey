@@ -61,8 +61,8 @@ def code_dir() -> Path:
 
 
 def source_sha256() -> str:
-    """The SHA-256 of the files :data:`REQUIRED_FILES` names, as read now, so a record names the code
-    that ran even if the folder changed after setup; ``unknown`` when they are missing."""
+    """The SHA-256 of the files :data:`REQUIRED_FILES` names, as read now, so a record names the
+    code that ran even if the folder changed after setup; ``unknown`` when they are missing."""
     root = Path(os.environ.get(CODE_ENV, "").strip())
     digest = hashlib.sha256()
     for name in REQUIRED_FILES:
