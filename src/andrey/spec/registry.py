@@ -834,6 +834,48 @@ _add(
 )
 _add(
     MethodSpec(
+        name="lges",
+        family="score",
+        summary="Less greedy equivalence search: GES that adds no edge between two variables the "
+        "score already holds independent given one's parents in a graph of the current class, "
+        "then deletes and reverses edges as GES and GIES do; fewer extra edges than GES on sparse "
+        "linear-Gaussian graphs. insertion=conservative also skips a pair when any of its "
+        "additions lowers the score. BIC by default, BDeu when every column is categorical, "
+        "conditional Gaussian when some are. Returns a CPDAG + score.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
+            "a mixed-data setting read",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            _SCORE_FUNC,
+            _PENALTY_DISCOUNT,
+            _EBIC_GAMMA,
+            _EQUIVALENT_SAMPLE_SIZE,
+            ParamSpec(
+                name="insertion",
+                type="str",
+                default="safe",
+                choices=("safe", "conservative"),
+                doc="Which pairs an edge addition skips: safe (SafeInsert) skips a pair when one "
+                "graph of the current class scores higher without the edge, and recovers the true "
+                "class as the rows grow; conservative (ConservativeInsert) also skips it when any "
+                "valid addition of the edge lowers the score, with fewer errors in the paper's "
+                "simulations and no such proof.",
+            ),
+            _CATEGORICAL,
+        ),
+        references=("Ejaz & Bareinboim 2025",),
+    )
+)
+_add(
+    MethodSpec(
         name="ages",
         family="score",
         summary="Aggregative greedy equivalence search for linear-Gaussian data with weak edges: "
@@ -3642,7 +3684,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "iamb": ("target", "markov_blanket"),
     "inter_iamb": ("target", "markov_blanket"),
     "mmpc": ("target", "parents_and_children"),
-    **dict.fromkeys(("gies", "xges", "mmhc", "rsmax2"), ("score",)),
+    **dict.fromkeys(("gies", "xges", "lges", "mmhc", "rsmax2"), ("score",)),
     **dict.fromkeys(
         ("ges", "hc", "tabu", "boss", "grasp"), ("score", "index_edges", "changing_variables")
     ),

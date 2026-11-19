@@ -354,8 +354,8 @@ UNIT_CASES = {
         (
             *("pc", "fci", "gfci", "cdnod", "fci_jci", "iamb", "inter_iamb", "mmpc", "mmhc"),
             "rsmax2",
-            *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
-            *("boss_fci", "grasp_fci", "igsp", "ut_igsp"),
+            *("ges", "gies", "gnies", "xges", "lges", "hc", "tabu", "exact_search", "boss"),
+            *("grasp", "boss_fci", "grasp_fci", "igsp", "ut_igsp"),
         ),
         "gauss_5v",
     ),
@@ -517,7 +517,7 @@ def spy_on_builds(monkeypatch) -> dict[str, list[str]]:
         spy(ci._CI_REGISTRY, key, "indep_test")
     for key in list(pcmci.PARTIAL_CORRELATION_TESTS):
         spy(pcmci.PARTIAL_CORRELATION_TESTS, key, "indep_test")
-    for module in ("ges", "gies", "xges", "exact", "hc", "boss"):
+    for module in ("ges", "gies", "xges", "lges", "exact", "hc", "boss"):
         engine = importlib.import_module(f"andrey.search.{module}")
 
         def make_score(score_func, *args, _make=engine.make_score, **options):

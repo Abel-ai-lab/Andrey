@@ -1646,6 +1646,212 @@ def xges(
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 
+@method_spec("lges")
+def lges(
+    data: npt.ArrayLike,
+    *,
+    score_func: str | None = None,
+    penalty_discount: float = 1.0,
+    ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
+    insertion: str = "safe",
+    categorical: Sequence[str | int] | None = None,
+) -> StructureOutput:
+    """Learn a CPDAG from observational data with less greedy equivalence search (LGES).
+
+    LGES searches the equivalence classes that GES searches [2]_, with GES's moves, the turning
+    move of GIES [3]_, and a decomposable score, the BIC by default, but adds fewer edges [1]_: it
+    leaves out an edge between two variables when the score says that some graph of the current
+    class already makes them independent given the parents of one of them (see Notes).
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    score_func : str or None, default=None
+        Local score objective, as for :func:`~andrey.ges`: ``"bic"``, the linear-Gaussian BIC, for
+        continuous data. ``"bdeu"`` is the BDeu score and ``"discrete_bic"`` the multinomial BIC,
+        for categorical data coded by whole numbers. ``"degen_gauss"`` (degenerate Gaussian) and
+        ``"cond_gauss"`` (conditional Gaussian) are BIC scores for mixed data, continuous and
+        categorical columns. ``"normal_scores"``, experimental, is ``"bic"`` on each column's normal
+        scores, for continuous data that are Gaussian only after an unknown increasing
+        transformation of each column, as :func:`~andrey.ges` describes, with its limits. ``None``
+        picks from the declared column types: ``"bdeu"`` when every column is categorical,
+        ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared categorical by
+        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
+        values. ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        declared column types when this is ``None``.
+    penalty_discount : float, default=1.0
+        Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
+        linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is
+        the standard BIC, the score of the method's paper [1]_. Must be finite and non-negative.
+        BDeu ignores it; for the multinomial BIC it weighs ``log(n)`` per free parameter of a
+        variable's conditional probability table.
+    ebic_gamma : float, default=1.0
+        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` and ``"normal_scores"`` use it: passing it
+        with another score raises ``ValueError``. See Notes.
+    equivalent_sample_size : float, default=1.0
+        The equivalent sample size of the BDeu score: how many rows the uniform prior over each
+        variable's conditional distributions is worth. A larger value weighs the prior more
+        against the data, and the graph can change with it. Must be finite and positive. Only
+        ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
+    insertion : {"safe", "conservative"}, default="safe"
+        Which pairs of variables an edge addition leaves out (see Notes). ``"safe"`` (SafeInsert)
+        leaves out a pair when one graph of the current class scores higher without the edge; the
+        paper proves that the search then recovers the true class as the rows grow [1]_.
+        ``"conservative"`` (ConservativeInsert) also leaves out a pair when any valid addition of
+        the edge lowers the score; it made fewer errors in the paper's simulations, with no such
+        proof.
+    categorical : sequence of str or int, or None, default=None
+        The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
+        never a column by its values. ``[]`` marks none. A categorical score reads every column as
+        categorical, and a continuous score raises ``ValueError`` on a declared column, named here
+        or by its type. See *Data types* in the
+        :doc:`getting-started guide </docs/guides/getting-started>`.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
+        ``"lges"`` and ``metadata["score"]`` the score of the result, computed as for
+        :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges, undirected
+        (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
+        position. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``, and ``metadata`` also records the penalties its score used,
+        under their parameter names.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a 2-D numeric
+        matrix with at least two rows and no ``NaN`` or ``inf``, or if a column is constant; with a
+        categorical score, if ``data`` holds a number that is not whole; or, with a mixed-data
+        score, if ``categorical`` names a column ``data`` lacks, or if a categorical column holds a
+        number that is not whole. Also if a continuous score meets a column declared categorical, by
+        ``categorical`` or by its type. With the BIC score, also if a column repeats another column
+        up to scale and shift given more than two rows or, with more rows than columns, is a linear
+        function of other columns. One message names every group of copies and says to keep one
+        column per group.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On every call: the method is experimental.
+    DataTypeWarning
+        When a mixed-data score finds no declared categorical column and so runs as the
+        linear-Gaussian form, or when a setting reads columns that look like category codes as
+        numbers. Each message warns once per process.
+
+    Notes
+    -----
+    **When to use.** LGES makes the assumptions of :func:`~andrey.ges`: i.i.d. observational data,
+    no unmeasured common causes and, with the default BIC score on continuous data, linear relations
+    with Gaussian noise. Its moves need only a score that adds one term per variable and gives
+    equivalent graphs the same score, which each of the scores does. The paper claims it for sparse
+    linear-Gaussian graphs of up to 150 variables with 1,000 or 10,000 rows, where it added fewer
+    wrong edges than GES and ran faster [1]_; it returns a CPDAG. When unmeasured common causes are
+    plausible, use :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be
+    oriented, use :func:`~andrey.direct_lingam`; when some rows come from interventions, use
+    :func:`~andrey.gies`.
+
+    **How it works.** The search starts from the empty graph and runs three phases once, each until
+    no move improves the score: edge additions, edge deletions, then reversals of an edge, the
+    turning phase of GIES [3]_. The deletions and reversals are those of GES and GIES. Each step of
+    the first phase takes one DAG ``G`` of the current class and, for each pair ``(x, y)`` of
+    non-adjacent variables, compares the score of ``y`` given its parents in ``G`` with the score
+    given those parents and ``x``. When the edge lowers the score, the score holds ``y`` independent
+    of ``x`` given those parents, and the step adds no edge between ``x`` and ``y``
+    (SafeInsert). With ``insertion="conservative"`` it also adds no edge between them when any
+    valid addition ``x -> y`` of GES lowers the score (ConservativeInsert). Of the additions left,
+    the step takes the one that improves the score most, as GES does. ``G`` is the DAG that orients
+    the class by removing, while one is left, the first sink whose neighbors are adjacent to each
+    other, in the order of the columns' ranks
+    (:doc:`column-order guide </docs/guides/column-order>`), so the result does not depend on the
+    column order; moves whose score changes are equal after rounding are taken in that order too.
+
+    The phase order is that of the code published with the paper, whose experiments run it: the
+    additions, then the deletions, then the reversals, once. The paper's Algorithm 1 instead
+    deletes and reverses before each addition, and its LGES+ variant also retries each deletion;
+    neither is implemented here. The paper's pseudocode leaves out a pair ``(x, y)`` also when
+    ``x`` is a descendant of ``y`` in ``G``, where adding ``x -> y`` to ``G`` would close a cycle;
+    the published code compares the two scores for every pair, and so does this search. The
+    paper's prior knowledge, which orders the additions by required and forbidden edges and lets
+    the data overrule them, and its orientation of the result with interventional data are not
+    implemented.
+
+    **Choosing the penalty.** The score charges a variable ``penalty_discount * log(n_samples)`` per
+    parent plus the extended-BIC term ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``
+    [4]_, as for :func:`~andrey.ges`, whose default this follows. The paper uses the standard BIC,
+    ``ebic_gamma=0.0`` with ``penalty_discount=1.0``.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
+    variable, each over every row, and terms over different rows do not add up to the score of one
+    dataset, so the search cannot delete rows per test as the conditional-independence searches do.
+    Drop the incomplete rows first, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** Not benchmarked yet. Its tests run it on up to 30 variables with up to 5,000
+    rows, and it was compared with the authors' code on the paper's linear-Gaussian simulation with
+    up to 50 variables and 10,000 rows. The paper proves the recovery of the true class as the rows
+    grow only for ``insertion="safe"``. Each step of the first phase scores every pair of
+    non-adjacent variables, and every valid addition for each pair it keeps, in one process. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density,
+    the method's settings, and the machine.
+
+    References
+    ----------
+    .. [1] Ejaz, A., and Bareinboim, E. (2025). Less greedy equivalence search. Advances in Neural
+       Information Processing Systems 38.
+    .. [2] Chickering, D. M. (2002). Optimal structure identification with greedy search. JMLR 3,
+       507-554.
+    .. [3] Hauser, A., and Buhlmann, P. (2012). Characterization and greedy learning of
+       interventional Markov equivalence classes of directed acyclic graphs. JMLR 13, 2409-2464.
+    .. [4] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
+       selection with large model spaces. Biometrika 95(3), 759-771.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from andrey import lges
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(500)
+    >>> y = rng.standard_normal(500)
+    >>> z = x + y + 0.5 * rng.standard_normal(500)
+    >>> lges(pd.DataFrame({"x": x, "y": y, "z": z})).structure.oriented_edges()
+    [('x', 'z', 'directed'), ('y', 'z', 'directed')]
+    """
+    from andrey.search.lges import lges as _lges
+
+    assert score_func is not None  # method_spec picks it from the column types
+    X, mask, labels, _ = fit_inputs(
+        data, "score_func", score_func, categorical, None, method="lges"
+    )
+    with copies_named(labels):
+        cpdag, score = _lges(
+            X,
+            score_func=score_func,
+            penalty_discount=penalty_discount,
+            ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
+            insertion=insertion,
+            categorical=mask,
+        )
+    metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}
+    return structure_output(cpdag, labels=labels, metadata=metadata)
+
+
 @method_spec("hc")
 def hc(
     data: npt.ArrayLike,

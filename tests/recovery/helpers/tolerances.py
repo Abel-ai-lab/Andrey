@@ -29,6 +29,7 @@ SPEC: dict[str, dict] = {
         "numeric": {},
     },
     "XGES": GRAPH_SCORE,
+    "LGES": GRAPH_SCORE,
     "AGES": GRAPH_ONLY,
     "HC": GRAPH_SCORE,
     "Tabu": GRAPH_SCORE,

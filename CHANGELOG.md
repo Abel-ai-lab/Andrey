@@ -21,6 +21,11 @@ names its pull request.
 - For contributors, a benchmark lane runs `anm`, `pnl`, `loci`, and `resit` beside the authors'
   code of QCCD, HECI, and GRCI on the Tübingen cause-effect pairs, and a summary script turns its
   records into a weighted-accuracy table. ([#1127])
+- `lges`, experimental: less greedy equivalence search (Ejaz and Bareinboim 2025), a score search
+  next to `ges` and `xges` that adds no edge between two variables the score already holds
+  independent given the parents of one of them in a graph of the current class, then deletes and
+  reverses edges as GES and GIES do. `insertion` picks SafeInsert, the default, or
+  ConservativeInsert. It takes the scores of `ges`. ([#PRNUM])
 
 ### Changed
 
@@ -2714,6 +2719,7 @@ First alpha release.
 [#1122]: https://github.com/Abel-ai-lab/Andrey/pull/1122
 [#1127]: https://github.com/Abel-ai-lab/Andrey/pull/1127
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
+[#PRNUM]: https://github.com/Abel-ai-lab/Andrey/pull/PRNUM
 [#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
 [#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
 [#1068]: https://github.com/Abel-ai-lab/Andrey/pull/1068

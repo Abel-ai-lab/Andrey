@@ -26,6 +26,7 @@ from andrey.latent.gin import _root_pvalue, gin
 from andrey.search.calm import moral_graph
 from andrey.search.ges import ges
 from andrey.search.gies import gies
+from andrey.search.lges import lges
 from andrey.search.xges import xges
 from andrey.temporal.pcmci import design_test
 from tests.recovery.helpers.xges_rescan import xges_rescan
@@ -138,6 +139,14 @@ def test_xges_ties() -> None:
     x = _swap_symmetric(0)
     for search in (xges, xges_rescan):
         _assert_order_free(lambda data: search(data)[0].to_numpy(), x)
+
+
+def test_lges_ties() -> None:
+    """LGES meets the tie GES meets, under each insertion rule; the DAG SafeInsert reads follows
+    the same ranks."""
+    x = _swap_symmetric(0)
+    for insertion in ("safe", "conservative"):
+        _assert_order_free(lambda data: lges(data, insertion=insertion)[0].to_numpy(), x)
 
 
 def test_calm_moral_graph_ties() -> None:

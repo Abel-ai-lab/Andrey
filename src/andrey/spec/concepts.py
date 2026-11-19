@@ -132,7 +132,7 @@ SCORE_SEARCHES = (
     "boss_fci",
     "grasp_fci",
 )
-PURE_SCORE = ("ges", "gies", "xges", "hc", "tabu", "exact_search", "boss", "grasp")
+PURE_SCORE = ("ges", "gies", "xges", "lges", "hc", "tabu", "exact_search", "boss", "grasp")
 CONTINUOUS = ("notears", "dagma")
 LINGAM = (
     "direct_lingam",
@@ -164,6 +164,7 @@ NO_KNOWLEDGE = (
     "loci",
     "icp",
     "ages",
+    "lges",
     "cpcm",
     "cpcm_graph",
     "skewd",
@@ -483,7 +484,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="score",
-        suitable=SCORE_SEARCHES,
+        suitable=(*SCORE_SEARCHES, "lges"),
         exempt=_exempt(
             "Its score is the method: the noise-intervention likelihood has no other local score.",
             "gnies",
@@ -512,7 +513,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="BIC penalty",
-        suitable=(*SCORE_SEARCHES, "gnies", "ages"),
+        suitable=(*SCORE_SEARCHES, "lges", "gnies", "ages"),
         others_exempt="Does not score with BIC.",
     ),
     Concept(
@@ -532,7 +533,7 @@ _CONCEPTS = (
             maximum=1,
         ),
         fragment="extended-BIC term",
-        suitable=(*SCORE_SEARCHES, "gnies"),
+        suitable=(*SCORE_SEARCHES, "lges", "gnies"),
         others_exempt="Does not score with BIC.",
         deviations=(
             Deviation(
@@ -571,7 +572,7 @@ _CONCEPTS = (
             exclusive_minimum=True,
         ),
         fragment="equivalent sample size",
-        suitable=SCORE_SEARCHES,
+        suitable=(*SCORE_SEARCHES, "lges"),
         others_exempt="Does not score with BDeu.",
     ),
     Concept(
@@ -789,6 +790,11 @@ _CONCEPTS = (
                 "The paper defines no cap, and the aggregation can direct edges into a node "
                 "beyond a cap its CPDAGs keep.",
                 "ages",
+            ),
+            *_exempt(
+                "Not taken yet: the paper defines no cap, and the turning phase would need one "
+                "that holds after each reversal.",
+                "lges",
             ),
             *_exempt("Parents come from the adaptive Lasso on the order.", *LINGAM),
             *_exempt(
@@ -1107,6 +1113,12 @@ _CONCEPTS = (
                 "knowledge; ges takes knowledge.",
                 "ages",
             ),
+            *_exempt(
+                "Not taken yet: its paper's prior knowledge orders the edge additions and lets the "
+                "data overrule a required or forbidden edge, unlike the knowledge every part of "
+                "which a search honors.",
+                "lges",
+            ),
         ),
     ),
     Concept(
@@ -1118,9 +1130,11 @@ _CONCEPTS = (
         exempt=(
             *_exempt(
                 "Has no edge for knowledge to name (the knowledge concept).",
-                *(m for m in NO_KNOWLEDGE if m not in ("icp", "ages", "cpcm_graph")),
+                *(m for m in NO_KNOWLEDGE if m not in ("icp", "ages", "lges", "cpcm_graph")),
             ),
-            *_exempt("Takes no knowledge (the knowledge concept).", "icp", "ages", "cpcm_graph"),
+            *_exempt(
+                "Takes no knowledge (the knowledge concept).", "icp", "ages", "lges", "cpcm_graph"
+            ),
         ),
     ),
     Concept(
@@ -1150,6 +1164,7 @@ _CONCEPTS = (
             "tabu",
             "gies",
             "xges",
+            "lges",
             *PCMCI_FAMILY,
             "igsp",
             "ut_igsp",
@@ -1209,6 +1224,11 @@ _CONCEPTS = (
                 "The paper defines the solution path for complete data; a path over the expected "
                 "covariance of structural EM, refit per penalty or not, is not published.",
                 "ages",
+            ),
+            *_exempt(
+                "Not taken yet: the paper defines the search for complete data; structural EM "
+                "would suit it as it suits ges.",
+                "lges",
             ),
             *_exempt(
                 "A score or a regression reads every column.",
@@ -1379,6 +1399,11 @@ _CONCEPTS = (
                 "The paper defines the aggregation for data from one environment; ges is the "
                 "score search that takes env.",
                 "ages",
+            ),
+            *_exempt(
+                "Not taken yet: the paper defines the search for data from one environment; ges "
+                "is the score search that takes env.",
+                "lges",
             ),
             *_exempt(
                 "Its model reads the noise of continuous variables, which an environment label "
@@ -1567,7 +1592,7 @@ _CONCEPTS = (
         "registered test records its registered name. A score search records the penalties its "
         "score used: penalty_discount for every score but bdeu, ebic_gamma for bic, and "
         "equivalent_sample_size for bdeu.",
-        suitable=tuple(m for m in ALL_METHODS if m in (*TESTED, *SCORE_SEARCHES)),
+        suitable=tuple(m for m in ALL_METHODS if m in (*TESTED, *SCORE_SEARCHES, "lges")),
         others_exempt="Neither a conditional-independence test nor a score to choose.",
     ),
     Concept(
