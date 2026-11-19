@@ -209,9 +209,9 @@ def markdown(summary: dict, records: list[dict]) -> str:
         median = "-" if s["median_wall_s"] is None else f"{s['median_wall_s']:.2f}"
         lines.append(
             f"| {m} | {s['finished']}/{s['requested']} | {s['finished_weight']:.3f} | "
-            f"{s['undecided']} | {s['accuracy']:.3f} [{s['accuracy_ci'][0]:.3f}, {s['accuracy_ci'][1]:.3f}] | "
-            f"{s['common_accuracy']:.3f} [{s['common_accuracy_ci'][0]:.3f}, {s['common_accuracy_ci'][1]:.3f}] | "
-            f"{d[0]:+.3f} [{d[1]:+.3f}, {d[2]:+.3f}] | {median} | {s['total_wall_s']:.0f} |"
+            f"{s['undecided']} | {cell(s['accuracy'], *s['accuracy_ci'])} | "
+            f"{cell(s['common_accuracy'], *s['common_accuracy_ci'])} | "
+            f"{cell(*d, sign='+')} | {median} | {s['total_wall_s']:.0f} |"
         )
     other = {
         m: s["statuses"] for m, s in summary["solutions"].items() if set(s["statuses"]) - {"ok"}
@@ -222,6 +222,13 @@ def markdown(summary: dict, records: list[dict]) -> str:
             "Fits that did not finish: " + "; ".join(f"{m} {st}" for m, st in other.items()),
         ]
     return "\n".join(lines) + "\n"
+
+
+def cell(value: float, low: float, high: float, sign: str = "") -> str:
+    """``value [low, high]`` to three decimals, or ``-`` when no pair supports the value (NaN)."""
+    if math.isnan(value):
+        return "-"
+    return f"{value:{sign}.3f} [{low:{sign}.3f}, {high:{sign}.3f}]"
 
 
 def without_nan(value: Any) -> Any:
