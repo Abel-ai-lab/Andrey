@@ -151,6 +151,8 @@ def subset_rows(
         rows = block_positions(n, block)
         if inside is not None:
             rows = rows[~inside[rows].all(axis=1)]
+            if not len(rows):
+                continue
         held.append(rows)
         count += len(rows)
         while count >= CHUNK:
