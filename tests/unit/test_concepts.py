@@ -972,15 +972,26 @@ def test_every_search_with_a_ci_test_accepts_a_registered_test(method, settings,
     assert out.structure == expected.structure
 
 
+#: Least-squares regressions and one split keep the regression tests fast where only the seed
+#: they receive matters.
+FAST_SETTINGS = {
+    "gcm": {"regression": "linear"},
+    "wgcm": {"regression": "linear"},
+    "pcm": {"regression": "linear", "n_splits": 1},
+}
+
+
 @pytest.fixture
 def built_seeds(monkeypatch):
     """The seed each randomized test a fit builds receives; ``None`` is none passed."""
     seeds = []
     for name in STOCHASTIC:
 
-        def build(data, *args, _factory=ci._CI_REGISTRY[name], **options):
+        def build(
+            data, *args, _factory=ci._CI_REGISTRY[name], _fast=FAST_SETTINGS.get(name), **options
+        ):
             seeds.append(options.get("seed"))
-            return _factory(data, *args, **options)
+            return _factory(data, *args, **options, **(_fast or {}))
 
         monkeypatch.setitem(ci._CI_REGISTRY, name, build)
     return seeds

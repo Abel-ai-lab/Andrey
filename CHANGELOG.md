@@ -21,6 +21,16 @@ names its pull request.
 - For contributors, a benchmark lane runs `anm`, `pnl`, `loci`, and `resit` beside the authors'
   code of QCCD, HECI, and GRCI on the Tübingen cause-effect pairs, and a summary script turns its
   records into a weighted-accuracy table. ([#1127])
+- Three experimental regression-based conditional-independence tests, as `indep_test` options of
+  every method that takes one: `"gcm"`, the generalized covariance measure (Shah and Peters 2020),
+  which tests the covariance of the residuals of boosted-tree regressions; `"wgcm"`, the weighted
+  generalized covariance measure (Scheidegger, Hörrmann, and Bühlmann 2022), which weights that
+  covariance by an estimated sign function of the conditioning set (`variant="fix"` takes fixed
+  weights); and `"pcm"`, the projected covariance measure (Lundborg, Kim, Shah, and Samworth
+  2024), which tests whether one variable improves a random-forest prediction of the other. Each
+  takes `regression="boosting"`, `"forest"`, or `"linear"`; the sample splits and folds are drawn
+  from `seed` over rows held in an order of their values, so a p-value depends on neither the row
+  nor the column order. A contributor's script compares them with the authors' code. ([#PR])
 
 ### Changed
 

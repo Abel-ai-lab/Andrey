@@ -38,10 +38,10 @@ time.
 
 The registry at the end maps each ``indep_test`` name to a factory. The nonlinear tests live in
 their own modules (KCI and RCoT in :mod:`andrey.core.ci_kernel`, CMIknn in
-:mod:`andrey.core.ci_cmiknn`, GPDC in :mod:`andrey.core.ci_gpdc`) and are imported when first
-built. On data with ``NaN``, :func:`make_indep_test` wraps the registered test in the test-wise
-deletion of :mod:`andrey.core.ci_missing`, which answers each query on the rows observed in all of
-its columns.
+:mod:`andrey.core.ci_cmiknn`, GPDC in :mod:`andrey.core.ci_gpdc`, and GCM, wGCM, and PCM in
+:mod:`andrey.core.ci_regression`) and are imported when first built. On data with ``NaN``,
+:func:`make_indep_test` wraps the registered test in the test-wise deletion of
+:mod:`andrey.core.ci_missing`, which answers each query on the rows observed in all of its columns.
 
 References
 ----------
@@ -1793,11 +1793,15 @@ NONLINEAR_CLASSES: dict[str, tuple[str, str]] = {
     "rcot": ("ci_kernel", "RCoT"),
     "cmiknn": ("ci_cmiknn", "CMIknn"),
     "gpdc": ("ci_gpdc", "GPDC"),
+    "gcm": ("ci_regression", "GCM"),
+    "wgcm": ("ci_regression", "WGCM"),
+    "pcm": ("ci_regression", "PCM"),
 }
 NONLINEAR_INDEP_TESTS: tuple[str, ...] = tuple(NONLINEAR_CLASSES)
-#: The tests that draw random numbers, which ``seed`` fixes: RCoT's random features, and the random
-#: tie keys and permutations of CMIknn and GPDC. The other tests draw none.
-STOCHASTIC_INDEP_TESTS: tuple[str, ...] = ("rcot", "cmiknn", "gpdc")
+#: The tests that draw random numbers, which ``seed`` fixes: RCoT's random features, the random
+#: tie keys and permutations of CMIknn and GPDC, and the cross-validation folds, forests, sample
+#: splits, and multipliers of GCM, wGCM, and PCM. The other tests draw none.
+STOCHASTIC_INDEP_TESTS: tuple[str, ...] = ("rcot", "cmiknn", "gpdc", "gcm", "wgcm", "pcm")
 
 
 def _nonlinear(name: str, data: np.ndarray, **options: Any) -> CITest:
@@ -1827,6 +1831,16 @@ DISCRETE_INDEP_TESTS: tuple[str, ...] = ("chisq", "gsq")
 #: always read several environments does not offer them, as the ranks would mix the environments.
 RANK_INDEP_TESTS: tuple[str, ...] = ("normal_scores",)
 MIXED_INDEP_TESTS: tuple[str, ...] = ("degen_gauss", "cond_gauss")
+#: The tests not yet supported, as the status column of the API reference marks them; the quality
+#: gate checks the other nonlinear tests.
+EXPERIMENTAL_INDEP_TESTS: tuple[str, ...] = (
+    "normal_scores",
+    "degen_gauss",
+    "cond_gauss",
+    "gcm",
+    "wgcm",
+    "pcm",
+)
 #: The shipped tests of continuous data: the partial-correlation and the nonlinear tests.
 CONTINUOUS_INDEP_TESTS: tuple[str, ...] = tuple(
     name
@@ -1951,7 +1965,8 @@ def pins_blas(test: CITest) -> bool:
     same bits whatever the host's thread count, and the partial-correlation tests match the
     one-thread parallel skeleton workers; the chi-square tests call no BLAS. The nonlinear tests set
     it: KCI is unpinned from 2,000 rows, where its kernel products run faster on every BLAS thread
-    and its p-values are reproducible for a fixed thread count; RCoT, CMIknn, and GPDC are pinned.
+    and its p-values are reproducible for a fixed thread count; RCoT, CMIknn, GPDC, GCM, wGCM, and
+    PCM are pinned.
     """
     pin = getattr(test, "pin_blas", None)
     if pin is not None:
