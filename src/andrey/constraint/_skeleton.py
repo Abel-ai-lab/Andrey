@@ -354,8 +354,8 @@ def first_order_removals(
             record_tests(trace, 1, x, y, subsets, pvals, alpha)
         passing = np.flatnonzero(pvals > alpha)
         if passing.size:
-            # Some candidate separates, so the largest p-value is a separating one.
-            p = max(pvals.tolist()) if record_pvalues else None
+            # The largest separating p-value: a query not tested (NaN) never separates.
+            p = max(pvals[passing].tolist()) if record_pvalues else None
             removals.append((x, y, tuple(subsets[k][0] for k in passing.tolist()), p))
     return removals
 

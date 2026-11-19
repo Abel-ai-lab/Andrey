@@ -47,7 +47,7 @@ import numpy as np
 from andrey.constraint._skeleton import CHUNK, adjacent_pairs, scan_conditioning_sets
 from andrey.core import ARROW, NULL, TAIL, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
-from andrey.core.ci_missing import TestwiseDeletion
+from andrey.core.ci_missing import NOT_TESTED, TestwiseDeletion, not_tested
 from andrey.core.knowledge import Constraints, orient
 from andrey.core.orient import meek
 from andrey.core.ties import (
@@ -256,10 +256,14 @@ def _weakest(
     conds: list[tuple[int, ...]],
     sets: list[tuple[int, ...]] | None = None,
     ranks: Sequence[int] = (),
+    alpha: float = 1.0,
 ) -> list[tuple[float, float]]:
     """Each candidate's weakest association with ``target`` over the conditioning sets ``conds``.
 
-    Returns ``(largest p-value, smallest strength)`` per entry of ``xs``. The strength is the
+    Returns ``(largest p-value, smallest strength)`` per entry of ``xs``, over the sets that were
+    tested. A candidate with a set not tested and no tested p-value above ``alpha`` answers
+    :data:`~andrey.core.ci_missing.NOT_TESTED`: that set might have separated it, so its
+    association is unknown (:func:`_weaker`). The strength is the
     absolute partial correlation for a test with ``statistic_pvalues``, evaluated for every query
     of one conditioning-set size in one call, else the negated p-value from ``batched_call`` or the
     scalar test. With ``sets``, each candidate's set with the largest p-value is appended to it
@@ -277,13 +281,15 @@ def _weakest(
                 if batched is not None
                 else [test(target, x, c) for c in conds]
             )
-            top = float(max(ps))
+            values = np.asarray(ps, dtype=np.float64)
+            top = _weaker(float(np.fmax.reduce(values)), bool(not_tested(values).any()), alpha)
             out.append((top, -top))
             if sets is not None:
                 sets.extend(_largest_sets(np.asarray(ps, dtype=np.float64)[None], conds, ranks))
         return out
     pmax = np.full(len(xs), -np.inf)
     rmin = np.full(len(xs), np.inf)
+    skipped = np.zeros(len(xs), dtype=bool)
     by_size: dict[int, list[tuple[int, ...]]] = {}
     for cond in conds:
         by_size.setdefault(len(cond), []).append(cond)
@@ -294,13 +300,24 @@ def _weakest(
         r, p = batch(np.full(x.size, target, dtype=np.intp), x, np.tile(cols, (len(xs), 1)))
         if sets is not None:
             pvalues.append(np.asarray(p, dtype=np.float64).reshape(len(xs), len(group)))
-        pmax = np.maximum(pmax, np.asarray(p).reshape(len(xs), len(group)).max(axis=1))
-        rmin = np.minimum(rmin, np.abs(np.asarray(r)).reshape(len(xs), len(group)).min(axis=1))
+        p = np.asarray(p, dtype=np.float64).reshape(len(xs), len(group))
+        pmax = np.fmax(pmax, np.fmax.reduce(p, axis=1))
+        rmin = np.fmin(rmin, np.fmin.reduce(np.abs(np.asarray(r)).reshape(p.shape), axis=1))
+        skipped |= not_tested(p).any(axis=1)
     if sets is not None:
         sets.extend(
             _largest_sets(np.hstack(pvalues), [c for g in by_size.values() for c in g], ranks)
         )
+    pmax[skipped & ~(pmax > alpha)] = NOT_TESTED
     return list(zip(pmax.tolist(), rmin.tolist(), strict=True))
+
+
+def _weaker(p: float, skipped: bool, alpha: float) -> float:
+    """The largest p-value ``p`` of the sets that were tested, or
+    :data:`~andrey.core.ci_missing.NOT_TESTED` when a set was not (``skipped``) and ``p`` does not
+    exceed ``alpha``: a tested set that separates decides, and otherwise the set not tested might
+    have."""
+    return NOT_TESTED if skipped and not p > alpha else p
 
 
 def _largest_sets(
@@ -366,7 +383,7 @@ def parents_children(
     others = [
         x for x in range(d) if x != target and x not in required and (allowed is None or allowed[x])
     ]
-    weakest = dict(zip(others, _weakest(test, target, others, [()]), strict=True))
+    weakest = dict(zip(others, _weakest(test, target, others, [()], alpha=alpha), strict=True))
     if sepsets is not None:
         sepsets.update({x: () for x, (p, _) in weakest.items() if p > alpha})
     members: list[int] = []
@@ -381,10 +398,12 @@ def parents_children(
             conds = [tuple(sorted((*rest, new))) for rest in combinations(members, size)]
             largest: list[tuple[int, ...]] = []
             weakened = _weakest(
-                test, target, xs, conds, None if sepsets is None else largest, ranks
+                test, target, xs, conds, None if sepsets is None else largest, ranks, alpha
             )
             for i, (x, (p, strength)) in enumerate(zip(xs, weakened, strict=True)):
-                pool[x] = (max(pool[x][0], p), min(pool[x][1], strength))
+                was = pool[x][0]
+                top = _weaker(float(np.fmax(was, p)), bool(not_tested([was, p]).any()), alpha)
+                pool[x] = (top, float(np.fmin(pool[x][1], strength)))
                 if sepsets is not None and pool[x][0] > alpha:
                     sepsets.setdefault(x, largest[i])
             if not every:
@@ -564,12 +583,17 @@ def blanket_colliders(
                 conds = _collider_sets(sides, size, b)
                 width = CHUNK if every else min(_FIRST_CHUNK, CHUNK)
                 while (every or p <= alpha) and (chunk := list(islice(conds, width))):
-                    [(p_chunk, strength_chunk)] = _weakest(test, a, [c], chunk)
-                    p, strength = max(p, p_chunk), min(strength, strength_chunk)
+                    [(p_chunk, strength_chunk)] = _weakest(test, a, [c], chunk, alpha=alpha)
+                    skipped = bool(not_tested([p, p_chunk]).any())
+                    p = _weaker(float(np.fmax(p, p_chunk)), skipped, alpha)
+                    strength = float(np.fmin(strength, strength_chunk))
                     width = min(2 * width, CHUNK)
                 if p > alpha:
                     sepsets[a, c] = (*sepsets[a, c], b)
                     break
+            if not_tested(p):  # a set not tested might have separated a and c: no collider
+                ambiguous.add((a, b, c))
+                continue
             strengths[a, b, c] = strength
     return sepsets, strengths, frozenset(ambiguous)
 

@@ -78,7 +78,7 @@ def fit_blanket(
             marks = np.where(adjacent, TAIL, NULL).astype(np.int8)
             name = label_of(labels)
             metadata |= {"target": name(t), _SETS[method]: [name(j) for j in members]}
-    metadata |= categorical_metadata(mask, data) | rows_metadata(rows)
+    metadata |= categorical_metadata(mask, data) | rows_metadata(rows, alpha, label_of(labels))
     return structure_output(to_structure(marks, kind=kind), labels=labels, metadata=metadata)
 
 

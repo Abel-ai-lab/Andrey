@@ -47,6 +47,7 @@ Intelligence (UAI), PMLR 124, 1388-1397. https://proceedings.mlr.press/v124/rung
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from itertools import combinations
@@ -57,6 +58,7 @@ import numpy as np
 from andrey.constraint._skeleton import check_collider_rule, collider_verdict
 from andrey.constraint.pc import check_knowledge_cycle
 from andrey.core import backend
+from andrey.core.ci_missing import NOT_TESTED
 from andrey.core.fdr import check_fdr_method, corrected_pvalues
 from andrey.core.knowledge import orient as orient_known
 from andrey.core.structure import ARROW, NULL, TAIL
@@ -84,7 +86,10 @@ class PCMCIPlusResult:
     ``marks`` holds the lag-0 endpoint marks: ``marks[i, j]`` is the mark at ``i`` on the link
     ``i - j``, ``TAIL``/``ARROW`` for ``i -> j``, ``TAIL`` at both ends for an unoriented link, and
     ``ARROW`` at both ends for a conflict. ``sepsets[(i, lag, j)]`` is the lag-0 separating set
-    phase 2 stored for a removed link, under both orders at lag 0. ``ambiguous_triples`` lists the
+    phase 2 stored for a removed link, under both orders at lag 0. ``undecided``, shaped as
+    ``adjacency``, marks the links left adjacent after a test without the rows it needs
+    (:data:`~andrey.core.ci_missing.NOT_TESTED`), which could have removed them; one with no test
+    that had rows reads ``NaN`` in ``p_values``. ``ambiguous_triples`` lists the
     ``(i, lag, k, j)`` triples phase 3 left ambiguous, a lag-0 triple in both orders.
     """
 
@@ -95,6 +100,7 @@ class PCMCIPlusResult:
     statistics: np.ndarray
     sepsets: dict[tuple[int, int, int], tuple[int, ...]]
     ambiguous_triples: tuple[Triple, ...]
+    undecided: np.ndarray | None = None
 
     @property
     def conflicts(self) -> tuple[tuple[int, int], ...]:
@@ -104,7 +110,8 @@ class PCMCIPlusResult:
 
 
 class Recorder:
-    """Passes queries to ``test``; keeps each column pair's largest p-value and its statistic."""
+    """Passes queries to ``test``; keeps each column pair's largest p-value and its statistic, of
+    the queries that were tested."""
 
     def __init__(self, test: LinkTest) -> None:
         self.test = test
@@ -119,6 +126,8 @@ class Recorder:
             statistics.tolist(),
             p_values.tolist(),
         ):
+            if math.isnan(p_value):  # not tested: no p-value to keep
+                continue
             best = self.largest.get(pair)
             if best is None or p_value > best[1]:
                 self.largest[pair] = (statistic, p_value)
@@ -183,8 +192,14 @@ def skeleton(
     constraints: LaggedConstraints | None = None,
     max_p_global: int | None = None,
     pool: np.ndarray | None = None,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[tuple[int, int, int], tuple[int, ...]]]:
-    """Phase 2: return ``(adjacency, largest p-values, their statistics, sepsets)``.
+) -> tuple[
+    np.ndarray, np.ndarray, np.ndarray, dict[tuple[int, int, int], tuple[int, ...]], np.ndarray
+]:
+    """Phase 2: return ``(adjacency, largest p-values, their statistics, sepsets, undecided)``.
+
+    ``undecided`` marks the adjacent links one of whose tests was not tested
+    (:data:`~andrey.core.ci_missing.NOT_TESTED`); such a test neither removes a link nor sets its
+    strength or largest p-value.
 
     The p-value array holds ``-1`` for a link phase 2 never tested. ``ranks`` holds each
     variable's :func:`~andrey.core.ties.tie_ranks`: a lag-0 pair is tested first from its end of
@@ -209,6 +224,7 @@ def skeleton(
     p_values = np.full(shape, -1.0)
     statistics = np.zeros(shape)
     strength = np.full(shape, np.inf)
+    skipped = np.zeros(shape, dtype=bool)
     sepsets: dict[tuple[int, int, int], tuple[int, ...]] = {}
     pool = np.ones(n_vars, dtype=bool) if pool is None else pool
     order = sorted(range(n_vars), key=lambda k: (ranks[k], k))
@@ -238,10 +254,15 @@ def skeleton(
             # The subsets count as tested in order up to the first that separates.
             separating = np.flatnonzero(tested_p_values > pc_alpha)
             tested = separating[0] + 1 if separating.size else len(subsets)
-            largest = int(np.argmax(tested_p_values[:tested]))
+            # A subset not tested (NaN) sets neither the strength nor the largest p-value.
+            counted = np.flatnonzero(~np.isnan(tested_p_values[:tested]))
             ends = ((lag, i, j), (0, j, i)) if lag == 0 else ((lag, i, j),)
             for index in ends:
-                strength[index] = min(strength[index], np.abs(tested_statistics[:tested]).min())
+                skipped[index] |= counted.size < tested
+                if not counted.size:
+                    continue
+                largest = int(counted[np.argmax(tested_p_values[counted])])
+                strength[index] = min(strength[index], np.abs(tested_statistics[counted]).min())
                 if tested_p_values[largest] > p_values[index]:
                     p_values[index] = tested_p_values[largest]
                     statistics[index] = tested_statistics[largest]
@@ -261,7 +282,7 @@ def skeleton(
             )
             for j in range(n_vars)
         ]
-    return adjacency, p_values, statistics, sepsets
+    return adjacency, p_values, statistics, sepsets, adjacency & skipped
 
 
 def _neighbors(adjacency: np.ndarray, j: int) -> list[int]:
@@ -543,9 +564,12 @@ def run_phases(
     """
     recorder = Recorder(test)
     parents = lagged_parents(recorder, n_vars, tau_max, pc_alpha, ranks, constraints, max_depth)
-    adjacency, p_values, statistics, sepsets = skeleton(
+    adjacency, p_values, statistics, sepsets, undecided = skeleton(
         test, n_vars, parents, tau_max, pc_alpha, ranks, constraints, max_p_global
     )
+    # An adjacent link no test with rows decided has no largest p-value.
+    p_values[undecided & (p_values < 0)] = NOT_TESTED
+    statistics[np.isnan(p_values)] = NOT_TESTED
     for (x, j), (statistic, p_value) in recorder.largest.items():
         lag, i = divmod(x, n_vars)
         if p_values[lag, i, j] < 0:  # removed in phase 1
@@ -579,4 +603,5 @@ def run_phases(
         statistics=statistics,
         sepsets=sepsets,
         ambiguous_triples=tuple(sorted(ambiguous)),
+        undecided=undecided,
     )

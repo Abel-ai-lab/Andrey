@@ -341,9 +341,12 @@ def pc1(
     re-sorts the survivors by strength rounded to ``KEY_DP`` decimals, strongest first, and equal
     ones by ``ranks[i]``, then by lag, for the candidate ``(i, lag)``; ``ranks`` holds each
     variable's :func:`~andrey.core.ties.tie_ranks`. Each round is one ``test`` call over all
-    remaining candidates. With ``constraints``, a forbidden link is no candidate, and a required one
-    is never tested: it stays, with the strength of a partial correlation of ``1``. With
-    ``max_depth``, the rounds stop after ``p = max_depth``, so no test conditions on more.
+    remaining candidates. A test that was not tested
+    (:data:`~andrey.core.ci_missing.NOT_TESTED`) neither removes its candidate nor sets its
+    strength, and a candidate none of whose tests was tested ranks after the others. With
+    ``constraints``, a forbidden link is no candidate, and a required one is never tested: it
+    stays, with the strength of a partial correlation of ``1``. With ``max_depth``, the rounds
+    stop after ``p = max_depth``, so no test conditions on more.
     """
     columns = np.array(
         [_column((i, lag), n_vars) for i in range(n_vars) for lag in range(1, tau_max + 1)],
@@ -369,7 +372,9 @@ def pc1(
             )
         strength = np.fmin(strength, np.abs(statistics))
         kept = np.flatnonzero(~(p_values > pc_alpha))
-        kept = kept[np.lexsort((tie[kept], -np.round(strength[kept], KEY_DP)))]
+        # A candidate whose every test so far was not tested has no strength: it ranks last.
+        unranked = np.isinf(strength[kept])
+        kept = kept[np.lexsort((tie[kept], -np.round(strength[kept], KEY_DP), unranked))]
         columns, strength, tie = columns[kept], strength[kept], tie[kept]
         p += 1
     return tuple((int(c) % n_vars, int(c) // n_vars) for c in columns)

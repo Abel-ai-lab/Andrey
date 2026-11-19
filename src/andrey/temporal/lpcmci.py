@@ -79,6 +79,7 @@ with latent confounders. Advances in Neural Information Processing Systems 33 (N
 
 from __future__ import annotations
 
+import math
 from collections import Counter, OrderedDict
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
@@ -88,7 +89,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from andrey.core import backend
-from andrey.core.ci_missing import PartialCorrelationDeletion
+from andrey.core.ci_missing import NOT_TESTED, PartialCorrelationDeletion
 from andrey.core.structure import ARROW, CIRCLE, NULL, TAIL
 from andrey.core.ties import KEY_DP, tie_ranks
 from andrey.temporal.pcmci import DesignTest, LinkTest, design_test
@@ -125,7 +126,10 @@ class LPCMCIResult:
     where no test ran, and ``1`` and ``0`` for a required link. ``sepsets[(i, j, lag)]`` lists the
     separating sets of a removed link (``i < j`` at lag 0) as ``(variable, lag)`` nodes relative
     to ``X^j_t``. ``parents[j]`` holds the ``(i, lag)`` nodes the last preliminary iteration found
-    to be parents of ``X^j_t``, kept as directed links for the final phase.
+    to be parents of ``X^j_t``, kept as directed links for the final phase. ``undecided`` holds
+    the links ``(i, j, lag)`` left in the graph that a test without the rows it needs
+    (:data:`~andrey.core.ci_missing.NOT_TESTED`) could have removed; one with no test that had
+    rows reads ``NaN`` in ``statistics`` and ``p_values``.
     """
 
     start_marks: np.ndarray
@@ -134,6 +138,7 @@ class LPCMCIResult:
     p_values: np.ndarray
     sepsets: dict[Key, tuple[frozenset[Node], ...]]
     parents: tuple[tuple[Node, ...], ...]
+    undecided: tuple[Key, ...] = ()
 
     @property
     def adjacency(self) -> np.ndarray:
@@ -226,6 +231,8 @@ class LPCMCISearch:
         self.shifted: dict[tuple[Key, int], list[frozenset[Node]]] = {}
         self.imin: dict[Key, float] = {}
         self.best: dict[Key, tuple[float, float]] = {}
+        #: The links with a test that was not tested (:data:`~andrey.core.ci_missing.NOT_TESTED`).
+        self.skipped: set[Key] = set()
         self.sepsets: dict[Key, list[frozenset[Node]]] = {}
         self.ever_directed: set[tuple[Key, bool]] = set()
         self.version = 0
@@ -525,7 +532,11 @@ class LPCMCISearch:
     def _record(
         self, key: Key, statistic: float, p_value: float, *, rank: bool, report: bool
     ) -> None:
-        """Update the link's smallest absolute statistic and its largest p-value."""
+        """Update the link's smallest absolute statistic and its largest p-value; a test that was
+        not tested updates neither and marks the link ``skipped``."""
+        if math.isnan(p_value):
+            self.skipped.add(key)
+            return
         if rank:
             self.imin[key] = min(abs(statistic), self.imin.get(key, np.inf))
         if report and (key not in self.best or p_value > self.best[key][1]):
@@ -622,6 +633,10 @@ class LPCMCISearch:
 
     def _record_batch(self, key: Key, statistics: np.ndarray, p_values: np.ndarray) -> None:
         """:meth:`_record` of each test in order, with ``rank`` and ``report``."""
+        tested = ~np.isnan(p_values)
+        if not tested.all():
+            self.skipped.add(key)
+            statistics, p_values = statistics[tested], p_values[tested]
         if not len(p_values):
             return
         self.imin[key] = min(float(np.abs(statistics).min()), self.imin.get(key, np.inf))
@@ -977,8 +992,9 @@ class LPCMCISearch:
         while droppable := sorted(current - known, key=_order):
             trials = [current - {node} for node in droppable]
             _, p_values = self.run_tests(a, b, trials, rank=False, report=False)
-            best = max(range(len(trials)), key=lambda k: p_values[k])
-            if p_values[best] <= self.alpha:
+            # A trial not tested (NaN) never drops a node.
+            best = max(range(len(trials)), key=lambda k: np.nan_to_num(p_values[k], nan=-1.0))
+            if not p_values[best] > self.alpha:
                 break
             current = trials[best]
         return current
@@ -1480,6 +1496,12 @@ def _result(search: LPCMCISearch, kept: list[tuple[Key, bool]]) -> LPCMCIResult:
         statistics[lag, i, j], p_values[lag, i, j] = statistic, p_value
         if lag == 0:
             statistics[0, j, i], p_values[0, j, i] = statistic, p_value
+    undecided = tuple(sorted(key for key in search.skipped if key in search.edges))
+    for i, j, lag in undecided:  # a link no test with rows decided: its largest p-value is unknown
+        if (i, j, lag) not in search.best:
+            statistics[lag, i, j], p_values[lag, i, j] = NOT_TESTED, NOT_TESTED
+            if lag == 0:
+                statistics[0, j, i], p_values[0, j, i] = NOT_TESTED, NOT_TESTED
     for i, j, lag in search.required:  # never tested
         statistics[lag, i, j], p_values[lag, i, j] = 1.0, 0.0
         if lag == 0:
@@ -1497,4 +1519,5 @@ def _result(search: LPCMCISearch, kept: list[tuple[Key, bool]]) -> LPCMCIResult:
         p_values=p_values,
         sepsets={key: tuple(sets) for key, sets in sorted(search.sepsets.items())},
         parents=tuple(tuple(sorted(found, key=_order)) for found in parents),
+        undecided=tuple(key for key in undecided if key not in search.required),
     )

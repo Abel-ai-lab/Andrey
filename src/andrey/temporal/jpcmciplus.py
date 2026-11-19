@@ -469,7 +469,7 @@ def run_phases(
     free = tested(np.outer(contexts, system), contexts)
     kept = _linked(parents, n_nodes, tau_max) & ~free
     kept[0] = between_system
-    links, _, _, sepsets = skeleton(
+    links, _, _, sepsets, _ = skeleton(
         test,
         n_nodes,
         parents,
@@ -485,7 +485,7 @@ def run_phases(
     free = tested(np.outer(dummies, system), np.zeros(n_nodes, dtype=bool))
     kept = _linked(parents, n_nodes, tau_max) & ~free
     kept[0] |= between_system
-    links, _, _, dummy_sepsets = skeleton(
+    links, _, _, dummy_sepsets, _ = skeleton(
         test,
         n_nodes,
         parents,
@@ -501,7 +501,7 @@ def run_phases(
     # The system pass.
     free = tested(between_system, system)
     kept = _linked(parents, n_nodes, tau_max) & ~free
-    adjacency, p_values, statistics, system_sepsets = skeleton(
+    adjacency, p_values, statistics, system_sepsets, _ = skeleton(
         test,
         n_nodes,
         parents,
