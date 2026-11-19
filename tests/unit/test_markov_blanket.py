@@ -36,7 +36,6 @@ from andrey.core.ci_missing import rows_tested
 from andrey.core.orient import dag2cpdag
 from andrey.core.ties import KEY_DP, tie_ranks
 from andrey.search.calm import moral_graph
-from andrey.spec import REGISTRY
 from tests.recovery.helpers.oracle import DSeparation
 
 
