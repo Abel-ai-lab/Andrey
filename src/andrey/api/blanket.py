@@ -43,6 +43,7 @@ def fit_blanket(
     structure: str,
     alpha: float,
     indep_test: str | None,
+    degrees_of_freedom: str,
     categorical: Sequence[str | int] | None,
     seed: int | None,
     max_depth: int | None,
@@ -61,6 +62,7 @@ def fit_blanket(
     settings = {
         "alpha": alpha,
         "indep_test": indep_test,
+        "degrees_of_freedom": degrees_of_freedom,
         "categorical": mask,
         "seed": seed,
         "max_depth": max_depth,
@@ -90,6 +92,7 @@ def iamb(
     structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -131,6 +134,13 @@ def iamb(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -231,13 +241,12 @@ def iamb(
     of the target given the other current members. With exact tests, the result is the true Markov
     blanket [1]_.
 
-    Candidates whose strengths agree to nine decimals go to the column whose rank, computed from the
-    data, comes first, as for :func:`~andrey.hc`, so the sets do not depend on the column order
-    unless two columns are identical. The strength is the absolute partial correlation for
-    ``"fisherz"`` and ``"student_t"``, which keeps its order where p-values underflow to zero, and
-    the p-value for the other tests. Where the p-values of several candidates underflow to zero, the
-    candidate with the strongest statistic joins first, as the association measure of [1]_ orders
-    them.
+    The strength is the absolute partial correlation for ``"fisherz"`` and ``"student_t"``, compared
+    to nine decimals, which keeps its order where p-values underflow to zero, and the p-value for
+    the other tests, compared to nine significant digits, so p-values far below ``1e-9`` keep their
+    order. Candidates whose strengths agree, as p-values that are exactly zero do, go to the column
+    whose rank, computed from the data, comes first, as for :func:`~andrey.hc`, so the sets do not
+    depend on the column order unless two columns are identical.
 
     **From blankets to a graph.** Without a target, a pair is kept when each variable is in the
     other's blanket, which gives the moral graph (``structure="moral"``). The skeleton drops each
@@ -346,6 +355,7 @@ def iamb(
         structure=structure,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
@@ -361,6 +371,7 @@ def inter_iamb(
     structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -401,6 +412,13 @@ def inter_iamb(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -504,11 +522,12 @@ def inter_iamb(
     step repeats one it held after an earlier step, which on sample data could otherwise make it
     cycle. With exact tests, the result is the true Markov blanket [1]_.
 
-    Candidates whose strengths agree to nine decimals go to the column whose rank, computed from the
-    data, comes first, as for :func:`~andrey.hc`, so the sets do not depend on the column order
-    unless two columns are identical. The strength is the absolute partial correlation for
-    ``"fisherz"`` and ``"student_t"``, which keeps its order where p-values underflow to zero, and
-    the p-value for the other tests.
+    The strength is the absolute partial correlation for ``"fisherz"`` and ``"student_t"``, compared
+    to nine decimals, which keeps its order where p-values underflow to zero, and the p-value for
+    the other tests, compared to nine significant digits, so p-values far below ``1e-9`` keep their
+    order. Candidates whose strengths agree, as p-values that are exactly zero do, go to the column
+    whose rank, computed from the data, comes first, as for :func:`~andrey.hc`, so the sets do not
+    depend on the column order unless two columns are identical.
 
     **From blankets to a graph.** Without a target, a pair is kept when each variable is in the
     other's blanket, which gives the moral graph (``structure="moral"``). The skeleton drops each
@@ -610,6 +629,7 @@ def inter_iamb(
         structure=structure,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
@@ -625,6 +645,7 @@ def mmpc(
     structure: str = "skeleton",
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -665,6 +686,13 @@ def mmpc(
         test. ``None`` picks from the declared column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -879,6 +907,7 @@ def mmpc(
         structure=structure,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,

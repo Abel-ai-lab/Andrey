@@ -28,8 +28,10 @@ completes the result by Meek's rules.
 
 Candidates are compared by the strength of their dependence on the target: the absolute partial
 correlation for a test that reports one (``statistic_pvalue``), else the p-value. Strengths that
-agree to ``KEY_DP`` decimals go to the candidate with the lower rank, from
-:func:`~andrey.core.ties.tie_ranks`, so the sets do not depend on the column order.
+agree go to the candidate with the lower rank, from :func:`~andrey.core.ties.tie_ranks`, so the
+sets do not depend on the column order. A partial correlation is compared to ``KEY_DP`` decimals.
+A p-value is compared to ``KEY_DP`` decimals in MMPC and to ``KEY_DP`` significant digits in every
+grow step of IAMB and Inter-IAMB (:func:`markov_blanket`).
 """
 
 from __future__ import annotations
@@ -74,8 +76,16 @@ def _tests_every_set(test: CITest) -> bool:
     return isinstance(test, TestwiseDeletion)
 
 
-def _dependence(test: CITest) -> _Dependence:
-    """The p-value and strength key of a query, read from ``statistic_pvalue`` where it exists."""
+def _pvalue_key(p: float, significant: bool) -> float:
+    """A p-value's strength key: ``p`` to ``KEY_DP`` significant digits when ``significant``, so
+    p-values far below ``10**-KEY_DP``, common for strong dependence on many rows, keep the order of
+    their sizes, else to ``KEY_DP`` decimals."""
+    return float(f"{p:.{KEY_DP}g}") if significant else round(p, KEY_DP)
+
+
+def _dependence(test: CITest, *, significant: bool = False) -> _Dependence:
+    """The p-value and strength key of a query, read from ``statistic_pvalue`` where it exists; a
+    p-value key is :func:`_pvalue_key`'s."""
     statistic_pvalue = getattr(test, "statistic_pvalue", None)
     if statistic_pvalue is not None:
 
@@ -87,13 +97,13 @@ def _dependence(test: CITest) -> _Dependence:
 
     def by_pvalue(target: int, x: int, cond: Sequence[int]) -> tuple[float, float]:
         p = test(target, x, cond)
-        return p, round(p, KEY_DP)
+        return p, _pvalue_key(p, significant)
 
     return by_pvalue
 
 
 def _dependences(
-    test: CITest,
+    test: CITest, *, significant: bool = False
 ) -> Callable[[int, Sequence[int], Sequence[int]], list[tuple[float, float]]]:
     """:func:`_dependence` of every candidate in ``xs`` against one conditioning set.
 
@@ -106,10 +116,10 @@ def _dependences(
         def by_scan(
             target: int, xs: Sequence[int], cond: Sequence[int]
         ) -> list[tuple[float, float]]:
-            return [(p, round(p, KEY_DP)) for p in scan(target, xs, cond).tolist()]
+            return [(p, _pvalue_key(p, significant)) for p in scan(target, xs, cond).tolist()]
 
         return by_scan
-    dependence = _dependence(test)
+    dependence = _dependence(test, significant=significant)
 
     def one_by_one(
         target: int, xs: Sequence[int], cond: Sequence[int]
@@ -143,7 +153,8 @@ def markov_blanket(
     """Estimate ``target``'s Markov blanket with IAMB, or with Inter-IAMB when ``interleaved``.
 
     Grow: add the candidate most dependent on ``target`` given the current blanket, among those
-    whose p-value is at or below ``alpha``, until none is. Shrink: visit the members in the order
+    whose p-value is at or below ``alpha``, until none is; a p-value strength is compared to
+    ``KEY_DP`` significant digits. Shrink: visit the members in the order
     they joined and drop each one the test finds independent of ``target`` (a p-value above
     ``alpha``) given the other current members. IAMB grows to the end and then shrinks once;
     Inter-IAMB shrinks after every addition and stops when no candidate qualifies or the blanket
@@ -161,7 +172,7 @@ def markov_blanket(
     ``target`` is set in it, in place, to the conditioning set of the last such test: the blanket
     of the grow step that left it out, or the other members when the shrink dropped it.
     """
-    dependences = _dependences(test)
+    dependences = _dependences(test, significant=True)
     required = _required(constraints, target, ranks)
     blanket: list[int] = list(required)
     seen: set[frozenset[int]] = set()
@@ -412,15 +423,46 @@ def parents_children(
         rest = sorted(z for z in members if z != x)
         top = len(rest) if max_depth is None else min(len(rest), max_depth)
         for size in range(1, top + 1):
-            trace: list[dict] | None = None if sepsets is None else []
-            if scan_conditioning_sets(test, target, x, rest, size, alpha, set(), before, trace):
+            found = _separating(test, target, x, rest, size, alpha, before, ranks)
+            if found is not None:
                 members.remove(x)
-                if sepsets is not None and trace is not None:
-                    found = [t for t in trace if t["removed"]]
-                    p = np.array([[t["p"] for t in found]])
-                    [sepsets[x]] = _largest_sets(p, [t["S"] for t in found], ranks)
+                if sepsets is not None:
+                    sepsets[x] = found
                 break
     return members
+
+
+def _separating(
+    test: CITest,
+    target: int,
+    x: int,
+    among: list[int],
+    size: int,
+    alpha: float,
+    skip_within: set[int],
+    ranks: Sequence[int],
+) -> tuple[int, ...] | None:
+    """The set of ``size`` members of ``among`` that separates ``x`` from ``target`` (a p-value
+    above ``alpha``) with the largest p-value, ties as :func:`_largest_sets` breaks them, or
+    ``None`` when no set does.
+
+    Every such set is tested, those lying inside ``skip_within`` excepted
+    (:func:`~andrey.constraint._skeleton.scan_conditioning_sets`). Only the best separating set so
+    far is kept, so the memory does not grow with the number of sets.
+    """
+    best: list[tuple[tuple[int, ...], float]] = []
+
+    def visit(chunk: np.ndarray, pvalues: Sequence[float]) -> None:
+        p = np.asarray(pvalues, dtype=np.float64)
+        hits = [(tuple(chunk[j].tolist()), float(p[j])) for j in np.flatnonzero(p > alpha).tolist()]
+        if hits:
+            found = best + hits
+            sets = [s for s, _ in found]
+            [pick] = _largest_sets(np.array([[q for _, q in found]]), sets, ranks)
+            best[:] = [found[sets.index(pick)]]
+
+    scan_conditioning_sets(test, target, x, among, size, alpha, set(), skip_within, visit=visit)
+    return best[0][0] if best else None
 
 
 def mmpc_sets(
@@ -618,12 +660,18 @@ def blanket_cpdag(
 
 
 def _ranked_test(
-    X: np.ndarray, indep_test: str, categorical: np.ndarray | None, seed: int | None
+    X: np.ndarray,
+    indep_test: str,
+    categorical: np.ndarray | None,
+    seed: int | None,
+    degrees_of_freedom: str,
 ) -> tuple[CITest, list[int]]:
-    """The ``indep_test`` test, seeded by ``seed``, over ``X`` and each column's
-    :func:`~andrey.core.ties.tie_ranks`, the columns the test reads as categories ranked as
-    categories (:func:`~andrey.core.ties.tie_mask`)."""
-    test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
+    """The ``indep_test`` test, seeded by ``seed``, with ``degrees_of_freedom``, over ``X`` and
+    each column's :func:`~andrey.core.ties.tie_ranks`, the columns the test reads as categories
+    ranked as categories (:func:`~andrey.core.ties.tie_mask`)."""
+    test = make_indep_test(
+        indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
+    )
     return test, tie_ranks(X, tie_mask(indep_test, categorical, X.shape[1])).tolist()
 
 
@@ -862,6 +910,7 @@ def local_search(
     *,
     alpha: float,
     indep_test: str,
+    degrees_of_freedom: str = "mean",
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -870,11 +919,12 @@ def local_search(
     """A :class:`LocalSearch` over the ``indep_test`` test of ``X``.
 
     ``categorical`` marks the categorical columns for a mixed-data test; ``seed`` fixes the draws
-    of a stochastic test (``None`` uses ``ANDREY_SEED``); ``alpha``, ``max_depth``, and
+    of a stochastic test (``None`` uses ``ANDREY_SEED``); ``degrees_of_freedom`` reaches a
+    categorical test (:class:`~andrey.core.ci.ChiSquare`); ``alpha``, ``max_depth``, and
     ``constraints`` are as :class:`LocalSearch` takes them. A column the test reads as categories
     (:func:`~andrey.core.ties.tie_mask`) has as many levels as distinct observed values.
     """
-    test, ranks = _ranked_test(X, indep_test, categorical, seed)
+    test, ranks = _ranked_test(X, indep_test, categorical, seed, degrees_of_freedom)
     mask = tie_mask(indep_test, categorical, X.shape[1])
     levels = None
     if mask.any():
@@ -899,6 +949,7 @@ def local_structure(
     *,
     alpha: float,
     indep_test: str,
+    degrees_of_freedom: str = "mean",
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -920,6 +971,7 @@ def local_structure(
         X,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
@@ -936,6 +988,7 @@ def local_set(
     *,
     alpha: float,
     indep_test: str,
+    degrees_of_freedom: str = "mean",
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -950,6 +1003,7 @@ def local_set(
         X,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,

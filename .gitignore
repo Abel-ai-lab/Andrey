@@ -29,6 +29,13 @@ benchmarks/.tetrad-missing/
 benchmarks/.loci/
 # The authors' SkewD code that benchmarks/start_skewd.sh fetches, read from disk and never committed.
 benchmarks/.skewd/
+# The authors' bQCD code that benchmarks/start_qccd.sh fetches, read from disk and never committed.
+benchmarks/.qccd/
+# The authors' HECI code that benchmarks/start_heci.sh fetches, read from disk and never committed.
+benchmarks/.heci/
+# The authors' GRCI code (CC BY-NC 4.0) that benchmarks/start_grci.sh fetches, read from disk and
+# never committed.
+benchmarks/.grci/
 # The authors' NOTEARS code that benchmarks/start_notears.sh fetches, read from disk and never
 # committed.
 benchmarks/.notears/

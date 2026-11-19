@@ -25,6 +25,7 @@ from andrey import api
 from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.core.ci import (
     CONTINUOUS_INDEP_TESTS,
+    DEGREES_OF_FREEDOM,
     RANK_INDEP_TESTS,
     SHIPPED_INDEP_TESTS,
     STOCHASTIC_INDEP_TESTS,
@@ -417,6 +418,28 @@ _CONCEPTS = (
                 "monotone changes the likelihood stage reads; the authors' code runs PC with kci.",
             ),
         ),
+    ),
+    Concept(
+        key="degrees_of_freedom",
+        summary="The degrees of freedom of the categorical tests, chisq and gsq: mean = the mean "
+        "of the statistic when y is shuffled within each configuration of the conditioning set; "
+        "nonempty = (r_x - 1)(r_y - 1) per configuration over the values present, its table's "
+        "empty rows and columns struck (Spirtes, Glymour and Scheines 1993, Section 5.5). The two "
+        "differ only on sparse tables. A call that passes it with another test raises ValueError.",
+        param=_template(
+            "degrees_of_freedom",
+            "str",
+            "mean",
+            "Degrees of freedom of the categorical tests, chisq and gsq: mean = the mean of the "
+            "statistic when y is shuffled within each configuration of the conditioning set; "
+            "nonempty = (r_x - 1) * (r_y - 1) per configuration over the values of x and y present "
+            "in it, the table's empty rows and columns struck. They differ only on sparse tables. "
+            "Only chisq and gsq read it: passing it with another test raises ValueError.",
+            choices=DEGREES_OF_FREEDOM,
+        ),
+        fragment="degrees of freedom",
+        suitable=tuple(m for m in TESTED if m not in CONTINUOUS_TESTED),
+        others_exempt="Takes no categorical conditional-independence test.",
     ),
     Concept(
         key="invariance_test",
