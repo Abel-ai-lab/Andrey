@@ -30,6 +30,7 @@ import json
 import os
 import platform
 import socket
+import subprocess
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -75,6 +76,32 @@ def make_solution(name: str) -> Any:
 
     module, cls = REFERENCES[name]
     return getattr(import_module(module), cls)()
+
+
+def preflight(adapters: dict[str, Any]) -> dict[str, str]:
+    """Check every fit interpreter and every reference's code folder before any fit runs.
+
+    Returns ``{solution: version}``: the version of the package each solution's fits run, read from
+    the interpreter that runs them when it is not the driver's.
+    """
+    from importlib import import_module
+
+    interpreters = check_interpreters(list(adapters.values()))
+    for name in adapters:
+        if name in REFERENCES:
+            import_module(REFERENCES[name][0]).code_dir()
+    versions = {}
+    for name, adapter in adapters.items():
+        versions[name] = adapter.package_version
+        if adapter.package == "andrey" and getattr(adapter, "python_env", None):
+            command = [
+                str(interpreters[adapter.name]),
+                "-c",
+                "import andrey; print(andrey.__version__)",
+            ]
+            run = subprocess.run(command, capture_output=True, text=True, check=True)
+            versions[name] = run.stdout.strip()
+    return versions
 
 
 def parse_pairs(text: str) -> set[int]:
@@ -148,8 +175,12 @@ def main(argv: list[str] | None = None) -> int:
     records = args.out / "records.jsonl"
     done = done_units(records)
     adapters = {name: make_solution(name) for name in args.solutions}
-    # A missing interpreter fails here, before any fit runs.
-    check_interpreters(list(adapters.values()))
+    versions = preflight(adapters)
+    # The selected pairs, so the summary counts a pair no fit reached as unfinished.
+    manifest = args.out / "pairs.json"
+    expected = json.loads(manifest.read_text()) if manifest.is_file() else {}
+    expected.update({q.name: q.weight for q in pairs})
+    manifest.write_text(json.dumps(dict(sorted(expected.items())), indent=1) + "\n")
     # Largest pairs first, so a worker is not left with the slow fits at the end.
     tasks = [
         (q, name)
@@ -183,7 +214,7 @@ def main(argv: list[str] | None = None) -> int:
             "solution": adapter.name,
             "method": name,
             "package": adapter.package,
-            "package_version": adapter.package_version,
+            "package_version": versions[name],
             "params": dict(adapter.params()),
             "status": measure.get("status"),
             "wall_s": measure.get("wall_s"),
