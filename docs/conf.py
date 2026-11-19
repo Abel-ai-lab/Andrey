@@ -25,6 +25,7 @@ import tomllib
 from urllib.parse import urljoin
 
 import ablog.blog
+import yaml
 from ablog.blog import Blog
 from ablog.post import register_posts
 from docutils import nodes
@@ -232,10 +233,15 @@ ABEL_LOGO_WIDTH = 600
 AVIF_QUALITY = 50
 # The icon's PNGs at the site's root, by name, each its side in pixels (_write_discovery).
 FAVICONS = {"favicon-96.png": 96, "apple-touch-icon.png": 180}
-# Pages a search engine should not list: the search page, and the page the server shows for a
-# missing address (404.md). The blog's generated pages (All Posts, the years, the archive, the tags,
-# and the authors) only list the posts again, so they are not listed either (`_blog_collection`).
-UNINDEXED = {"search", "404"}
+# The software's image in the structured data: the home-screen icon, a raster search results show.
+SOFTWARE_ICON = "apple-touch-icon.png"
+# Pages a search engine should not list: the search page, the page the server shows for a missing
+# address (404.md), and the general index, which only lists the API's names again. The blog's
+# generated pages (All Posts, the years, the archive, the tags, and the authors) only list the
+# posts again (`_blog_collection`), and the source-code pages under `_modules/`
+# (`UNINDEXED_FOLDER`) repeat the API reference's code, so they are not listed either.
+UNINDEXED = {"search", "404", "genindex"}
+UNINDEXED_FOLDER = "_modules/"
 # The pages llms.txt lists, by section; each release card and published post follows its section's
 # pages, newest first.
 LLMS_SECTIONS = (
@@ -246,6 +252,8 @@ LLMS_SECTIONS = (
             "docs/guides/getting-started",
             "docs/guides/concepts",
             "docs/faq",
+            "docs/methods",
+            "docs/comparison",
             "docs/api",
             "docs/configuration",
             "docs/guides/graph-types",
@@ -258,6 +266,9 @@ LLMS_SECTIONS = (
     ("Blog", ("blog/index",)),
 )
 PACKAGE = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+# How to cite Andrey, from the repository's citation file, which the FAQ's BibTeX entry repeats.
+CITATION = ROOT / "CITATION.cff"
+CITE_ANCHOR = "docs/faq.html#how-do-i-cite-it"
 html_theme_options = {
     # One header on every page (_templates/site-*.html): the wordmark to the homepage and the
     # release to the changelog, then the site's sections, then search, theme, and GitHub.
@@ -330,8 +341,8 @@ html_additional_pages = {
     "docs/demos/benchmark-explorer": "benchmark-explorer-redirect.html",
 }
 # The pages that moved, each old address with the page, and the section where it names one, that
-# holds its content now. The old address redirects there (_moved_pages), and a released post that
-# links the old page keeps its link (_moved_links).
+# holds its content now. The old address redirects there (_moved_pages), and a released post's link
+# to the old page leads to the new one (_moved_links).
 EXAMPLES_DEMOS = "docs/examples/index#interactive-demos"
 MOVED = {
     "demo/index": EXAMPLES_DEMOS,
@@ -362,7 +373,8 @@ def _moved_pages(app):  # noqa: ANN001, ANN202 -- Sphinx event arguments
 
 
 def _moved_links(app, doctree) -> None:  # noqa: ANN001 -- Sphinx event arguments
-    """Point a post's link to a page in ``MOVED`` at the page's old address, which redirects.
+    """Point a post's link to a page in ``MOVED`` at the page that holds its content now, and the
+    section ``MOVED`` names, else the link's own, so a reader and a crawler skip the redirect.
 
     A released post is not edited, so its link names a source file that is gone; left alone, the
     link would not resolve and the build would stop.
@@ -375,7 +387,9 @@ def _moved_links(app, doctree) -> None:  # noqa: ANN001 -- Sphinx event argument
         path, _, section = node["reftarget"].partition("#")
         old = posixpath.normpath(posixpath.join(here, path)).removesuffix(".md")
         if node.get("reftype") == "myst" and old in MOVED:
-            address = posixpath.relpath(old, here) + ".html" + (f"#{section}" if section else "")
+            doc, _, moved_section = MOVED[old].partition("#")
+            section = moved_section or section
+            address = posixpath.relpath(doc, here) + ".html" + (f"#{section}" if section else "")
             node.replace_self(nodes.reference("", "", *node.children, refuri=address))
 
 
@@ -460,14 +474,20 @@ def _load_summary(app) -> dict:  # noqa: ANN001
 
 def _facts() -> list[str]:
     """What Andrey covers, one plain sentence each, for llms.txt and the structured data: the kinds
-    of data, every registry family with its methods, and where the measurements are."""
+    of data, the methods by status, every registry family with its methods (an experimental one
+    marked), and where the measurements are."""
+    specs = list_specs()
     families: dict[str, list[str]] = {}
-    for spec in list_specs():
-        families.setdefault(spec.family, []).append(f"`{spec.name}`")
+    for spec in specs:
+        marked = "" if spec.status == "supported" else f" ({spec.status})"
+        families.setdefault(spec.family, []).append(f"`{spec.name}`{marked}")
+    supported = sum(spec.status == "supported" for spec in specs)
     return [
         "Data: continuous, categorical, and mixed columns; independent samples and time series; "
         "linear and nonlinear relationships; hidden common causes; interventions and several "
         "domains.",
+        f"Methods: {len(specs)} in all, {supported} supported and {len(specs) - supported} "
+        "experimental.",
         *(
             f"{label}: {', '.join(families[family])}."
             for family, label in site.SPEC_FAMILIES.items()
@@ -475,13 +495,37 @@ def _facts() -> list[str]:
         ),
         "Background knowledge: required and forbidden edges and tiers in time, through "
         "`knowledge=`.",
-        "Speed: batched array operations, CPU cores, and a GPU for some methods; every method is "
-        f"timed against the packages that implement it in the release cards, {SITE_URL}docs/"
-        "benchmarks.html.",
+        "Speed: batched array operations, CPU cores, and a GPU for some methods; the release "
+        f"cards at {SITE_URL}docs/benchmarks.html time every method against the packages that "
+        "implement it.",
         "Open source: the code under the Apache License 2.0, and the benchmark scripts and "
         "summaries behind every published number, so anyone can rerun them; "
         "`pip install andrey-core`.",
     ]
+
+
+def _llms_summary() -> str:
+    """``llms.txt``'s opening summary, the first lines an answer engine reads: the speed claim with
+    no number, then accuracy, agents, and the kinds of data, with the count of supported methods
+    from the registry."""
+    supported = sum(spec.status == "supported" for spec in list_specs())
+    return (
+        "Andrey is the fastest open-source Python package for causal discovery. It is accurate "
+        "(each method checked against its authors' code), built for agents (a CLI with JSON "
+        "output and introspection), and covers observational, interventional, time-series, "
+        f"hidden-variable and two-variable data with {supported} supported methods."
+    )
+
+
+def _cite() -> str:
+    """How to cite Andrey, in one line: the authors, title, version, and address of
+    ``CITATION.cff``, and the FAQ's answer that gives the BibTeX entry."""
+    citation = yaml.safe_load(CITATION.read_text(encoding="utf-8"))
+    authors = ", ".join(author["name"] for author in citation["authors"])
+    return (
+        f"{authors}, {citation['title']}, version {citation['version']}, {citation['url']}; "
+        f"the BibTeX entry is at {SITE_URL}{CITE_ANCHOR}"
+    )
 
 
 # Each method's name in prose. A method missing here, or a name no method has, stops the build.
@@ -768,22 +812,30 @@ def _description(app, context: dict, doctree: nodes.document | None) -> str:  # 
 
 def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: ANN001
     """The page's description, its Open Graph and Twitter card tags (title, summary, address, and
-    image), its canonical address, and its structured data (``discovery.head_tags``): the
-    organization, the website, the software at the release the page belongs to, the page or post,
-    and its breadcrumbs. The pages in ``UNINDEXED`` and the blog's generated pages are ``noindex``
-    and name no canonical address. The description and ``og:description`` are one value, as are
-    ``og:url`` and the canonical address."""
-    unindexed = pagename in UNINDEXED or _blog_collection(context, doctree)
+    image with its text alternative), its canonical address, and its structured data
+    (``discovery.head_tags``): the organization, the website, the software at the current release,
+    the page or post (with its update's date once a release has updated it), and its breadcrumbs,
+    which pass through Docs or Blog. The pages in ``UNINDEXED``, those under ``UNINDEXED_FOLDER``,
+    and the blog's generated pages are ``noindex`` and name no canonical address. The description
+    and ``og:description`` are one value, as are ``og:url`` and the canonical address."""
+    unindexed = (
+        pagename in UNINDEXED
+        or pagename.startswith(UNINDEXED_FOLDER)
+        or _blog_collection(context, doctree)
+    )
     home = context.get("home")
     heading = re.sub(r"<[^>]+>", "", context.get("title") or app.config.project)
     title = home["title"] if home else html.unescape(heading)
     description = _description(app, context, doctree)
     url = SITE_URL + ("" if pagename == "index" else f"{pagename}.html")
     image, size = HOME_PREVIEW, (cards.SOCIAL_W, cards.SOCIAL_H)
+    alt = f"Andrey wordmark with the tagline: {cards.TAGLINE}"
     if pagename in _blog(app):  # each post's preview is its banner: its art, title, and release
         image, size = f"assets/preview/{pagename.removeprefix('blog/')}.jpg", (cards.W, cards.H)
-        preview = cards.preview_jpeg(_cover_kind(app, pagename), title, _cover_line(app, pagename))
+        line = _cover_line(app, pagename)
+        preview = cards.preview_jpeg(_cover_kind(app, pagename), title, line)
         _write_bytes(pathlib.Path(app.outdir) / image, preview)
+        alt = f"Andrey blog banner: {title}" + (f" ({line})" if line else "")
     image = SITE_URL + image
     tags = {
         "description": description,
@@ -796,6 +848,7 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         "og:image:type": "image/jpeg",
         "og:image:width": str(size[0]),
         "og:image:height": str(size[1]),
+        "og:image:alt": alt,
         "twitter:card": "summary_large_image",
     }
     preview = "".join(
@@ -810,15 +863,16 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         markdown = html.escape(f"{SITE_URL}_sources/{source}", quote=True)
         preview += f'<link rel="alternate" type="text/markdown" href="{markdown}">\n'
     page = {"title": title, "description": description, "url": url, "image": image}
+    page["image_alt"] = alt
     if unindexed:
         page["indexable"] = False
-    if match := re.fullmatch(r"docs/benchmarks/(\d+\.\d+\.\d+)", pagename):
-        page["software_version"] = match[1]
     post = None
     if pagename in Blog(app):
         article = Blog(app)[pagename]
+        updated = article.date and article.update and article.update != article.date
         post = {
             "date": article.date.strftime("%Y-%m-%d") if article.date else None,
+            "modified": article.update.strftime("%Y-%m-%d") if updated else None,
             "authors": [
                 {
                     "name": str(person),
@@ -826,9 +880,15 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
                 }
                 for person in article.author or ()
             ],
-            "version": app.env.metadata.get(pagename, {}).get("version"),
         }
-    parents = [
+    # The site's section first: the docs' root and the blog's front page are no page's toctree
+    # parent, so Sphinx names neither.
+    section = [
+        {"title": name, "url": SITE_URL + f"{doc}.html"}
+        for name, doc in (("Docs", root_doc), ("Blog", "blog/index"))
+        if pagename.startswith(doc.split("/")[0] + "/") and pagename != doc
+    ]
+    parents = section + [
         {
             "title": html.unescape(re.sub(r"<[^>]+>", "", parent["title"])),
             "url": urljoin(url, parent["link"]),
@@ -837,7 +897,8 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
     ]
     software = {
         "name": app.config.project,
-        "description": PACKAGE["description"],
+        # The homepage's summary, which opens with the speed claim.
+        "description": app.andrey_home["description"],
         "version": release,
         "license": {
             "@type": "CreativeWork",
@@ -847,8 +908,11 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         "programmingLanguage": "Python",
         "runtimePlatform": f"Python {PACKAGE['requires-python']}",
         "codeRepository": PACKAGE["urls"]["Source"],
-        # Andrey's own icon, the favicon; the organization's node carries Abel's logo.
-        "image": SITE_URL + "_static/favicon.svg",
+        "softwareVersion": release,
+        "downloadUrl": PYPI_URL,
+        # Andrey's own icon, as a PNG (_write_discovery); the organization's node carries Abel's
+        # logo.
+        "image": SITE_URL + SOFTWARE_ICON,
         "alternateName": PACKAGE["name"],
         # A software application too, for its category, platforms, price, and features.
         "@type": ["SoftwareSourceCode", "SoftwareApplication"],
@@ -857,7 +921,7 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
         "keywords": ", ".join(PACKAGE["keywords"]),
         "featureList": [fact.replace("`", "") for fact in _facts()],
-        "sameAs": [f"https://pypi.org/project/{PACKAGE['name']}/", PACKAGE["urls"]["Source"]],
+        "sameAs": [PYPI_URL, PACKAGE["urls"]["Source"]],
     }
     return preview + discovery.head_tags(
         page,
@@ -974,13 +1038,14 @@ def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event ar
     try:
         entries = discovery.read_pages(outdir, [n for _, documents in sections for n in documents])
         text = discovery.llms_index(
-            app.andrey_home["description"],
+            _llms_summary(),
             entries,
             sections,
             site_url=SITE_URL,
             project=app.config.project,
             version=release,
             facts=_facts(),
+            cite=_cite(),
         )
     except ValueError as error:
         raise ConfigError(str(error)) from None
