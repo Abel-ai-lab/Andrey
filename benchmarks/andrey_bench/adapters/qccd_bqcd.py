@@ -118,6 +118,7 @@ class TagasovskaQCCD(RAdapter):
             "type": "QCCD",
             "m": self.levels,
             "rvinecopulib": rsession.package_version("rvinecopulib"),
+            "statmod": rsession.package_version("statmod"),
         }
 
     def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:

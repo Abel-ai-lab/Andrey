@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 """Summarize ``tuebingen_pairs.py`` runs: weighted accuracy with an interval, coverage, and time.
 
-Reads ``records.jsonl`` from each run directory and writes ``summary.md`` and ``summary.json`` to
-``--out``. For each solution it reports:
+Reads ``records.jsonl`` and, where the driver wrote it, ``pairs.json`` (the pairs the run was asked
+for) from each run directory, and writes ``summary.md`` and ``summary.json`` to ``--out``. For each
+solution it reports:
 
 - **coverage**: the pairs whose fit finished (``ok``), as a count and as the share of the pairs'
-  total weight. A timeout, a memory kill, or an error is not an answer: it is not scored as a guess
+  total weight. A timeout, a memory kill, an error, or a pair with no record is not an answer: it is not scored as a guess
   and not counted in the accuracy, and the column says how much of the set the accuracy covers.
 - **accuracy**: the weighted share of finished pairs whose decision names the true direction, with
   the collection's weights; a finished fit with no edge counts as wrong, and ``undecided`` counts
@@ -35,6 +36,16 @@ RESAMPLES = 10_000
 LEVEL = 0.95
 
 
+def read_manifest(runs: list[Path]) -> dict[str, float]:
+    """The pairs the runs were asked for, ``{pair: weight}``, from each run's ``pairs.json``."""
+    expected: dict[str, float] = {}
+    for run in runs:
+        path = run / "pairs.json"
+        if path.is_file():
+            expected.update(json.loads(path.read_text()))
+    return expected
+
+
 def read_records(runs: list[Path]) -> list[dict]:
     """Every fit record of the run directories; a repeated (pair, solution) keeps the last one."""
     latest: dict[tuple[str, str], dict] = {}
@@ -57,10 +68,16 @@ def interval(draws: np.ndarray) -> tuple[float, float]:
     return float(lo), float(hi)
 
 
-def summarize(records: list[dict], seed: int = 0) -> dict:
-    """The tables of the module docstring as a dict, from the fit records."""
-    pairs = sorted({r["pair"] for r in records})
-    weight = np.array([next(r["weight"] for r in records if r["pair"] == p) for p in pairs])
+def summarize(records: list[dict], expected: dict[str, float] | None = None, seed: int = 0) -> dict:
+    """The tables of the module docstring as a dict, from the fit records.
+
+    ``expected`` (``{pair: weight}``) adds the pairs a run was asked for: a pair with no record of a
+    solution counts as ``missing`` for it, unfinished.
+    """
+    weights = dict(expected or {})
+    weights.update({r["pair"]: r["weight"] for r in records})
+    pairs = sorted(weights)
+    weight = np.array([weights[p] for p in pairs])
     seen = {r["method"] for r in records}
     methods = [m for m in METHOD_ORDER if m in seen] + sorted(seen - set(METHOD_ORDER))
     index = {p: i for i, p in enumerate(pairs)}
@@ -77,6 +94,10 @@ def summarize(records: list[dict], seed: int = 0) -> dict:
             right[m][i] = float(bool(r.get("correct")))
             wall[m][i] = r["wall_s"]
             undecided[m] += r.get("decision") in ("none", "other")
+    for m in methods:
+        missing = len(pairs) - sum(statuses[m].values())
+        if missing:
+            statuses[m]["missing"] = missing
     rng = np.random.default_rng(seed)
     draws = rng.integers(0, len(pairs), size=(RESAMPLES, len(pairs)))
     common = np.logical_and.reduce([ok[m] for m in methods])
@@ -179,7 +200,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", required=True, type=Path)
     args = p.parse_args(argv)
     records = read_records(args.runs)
-    summary = summarize(records)
+    summary = summarize(records, read_manifest(args.runs))
     args.out.mkdir(parents=True, exist_ok=True)
     text = json.dumps(without_nan(summary), indent=2, allow_nan=False)
     (args.out / "summary.json").write_text(text + "\n")
