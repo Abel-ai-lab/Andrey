@@ -133,7 +133,9 @@ baselines. A value a method does not list raises a
 `ValueError` that
 names the values it takes. A column with no observed value, or a constant one over its observed
 values, raises a `ValueError` before the fit, and a test with fewer rows than it needs, `|S| + 3`
-for `"fisherz"` and `"student_t"` and 2 for the other tests, raises one during it. `cdnod` and
+for `"fisherz"` and `"student_t"`; 4 for `"gcm"` and for `"wgcm"` with `variant="fix"`, 17 for
+`"wgcm"`'s default `variant="est"`, and 12 for `"pcm"`; and 2 for the other tests, raises one
+during it. `cdnod` and
 `fci_jci` need a complete `env`. Every other method raises a `ValueError` that names it and says
 what to do instead, as [Missing values](guides/getting-started.md#missing-values) describes; each
 method's Notes say why.
@@ -143,8 +145,8 @@ method's Notes say why.
 `mmhc`, `rsmax2`, `igsp`, `ut_igsp`, `pcmci`, `pcmciplus`, and `lpcmci` take the same `indep_test`
 choices: `"fisherz"`, `"student_t"`, and `"normal_scores"` for continuous data, `"chisq"` and
 `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"` for mixed data, and the nonlinear
-tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` ([Conditional-independence
-tests](#conditional-independence-tests)). `None`, the default, picks from the declared column types,
+tests `"kci"`, `"rcot"`, `"cmiknn"`, `"gpdc"`, `"gcm"`, `"wgcm"`, and `"pcm"`
+([Conditional-independence tests](#conditional-independence-tests)). `None`, the default, picks from the declared column types,
 `"fisherz"` for continuous data. `jpcmciplus` takes the continuous and nonlinear tests, as its
 dummies enter a test as numeric columns. `skewd_mv` takes them without `"normal_scores"`, as its
 likelihood stage reads the values, and its default is `"kci"`. `pcmci`, `pcmciplus`, `jpcmciplus`,
@@ -339,11 +341,12 @@ whole number from 0 to 2**32 - 1 that fixes their random draws. `None`, the defa
 configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh random one, so a call repeats
 exactly. Apart from `boss_fci` and `grasp_fci`, whose BOSS or GRaSP phase visits the variables in a
 random order on every fit, the methods that test independence draw random numbers only under
-`indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `pc` also with `missing="mvpc"` on data with missing
-values, `igsp` and `ut_igsp` also with `n_starts` above 1, `hc` and `tabu` only with `n_starts`
-above 1, and `cpcm` and `cpcm_graph` only for a column under `family="poisson"` or
-`"negative_binomial"`; `skewd` and `skewd_mv` draw in every fit, in their Bayesian optimization and
-CMA-ES, whatever test PC runs. Otherwise `seed` changes nothing, and `metadata["seed"]` is not set.
+`indep_test="rcot"`, `"cmiknn"`, `"gpdc"`, `"gcm"`, `"wgcm"`, or `"pcm"`, `pc` also with
+`missing="mvpc"` on data with missing values, `igsp` and `ut_igsp` also with `n_starts` above 1,
+`hc` and `tabu` only with `n_starts` above 1, and `cpcm` and `cpcm_graph` only for a column under
+`family="poisson"` or `"negative_binomial"`; `skewd` and `skewd_mv` draw in every fit, in their
+Bayesian optimization and CMA-ES, whatever test PC runs. Otherwise `seed` changes nothing, and
+`metadata["seed"]` is not set.
 A call that gives `seed` does not depend on `ANDREY_SEED`. Every other method is deterministic and
 takes no seed.
 
@@ -750,6 +753,9 @@ A method becomes supported once it has:
 | `"rcot"` | Random-feature approximation of the kernel test; time linear in the rows | Supported |
 | `"cmiknn"` | Nearest-neighbor conditional mutual information, with a local permutation null | Supported |
 | `"gpdc"` | Gaussian-process regression, then a distance-correlation test of the residuals | Supported |
+| `"gcm"` | Generalized covariance measure: the normalized covariance of the residuals of boosted-tree regressions | Experimental |
+| `"wgcm"` | Weighted generalized covariance measure: the GCM with weights on the conditioning set, for a covariance that changes sign | Experimental |
+| `"pcm"` | Projected covariance measure: whether one variable improves a random-forest prediction of the other | Experimental |
 
 `normal_scores` ranks each column over every row its test reads, and its model is one distribution.
 Ranked over the rows of several environments, a column mixes their distributions, and its scores
@@ -836,6 +842,9 @@ query.
    ci_kernel.RCoT
    ci_cmiknn.CMIknn
    ci_gpdc.GPDC
+   ci_regression.GCM
+   ci_regression.WGCM
+   ci_regression.PCM
    ci.CITest
    ci_missing.TestwiseDeletion
    ci.register_indep_test

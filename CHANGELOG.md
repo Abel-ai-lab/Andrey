@@ -21,6 +21,19 @@ names its pull request.
 - For contributors, a benchmark lane runs `anm`, `pnl`, `loci`, and `resit` beside the authors'
   code of QCCD, HECI, and GRCI on the Tübingen cause-effect pairs, and a summary script turns its
   records into a weighted-accuracy table. ([#1127])
+- Three experimental regression-based conditional-independence tests, as `indep_test` options of
+  every method that takes one: `"gcm"`, the generalized covariance measure (Shah and Peters 2020),
+  which tests the covariance of the residuals of boosted-tree regressions; `"wgcm"`, the weighted
+  generalized covariance measure (Scheidegger, Hörrmann, and Bühlmann 2022), which weights that
+  covariance by an estimated sign function of the conditioning set (`variant="fix"` takes fixed
+  weights); and `"pcm"`, the projected covariance measure (Lundborg, Kim, Shah, and Samworth
+  2024), which tests whether one variable improves a random-forest prediction of the other. Each
+  takes `regression="boosting"`, `"forest"`, or `"linear"`. Each fit and each sample split reads
+  only the query's columns, standardized, rounded, and signed, with the rows in an order of their
+  values, so a p-value depends on neither the row nor the column order, nor on columns outside the
+  query, and changes with a column's units or sign only where the rounding moves a value or a
+  column is symmetric about its mean once sorted. A contributor's script compares them with the
+  authors' code. ([#1147])
 
 ### Changed
 
@@ -2727,6 +2740,7 @@ First alpha release.
 [#1120]: https://github.com/Abel-ai-lab/Andrey/pull/1120
 [#1122]: https://github.com/Abel-ai-lab/Andrey/pull/1122
 [#1127]: https://github.com/Abel-ai-lab/Andrey/pull/1127
+[#1147]: https://github.com/Abel-ai-lab/Andrey/pull/1147
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
 [#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
 [#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
