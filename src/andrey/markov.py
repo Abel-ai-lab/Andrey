@@ -334,7 +334,8 @@ def markov_check(
     if unexplained or not np.all((p_values[tested] >= 0) & (p_values[tested] <= 1)):
         raise ValueError(f"markov_check: the {test_name!r} test returned a p-value outside [0, 1]")
     if test_name in TABLE_TESTS:
-        _warn_sparse(X, columns, facts, test_name, rows_per_test)
+        ran = [fact for fact, kept in zip(facts, tested.tolist()) if kept]
+        _warn_sparse(X, columns, ran, test_name, rows_per_test)
 
     statistic, p_uniform = (
         anderson_darling_uniform(p_values[tested]) if tested.any() else (None, None)

@@ -1308,7 +1308,7 @@ def bootstrap(
     if method_kwargs.get("missing") is None and any(
         out.metadata.get("missing") == TESTWISE for group in groups for out in group
     ):
-        notice_default_missing(spec.name)
+        notice_default_missing(spec.name, _not_tested_over([out for g in groups for out in g]))
     metadata: dict[str, JSONValue] = {
         "method": spec.name,
         "seed": root,
@@ -1330,6 +1330,19 @@ def bootstrap(
         for group in groups
     ]
     return outs if spec.output.multi else outs[0]
+
+
+def _not_tested_over(fits: list) -> dict:
+    """Return the not-tested metadata of ``fits`` for the notice.
+
+    The pairs never observed together and the undecided pairs of any fit, in order of first
+    appearance, and the tests not tested over all of them.
+    """
+    merged: dict = {"not_tested": sum(out.metadata.get("not_tested", 0) for out in fits)}
+    for key in ("never_observed_together", "undecided_pairs"):
+        pairs = [pair for out in fits for pair in out.metadata.get(key, [])]
+        merged[key] = [pair for k, pair in enumerate(pairs) if pair not in pairs[:k]]
+    return merged
 
 
 def _column_ranks(job: Job) -> np.ndarray:

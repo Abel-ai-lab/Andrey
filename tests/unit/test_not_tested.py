@@ -8,7 +8,11 @@ The fixed case is a merged-cohort table: one cohort observes ``{S1, S2, S3, A}``
 from __future__ import annotations
 
 import logging
+import os
+import subprocess
+import sys
 from functools import partial
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -277,6 +281,29 @@ def test_the_notice_names_a_pair_never_observed_together(caplog):
         andrey.fci(_never_together())
     (notice,) = [r.getMessage() for r in caplog.records if r.name == "andrey.api._method"]
     assert "never observed together (X and Y)" in notice
+
+
+_BOOTSTRAP_PROBE = """
+import andrey
+from test_not_tested import _never_together
+
+if __name__ == "__main__":
+    with andrey.config(n_jobs=2):
+        andrey.bootstrap("pc", _never_together(), n_resamples=4, seed=0)
+"""
+
+
+def test_the_notice_of_a_bootstrap_on_worker_processes_names_a_pair_never_observed_together(
+    tmp_path,
+):
+    probe = tmp_path / "probe.py"
+    probe.write_text(_BOOTSTRAP_PROBE)
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join([str(Path(__file__).parent), *sys.path])}
+    run = subprocess.run(
+        [sys.executable, str(probe)], capture_output=True, text=True, check=True, env=env
+    )
+    assert run.stderr.count("the default handling, test-wise deletion") == 1
+    assert "never observed together (X and Y)" in run.stderr and "Undecided: X and Y" in run.stderr
 
 
 def test_em_refuses_a_pair_never_observed_together_by_name():
