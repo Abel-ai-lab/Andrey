@@ -64,7 +64,9 @@ names its pull request.
   causal links switch between a few persistent regimes. It returns an `andrey.RegimeOutput`: the
   regime of each time step, the regime weights, and one temporal result per regime, as `pcmci`
   returns it. The regime step solves the paper's linear program with SciPy, so it needs no new
-  dependency. A contributor's script compares it with the authors' code start by start. ([#1149])
+  dependency. A time step joins a regime only when its weight is above `switch_threshold`, as in
+  the authors' code. A contributor's script compares it with the authors' code start by start.
+  ([#1149], [#1159])
 - Three experimental regression-based conditional-independence tests, as `indep_test` options of
   every method that takes one: `"gcm"`, the generalized covariance measure (Shah and Peters 2020),
   which tests the covariance of the residuals of boosted-tree regressions; `"wgcm"`, the weighted
@@ -2876,6 +2878,7 @@ First alpha release.
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
 [#1146]: https://github.com/Abel-ai-lab/Andrey/pull/1146
 [#1149]: https://github.com/Abel-ai-lab/Andrey/pull/1149
+[#1159]: https://github.com/Abel-ai-lab/Andrey/pull/1159
 [#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
 [#1068]: https://github.com/Abel-ai-lab/Andrey/pull/1068
 [#1090]: https://github.com/Abel-ai-lab/Andrey/pull/1090
