@@ -147,6 +147,8 @@ _MARGIN = 100.0
 # n - |S| - offset.
 _DF_OFFSET: dict[type, int] = {FisherZ: 3, StudentT: 2}
 
+#: The rows :meth:`TestwiseDeletion.together` counts in one product, which bounds its temporaries.
+_TOGETHER_ROWS = 1 << 16
 #: The tests run inside :func:`rows_tested`, or ``None`` outside it.
 _ROWS: ContextVar[RowCounts | None] = ContextVar("andrey_rows_tested", default=None)
 
@@ -536,8 +538,12 @@ class TestwiseDeletion:
         """``(d, d)`` booleans: ``[i, j]`` when some row observes columns ``i`` and ``j`` together.
         A query over a pair that is ``False`` keeps no rows, so it is not tested."""
         if self._together is None:
-            seen = self._observed.astype(np.float32)
-            self._together = (seen.T @ seen) > 0
+            d = self._observed.shape[1]
+            counts = np.zeros((d, d), dtype=np.float32)
+            for start in range(0, self._observed.shape[0], _TOGETHER_ROWS):
+                seen = self._observed[start : start + _TOGETHER_ROWS].astype(np.float32)
+                counts += seen.T @ seen
+            self._together = counts > 0
         return self._together
 
     def count_not_tested(self, x: int, y: int, queries: int) -> None:
@@ -908,6 +914,12 @@ class GaussianDeletion(PartialCorrelationDeletion):
         flagged &= ~short
         r[short] = p[short] = NOT_TESTED
         return r, p, rows, flagged
+
+    def together(self) -> np.ndarray:
+        """:meth:`TestwiseDeletion.together`, read from the pair counts :meth:`_pairwise` keeps."""
+        if self._together is None:
+            self._together = self._pairwise()[0] > 0
+        return self._together
 
     def _pairwise(self) -> tuple[np.ndarray, np.ndarray]:
         """The rows each pair of columns shares and the pair's correlation on them, ``(d, d)``.

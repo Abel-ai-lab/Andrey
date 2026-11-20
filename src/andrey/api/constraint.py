@@ -316,12 +316,12 @@ def pc(
     pair and never confirms a link, and ``metadata["not_tested"]`` counts such tests. A pair no
     tested query could decide, as a pair never observed together, stays adjacent and is listed in
     ``metadata["undecided_pairs"]``. On merged cohorts, every pair of variables measured only in
-    different cohorts is therefore an edge of the output and an undecided pair: a fact about the
-    data, not a finding. A continuous column constant on a test's rows raises ``ValueError``. With
-    missing values, the skeleton search runs in one process. Test-wise deletion is valid when values
-    are missing completely at random, which means that whether a value is missing depends on no
-    value in the data; the rows a test reads are then a random sample of all rows, and otherwise
-    they are a selected sample that more rows do not correct.
+    different cohorts is therefore an undecided pair and, unless knowledge forbids it, an edge of
+    the output: a fact about the data, not a finding. A continuous column constant on a test's rows
+    raises ``ValueError``. With missing values, the skeleton search runs in one process. Test-wise
+    deletion is valid when values are missing completely at random, which means that whether a value
+    is missing depends on no value in the data; the rows a test reads are then a random sample of
+    all rows, and otherwise they are a selected sample that more rows do not correct.
 
     **Missing-Value PC.** ``missing="mvpc"`` follows Algorithm 1 of Tu et al. [13]_. The test-wise
     skeleton keeps every true edge but can keep extra ones: an extra edge ``x - y`` needs the
@@ -839,12 +839,12 @@ def fci(
     pair and never confirms a link, and ``metadata["not_tested"]`` counts such tests. A pair no
     tested query could decide, as a pair never observed together, stays adjacent and is listed in
     ``metadata["undecided_pairs"]``. On merged cohorts, every pair of variables measured only in
-    different cohorts is therefore an edge of the output and an undecided pair: a fact about the
-    data, not a finding. A continuous column constant on a test's rows raises ``ValueError``. With
-    missing values, the skeleton search runs in one process. Test-wise deletion is valid when values
-    are missing completely at random, which means that whether a value is missing depends on no
-    value in the data; the rows a test reads are then a random sample of all rows, and otherwise
-    they are a selected sample that more rows do not correct.
+    different cohorts is therefore an undecided pair and, unless knowledge forbids it, an edge of
+    the output: a fact about the data, not a finding. A continuous column constant on a test's rows
+    raises ``ValueError``. With missing values, the skeleton search runs in one process. Test-wise
+    deletion is valid when values are missing completely at random, which means that whether a value
+    is missing depends on no value in the data; the rows a test reads are then a random sample of
+    all rows, and otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs with no
     hidden variable, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through which
@@ -1665,14 +1665,14 @@ def cdnod(
     tested query could decide, as a pair never observed together, stays adjacent and is listed in
     ``metadata["undecided_pairs"]``; a test whose ``env`` is constant on its rows, which come from
     one environment, is not tested. On merged cohorts, every pair of variables measured only in
-    different cohorts is therefore an edge of the output and an undecided pair: a fact about the
-    data, not a finding. A continuous column constant on a test's rows raises ``ValueError``.
-    ``env`` must be complete, and ``dependence_threshold``, whose kernel measures read every row,
-    raises ``ValueError`` on data with missing values. With missing values, the skeleton search runs
-    in one process. Test-wise deletion is valid when values are missing completely at random, which
-    means that whether a value is missing depends on no value in the data; the rows a test reads are
-    then a random sample of all rows, and otherwise they are a selected sample that more rows do not
-    correct.
+    different cohorts is therefore an undecided pair and, unless knowledge forbids it, an edge of
+    the output: a fact about the data, not a finding. A continuous column constant on a test's rows
+    raises ``ValueError``. ``env`` must be complete, and ``dependence_threshold``, whose kernel
+    measures read every row, raises ``ValueError`` on data with missing values. With missing values,
+    the skeleton search runs in one process. Test-wise deletion is valid when values are missing
+    completely at random, which means that whether a value is missing depends on no value in the
+    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
+    selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs whose means
     shift across 4 domains, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes
@@ -2038,12 +2038,12 @@ def fci_jci(
     tested query could decide, as a pair never observed together, stays adjacent and is listed in
     ``metadata["undecided_pairs"]``; a test whose ``env`` is constant on its rows, which come from
     one environment, is not tested. On merged cohorts, every pair of variables measured only in
-    different cohorts is therefore an edge of the output and an undecided pair: a fact about the
-    data, not a finding. A continuous column constant on a test's rows raises ``ValueError``. With
-    missing values, the skeleton search runs in one process. Test-wise deletion is valid when values
-    are missing completely at random, which means that whether a value is missing depends on no
-    value in the data; the rows a test reads are then a random sample of all rows, and otherwise
-    they are a selected sample that more rows do not correct.
+    different cohorts is therefore an undecided pair and, unless knowledge forbids it, an edge of
+    the output: a fact about the data, not a finding. A continuous column constant on a test's rows
+    raises ``ValueError``. With missing values, the skeleton search runs in one process. Test-wise
+    deletion is valid when values are missing completely at random, which means that whether a value
+    is missing depends on no value in the data; the rows a test reads are then a random sample of
+    all rows, and otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on its authors' simulation [1]_, linear-Gaussian data with hidden
     common causes and one context variable that changes one variable: 4, 10, and 100 variables with
