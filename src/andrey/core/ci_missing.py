@@ -1038,7 +1038,7 @@ def testwise_deletion(
         kind = BoundedDeletion
     else:
         kind = TestwiseDeletion
-    floor = getattr(factory if test_class is None else test_class, "least_rows", None)
+    floor, floor_options = _row_floor(factory, test_class, options)
     return kind(
         arr,
         build,
@@ -1046,8 +1046,31 @@ def testwise_deletion(
         test_class=test_class,
         continuous=continuous,
         check_copies=check_copies,
-        least=None if floor is None else lambda size: int(floor(size, **options)),
+        least=None if floor is None else lambda size: int(floor(size, **floor_options)),
     )
+
+
+def _row_floor(
+    factory: Callable[..., CITest], test_class: type | None, options: Mapping[str, Any]
+) -> tuple[Callable[..., int] | None, Mapping[str, Any]]:
+    """The ``least_rows`` of the test ``factory`` builds and the options it reads.
+
+    A variant registered as ``partial(make_indep_test, name, **settings)`` has the floor of the
+    test ``name`` with ``settings`` and ``options``; ``(None, options)`` when no test has one.
+    """
+    from . import ci
+
+    if test_class is not None:
+        return getattr(test_class, "least_rows", None), options
+    if (
+        isinstance(factory, partial)
+        and factory.func is ci.make_indep_test
+        and factory.args
+        and factory.args[0] in ci._CI_REGISTRY
+    ):
+        inner = ci._CI_REGISTRY[factory.args[0]]
+        return _row_floor(inner, _shipped_class(inner), {**factory.keywords, **options})
+    return getattr(factory, "least_rows", None), options
 
 
 def mark_environment(test: CITest, column: int) -> CITest:
