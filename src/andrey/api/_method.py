@@ -663,7 +663,13 @@ def _missing_cells(data: object) -> np.ndarray | None:
     if isinstance(data, pd.DataFrame):  # of any column types
         return np.asarray(data.isna(), dtype=bool)
     try:
-        missing = np.isnan(np.asarray(data, dtype=np.float64))
+        array = np.asarray(data)
+        if array.dtype.kind in "biu":  # no value of these types is missing
+            missing = np.zeros(array.shape, dtype=bool)
+        elif array.dtype.kind == "f":
+            missing = np.isnan(array)
+        else:
+            missing = np.isnan(np.asarray(array, dtype=np.float64))
     except (TypeError, ValueError):
         return None
     return missing if missing.ndim == 2 else None
