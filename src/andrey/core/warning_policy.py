@@ -135,6 +135,21 @@ def mark_logged(key: str) -> None:
         _logged.add(key)
 
 
+@contextlib.contextmanager
+def logged_later(key: str) -> Generator[None]:
+    """Keep :func:`log_once` silent for ``key`` inside the block; afterwards it logs ``key`` as it
+    would have, so the caller can log one notice for every fit the block ran."""
+    with _lock:
+        fresh = key not in _logged
+        _logged.add(key)
+    try:
+        yield
+    finally:
+        if fresh:
+            with _lock:
+                _logged.discard(key)
+
+
 class _Held(logging.Handler):
     """Holds the records it is handed, in order."""
 

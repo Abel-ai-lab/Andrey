@@ -366,6 +366,21 @@ def test_the_notice_of_a_bootstrap_on_worker_processes_names_a_pair_never_observ
     assert "1 pair (X and Y) is undecided." in run.stderr
 
 
+def test_a_bootstrap_in_one_process_logs_one_notice_from_every_fit(caplog, monkeypatch):
+    """In one process, as on workers, the fits log no notice of their own: bootstrap logs one, from
+    the pairs of every fit."""
+    from andrey import resample
+
+    over = resample._not_tested_over
+    later = {"undecided_pairs": [["P", "Q"]]}  # as if a later fit had left P and Q undecided
+    monkeypatch.setattr(resample, "_not_tested_over", lambda fits: over(fits) | later)
+    with andrey.config(n_jobs=1), caplog.at_level(logging.WARNING, logger="andrey"):
+        andrey.bootstrap("pc", _never_together(), n_resamples=2, seed=0)
+    notices = [r.getMessage() for r in caplog.records if "default handling" in r.getMessage()]
+    assert len(notices) == 1
+    assert "1 pair (P and Q) is undecided." in notices[0]
+
+
 def test_em_refuses_a_pair_never_observed_together_by_name():
     with pytest.raises(ValueError, match=r"^drop column 'X' or column 'Y', .*share none"):
         andrey.ges(_never_together(), missing="em")

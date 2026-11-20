@@ -48,7 +48,13 @@ from andrey.core.structure import (
     is_ancestral_kind,
 )
 from andrey.core.ties import tie_ranks
-from andrey.core.warning_policy import AndreyWarning, held_records, mark_logged, warn_once
+from andrey.core.warning_policy import (
+    AndreyWarning,
+    held_records,
+    logged_later,
+    mark_logged,
+    warn_once,
+)
 from andrey.search._parallel import pick_context
 
 if TYPE_CHECKING:
@@ -973,7 +979,13 @@ def fit_resamples(job: Job, n_resamples: int, workers: int) -> list[Fitted]:
     results: list[Fitted] = []
     try:
         if workers <= 1:
-            with _backend.one_blas_thread(), _backend.config(n_jobs=1):
+            # As on workers, the fits log no notice of a default handling of missing values:
+            # bootstrap logs it once, from every fit's metadata.
+            with (
+                _backend.one_blas_thread(),
+                _backend.config(n_jobs=1),
+                logged_later(MISSING_DEFAULT_NOTICE),
+            ):
                 for b in range(n_resamples):
                     results.append(_run_one(job, b))
                     _relog(results[-1][2], seen)
