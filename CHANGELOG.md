@@ -20,7 +20,7 @@ names its pull request.
   `metadata["never_observed_together"]` the pairs of columns no row observes together; the notice
   for `missing=None` names the first of them. A pair no tested query could decide stays adjacent
   in PC, FCI, CD-NOD, and FCI-JCI and in the Markov-blanket searches' sets; PCMCI, PCMCI+, and
-  J-PCMCI+ condition no test on a lagged parent without a tested result. ([#PR_NOT_TESTED])
+  J-PCMCI+ condition no test on a lagged parent without a tested result. ([#1151])
 
 - `metadata["p_one_tests"]` counts every test of a fit on data with missing values that returned
   `p = 1`, whichever test it is, as a test whose statistic is exactly zero answers. ([#1102])
@@ -43,7 +43,7 @@ names its pull request.
   `fisherz` and `normal_scores` need `|S| + 4` rows, `cond_gauss` `|S| + 3`, and `cmiknn` with an
   int `k_cmi` `k_cmi + 1`. LPCMCI's collider votes leave a triple ambiguous when a subset not tested
   could change the verdict. On the command line, a number that is not finite, as the p-value of a
-  test not tested, is `null` in the JSON output. ([#PR_NOT_TESTED])
+  test not tested, is `null` in the JSON output. ([#1151])
 - With `missing=None` on data with missing values, a method whose tests delete rows logs one notice
   per process that names the handling, test-wise deletion, and when it is valid. Pass
   `missing="testwise"` to choose it by name. `bootstrap` logs it once for all of its worker
@@ -79,8 +79,9 @@ names its pull request.
   the notice of the default handling under `missing=None`. ([#1151])
 - `pc(missing="mvpc")` counts the indicator queries it answers 1 in `metadata["p_one_tests"]`, and
   the corrected tests that return a p-value of 1 in `metadata["corrected_edges"]["p_one_tests"]`.
-  A corrected test needs the rows that leave its test a degree of freedom, `|S| + 4` for `fisherz`,
-  or the pair keeps its test-wise answer. ([#1151])
+  An indicator query on fewer rows than its test needs is not tested, so it no longer rules out a
+  parent of the indicator. A corrected test needs the rows that leave its test a degree of freedom,
+  `|S| + 4` for `fisherz`, or the pair keeps its test-wise answer. ([#1151])
 - Under `missing="em"` with the linear-Gaussian BIC, copies among the observed values raise
   `CopiedColumnsError` before a pair of columns that shares no observed row, as on complete data.
   ([#1151])
@@ -88,7 +89,8 @@ names its pull request.
   logger under it, or the root logger is set above `WARNING`, or a logger under `andrey` has its
   own handler or does not propagate, and `bootstrap` logs the records of fits that ran in worker
   processes in the calling process, once each, so they reach `run.warnings` instead of standard
-  error. ([#1151])
+  error. Each record keeps the file, line, and function that logged it, and those of a resample
+  that raises are logged before its error. ([#1151])
 
 ## [0.18.0] - 2026-11-19
 
