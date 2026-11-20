@@ -143,7 +143,9 @@ def markov_blanket(
     """Estimate ``target``'s Markov blanket with IAMB, or with Inter-IAMB when ``interleaved``.
 
     Grow: add the candidate most dependent on ``target`` given the current blanket, among those
-    whose p-value is at or below ``alpha``, until none is. Shrink: visit the members in the order
+    whose p-value is at or below ``alpha``, until none is; then add, in rank order, each candidate
+    whose test given the blanket was not tested and that no earlier test separated, since a test
+    without rows separates no pair. Shrink: visit the members in the order
     they joined and drop each one the test finds independent of ``target`` (a p-value above
     ``alpha``) given the other current members. IAMB grows to the end and then shrinks once;
     Inter-IAMB shrinks after every addition and stops when no candidate qualifies or the blanket
@@ -165,19 +167,30 @@ def markov_blanket(
     required = _required(constraints, target, ranks)
     blanket: list[int] = list(required)
     seen: set[frozenset[int]] = set()
+    separated: set[int] = set()
     while max_depth is None or len(blanket) <= max_depth:
         best_key, best_x = None, None
         candidates = [x for x in range(d) if x != target and x not in blanket]
         given = tuple(sorted(blanket))
+        untested = []
         for x, (p, strength) in zip(
             candidates, dependences(target, candidates, blanket), strict=True
         ):
             key = (strength, ranks[x])
             if p <= alpha and (best_key is None or key < best_key):
                 best_key, best_x = key, x
-            if sepsets is not None and p > alpha:
-                sepsets[x] = given
+            if p > alpha:
+                separated.add(x)
+                if sepsets is not None:
+                    sepsets[x] = given
+            if not_tested(p) and x not in separated:
+                untested.append(x)
         if best_x is None:
+            # A candidate whose test given the blanket was not tested, and that no test separated
+            # before, stays: a test without rows separates no pair.
+            blanket.extend(sorted(untested, key=lambda x: ranks[x]))
+            if interleaved and untested:
+                _shrink(test, target, alpha, blanket, required, sepsets)
             break
         blanket.append(best_x)
         if interleaved:
@@ -256,14 +269,15 @@ def _weakest(
     conds: list[tuple[int, ...]],
     sets: list[tuple[int, ...]] | None = None,
     ranks: Sequence[int] = (),
-    alpha: float = 1.0,
+    alpha: float | None = None,
 ) -> list[tuple[float, float]]:
     """Each candidate's weakest association with ``target`` over the conditioning sets ``conds``.
 
     Returns ``(largest p-value, smallest strength)`` per entry of ``xs``, over the sets that were
-    tested. A candidate with a set not tested and no tested p-value above ``alpha`` answers
-    :data:`~andrey.core.ci_missing.NOT_TESTED`: that set might have separated it, so its
-    association is unknown (:func:`_weaker`). The strength is the
+    tested; :data:`~andrey.core.ci_missing.NOT_TESTED` when none was. With ``alpha``, a candidate
+    with a set not tested and no tested p-value above ``alpha`` answers
+    :data:`~andrey.core.ci_missing.NOT_TESTED` too: that set might have separated it, so a verdict
+    that needs every set is unknown (:func:`_weaker`). The strength is the
     absolute partial correlation for a test with ``statistic_pvalues``, evaluated for every query
     of one conditioning-set size in one call, else the negated p-value from ``batched_call`` or the
     scalar test. With ``sets``, each candidate's set with the largest p-value is appended to it
@@ -282,7 +296,9 @@ def _weakest(
                 else [test(target, x, c) for c in conds]
             )
             values = np.asarray(ps, dtype=np.float64)
-            top = _weaker(float(np.fmax.reduce(values)), bool(not_tested(values).any()), alpha)
+            top = float(np.fmax.reduce(values))
+            if alpha is not None:
+                top = _weaker(top, bool(not_tested(values).any()), alpha)
             out.append((top, -top))
             if sets is not None:
                 sets.extend(_largest_sets(np.asarray(ps, dtype=np.float64)[None], conds, ranks))
@@ -308,7 +324,9 @@ def _weakest(
         sets.extend(
             _largest_sets(np.hstack(pvalues), [c for g in by_size.values() for c in g], ranks)
         )
-    pmax[skipped & ~(pmax > alpha)] = NOT_TESTED
+    pmax[np.isinf(pmax)] = NOT_TESTED
+    if alpha is not None:
+        pmax[skipped & ~(pmax > alpha)] = NOT_TESTED
     return list(zip(pmax.tolist(), rmin.tolist(), strict=True))
 
 
@@ -384,7 +402,7 @@ def parents_children(
     others = [
         x for x in range(d) if x != target and x not in required and (allowed is None or allowed[x])
     ]
-    weakest = dict(zip(others, _weakest(test, target, others, [()], alpha=alpha), strict=True))
+    weakest = dict(zip(others, _weakest(test, target, others, [()]), strict=True))
     if sepsets is not None:
         sepsets.update({x: () for x, (p, _) in weakest.items() if p > alpha})
     members: list[int] = []
@@ -399,12 +417,11 @@ def parents_children(
             conds = [tuple(sorted((*rest, new))) for rest in combinations(members, size)]
             largest: list[tuple[int, ...]] = []
             weakened = _weakest(
-                test, target, xs, conds, None if sepsets is None else largest, ranks, alpha
+                test, target, xs, conds, None if sepsets is None else largest, ranks
             )
             for i, (x, (p, strength)) in enumerate(zip(xs, weakened, strict=True)):
-                was = pool[x][0]
-                top = _weaker(float(np.fmax(was, p)), bool(not_tested([was, p]).any()), alpha)
-                pool[x] = (top, float(np.fmin(pool[x][1], strength)))
+                # A set not tested is left out: it separates no candidate.
+                pool[x] = (float(np.fmax(pool[x][0], p)), float(np.fmin(pool[x][1], strength)))
                 if sepsets is not None and pool[x][0] > alpha:
                     sepsets.setdefault(x, largest[i])
             if not every:
@@ -868,6 +885,11 @@ class LocalSearch:
             mb = self._sets(lambda i: self.local(method, i)[1] or [])
             blankets = mb & mb.T
             skeleton = blankets if structure == "moral" else sets & sets.T
+        if isinstance(self.test, TestwiseDeletion):  # pairs no test with rows can decide
+            apart = self.test.undecidable()
+            if self.constraints is not None:
+                apart &= self.constraints.support()
+            skeleton, blankets = skeleton | apart, blankets | apart
         if structure != "cpdag":
             return np.where(skeleton, TAIL, NULL).astype(np.int8)
         return blanket_cpdag(
@@ -939,7 +961,10 @@ def local_structure(
     parents and children and the moral graph from its blankets, both by the AND rule.
     ``"cpdag"`` orients the skeleton (:func:`blanket_cpdag`) against the blankets: the moral graph,
     or for a ``"pc"`` learner each variable's set together with its members' sets before the
-    symmetry check (:func:`reach`). The other arguments are :func:`local_search`'s.
+    symmetry check (:func:`reach`). On data with missing values, a pair no query of which can be
+    tested (:meth:`~andrey.core.ci_missing.TestwiseDeletion.undecidable`), a pair never observed
+    together included, joins both graphs, as a skeleton search keeps such a pair adjacent. The
+    other arguments are :func:`local_search`'s.
     """
     search = local_search(
         X,

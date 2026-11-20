@@ -94,10 +94,10 @@ NOT_TESTED = float("nan")
 #: The sentence on a query without the rows its test needs, which the docstring of every method
 #: that deletes rows per test, the ``missing`` concept, and the notice share.
 NOT_TESTED_CLAIM = (
-    "A test whose variables are observed together on fewer rows than it needs, a pair never "
-    "observed together included, is not tested: it never separates a pair and never confirms a "
-    "link, and a pair no tested set separated after such a test is listed as undecided in "
-    'metadata["undecided_pairs"].'
+    "A test whose variables are observed together on fewer rows than it needs or that has no "
+    "degrees of freedom left, a pair never observed together included, is not tested: it never "
+    "separates a pair and never confirms a link. A pair that no test with rows could decide, such "
+    'as a pair never observed together, is listed in metadata["undecided_pairs"].'
 )
 #: What the error of a test without the rows it needs advises: a test over fewer columns keeps more
 #: rows, and a dropped column is no longer there to condition on.
@@ -208,6 +208,11 @@ class RowCounts(Counter[int]):
                 pair = (a, b)
                 self.largest[pair] = max(self.largest.get(pair, -np.inf), value)
 
+    def untested(self) -> list[tuple[int, int]]:
+        """The pairs with a query that was not tested and no query that was: no test with rows
+        could decide them, as a pair never observed together."""
+        return [pair for pair in self.not_tested if pair not in self.largest]
+
     def undecided(self, alpha: float) -> list[tuple[int, int]]:
         """The pairs with a query that was not tested and no tested query with ``p > alpha``:
         no test with rows separated them, and one without rows might have."""
@@ -250,9 +255,7 @@ def rows_tested_elsewhere() -> Generator[RowCounts]:
 
 
 def rows_metadata(
-    counter: Mapping[int, int],
-    alpha: float | None = None,
-    name: Callable[[int], Any] = int,
+    counter: Mapping[int, int], name: Callable[[int], Any] | None = None
 ) -> dict[str, Any]:
     """Return the metadata of the tests ``counter`` holds; ``{}`` when it holds none.
 
@@ -263,17 +266,16 @@ def rows_metadata(
     :class:`RowCounts` holds, whichever test it is, as a test whose statistic is exactly zero
     answers; a query with zero degrees of freedom is not tested, not counted there.
     ``"not_tested"``, present when it is not zero,
-    is the number of queries not tested (:data:`NOT_TESTED`). With ``alpha``, the level a tested
-    query separates a pair at, ``"undecided_pairs"`` lists the pairs of :meth:`RowCounts.undecided`
-    as ``[a, b]`` lists of ``name(column)`` by :func:`named_pairs`; ``name`` keeps the 0-based
-    position by default.
+    is the number of queries not tested (:data:`NOT_TESTED`). With ``name``, ``"undecided_pairs"``
+    lists the pairs no tested query could decide, those of :meth:`RowCounts.untested`, as
+    ``[a, b]`` lists of ``name(column)`` by :func:`named_pairs`.
     """
     skipped = counter.total_not_tested() if isinstance(counter, RowCounts) else 0
     if not counter and not skipped:
         return {}
     if not counter:
         metadata: dict[str, Any] = {"rows_tested": {"min": 0, "median": 0}}
-        return metadata | _not_tested_metadata(counter, skipped, alpha, name)
+        return metadata | _not_tested_metadata(counter, skipped, name)
     counts = sorted(counter.items())
     total = sum(n for _, n in counts)
     middle = [(total - 1) // 2, total // 2]
@@ -286,21 +288,18 @@ def rows_metadata(
     metadata = {"rows_tested": {"min": counts[0][0], "median": (values[0] + values[1]) / 2}}
     p_one = getattr(counter, "p_one", 0)
     metadata |= {"p_one_tests": p_one} if p_one else {}
-    return metadata | _not_tested_metadata(counter, skipped, alpha, name)
+    return metadata | _not_tested_metadata(counter, skipped, name)
 
 
 def _not_tested_metadata(
-    counter: Mapping[int, int],
-    skipped: int,
-    alpha: float | None,
-    name: Callable[[int], Any],
+    counter: Mapping[int, int], skipped: int, name: Callable[[int], Any] | None
 ) -> dict[str, Any]:
     """``"not_tested"`` and ``"undecided_pairs"`` of :func:`rows_metadata`."""
     if not skipped:
         return {}
     metadata: dict[str, Any] = {"not_tested": skipped}
-    if alpha is not None and isinstance(counter, RowCounts):
-        metadata["undecided_pairs"] = named_pairs(counter.undecided(alpha), name)
+    if name is not None and isinstance(counter, RowCounts):
+        metadata["undecided_pairs"] = named_pairs(counter.untested(), name)
     return metadata
 
 
@@ -391,6 +390,16 @@ class TestwiseDeletion:
         self._environments[list(columns)] = True
         self._cache.clear()
         self._held = 0
+
+    def undecidable(self) -> np.ndarray:
+        """``[i, j]`` when columns ``i`` and ``j`` are observed together on fewer rows than their
+        test without conditions needs, never together included: no query of the pair can be
+        tested, as every condition keeps fewer rows and needs more. A symmetric boolean matrix with
+        a ``False`` diagonal."""
+        observed = self._observed.astype(np.float64)
+        out = observed.T @ observed < self.least_rows(0)
+        np.fill_diagonal(out, False)
+        return out
 
     @property
     def environments(self) -> np.ndarray:

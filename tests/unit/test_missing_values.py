@@ -320,7 +320,7 @@ def test_a_test_with_too_few_rows_is_not_tested_and_counted(name, size):
         assert np.isnan(test(0, 1, list(range(2, 2 + size))))
     assert test.least_rows(size) == least
     assert rows.not_tested == {(0, 1): 1} and not rows  # counted apart, reading no rows
-    assert rows_metadata(rows, 0.05) == {
+    assert rows_metadata(rows, int) == {
         "rows_tested": {"min": 0, "median": 0},
         "not_tested": 1,
         "undecided_pairs": [[0, 1]],

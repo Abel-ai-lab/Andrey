@@ -547,7 +547,7 @@ def pc(
         "conflicts": [list(edge) for edge in sorted(conflicts)],
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
-        **rows_metadata(rows, alpha, label_of(labels)),
+        **rows_metadata(rows, label_of(labels)),
         **_mvpc_metadata(found, labels, seed),
     }
     return structure_output(cpdag, labels=labels, metadata=metadata)
@@ -926,7 +926,7 @@ def fci(
     metadata = {
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
-        **rows_metadata(rows, alpha, label_of(labels)),
+        **rows_metadata(rows, label_of(labels)),
     }
     return structure_output(pag, labels=labels, metadata=metadata)
 
@@ -1791,7 +1791,7 @@ def cdnod(
         "changing_variables": [variable(j) for j in index_edges],
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
-        **rows_metadata(rows, alpha, lambda j: "env" if j == d else variable(j)),
+        **rows_metadata(rows, lambda j: "env" if j == d else variable(j)),
     }
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
@@ -2125,7 +2125,7 @@ def fci_jci(
         "index_edges": [[variable(j), kind] for j, kind in index_edges],
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
-        **rows_metadata(rows, alpha, lambda j: "env" if j == d else variable(j)),
+        **rows_metadata(rows, lambda j: "env" if j == d else variable(j)),
     }
     return structure_output(pag, labels=labels, metadata=metadata)
 

@@ -110,7 +110,7 @@ def test_every_table_method_runs_when_a_pair_shares_few_or_no_rows(name, k):
         assert "never_observed_together" not in out.metadata
 
 
-@pytest.mark.parametrize("name", SKELETON)
+@pytest.mark.parametrize("name", [*SKELETON, "iamb", "inter_iamb", "mmpc"])
 def test_a_pair_never_observed_together_stays_adjacent_and_keeps_the_true_edges(name):
     out = TABLE_METHODS[name](_cohorts(0))
     for a, b in (("A", "B"), ("A", "S1"), ("B", "S1")):
