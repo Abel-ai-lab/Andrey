@@ -38,7 +38,6 @@ names its pull request.
 - `pc(missing="mvpc")` records the fewest and the median rows a corrected test read as
   `metadata["corrected_edges"]["rows_tested"]`, so a fit shows when the correction ran on few rows.
   The graph and the other metadata are unchanged. ([#1094])
-
 - `degrees_of_freedom`, an argument of every method that takes the categorical tests, `"chisq"` and
   `"gsq"`, and of `ChiSquare`: `"mean"`, the default and the rule so far, is the mean of the
   statistic when `y` is shuffled within each configuration of the conditioning set; `"nonempty"` is
@@ -134,7 +133,6 @@ names its pull request.
 - On data with missing values, `fisherz` and `student_t` p-values with a conditioning set can
   differ from 0.18.0 in the last digits (relative change up to about 1e-11 measured), as each
   block's sums run in a fixed order; graphs are unchanged on the fits compared. ([#1142])
-
 - The website is easier to find and quote in search and AI answers. The homepage's description, its
   structured data, and `llms.txt` say what Andrey is, starting with the speed claim; `llms.txt` also
   links the methods and comparison pages, says how to cite Andrey, and marks each experimental
@@ -202,7 +200,6 @@ names its pull request.
   processes in the calling process, once each, so they reach `run.warnings` instead of standard
   error. Each record keeps the file, line, and function that logged it, and those of a resample
   that raises are logged before its error. ([#1151])
-
 - The backward phase of `mmpc` keeps the best separating set of each size it tests, not a record
   of every set, so its memory no longer grows with the number of sets. Answers are unchanged.
   ([#1019])
