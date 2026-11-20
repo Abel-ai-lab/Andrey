@@ -32,6 +32,7 @@ from andrey.constraint.fci import (
 from andrey.constraint.pc import adjacency_search, knowledge_masks
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import make_indep_test
+from andrey.core.ci_missing import mark_environment
 from andrey.core.structure import EDGE_TYPES
 
 if TYPE_CHECKING:
@@ -109,8 +110,15 @@ def fci_jci(
     augmented = np.concatenate([X, context], axis=1)
     mask = None if categorical is None else np.append(np.asarray(categorical, bool), True)
     padded = None if constraints is None else constraints.padded(d + 1)
-    test = make_indep_test(
-        indep_test, augmented, categorical=mask, seed=seed, degrees_of_freedom=degrees_of_freedom
+    test = mark_environment(
+        make_indep_test(
+            indep_test,
+            augmented,
+            categorical=mask,
+            seed=seed,
+            degrees_of_freedom=degrees_of_freedom,
+        ),
+        d,
     )
     allowed, keep, apart = knowledge_masks(padded)
     workers = backend.worker_count(workers)

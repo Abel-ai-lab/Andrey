@@ -268,6 +268,7 @@ def to_json_schema(spec: MethodSpec) -> dict:
             "has_ordering": spec.output.has_ordering,
             "has_latents": spec.output.has_latents,
             "multi": spec.output.multi,
+            "regimes": spec.output.regimes,
             "metadata": list(spec.output.metadata),
             "description": spec.output.doc,
         },
@@ -323,6 +324,11 @@ def cli_meta() -> dict:
                 "and weight when the method estimates one), latent_nodes (GIN), ordering"
             ),
             "metadata": "scores / p-values / provenance from the run",
+            "results": (
+                "with multi: true, in place of structure and metadata: one {structure, metadata} "
+                "per group (multi_group_direct_lingam) or per target, in the order of a list such "
+                "as 'target=[a,b]' on a method that takes a target"
+            ),
             "run": "resolved params, seed, versions, elapsed, n_samples, n_variables, and the "
             "fit's warnings (category, message)",
         },
@@ -507,7 +513,8 @@ def render_skill() -> str:
     a("## Reading the result")
     a("")
     a(
-        "A run's envelope holds `structure` (or `results`, one per group): its `kind` (`dag`, "
+        "A run's envelope holds `structure` (or `results`, one per group, or one per target when "
+        "`target=[a,b]` is a list): its `kind` (`dag`, "
         "`cpdag`, `pag`, or temporal), `labels`, `n_edges`, an `edge_types` count, and `edges`. "
         "Each edge has a `source` and a `target`, indexes into `labels`, a `type`, and, from a "
         "method with weights (`output.weighted` in its contract), a `weight`. A causal order is "
@@ -583,8 +590,15 @@ def render_skill() -> str:
         "reading the rows observed in all of its variables. `metadata.rows_tested` gives the "
         "fewest (`min`) and the median rows a test read, `metadata.missing` the handling, and "
         "`metadata.p_one_tests`, present when it is not zero, the number of tests that returned "
-        "p = 1, whichever test it is; a test with zero degrees of freedom answers so. A fit "
-        "that runs the deletion under `null` logs one notice per process that names it. They are "
+        "p = 1, whichever test it is. A test with fewer rows than it needs, or with zero degrees "
+        "of freedom left, is not tested: it never separates a pair and never confirms a link. "
+        "`metadata.not_tested` counts the conditioning sets not tested, including those the "
+        "search skipped because no row can test them, `metadata.undecided_pairs` lists the pairs "
+        "no tested query could decide, and `metadata.never_observed_together` the pairs of "
+        "columns no row observes together. A fit that runs the deletion under `null` logs one "
+        "notice per process that names it and gives the number of undecided pairs and of pairs "
+        "never observed together, naming them when there are at most five. The searches that "
+        "delete rows per test are "
         + ", ".join(f"`{s.name}`" for s in REGISTRY.values() if s.data.missing)
         + f". {TESTWISE_CLAIM} The searches whose fit "
         "reads only a covariance, "

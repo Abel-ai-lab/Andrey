@@ -68,6 +68,28 @@ def parse_int(value: str, source: str) -> int:
         raise ValueError(f"{source} must be an integer, got {value!r}") from exc
 
 
+def parse_share(value: str, source: str) -> float:
+    """Return ``value`` as a share: a number from ``0`` to ``1``."""
+    try:
+        share = float(value)
+    except ValueError as exc:
+        raise ValueError(f"{source} must be a number from 0 to 1, got {value!r}") from exc
+    if not 0.0 <= share <= 1.0:
+        raise ValueError(f"{source} must be a number from 0 to 1, got {value!r}")
+    return share
+
+
+def parse_factor(value: str, source: str) -> float:
+    """Return ``value`` as a factor: a number of at least ``1``."""
+    try:
+        factor = float(value)
+    except ValueError as exc:
+        raise ValueError(f"{source} must be a number of at least 1, got {value!r}") from exc
+    if not factor >= 1.0:
+        raise ValueError(f"{source} must be a number of at least 1, got {value!r}")
+    return factor
+
+
 def parse_seed(value: str, source: str) -> int:
     """Return a seed: an integer from ``0`` to ``SEED_MAX``."""
     seed = parse_int(value, source)
@@ -114,6 +136,13 @@ SKELETON_PARALLEL_MIN_WORK = Setting("ANDREY_SKELETON_PARALLEL_MIN_WORK", parse_
 POSSIBLE_DSEP_PARALLEL_MIN_WORK = Setting("ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK", parse_int)
 RCOT_PARALLEL_MIN_WORK = Setting("ANDREY_RCOT_PARALLEL_MIN_WORK", parse_int)
 LINGAM_PRUNE_MIN_WORK = Setting("ANDREY_LINGAM_PRUNE_MIN_WORK", parse_int)
+TESTWISE_GROUP_BYTES = Setting("ANDREY_TESTWISE_GROUP_BYTES", parse_int)
+TESTWISE_GROUP_MAX_SCATTER = Setting("ANDREY_TESTWISE_GROUP_MAX_SCATTER", parse_share)
+TESTWISE_GROUP_MAX_GROUPS = Setting("ANDREY_TESTWISE_GROUP_MAX_GROUPS", parse_int)
+TESTWISE_GROUP_MAX_SHARED = Setting("ANDREY_TESTWISE_GROUP_MAX_SHARED", parse_share)
+TESTWISE_GROUP_MIN_COLUMNS = Setting("ANDREY_TESTWISE_GROUP_MIN_COLUMNS", parse_int)
+TESTWISE_GROUP_MIN_GAIN = Setting("ANDREY_TESTWISE_GROUP_MIN_GAIN", parse_factor)
+SHARED_SCAN_MIN_WORK = Setting("ANDREY_SHARED_SCAN_MIN_WORK", parse_int)
 COV_GPU_THRESHOLD = Setting("ANDREY_COV_GPU_THRESHOLD", parse_int)
 ENTROPY_GPU_THRESHOLD = Setting("ANDREY_ENTROPY_GPU_THRESHOLD", parse_int)
 KCI_GPU_THRESHOLD = Setting("ANDREY_KCI_GPU_THRESHOLD", parse_int)
@@ -136,6 +165,13 @@ SETTINGS: dict[str, Setting] = {
         POSSIBLE_DSEP_PARALLEL_MIN_WORK,
         RCOT_PARALLEL_MIN_WORK,
         LINGAM_PRUNE_MIN_WORK,
+        TESTWISE_GROUP_BYTES,
+        TESTWISE_GROUP_MAX_SCATTER,
+        TESTWISE_GROUP_MAX_GROUPS,
+        TESTWISE_GROUP_MAX_SHARED,
+        TESTWISE_GROUP_MIN_COLUMNS,
+        TESTWISE_GROUP_MIN_GAIN,
+        SHARED_SCAN_MIN_WORK,
         COV_GPU_THRESHOLD,
         ENTROPY_GPU_THRESHOLD,
         KCI_GPU_THRESHOLD,

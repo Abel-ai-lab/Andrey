@@ -329,7 +329,12 @@ def notears(
 
     with copies_named(labels), one_blas_thread():
         result, em = fit_missing(
-            X, missing, fit, n_em_iterations=n_em_iterations, rows=np.shape(data)[0]
+            X,
+            missing,
+            fit,
+            n_em_iterations=n_em_iterations,
+            rows=np.shape(data)[0],
+            labels=labels,
         )
     return _output(result, labels, em)
 
@@ -609,6 +614,11 @@ def dagma(
 
     with copies_named(labels), one_blas_thread():
         result, em = fit_missing(
-            X, missing, fit, n_em_iterations=n_em_iterations, rows=np.shape(data)[0]
+            X,
+            missing,
+            fit,
+            n_em_iterations=n_em_iterations,
+            rows=np.shape(data)[0],
+            labels=labels,
         )
     return _output(result, labels, em)

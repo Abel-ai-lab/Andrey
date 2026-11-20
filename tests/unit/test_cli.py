@@ -14,6 +14,7 @@ import warnings
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 
 import andrey
@@ -231,6 +232,32 @@ def test_run_multi_group(capsys, nongaussian_path):
     env = json.loads(out)
     assert code == 0 and env["multi"] is True
     assert len(env["results"]) == 2
+
+
+def test_run_regimes(capsys, tmp_path):
+    """A regime fit's envelope holds the regime of each step and one result per regime, named by
+    the header, and its terminal summary one block per regime."""
+    from andrey.cli import render_human
+    from tests.recovery.helpers import datagen
+
+    path = tmp_path / "regimes.csv"
+    data = pd.DataFrame(datagen.generate("regime_var_2v", shuffle=False), columns=["a", "b"])
+    data.to_csv(path, index=False)
+    settings = ["max_transitions=7", "n_starts=2"]
+    code, out, _ = _run(["run", "rpcmci", "--data", str(path), *settings], capsys)
+    env = json.loads(out)
+    assert code == 0 and env["multi"] is True
+    assert len(env["regimes"]) == len(data) and set(env["regimes"]) <= {0, 1}
+    assert env["regime_weights"] is None and env["regime_weights_shape"] == [2, len(data)]
+    assert len(env["results"]) == 2 and env["metadata"]["algorithm"] == "rpcmci"
+    assert all(r["structure"]["labels"] == ["a", "b"] for r in env["results"])
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fit = andrey.rpcmci(data, max_transitions=7, n_starts=2)
+    run = {"warnings": [], "n_samples": 600, "n_variables": 2, "elapsed_s": 0.0}
+    text = render_human(REGISTRY["rpcmci"], fit, {**run, "versions": {"andrey": "x"}})
+    assert text.startswith("rpcmci  |  2 regimes over 600 time steps")
+    assert "regime 0, " in text and "regime 1, " in text
 
 
 @pytest.mark.parametrize(
@@ -732,6 +759,39 @@ def test_a_run_isolates_the_loggers_during_the_fit_and_restores_them(capsys, gap
         logger.removeHandler(own)
     assert code == 0 and err == "" and seen.getvalue() == ""
     assert json.loads(out)["run"]["warnings"][0]["category"] == "LogWarning"
+
+
+@pytest.mark.parametrize("name", ["andrey", ""])
+def test_a_logger_set_above_warning_keeps_the_fit_notice_and_its_level(capsys, gappy_path, name):
+    """A threshold above ``WARNING`` on the ``andrey`` or the root logger drops no record."""
+    import logging
+
+    logger = logging.getLogger(name or None)
+    level = logger.level
+    logger.setLevel(logging.ERROR)
+    try:
+        code, out, err = _run(["run", "pc", "--data", str(gappy_path), "--json"], capsys)
+        assert logger.level == logging.ERROR
+    finally:
+        logger.setLevel(level)
+    assert code == 0 and err == ""
+    [notice] = json.loads(out)["run"]["warnings"]
+    assert notice["category"] == "LogWarning"
+
+
+def test_the_records_bootstrap_workers_log_go_in_the_envelope_not_stderr(capfd, tmp_path):
+    """Structural EM's warning, logged in worker processes, reaches ``run.warnings`` once."""
+    x = np.random.default_rng(0).standard_normal((300, 3))
+    x[:, 1] += x[:, 0]
+    x[np.random.default_rng(1).random(x.shape) < 0.1] = np.nan
+    path = tmp_path / "gaps.csv"
+    np.savetxt(path, x, delimiter=",", header="a,b,c", comments="")
+    argv = ["bootstrap", "ges", "--data", str(path), "--n-resamples", "4", "--json"]
+    with andrey.config(n_jobs=2):
+        code, out, err = _run([*argv, "missing=em", "n_em_iterations=1"], capfd)
+    assert code == 0 and err == ""
+    logged = [w for w in json.loads(out)["run"]["warnings"] if w["category"] == "LogWarning"]
+    assert [w["message"][:44] for w in logged] == ["structural EM: the graph still changed in th"]
 
 
 # --- shell-aware output ---------------------------------------------------------------------------
@@ -1290,6 +1350,95 @@ def test_target_names_a_header_column_or_a_position(capsys, tmp_path):
     assert code == 2 and json.loads(err)["error"]["code"] == "unknown_column"
 
 
+def _collider_file(tmp_path):
+    rng = np.random.default_rng(3)
+    a, b, e = rng.standard_normal((3, 500))
+    path = tmp_path / "collider.csv"
+    path.write_text("a,b,c\n" + "\n".join(f"{x},{y},{z}" for x, y, z in zip(a, b, a + b + 0.5 * e)))
+    return path
+
+
+def _results(out):
+    """Each target's answer in an envelope."""
+    env = json.loads(out)
+    assert env["multi"] is True and "structure" not in env and "metadata" not in env
+    return [(r["structure"], r["metadata"]) for r in env["results"]]
+
+
+def test_a_list_of_targets_gives_each_target_its_own_result(capsys, tmp_path):
+    """A bracket list names columns by header or position, and each result is the single call's."""
+    base = ["run", "iamb", "--data", str(_collider_file(tmp_path))]
+    code, out, _ = _run([*base, "target=[c,a]"], capsys)
+    assert code == 0
+    listed = _results(out)
+    assert [metadata["target"] for _, metadata in listed] == ["c", "a"]
+    for target, answer in zip("ca", listed, strict=True):
+        _, one, _ = _run([*base, f"target={target}"], capsys)
+        env = json.loads(one)
+        assert answer == (env["structure"], env["metadata"])
+    code, by_position, _ = _run([*base, "target=[2,0]"], capsys)
+    assert code == 0 and _results(by_position) == listed
+    code, one_entry, _ = _run([*base, "target=[c]"], capsys)  # a list of one is still a list
+    assert code == 0 and _results(one_entry) == listed[:1]
+
+
+def test_a_list_of_targets_in_a_config_file(capsys, tmp_path):
+    path = _collider_file(tmp_path)
+    cfg = tmp_path / "targets.yaml"
+    cfg.write_text("target: [c, a]\n")
+    code, out, _ = _run(["run", "mmpc", "--data", str(path), "--config", str(cfg)], capsys)
+    assert code == 0
+    assert [metadata["target"] for _, metadata in _results(out)] == ["c", "a"]
+    code, out, _ = _run(
+        ["run", "mmpc", "--data", str(path), "--config", str(cfg), "target=b"], capsys
+    )
+    assert code == 0 and json.loads(out)["metadata"]["target"] == "b"  # the override wins
+    cfg.write_text("target: 2\n")  # positions in a config file are strings, as for categorical
+    code, _out, err = _run(["run", "mmpc", "--data", str(path), "--config", str(cfg)], capsys)
+    assert code == 2 and json.loads(err)["error"]["code"] == "invalid_params"
+
+
+@pytest.mark.parametrize(
+    ("target", "code"),
+    [("[]", "invalid_params"), ("[c,2]", "bad_value"), ("[a,h]", "unknown_column")],
+)
+def test_a_bad_list_of_targets_is_a_usage_error(capsys, tmp_path, target, code):
+    """An empty list, one column twice (by name and by position), and a column the file lacks."""
+    argv = ["run", "iamb", "--data", str(_collider_file(tmp_path)), f"target={target}"]
+    status, _out, err = _run(argv, capsys)
+    assert status == 2 and json.loads(err)["error"]["code"] == code
+
+
+def test_icp_names_the_header_columns_for_one_target_and_for_a_list(capsys, tmp_path):
+    rng = np.random.default_rng(0)
+    env = np.repeat([0, 1], 300)
+    x = rng.standard_normal(600) + 2 * env
+    y = x + rng.standard_normal(600)
+    z = y + rng.standard_normal(600)
+    data = tmp_path / "icp.csv"
+    data.write_text("x,y,z\n" + "\n".join(f"{a},{b},{c}" for a, b, c in zip(x, y, z)))
+    env_path = tmp_path / "env.csv"
+    env_path.write_text("env\n" + "\n".join(str(v) for v in env))
+    base = ["run", "icp", "--data", str(data), "--env", str(env_path)]
+    code, out, _ = _run([*base, "target=y"], capsys)
+    assert code == 0 and json.loads(out)["metadata"]["target"] == "y"
+    code, out, _ = _run([*base, "target=[y,z]"], capsys)
+    assert code == 0
+    listed = [(metadata["target"], metadata["parents"]) for _, metadata in _results(out)]
+    assert listed[0] == ("y", ["x"]) and listed[1][0] == "z"
+
+
+def test_a_list_of_targets_has_a_human_summary_and_no_bootstrap(capsys, monkeypatch, tmp_path):
+    path = str(_collider_file(tmp_path))
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+    code, out, _ = _run(["run", "iamb", "--data", path, "target=[c,a]"], capsys)
+    assert code == 0 and out.startswith("iamb  |  2 targets")
+    assert "target c" in out and "target a" in out
+    monkeypatch.setattr("sys.stdout.isatty", lambda: False)
+    code, _out, err = _run(["bootstrap", "iamb", "--data", path, "target=[c,a]"], capsys)
+    assert code == 2 and "one target at a time" in json.loads(err)["error"]["message"]
+
+
 def test_a_mixed_run_reads_the_named_columns_and_warns_of_undeclared_codes(capsys, tmp_path):
     """A data file holds numbers only, so ``categorical`` names the categorical columns; without
     it, a whole-number column stays continuous and the warning names it."""
@@ -1363,3 +1512,17 @@ def test_the_bootstrap_reads_contexts_and_blocks_of_every_dataset(tmp_path, caps
     code, out, err = _run(argv, capsys)
     assert code == 0, err
     assert json.loads(out)["structure"]["labels"] == ["x", "y"]
+
+
+def test_a_p_value_not_tested_is_null_in_strict_json(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr("sys.stdout.isatty", lambda: False)
+    rng = np.random.default_rng(0)
+    x = rng.standard_normal((200, 3))
+    x[:100, 1] = np.nan  # columns 1 and 2 never observed together
+    x[100:, 2] = np.nan
+    path = tmp_path / "gaps.csv"
+    np.savetxt(path, x, delimiter=",", header="a,b,c", comments="")
+    code, out, _ = _run(["run", "pcmci", "--data", str(path)], capsys)
+    assert code == 0
+    env = json.loads(out, parse_constant=lambda token: pytest.fail(f"non-standard {token}"))
+    assert None in [p for lag in env["metadata"]["p_values"] for row in lag for p in row]

@@ -188,7 +188,9 @@ variables are observed (test-wise deletion), so the fit keeps the samples that d
 incomplete one would lose; `missing="testwise"` names this handling, the default, and PC also takes
 `missing="mvpc"`, a correction for values whose missingness depends on the variables.
 Test-wise deletion is valid when values are missing completely at random; when whether a value is
-missing depends on the variables, a test can be biased. The [release cards](benchmarks.md) measure
+missing depends on the variables, a test can be biased. A test with too few rows, as for two
+columns never observed together in merged cohorts, is not tested and decides nothing; the pairs it
+leaves undecided are listed in `metadata["undecided_pairs"]`. The [release cards](benchmarks.md) measure
 it against dropping incomplete samples. The searches whose fit reads the data only through their
 covariance, {{ em_methods }}, take `missing="em"`: structural EM over the expected covariance of
 the data, which suits linear-Gaussian data whose missing values depend at most on columns that

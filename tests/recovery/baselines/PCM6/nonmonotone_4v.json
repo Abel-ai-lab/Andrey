@@ -1,0 +1,29 @@
+{
+  "algorithm": "PCM6",
+  "case": "nonmonotone_4v",
+  "input": {
+    "case": "nonmonotone_4v",
+    "column_order": [
+      2,
+      3,
+      0,
+      1
+    ],
+    "seed": 20261014,
+    "sha256": "1242fad5f9dc6bf9ab2ce6d9b0ce40603bde039838d85e873e9d052e7878b9ee",
+    "shape": [
+      400,
+      4
+    ]
+  },
+  "output": {
+    "pvalues": [
+      0.17806912686776655,
+      0.6198600379409913,
+      0.3256736293678112,
+      0.4036116539886045,
+      2.2680868481143262e-07
+    ]
+  },
+  "schema_version": 3
+}

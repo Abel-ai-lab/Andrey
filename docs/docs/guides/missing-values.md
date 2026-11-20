@@ -116,18 +116,41 @@ A time series keeps every step: each row of the lagged design that reads a missi
 Each test of PCMCI, PCMCI+, or LPCMCI reads the design rows where all of its lagged variables are
 observed.
 
-A test needs enough rows where its variables are observed: `|S| + 3` for the partial-correlation
-tests (`fisherz`, `student_t`, and `normal_scores`), with `|S|` the size of its conditioning set,
-and 2 for the other tests. A test with fewer rows raises a `ValueError` that says so. Cap the
-conditioning sets with `max_depth` (`max_p_global` in LPCMCI and the same-step phases of PCMCI+), or
-drop a column with many missing values, which can remove a common cause of the columns that stay.
-A test with zero degrees of freedom, as when a column holds one category on the test's rows or
-`fisherz` reads `|S| + 3` rows, returns a p-value of 1, which reads as independence without
-evidence. `metadata["p_one_tests"]`, present when it is not zero, counts every test of the fit that
-returned a p-value of 1, whichever test it is. CD-NOD and FCI-JCI need a complete `env`.
+A test needs enough rows where its variables are observed: `|S| + 4` for `fisherz` and
+`normal_scores`, `|S| + 3` for `student_t` and `cond_gauss`, with `|S|` the size of its
+conditioning set, and 2 for most other tests. A test with fewer rows, or with zero degrees of
+freedom left, as when a column holds one category on the test's rows, is not tested, a pair never
+observed together included: it never separates a pair and never confirms a link. So is a CD-NOD or
+FCI-JCI test whose `env` is constant on its rows, which then come from one environment. CD-NOD and
+FCI-JCI need a complete `env`.
+
+A pair that no test with rows could decide stays adjacent in PC, FCI, CD-NOD, and FCI-JCI, stays in
+the Markov-blanket searches' sets, and in PCMCI and its variants has no p-value (`NaN`, `null` on
+the command line); `metadata["undecided_pairs"]` lists each such pair. PCMCI, PCMCI+, and J-PCMCI+
+condition no test on a lagged parent without a tested result, and LPCMCI none on a node whose link
+to either end of the tested pair has none. `metadata["not_tested"]` counts the conditioning sets
+not tested, including those the search skipped because no row can test them; it measures the
+search more than the data, so the notice for `missing=None` leaves it out and gives the number of
+undecided pairs and of pairs never observed together, naming them when there are at most five.
+`metadata["never_observed_together"]` lists the pairs of columns no row observes together.
+`metadata["p_one_tests"]`, present when it is not zero, counts the tests that returned a p-value of
+1, as a test whose statistic is exactly zero does.
+
+On merged cohorts, every pair of variables measured only in different cohorts is therefore an
+undecided pair and an edge of the output of PC, FCI, CD-NOD, FCI-JCI, and the Markov-blanket
+searches, unless knowledge forbids the edge or, in IAMB and Inter-IAMB, `max_depth` stops the
+blanket's growth first: a fact about the data, not a finding. Merged cohorts often leave such
+pairs, and whether a row belongs to a cohort is rarely random, so test-wise deletion may not be
+valid there. To decide more pairs, cap the conditioning sets with `max_depth` (`max_p_global` in
+LPCMCI and the same-step phases of PCMCI+), or drop a column with many missing values, which can
+remove a common cause of the columns that stay.
 
 With `fisherz` and `student_t`, each test computes its correlations directly from its rows, for many
-tests at once. The other tests are built anew on each test's rows, which costs more.
+tests at once. When the rows fall into a few missingness patterns, as in data merged from cohorts
+that each measure their own variables, those sums come from tables kept once per pattern group
+instead of from every row, with the same results up to the last digits
+([Configuration](../configuration.md#test-wise-deletion) says when). The other tests are built anew
+on each test's rows, which costs more.
 
 We measured test-wise deletion with PC and FCI, with `fisherz` and `student_t`, on values missing
 completely at random and one pattern missing at random: the
@@ -147,25 +170,30 @@ A corrected test reads the rows where its pair, its conditioning set, and those 
 observed. When too few rows are available, it uses the test-wise test instead. The pair then keeps
 its test-wise result for that conditioning set, and `metadata["corrected_edges"]["uncorrected"]`
 lists the pair. `metadata["corrected_edges"]["rows_tested"]` gives the fewest and the median rows a
-corrected test read, so you can see when the correction ran on few rows.
+corrected test read, so you can see when the correction ran on few rows, and
+`metadata["corrected_edges"]["p_one_tests"]`, present when it is not zero, counts the corrected
+tests that returned a p-value of 1.
 
 The correction holds when no indicator causes a variable, every independence in the observed rows
 also holds in the missing ones, no indicator is a deterministic function of others, and no value
 causes its own missingness. The data cannot check these conditions. The permutation correction also
 needs linear-Gaussian variables and the paper's two conditions: given `W`, the parents of the
 indicators involved, those indicators are independent of the tested variables, and conditioning on
-the indicators of `W` leaves the tested relation unchanged. When a variable used to rebuild the
-data goes missing because of a common effect of the tested pair, the extra edge can stay, as in the
-paper's Figure 1c. The paper's density-ratio correction for those cases is not implemented.
+the indicators of `W` leaves the tested relation unchanged. The second requires the rows used to
+rebuild the data to preserve the independence of each pair tested. When a variable used to rebuild
+the data goes missing because of a common effect of that pair, the extra edge can stay. This occurs
+in the paper's Figure 1c and when two effects of the same causes each cause the other's missingness.
+The paper's density-ratio correction for those cases is not implemented.
 
 On simulated data in the paper's setting, MVPC made fewer errors than test-wise deletion in 10 of
-16 settings where values go missing for a reason and tied in the rest. At 50 variables and 10,000
-rows it made 5.1 errors against 14.3. Two limits showed on larger graphs:
+16 settings where values go missing for a reason and tied in the rest. It also tied where values
+are missing completely at random. At 50 variables and 10,000 rows it made 5.1 errors against 14.3.
+Two limits showed on larger graphs:
 
 - It does not help when every missingness indicator depends weakly on many variables, and its
   search for those variables can then take a long time; `max_depth` bounds it.
 - With 50 or 100 variables and 20 or 30% of the values missing, it made 0.7 to 3.6 more errors than
-  test-wise deletion in 12 settings. Use test-wise deletion there.
+  test-wise deletion in 12 settings, on two sets of datasets each. Use test-wise deletion there.
 
 The [0.16.0 release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data) has the numbers.
 
@@ -198,18 +226,24 @@ the data hold no covariance for them. `metadata["em"]` records the rows dropped 
 the fewest rows that observe both columns of a pair (`min_shared_rows`).
 
 `missing="em"` is supported in {{ em_supported_names }}, where no setting we measured was less
-accurate than a reference implementation on the first datasets and again on fresh ones. In
-{{ em_experimental_names }} it is experimental: no reference implementation exists to compare them
-with. What to expect from a fit:
+accurate than a reference implementation on the first datasets and again on fresh ones. We
+measured `ges`, `boss`, and `grasp` at `ebic_gamma=0.0`, up to 50 variables, against a reference
+that estimates one covariance by EM before its search, a simpler method than structural EM, at two
+settings of the sample size its score counts. `boss` and `grasp` were better than the empty graph
+in 102 and 103 of 108 settings. In {{ em_experimental_names }} it is experimental: no reference
+implementation exists to compare them with. What to expect from a fit:
 
 - EM costs time. With 10 rounds a fit runs the search 10 times and the E-step 56 times, and it took
   2 to 72 times as long as the same search on complete data.
 - EM does not always settle within its 10 rounds. The last round still changed the graph in 2 to 6%
-  of the fits we measured, and in 20% of `grasp`'s. Such a fit logs a warning, and more rows help.
+  of the fits we measured, and in 20% of `grasp`'s, most often with 50 variables and 100 rows. Such
+  a fit logs a warning, and more rows help.
   A larger `n_em_iterations` runs more rounds, which lets some of these fits settle while others
   keep changing between graphs; we have not benchmarked values other than 10 yet.
 - With about 100 rows, `hc` and `tabu` are often no better than the empty graph, with EM and on
-  complete data alike.
+  complete data alike. From 500 rows on they were better in every setting.
+- On denser graphs (mean degree 4) `ges` at `ebic_gamma=0.0` was rarely better than the empty
+  graph, with EM and on complete data alike.
 
 The [0.17.0 release card](../benchmarks/0.17.0.md#missing-data) has the numbers.
 

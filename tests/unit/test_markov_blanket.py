@@ -244,9 +244,9 @@ def test_a_non_collider_stops_at_its_first_separating_chunk(monkeypatch, kind, f
     tested = []
     weakest = blanket._weakest
 
-    def counted(test, target, xs, conds):
+    def counted(test, target, xs, conds, *args, **kwargs):
         tested.append(len(conds))
-        return weakest(test, target, xs, conds)
+        return weakest(test, target, xs, conds, *args, **kwargs)
 
     monkeypatch.setattr(blanket, "_weakest", counted)
     with rows_tested() as rows:
@@ -497,3 +497,65 @@ def test_table_size_counts_cells_and_degrees_of_freedom():
 def test_a_learner_row_names_one_search_or_one_pc_learner(row):
     with pytest.raises(ValueError, match="pc_spouses"):
         Learner(**row)
+
+
+def test_the_recorded_set_is_the_tested_separator_beside_a_set_not_tested():
+    pvalues = np.array([[np.nan, 0.3, 0.1], [np.nan, np.nan, np.nan]])
+    conds = [(1,), (2,), (3,)]
+    assert blanket._largest_sets(pvalues, conds, [0, 1, 2, 3]) == [(2,), (1,)]
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "student_t", "normal_scores"])
+def test_a_large_grow_scan_is_answered_from_one_factor(kind):
+    """A grow scan of enough candidates given two or more variables goes to the test's one-factor
+    path and agrees with each candidate asked alone to rounding (the p-value to 1e-9 relative, on
+    the same side of alpha); one candidate keeps the per-query answer bit for bit."""
+    x = data.sample_scm(graph="erdos_renyi", d=40, n=400, seed=3, density=3.0).data
+    test = make_indep_test(kind, x)
+    factored = []
+    factor = test._schur_partial_correlations
+    test._schur_partial_correlations = lambda *args: factored.append(1) or factor(*args)
+    scan = blanket._dependences(test, significant=True)
+    one = blanket._dependence(test, significant=True)
+    cond = [2, 9, 17]
+    xs = [v for v in range(40) if v != 4 and v not in cond]
+    got = np.array(scan(4, xs, cond))
+    assert factored == [1]
+    want = np.array([one(4, v, cond) for v in xs])
+    np.testing.assert_allclose(got[:, 0], want[:, 0], rtol=1e-9, atol=1e-300)
+    assert ((got[:, 0] <= 0.05) == (want[:, 0] <= 0.05)).all()
+    np.testing.assert_allclose(got[:, 1], want[:, 1], rtol=0.0, atol=10.0**-KEY_DP)
+    assert scan(4, xs[:1], cond) == [one(4, xs[0], cond)]
+
+
+@pytest.mark.parametrize("interleaved", [False, True])
+def test_the_shared_factor_leaves_every_blanket_unchanged(interleaved, monkeypatch):
+    """IAMB and Inter-IAMB find the same blanket at every target whether every grow scan is
+    factored or none is."""
+    x = data.sample_scm(graph="erdos_renyi", d=30, n=500, seed=1, density=3.0).data
+    ranks = tie_ranks(x).tolist()
+
+    def blankets(min_work: str) -> list[list[int]]:
+        monkeypatch.setenv("ANDREY_SHARED_SCAN_MIN_WORK", min_work)
+        test = FisherZ(x)
+        return [
+            markov_blanket(test, t, 30, 0.05, ranks, interleaved=interleaved) for t in range(30)
+        ]
+
+    assert blankets("0") == blankets("1000000000")
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "student_t", "normal_scores"])
+def test_a_small_grow_scan_keeps_the_per_query_bits(kind):
+    """A grow scan below the factor's work, or given fewer than two variables, gives each candidate
+    the p-value and key of that candidate asked alone, bit for bit."""
+    x = data.sample_scm(graph="erdos_renyi", d=12, n=400, seed=3, density=3.0).data
+    test = make_indep_test(kind, x)
+    scan = blanket._dependences(test, significant=True)
+    one = blanket._dependence(test, significant=True)
+    for cond in [[], [7], [2, 9], [0, 3, 8]]:
+        xs = [v for v in range(12) if v != 4 and v not in cond]
+        for some in (xs, xs[:3]):
+            if len(cond) >= 2 and len(some) * (len(cond) + 2) >= 128:
+                continue
+            assert scan(4, some, cond) == [one(4, v, cond) for v in some], (cond, some)

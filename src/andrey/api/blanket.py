@@ -7,6 +7,7 @@ return that variable's set; without, every variable's, joined by the AND rule in
 
 from __future__ import annotations
 
+from functools import partial
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -17,9 +18,10 @@ from andrey.api._adapt import (
     fit_inputs,
     label_of,
     structure_output,
+    target_columns,
 )
 from andrey.api._method import method_spec
-from andrey.core import NULL, TAIL
+from andrey.core import NULL, TAIL, backend
 from andrey.core.ci_missing import rows_metadata, rows_tested
 from andrey.core.knowledge import Knowledge, as_node, column_position
 from andrey.core.orient import to_structure
@@ -29,6 +31,7 @@ if TYPE_CHECKING:
 
     import numpy.typing as npt
 
+    from andrey.constraint.blanket import LocalSearch
     from andrey.core import StructureOutput
 
 #: The ``metadata`` key of each method's set, and the ``algorithm`` it reports.
@@ -39,7 +42,7 @@ def fit_blanket(
     method: str,
     data: npt.ArrayLike,
     *,
-    target: str | int | None,
+    target: str | int | Sequence[str | int] | None,
     structure: str,
     alpha: float,
     indep_test: str | None,
@@ -48,9 +51,13 @@ def fit_blanket(
     seed: int | None,
     max_depth: int | None,
     knowledge: Knowledge | None,
-) -> StructureOutput:
-    """Check the settings, run the search, and wrap the graph ``structure`` names or the set."""
-    from andrey.constraint.blanket import local_set, local_structure
+) -> StructureOutput | list[StructureOutput]:
+    """Check the settings, run the search, and wrap the graph ``structure`` names or the set.
+
+    A list of targets gives one result for each, in its order.
+    """
+    from andrey.constraint._parallel_targets import answers
+    from andrey.constraint.blanket import local_search, local_set, local_structure
     from andrey.spec.concepts import BLANKET_STRUCTURES
 
     assert indep_test is not None  # method_spec picks it from the column types
@@ -58,7 +65,12 @@ def fit_blanket(
         data, "indep_test", indep_test, categorical, knowledge, method=method, missing=True
     )
     d = X.shape[1]
-    t = None if target is None else column_position(as_node(target, "target"), labels, d, "target")
+    targets = target_columns(target, labels, d, method)
+    t = (
+        None
+        if target is None or targets is not None
+        else column_position(as_node(target, "target"), labels, d, "target")
+    )
     settings = {
         "alpha": alpha,
         "indep_test": indep_test,
@@ -68,6 +80,24 @@ def fit_blanket(
         "max_depth": max_depth,
         "constraints": constraints,
     }
+    if targets is not None:
+        with copies_named(labels):
+            found = answers(
+                partial(local_search, X, **settings),
+                partial(_target_set, method),
+                targets,
+                backend.worker_count(),
+            )
+        outs = []
+        for x, (members, rows) in zip(targets, found, strict=True):
+            marks, metadata = _target_answer(method, x, members, d, labels)
+            metadata |= categorical_metadata(mask, data) | rows_metadata(rows, label_of(labels))
+            outs.append(
+                structure_output(
+                    to_structure(marks, kind="undirected"), labels=labels, metadata=metadata
+                )
+            )
+        return outs
     metadata: dict[str, object] = {}
     kind = BLANKET_STRUCTURES[structure] if t is None else "undirected"
     with copies_named(labels), rows_tested() as rows:
@@ -75,20 +105,43 @@ def fit_blanket(
             marks = local_structure(X, method, structure, **settings)
         else:
             members = local_set(X, method, t, **settings)
-            adjacent = np.zeros((d, d), dtype=bool)
-            adjacent[t, members] = adjacent[members, t] = True
-            marks = np.where(adjacent, TAIL, NULL).astype(np.int8)
-            name = label_of(labels)
-            metadata |= {"target": name(t), _SETS[method]: [name(j) for j in members]}
-    metadata |= categorical_metadata(mask, data) | rows_metadata(rows)
+            marks, metadata = _target_answer(method, t, members, d, labels)
+    metadata |= categorical_metadata(mask, data) | rows_metadata(rows, label_of(labels))
     return structure_output(to_structure(marks, kind=kind), labels=labels, metadata=metadata)
+
+
+def _target_set(method: str, search: LocalSearch, t: int) -> list[int]:
+    """Return ``t``'s set by the learner ``method``, in the order its members joined.
+
+    The set is the Markov blanket of a ``"blanket"`` learner and the parents and children of a
+    ``"pc"`` learner.
+    """
+    pc, mb, _ = search.local(method, t)
+    found = pc if mb is None else mb
+    assert found is not None  # every learner learns one of the two
+    return found
+
+
+def _target_answer(
+    method: str, t: int, members: list[int], d: int, labels: tuple[str, ...] | None
+) -> tuple[np.ndarray, dict[str, object]]:
+    """Return ``t``'s set ``members`` as endpoint marks and metadata.
+
+    The marks are an undirected graph joining ``t`` to each member; the metadata names ``t`` and
+    lists the set.
+    """
+    adjacent = np.zeros((d, d), dtype=bool)
+    adjacent[t, members] = adjacent[members, t] = True
+    marks = np.where(adjacent, TAIL, NULL).astype(np.int8)
+    name = label_of(labels)
+    return marks, {"target": name(t), _SETS[method]: [name(j) for j in members]}
 
 
 @method_spec("iamb")
 def iamb(
     data: npt.ArrayLike,
     *,
-    target: str | int | None = None,
+    target: str | int | Sequence[str | int] | None = None,
     structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
@@ -98,7 +151,7 @@ def iamb(
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
-) -> StructureOutput:
+) -> StructureOutput | list[StructureOutput]:
     """Learn a CPDAG, or one variable's Markov blanket, with incremental association (IAMB).
 
     A variable's Markov blanket is the smallest set of other variables given which it is
@@ -112,10 +165,12 @@ def iamb(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    target : str, int, or None, default=None
+    target : str, int, list of them, or None, default=None
         The variable whose set to learn: a column label (a string) or a 0-based position (an
-        integer). ``None`` learns every variable's set and keeps a pair when each variable is in
-        the other's set.
+        integer). A list of them learns each one's set with one search, which sets up the test
+        once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
+        ``indep_test``; with missing values, each target has a search of its own. ``None`` learns
+        every variable's set and keeps a pair when each variable is in the other's set.
     structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
@@ -152,8 +207,8 @@ def iamb(
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
-        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
-        tests, ``metadata["seed"]`` records the seed used.
+        only ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"`` make; the
+        other tests ignore it. With those tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -184,8 +239,9 @@ def iamb(
 
     Returns
     -------
-    StructureOutput
-        Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
+    StructureOutput or list of StructureOutput
+        With a list of targets, a list holding each target's result, in its order, as that target
+        alone gives it. Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
         :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
         cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
         and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
@@ -269,13 +325,20 @@ def iamb(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [5]_ [6]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. A test raises ``ValueError`` when it has fewer rows than it needs,
-    ``|S| + 3`` for the partial-correlation tests (``"fisherz"``, ``"student_t"``, and
-    ``"normal_scores"``) and 2 for the other tests, or when a continuous column is constant on its
-    rows. Test-wise deletion is valid when values are missing completely at random, which means that
-    whether a value is missing depends on no value in the data; the rows a test reads are then a
-    random sample of all rows, and otherwise they are a selected sample that more rows do not
-    correct.
+    the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
+    ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including those the search skipped because no row can test them. A candidate no tested
+    query separated, as a variable never observed with the target, stays in the target's set, and a
+    pair no tested query could decide is listed in ``metadata["undecided_pairs"]``. On merged
+    cohorts, every pair of variables measured only in different cohorts is therefore an undecided
+    pair and, unless knowledge forbids it or ``max_depth`` stops the blanket's growth first, an edge
+    of the output: a fact about the data, not a finding. A continuous column constant on a test's
+    rows raises ``ValueError``. Test-wise deletion is valid when values are missing completely at
+    random, which means that whether a value is missing depends on no value in the data; the rows a
+    test reads are then a random sample of all rows, and otherwise they are a selected sample that
+    more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data with Fisher-z tests at alpha 0.05,
     on one core: 20, 50, and 100 variables with 1,000 and 5,000 rows and mean degree 2 and 4, with
@@ -368,7 +431,7 @@ def iamb(
 def inter_iamb(
     data: npt.ArrayLike,
     *,
-    target: str | int | None = None,
+    target: str | int | Sequence[str | int] | None = None,
     structure: str = "cpdag",
     alpha: float = 0.05,
     indep_test: str | None = None,
@@ -378,7 +441,7 @@ def inter_iamb(
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
-) -> StructureOutput:
+) -> StructureOutput | list[StructureOutput]:
     """Learn a CPDAG, or one variable's Markov blanket, with interleaved IAMB (Inter-IAMB).
 
     Inter-IAMB [1]_ is IAMB with its shrink step after every addition, so a member that becomes
@@ -391,10 +454,12 @@ def inter_iamb(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    target : str, int, or None, default=None
+    target : str, int, list of them, or None, default=None
         The variable whose set to learn: a column label (a string) or a 0-based position (an
-        integer). ``None`` learns every variable's set and keeps a pair when each variable is in
-        the other's set.
+        integer). A list of them learns each one's set with one search, which sets up the test
+        once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
+        ``indep_test``; with missing values, each target has a search of its own. ``None`` learns
+        every variable's set and keeps a pair when each variable is in the other's set.
     structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
@@ -431,8 +496,8 @@ def inter_iamb(
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
-        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
-        tests, ``metadata["seed"]`` records the seed used.
+        only ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"`` make; the
+        other tests ignore it. With those tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -463,8 +528,9 @@ def inter_iamb(
 
     Returns
     -------
-    StructureOutput
-        Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
+    StructureOutput or list of StructureOutput
+        With a list of targets, a list holding each target's result, in its order, as that target
+        alone gives it. Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
         :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
         cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
         and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
@@ -551,13 +617,20 @@ def inter_iamb(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [5]_ [6]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. A test raises ``ValueError`` when it has fewer rows than it needs,
-    ``|S| + 3`` for the partial-correlation tests (``"fisherz"``, ``"student_t"``, and
-    ``"normal_scores"``) and 2 for the other tests, or when a continuous column is constant on its
-    rows. Test-wise deletion is valid when values are missing completely at random, which means that
-    whether a value is missing depends on no value in the data; the rows a test reads are then a
-    random sample of all rows, and otherwise they are a selected sample that more rows do not
-    correct.
+    the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
+    ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including those the search skipped because no row can test them. A candidate no tested
+    query separated, as a variable never observed with the target, stays in the target's set, and a
+    pair no tested query could decide is listed in ``metadata["undecided_pairs"]``. On merged
+    cohorts, every pair of variables measured only in different cohorts is therefore an undecided
+    pair and, unless knowledge forbids it or ``max_depth`` stops the blanket's growth first, an edge
+    of the output: a fact about the data, not a finding. A continuous column constant on a test's
+    rows raises ``ValueError``. Test-wise deletion is valid when values are missing completely at
+    random, which means that whether a value is missing depends on no value in the data; the rows a
+    test reads are then a random sample of all rows, and otherwise they are a selected sample that
+    more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data with 20, 50, and 100 variables,
     1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05, on one core.
@@ -643,7 +716,7 @@ def inter_iamb(
 def mmpc(
     data: npt.ArrayLike,
     *,
-    target: str | int | None = None,
+    target: str | int | Sequence[str | int] | None = None,
     structure: str = "skeleton",
     alpha: float = 0.05,
     indep_test: str | None = None,
@@ -653,7 +726,7 @@ def mmpc(
     seed: int | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
-) -> StructureOutput:
+) -> StructureOutput | list[StructureOutput]:
     """Learn a skeleton, or one variable's parents and children, with MMPC.
 
     Max-min parents and children (MMPC) [1]_ finds the variables adjacent to a target in the causal
@@ -667,10 +740,13 @@ def mmpc(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    target : str, int, or None, default=None
+    target : str, int, list of them, or None, default=None
         The variable whose set to learn: a column label (a string) or a 0-based position (an
-        integer). ``None`` learns every variable's set and keeps a pair when each variable is in
-        the other's set.
+        integer). A list of them learns each one's set with one search, which sets up the test
+        once and learns the set of a variable two targets' symmetry checks read once, on
+        ``andrey.config.n_jobs`` worker processes for a partial-correlation ``indep_test``; with
+        missing values, each target has a search of its own. ``None`` learns every variable's set
+        and keeps a pair when each variable is in the other's set.
     structure : {"skeleton", "cpdag"}, default="skeleton"
         The graph returned when ``target`` is ``None``. ``"skeleton"``: the adjacencies with no
         directions, each variable joined to its parents and children, the graph the sets give.
@@ -706,8 +782,8 @@ def mmpc(
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
-        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
-        tests, ``metadata["seed"]`` records the seed used.
+        only ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"`` make; the
+        other tests ignore it. With those tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -736,8 +812,9 @@ def mmpc(
 
     Returns
     -------
-    StructureOutput
-        Without ``target``, wraps the graph ``structure`` names: an ``undirected``
+    StructureOutput or list of StructureOutput
+        With a list of targets, a list holding each target's result, in its order, as that target
+        alone gives it. Without ``target``, wraps the graph ``structure`` names: an ``undirected``
         :class:`~andrey.core.GraphStructure` for ``"skeleton"``, whose edges have no arrowhead and
         join each pair in each other's set, or a ``cpdag`` one for ``"cpdag"``, whose undirected
         edges the tests cannot orient. With ``target``, an ``undirected`` one whose edges join
@@ -824,13 +901,19 @@ def mmpc(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [5]_ [6]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. A test raises ``ValueError`` when it has fewer rows than it needs,
-    ``|S| + 3`` for the partial-correlation tests (``"fisherz"``, ``"student_t"``, and
-    ``"normal_scores"``) and 2 for the other tests, or when a continuous column is constant on its
-    rows. Test-wise deletion is valid when values are missing completely at random, which means that
-    whether a value is missing depends on no value in the data; the rows a test reads are then a
-    random sample of all rows, and otherwise they are a selected sample that more rows do not
-    correct.
+    the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
+    ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including those the search skipped because no row can test them. A candidate no tested
+    query separated, as a variable never observed with the target, stays in the target's set, and a
+    pair no tested query could decide is listed in ``metadata["undecided_pairs"]``. On merged
+    cohorts, every pair of variables measured only in different cohorts is therefore an undecided
+    pair and, unless knowledge forbids it, an edge of the output: a fact about the data, not a
+    finding. A continuous column constant on a test's rows raises ``ValueError``. Test-wise deletion
+    is valid when values are missing completely at random, which means that whether a value is
+    missing depends on no value in the data; the rows a test reads are then a random sample of all
+    rows, and otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data with Fisher-z tests at alpha 0.05,
     on one core: 20, 50, and 100 variables with 1,000 and 5,000 rows and mean degree 2 and 4, with
