@@ -391,26 +391,27 @@ block with `andrey.config(n_jobs=...)`, or with the `ANDREY_*` variables of
 [Configuration](configuration.md); `bootstrap` follows them too.
 
 % concept: penalty_discount
-`ges`, `gies`, `gnies`, `xges`, `ages`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`,
-`boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take `penalty_discount`, the multiplier on the BIC
-penalty per parameter, the term of Ramsey et al. (2017): larger values give sparser graphs, and
+`ges`, `gies`, `gnies`, `xges`, `lges`, `ages`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`,
+`gfci`, `boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take `penalty_discount`, the multiplier on the
+BIC penalty per parameter, the term of Ramsey et al. (2017): larger values give sparser graphs, and
 `1.0`, the default, with `ebic_gamma=0.0` is the standard BIC. Every score but `"bdeu"` has this
-penalty, and `metadata["penalty_discount"]` records the value the score used. `ages` reads it as
-the lowest penalty of its solution path.
+penalty, and `metadata["penalty_discount"]` records the value the score used. `ages` reads it as the
+lowest penalty of its solution path.
 
 % concept: ebic_gamma
-`ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `boss_fci`,
-`grasp_fci`, `mmhc`, and `rsmax2` take `ebic_gamma`, the weight of the extended BIC, from 0 to 1
-(Chen and Chen 2008): their linear-Gaussian BIC adds `2 * ebic_gamma * log C(n_variables - 1,
-n_parents)` to each variable's score, a penalty that grows with the number of variables. `gfci`,
-`boss_fci`, and `grasp_fci` default to `ebic_gamma=0.0`, the standard BIC, and the others to `1.0`;
-{py:func}`~andrey.ges` describes the choice and {py:func}`~andrey.gfci` says why its default
-differs. Only `score_func="bic"` and `"normal_scores"` add the term, so passing `ebic_gamma` with
-another score, named or picked by `None`, raises a `ValueError`; `metadata["ebic_gamma"]` records the
-value a `"bic"` or `"normal_scores"` fit used. `gnies`, which has one score, always adds it.
+`ges`, `gies`, `gnies`, `xges`, `lges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`,
+`boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take `ebic_gamma`, the weight of the extended BIC,
+from 0 to 1 (Chen and Chen 2008): their linear-Gaussian BIC adds `2 * ebic_gamma * log
+C(n_variables - 1, n_parents)` to each variable's score, a penalty that grows with the number of
+variables. `gfci`, `boss_fci`, `grasp_fci`, and `lges` default to `ebic_gamma=0.0`, the standard
+BIC, and the others to `1.0`; {py:func}`~andrey.ges` describes the choice, and
+{py:func}`~andrey.gfci` and {py:func}`~andrey.lges` say why their defaults differ. Only
+`score_func="bic"` and `"normal_scores"` add the term, so passing `ebic_gamma` with another score,
+named or picked by `None`, raises a `ValueError`; `metadata["ebic_gamma"]` records the value a
+`"bic"` or `"normal_scores"` fit used. `gnies`, which has one score, always adds it.
 
 % concept: equivalent_sample_size
-`ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `boss_fci`,
+`ges`, `gies`, `xges`, `lges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `boss_fci`,
 `grasp_fci`, `mmhc`, and `rsmax2` take `equivalent_sample_size`, the equivalent sample size of the
 BDeu score (Heckerman, Geiger and Chickering 1995; Buntine 1991): the number of rows its uniform
 prior over each variable's conditional distributions is worth, a positive number. `1.0`, the
@@ -698,6 +699,7 @@ in a process.
    das
    cpcm
    cpcm_graph
+   lges
    rpcmci
 ```
 
@@ -736,6 +738,21 @@ given its parents, have the largest likelihood. It suits a few variables: it fit
 distinct parent set the class allows, and `max_fits` (100 by default, the order up to which the
 paper expects it to apply) makes it refuse a class that needs more, before it fits any. It is
 experimental until its comparison with the authors' code is published.
+
+LGES, less greedy equivalence search (Ejaz and Bareinboim 2025), {py:func}`~andrey.lges`, is GES
+with fewer edge additions: it adds no edge between two variables when one graph of the current
+class scores better without it (SafeInsert), and with `insertion="conservative"` also when any
+valid addition of the edge worsens the score (ConservativeInsert). It also deletes and reverses
+edges as GES and GIES do, and returns a CPDAG. `schedule` picks the order of these moves:
+`"lges"`, the default, is the paper's main method, LGES (its Algorithm 1), which deletes and
+reverses edges before each single addition; `"lges0_released"` is its LGES-0 variant (Algorithm 8)
+with the phases in the order of the authors' code: additions, deletions, then reversals, once. LGES
+is the default as the paper's main method. On the paper's linear-Gaussian simulation the two made
+about as many errors on the sparsest graphs (mean degree 1 and 2), with LGES-0 slightly ahead more
+often, and LGES made fewer on denser ones (mean degree 3 and up). With the standard BIC, its
+default, each schedule returns the CPDAGs of the authors' code run in its order on that simulation
+when both read the same graph of each class; it is experimental until it is benchmarked in that
+setting.
 
 Regime-PCMCI (Saggioro et al. 2020), {py:func}`~andrey.rpcmci`, takes one time series whose lagged
 links switch between a few persistent regimes. Each start draws random regime weights, then

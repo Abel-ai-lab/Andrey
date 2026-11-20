@@ -21,6 +21,14 @@ names its pull request.
 - For contributors, a benchmark lane runs `anm`, `pnl`, `loci`, and `resit` beside the authors'
   code of QCCD, HECI, and GRCI on the Tübingen cause-effect pairs, and a summary script turns its
   records into a weighted-accuracy table. ([#1127])
+- `lges`, experimental: less greedy equivalence search (Ejaz and Bareinboim 2025), a score search
+  next to `ges` and `xges` that adds no edge between two variables the score already holds
+  independent given the parents of one of them in a graph of the current class, and deletes and
+  reverses edges as GES and GIES do. `schedule` picks the paper's main method, LGES (Algorithm 1,
+  `"lges"`, the default), which deletes and reverses before each addition, or its LGES-0 in the
+  order of the authors' code (`"lges0_released"`: additions, deletions, then reversals).
+  `insertion` picks SafeInsert, the default, or ConservativeInsert. It takes the scores of `ges`,
+  with the standard BIC (`ebic_gamma=0.0`) as its default. ([#1146])
 - `rpcmci`, experimental: Regime-PCMCI (Saggioro et al. 2020) for one time series whose lagged
   causal links switch between a few persistent regimes. It returns an `andrey.RegimeOutput`: the
   regime of each time step, the regime weights, and one temporal result per regime, as `pcmci`
@@ -2747,6 +2755,7 @@ First alpha release.
 [#1127]: https://github.com/Abel-ai-lab/Andrey/pull/1127
 [#1147]: https://github.com/Abel-ai-lab/Andrey/pull/1147
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
+[#1146]: https://github.com/Abel-ai-lab/Andrey/pull/1146
 [#1149]: https://github.com/Abel-ai-lab/Andrey/pull/1149
 [#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
 [#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046

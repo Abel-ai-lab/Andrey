@@ -57,7 +57,7 @@ CPDAG_FITS = {
     **{f"pc-{test}": partial(andrey.pc, indep_test=test) for test in MIXED},
     **{
         f"{method}-{score}": partial(getattr(andrey, method), score_func=score)
-        for method in ("ges", "gies", "xges", "hc", "tabu", "boss", "grasp")
+        for method in ("ges", "gies", "xges", "lges", "hc", "tabu", "boss", "grasp")
         for score in MIXED
     },
     "cdnod-cond_gauss": lambda x, categorical: andrey.cdnod(
@@ -197,6 +197,8 @@ def random_network():
         "gies-cond_gauss",
         "xges-degen_gauss",
         "xges-cond_gauss",
+        "lges-degen_gauss",
+        "lges-cond_gauss",
         "boss-degen_gauss",
         "boss-cond_gauss",
     ],

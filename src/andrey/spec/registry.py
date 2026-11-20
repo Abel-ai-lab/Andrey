@@ -836,6 +836,64 @@ _add(
 )
 _add(
     MethodSpec(
+        name="lges",
+        family="score",
+        summary="Less greedy equivalence search: GES that adds no edge between two variables the "
+        "score already holds independent given one's parents in a graph of the current class, and "
+        "deletes and reverses edges as GES and GIES do. schedule=lges (default) is the paper's "
+        "LGES (Algorithm 1), deleting and reversing before each addition; "
+        "schedule=lges0_released is its LGES-0 in the authors' code's order (additions, "
+        "deletions, then reversals). "
+        "insertion=conservative also skips a pair when any of its additions worsens the score. "
+        "The standard BIC by default, BDeu when every column is categorical, conditional Gaussian "
+        "when some are. Returns a CPDAG + score.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
+            "a mixed-data setting read",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            _SCORE_FUNC,
+            _PENALTY_DISCOUNT,
+            _EBIC_GAMMA_STANDARD,
+            _EQUIVALENT_SAMPLE_SIZE,
+            ParamSpec(
+                name="insertion",
+                type="str",
+                default="safe",
+                choices=("safe", "conservative"),
+                doc="Which pairs an edge addition skips: safe (SafeInsert) skips a pair when one "
+                "graph of the current class scores better without the edge, and the paper proves "
+                "that it recovers the true class as the rows grow; conservative "
+                "(ConservativeInsert) also skips it when any valid addition of the edge worsens "
+                "the score, with fewer errors in the paper's simulations and no such proof.",
+            ),
+            ParamSpec(
+                name="schedule",
+                type="str",
+                default="lges",
+                choices=("lges", "lges0_released"),
+                doc="The order of the phases: lges is the paper's LGES (Algorithm 1), deleting "
+                "then reversing edges until neither improves the score before each single "
+                "addition; lges0_released is its LGES-0 (Algorithm 8) in the order of the "
+                "authors' code: additions, deletions, then reversals, once. lges is the "
+                "default as the paper's main method; on the paper's linear-Gaussian simulation "
+                "the two made about as many errors on the sparsest graphs and lges fewer on "
+                "denser ones.",
+            ),
+            _CATEGORICAL,
+        ),
+        references=("Ejaz & Bareinboim 2025",),
+    )
+)
+_add(
+    MethodSpec(
         name="ages",
         family="score",
         summary="Aggregative greedy equivalence search for linear-Gaussian data with weak edges: "
@@ -3758,7 +3816,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "iamb": ("target", "markov_blanket"),
     "inter_iamb": ("target", "markov_blanket"),
     "mmpc": ("target", "parents_and_children"),
-    **dict.fromkeys(("gies", "xges", "mmhc", "rsmax2"), ("score",)),
+    **dict.fromkeys(("gies", "xges", "lges", "mmhc", "rsmax2"), ("score",)),
     **dict.fromkeys(
         ("ges", "hc", "tabu", "boss", "grasp"), ("score", "index_edges", "changing_variables")
     ),

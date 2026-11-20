@@ -10,7 +10,7 @@ from andrey.core import ARROW, TAIL
 from andrey.core.structure import GraphStructure
 
 # A graph candidate also carries the scalar objective score (from metadata).
-_SCORE_GRAPH = frozenset({"GES", "GIES", "XGES", "HC", "Tabu", "MMHC", "RSMAX2"})
+_SCORE_GRAPH = frozenset({"GES", "GIES", "XGES", "LGES", "HC", "Tabu", "MMHC", "RSMAX2"})
 # Graph-output algorithms: candidate = {"graph"[, "score"]}.
 _GRAPH = (
     frozenset(
