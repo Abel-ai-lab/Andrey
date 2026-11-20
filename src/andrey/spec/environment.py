@@ -15,7 +15,13 @@ from andrey.constraint._parallel_skeleton import (
 )
 from andrey.core.backend import GPU_THRESHOLDS
 from andrey.core.env import SEED_MAX
-from andrey.core.missing_groups import GROUP_BYTES, GROUP_MAX_SCATTER, MAX_GROUPS, MIN_COLUMNS
+from andrey.core.missing_groups import (
+    GROUP_BYTES,
+    GROUP_MAX_SCATTER,
+    MAX_GROUPS,
+    MIN_COLUMNS,
+    MIN_GAIN,
+)
 from andrey.lingam.pwling import MIN_PRUNE_WORK
 from andrey.search._parallel_ges import MIN_POOL_GES_WORK
 
@@ -152,12 +158,11 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         effect=(
             "Path gate for test-wise deletion with `fisherz` or `student_t` on data with missing "
             "values: the rows are grouped by their missingness patterns, and each block's sums "
-            "come from the groups' tables, only when those tables fit in this many bytes, the "
-            f"patterns form at most {MAX_GROUPS} groups, and the scattered share stays within "
-            "`ANDREY_TESTWISE_GROUP_MAX_SCATTER`; otherwise each block is summed over every row. "
-            "The path is chosen once per test from the data, for a test over at least "
-            f"{MIN_COLUMNS} columns. The two paths count the same rows and agree up to rounding. "
-            "`0` keeps every test on the per-row path."
+            "come from the groups' tables, only when those tables fit in this many bytes and the "
+            "other test-wise grouping variables below allow it; otherwise each block is summed "
+            "over every row. The path is chosen once per test from the data. The two paths count "
+            "the same rows for every tested query and agree up to rounding. `0` keeps every test "
+            "on the per-row path."
         ),
         group="backend",
     ),
@@ -171,6 +176,42 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "misses within its group's columns are at most this share of those columns' cells. "
             "Above it, the corrections for rows missing several columns of a block cost more "
             "than summing every row."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_TESTWISE_GROUP_MAX_GROUPS",
+        values="integer",
+        default=str(MAX_GROUPS),
+        effect=(
+            "Path gate for test-wise deletion with `fisherz` or `student_t` (see "
+            "`ANDREY_TESTWISE_GROUP_BYTES`): the grouped path is used only when the missingness "
+            "patterns form at most this many groups. Data with as many patterns as rows stop "
+            "early, at little cost. `0` keeps every test on the per-row path."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_TESTWISE_GROUP_MIN_COLUMNS",
+        values="integer",
+        default=str(MIN_COLUMNS),
+        effect=(
+            "Path gate for test-wise deletion with `fisherz` or `student_t` (see "
+            "`ANDREY_TESTWISE_GROUP_BYTES`): the grouped path is used only for a test over at "
+            "least this many columns. A test over fewer, such as one built for a single query, "
+            "asks too few distinct blocks to repay the grouping."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_TESTWISE_GROUP_MIN_GAIN",
+        values="number of at least 1",
+        default=str(MIN_GAIN),
+        effect=(
+            "Block gate for test-wise deletion with `fisherz` or `student_t` on the grouped path "
+            "(see `ANDREY_TESTWISE_GROUP_BYTES`): a block takes the groups' sums only when its "
+            "estimated per-row cost is at least this many times its grouped cost; any other "
+            "block is summed over every row."
         ),
         group="backend",
     ),

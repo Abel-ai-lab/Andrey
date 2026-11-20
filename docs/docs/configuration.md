@@ -100,17 +100,28 @@ With `fisherz` or `student_t` on data with missing values, a test reads the rows
 one of its columns. When the rows fall into a few missingness patterns, as in data merged from
 cohorts that each measure their own variables, the rows are grouped by pattern once, and each
 test's sums come from the groups' tables instead of from every row. The groups follow the
-patterns, not the row or the column order. A test over at least 8 columns takes this path when the
-two variables below allow it, chosen once from the data; within it, a test whose rows missing
-several of its columns are many still sums every row. The two paths count the same rows and agree
-up to the last digits of the p-values.
+patterns, not the row or the column order. The path is chosen once per test from the data, by the
+variables below. Within it, each block of columns takes the cheaper of the two sums, and a block
+that keeps only a small share of its groups' rows is summed over every row, where the groups' sums
+would lose digits. A block whose groups hold too few rows for its test is not tested without
+being summed. The two paths count the same rows for every tested query and agree up to the last
+digits of the p-values.
 
 - `ANDREY_TESTWISE_GROUP_BYTES`: the grouped path is used only when its tables fit in this many
-  bytes (default `268435456`, 256 MiB) and the patterns form at most 64 groups; `0` keeps every
-  test on the per-row path.
+  bytes (default `268435456`, 256 MiB); `0` keeps every test on the per-row path.
 - `ANDREY_TESTWISE_GROUP_MAX_SCATTER`: the grouped path is used only when the cells a row misses
   among its group's columns are at most this share of those cells (default `0.15`). Above it,
   correcting for the rows that miss several columns of a test costs more than summing every row.
+- `ANDREY_TESTWISE_GROUP_MAX_GROUPS`: the grouped path is used only when the patterns form at most
+  this many groups (default `64`).
+- `ANDREY_TESTWISE_GROUP_MIN_COLUMNS`: the grouped path is used only for a test over at least this
+  many columns (default `8`). A test over fewer asks too few distinct blocks to repay the grouping.
+- `ANDREY_TESTWISE_GROUP_MIN_GAIN`: on the grouped path, a block takes the groups' sums only when
+  its estimated per-row cost is at least this many times its grouped cost (default `2`).
+
+Two constants are fixed. The cost of opening a group sets how the rows split into groups, not
+whether a test uses them. The share of its groups' rows below which a block is summed over every
+row, one sixteenth, bounds the rounding, which no speed setting loosens.
 
 ## GPU dispatch
 

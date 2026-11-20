@@ -39,13 +39,17 @@ References
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import TypeVar
 
 import numpy as np
 
 from . import backend, env
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 #: The default of ``ANDREY_TESTWISE_GROUP_BYTES``: the grouped sums are used only when their tables
 #: fit in this many bytes; ``0`` keeps every fit on the per-row path.
@@ -56,19 +60,33 @@ GROUP_BYTES = 1 << 28
 #: ``O_g`` over all rows.
 GROUP_MAX_SCATTER = 0.15
 
-#: The most groups :func:`pattern_groups` forms before it stops, so data with as many patterns as
-#: rows, where the grouped sums cannot help, cost little to rule out.
+#: The default of ``ANDREY_TESTWISE_GROUP_MAX_GROUPS``: the most groups :func:`pattern_groups`
+#: forms before it stops, so data with as many patterns as rows, where the grouped sums cannot
+#: help, cost little to rule out.
 MAX_GROUPS = 64
 
-#: The fewest columns a test's data need for the grouped sums: a test over fewer columns, such as
-#: one built for a single query, asks few distinct blocks, each summed once, so the groups cannot
-#: repay their setup.
+#: The default of ``ANDREY_TESTWISE_GROUP_MIN_COLUMNS``: the fewest columns a test's data need for
+#: the grouped sums. A test over fewer columns, such as one built for a single query, asks few
+#: distinct blocks, each summed once, so the groups cannot repay their setup.
 MIN_COLUMNS = 8
+
+#: The default of ``ANDREY_TESTWISE_GROUP_MIN_GAIN``: a block takes the grouped sums when its
+#: estimated per-row cost is at least this many times its grouped cost
+#: (:meth:`GroupedSums.cheaper`).
+MIN_GAIN = 2.0
 
 #: A pattern opens its own group when joining any group would add more work than this: the rows
 #: missing two or more columns of the group, which the block step scans, plus the pairs of columns
 #: each such row misses. A group costs the block step about as much as scanning this many rows.
+#: Fixed, not a setting: it is the grouping's unit of cost, which decides how the rows split into
+#: groups, while the settings above decide whether a test or a block uses them.
 _OPEN_COST = 128
+
+#: A tested block whose rows are fewer than its groups' rows over this, or fewer than twice its
+#: columns, is summed per row (:meth:`GroupedSums.exact`). Its grouped sums would subtract nearly
+#: all of the groups' sums, so rounding would grow with the groups' rows over the block's rows.
+#: Fixed, not a setting: it bounds the rounding, which no speed setting should loosen.
+FEW_ROWS = 16
 
 # Each step of the block computation holds at most about this many bytes of temporaries.
 _STEP_BYTES = 1 << 23
@@ -91,22 +109,27 @@ class Grouping:
         return float(self.missed.sum()) / cells if cells else 0.0
 
     def table_bytes(self) -> int:
-        """The bytes :class:`GroupedSums` allocates for these groups, counted before it does."""
+        """The bytes :class:`GroupedSums` allocates for these groups, counted before it does: per
+        group, the count, sums, and cross products over all its rows and over its rows missing
+        each scattered column, the pair counts of the rows missing two or more columns, and those
+        rows' values and masks."""
         total = 0
         for g, columns in enumerate(self.observed):
             o = int(columns.sum())
             members = self.missed[self.group == g][:, columns]
             spread = int(members.any(axis=0).sum())
             twice = int((members.sum(axis=1) >= 2).sum())
-            total += 8 * (1 + o + o * o) * (2 + spread) + 9 * o * twice
+            total += 8 * (1 + o + o * o) * (2 + spread) + 8 * o * o + 9 * o * twice
         return total
 
 
-def pattern_groups(observed: np.ndarray, ranks: np.ndarray) -> Grouping | None:
+def pattern_groups(
+    observed: np.ndarray, ranks: np.ndarray, max_groups: int = MAX_GROUPS
+) -> Grouping | None:
     """Group the rows by their missingness patterns, by cost (see the module).
 
     ``observed`` is the ``(n, d)`` observed mask and ``ranks`` each column's tie rank. Returns
-    ``None`` when the patterns need more than :data:`MAX_GROUPS` groups.
+    ``None`` when the patterns need more than ``max_groups`` groups.
     """
     n, d = observed.shape
     packed = np.packbits(observed, axis=1)
@@ -147,7 +170,7 @@ def pattern_groups(observed: np.ndarray, ranks: np.ndarray) -> Grouping | None:
             if cost < best_cost or (best < 0 and cost == best_cost):
                 best, best_cost = g, cost
         if best < 0:
-            if len(sets) == MAX_GROUPS:
+            if len(sets) == max_groups:
                 return None
             sets.append(pattern)
             rows.append(count)
@@ -181,23 +204,24 @@ def pattern_groups(observed: np.ndarray, ranks: np.ndarray) -> Grouping | None:
     return Grouping(group, held, held[group] & ~observed)
 
 
-def grouping_for(observed: np.ndarray, ranks: np.ndarray) -> Grouping | None:
+def grouping_for(observed: np.ndarray, ranks: Callable[[], np.ndarray]) -> Grouping | None:
     """The groups the grouped sums use on ``observed``, or ``None`` for the per-row path.
 
-    The grouped sums are used when the data have at least :data:`MIN_COLUMNS` columns, the
-    patterns form at most :data:`MAX_GROUPS` groups, their scattered share is at most
-    ``ANDREY_TESTWISE_GROUP_MAX_SCATTER``, and their tables fit in ``ANDREY_TESTWISE_GROUP_BYTES``.
-    The choice depends on the data alone.
+    ``ranks`` returns each column's tie rank; it is called only once the cheap checks pass. The
+    grouped sums are used when the data have at least ``ANDREY_TESTWISE_GROUP_MIN_COLUMNS``
+    columns, the patterns form at most ``ANDREY_TESTWISE_GROUP_MAX_GROUPS`` groups, their
+    scattered share is at most ``ANDREY_TESTWISE_GROUP_MAX_SCATTER``, and their tables fit in
+    ``ANDREY_TESTWISE_GROUP_BYTES``. The choice depends on the data alone.
     """
-    budget = env.TESTWISE_GROUP_BYTES.read()
-    budget = GROUP_BYTES if budget is None else budget
-    scatter = env.TESTWISE_GROUP_MAX_SCATTER.read()
-    scatter = GROUP_MAX_SCATTER if scatter is None else scatter
-    if budget <= 0 or observed.shape[1] < MIN_COLUMNS or observed.all():
+    budget = _read(env.TESTWISE_GROUP_BYTES, GROUP_BYTES)
+    scatter = _read(env.TESTWISE_GROUP_MAX_SCATTER, GROUP_MAX_SCATTER)
+    most = _read(env.TESTWISE_GROUP_MAX_GROUPS, MAX_GROUPS)
+    fewest = _read(env.TESTWISE_GROUP_MIN_COLUMNS, MIN_COLUMNS)
+    if budget <= 0 or most <= 0 or observed.shape[1] < fewest or observed.all():
         return None
-    grouping = pattern_groups(observed, ranks)
+    grouping = pattern_groups(observed, ranks(), most)
     if grouping is None:
-        logger.debug("test-wise deletion: per-row sums, more than %d groups", MAX_GROUPS)
+        logger.debug("test-wise deletion: per-row sums, more than %d groups", most)
         return None
     share = grouping.scattered_share
     size = grouping.table_bytes()
@@ -210,6 +234,19 @@ def grouping_for(observed: np.ndarray, ranks: np.ndarray) -> Grouping | None:
         size,
     )
     return grouping if path else None
+
+
+def _read(setting: env.Setting[T], default: T) -> T:
+    """``setting``'s value, or ``default`` when it is unset."""
+    value = setting.read()
+    return default if value is None else value
+
+
+def few_rows(count: np.ndarray, bound: np.ndarray, k: int) -> np.ndarray:
+    """Which blocks of ``k`` columns, with ``count`` rows out of their groups' ``bound``, the
+    per-row sums compute instead of the groups: fewer than ``bound / FEW_ROWS`` rows or fewer
+    than ``2 k`` (see :data:`FEW_ROWS`)."""
+    return (count * FEW_ROWS < bound) | (count < 2 * k)
 
 
 class GroupedSums:
@@ -270,29 +307,30 @@ class GroupedSums:
                 both = missed[:, twice].astype(np.float64)
                 self.pairs.append(np.triu(np.rint(both @ both.T), 1))
         self.n = int(len(grouping.group))
+        self.gain = _read(env.TESTWISE_GROUP_MIN_GAIN, MIN_GAIN)
 
     def cheaper(self, columns: np.ndarray) -> np.ndarray:
         """Which blocks, rows of ``columns``, the groups compute for less than the per-row sums.
 
-        In each of its groups, a block of ``k`` columns scans the rows missing two or more columns
-        of the group, ``k`` bytes a row where the per-row sums take about ``k^2`` products, and
-        corrects each row missing two or more of its own columns, at most the rows missing both of
-        each pair of them (the columns are sorted, so each pair's count sits above the diagonal).
-        A block takes the grouped sums when the scanned rows over ``k`` plus that bound, summed
-        over its groups, are at most half the rows the per-row sums read. The choice
-        depends on the block and the data alone.
+        The per-row sums read the observed masks of all ``n`` rows for each block, then sum the
+        rows it keeps. In each of its groups, the grouped sums read the masks of the rows missing
+        two or more columns of the group, and correct each row missing two or more of the block's
+        own columns, at most the rows missing both of each pair of them (the columns are sorted,
+        so each pair's count sits above the diagonal). A block takes the grouped sums when those
+        read rows plus that bound, summed over its groups, times ``ANDREY_TESTWISE_GROUP_MIN_GAIN``
+        are at most ``n``. The choice depends on the block and the data alone.
         """
         k = columns.shape[1]
-        bound = np.zeros(len(columns))
+        work = np.zeros(len(columns))
         inside = np.asarray(self.observed[:, columns].all(axis=2))
         i, j = np.triu_indices(k, 1)
         for g, pairs in enumerate(self.pairs):
             at = np.flatnonzero(inside[g])
             if len(at):
                 local = self.local[g][columns[at]]
-                bound[at] += pairs[local[:, i], local[:, j]].sum(axis=1)
-                bound[at] += self.twice_missed[g].shape[1] / k
-        return 2 * bound <= self.n
+                work[at] += pairs[local[:, i], local[:, j]].sum(axis=1)
+                work[at] += self.twice_missed[g].shape[1]
+        return self.gain * work <= self.n
 
     def counts(self, columns: np.ndarray) -> np.ndarray:
         """The most rows each block, a row of ``columns``, can hold: those of its groups."""

@@ -684,9 +684,10 @@ With `fisherz` and `student_t`, each test computes its correlations directly fro
 tests at once. When the rows fall into a few missingness patterns, as in data merged from cohorts
 that each measure their own variables, those sums come from tables kept once per pattern group
 instead of from every row, with the same results up to the last digits
-([Configuration](../configuration.md#test-wise-deletion) says when). The other tests are built anew on each test's rows, which costs more. A time series
-keeps every step: each row of the lagged design that reads a missing value holds it. Each test of
-PCMCI, PCMCI+, or LPCMCI reads the design rows where all of its lagged variables are observed.
+([Configuration](../configuration.md#test-wise-deletion) says when). The other tests are built
+anew on each test's rows, which costs more. A time series keeps every step: each row of the lagged
+design that reads a missing value holds it. Each test of PCMCI, PCMCI+, or LPCMCI reads the design
+rows where all of its lagged variables are observed.
 
 Test-wise deletion is valid when values are missing completely at random, which means that whether
 a value is missing depends on no value in the data; the rows a test reads are then a random sample

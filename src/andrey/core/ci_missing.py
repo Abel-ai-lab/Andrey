@@ -64,7 +64,7 @@ from .ci import (
     p_value_statistics,
     per_query,
 )
-from .missing_groups import GroupedSums, grouping_for
+from .missing_groups import GroupedSums, few_rows, grouping_for
 from .score import (
     ZERO_RESIDUAL,
     CopiedColumnsError,
@@ -884,7 +884,10 @@ class GaussianDeletion(PartialCorrelationDeletion):
         same columns within ``_CACHE_BYTES``, each taking ``_ENTRY_BYTES`` besides its matrix; a
         query reads it in its own order. The blocks not kept are computed in steps of at most
         ``_STEP_BYTES`` of row values. A block's rows are counted from the observed masks first,
-        and a block with fewer than :meth:`least_rows` is never summed: its matrix is ``NaN``.
+        and a block with fewer than :meth:`least_rows` is never summed: its matrix is ``NaN``. On
+        the grouped path, a block whose groups hold fewer rows than that is not counted either: its
+        count is its groups' rows, an upper bound, which no answer reads, since its queries are not
+        tested.
         """
         k = columns.shape[1]
         keys = [tuple(row) for row in np.sort(columns, axis=1).tolist()]
@@ -894,23 +897,28 @@ class GaussianDeletion(PartialCorrelationDeletion):
         step = len(new) if grouped is None else max(1, _STEP_BYTES // (32 * k * k))
         for start in range(0, len(new), max(step, 1)):
             chunk = np.array(new[start : start + step], dtype=np.intp).reshape(-1, k)
-            # The per-row path also counts the blocks too short for the groups to hold enough rows.
-            per_row = (
-                np.ones(len(chunk), dtype=bool)
-                if grouped is None
-                else ~grouped.cheaper(chunk) | (grouped.counts(chunk) < least)
-            )
             blocks = np.full((len(chunk), k, k), np.nan)
             counts = np.zeros(len(chunk), dtype=np.int64)
+            per_row = np.ones(len(chunk), dtype=bool)
+            summed = np.empty(0, dtype=np.intp)  # the blocks the groups sum
+            if grouped is not None:
+                bound = grouped.counts(chunk)
+                short = bound < least
+                counts[short] = bound[short]
+                cheaper = ~short & grouped.cheaper(chunk)
+                per_row = ~short & ~cheaper
+                summed = np.flatnonzero(cheaper)
             if per_row.any():
                 blocks[per_row], counts[per_row] = self._summed(chunk[per_row], least)
-            if grouped is not None and not per_row.all():
-                at = np.flatnonzero(~per_row)
-                count, sums, products = grouped.blocks(chunk[at])
-                counts[at] = count
-                blocks[at] = np.where(
+            if grouped is not None and len(summed):
+                count, sums, products = grouped.blocks(chunk[summed])
+                counts[summed] = count
+                blocks[summed] = np.where(
                     (count >= least)[:, None, None], _correlations(products, sums, count), np.nan
                 )
+                again = summed[(count >= least) & few_rows(count, bound[summed], k)]
+                if len(again):
+                    blocks[again], counts[again] = self._summed(chunk[again], least)
             for key, block, count in zip(map(tuple, chunk.tolist()), blocks, counts.tolist()):
                 self._blocks[key] = (block, count)
                 self._kept += block.nbytes + _ENTRY_BYTES
@@ -954,7 +962,7 @@ class GaussianDeletion(PartialCorrelationDeletion):
         if not self._chosen:
             from .ties import tie_ranks
 
-            grouping = grouping_for(self._observed, tie_ranks(self._data))
+            grouping = grouping_for(self._observed, lambda: tie_ranks(self._data))
             self._grouped = None if grouping is None else GroupedSums(self._values, grouping)
             self._chosen = True
         return self._grouped

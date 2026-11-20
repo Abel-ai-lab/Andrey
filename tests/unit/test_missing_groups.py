@@ -84,14 +84,14 @@ def test_patterns_with_no_structure_take_the_per_row_path():
     rng = np.random.default_rng(2)
     x = rng.standard_normal((4_000, 30))
     x[rng.random(x.shape) < 0.3] = np.nan
-    assert missing_groups.grouping_for(~np.isnan(x), tie_ranks(x)) is None
+    assert missing_groups.grouping_for(~np.isnan(x), lambda: tie_ranks(x)) is None
 
 
 def test_a_zero_byte_budget_keeps_the_per_row_path(monkeypatch):
     x = _cohorts()
-    assert missing_groups.grouping_for(~np.isnan(x), tie_ranks(x)) is not None
+    assert missing_groups.grouping_for(~np.isnan(x), lambda: tie_ranks(x)) is not None
     _per_row(monkeypatch)
-    assert missing_groups.grouping_for(~np.isnan(x), tie_ranks(x)) is None
+    assert missing_groups.grouping_for(~np.isnan(x), lambda: tie_ranks(x)) is None
 
 
 @pytest.mark.parametrize("value", ["-0.1", "1.5", "a lot"])
@@ -131,8 +131,9 @@ def test_grouped_sums_answer_as_the_per_row_sums_up_to_rounding(monkeypatch, gro
         paths[path] = found
     for size, (r, p, rows) in paths["grouped"].items():
         r_ref, p_ref, rows_ref = paths["per-row"][size]
-        assert np.array_equal(rows, rows_ref)  # the same row counts, short blocks included
         assert np.array_equal(np.isnan(p), np.isnan(p_ref))  # the same queries not tested
+        tested = ~np.isnan(p)
+        assert np.array_equal(rows[tested], rows_ref[tested])
         assert np.allclose(r, r_ref, rtol=RTOL, atol=1e-12, equal_nan=True)
         assert np.allclose(p, p_ref, rtol=RTOL, atol=1e-12, equal_nan=True)
 
@@ -152,15 +153,86 @@ def test_a_grouped_query_gives_the_same_bits_alone_and_in_any_batch(grouped, nam
             assert list(zip(r.tolist(), p.tolist())) == [alone[i] for i in batch]
 
 
+def _spy(monkeypatch, cls, name: str) -> list[int]:
+    """Count the blocks each call of ``cls.name`` computes."""
+    calls: list[int] = []
+    original = getattr(cls, name)
+
+    def counted(self, columns, *args):
+        calls.append(len(columns))
+        return original(self, columns, *args)
+
+    monkeypatch.setattr(cls, name, counted)
+    return calls
+
+
 @pytest.mark.parametrize("method", ["pc", "fci", "iamb"])
 def test_a_fit_on_merged_cohorts_finds_the_same_graph_on_either_path(monkeypatch, method):
     x = _cohorts(n=4_000, seed=8)[:, :10]
     fit = getattr(andrey, method)
+    summed = _spy(monkeypatch, missing_groups.GroupedSums, "blocks")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         found = fit(x, indep_test="fisherz", missing="testwise")
+        assert sum(summed) > 0  # some blocks took the grouped sums
         _per_row(monkeypatch)
         reference = fit(x, indep_test="fisherz", missing="testwise")
     assert np.array_equal(found.structure.to_numpy(), reference.structure.to_numpy())
-    for key in ("not_tested", "undecided_pairs", "rows_min", "rows_median"):
+    for key in ("not_tested", "undecided_pairs", "rows_tested", "never_observed_together"):
         assert found.metadata.get(key) == reference.metadata.get(key)
+    assert found.metadata["rows_tested"]["min"] > 0
+
+
+def test_a_block_with_few_of_its_groups_rows_takes_the_per_row_sums(monkeypatch, grouped):
+    """A column seen in 40 of 20,000 rows, every other cell observed: one group holds every row,
+    and the grouped sums of the column's blocks would subtract nearly all of the group's sums.
+    They give the per-row bits."""
+    rng = np.random.default_rng(9)
+    n, d = 20_000, 10
+    z = rng.standard_normal((n, d))
+    z[:, 1:] += 0.4 * z[:, :-1]
+    x = z * rng.uniform(0.5, 2.0, d) + rng.uniform(1e3, 1e4, d)
+    rare = np.zeros(n, dtype=bool)
+    rare[rng.choice(n, 40, replace=False)] = True
+    x[~rare, d - 1] = np.nan
+    q = np.array(
+        [[0, d - 1, *rng.choice(np.arange(1, d - 1), 2, replace=False)] for _ in range(60)]
+    )
+    lo, hi, conds = q[:, 0], q[:, 1], np.sort(q[:, 2:], axis=1)
+    test = make_indep_test("fisherz", x)
+    grouped_sums = test._grouped_sums()
+    assert grouped_sums is not None and len(grouped_sums.rows) == 1
+    r, p = test.statistic_pvalues(lo, hi, conds)
+    _per_row(monkeypatch)
+    r_ref, p_ref = make_indep_test("fisherz", x).statistic_pvalues(lo, hi, conds)
+    assert np.isfinite(p_ref).all()
+    assert r.tolist() == r_ref.tolist() and p.tolist() == p_ref.tolist()
+
+
+def test_one_chunk_mixes_grouped_and_per_row_blocks(monkeypatch, grouped):
+    x = _cohorts(seed=10)
+    monkeypatch.setenv("ANDREY_TESTWISE_GROUP_MIN_GAIN", "40")  # sends some blocks per row
+    summed = _spy(monkeypatch, missing_groups.GroupedSums, "blocks")
+    per_row = _spy(monkeypatch, type(make_indep_test("fisherz", x)), "_summed")
+    queries = np.sort(np.array(_queries(x.shape[1], seed=11)[2]), axis=1)
+    lo, hi, conds = queries[:, 0], queries[:, 1], queries[:, 2:]
+    r, p = make_indep_test("fisherz", x).statistic_pvalues(lo, hi, conds)
+    assert summed and per_row  # both paths answered blocks of the same chunk
+    _per_row(monkeypatch)
+    r_ref, p_ref = make_indep_test("fisherz", x).statistic_pvalues(lo, hi, conds)
+    assert np.array_equal(np.isnan(p), np.isnan(p_ref))
+    assert np.allclose(r, r_ref, rtol=RTOL, atol=1e-12, equal_nan=True)
+    assert np.allclose(p, p_ref, rtol=RTOL, atol=1e-12, equal_nan=True)
+
+
+def test_the_correction_step_gives_the_same_bits_in_smaller_steps(monkeypatch, grouped):
+    """With the step size lowered, the rows missing several columns of a block are added in many
+    pieces, a block's rows split across them; the sums keep their bits."""
+    x = _cohorts(seed=12)
+    queries = np.sort(np.array(_queries(x.shape[1], seed=13)[4]), axis=1)
+    lo, hi, conds = queries[:, 0], queries[:, 1], queries[:, 2:]
+    r, p = make_indep_test("fisherz", x).statistic_pvalues(lo, hi, conds)
+    monkeypatch.setattr(missing_groups, "_STEP_BYTES", 1 << 12)
+    r_small, p_small = make_indep_test("fisherz", x).statistic_pvalues(lo, hi, conds)
+    assert r.tolist() == r_small.tolist()
+    assert np.array_equal(p, p_small, equal_nan=True)
