@@ -838,7 +838,8 @@ _add(
         family="score",
         summary="Less greedy equivalence search, its paper's LGES-0 variant: GES that adds no "
         "edge between two variables the score already holds independent given one's parents in a "
-        "graph of the current class, then deletes and reverses edges as GES and GIES do. "
+        "graph of the current class, then deletes and reverses edges as GES and GIES do, in the "
+        "order of the authors' code (the paper's Algorithm 8 reverses before it deletes). "
         "insertion=conservative also skips a pair when any of its additions worsens the score. "
         "The standard BIC by default, BDeu when every column is categorical, conditional Gaussian "
         "when some are. Returns a CPDAG + score.",

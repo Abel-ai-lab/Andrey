@@ -104,9 +104,9 @@ def test_turning_phase_reaches_the_authors_cpdag(insertion, tie_break, monkeypat
     authors = [(0, 1, "directed"), (0, 2, "undirected"), (2, 1, "directed"), (3, 1, "directed")]
     authors.append((2, 3, "undirected"))
     with andrey.config(tie_break=tie_break):
-        full = andrey.lges(x, insertion=insertion).structure
+        full = andrey.lges(x, insertion=insertion, ebic_gamma=0.0).structure
         monkeypatch.setattr("andrey.search.lges._turning_best", lambda *args: None)
-        unturned = andrey.lges(x, insertion=insertion).structure
+        unturned = andrey.lges(x, insertion=insertion, ebic_gamma=0.0).structure
     assert sorted(full.oriented_edges()) == sorted(authors)
     assert shd(full, unturned) > 0
 
@@ -131,7 +131,7 @@ def test_recovers_sparse_er_graphs(insertion):
     for seed in range(4):
         sample = _er_sample(20, 5000, seed)
         truth = to_cpdag(sample.graph)
-        out = andrey.lges(np.asarray(sample.data), insertion=insertion)
+        out = andrey.lges(np.asarray(sample.data), insertion=insertion, ebic_gamma=0.0)
         errors.append(shd(out.structure, truth))
         empty += int(np.count_nonzero(truth.to_numpy())) // 2
     assert errors[0] == 0
