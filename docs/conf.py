@@ -573,6 +573,7 @@ PROSE_NAMES = {
     "pcmciplus": "PCMCI+",
     "jpcmciplus": "J-PCMCI+",
     "lpcmci": "LPCMCI",
+    "rpcmci": "Regime-PCMCI",
     "granger": "Granger",
     "dynotears": "DYNOTEARS",
     "anm": "ANM",

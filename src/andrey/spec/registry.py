@@ -2648,6 +2648,119 @@ _add(
 )
 _add(
     MethodSpec(
+        name="rpcmci",
+        family="temporal",
+        summary="Regime-PCMCI for one multivariate time series whose lagged causal links switch "
+        "between a few persistent regimes: the regime of each time step and the lagged links of "
+        "each regime. Returns one temporal structure per regime.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data", kind="matrix", doc="A multivariate time series, row = step."
+                ),
+            ),
+            layout="(n_samples, n_variables), row = time step",
+        ),
+        output=OutputSpec(
+            structure_type="temporal",
+            graph_kind=None,
+            regimes=True,
+            doc="the regime of each time step and the regime weights; per regime, lag graphs "
+            "for lags 1..tau_max with MCI p_values, statistics, and the PC1 parents in metadata.",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            ParamSpec(
+                name="n_regimes",
+                type="int",
+                default=2,
+                doc="The number of regimes, at least 2.",
+                minimum=2,
+            ),
+            ParamSpec(
+                name="max_transitions",
+                type="int",
+                default=1,
+                doc="The most times each regime may switch on or off over the series, at least 1; "
+                "about n_samples / (mean regime length * n_regimes).",
+                minimum=1,
+            ),
+            ParamSpec(
+                name="switch_threshold",
+                type="float",
+                default=0.5,
+                doc="The weight at which a time step joins a regime's PCMCI step and model fit, "
+                "in (0, 1).",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+            ),
+            concept_param(
+                "tau_max",
+                doc="The largest lag tested; links at lags 1 to tau_max are tested.",
+            ),
+            ParamSpec(
+                name="pc1_alpha",
+                type="float",
+                default=0.2,
+                doc="Significance level of each regime's PC1 parent selection; larger keeps more "
+                "parents as conditions.",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+            ),
+            concept_param(
+                "alpha",
+                default=0.01,
+                doc="Significance level of each regime's MCI test, the level that decides the "
+                "returned links; a link is kept when its p-value is at most this.",
+            ),
+            concept_param(
+                "fdr_method",
+                default="none",
+                doc="How each regime's MCI p-values are corrected for the number of links tested: "
+                "none keeps them as tested; fdr_bh replaces them with their Benjamini-Hochberg "
+                "adjusted values over all the regime's links together, and a link is kept when its "
+                "adjusted p-value is at most alpha.",
+            ),
+            concept_param(
+                "indep_test",
+                default="student_t",
+                nullable=False,
+                choices=("student_t", "fisherz"),
+                doc="The partial-correlation test, for linear effects: student_t takes the p-value "
+                "from the Student-t distribution, fisherz from Fisher's z-transform.",
+            ),
+            concept_param(
+                "n_starts",
+                default=50,
+                doc="Number of starts, each from its own random regime assignment drawn from "
+                "seed and its index; returns the start with the lowest objective.",
+            ),
+            concept_param(
+                "max_iter",
+                default=20,
+                nullable=False,
+                doc="The most iterations of each start, at least 1; one iteration learns every "
+                "regime's graph and then reassigns the time steps.",
+            ),
+            concept_param(
+                "seed",
+                doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
+                "random one, so a fit repeats. Start 0 draws its first regime weights from "
+                "seed, start a > 0 from SeedSequence(seed, spawn_key=(a,)).",
+            ),
+        ),
+        references=("Saggioro et al. 2020", "Runge et al. 2019"),
+    )
+)
+_add(
+    MethodSpec(
         name="lpcmci",
         family="temporal",
         summary="LPCMCI for a single multivariate time series with possible hidden common causes: "
@@ -3726,6 +3839,11 @@ _METADATA: dict[str, tuple[str, ...]] = {
         *("context_links", "index_edges", "time_index_edges", "time_dummy"),
     ),
     "lpcmci": ("links", "p_values", "statistics", "parents", "conflicts"),
+    # The run's keys, then each regime's.
+    "rpcmci": (
+        *("objective", "start", "n_iterations", "converged", "failed_starts"),
+        *("p_values", "statistics", "parents"),
+    ),
     **dict.fromkeys(("anm", "pnl"), ("p_values", "statistics")),
     "loci": ("log_likelihoods", "p_values", "statistics"),
     "cpcm": ("p_values", "statistics", "independence_p_value", "families"),

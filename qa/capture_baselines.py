@@ -154,6 +154,7 @@ ALGORITHMS = {
     "PCMCI": (_facade("pcmci", tau_max=2, indep_test="student_t"), "var_3v_lag2"),
     "PCMCIplus": (_facade("pcmciplus", tau_max=2, indep_test="student_t"), "var_4v_stable"),
     "LPCMCI": (_facade("lpcmci", tau_max=2, indep_test="student_t"), "var_6v_hidden"),
+    "RPCMCI": (_facade("rpcmci", max_transitions=7, n_starts=4, seed=0), "regime_var_2v"),
     "KCI": (_run_ci_test, "nonmonotone_4v"),
     "RCoT": (_run_ci_test, "nonmonotone_4v"),
     "CMIknn": (_run_ci_test, "nonmonotone_4v"),

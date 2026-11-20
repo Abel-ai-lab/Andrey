@@ -118,9 +118,10 @@ registry. Every facade docstring has, in order:
 - **Extended summary**: a sentence or two on the method, where it helps.
 - **Parameters**: every argument with its type or shape and, for enums, the `{"a", "b"}` choices,
   named as in the signature (the drift guard checks them).
-- **Returns**: `StructureOutput` (`multi_group_direct_lingam`, one per group), naming the wrapped
-  kind (`cpdag`, `dag`, `pag`, temporal) and the contents of `.metadata`, and of `.ordering` and
-  `.weighted_adjacency` when the method sets them.
+- **Returns**: `StructureOutput` (`multi_group_direct_lingam`, one per group; `rpcmci`, a
+  `RegimeOutput` with one per regime), naming the wrapped kind (`cpdag`, `dag`, `pag`, temporal)
+  and the contents of `.metadata`, and of `.ordering` and `.weighted_adjacency` when the method
+  sets them.
 - **Raises**: the error taxonomy, noting which `ValueError`s enumerate valid options.
 - **Warns**: the warnings the method raises itself, `ExperimentalWarning` when it is experimental,
   the data check's `DataTypeWarning`, and `BoundaryWarning` when a ladder of the method's measured
@@ -151,8 +152,8 @@ in Returns, and the shared Warns entries. To change one, edit the table and run
 hold one and does not; `tests/unit/test_facade_docstrings.py` fails while a copy differs.
 
 `andrey.pc` is the model. The public core classes autodoc renders (`GraphStructure`,
-`TemporalStructure`, `SummaryGraph`, `StructureOutput`) take the same sections on their
-argument-taking methods; `ruff`'s `D` rules are off there, so
+`TemporalStructure`, `SummaryGraph`, `StructureOutput`, `RegimeOutput`) take the same sections on
+their argument-taking methods; `ruff`'s `D` rules are off there, so
 `test_public_core_methods_document_their_parameters` pins their `Parameters` to the signatures.
 
 ## Common changes

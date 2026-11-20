@@ -30,7 +30,7 @@ import andrey
 from andrey.core import TemporalStructure
 from andrey.core.stats import normal_scores
 from andrey.spec import list_specs
-from tests.unit.methods import fit_settings
+from tests.unit.methods import fit_settings, regime_paths, results
 
 N = 300
 P = 6
@@ -126,9 +126,7 @@ def graphs(structure) -> list[np.ndarray]:
 
 
 def marks(out) -> list[np.ndarray]:
-    return [
-        m for result in (out if isinstance(out, list) else [out]) for m in graphs(result.structure)
-    ]
+    return [m for result in results(out) for m in graphs(result.structure)] + regime_paths(out)
 
 
 def always_env(spec) -> bool:
