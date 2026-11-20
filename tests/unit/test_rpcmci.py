@@ -122,36 +122,36 @@ def start_once(series, weights):
     )
 
 
-def test_a_step_at_the_threshold_joins_no_regime(series):
-    """A stretch weighted exactly 0.5 in both regimes is fit as if weighted 0 in both."""
+def assert_same_fit(a, b):
+    assert a is not None and b is not None
+    for x, y in zip(a.results, b.results, strict=True):
+        np.testing.assert_array_equal(x.p_values, y.p_values)
+    np.testing.assert_array_equal(a.weights, b.weights)
+
+
+def test_a_step_at_the_threshold_joins_both_regimes(series):
+    """A stretch weighted exactly 0.5 in both regimes is fit as if weighted 1 in both."""
     path = datagen.regime_path(CASE)
     true = np.stack([path == 0, path == 1]).astype(np.float64)
-    half, empty = true.copy(), true.copy()
+    half, full = true.copy(), true.copy()
     half[:, 100:200] = 0.5
-    empty[:, 100:200] = 0.0
-    at, out = start_once(series, half), start_once(series, empty)
-    assert at is not None and out is not None
-    for a, b in zip(at.results, out.results, strict=True):
-        np.testing.assert_array_equal(a.p_values, b.p_values)
-    np.testing.assert_array_equal(at.weights, out.weights)
+    full[:, 100:200] = 1.0
+    assert_same_fit(start_once(series, half), start_once(series, full))
 
 
-def test_a_step_off_the_threshold_in_its_last_bits_joins_no_regime(series):
+def test_a_step_off_the_threshold_in_its_last_bits_joins_both_regimes(series):
     """Weights of 0.5 plus or minus 4e-16, as the solver can return half, are read as 0.5."""
     path = datagen.regime_path(CASE)
     true = np.stack([path == 0, path == 1]).astype(np.float64)
-    near, empty = true.copy(), true.copy()
+    near, full = true.copy(), true.copy()
     near[0, 100:200], near[1, 100:200] = 0.5 + 4e-16, 0.5 - 4e-16
-    empty[:, 100:200] = 0.0
-    at, out = start_once(series, near), start_once(series, empty)
-    assert at is not None and out is not None
-    for a, b in zip(at.results, out.results, strict=True):
-        np.testing.assert_array_equal(a.p_values, b.p_values)
-    np.testing.assert_array_equal(at.weights, out.weights)
+    full[:, 100:200] = 1.0
+    assert_same_fit(start_once(series, near), start_once(series, full))
 
 
-def test_weights_all_at_the_threshold_leave_every_regime_empty(series):
-    assert start_once(series, np.full((2, len(series)), 0.5)) is None
+def test_weights_all_at_the_threshold_fit_every_step_in_every_regime(series):
+    n = len(series)
+    assert_same_fit(start_once(series, np.full((2, n), 0.5)), start_once(series, np.ones((2, n))))
 
 
 # --- the result type -------------------------------------------------------------------------
