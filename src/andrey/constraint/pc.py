@@ -237,9 +237,9 @@ def indicator_parents(
     the indicator, or that has fewer rows than the test needs, is not tested
     (:class:`~andrey.constraint.mvpc.IndicatorTest`). A column on whose observed rows the
     indicator holds one value has no query tested: it is no parent and conditions no test. A column
-    left adjacent only because a query of its pair was not tested
-    (:meth:`~andrey.core.ci_missing.RowCounts.undecided`) is not a parent: no test with rows
-    found it. The tests count in the fit's rows, without their pairs, which are the indicator's.
+    left adjacent with no query of its pair tested
+    (:meth:`~andrey.core.ci_missing.RowCounts.untested`) is not a parent: no test with rows found
+    it. The tests count in the fit's rows, without their pairs, which are the indicator's.
     """
     d = X.shape[1]
     parents: dict[int, list[int]] = {}
@@ -255,7 +255,7 @@ def indicator_parents(
                     pairs[column, other] = pairs[other, column] = False
                     test(column, other)
             found, _, _ = adjacency_search(test, d, alpha, support=pairs, max_depth=max_depth)
-        undecided = {a if b == column else b for a, b in rows.undecided(alpha)}
+        undecided = {a if b == column else b for a, b in rows.untested()}
         adjacent = [c for c in np.flatnonzero(found[column] != NULL) if c not in undecided]
         if adjacent:
             parents[int(column)] = [int(c) for c in adjacent]

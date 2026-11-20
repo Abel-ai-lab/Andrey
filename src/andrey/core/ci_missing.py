@@ -213,11 +213,6 @@ class RowCounts(Counter[int]):
         could decide them, as a pair never observed together."""
         return [pair for pair in self.not_tested if pair not in self.largest]
 
-    def undecided(self, alpha: float) -> list[tuple[int, int]]:
-        """The pairs with a query that was not tested and no tested query with ``p > alpha``:
-        no test with rows separated them, and one without rows might have."""
-        return [pair for pair in self.not_tested if not self.largest.get(pair, -np.inf) > alpha]
-
 
 def not_tested(p: npt.ArrayLike) -> np.ndarray:
     """Mark the p-values that are :data:`NOT_TESTED`: the queries whose block held fewer rows than

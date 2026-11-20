@@ -295,3 +295,14 @@ def test_an_mcar_mask_gives_the_indicators_few_parents():
     out = andrey.pc(np.where(mask.mask, np.nan, X), missing="mvpc")
     assert sum(map(len, out.metadata["missingness_parents"].values())) <= 1
     assert out.structure == andrey.pc(np.where(mask.mask, np.nan, X)).structure
+
+
+def test_a_parent_found_by_a_tested_query_stays_when_a_later_query_has_no_rows():
+    # Column 0 goes missing where column 2 is low; column 1 is observed on 3 rows, too few for any
+    # test, so the queries of 2 given 1 are not tested, yet 2's tested dependence keeps it a parent.
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((2000, 3))
+    X[X[:, 2] < np.quantile(X[:, 2], 0.3), 0] = np.nan
+    X[3:, 1] = np.nan
+    out = andrey.pc(X, missing="mvpc")
+    assert out.metadata["missingness_parents"][0] == [2]
