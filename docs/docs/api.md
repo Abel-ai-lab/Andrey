@@ -133,7 +133,9 @@ baselines. A value a method does not list raises a
 `ValueError` that
 names the values it takes. A column with no observed value, or a constant one over its observed
 values, raises a `ValueError` before the fit, and a test with fewer rows than it needs, `|S| + 3`
-for `"fisherz"` and `"student_t"` and 2 for the other tests, raises one during it. `cdnod` and
+for `"fisherz"` and `"student_t"`; 4 for `"gcm"` and for `"wgcm"` with `variant="fix"`, 17 for
+`"wgcm"`'s default `variant="est"`, and 12 for `"pcm"`; and 2 for the other tests, raises one
+during it. `cdnod` and
 `fci_jci` need a complete `env`. Every other method raises a `ValueError` that names it and says
 what to do instead, as [Missing values](guides/getting-started.md#missing-values) describes; each
 method's Notes say why.

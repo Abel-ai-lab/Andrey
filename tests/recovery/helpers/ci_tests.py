@@ -26,11 +26,14 @@ CI_TESTS = {
     "GPDC": ("gpdc", partial(GPDC, n_null=300, seed=0)),
 }
 #: The regression-based tests, whose recorded outputs are kept apart from the graph checks above: a
-#: covariance test does not see the nonmonotone links. PCM averages one split, not six.
+#: covariance test does not see the nonmonotone links. "PCM" averages one split and "PCM6" the
+#: default six.
 REGRESSION_CI_TESTS = {
     "GCM": ("gcm", partial(GCM, seed=0)),
     "WGCM": ("wgcm", partial(WGCM, seed=0)),
+    "WGCM_FIX": ("wgcm", partial(WGCM, variant="fix", seed=0)),
     "PCM": ("pcm", partial(PCM, n_splits=1, seed=0)),
+    "PCM6": ("pcm", partial(PCM, seed=0)),
 }
 
 
