@@ -2347,8 +2347,10 @@ def rpcmci(
     in which a regime holds steps of several true regimes, and some starts end with a regime too
     small to fit; ``n_starts`` guards against it at a cost that grows linearly with it [1]_.
     Regimes whose models differ little, such as one link's strength alone, are hard to tell apart
-    [1]_. The number of regimes and ``max_transitions`` are not learned. Each iteration runs PCMCI
-    once per regime and solves one linear program over ``2 * n_regimes * n_samples`` variables.
+    [1]_. On a series without regimes, each regime keeps the steps its model fits best, so a
+    regime, most often a small one, can hold a spurious link. The number of regimes and
+    ``max_transitions`` are not learned. Each iteration runs PCMCI once per regime and solves one
+    linear program over ``2 * n_regimes * n_samples`` variables.
     The numbers are a reference, not a hard limit: they change with the data generator, the
     density, the method's settings, and the machine.
 
