@@ -255,18 +255,18 @@ def grouping_for(
     ``ranks`` returns each column's tie rank and ``shared`` the ``(d, d)`` counts of the rows each
     pair of columns observes together; each is called only once the checks before it pass. The
     grouped sums are used when the data have at least ``ANDREY_TESTWISE_GROUP_MIN_COLUMNS``
-    columns, a quarter of the pairs of columns or more are observed together in at most
-    ``ANDREY_TESTWISE_GROUP_MAX_SHARED`` of the rows, the patterns form at most
-    ``ANDREY_TESTWISE_GROUP_MAX_GROUPS`` groups, their
-    scattered share is at most ``ANDREY_TESTWISE_GROUP_MAX_SCATTER``, their tables fit in
-    ``ANDREY_TESTWISE_GROUP_BYTES``, and some block can pass the block gate
-    (:meth:`Grouping.some_block_cheaper`). The choice depends on the data alone.
+    columns, and two at least, a quarter of the pairs of columns or more are observed together in
+    at most ``ANDREY_TESTWISE_GROUP_MAX_SHARED`` of the rows, the patterns form at most
+    ``ANDREY_TESTWISE_GROUP_MAX_GROUPS`` groups, their scattered share is at most
+    ``ANDREY_TESTWISE_GROUP_MAX_SCATTER``, their tables fit in ``ANDREY_TESTWISE_GROUP_BYTES``, and
+    some block can pass the block gate (:meth:`Grouping.some_block_cheaper`). The choice depends on
+    the data alone.
     """
     budget = _read(env.TESTWISE_GROUP_BYTES, GROUP_BYTES)
     scatter = _read(env.TESTWISE_GROUP_MAX_SCATTER, GROUP_MAX_SCATTER)
     most = _read(env.TESTWISE_GROUP_MAX_GROUPS, MAX_GROUPS)
     fewest = _read(env.TESTWISE_GROUP_MIN_COLUMNS, MIN_COLUMNS)
-    if budget <= 0 or most <= 0 or observed.shape[1] < fewest or observed.all():
+    if budget <= 0 or most <= 0 or observed.shape[1] < max(fewest, 2) or observed.all():
         return None
     pairs = shared()[np.triu_indices(observed.shape[1], 1)] / observed.shape[0]
     common = float(np.quantile(pairs, _SHARED_QUANTILE))

@@ -158,6 +158,15 @@ def test_a_zero_byte_budget_keeps_the_per_row_path(monkeypatch):
     assert _grouping_for(x) is None
 
 
+@pytest.mark.parametrize("fewest", ["0", "1"])
+def test_one_column_takes_the_per_row_path_whatever_the_column_cutoff(monkeypatch, fewest):
+    """One column has no pair to share rows, so it keeps the per-row sums whatever the cutoff."""
+    monkeypatch.setenv("ANDREY_TESTWISE_GROUP_MIN_COLUMNS", fewest)
+    x = np.arange(20.0)[:, None]
+    x[3, 0] = np.nan
+    assert _grouping_for(x) is None
+
+
 @pytest.mark.parametrize("value", ["-0.1", "1.5", "a lot"])
 @pytest.mark.parametrize("name", ["MAX_SCATTER", "MAX_SHARED"])
 def test_a_share_cutoff_outside_zero_to_one_is_refused(monkeypatch, name, value):
