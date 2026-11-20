@@ -73,8 +73,8 @@ names its pull request.
   reason: the cited result covers another procedure. Every method that deletes rows per test now
   states one shared sentence, valid when values are missing completely at random, and the guide's
   text on `None` and on structural EM is corrected. ([#1102])
-- The docs name `normal_scores` among the tests that need `|S| + 3` rows where their variables are
-  observed; they gave it the 2 rows of the other tests. ([#1102])
+- The docs name `normal_scores` among the partial-correlation tests that need more rows where their
+  variables are observed; they gave it the 2 rows of the other tests. ([#1102])
 - On data with missing values, a `fisherz` or `student_t` query gets the same statistic and
   p-value, bit for bit, whether it is asked alone or with other queries, in any order. On more
   than 8,192 rows the last bits followed the queries computed with it. ([#1142])
@@ -83,8 +83,9 @@ names its pull request.
   the notice of the default handling under `missing=None`. ([#1151])
 - `pc(missing="mvpc")` counts the indicator queries it answers 1 in `metadata["p_one_tests"]`, and
   the corrected tests that return a p-value of 1 in `metadata["corrected_edges"]["p_one_tests"]`.
-  An indicator query on fewer rows than its test needs is not tested, so it no longer rules out a
-  parent of the indicator. A corrected test needs the rows that leave its test a degree of freedom,
+  An indicator query on fewer rows than its test needs is not tested, as every test-wise test is:
+  it counts in `metadata["not_tested"]`, not as `p = 1`, and its rows no longer lower
+  `metadata["rows_tested"]["min"]`; the indicator's parents are the same. A corrected test needs the rows that leave its test a degree of freedom,
   `|S| + 4` for `fisherz`, or the pair keeps its test-wise answer. ([#1151])
 - Under `missing="em"` with the linear-Gaussian BIC, copies among the observed values raise
   `CopiedColumnsError` before a pair of columns that shares no observed row, as on complete data.
