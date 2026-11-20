@@ -2748,7 +2748,6 @@ First alpha release.
 [#1147]: https://github.com/Abel-ai-lab/Andrey/pull/1147
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
 [#1149]: https://github.com/Abel-ai-lab/Andrey/pull/1149
-[#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
 [#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
 [#1068]: https://github.com/Abel-ai-lab/Andrey/pull/1068
 [#1090]: https://github.com/Abel-ai-lab/Andrey/pull/1090
