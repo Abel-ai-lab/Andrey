@@ -314,9 +314,10 @@ class GCM(_RegressionTest):
     it is kept on the test object and reused by every later query on the same pair of them. Each
     column is standardized and rounded to 9 decimal places, and the folds and the trees are drawn
     over the rows in lexicographic order of the variable and the conditioning set alone, so the
-    p-value does not change with the row or column order, with columns outside the query, or,
-    except where a change of units moves a value across the rounding, with a column's units or
-    sign.
+    p-value does not change with the row or column order, with columns outside the query, or with
+    a column's units or sign. The exceptions: a change of units that moves a value across the
+    rounding, and a sign flip of a column whose sorted values equal their negation's, such as a
+    balanced ``-1``/``1`` column, which no value of the column orients.
     Products that are all zero give the statistic ``0`` and the p-value ``1``; products that are
     one nonzero constant, a covariance without noise, give an infinite statistic and the p-value
     ``0``.

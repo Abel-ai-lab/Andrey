@@ -31,8 +31,9 @@ names its pull request.
   takes `regression="boosting"`, `"forest"`, or `"linear"`. Each fit and each sample split reads
   only the query's columns, standardized, rounded, and signed, with the rows in an order of their
   values, so a p-value depends on neither the row nor the column order, nor on columns outside the
-  query, and changes with a column's units or sign only where the rounding moves a value. A
-  contributor's script compares them with the authors' code. ([#1147])
+  query, and changes with a column's units or sign only where the rounding moves a value or a
+  column is symmetric about its mean once sorted. A contributor's script compares them with the
+  authors' code. ([#1147])
 
 ### Changed
 
