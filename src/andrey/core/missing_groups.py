@@ -108,6 +108,13 @@ class Grouping:
         cells = int(self.observed[self.group].sum())
         return float(self.missed.sum()) / cells if cells else 0.0
 
+    def some_block_cheaper(self, gain: float) -> bool:
+        """Whether some block can take the grouped sums: a block reads the masks of at least the
+        rows missing two or more columns of one of its groups, so when every group has more than
+        ``n / gain`` such rows, :meth:`GroupedSums.cheaper` refuses every block."""
+        twice = np.bincount(self.group[self.missed.sum(axis=1) >= 2], minlength=len(self.observed))
+        return bool(gain * twice.min() <= len(self.group))
+
     def table_bytes(self) -> int:
         """The bytes :class:`GroupedSums` allocates for these groups, counted before it does: per
         group, the count, sums, and cross products over all its rows and over its rows missing
@@ -210,8 +217,9 @@ def grouping_for(observed: np.ndarray, ranks: Callable[[], np.ndarray]) -> Group
     ``ranks`` returns each column's tie rank; it is called only once the cheap checks pass. The
     grouped sums are used when the data have at least ``ANDREY_TESTWISE_GROUP_MIN_COLUMNS``
     columns, the patterns form at most ``ANDREY_TESTWISE_GROUP_MAX_GROUPS`` groups, their
-    scattered share is at most ``ANDREY_TESTWISE_GROUP_MAX_SCATTER``, and their tables fit in
-    ``ANDREY_TESTWISE_GROUP_BYTES``. The choice depends on the data alone.
+    scattered share is at most ``ANDREY_TESTWISE_GROUP_MAX_SCATTER``, their tables fit in
+    ``ANDREY_TESTWISE_GROUP_BYTES``, and some block can pass the block gate
+    (:meth:`Grouping.some_block_cheaper`). The choice depends on the data alone.
     """
     budget = _read(env.TESTWISE_GROUP_BYTES, GROUP_BYTES)
     scatter = _read(env.TESTWISE_GROUP_MAX_SCATTER, GROUP_MAX_SCATTER)
@@ -225,7 +233,8 @@ def grouping_for(observed: np.ndarray, ranks: Callable[[], np.ndarray]) -> Group
         return None
     share = grouping.scattered_share
     size = grouping.table_bytes()
-    path = share <= scatter and size <= budget
+    gain = _read(env.TESTWISE_GROUP_MIN_GAIN, MIN_GAIN)
+    path = share <= scatter and size <= budget and grouping.some_block_cheaper(gain)
     logger.debug(
         "test-wise deletion: %s sums, %d groups, scattered share %.3f, %d table bytes",
         "grouped" if path else "per-row",

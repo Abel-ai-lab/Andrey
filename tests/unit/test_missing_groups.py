@@ -87,6 +87,18 @@ def test_patterns_with_no_structure_take_the_per_row_path():
     assert missing_groups.grouping_for(~np.isnan(x), lambda: tie_ranks(x)) is None
 
 
+def test_one_group_whose_rows_mostly_miss_two_columns_takes_the_per_row_path():
+    """Cells missing completely at random at 10% over 50 columns form one group in which nearly
+    every row misses two or more columns, so no block can take the grouped sums."""
+    rng = np.random.default_rng(3)
+    x = rng.standard_normal((4_000, 50))
+    x[rng.random(x.shape) < 0.1] = np.nan
+    grouping = missing_groups.pattern_groups(~np.isnan(x), tie_ranks(x))
+    assert grouping is not None and len(grouping.observed) == 1
+    assert not grouping.some_block_cheaper(missing_groups.MIN_GAIN)
+    assert missing_groups.grouping_for(~np.isnan(x), lambda: tie_ranks(x)) is None
+
+
 def test_a_zero_byte_budget_keeps_the_per_row_path(monkeypatch):
     x = _cohorts()
     assert missing_groups.grouping_for(~np.isnan(x), lambda: tie_ranks(x)) is not None
