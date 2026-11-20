@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import warnings
 
 import numpy as np
@@ -828,6 +829,26 @@ def test_a_failed_fit_stops_the_run_and_names_its_resample(workers):
     with pytest.raises(TypeError, match="bogus") as raised:
         with_workers(workers, "hc", lingam_data(), n_resamples=3, bogus=1)
     assert any("bootstrap resample 0" in note for note in raised.value.__notes__)
+
+
+def test_the_records_of_the_fits_before_a_failed_one_and_its_own_reach_the_caller(
+    monkeypatch, caplog
+):
+    fit, calls = andrey.pc, []
+
+    def failing(data, **kwargs):
+        calls.append(len(calls))
+        logging.getLogger("andrey.probe").warning("resample %d", calls[-1])
+        if len(calls) == 2:
+            raise RuntimeError("bogus")
+        return fit(data, **kwargs)
+
+    monkeypatch.setattr(resample.api, "pc", failing)
+    with caplog.at_level("WARNING", logger="andrey"), pytest.raises(RuntimeError, match="bogus"):
+        with_workers(1, "pc", lingam_data(), n_resamples=3)
+    records = [r for r in caplog.records if r.name == "andrey.probe"]
+    assert [r.getMessage() for r in records] == ["resample 0", "resample 1"]
+    assert records[0].funcName == "failing" and records[0].pathname == __file__
 
 
 def test_each_warning_of_the_fits_is_raised_once():

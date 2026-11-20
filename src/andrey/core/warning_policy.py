@@ -161,6 +161,8 @@ def held_records() -> Generator[list[logging.LogRecord]]:
     reaches the held handler and none goes out on its way. The handlers, the propagation, and the
     levels are restored after the block. A block in another thread waits until this one ends, so
     each restores what it found; a block nested in this thread holds the records of its own span.
+    As the loggers are the process's, the block also holds what other threads log through them
+    while it lasts.
     """
     with _holding:
         handler = _Held()

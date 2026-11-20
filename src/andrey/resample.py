@@ -876,16 +876,39 @@ def _draw(job: Job, b: int) -> list[np.ndarray]:
     return [rng.integers(0, n, size=n) for n in sizes]
 
 
-#: What one resample's fit returns: the fit, the warnings it raised, and its log records as
-#: ``(logger name, level, message)``, which pickle as a record may not.
-Fitted = tuple[Any, list[tuple[type[Warning], str]], list[tuple[str, int, str]]]
+#: A log record as ``(logger name, level, message, path, line, function)``, which pickles as a
+#: record may not.
+Logged = tuple[str, int, str, str, int, str]
+#: What one resample's fit returns: the fit, the warnings it raised, and its log records.
+Fitted = tuple[Any, list[tuple[type[Warning], str]], list[Logged]]
+#: The attribute of a resample's error that holds the records its fit logged before it raised.
+_RECORDS = "andrey_bootstrap_records"
+
+
+def _logged(records: list[logging.LogRecord]) -> list[Logged]:
+    return [(r.name, r.levelno, r.getMessage(), r.pathname, r.lineno, r.funcName) for r in records]
+
+
+def _relog(records: Sequence[Logged], seen: set[tuple[str, int, str]]) -> None:
+    """Log each of ``records`` through its own logger, from where it was logged, once.
+
+    A record whose logger, level, and message are in ``seen`` is skipped; ``seen`` gains the others.
+    """
+    for name, level, message, path, line, function in records:
+        if (name, level, message) in seen:
+            continue
+        seen.add((name, level, message))
+        logger = logging.getLogger(name)
+        if logger.isEnabledFor(level):
+            logger.handle(logger.makeRecord(name, level, path, line, message, (), None, function))
 
 
 def _run_one(job: Job, b: int) -> Fitted:
     """Fit resample ``b``; return the fit, the warnings it raised, and the records it logged.
 
     The records are held (:func:`~andrey.core.warning_policy.held_records`) in a worker process as
-    in this one, so :func:`bootstrap` logs them in the calling process, whatever the workers.
+    in this one, so :func:`fit_resamples` logs them in the calling process, whatever the workers. A
+    fit that raises carries its records on the error, as its attribute ``_RECORDS``.
     """
     idx = _draw(job, b)
     if job.unit in _PANEL_UNITS:
@@ -898,6 +921,7 @@ def _run_one(job: Job, b: int) -> Fitted:
         sequence = np.random.SeedSequence(job.seed, spawn_key=(b, 1))
         kwargs["seed"] = int(sequence.generate_state(1)[0])
     fit = getattr(api, job.name)
+    records: list[logging.LogRecord] = []
     try:
         with held_records() as records, warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
@@ -906,9 +930,9 @@ def _run_one(job: Job, b: int) -> Fitted:
         exc.add_note(
             f"raised in bootstrap resample {b} of seed {job.seed}; its rows are the draw's"
         )
+        setattr(exc, _RECORDS, _logged(records))
         raise
-    logged = [(r.name, r.levelno, r.getMessage()) for r in records]
-    return out, [(w.category, str(w.message)) for w in caught], logged
+    return out, [(w.category, str(w.message)) for w in caught], _logged(records)
 
 
 _JOB: Job | None = None
@@ -939,16 +963,40 @@ def _task(b: int) -> Fitted:
 
 
 def fit_resamples(job: Job, n_resamples: int, workers: int) -> list[Fitted]:
-    """Fit every resample, in order, in this process or on ``workers`` worker processes."""
-    if workers <= 1:
-        with _backend.one_blas_thread(), _backend.config(n_jobs=1):
-            return [_run_one(job, b) for b in range(n_resamples)]
+    """Fit every resample, in order, in this process or on ``workers`` worker processes.
+
+    The records each fit logged are logged here as its result comes in, in order, once each by
+    logger, level, and message (:func:`_relog`); a fit that raises has its records logged before
+    its error goes on, after those of the fits before it.
+    """
+    seen: set[tuple[str, int, str]] = set()
+    results: list[Fitted] = []
+    try:
+        if workers <= 1:
+            with _backend.one_blas_thread(), _backend.config(n_jobs=1):
+                for b in range(n_resamples):
+                    results.append(_run_one(job, b))
+                    _relog(results[-1][2], seen)
+            return results
+        return _fit_on_workers(job, n_resamples, workers, results, seen)
+    except Exception as exc:
+        _relog(getattr(exc, _RECORDS, ()), seen)
+        raise
+
+
+def _fit_on_workers(
+    job: Job, n_resamples: int, workers: int, results: list[Fitted], seen: set[tuple[str, int, str]]
+) -> list[Fitted]:
+    """:func:`fit_resamples` on ``workers`` worker processes, appending to ``results``."""
     pool = ProcessPoolExecutor(
         max_workers=workers, mp_context=pick_context(), initializer=_init_worker, initargs=(job,)
     )
     try:
         futures = [pool.submit(_task, b) for b in range(n_resamples)]
-        return [future.result() for future in futures]
+        for future in futures:
+            results.append(future.result())
+            _relog(results[-1][2], seen)
+        return results
     except BrokenProcessPool as exc:
         raise RuntimeError(
             "a bootstrap worker died, most likely out of memory; rerun with andrey.config(n_jobs=1)"
@@ -1078,8 +1126,11 @@ def bootstrap(
         no valid graph of the method's kind, so the averaged graph is the valid resample graph
         nearest the others, or, when no resample is valid, the resample graph nearest the others.
         Each distinct record the fits logged, at least each warning-level one, is logged once
-        too, after the fits, through its own logger, whether the fits ran in this process or in
-        worker processes.
+        too, through its own logger and from where it was logged, as its fit returns, in the
+        order of the resamples, whether the fits ran in this process or in worker processes;
+        those of a fit that raises are logged before its error goes on. While a fit runs in this
+        process, a record an ``andrey`` logger logs in another thread is held with the fit's own
+        and logged with them.
 
     Notes
     -----
@@ -1250,8 +1301,6 @@ def bootstrap(
     workers = min(_backend.worker_count(None), n_resamples)
     results = fit_resamples(job, n_resamples, workers)
     ranks = _column_ranks(job) if spec.output.graph_kind == "dag" else None
-    for name, level, message in dict.fromkeys(r for *_, logged in results for r in logged):
-        logging.getLogger(name).log(level, message)
     for category, message in dict.fromkeys(w for _, caught, _ in results for w in caught):
         warnings.warn(message, category, stacklevel=2)
     fits = [out for out, *_ in results]
