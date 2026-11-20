@@ -332,3 +332,29 @@ def test_a_subset_not_tested_keeps_a_verdict_only_when_either_outcome_does(
     separating, skipped, rule, verdict
 ):
     assert collider_verdict(separating, 7, rule, skipped) == verdict
+
+
+class _SkipsFirstConditioned:
+    """Every query dependent (p = 0), except the first conditioned query of the column pair
+    ``(x, y)``, which is not tested."""
+
+    def __init__(self, x: int, y: int) -> None:
+        self.pair, self.skipped = (x, y), False
+
+    def statistic_pvalues(self, x, y, conditions):
+        statistics, p_values = np.full(len(x), 0.5), np.zeros(len(x))
+        if not self.skipped and conditions.shape[1]:
+            hit = np.flatnonzero((np.asarray(x) == self.pair[0]) & (np.asarray(y) == self.pair[1]))
+            if len(hit):
+                statistics[hit[0]] = p_values[hit[0]] = np.nan
+                self.skipped = True
+        return statistics, p_values
+
+
+def test_a_lagged_link_kept_past_a_phase_1_query_not_tested_is_undecided():
+    n_vars, tau_max = 2, 1
+    test = _SkipsFirstConditioned(x=n_vars, y=1)  # design column of X^0_{t-1}, into X^1_t
+    result = pcmciplus_module.run_phases(test, n_vars, tau_max, 0.05, "majority", [0, 1])
+    assert test.skipped and result.adjacency[1, 0, 1]
+    assert result.undecided[1, 0, 1]
+    assert result.undecided.sum() == 1

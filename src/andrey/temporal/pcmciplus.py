@@ -111,11 +111,12 @@ class PCMCIPlusResult:
 
 class Recorder:
     """Passes queries to ``test``; keeps each column pair's largest p-value and its statistic, of
-    the queries that were tested."""
+    the queries that were tested, and in ``skipped`` the pairs with a query that was not."""
 
     def __init__(self, test: LinkTest) -> None:
         self.test = test
         self.largest: dict[tuple[int, int], tuple[float, float]] = {}
+        self.skipped: set[tuple[int, int]] = set()
 
     def statistic_pvalues(
         self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
@@ -127,6 +128,7 @@ class Recorder:
             p_values.tolist(),
         ):
             if math.isnan(p_value):  # not tested: no p-value to keep
+                self.skipped.add(pair)
                 continue
             best = self.largest.get(pair)
             if best is None or p_value > best[1]:
@@ -573,6 +575,10 @@ def run_phases(
     )
     # An adjacent link no test with rows decided has no largest p-value.
     p_values[undecided & (p_values < 0)] = NOT_TESTED
+    # A lagged link phase 1 kept past a query not tested might have been removed by it.
+    for x, j in recorder.skipped:
+        lag, i = divmod(x, n_vars)
+        undecided[lag, i, j] |= bool(lag and adjacency[lag, i, j])
     statistics[np.isnan(p_values)] = NOT_TESTED
     for (x, j), (statistic, p_value) in recorder.largest.items():
         lag, i = divmod(x, n_vars)

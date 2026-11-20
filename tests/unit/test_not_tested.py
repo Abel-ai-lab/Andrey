@@ -150,5 +150,18 @@ def test_markov_check_leaves_facts_not_tested_out_of_the_uniformity_test():
     df = _cohorts(1)
     dag = andrey.pc(df.fillna(0.0))
     out = andrey.markov_check(dag, df, seed=0)
-    p = np.asarray(out.p_values, dtype=np.float64)
-    assert np.isnan(p).sum() == out.metadata["not_tested"]
+    assert out.metadata["not_tested"] > 0
+    assert np.isfinite(out.p_values).all() and out.n_tests == len(out.p_values)
+
+
+def test_pairs_never_observed_together_are_found_in_a_table_of_text():
+    from andrey.api._method import never_observed_together
+
+    frame = pd.DataFrame(
+        {
+            "a": pd.Categorical(["x", "y", None, None]),
+            "b": ["u", "v", "u", None],
+            "c": [None, None, 1.0, 2.0],
+        }
+    )
+    assert never_observed_together(frame) == [["a", "c"]]
