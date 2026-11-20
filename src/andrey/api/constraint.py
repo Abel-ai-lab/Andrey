@@ -171,9 +171,10 @@ def pc(
         (``"retested"``), those removed (``"removed"``), and those with a test that had too few
         rows to correct (``"uncorrected"``), as ``[x, y]`` pairs in ascending order, and, when a
         test was corrected, the fewest and the median rows a corrected test read
-        (``"rows_tested"``, with ``"min"`` and ``"median"``); both name a DataFrame's columns and
-        number an array's from 0, and ``metadata["seed"]`` is the seed of the permutations. With a
-        randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+        (``"rows_tested"``, with ``"min"`` and ``"median"``) and, when it is not zero, the number
+        of corrected tests that returned ``p = 1`` (``"p_one_tests"``); both name a DataFrame's
+        columns and number an array's from 0, and ``metadata["seed"]`` is the seed of the
+        permutations. With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
         ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
         ``andrey.config.tie_break``.
 
@@ -562,7 +563,8 @@ def _mvpc_metadata(found: dict, labels: Sequence[str] | None, seed: int) -> dict
     ``found`` is empty when the correction did not run, on data without missing values, and the
     fit then drew no random numbers. A column is its label when ``labels`` is given, else its
     0-based position. The corrected edges hold ``rows_tested``, the fewest and the median rows a
-    corrected test read (:func:`~andrey.core.ci_missing.rows_metadata`), when one ran.
+    corrected test read, and ``p_one_tests``, the corrected tests that returned ``p = 1``, when it
+    is not zero (:func:`~andrey.core.ci_missing.rows_metadata`), when one ran.
     """
     if not found:
         return {}

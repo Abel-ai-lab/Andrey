@@ -708,8 +708,9 @@ set, and those parents are all observed. When too few rows are available, it use
 test instead. The pair then keeps its test-wise result for that conditioning set, and
 `metadata["corrected_edges"]["uncorrected"]` lists the pair.
 `metadata["corrected_edges"]["rows_tested"]` gives the fewest and the median rows a corrected test
-read, so you can see when the correction ran on few rows. On complete data, MVPC gives the
-test-wise result.
+read, so you can see when the correction ran on few rows, and
+`metadata["corrected_edges"]["p_one_tests"]`, present when it is not zero, counts the corrected
+tests that returned a p-value of 1. On complete data, MVPC gives the test-wise result.
 
 The correction holds when no indicator causes a variable, every independence in the observed rows
 also holds in the missing ones, no indicator is a deterministic function of others, and no value

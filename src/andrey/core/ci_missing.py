@@ -242,6 +242,14 @@ def rows_tested() -> Generator[RowCounts]:
         _ROWS.reset(token)
 
 
+def count_answer(rows: int, p: float, x: int, y: int) -> None:
+    """Count, in the running :func:`rows_tested` counter if any, a query of ``x`` and ``y``
+    answered ``p`` on ``rows`` rows by a test that is no :class:`TestwiseDeletion`, as MVPC's
+    indicator search answers one whose indicator is constant on its rows."""
+    if (counter := _ROWS.get()) is not None:
+        counter.add([rows], [p], [min(x, y)], [max(x, y)])
+
+
 @contextlib.contextmanager
 def rows_tested_elsewhere() -> Generator[RowCounts]:
     """:func:`rows_tested` for tests over another matrix than the data's, as MVPC's indicator
