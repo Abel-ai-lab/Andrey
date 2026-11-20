@@ -1645,10 +1645,12 @@ def skewd_mv(
         become the structure's ``labels``.
     alpha : float, default=0.05
         Significance level of PC's conditional-independence tests, in ``(0, 1)``.
-    indep_test : {"fisherz", "student_t", "kci", "rcot", "cmiknn", "gpdc"} or None, default="kci"
-        PC's conditional-independence test, a test of continuous data as in :func:`~andrey.pc`, but
-        not ``"normal_scores"``: the likelihood stage reads the values, which ranks would hide. The
-        default is the kernel test [3]_, the authors' choice. ``None`` picks ``"fisherz"``.
+    indep_test : str or None, default="kci"
+        PC's conditional-independence test, a test of continuous data as in :func:`~andrey.pc`:
+        ``"fisherz"``, ``"student_t"``, ``"kci"``, ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``,
+        ``"wgcm"``, or ``"pcm"``, but not ``"normal_scores"``: the likelihood stage reads the
+        values, which ranks would hide. The default is the kernel test [3]_, the authors' choice.
+        ``None`` picks ``"fisherz"``.
     tuning_iter : int, default=20
         The penalty settings, at least 1, that the Bayesian optimization scores by
         cross-validation for each conditional model; the first half, rounded up, are Latin

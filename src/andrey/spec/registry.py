@@ -56,7 +56,9 @@ _OTHER_TESTS = (
     "Gaussian and cond_gauss = conditional Gaussian likelihood ratio. For nonlinear effects in "
     "continuous data, each far slower per test: kci = kernel test; rcot = its random-feature "
     "approximation; cmiknn = nearest-neighbor conditional mutual information; gpdc = "
-    "Gaussian-process regression and distance correlation. These four rank the columns as the "
+    "Gaussian-process regression and distance correlation; gcm, wgcm, pcm = the generalized, "
+    "weighted generalized, and projected covariance measures of regression residuals. These seven "
+    "rank the columns as the "
     "searches do, so ANDREY_TIE_BREAK=position makes their p-values depend on the column order. "
     + _DECLARED.format(every="gsq", fallback="fisherz")
 )
@@ -135,8 +137,8 @@ _RESTART_DOC = (
 _TEST_SEED = concept_param(
     "seed",
     doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
-    "so a fit repeats. Seed for the random draws of indep_test, which only rcot, cmiknn, and gpdc "
-    "make; the other tests ignore it.",
+    "so a fit repeats. Seed for the random draws of indep_test, which only rcot, cmiknn, gpdc, "
+    "gcm, wgcm, and pcm make; the other tests ignore it.",
 )
 _MATRIX_LAYOUT = "(n_samples, n_variables), row = sample"
 #: The environment index the score searches and their FCI hybrids take for data pooled across
@@ -1594,8 +1596,8 @@ _PERMUTATION_FCI_SEED = concept_param(
     "seed",
     doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
     "so a fit repeats. Seed for the random order in which the BOSS or GRaSP phase visits "
-    "variables, for GRaSP's random starting order, and for the random draws of rcot, cmiknn, and "
-    "gpdc.",
+    "variables, for GRaSP's random starting order, and for the random draws of rcot, cmiknn, "
+    "gpdc, gcm, wgcm, and pcm.",
 )
 for _name, _summary, _own, _refs in (
     (
@@ -2117,7 +2119,8 @@ _add(
                 "nonlinear effects, each far slower per test: kci = kernel test, the authors' "
                 "choice; rcot = its random-feature approximation; cmiknn = nearest-neighbor "
                 "conditional mutual information; gpdc = Gaussian-process regression and distance "
-                "correlation. null picks fisherz.",
+                "correlation; gcm, wgcm, pcm = the generalized, weighted generalized, and "
+                "projected covariance measures of regression residuals. null picks fisherz.",
             ),
             ParamSpec(
                 name="tuning_iter",
