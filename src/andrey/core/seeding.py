@@ -82,3 +82,14 @@ def start_rng(seed: int, start: int) -> random.Random:
         return random.Random(seed)
     child = np.random.SeedSequence(seed, spawn_key=(start,))
     return random.Random(int(child.generate_state(1)[0]))
+
+
+def start_generator(seed: int, start: int) -> np.random.Generator:
+    """The NumPy generator of start ``start`` of a search with several starts, seeded by ``seed``.
+
+    The rule of :func:`start_rng`: start ``0`` draws from ``seed`` itself, start ``k > 0`` from
+    ``SeedSequence(seed, spawn_key=(k,))``.
+    """
+    if start == 0:
+        return np.random.default_rng(seed)
+    return np.random.default_rng(np.random.SeedSequence(seed, spawn_key=(start,)))

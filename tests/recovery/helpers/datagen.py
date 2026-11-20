@@ -131,6 +131,38 @@ def _lagged_var(
     return X[burn_in:]
 
 
+def _regime_var(
+    seed: int, n_samples: int, lags: list[list[list[list[float]]]], window: list[int], noise: str
+) -> tuple[np.ndarray, np.ndarray]:
+    """A VAR whose lag matrices switch between regimes, and the regime of each step.
+
+    ``lags[k]`` lists regime ``k``'s ``A_1 .. A_p`` as :func:`_lagged_var` takes them. The regimes
+    follow each other in turn, each for a whole number of steps drawn uniformly from ``window``
+    (inclusive), and step ``t`` adds the effects of the regime active at ``t``.
+    """
+    rng = np.random.default_rng(seed)
+    A = np.asarray(lags, dtype=np.float64)
+    n_regimes, p, d = A.shape[0], A.shape[1], A.shape[2]
+    path: list[int] = []
+    regime = 0
+    while len(path) < n_samples:
+        path += [regime] * int(rng.integers(window[0], window[1] + 1))
+        regime = (regime + 1) % n_regimes
+    regimes = np.array(path[:n_samples])
+    e = _noise(rng, (n_samples, d), noise)
+    X = np.zeros((n_samples, d), dtype=np.float64)
+    for t in range(n_samples):
+        X[t] = e[t] + sum(A[regimes[t], k] @ X[t - k - 1] for k in range(min(p, t)))
+    return X, regimes
+
+
+def regime_path(case_id: str) -> np.ndarray:
+    """The regime of each step of a ``regime_var`` case's pinned input."""
+    spec = CASES[case_id]
+    args = (spec["n_samples"], spec["lags"], spec["window"], spec["noise"])
+    return _regime_var(spec["seed"], *args)[1]
+
+
 def _varma_process(
     seed: int,
     n_samples: int,
@@ -520,6 +552,20 @@ CASES: dict[str, dict] = {
             [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, -0.5, 0.0]],
         ],
     },
+    # Two regimes of 70 to 100 steps in turn, the sign of the lag-1 link X0 -> X1 switching
+    # between them, both variables autocorrelated (the paper's "sign X1X2" example, shorter) -
+    # RPCMCI.
+    "regime_var_2v": {
+        "model": "regime_var",
+        "noise": "gaussian",
+        "seed": 20261119,
+        "n_samples": 600,
+        "window": [70, 100],
+        "lags": [
+            [[[0.2, 0.0], [0.8, 0.2]]],
+            [[[0.2, 0.0], [-0.8, 0.2]]],
+        ],
+    },
     # Stable/invertible VARMA(1,1), non-Gaussian noise - VARMALiNGAM.
     "varma_3v": {
         "model": "varma",
@@ -802,6 +848,8 @@ def _n_columns(spec: dict) -> int:
     model = spec.get("model")
     if model == "lagged_var":
         return len(spec["lags"][0])
+    if model == "regime_var":
+        return len(spec["lags"][0][0])
     if model in ("anm", "lsnm"):
         return 2
     if model in ("nonmonotone", "rational_chain", "nonlinear_fork"):
@@ -898,6 +946,8 @@ def _generate(case_id: str, replicate: int) -> np.ndarray:
             noise=spec["noise"],
             burn_in=spec["burn_in"],
         )
+    if model == "regime_var":
+        return _regime_var(seed, spec["n_samples"], spec["lags"], spec["window"], spec["noise"])[0]
     if model == "varma":
         return _varma_process(
             seed=seed,
@@ -977,6 +1027,11 @@ def defined_edges(case_id: str) -> tuple[int, int, np.ndarray]:
         effect, cause = np.nonzero(np.any(np.asarray(spec["lags"]) != 0, axis=0))
         keep = effect != cause
         return len(spec["lags"][0]), len(spec["lags"][0]), np.stack([cause, effect], 1)[keep]
+    if model == "regime_var":  # the lagged effects between variables of any regime
+        effect, cause = np.nonzero(np.any(np.asarray(spec["lags"]) != 0, axis=(0, 1)))
+        keep = effect != cause
+        n = len(spec["lags"][0][0])
+        return n, n, np.stack([cause, effect], 1)[keep]
     if model in ("anm", "lsnm"):
         return 2, 2, np.array([[0, 1]])
     if model in ("nonmonotone", "rational_chain"):

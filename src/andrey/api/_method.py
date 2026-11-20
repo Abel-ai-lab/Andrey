@@ -32,6 +32,7 @@ from andrey.core.ci import (
 )
 from andrey.core.ci_missing import TESTWISE
 from andrey.core.knowledge import PATH_PARTS, Knowledge, resolve
+from andrey.core.output import RegimeOutput
 from andrey.core.removed import removal_hint
 from andrey.core.score import LINEAR_SCORES, PENALIZED_SCORES, RANK_SCORES
 from andrey.core.seeding import resolve_seed
@@ -136,6 +137,10 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
                 stamp["tie_break"] = config.tie_break
             if isinstance(out, list):
                 return [stamped(o, stamp | missing_used(spec, bound.arguments, o)) for o in out]
+            if isinstance(out, RegimeOutput):  # the run and each regime's graph carry the stamp
+                outputs = tuple(stamped(o, stamp) for o in out.outputs)
+                metadata = {"algorithm": name, **out.metadata, **stamp}
+                return dataclasses.replace(out, _outputs=outputs, _metadata=metadata)
             return stamped(out, stamp | missing_used(spec, bound.arguments, out))
 
         return run  # ty: ignore[invalid-return-type]  # functools.wraps keeps the signature
@@ -450,7 +455,8 @@ def draws_random_numbers(spec: MethodSpec, arguments: dict[str, Any]) -> bool:
     """Whether a fit of the seeded method ``spec`` with ``arguments`` draws random numbers.
 
     A method that takes ``tuning_iter`` always does: its optimization draws in every fit, whatever
-    test it runs. A method with an ``indep_test`` draws them only under a randomized test
+    test it runs; so does a method that returns regimes, whose every start draws its first regime
+    assignment. A method with an ``indep_test`` draws them only under a randomized test
     (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`) or, when it takes ``n_starts``, for the starts
     after the first, with ``n_starts`` above 1, unless it also takes a ``score_func``: then a
     search over variable orders, visited in a random order, runs before the tests (``boss_fci``,
@@ -460,8 +466,8 @@ def draws_random_numbers(spec: MethodSpec, arguments: dict[str, Any]) -> bool:
     method always does. ``pc``'s ``missing="mvpc"`` draws them only on data with missing values,
     which this check does not read: ``pc`` records its seed itself when the correction ran.
     """
-    if any(p.name == "tuning_iter" for p in spec.params):
-        return True
+    if any(p.name == "tuning_iter" for p in spec.params) or spec.output.regimes:
+        return True  # an optimization's draws, or a regime search's random first assignments
     test = next((p for p in spec.params if p.name == "indep_test"), None)
     starts = next((p for p in spec.params if p.name == "n_starts"), None)
     order_search = starts is not None and any(p.name == "score_func" for p in spec.params)

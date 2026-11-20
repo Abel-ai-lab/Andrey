@@ -166,6 +166,7 @@ def design_test(
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     degrees_of_freedom: str = "mean",
+    rows: np.ndarray | None = None,
 ) -> LinkTest:
     """The ``indep_test`` test over the lagged design of ``data``.
 
@@ -186,9 +187,15 @@ def design_test(
     the test deletes rows per test (:mod:`andrey.core.ci_missing`): each query reads the design
     rows observed in all of its columns. Two columns are then copies when they repeat each other on
     the rows where both are observed.
+
+    ``rows``, a boolean mask over the design rows (time steps ``2 * tau_max`` to ``T - 1``), keeps
+    the marked rows only: each test then reads the steps whose effect is marked, with the lagged
+    values of every earlier step.
     """
     mask = None if categorical is None else np.tile(categorical, 2 * tau_max + 1)
     design = lagged_design(data, 2 * tau_max)
+    if rows is not None:
+        design = design[rows]
     return column_test(
         indep_test,
         design,
@@ -469,6 +476,7 @@ def pcmci(
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     degrees_of_freedom: str = "mean",
+    rows: np.ndarray | None = None,
 ) -> PCMCIResult:
     """Run PC1 and MCI on a ``(T, n)`` series with the ``indep_test`` test.
 
@@ -481,7 +489,8 @@ def pcmci(
     a required one is. ``max_depth`` caps PC1's conditioning sets. ``categorical``, the mask of the
     categorical columns for a mixed-data test, ``seed``, and ``degrees_of_freedom`` reach
     :func:`design_test`, which raises
-    on an ``indep_test`` it cannot build.
+    on an ``indep_test`` it cannot build. ``rows`` keeps only the marked design rows
+    (:func:`design_test`).
     """
     check_fdr_method(fdr_method)
     data = np.asarray(data, dtype=np.float64)
@@ -493,6 +502,7 @@ def pcmci(
         categorical=categorical,
         seed=seed,
         degrees_of_freedom=degrees_of_freedom,
+        rows=rows,
     )
     ranks = tie_ranks(data, categorical).tolist()
     with backend.one_blas_thread():  # the stacked inversions then give the same bits on any host

@@ -143,7 +143,7 @@ LINGAM = (
 )
 RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl", "loci")
 #: The searches that take n_starts.
-STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_igsp")
+STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_igsp", "rpcmci")
 #: The tests of a method whose tests always read several environments: all but the rank-based
 #: ones, which rank each column over the rows of every environment.
 UNRANKED_TESTS = tuple(t for t in SHIPPED_INDEP_TESTS if t not in RANK_INDEP_TESTS)
@@ -152,9 +152,9 @@ _POOLED_RANKS = (
     "distributions"
 )
 #: The methods that take a conditional-independence test.
-TESTED = (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp", "skewd_mv")
+TESTED = (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "rpcmci", "igsp", "ut_igsp", "skewd_mv")
 #: The tested methods that read continuous data only, so take the tests of continuous data.
-CONTINUOUS_TESTED = ("jpcmciplus", "skewd_mv")
+CONTINUOUS_TESTED = ("jpcmciplus", "rpcmci", "skewd_mv")
 #: The methods with no edge to name in knowledge, ICP, whose tests take none, and the methods that
 #: take none yet.
 NO_KNOWLEDGE = (
@@ -168,6 +168,7 @@ NO_KNOWLEDGE = (
     "cpcm_graph",
     "skewd",
     "skewd_mv",
+    "rpcmci",
 )
 #: The methods whose main loop a cap can stop early.
 CAPPED_LOOPS = (
@@ -182,6 +183,7 @@ CAPPED_LOOPS = (
     "dynotears",
     "skewd",
     "skewd_mv",
+    "rpcmci",
 )
 #: Every method, in ``andrey.api.__all__`` order.
 ALL_METHODS: tuple[str, ...] = tuple(api.__all__)
@@ -206,6 +208,7 @@ _CONCEPTS = (
             *CI_SEARCHES,
             *PCMCI_FAMILY,
             "jpcmciplus",
+            "rpcmci",
             "granger",
             *RESIDUAL,
             "cam",
@@ -254,6 +257,13 @@ _CONCEPTS = (
                 default=0.01,
                 reason="It matches pcmciplus's default, as J-PCMCI+ runs the phases of PCMCI+; "
                 "the experiments of Gunther, Ninad and Runge (2023) use 0.05.",
+            ),
+            Deviation(
+                method="rpcmci",
+                name="alpha",
+                default=0.01,
+                reason="0.01 is the level of the method's published experiments (Saggioro et al. "
+                "2020, Tables 2 and 5).",
             ),
             Deviation(
                 method="rcd",
@@ -407,6 +417,16 @@ _CONCEPTS = (
                 reason="The dummies enter every test as numeric one-hot columns, so it takes the "
                 "tests of continuous data, but not normal_scores, which ranks each column over the "
                 "rows of every dataset and so mixes their distributions.",
+            ),
+            Deviation(
+                method="rpcmci",
+                name="indep_test",
+                default="student_t",
+                choices=("student_t", "fisherz"),
+                reason="Its regime step fits linear regressions, so it takes the "
+                "partial-correlation tests of the linear setting the paper restricts it to "
+                "(Saggioro et al. 2020, Section 3.5); the default is the test of its published "
+                "experiments, partial correlation with the Student-t distribution.",
             ),
             Deviation(
                 method="skewd_mv",
@@ -637,13 +657,23 @@ _CONCEPTS = (
             choices=FDR_METHODS,
         ),
         fragment="benjamini-hochberg",
-        suitable=("pcmci", "pcmciplus", "jpcmciplus", "granger"),
+        suitable=("pcmci", "pcmciplus", "jpcmciplus", "rpcmci", "granger"),
         exempt=_exempt(
             "The marks come from the removal phases and the orientation rules at alpha, not from "
             "a threshold on the p-values the method reports.",
             "lpcmci",
         ),
         others_exempt="Reports no p-values of a family of lagged links.",
+        deviations=(
+            Deviation(
+                method="rpcmci",
+                name="fdr_method",
+                default="none",
+                choices=FDR_METHODS,
+                reason="The method's published experiments threshold each regime's MCI p-values "
+                "as tested (Saggioro et al. 2020, Section 4.1).",
+            ),
+        ),
     ),
     Concept(
         key="max_depth",
@@ -691,6 +721,9 @@ _CONCEPTS = (
                 "skewd",
             ),
             *_exempt("Runs PC at no depth limit, as its paper does.", "skewd_mv"),
+            *_exempt(
+                "Each regime runs PCMCI at no depth limit, as the method's paper does.", "rpcmci"
+            ),
             *_exempt(
                 "No conditional-independence tests; max_parents caps the sets it tests.", "icp"
             ),
@@ -795,6 +828,7 @@ _CONCEPTS = (
                 "No search over parent sets.",
                 *PCMCI_FAMILY,
                 "jpcmciplus",
+                "rpcmci",
                 "granger",
                 *RESIDUAL,
                 "resit",
@@ -863,7 +897,10 @@ _CONCEPTS = (
         summary="The largest lag; the smallest follows the method's theory.",
         param=_template("tau_max", "int", 1, "The largest lag, at least 1.", minimum=1),
         fragment="largest lag",
-        suitable=(*PCMCI_FAMILY, "jpcmciplus", "granger", "longitudinal_lingam", "dynotears"),
+        suitable=(
+            *PCMCI_FAMILY,
+            *("jpcmciplus", "rpcmci", "granger", "longitudinal_lingam", "dynotears"),
+        ),
         exempt=_exempt("order=(p, q) is the ARMA order, a different concept.", "varma_lingam"),
         others_exempt="i.i.d. data.",
     ),
@@ -951,6 +988,15 @@ _CONCEPTS = (
                 "order (Yang, Katcoff and Uhler 2018). On one set of simulated datasets in its "
                 "papers' settings, the SHD of 10 searches was lower than one search's in 21 of 87 "
                 "groups, that of 5 in 19, and neither was higher than the other's anywhere.",
+            ),
+            Deviation(
+                method="rpcmci",
+                name="n_starts",
+                default=50,
+                fragment="lowest objective",
+                reason="Every start draws a random regime assignment, and the start with the "
+                "lowest objective is returned, the paper's annealing; 50 is the number of its "
+                "published experiments (Saggioro et al. 2020, Tables 2 and 5).",
             ),
             Deviation(
                 method="ut_igsp",
@@ -1096,7 +1142,7 @@ _CONCEPTS = (
                 "or removes edges from the complete DAG of a causal order.",
                 "cpcm_graph",
             ),
-            *_exempt("Its paper gives no rule for background knowledge.", "skewd_mv"),
+            *_exempt("Its paper gives no rule for background knowledge.", "skewd_mv", "rpcmci"),
             *_exempt(
                 "Its tests read each set of the target's predictors as the data give it; no "
                 "knowledge of edges enters an invariance test.",
@@ -1118,9 +1164,11 @@ _CONCEPTS = (
         exempt=(
             *_exempt(
                 "Has no edge for knowledge to name (the knowledge concept).",
-                *(m for m in NO_KNOWLEDGE if m not in ("icp", "ages", "cpcm_graph")),
+                *(m for m in NO_KNOWLEDGE if m not in ("icp", "ages", "cpcm_graph", "rpcmci")),
             ),
-            *_exempt("Takes no knowledge (the knowledge concept).", "icp", "ages", "cpcm_graph"),
+            *_exempt(
+                "Takes no knowledge (the knowledge concept).", "icp", "ages", "cpcm_graph", "rpcmci"
+            ),
         ),
     ),
     Concept(
@@ -1229,7 +1277,7 @@ _CONCEPTS = (
                 "igsp",
                 "ut_igsp",
             ),
-            *_exempt("A series cannot drop a step.", "granger", "dynotears"),
+            *_exempt("A series cannot drop a step.", "granger", "dynotears", "rpcmci"),
             *_exempt("Its stacked design reads every step of every dataset.", "jpcmciplus"),
         ),
         deviations=(
@@ -1362,7 +1410,7 @@ _CONCEPTS = (
                 "A time-series method: its rows are the steps of a series, read in order through "
                 "its lags, and it takes no context variable here.",
                 *PCMCI_FAMILY,
-                *("granger", "varma_lingam", "dynotears"),
+                *("rpcmci", "granger", "varma_lingam", "dynotears"),
             ),
             *_exempt(
                 "Continuous optimization of a least-squares or Gaussian likelihood loss, which "

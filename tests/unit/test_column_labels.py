@@ -17,7 +17,7 @@ from andrey.core import TemporalStructure, backend
 from andrey.core.knowledge import column_position
 from andrey.core.structure import node_labels
 from andrey.spec import list_specs
-from tests.unit.methods import domains, environments, fit_settings
+from tests.unit.methods import domains, environments, fit_settings, regime_paths, results
 
 COLUMNS = ["x", "y", "z"]
 N = 400
@@ -77,8 +77,7 @@ def labeled_fit(name: str) -> list:
     spec = next(spec for spec in TABLE_SPECS if spec.name == name)
     frames = [frame(seed).set_axis([1, 0, "z"], axis=1) for seed in range(3)]
     settings = {**fit_settings(spec.name), **CONTEXT.get(spec.name, {})}
-    out = getattr(andrey, spec.name)(*inputs(spec, frames), **settings)
-    return out if isinstance(out, list) else [out]
+    return results(getattr(andrey, spec.name)(*inputs(spec, frames), **settings))
 
 
 @pytest.mark.parametrize("spec", TABLE_SPECS, ids=lambda spec: spec.name)
@@ -127,8 +126,8 @@ def test_columns_named_alike_as_text_raise_before_the_fit(spec):
 
 def named_marks(out) -> list[dict]:
     """Each graph of a result as ``{(label, label): mark}``, which no column order changes."""
-    found = []
-    for result in out if isinstance(out, list) else [out]:
+    found: list[dict] = [{("regimes",): path.tolist()} for path in regime_paths(out)]
+    for result in results(out):
         for graph in graphs(result.structure):
             m, labels = graph.to_numpy(), graph.labels
             found.append(

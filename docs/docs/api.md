@@ -26,7 +26,9 @@ Every method has the same shape:
 - **A result out.** Each call returns a {py:class}`~andrey.StructureOutput`, one per table for
   `multi_group_direct_lingam`: the graph in `out.structure` and, where the method gives them, a
   causal order in `out.ordering`, edge weights in `out.weighted_adjacency`, and run details such as
-  the test, the score, and the seed in `out.metadata`.
+  the test, the score, and the seed in `out.metadata`. `rpcmci` returns a
+  {py:class}`~andrey.RegimeOutput` instead: the regime of each time step in `out.regimes`, run
+  details in `out.metadata`, and one such result per regime in `out.outputs[k]`.
 - **Supported or experimental.** A [supported](#supported-methods) method is benchmarked against
   other packages and checked against known graphs before each release; an
   [experimental](#experimental-methods) one is not yet. `andrey list` prints each method's status.
@@ -133,7 +135,9 @@ baselines. A value a method does not list raises a
 `ValueError` that
 names the values it takes. A column with no observed value, or a constant one over its observed
 values, raises a `ValueError` before the fit, and a test with fewer rows than it needs, `|S| + 3`
-for `"fisherz"` and `"student_t"` and 2 for the other tests, raises one during it. `cdnod` and
+for `"fisherz"` and `"student_t"`; 4 for `"gcm"` and for `"wgcm"` with `variant="fix"`, 17 for
+`"wgcm"`'s default `variant="est"`, and 12 for `"pcm"`; and 2 for the other tests, raises one
+during it. `cdnod` and
 `fci_jci` need a complete `env`. Every other method raises a `ValueError` that names it and says
 what to do instead, as [Missing values](guides/getting-started.md#missing-values) describes; each
 method's Notes say why.
@@ -143,15 +147,17 @@ method's Notes say why.
 `mmhc`, `rsmax2`, `igsp`, `ut_igsp`, `pcmci`, `pcmciplus`, and `lpcmci` take the same `indep_test`
 choices: `"fisherz"`, `"student_t"`, and `"normal_scores"` for continuous data, `"chisq"` and
 `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"` for mixed data, and the nonlinear
-tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` ([Conditional-independence
-tests](#conditional-independence-tests)). `None`, the default, picks from the declared column types,
-`"fisherz"` for continuous data. `jpcmciplus` takes the continuous and nonlinear tests, as its
-dummies enter a test as numeric columns. `skewd_mv` takes them without `"normal_scores"`, as its
-likelihood stage reads the values, and its default is `"kci"`. `pcmci`, `pcmciplus`, `jpcmciplus`,
-and `lpcmci` run each test on the lagged values of the series, and order the candidate conditions by
-the test's statistic, as tigramite does: the partial correlation, the chi-square statistic, the
-likelihood ratio, CMIknn's conditional mutual information estimate, or GPDC's distance correlation.
-A test you register that reports only p-values is ordered by its p-value, smallest first.
+tests `"kci"`, `"rcot"`, `"cmiknn"`, `"gpdc"`, `"gcm"`, `"wgcm"`, and `"pcm"`
+([Conditional-independence tests](#conditional-independence-tests)). `None`, the default, picks from
+the declared column types, `"fisherz"` for continuous data. `jpcmciplus` takes the continuous and
+nonlinear tests, as its dummies enter a test as numeric columns. `skewd_mv` takes them without
+`"normal_scores"`, as its likelihood stage reads the values, and its default is `"kci"`. `rpcmci`
+takes `"student_t"`, its default, and `"fisherz"`, as its regime step fits linear models. `pcmci`,
+`pcmciplus`, `jpcmciplus`, `lpcmci`, and `rpcmci` run each test on the lagged values of the series,
+and order the candidate conditions by the test's statistic, as tigramite does: the partial
+correlation, the chi-square statistic, the likelihood ratio, CMIknn's conditional mutual information
+estimate, or GPDC's distance correlation. A test you register that reports only p-values is ordered
+by its p-value, smallest first.
 
 % concept: degrees_of_freedom
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
@@ -235,10 +241,10 @@ return the CPDAG of a DAG, which always has a consistent extension.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 % concept: tau_max
-`pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `longitudinal_lingam`, and `dynotears` take
-`tau_max`, the largest lag, at least 1, with a default of 1; for `longitudinal_lingam` a lag counts
-time points of the panel. The ARMA order of VARMA-LiNGAM, `order=(p, q)`, is a different setting and
-keeps its name.
+`pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `rpcmci`, `granger`, `longitudinal_lingam`, and
+`dynotears` take `tau_max`, the largest lag, at least 1, with a default of 1; for
+`longitudinal_lingam` a lag counts time points of the panel. The ARMA order of VARMA-LiNGAM,
+`order=(p, q)`, is a different setting and keeps its name.
 
 % concept: measure
 `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` run
@@ -258,12 +264,13 @@ from outside, as in a randomized experiment (FCI-JCI123), so every edge the inde
 of it.
 
 % concept: fdr_method
-`pcmci`, `pcmciplus`, `jpcmciplus`, and `granger` take `fdr_method`, tigramite's name for the
-correction of the lagged links' p-values for the number of links tested. `"fdr_bh"`, the default,
-replaces them with their Benjamini-Hochberg adjusted values over all the lagged links together,
-which holds the false discovery rate at or below the level when the tests are independent or
-positively dependent. `"none"` keeps each p-value as tested, so about `alpha` of the absent links
-appear as links. `pcmci` and `granger` keep a link when its adjusted p-value is at most `alpha`;
+`pcmci`, `pcmciplus`, `jpcmciplus`, `rpcmci`, and `granger` take `fdr_method`, tigramite's name for
+the correction of the lagged links' p-values for the number of links tested. `"fdr_bh"`, the
+default, replaces them with their Benjamini-Hochberg adjusted values over all the lagged links
+together, which holds the false discovery rate at or below the level when the tests are independent
+or positively dependent. `"none"` keeps each p-value as tested, so about `alpha` of the absent links
+appear as links. `pcmci` and `granger` keep a link when its adjusted p-value is at most `alpha`, and
+so does `rpcmci` in each regime, whose default is `"none"`, as in its paper's experiments;
 `pcmciplus` and `jpcmciplus` decide their links in the skeleton phase and report the adjusted values
 in `metadata["p_values"]` without changing them. LPCMCI takes none, as tigramite's LPCMCI does not.
 
@@ -333,28 +340,30 @@ the PAG their tests then orient can put more arrowheads at a node.
 
 % concept: seed
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
-`mmhc`, `rsmax2`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`,
-`hc`, `tabu`, `calm`, `ica_lingam`, `cpcm`, `cpcm_graph`, `skewd`, and `skewd_mv` take `seed`, a
+`mmhc`, `rsmax2`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `rpcmci`, `boss`, `grasp`, `igsp`,
+`ut_igsp`, `hc`, `tabu`, `calm`, `ica_lingam`, `cpcm`, `cpcm_graph`, `skewd`, and `skewd_mv` take
+`seed`, a
 whole number from 0 to 2**32 - 1 that fixes their random draws. `None`, the default, is the
 configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh random one, so a call repeats
 exactly. Apart from `boss_fci` and `grasp_fci`, whose BOSS or GRaSP phase visits the variables in a
 random order on every fit, the methods that test independence draw random numbers only under
-`indep_test="rcot"`, `"cmiknn"`, or `"gpdc"`, `pc` also with `missing="mvpc"` on data with missing
-values, `igsp` and `ut_igsp` also with `n_starts` above 1, `hc` and `tabu` only with `n_starts`
-above 1, and `cpcm` and `cpcm_graph` only for a column under `family="poisson"` or
-`"negative_binomial"`; `skewd` and `skewd_mv` draw in every fit, in their Bayesian optimization and
-CMA-ES, whatever test PC runs. Otherwise `seed` changes nothing, and `metadata["seed"]` is not set.
+`indep_test="rcot"`, `"cmiknn"`, `"gpdc"`, `"gcm"`, `"wgcm"`, or `"pcm"`, `pc` also with
+`missing="mvpc"` on data with missing values, `igsp` and `ut_igsp` also with `n_starts` above 1,
+`hc` and `tabu` only with `n_starts` above 1, and `cpcm` and `cpcm_graph` only for a column under
+`family="poisson"` or `"negative_binomial"`; `skewd` and `skewd_mv` draw in every fit, in their
+Bayesian optimization and CMA-ES, whatever test PC runs, and `rpcmci` draws the first regime
+weights of every start. Otherwise `seed` changes nothing, and `metadata["seed"]` is not set.
 A call that gives `seed` does not depend on `ANDREY_SEED`. Every other method is deterministic and
 takes no seed.
 
 % concept: n_starts
-`boss`, `grasp`, `boss_fci`, `grasp_fci`, `igsp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the
-number of searches a fit runs: the first from the start the method describes, each later one from a
-start drawn from `seed` and the search's index. `boss`, `grasp`, `boss_fci`, and `grasp_fci` start
-it from a random order, `igsp` and `ut_igsp` from a minimum-degree order with its ties drawn from
-`seed`, and `hc` and `tabu` from the best DAG so far after `n_perturbations` random edge changes.
-The fit returns the best-scoring search; a later one replaces an earlier one only when it scores
-better by more than `1e-6` (for `igsp`, fewer edges, then fewer I-contradicting edges; for
+`boss`, `grasp`, `boss_fci`, `grasp_fci`, `igsp`, `ut_igsp`, `hc`, `tabu`, and `rpcmci` take
+`n_starts`, the number of searches a fit runs: the first from the start the method describes, each
+later one from a start drawn from `seed` and the search's index. `boss`, `grasp`, `boss_fci`, and
+`grasp_fci` start it from a random order, `igsp` and `ut_igsp` from a minimum-degree order with its
+ties drawn from `seed`, and `hc` and `tabu` from the best DAG so far after `n_perturbations` random
+edge changes. The fit returns the best-scoring search; a later one replaces an earlier one only when
+it scores better by more than `1e-6` (for `igsp`, fewer edges, then fewer I-contradicting edges; for
 `ut_igsp`, a lower count of edges and targets), and `boss_fci` and `grasp_fci` run their tests on
 the best search's CPDAG. `igsp` and `ut_igsp` run 10 by default. On one set of simulated datasets in
 `igsp`'s papers' settings, at `alpha=1e-3`, 10 searches and 5 had a lower SHD than one in 21 and 19
@@ -365,7 +374,9 @@ can stop at a much worse order: with 50 variables, mean degree 4, and 500 rows a
 its mean SHD over 40 datasets was 29.6 with one start, 18.8 with `n_starts=4`, and 16.3 with
 `n_starts=8`, at median fits of 1.3, 5.1, and 10.4 s, while at mean degree 2 one start was enough.
 Each search builds its own caches and drops the previous one's, so more starts take more time but
-little more memory. `1`, the default for the others, runs one search.
+little more memory. `rpcmci` draws every start's regime weights from `seed` and the start's index
+and returns the start with the lowest objective, 50 by default, as in its paper's experiments. `1`,
+the default for the others, runs one search.
 
 % concept: n_perturbations
 `hc` and `tabu` take `n_perturbations`, the number of random edge additions, removals, or
@@ -687,6 +698,7 @@ in a process.
    das
    cpcm
    cpcm_graph
+   rpcmci
 ```
 
 DAS (Montagna et al. 2023), {py:func}`~andrey.das`, finds SCORE's causal order with the same Stein
@@ -725,6 +737,15 @@ distinct parent set the class allows, and `max_fits` (100 by default, the order 
 paper expects it to apply) makes it refuse a class that needs more, before it fits any. It is
 experimental until its comparison with the authors' code is published.
 
+Regime-PCMCI (Saggioro et al. 2020), {py:func}`~andrey.rpcmci`, takes one time series whose lagged
+links switch between a few persistent regimes. Each start draws random regime weights, then
+alternates PCMCI on each regime's time steps with a linear program that reassigns the steps to the
+regime whose linear model predicts them best, with at most `max_transitions` switches per regime;
+the start with the lowest objective is returned, the regime of each step and one lagged graph per
+regime in a {py:class}`~andrey.RegimeOutput`. SciPy's HiGHS solver solves the linear program
+exactly, so it needs no further package. It is experimental until its benchmark in the paper's
+setting is published.
+
 A method becomes supported once it has:
 
 - a benchmark campaign compared with another package, in a published summary and with a section
@@ -750,6 +771,9 @@ A method becomes supported once it has:
 | `"rcot"` | Random-feature approximation of the kernel test; time linear in the rows | Supported |
 | `"cmiknn"` | Nearest-neighbor conditional mutual information, with a local permutation null | Supported |
 | `"gpdc"` | Gaussian-process regression, then a distance-correlation test of the residuals | Supported |
+| `"gcm"` | Generalized covariance measure: the normalized covariance of the residuals of boosted-tree regressions | Experimental |
+| `"wgcm"` | Weighted generalized covariance measure: the GCM with weights on the conditioning set, for a covariance that changes sign | Experimental |
+| `"pcm"` | Projected covariance measure: whether one variable improves a random-forest prediction of the other | Experimental |
 
 `normal_scores` ranks each column over every row its test reads, and its model is one distribution.
 Ranked over the rows of several environments, a column mixes their distributions, and its scores
@@ -836,6 +860,9 @@ query.
    ci_kernel.RCoT
    ci_cmiknn.CMIknn
    ci_gpdc.GPDC
+   ci_regression.GCM
+   ci_regression.WGCM
+   ci_regression.PCM
    ci.CITest
    ci_missing.TestwiseDeletion
    ci.register_indep_test
@@ -904,6 +931,7 @@ DoWhy for effect estimation.
    :toctree: api
 
    GraphStructure
+   RegimeOutput
    Structure
    StructureOutput
    SummaryGraph

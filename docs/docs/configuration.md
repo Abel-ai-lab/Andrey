@@ -132,9 +132,10 @@ already running in the process, so a CPU fit never pays to start a GPU.
 - `ANDREY_SEED`: the seed of every method that draws random numbers when the call gives no `seed=`:
   BOSS, GRaSP, ICA-LiNGAM, CALM, IGSP and UT-IGSP with `n_starts` above 1 (the default), hill
   climbing and tabu search with `n_starts` above 1, and the searches that test independence, with
-  the `rcot`, `cmiknn`, and `gpdc` tests. The default is `0`; it takes any integer from `0` to
-  `2**32 - 1`. So `seed=None` is this configured seed, not a fresh random one, and a call repeats. A
-  call that gives `seed=` does not depend on it. Deterministic methods ignore it.
+  the `rcot`, `cmiknn`, `gpdc`, `gcm`, `wgcm`, and `pcm` tests. The default is `0`; it takes any
+  integer from `0` to `2**32 - 1`. So `seed=None` is this configured seed, not a fresh random one,
+  and a call repeats. A call that gives `seed=` does not depend on it. Deterministic methods ignore
+  it.
 - `ANDREY_TIE_BREAK`: how the searches choose between tied candidates. `rank` (the default) orders
   them by a rank computed from the data, which a row shuffle, a change of units, or a sign flip
   leaves in place, with [a few exceptions](guides/column-order.md#how-andrey-breaks-ties), so
