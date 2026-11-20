@@ -1055,8 +1055,8 @@ def structure_output(
 
 
 def is_column_list(target: object) -> bool:
-    """Whether ``target`` is a list of columns: a list, tuple, or NumPy array."""
-    return isinstance(target, list | tuple | np.ndarray)
+    """Whether ``target`` is a list of columns: a list or a tuple, as ``str_or_list`` takes."""
+    return isinstance(target, list | tuple)
 
 
 def target_columns(
@@ -1079,11 +1079,10 @@ def target_columns(
         if target is None or isinstance(target, str | int | np.integer):
             return None
         raise TypeError(
-            f"{what} must be a column name or position, or a list, tuple, or NumPy array of them, "
+            f"{what} must be a column name or position, or a list or tuple of them, "
             f"got {type(target).__name__}"
         )
-    assert isinstance(target, list | tuple | np.ndarray)
-    target = list(target)
+    assert isinstance(target, list | tuple)
     if not target:
         raise ValueError(f"{what} is an empty list; pass a column or a list of columns")
     found = [column_position(as_node(t, what), labels, d, what) for t in target]

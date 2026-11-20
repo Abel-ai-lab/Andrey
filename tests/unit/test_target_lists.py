@@ -130,19 +130,19 @@ def test_rows_tested_is_the_answer_of_its_own_call_with_missing_values(method, n
         _same(out, _fit(method, data, t))
 
 
-def test_a_tuple_or_an_array_of_columns_is_a_list():
+def test_a_tuple_of_columns_is_a_list():
     data = _gaussian()
-    outs = andrey.mmpc(data, target=np.arange(3))
+    outs = andrey.mmpc(data, target=(0, 1, 2))
     assert [out.metadata["target"] for out in outs] == ["x0", "x1", "x2"]
     (out,) = andrey.mmpc(data, target=("x3",))
     _same(out, andrey.mmpc(data, target="x3"))
 
 
 @pytest.mark.parametrize("method", ["mmpc", "icp"])
-@pytest.mark.parametrize("target", [{"x1", "x2"}, pd.Index(["x1", "x2"]), range(2)])
+@pytest.mark.parametrize("target", [np.arange(2), {"x1", "x2"}, pd.Index(["x1", "x2"]), range(2)])
 def test_an_unordered_or_other_collection_raises(method, target):
     data = _gaussian().assign(env=np.repeat([0, 1], 300))
-    with pytest.raises(TypeError, match="list, tuple, or NumPy array"):
+    with pytest.raises(TypeError, match="list or tuple"):
         _fit(method, data, target)
 
 
