@@ -1655,6 +1655,7 @@ def lges(
     ebic_gamma: float = 0.0,
     equivalent_sample_size: float = 1.0,
     insertion: str = "safe",
+    schedule: str = "lges",
     categorical: Sequence[str | int] | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with less greedy equivalence search (LGES).
@@ -1662,9 +1663,9 @@ def lges(
     LGES searches the equivalence classes that GES searches [2]_, with GES's moves, the turning
     move of GIES [3]_, and a decomposable score, the BIC by default, but adds fewer edges [1]_: it
     leaves out an edge between two variables when the score says that some graph of the current
-    class already makes them independent given the parents of one of them. This is the paper's
-    LGES-0 variant, with its phases in the order of the code published with the paper (see
-    Notes).
+    class already makes them independent given the parents of one of them. By default it runs the
+    paper's main method, LGES; ``schedule`` also runs its LGES-0 variant in the phase order of the
+    code published with the paper (see Notes).
 
     Parameters
     ----------
@@ -1706,11 +1707,20 @@ def lges(
     insertion : {"safe", "conservative"}, default="safe"
         Which pairs of variables an edge addition leaves out (see Notes). ``"safe"`` (SafeInsert)
         leaves out a pair when one graph of the current class scores better without the edge; the
-        paper proves that LGES-0 then recovers the true class as the rows grow (its Corollary C.1)
-        [1]_.
+        paper proves that each schedule then recovers the true class as the rows grow (its
+        Corollaries 1 and C.1) [1]_.
         ``"conservative"`` (ConservativeInsert) also leaves out a pair when any valid addition of
         the edge worsens the score; it made fewer errors in the paper's simulations, with no such
         proof.
+    schedule : {"lges", "lges0_released"}, default="lges"
+        The order of the search's phases (see Notes). ``"lges"`` is the paper's main method, LGES
+        (its Algorithm 1): before each single edge addition it deletes, then reverses, edges until
+        neither improves the score, and it stops when no addition improves it. ``"lges0_released"``
+        is the paper's LGES-0 (its Algorithm 8) in the phase order of the code published with the
+        paper: additions, then deletions, then reversals, each phase run once until no move improves
+        the score. ``"lges"`` is the default: on the paper's linear-Gaussian simulation, with 10
+        to 100 variables, it made fewer errors than LGES-0 in most settings, the denser graphs
+        above all, and LGES-0 fewer in some sparse ones; LGES took up to about 1.4 times as long.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1764,40 +1774,43 @@ def lges(
     **When to use.** LGES makes the assumptions of :func:`~andrey.ges`: i.i.d. observational data,
     no unmeasured common causes and, with the default BIC score on continuous data, linear relations
     with Gaussian noise. Its moves need only a score that adds one term per variable and gives
-    equivalent graphs the same score, which each of the scores does. The paper claims LGES-0, with
-    the standard BIC, for sparse linear-Gaussian graphs of up to 150 variables with 1,000 or 10,000
-    rows, where it added fewer wrong edges than GES and ran faster [1]_; it returns a CPDAG. When
-    unmeasured common causes are plausible, use :func:`~andrey.fci`; when the noise is non-Gaussian
-    and every edge should be oriented, use :func:`~andrey.direct_lingam`; when some rows come from
-    interventions, use :func:`~andrey.gies`.
+    equivalent graphs the same score, which each of the scores does. The paper claims LGES and
+    LGES-0, with the standard BIC, for sparse linear-Gaussian graphs of up to 150 variables with
+    1,000 or 10,000 rows, where they added fewer wrong edges than GES and ran faster [1]_; it
+    returns a CPDAG. When unmeasured common causes are plausible, use :func:`~andrey.fci`; when the
+    noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`; when
+    some rows come from interventions, use :func:`~andrey.gies`.
 
-    **How it works.** The search starts from the empty graph and runs three phases once, each until
-    no move improves the score: edge additions, edge deletions, then reversals of an edge, the
-    turning phase of GIES [3]_. The deletions and reversals are those of GES and GIES. Each step of
-    the first phase takes one DAG ``G`` of the current class and, for each pair ``(x, y)`` of
-    non-adjacent variables, compares the score of ``y`` given its parents in ``G`` with the score
-    given those parents and ``x``. When the edge worsens the score, the score holds ``y``
-    independent of ``x`` given those parents, and the step adds no edge between ``x`` and ``y``
-    (SafeInsert). With ``insertion="conservative"`` it also adds no edge between them when any
-    valid addition ``x -> y`` of GES worsens the score (ConservativeInsert). Of the additions left,
-    the step takes the one that improves the score most, as GES does. ``G`` is the DAG that orients
-    the class by removing, while one is left, the first sink whose neighbors are adjacent to each
-    other, in the order of the columns' ranks
+    **How it works.** The search starts from the empty graph and uses three moves: edge additions,
+    edge deletions, and reversals of an edge, the turning move of GIES [3]_. The deletions and
+    reversals are those of GES and GIES. Each addition takes one DAG ``G`` of the current class and,
+    for each pair ``(x, y)`` of non-adjacent variables, compares the score of ``y`` given its
+    parents in ``G`` with the score given those parents and ``x``. When the edge worsens the score,
+    the score holds ``y`` independent of ``x`` given those parents, and the step adds no edge
+    between ``x`` and ``y`` (SafeInsert). With ``insertion="conservative"`` it also adds no edge
+    between them when any valid addition ``x -> y`` of GES worsens the score
+    (ConservativeInsert). Of the additions left, the step takes the one that improves the score
+    most, as GES does. ``G`` is the DAG that orients the class by removing, while one is left, the
+    first sink whose neighbors are adjacent to each other, in the order of the columns' ranks
     (:doc:`column-order guide </docs/guides/column-order>`), so the result does not depend on the
     column order; moves whose score changes are equal after rounding are taken in that order too.
 
-    This is the paper's LGES-0 (its Algorithm 8) with the phases in the order of the code published
-    with the paper: the additions, then the deletions, then the reversals, once. Algorithm 8 itself
-    runs the reversals before the deletions, and the two orders can return different classes. The
-    paper's main variant, LGES (its Algorithm 1), deletes and reverses before each addition, and
-    LGES+ also retries each deletion; neither is implemented here. The paper's pseudocode leaves out
-    a pair ``(x, y)`` also when ``x`` is a descendant of ``y`` in ``G``, where adding ``x -> y`` to
-    ``G`` would close a cycle; the published code compares the two scores for every pair, and so
-    does this search. A move counts as improving when it lowers the score by more than ``1e-9``, the
-    rule of every greedy search here; the published code applies a move when it raises its score,
-    ``-1/2`` of this one up to a constant, by more than ``1e-6``. The paper's prior knowledge, which
-    orders the additions by required and forbidden edges and lets the data overrule them, and its
-    orientation of the result with interventional data are not implemented.
+    The two schedules order these moves differently. LGES (``schedule="lges"``, the paper's
+    Algorithm 1) repeats: deletions until none improves the score, reversals until none improves
+    it, then one addition; it stops when no addition improves the score. LGES-0
+    (``schedule="lges0_released"``) runs additions until none improves the score, then deletions,
+    then reversals, once, as the code published with the paper does; the paper's Algorithm 8
+    itself runs the reversals before the deletions, and the two orders can return different
+    classes. With ``insertion="safe"``, the paper proves that each recovers the true class as the
+    rows grow (its Corollary 1 for LGES, Corollary C.1 for LGES-0). Its LGES+, which also retries
+    each deletion, is not implemented. The paper's pseudocode leaves out a pair ``(x, y)`` also
+    when ``x`` is a descendant of ``y`` in ``G``, where adding ``x -> y`` to ``G`` would close a
+    cycle; the published code compares the two scores for every pair, and so does this search. A
+    move counts as improving when it lowers the score by more than ``1e-9``, the rule of every
+    greedy search here; the published code applies a move when it raises its score, ``-1/2`` of
+    this one up to a constant, by more than ``1e-6``. The paper's prior knowledge, which orders the
+    additions by required and forbidden edges and lets the data overrule them, and its orientation
+    of the result with interventional data are not implemented.
 
     **Choosing the penalty.** The score charges a variable ``penalty_discount * log(n_samples)`` per
     parent plus the extended-BIC term ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``
@@ -1811,15 +1824,17 @@ def lges(
     Drop the incomplete rows first, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on up to 20 variables with 5,000 rows,
-    and it was compared with the authors' code on the paper's simulation, with the linear-Gaussian
-    BIC, up to 50 variables and 10,000 rows, and on the paper's Sachs data, continuous and
-    discretized, the latter with the multinomial BIC. BDeu and the mixed-data scores were not
-    compared: the package's checks run them on small tables only. The paper proves the recovery of
-    the true class as the rows grow only for ``insertion="safe"``. Each step of the first phase
-    scores every pair of non-adjacent variables, and every valid addition for each pair it keeps, in
-    one process. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    **Limitations.** Not benchmarked yet. Its tests run it on up to 20 variables with 5,000 rows.
+    With the linear-Gaussian BIC, ``"lges0_released"`` was compared with the authors' code on the
+    paper's simulation up to 50 variables and 10,000 rows, and ``"lges"`` with the authors' step
+    functions run in Algorithm 1's order up to 35 variables; ``"lges0_released"`` was also compared
+    on the paper's Sachs data, continuous and discretized, the latter with the multinomial BIC.
+    BDeu and the mixed-data scores were not compared: the package's checks run them on small tables
+    only. The paper proves the recovery of the true class as the rows grow only for
+    ``insertion="safe"``. Each addition step scores every pair of non-adjacent variables, and every
+    valid addition for each pair it keeps, in one process; ``"lges"`` also rescans the deletions
+    and reversals after every addition. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1858,6 +1873,7 @@ def lges(
             ebic_gamma=ebic_gamma,
             equivalent_sample_size=equivalent_sample_size,
             insertion=insertion,
+            schedule=schedule,
             categorical=mask,
         )
     metadata = {"score": json_safe(score), **categorical_metadata(mask, data)}

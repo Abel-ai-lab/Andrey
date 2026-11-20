@@ -836,10 +836,12 @@ _add(
     MethodSpec(
         name="lges",
         family="score",
-        summary="Less greedy equivalence search, its paper's LGES-0 variant: GES that adds no "
-        "edge between two variables the score already holds independent given one's parents in a "
-        "graph of the current class, then deletes and reverses edges as GES and GIES do, in the "
-        "order of the authors' code (the paper's Algorithm 8 reverses before it deletes). "
+        summary="Less greedy equivalence search: GES that adds no edge between two variables the "
+        "score already holds independent given one's parents in a graph of the current class, and "
+        "deletes and reverses edges as GES and GIES do. schedule=lges (default) is the paper's "
+        "LGES (Algorithm 1), deleting and reversing before each addition; "
+        "schedule=lges0_released is its LGES-0 in the authors' code's order (additions, "
+        "deletions, then reversals). "
         "insertion=conservative also skips a pair when any of its additions worsens the score. "
         "The standard BIC by default, BDeu when every column is categorical, conditional Gaussian "
         "when some are. Returns a CPDAG + score.",
@@ -869,6 +871,18 @@ _add(
                 "that it recovers the true class as the rows grow; conservative "
                 "(ConservativeInsert) also skips it when any valid addition of the edge worsens "
                 "the score, with fewer errors in the paper's simulations and no such proof.",
+            ),
+            ParamSpec(
+                name="schedule",
+                type="str",
+                default="lges",
+                choices=("lges", "lges0_released"),
+                doc="The order of the phases: lges is the paper's LGES (Algorithm 1), deleting "
+                "then reversing edges until neither improves the score before each single "
+                "addition; lges0_released is its LGES-0 (Algorithm 8) in the order of the "
+                "authors' code: additions, deletions, then reversals, once. lges is the "
+                "default: it made fewer errors on the paper's linear-Gaussian simulation in most "
+                "settings.",
             ),
             _CATEGORICAL,
         ),

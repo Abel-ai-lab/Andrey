@@ -21,13 +21,14 @@ names its pull request.
 - For contributors, a benchmark lane runs `anm`, `pnl`, `loci`, and `resit` beside the authors'
   code of QCCD, HECI, and GRCI on the Tübingen cause-effect pairs, and a summary script turns its
   records into a weighted-accuracy table. ([#1127])
-- `lges`, experimental: less greedy equivalence search (Ejaz and Bareinboim 2025), the paper's
-  LGES-0 variant, a score search next to `ges` and `xges` that adds no edge between two variables
-  the score already holds independent given the parents of one of them in a graph of the current
-  class, then deletes and reverses edges as GES and GIES do, in the order of the authors' code
-  (Algorithm 8 reverses before it deletes). `insertion` picks SafeInsert, the default, or
-  ConservativeInsert. It takes the scores of `ges`, with the standard BIC (`ebic_gamma=0.0`) as
-  its default. ([#1146])
+- `lges`, experimental: less greedy equivalence search (Ejaz and Bareinboim 2025), a score search
+  next to `ges` and `xges` that adds no edge between two variables the score already holds
+  independent given the parents of one of them in a graph of the current class, and deletes and
+  reverses edges as GES and GIES do. `schedule` picks the paper's LGES (Algorithm 1, `"lges"`, the
+  default), which deletes and reverses before each addition, or its LGES-0 in the order of the
+  authors' code (`"lges0_released"`: additions, deletions, then reversals). `insertion` picks
+  SafeInsert, the default, or ConservativeInsert. It takes the scores of `ges`, with the standard
+  BIC (`ebic_gamma=0.0`) as its default. ([#1146])
 
 ### Changed
 

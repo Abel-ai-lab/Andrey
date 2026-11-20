@@ -1,13 +1,16 @@
 """Less greedy equivalence search over a decomposable score, the engine behind :func:`andrey.lges`.
 
-The search is LGES-0 with three phases run once, each until no move improves the score: Insert,
-Delete, then turning. The Insert phase is less greedy than that of GES: at each step it reads one
-DAG ``G`` of the current class and leaves out every pair ``(x, y)`` for which ``G`` scores better
-than ``G`` with ``x -> y`` added (SafeInsert); under ``insertion="conservative"`` it also leaves out
-a pair when any valid ``Insert(x, y, T)`` worsens the score (ConservativeInsert). The Delete phase
-is that of GES (:func:`~andrey.search._parallel_ges.backward_chunk_best`) and the turning phase that
-of GIES on observational data (:func:`~andrey.search.gies._turning_best`). The algorithm, its
-settings, and its reference are described on :func:`andrey.lges`.
+The Insert phase is less greedy than that of GES: at each step it reads one DAG ``G`` of the
+current class and leaves out every pair ``(x, y)`` for which ``G`` scores better than ``G`` with
+``x -> y`` added (SafeInsert); under ``insertion="conservative"`` it also leaves out a pair when
+any valid ``Insert(x, y, T)`` worsens the score (ConservativeInsert). The Delete phase is that of
+GES (:func:`~andrey.search._parallel_ges.backward_chunk_best`) and the turning phase that of GIES
+on observational data (:func:`~andrey.search.gies._turning_best`). Two schedules run them: LGES
+(``schedule="lges"``) deletes, then turns, until neither improves the score, before each single
+Insert, and stops when no Insert improves it; LGES-0 in the phase order of the released code
+(``schedule="lges0_released"``) runs Insert, Delete, then turning once, each until no move
+improves the score. The algorithm, its settings, and its reference are described on
+:func:`andrey.lges`.
 """
 
 from __future__ import annotations
@@ -29,6 +32,9 @@ from andrey.search.gies import FamilyScore, _turn, _turning_best
 
 #: The insertion strategies of :func:`lges`.
 INSERTIONS: tuple[str, ...] = ("safe", "conservative")
+
+#: The schedules of :func:`lges`: the paper's Algorithm 1, and LGES-0 in the released code's order.
+SCHEDULES: tuple[str, ...] = ("lges", "lges0_released")
 
 
 def extension(adj: np.ndarray, ranks: Sequence[int]) -> np.ndarray:
@@ -101,14 +107,17 @@ def lges(
     ebic_gamma: float = 0.0,
     equivalent_sample_size: float = 1.0,
     insertion: str = "safe",
+    schedule: str = "lges",
     categorical: np.ndarray | None = None,
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by less greedy equivalence search over a decomposable score.
 
-    Runs the Insert phase of :func:`insert_moves` from the empty graph, then the Delete phase and
-    the turning phase, each until no move lowers the score by more than
-    :data:`~andrey.core.ties.EPS_IMPROVE`, re-forming the CPDAG after every move. Returns the CPDAG
-    and its total score (lower is better), recomputed from it
+    Starts from the empty graph. Under ``schedule="lges"`` it repeats: Delete moves until none
+    improves, turning moves until none improves, then the best Insert of :func:`insert_moves`,
+    stopping when no Insert improves. Under ``schedule="lges0_released"`` it runs the Insert phase,
+    then the Delete phase, then the turning phase, each until no move improves. A move improves when
+    it lowers the score by more than :data:`~andrey.core.ties.EPS_IMPROVE`; the CPDAG is re-formed
+    after every move. Returns the CPDAG and its total score (lower is better), recomputed from it
     (:func:`~andrey.search.ges.recompute_objective`).
 
     Parameters
@@ -121,6 +130,8 @@ def lges(
         The score's settings, as for :func:`~andrey.search.ges.ges`.
     insertion : {"safe", "conservative"}
         The rule that leaves pairs out of the Insert phase (:func:`insert_moves`).
+    schedule : {"lges", "lges0_released"}
+        The order of the phases, as above.
     categorical : ndarray of bool or None
         Marks the categorical columns for a mixed-data score; the other scores ignore it.
 
@@ -131,6 +142,8 @@ def lges(
     """
     if insertion not in INSERTIONS:
         raise ValueError(f"unsupported insertion {insertion!r}; use one of {INSERTIONS}")
+    if schedule not in SCHEDULES:
+        raise ValueError(f"unsupported schedule {schedule!r}; use one of {SCHEDULES}")
     X = np.asarray(data, dtype=np.float64)
     n = X.shape[1]
     score = make_score(
@@ -147,21 +160,37 @@ def lges(
     cut = np.zeros((n, n), dtype=bool)
     with backend.one_blas_thread():
         engine = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
-        while (move := insert_best(adj, score, n, ranks, conservative)) is not None:
-            _, x, y, T = move
-            adj = ops.insert_cpdag(adj, x, y, T)
-        kept: dict[tuple[int, tuple[int, ...], int], float] = {}
-        while (
-            found := backward_chunk_best(
-                range(n), adj, engine, n, neighborhood_state(adj), ranks, kept
-            )
-        ) is not None:
-            _, x, y, H = found
-            adj = ops.delete_cpdag(adj, x, y, H)
         # The turning scan reads only the score's local scores, not its batched additions.
         family = cast(FamilyScore, score)
-        while (turn := _turning_best(adj, family, n, ranks)) is not None:
-            u, v, C, essential = turn
-            adj = _turn(adj, u, v, C, essential, cut)
+        kept: dict[tuple[int, tuple[int, ...], int], float] = {}
+
+        def deletes(adj: np.ndarray) -> np.ndarray:
+            while (
+                found := backward_chunk_best(
+                    range(n), adj, engine, n, neighborhood_state(adj), ranks, kept
+                )
+            ) is not None:
+                _, x, y, H = found
+                adj = ops.delete_cpdag(adj, x, y, H)
+            return adj
+
+        def turns(adj: np.ndarray) -> np.ndarray:
+            while (turn := _turning_best(adj, family, n, ranks)) is not None:
+                u, v, C, essential = turn
+                adj = _turn(adj, u, v, C, essential, cut)
+            return adj
+
+        if schedule == "lges":
+            while True:
+                adj = turns(deletes(adj))
+                if (move := insert_best(adj, score, n, ranks, conservative)) is None:
+                    break
+                _, x, y, T = move
+                adj = ops.insert_cpdag(adj, x, y, T)
+        else:
+            while (move := insert_best(adj, score, n, ranks, conservative)) is not None:
+                _, x, y, T = move
+                adj = ops.insert_cpdag(adj, x, y, T)
+            adj = turns(deletes(adj))
         total = recompute_objective(adj, score, n)
     return to_structure(adj, kind="cpdag"), total
