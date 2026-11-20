@@ -12,6 +12,7 @@ the same at any worker count, and the first ``k`` resamples of a longer run are 
 from __future__ import annotations
 
 import inspect
+import logging
 import math
 import warnings
 from collections.abc import Callable, Mapping, Sequence
@@ -47,7 +48,7 @@ from andrey.core.structure import (
     is_ancestral_kind,
 )
 from andrey.core.ties import tie_ranks
-from andrey.core.warning_policy import AndreyWarning, mark_logged, warn_once
+from andrey.core.warning_policy import AndreyWarning, held_records, mark_logged, warn_once
 from andrey.search._parallel import pick_context
 
 if TYPE_CHECKING:
@@ -875,8 +876,17 @@ def _draw(job: Job, b: int) -> list[np.ndarray]:
     return [rng.integers(0, n, size=n) for n in sizes]
 
 
-def _run_one(job: Job, b: int) -> tuple[Any, list[tuple[type[Warning], str]]]:
-    """Fit resample ``b``; return the fit and the warnings it raised."""
+#: What one resample's fit returns: the fit, the warnings it raised, and its warning-level log
+#: records as ``(logger name, level, message)``, which pickle as a record may not.
+Fitted = tuple[Any, list[tuple[type[Warning], str]], list[tuple[str, int, str]]]
+
+
+def _run_one(job: Job, b: int) -> Fitted:
+    """Fit resample ``b``; return the fit, the warnings it raised, and the records it logged.
+
+    The records are held (:func:`~andrey.core.warning_policy.held_records`) in a worker process as
+    in this one, so :func:`bootstrap` logs them in the calling process, whatever the workers.
+    """
     idx = _draw(job, b)
     if job.unit in _PANEL_UNITS:
         data = [_take(x, ix) for x, ix in zip(job.data, idx)]
@@ -889,7 +899,7 @@ def _run_one(job: Job, b: int) -> tuple[Any, list[tuple[type[Warning], str]]]:
         kwargs["seed"] = int(sequence.generate_state(1)[0])
     fit = getattr(api, job.name)
     try:
-        with warnings.catch_warnings(record=True) as caught:
+        with held_records() as records, warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             out = fit(data, **aligned, **kwargs)
     except Exception as exc:
@@ -897,7 +907,8 @@ def _run_one(job: Job, b: int) -> tuple[Any, list[tuple[type[Warning], str]]]:
             f"raised in bootstrap resample {b} of seed {job.seed}; its rows are the draw's"
         )
         raise
-    return out, [(w.category, str(w.message)) for w in caught]
+    logged = [(r.name, r.levelno, r.getMessage()) for r in records]
+    return out, [(w.category, str(w.message)) for w in caught], logged
 
 
 _JOB: Job | None = None
@@ -921,13 +932,13 @@ def _init_worker(job: Job) -> None:
     _JOB = job
 
 
-def _task(b: int) -> tuple[Any, list[tuple[type[Warning], str]]]:
+def _task(b: int) -> Fitted:
     """Worker side of one resample."""
     assert _JOB is not None  # _init_worker runs before any task
     return _run_one(_JOB, b)
 
 
-def fit_resamples(job: Job, n_resamples: int, workers: int) -> list[tuple[Any, list]]:
+def fit_resamples(job: Job, n_resamples: int, workers: int) -> list[Fitted]:
     """Fit every resample, in order, in this process or on ``workers`` worker processes."""
     if workers <= 1:
         with _backend.one_blas_thread(), _backend.config(n_jobs=1):
@@ -1066,6 +1077,8 @@ def bootstrap(
         Each distinct warning the fits raised, once; and, with ``strict=False``, when the vote has
         no valid graph of the method's kind, so the averaged graph is the valid resample graph
         nearest the others, or, when no resample is valid, the resample graph nearest the others.
+        Each distinct warning-level record the fits logged is logged once too, after the fits,
+        through its own logger, whether the fits ran in this process or in worker processes.
 
     Notes
     -----
@@ -1236,9 +1249,11 @@ def bootstrap(
     workers = min(_backend.worker_count(None), n_resamples)
     results = fit_resamples(job, n_resamples, workers)
     ranks = _column_ranks(job) if spec.output.graph_kind == "dag" else None
-    for category, message in dict.fromkeys(w for _, caught in results for w in caught):
+    for name, level, message in dict.fromkeys(r for *_, logged in results for r in logged):
+        logging.getLogger(name).log(level, message)
+    for category, message in dict.fromkeys(w for _, caught, _ in results for w in caught):
         warnings.warn(message, category, stacklevel=2)
-    fits = [out for out, _ in results]
+    fits = [out for out, *_ in results]
     groups = list(zip(*fits)) if spec.output.multi else [fits]
     if method_kwargs.get("missing") is None and any(
         out.metadata.get("missing") == TESTWISE for group in groups for out in group

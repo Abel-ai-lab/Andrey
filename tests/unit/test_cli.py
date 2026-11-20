@@ -734,6 +734,39 @@ def test_a_run_isolates_the_loggers_during_the_fit_and_restores_them(capsys, gap
     assert json.loads(out)["run"]["warnings"][0]["category"] == "LogWarning"
 
 
+@pytest.mark.parametrize("name", ["andrey", ""])
+def test_a_logger_set_above_warning_keeps_the_fit_notice_and_its_level(capsys, gappy_path, name):
+    """A threshold above ``WARNING`` on the ``andrey`` or the root logger drops no record."""
+    import logging
+
+    logger = logging.getLogger(name or None)
+    level = logger.level
+    logger.setLevel(logging.ERROR)
+    try:
+        code, out, err = _run(["run", "pc", "--data", str(gappy_path), "--json"], capsys)
+        assert logger.level == logging.ERROR
+    finally:
+        logger.setLevel(level)
+    assert code == 0 and err == ""
+    [notice] = json.loads(out)["run"]["warnings"]
+    assert notice["category"] == "LogWarning"
+
+
+def test_the_records_bootstrap_workers_log_go_in_the_envelope_not_stderr(capfd, tmp_path):
+    """Structural EM's warning, logged in worker processes, reaches ``run.warnings`` once."""
+    x = np.random.default_rng(0).standard_normal((300, 3))
+    x[:, 1] += x[:, 0]
+    x[np.random.default_rng(1).random(x.shape) < 0.1] = np.nan
+    path = tmp_path / "gaps.csv"
+    np.savetxt(path, x, delimiter=",", header="a,b,c", comments="")
+    argv = ["bootstrap", "ges", "--data", str(path), "--n-resamples", "4", "--json"]
+    with andrey.config(n_jobs=2):
+        code, out, err = _run([*argv, "missing=em", "n_em_iterations=1"], capfd)
+    assert code == 0 and err == ""
+    logged = [w for w in json.loads(out)["run"]["warnings"] if w["category"] == "LogWarning"]
+    assert [w["message"][:44] for w in logged] == ["structural EM: the graph still changed in th"]
+
+
 # --- shell-aware output ---------------------------------------------------------------------------
 
 

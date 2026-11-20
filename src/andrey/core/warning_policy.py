@@ -11,12 +11,13 @@ warns for every fit that drops a claim (:func:`warn_each`).
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import sys
 import threading
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from typing import TypeVar
 
 _T = TypeVar("_T")
@@ -130,6 +131,40 @@ def mark_logged(key: str) -> None:
     """
     with _lock:
         _logged.add(key)
+
+
+class _Held(logging.Handler):
+    """Holds the records it is handed, in order."""
+
+    def __init__(self) -> None:
+        super().__init__(logging.WARNING)
+        self.records: list[logging.LogRecord] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.records.append(record)
+
+
+@contextlib.contextmanager
+def held_records() -> Generator[list[logging.LogRecord]]:
+    """Hold the warning-level records of the ``andrey`` loggers inside the block, in order.
+
+    During the block the ``andrey`` logger holds only the handler that keeps them and does not
+    propagate, so no record reaches standard error, through the root logger's handlers or an
+    embedding application's either; its level is lowered to ``WARNING`` when it, or the logger it
+    inherits from, is set above it, so the block keeps every warning-level record whatever the
+    caller's threshold. The handlers, the propagation, and the level are restored after it.
+    """
+    handler = _Held()
+    logger = logging.getLogger(_PACKAGE)
+    handlers, propagate, level = logger.handlers[:], logger.propagate, logger.level
+    held: list[logging.Handler] = [handler]
+    logger.handlers, logger.propagate = held, False
+    logger.setLevel(min(logger.getEffectiveLevel(), logging.WARNING))
+    try:
+        yield handler.records
+    finally:
+        logger.handlers, logger.propagate = handlers, propagate
+        logger.setLevel(level)
 
 
 def warn_each(message: str, category: type[AndreyWarning]) -> None:

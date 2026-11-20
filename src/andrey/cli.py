@@ -18,7 +18,6 @@ import importlib.metadata
 import inspect
 import io
 import json
-import logging
 import math
 import os
 import platform
@@ -42,6 +41,7 @@ from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgeError
 from andrey.core.output import summary_lines
 from andrey.core.removed import removal_hint
 from andrey.core.structure import SUMMARY_EDGES, edge_count_text, edge_lines, node_labels
+from andrey.core.warning_policy import held_records
 from andrey.resample import bootstrap_summary_lines
 from andrey.spec import ENV_VARS, REGISTRY, SCHEMA_VERSION, get_spec, help_schema, list_specs
 from andrey.spec.concepts import BOOTSTRAP_PARAMS, MARKOV_CHECK_PARAMS
@@ -1082,40 +1082,23 @@ class LogWarning(Warning):
     """The category ``run.warnings`` gives a warning-level log record of a fit."""
 
 
-class _LogRecords(logging.Handler):
-    """Collects the warning-level records of the ``andrey`` loggers as warnings."""
-
-    def __init__(self) -> None:
-        super().__init__(logging.WARNING)
-        self.caught: list[warnings.WarningMessage] = []
-
-    def emit(self, record: logging.LogRecord) -> None:
-        self.caught.append(
-            warnings.WarningMessage(record.getMessage(), LogWarning, record.pathname, record.lineno)
-        )
-
-
 @contextlib.contextmanager
 def recorded_warnings() -> Generator[list[warnings.WarningMessage]]:
     """Record a fit's warnings and the warning-level records of its loggers, for ``run.warnings``.
 
     The list fills when the block exits, the warnings first and the log records after, each record
-    as a :class:`LogWarning`. The ``andrey`` logger holds only the recording handler and does not
-    propagate during the block, so no record reaches standard error, through the handlers of the
-    root logger or an embedding application's either; both are restored after it.
+    as a :class:`LogWarning`. The records are held by
+    :func:`~andrey.core.warning_policy.held_records`, so none reaches standard error, and none is
+    lost to a logger whose level is above ``WARNING``.
     """
-    handler = _LogRecords()
-    logger = logging.getLogger("andrey")
-    handlers, propagate = logger.handlers[:], logger.propagate
-    recording: list[logging.Handler] = [handler]
-    logger.handlers, logger.propagate = recording, False
-    try:
+    with held_records() as records:
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             yield caught
-        caught.extend(handler.caught)
-    finally:
-        logger.handlers, logger.propagate = handlers, propagate
+        caught.extend(
+            warnings.WarningMessage(r.getMessage(), LogWarning, r.pathname, r.lineno)
+            for r in records
+        )
 
 
 def run_info(

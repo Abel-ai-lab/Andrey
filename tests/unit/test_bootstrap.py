@@ -841,6 +841,19 @@ def test_each_warning_of_the_fits_is_raised_once():
         assert len(kinds) == 1, workers
 
 
+def test_each_record_the_fits_log_is_logged_once_in_the_calling_process(caplog):
+    """Structural EM's warning, from this process or from worker processes alike."""
+    x = lingam_data().to_numpy(copy=True)
+    x[np.random.default_rng(1).random(x.shape) < 0.1] = np.nan
+    for workers in (1, 2):
+        caplog.clear()
+        with caplog.at_level("WARNING", logger="andrey"):
+            with_workers(workers, "ges", x, n_resamples=4, missing="em", n_em_iterations=1)
+        logged = [r for r in caplog.records if r.name == "andrey.search.em"]
+        assert len(logged) == 1, workers
+        assert logged[0].getMessage().startswith("structural EM: the graph still changed")
+
+
 @pytest.mark.parametrize(("n_jobs", "n_resamples", "workers"), [(1, 3, 0), (2, 3, 2), (4, 2, 2)])
 def test_the_workers_follow_the_configured_count_and_never_nest(
     monkeypatch, n_jobs, n_resamples, workers
