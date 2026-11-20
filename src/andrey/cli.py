@@ -520,6 +520,12 @@ def render_human(
     if not isinstance(out, list):
         lines = summary_lines(out, name=spec.name, limit=limit, more=_MORE_HINT)
         return "\n".join(lines) + _run_footer(run)
+    if not spec.output.multi:  # a list of targets: one summary per target
+        lines = [f"{spec.name}  |  {len(out)} targets"]
+        for o in out:
+            name = f"target {o.metadata['target']}"
+            lines += ["", *summary_lines(o, name=name, limit=limit, more=_MORE_HINT)]
+        return "\n".join(lines) + _run_footer(run)
     lines = [f"{spec.name}  |  {len(out)} groups"]  # multi-group: one block per group
     for k, o in enumerate(out):
         graph = o.structure
@@ -1040,16 +1046,25 @@ def prepare_call(
 ) -> tuple[list, dict, tuple[str, ...] | None]:
     """Shape the loaded inputs and coerced params into what the facade takes.
 
-    ``categorical=`` names become positions, and ``knowledge=`` becomes an ``andrey.Knowledge``;
+    ``categorical=`` and ``target=`` names become positions, and ``knowledge=`` becomes an
+    ``andrey.Knowledge``;
     the method reads each text key of ``targets=`` that spells a number as the label of ``--env``
     it spells. A method that reads column types or knowledge, or whose graph adds latent nodes
-    (GIN), gets the data as a DataFrame, so its warnings and its graph name the header's columns.
+    (GIN), or that takes a ``target``, gets the data as a DataFrame, so its warnings, its graph, and
+    its metadata name the header's columns.
     Returns the inputs, params, and the labels still to apply to the result.
     """
     if fkwargs.get("categorical") is not None:
         fkwargs = {**fkwargs, "categorical": column_positions(fkwargs["categorical"], labels)}
-    if fkwargs.get("target") is not None:
-        fkwargs = {**fkwargs, "target": column_positions([fkwargs["target"]], labels, "target")[0]}
+    target = fkwargs.get("target")
+    if isinstance(target, (list, tuple)):  # one answer per target, in order
+        positions = column_positions(target, labels, "target")
+        if len(set(positions)) != len(positions):
+            message = f"target names a column twice: {list(target)}"
+            raise CliError("bad_value", message, EXIT_USAGE)
+        fkwargs = {**fkwargs, "target": positions}
+    elif target is not None:
+        fkwargs = {**fkwargs, "target": column_positions([target], labels, "target")[0]}
     contexts = [key for key in ("time_contexts", "space_contexts") if fkwargs.get(key) is not None]
     for key in contexts:
         fkwargs = {**fkwargs, key: column_positions(fkwargs[key], labels, key)}
@@ -1058,10 +1073,11 @@ def prepare_call(
             fkwargs = {**fkwargs, "knowledge": andrey.Knowledge(**fkwargs["knowledge"])}
         except (TypeError, ValueError) as exc:
             raise CliError("bad_value", f"knowledge: {exc}", EXIT_USAGE) from exc
-    named = any(p.name in ("categorical", "knowledge") for p in spec.params)
+    named = any(p.name in ("categorical", "knowledge", "target") for p in spec.params)
     if labels is not None and (named or spec.output.has_latents):
         # A method that reads column types names the header's columns in its warnings and in
-        # metadata["categorical"]; knowledge names them too, in each group of a panel. A graph
+        # metadata["categorical"]; knowledge names them too, in each group of a panel, and a
+        # method that takes a target names its target and sets in its metadata. A graph
         # with latent nodes names its observed variables from the table, and a graph that leaves
         # out the contexts names what it keeps, so no label is left to apply to the result.
         import pandas as pd
@@ -1221,6 +1237,10 @@ def execute_bootstrap(
     bad = [
         message
         for ok, message in (
+            (
+                not isinstance(fkwargs.get("target"), (list, tuple)),
+                "the bootstrap resamples one target at a time; pass target as one column",
+            ),
             (n_resamples >= 1, f"--n-resamples must be at least 1, got {n_resamples}"),
             (seed is None or seed >= 0, f"--seed must not be negative, got {seed}"),
             (block_length is None or block_length >= 1, "--block-length must be at least 1"),

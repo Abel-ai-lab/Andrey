@@ -24,11 +24,12 @@ Every method has the same shape:
   keyword arguments. `andrey run pc --data data.csv` runs it from the shell, with `--data` once per
   table for a method that takes a list ([Command-line interface](#command-line-interface)).
 - **A result out.** Each call returns a {py:class}`~andrey.StructureOutput`, one per table for
-  `multi_group_direct_lingam`: the graph in `out.structure` and, where the method gives them, a
-  causal order in `out.ordering`, edge weights in `out.weighted_adjacency`, and run details such as
-  the test, the score, and the seed in `out.metadata`. `rpcmci` returns a
-  {py:class}`~andrey.RegimeOutput` instead: the regime of each time step in `out.regimes`, run
-  details in `out.metadata`, and one such result per regime in `out.outputs[k]`.
+  `multi_group_direct_lingam` and one per column of a list `target`: the graph in `out.structure`
+  and, where the method gives them, a causal order in `out.ordering`, edge weights in
+  `out.weighted_adjacency`, and run details such as the test, the score, and the seed in
+  `out.metadata`. `rpcmci` returns a {py:class}`~andrey.RegimeOutput` instead: the regime of each
+  time step in `out.regimes`, run details in `out.metadata`, and one such result per regime in
+  `out.outputs[k]`.
 - **Supported or experimental.** A [supported](#supported-methods) method is benchmarked against
   other packages and checked against known graphs before each release; an
   [experimental](#experimental-methods) one is not yet. `andrey list` prints each method's status.
@@ -568,7 +569,16 @@ against the authors' code.
 IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
 `target`; without one, they join a pair when each is in the other's set and return the graph
 `structure` names: the CPDAG of the Grow-Shrink structure learner, the undirected skeleton, or, for
-IAMB and Inter-IAMB, the moral graph. MMHC learns a skeleton with MMPC's
+IAMB and Inter-IAMB, the moral graph. A list of targets returns a list of results, one per target
+in the list's order, each the result a call for that target alone returns. The three answer every
+target with one search, which sets up the test once, and MMPC learns the set of a variable that two
+targets' symmetry checks read once. With `andrey.config(n_jobs=...)` above 1 and a
+partial-correlation `indep_test` (`"fisherz"`, `"student_t"`, `"normal_scores"`), they split the
+targets over that many worker processes, with the same results for any number of workers. With
+missing values, each target has a search of its own in the calling process. `icp` also takes a
+list of targets and answers each in turn. On the command line, `'target=[a,b]'` names the columns
+by header or position, and the JSON result holds `multi: true` and `results`, one entry per target
+in the list's order, in place of `structure` and `metadata`. MMHC learns a skeleton with MMPC's
 conditional-independence tests, then runs hill climbing that joins only the skeleton's pairs.
 RSMAX2 generalizes it: its restrict phase keeps the pairs of the skeleton of MMPC, IAMB, or
 Inter-IAMB, or of PC's skeleton, and its maximize phase runs hill climbing or tabu search among
@@ -1560,7 +1570,9 @@ In `--help --json`, each parameter carries its bounds as JSON Schema's `minimum`
 `exclusiveMinimum` and `exclusiveMaximum`, the package-wide `concept` it implements, and the
 former names (`aliases`) and values (`choice_aliases`) it still accepts. `andrey --help --json`
 and `andrey config --help --json` list each concept, such as `alpha` or `max_depth`, with the name
-each method gives it. `andrey run` rejects a value out of range before the fit. Each method's
+each method gives it. `andrey run` rejects a value out of range before the fit. A `target` is a
+string or a list of strings, such as `'target=[a,b]'`, and a list returns `multi: true` and
+`results`, one per target, in place of `structure` and `metadata`. Each method's
 contract and its row of `andrey list` give `data_kinds`, the kinds of data it reads, as the
 [methods catalog](methods.md) lists them.
 

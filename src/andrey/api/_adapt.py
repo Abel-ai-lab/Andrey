@@ -1054,6 +1054,43 @@ def structure_output(
     return StructureOutput.new(structure, ordering=order, weighted_adjacency=weights, metadata=meta)
 
 
+def is_column_list(target: object) -> bool:
+    """Whether ``target`` is a list of columns: a list or a tuple, as ``str_or_list`` takes."""
+    return isinstance(target, list | tuple)
+
+
+def target_columns(
+    target: object, labels: Sequence[str] | None, d: int, method: str
+) -> list[int] | None:
+    """Return the positions of the columns a list of targets names, in its order.
+
+    ``None`` when ``target`` is one column (a label or a position) or ``None``.
+
+    Raises
+    ------
+    ValueError
+        If the list is empty, names a column the data lack, or names one column twice.
+    TypeError
+        If ``target`` is neither a column, ``None``, nor a list of columns
+        (:func:`is_column_list`), or a member is neither a column label nor a position.
+    """
+    what = f"{method}: target"
+    if not is_column_list(target):
+        if target is None or isinstance(target, str | int | np.integer):
+            return None
+        raise TypeError(
+            f"{what} must be a column name or position, or a list or tuple of them, "
+            f"got {type(target).__name__}"
+        )
+    assert isinstance(target, list | tuple)
+    if not target:
+        raise ValueError(f"{what} is an empty list; pass a column or a list of columns")
+    found = [column_position(as_node(t, what), labels, d, what) for t in target]
+    if len(set(found)) != len(found):
+        raise ValueError(f"{what} names a column twice: {list(target)}")
+    return found
+
+
 def column_namer(labels: tuple[str, ...] | None) -> Callable[[int], str]:
     """Name a column position by its label in ``labels``, quoted, or by its number.
 

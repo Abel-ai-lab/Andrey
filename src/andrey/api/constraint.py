@@ -10,7 +10,7 @@ regressions across environments and returns its estimated parents.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
@@ -30,6 +30,7 @@ from andrey.api._adapt import (
     label_of,
     split_index,
     structure_output,
+    target_columns,
 )
 from andrey.api._method import method_spec
 from andrey.core.ci_missing import rows_metadata, rows_tested
@@ -2176,12 +2177,12 @@ def icp(
     data: npt.ArrayLike,
     env: npt.ArrayLike | str | None = None,
     *,
-    target: str | int | None = None,
+    target: str | int | Sequence[str | int] | None = None,
     targets: Mapping | npt.ArrayLike | str | None = None,
     alpha: float = 0.05,
     invariance_test: str = "approximate",
     max_parents: int | None = None,
-) -> StructureOutput:
+) -> StructureOutput | list[StructureOutput]:
     """Learn one variable's causal parents from data in several environments with ICP.
 
     Invariant causal prediction [1]_ tests, for every set of the other variables, whether the
@@ -2208,9 +2209,10 @@ def icp(
         does not matter, as long as it left the target's mechanism alone. ``None`` takes the
         environments from ``data`` given as each environment's rows apart, or else from ``targets``
         given as a column or a 0/1 matrix: rows with the same targets are one environment.
-    target : str, int, or None
+    target : str, int, list of them, or None
         Required. The variable whose parents to find: a column label (a string) or a 0-based
-        position (an integer). ``None`` raises ``ValueError``.
+        position (an integer), or a list of them, each answered in turn. ``None`` raises
+        ``ValueError``.
     targets : mapping, str, array-like of shape (n_samples, n_variables), or None, default=None
         The variables intervened on in each environment, as for :func:`~andrey.gies`, by column
         label or 0-based position: a mapping ``{label: [variables]}`` from labels of ``env``, with
@@ -2237,8 +2239,10 @@ def icp(
 
     Returns
     -------
-    StructureOutput
-        Wraps a ``dag`` :class:`~andrey.core.GraphStructure` over every column, with an edge
+    StructureOutput or list of StructureOutput
+        With a list of targets, a list holding each target's result, in its order, as that target
+        alone gives it. Otherwise, wraps a ``dag`` :class:`~andrey.core.GraphStructure` over every
+        column, with an edge
         ``x -> target`` from each estimated parent ``x`` and no other edge; an absent edge says
         nothing about the pair. ``metadata["algorithm"]`` is ``"icp"``; ``metadata["target"]``
         names the target and ``metadata["parents"]`` the estimated parents, the variables in every
@@ -2379,12 +2383,29 @@ def icp(
     from andrey.core.knowledge import as_node, column_position
     from andrey.core.score import check_columns
 
+    given = data
     data, codes, env_labels, by_code = normalize_env_targets(
         data, env, targets, require_known_targets=False, method="icp"
     )
     X = data_matrix(data, method="icp")
     labels = column_labels(data)
     d = X.shape[1]
+    if target_columns(target, labels, d, "icp") is not None:
+        return [
+            cast(
+                "StructureOutput",
+                icp(
+                    given,
+                    env,
+                    target=each,
+                    targets=targets,
+                    alpha=alpha,
+                    invariance_test=invariance_test,
+                    max_parents=max_parents,
+                ),
+            )
+            for each in cast("Sequence[str | int]", target)
+        ]
     if target is None:
         raise ValueError(
             "icp: pass target, the variable whose parents to find, as a column label or a 0-based "

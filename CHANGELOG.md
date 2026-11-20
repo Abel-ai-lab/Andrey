@@ -47,6 +47,17 @@ names its pull request.
   query, and changes with a column's units or sign only where the rounding moves a value or a
   column is symmetric about its mean once sorted. A contributor's script compares them with the
   authors' code. ([#1147])
+- `target` takes a list of columns on `iamb`, `inter_iamb`, `mmpc`, and `icp`: one call returns one
+  result per target, in the list's order, each equal to a call for that target alone. The three set
+  learners answer every target with one search, which sets up the test once, and MMPC learns the
+  set of a variable that two targets' symmetry checks read once; with a partial-correlation test
+  they split the targets over `andrey.config(n_jobs=...)` worker processes, with the same results
+  for any number of workers. With missing values, each target has a search of its own. A list
+  shares the work of one call, so it takes less time than separate calls. `andrey run` takes the
+  list as `'target=[a,b]'`, by header name or position, or as a list in `--config`; its envelope
+  then holds `multi: true` and `results`, one per target, and the `--help --json` schema types
+  `target` as a string or a list of strings. `andrey run icp` names the target and the parents by
+  the header's column names, for one target as for a list. ([#1058], [#1153])
 
 ### Changed
 
@@ -2771,3 +2782,5 @@ First alpha release.
 [#1073]: https://github.com/Abel-ai-lab/Andrey/pull/1073
 [#1047]: https://github.com/Abel-ai-lab/Andrey/pull/1047
 [#1048]: https://github.com/Abel-ai-lab/Andrey/pull/1048
+[#1058]: https://github.com/Abel-ai-lab/Andrey/pull/1058
+[#1153]: https://github.com/Abel-ai-lab/Andrey/pull/1153
