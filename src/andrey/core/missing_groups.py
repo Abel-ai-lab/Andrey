@@ -102,6 +102,8 @@ FEW_ROWS = 16
 
 # Each step of the block computation holds at most about this many bytes of temporaries.
 _STEP_BYTES = 1 << 23
+# A block's correction rows are added in parts of at most about this many bytes of products.
+_PART_BYTES = 1 << 23
 
 
 @dataclass(frozen=True)
@@ -431,9 +433,19 @@ class GroupedSums:
                 continue
             weight = (m[block, row] - 1).astype(np.int64)
             bounds = np.append(np.flatnonzero(np.diff(block, prepend=-1)), len(block))
-            limit = max(1, _STEP_BYTES // (24 * k * k))
+            # A block with more rows than ``most`` is added in parts of ``most``, fixed by k only,
+            # so its bits do not depend on the step.
+            most = max(1, _PART_BYTES // (24 * k * k))
+            limit = min(most, max(1, _STEP_BYTES // (24 * k * k)))
             first = 0
             while first < len(bounds) - 1:  # whole blocks, at most ``limit`` rows unless one alone
+                if bounds[first + 1] - bounds[first] > most:
+                    ends = (bounds[first], bounds[first + 1])
+                    self._parts(
+                        part, block, row, weight, ends, most, values, start, (n_g, s_g, c_g)
+                    )
+                    first += 1
+                    continue
                 last = max(
                     first + 1, int(np.searchsorted(bounds, bounds[first] + limit, "right")) - 1
                 )
@@ -446,3 +458,28 @@ class GroupedSums:
                 s_g[owner] += np.add.reduceat(wx, cut, axis=0)
                 c_g[owner] += np.add.reduceat(wx[:, :, None] * x[:, None, :], cut, axis=0)
                 first = last
+
+    @staticmethod
+    def _parts(
+        part: np.ndarray,
+        block: np.ndarray,
+        row: np.ndarray,
+        weight: np.ndarray,
+        ends: tuple[int, int],
+        most: int,
+        values: np.ndarray,
+        start: int,
+        sums: tuple[np.ndarray, np.ndarray, np.ndarray],
+    ) -> None:
+        """:meth:`_twice` for one block whose correction rows ``ends[0]:ends[1]`` exceed ``most``:
+        they are added ``most`` at a time, in row order, so no part's products exceed
+        ``_PART_BYTES``."""
+        n_g, s_g, c_g = sums
+        owner = start + int(block[ends[0]])
+        for lo in range(ends[0], ends[1], most):
+            at = slice(lo, min(lo + most, ends[1]))
+            x = values[part[block[at]], row[at, None]]
+            wx = weight[at, None] * x
+            n_g[owner] += np.add.reduce(weight[at])
+            s_g[owner] += np.add.reduce(wx, axis=0)
+            c_g[owner] += np.add.reduce(wx[:, :, None] * x[:, None, :], axis=0)

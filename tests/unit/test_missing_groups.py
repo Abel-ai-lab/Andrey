@@ -385,3 +385,29 @@ def test_sets_left_out_for_keeping_no_rows_count_as_asking_them_would(monkeypatc
     for key in ("not_tested", "undecided_pairs", "rows_tested", "never_observed_together"):
         assert found.metadata.get(key) == asked.metadata.get(key), key
     assert found.metadata["not_tested"] > 0
+
+
+def test_a_block_with_more_correction_rows_than_a_step_holds_is_added_in_parts(
+    monkeypatch, grouped
+):
+    x = _cohorts()
+    q = np.sort(np.array(_queries(x.shape[1])[3]), axis=1)
+    lo, hi, conds = q[:, 0], q[:, 1], q[:, 2:]
+    reference = make_indep_test("fisherz", x).statistic_pvalues(lo, hi, conds)
+    parts: list[int] = []
+    original = missing_groups.GroupedSums._parts
+
+    def counted(*args):
+        parts.append(1)
+        return original(*args)
+
+    monkeypatch.setattr(missing_groups.GroupedSums, "_parts", staticmethod(counted))
+    monkeypatch.setattr(missing_groups, "_PART_BYTES", 1)  # one correction row per part
+    test = make_indep_test("fisherz", x)
+    assert test._grouped_sums() is not None
+    r, p = test.statistic_pvalues(lo, hi, conds)
+    assert parts
+    _per_row(monkeypatch)
+    r_ref, p_ref = make_indep_test("fisherz", x).statistic_pvalues(lo, hi, conds)
+    for got, want in ((r, r_ref), (p, p_ref), (reference[0], r_ref)):
+        assert np.allclose(got, want, rtol=RTOL, atol=1e-12, equal_nan=True)
