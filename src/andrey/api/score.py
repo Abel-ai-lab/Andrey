@@ -1707,8 +1707,8 @@ def lges(
     insertion : {"safe", "conservative"}, default="safe"
         Which pairs of variables an edge addition leaves out (see Notes). ``"safe"`` (SafeInsert)
         leaves out a pair when one graph of the current class scores better without the edge; the
-        paper proves that each schedule then recovers the true class as the rows grow (see
-        Notes) [1]_.
+        paper proves that LGES then recovers the true class as the rows grow (its Corollary 1;
+        Notes cover LGES-0) [1]_.
         ``"conservative"`` (ConservativeInsert) also leaves out a pair when any valid addition of
         the edge worsens the score; it made fewer errors in the paper's simulations, with no such
         proof.
