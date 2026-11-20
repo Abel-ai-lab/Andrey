@@ -65,7 +65,7 @@ from andrey.core.ci import (
     StudentT,
     make_indep_test,
 )
-from andrey.core.ci_missing import PartialCorrelationDeletion, testwise_deletion
+from andrey.core.ci_missing import PartialCorrelationDeletion, not_tested, testwise_deletion
 from andrey.core.fdr import check_fdr_method, corrected_pvalues
 from andrey.core.score import CopiedColumnsError, copies_error
 from andrey.core.ties import KEY_DP, tie_ranks
@@ -377,10 +377,12 @@ def pc1(
         strength = np.fmin(strength, np.abs(statistics))
         kept = np.flatnonzero(~(p_values > pc_alpha))
         if p == 0:  # a candidate with no tested result conditions no test
-            unranked = kept[np.isinf(strength[kept])]
+            untested = not_tested(p_values[kept])
             if undecided is not None:
-                undecided.extend((int(c) % n_vars, int(c) // n_vars) for c in columns[unranked])
-            kept = kept[np.isfinite(strength[kept])]
+                undecided.extend(
+                    (int(c) % n_vars, int(c) // n_vars) for c in columns[kept[untested]]
+                )
+            kept = kept[~untested]
         kept = kept[np.lexsort((tie[kept], -np.round(strength[kept], KEY_DP)))]
         columns, strength, tie = columns[kept], strength[kept], tie[kept]
         p += 1
