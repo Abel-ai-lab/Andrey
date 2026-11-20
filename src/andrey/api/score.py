@@ -1691,7 +1691,7 @@ def lges(
         non-negative.
         BDeu ignores it; for the multinomial BIC it weighs ``log(n)`` per free parameter of a
         variable's conditional probability table.
-    ebic_gamma : float, default=1.0
+    ebic_gamma : float, default=0.0
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0``, the

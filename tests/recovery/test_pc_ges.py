@@ -131,7 +131,7 @@ def distorted(x: np.ndarray) -> np.ndarray:
     return np.stack([MONOTONE[j % len(MONOTONE)](x[:, j]) for j in range(x.shape[1])], axis=1)
 
 
-@pytest.mark.parametrize("name", ["ges", "gfci"])
+@pytest.mark.parametrize("name", ["ges", "lges", "gfci"])
 def test_the_rank_based_score_recovers_gaussian_data_and_ignores_a_monotone_distortion(name):
     """On linear-Gaussian data the rank-based score finds about the graph the BIC finds, far from
     the empty graph; after a strictly increasing map of each column the BIC's errors grow past the
@@ -154,7 +154,7 @@ def test_the_rank_based_score_recovers_gaussian_data_and_ignores_a_monotone_dist
         )
     rank_errors, bic_errors, distorted_errors, empty_errors = np.sum(errors, axis=0)
     # Over the 10 graphs of 8 true edges: ges 23 errors with the rank-based score, 25 with the BIC,
-    # 84 with the BIC after the maps; gfci 22, 22, and 76; the empty graph 80.
+    # 84 with the BIC after the maps; lges 22, 23, and 86; gfci 22, 22, and 76; the empty graph 80.
     assert rank_errors < empty_errors / 2
     assert abs(rank_errors - bic_errors) <= 3
     assert distorted_errors >= 3 * rank_errors
