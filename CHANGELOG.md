@@ -28,9 +28,11 @@ names its pull request.
   covariance by an estimated sign function of the conditioning set (`variant="fix"` takes fixed
   weights); and `"pcm"`, the projected covariance measure (Lundborg, Kim, Shah, and Samworth
   2024), which tests whether one variable improves a random-forest prediction of the other. Each
-  takes `regression="boosting"`, `"forest"`, or `"linear"`; the sample splits and folds are drawn
-  from `seed` over rows held in an order of their values, so a p-value depends on neither the row
-  nor the column order. A contributor's script compares them with the authors' code. ([#1147])
+  takes `regression="boosting"`, `"forest"`, or `"linear"`. Each fit and each sample split reads
+  only the query's columns, standardized, rounded, and signed, with the rows in an order of their
+  values, so a p-value depends on neither the row nor the column order, nor on columns outside the
+  query, and changes with a column's units or sign only where the rounding moves a value. A
+  contributor's script compares them with the authors' code. ([#1147])
 
 ### Changed
 

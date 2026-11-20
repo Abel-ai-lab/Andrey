@@ -1,7 +1,8 @@
 """Agreement of Andrey's GCM, wGCM, and PCM tests with the authors' code on the papers' settings.
 
-Each case is drawn here, put into the layout the Andrey test holds (standardized columns, rows in
-its canonical order), and written to a folder that `benchmarks/regression_ci_reference.R` reads,
+Each case is drawn here, put into the layout the Andrey test reads for the query of x and y given
+the rest (its standardized, rounded, and signed columns, the rows in that query's order), and
+written to a folder that `benchmarks/regression_ci_reference.R` reads,
 so both sides test the same numbers. PCM is compared in its paper's direction, the mean of y given
 (x, z). Two layers are compared:
 
@@ -72,12 +73,11 @@ def pcm_case(setting: int, n: int, rng: np.random.Generator, *, forest: bool) ->
     return np.column_stack([x, y, z])
 
 
-def write_case(folder: Path, name: str, test: cr._RegressionTest, response: int) -> None:
-    """Write the test's data as the reference reads it, ``y`` being column ``response``."""
-    rank = test._tie_rank
-    other = 1 - response
-    cols = [rank[other], rank[response], *(rank[j] for j in range(2, len(rank)))]
-    data = test._data[:, cols]
+def write_case(folder: Path, name: str, test: cr._RegressionTest) -> None:
+    """Write the test's values as the reference reads them: the columns x, y, z1, ..., the rows in
+    the order of the query of x and y given the rest, so a row's position is its position there."""
+    rows, _ = test._layout(range(test._data.shape[1]))
+    data = test._data[rows]
     header = ",".join(["x", "y", *(f"z{j}" for j in range(1, data.shape[1] - 1))])
     np.savetxt(folder / f"{name}.csv", data, delimiter=",", header=header, comments="", fmt="%.17g")
 
@@ -116,7 +116,7 @@ def gcm_and_wgcm(folder: Path) -> None:
                 name = f"w{len(names)}"
                 data = wgcm_case(setting, n, np.random.default_rng([seed, n]))
                 tests[name] = (setting, n, seed, data)
-                write_case(folder, name, cr.GCM(data, seed=seed), response=1)
+                write_case(folder, name, cr.GCM(data, seed=seed))
                 names.append(name)
                 seeds.append(seed)
     gcm_rows = run_reference(folder, "gcm", names, seeds)
@@ -205,7 +205,7 @@ def pcm(folder: Path) -> None:
                     test = cr.PCM(
                         data, regression=regression, n_splits=6 if forest else 1, seed=seed
                     )
-                    write_case(folder, name, test, response=1)  # the paper's Y
+                    write_case(folder, name, test)  # column 1 is the paper's Y
                     tests[name] = (setting, n, seed, test)
                     names.append(name)
                     seeds.append(seed)
@@ -222,15 +222,12 @@ def pcm(folder: Path) -> None:
             p_ref = float(ndtr(-stat_ref))
             # The paper's direction, y given (x, z), whichever variable the query would make the
             # response; the last column says whether the query does.
-            rank = test._tie_rank
-            cond = sorted(rank[2:])
+            rows, cols = test._layout(range(test._data.shape[1]))
+            block, features = test._data[rows], cols[:]
+            features.remove(0)
+            features.remove(1)
             mean = float(
-                np.mean(
-                    [
-                        test._split_statistic(b, rank[1], rank[0], cond)
-                        for b in range(len(test._splits))
-                    ]
-                )
+                np.mean([test._split_statistic(block, s, 1, 0, features) for s in test._splits])
             )
             out.append(
                 [
@@ -243,7 +240,7 @@ def pcm(folder: Path) -> None:
                     p_ref,
                     float(ndtr(-mean)),
                     (ndtr(-mean) < 0.05) == (p_ref < 0.05),
-                    rank[1] > rank[0],
+                    cols.index(1) > cols.index(0),
                 ]
             )
         label = "random forests, 6 splits" if forest else "least squares, 1 split"

@@ -77,15 +77,15 @@ def test_a_covariance_without_noise_is_a_dependence():
 
 
 def test_pcm_needs_rows_for_a_split_in_each_half():
-    with pytest.raises(ValueError, match="10"):
-        cr.PCM(_chain(9))
-    assert 0.0 <= cr.PCM(_chain(10), n_splits=1)(0, 1, []) <= 1.0
+    with pytest.raises(ValueError, match="12"):
+        cr.PCM(_chain(11))
+    assert 0.0 <= cr.PCM(_chain(12), n_splits=1)(0, 1, []) <= 1.0
 
 
 def test_wgcm_est_needs_rows_for_a_split_in_its_estimation_part():
-    with pytest.raises(ValueError, match="14"):
-        cr.WGCM(_chain(13))
-    assert 0.0 <= cr.WGCM(_chain(14), regression="linear")(0, 1, [2]) <= 1.0
+    with pytest.raises(ValueError, match="17"):
+        cr.WGCM(_chain(16))
+    assert 0.0 <= cr.WGCM(_chain(17), regression="linear")(0, 1, [2]) <= 1.0
     assert 0.0 <= cr.WGCM(_chain(4), regression="linear", variant="fix")(0, 1, [2]) <= 1.0
 
 
@@ -127,13 +127,58 @@ def test_p_values_ignore_row_column_and_argument_order(name):
         assert shuffled(at(a), at(b), [at(c) for c in s]) == p
 
 
-@pytest.mark.parametrize("name", LINEAR)
-def test_p_values_ignore_the_units(name):
-    x = _chain(120)
-    scaled = x * np.array([4.0, 0.25, 8.0, 2.0]) + np.array([3.0, -1.0, 0.0, 5.0])
-    test, other = _test(name, x, seed=3), _test(name, scaled, seed=3)
-    for query in [(0, 2, [1]), (1, 3, [0, 2])]:
-        assert other(*query) == pytest.approx(test(*query), abs=1e-9)
+# The tree regressions on few rows, so that the checks below cover the layout they read.
+TREES = {
+    "gcm": {"regression": "boosting"},
+    "wgcm": {"regression": "boosting"},
+    "pcm": {"regression": "forest", "n_splits": 1},
+}
+
+
+def _nonlinear(n: int = 80, seed: int = 0) -> np.ndarray:
+    """``x`` and ``y`` both nonlinear in ``z``, with an interaction of ``x`` and ``z`` in ``y``."""
+    rng = np.random.default_rng(seed)
+    z = rng.standard_normal(n)
+    x = np.sin(2 * z) + 0.5 * rng.standard_normal(n)
+    y = np.cos(z) + 0.3 * x * z + 0.5 * rng.standard_normal(n)
+    return np.column_stack([x, y, z])
+
+
+ALL_OPTIONS = [
+    *(pytest.param(CLASSES[k], LINEAR[k], id=f"{k}-linear") for k in LINEAR),
+    *(pytest.param(CLASSES[k], TREES[k], id=f"{k}-trees") for k in TREES),
+]
+
+
+@pytest.mark.parametrize(("cls", "options"), ALL_OPTIONS)
+def test_p_values_ignore_columns_outside_the_query(cls, options):
+    x = _nonlinear()
+    rng = np.random.default_rng(5)
+    wider = np.column_stack([rng.standard_normal(len(x)), x, rng.standard_normal(len(x))])
+    test, other = cls(x, seed=3, **options), cls(wider, seed=3, **options)
+    for a, b, s in [(0, 1, [2]), (0, 2, [])]:
+        assert other(a + 1, b + 1, [c + 1 for c in s]) == test(a, b, s)
+
+
+@pytest.mark.parametrize("name", ["gcm", "wgcm", "pcm"])
+def test_testwise_deletion_outside_the_query_equals_the_complete_test(name):
+    x = _nonlinear()
+    wider = np.column_stack([x, np.random.default_rng(5).standard_normal(len(x))])
+    options = {"seed": 3, **LINEAR[name], **({"n_splits": 1} if name == "pcm" else {})}
+    complete = ci.make_indep_test(name, wider, **options)
+    wider[7, 3] = np.nan
+    assert ci.make_indep_test(name, wider, **options)(0, 1, [2]) == complete(0, 1, [2])
+
+
+@pytest.mark.parametrize(("cls", "options"), ALL_OPTIONS)
+def test_p_values_ignore_the_units_and_signs(cls, options):
+    x = _nonlinear()
+    scaled = x * np.array([3.7, 0.013, 11.3]) + np.array([2.5, -1.0, 2.5])
+    flipped = x * np.array([-1.0, 1.0, -1.0])
+    test = cls(x, seed=3, **options)
+    for other in (cls(scaled, seed=3, **options), cls(flipped, seed=3, **options)):
+        for query in [(0, 1, [2]), (0, 2, [1]), (1, 2, [])]:
+            assert other(*query) == pytest.approx(test(*query), abs=1e-9)
 
 
 @pytest.mark.parametrize("name", LINEAR)

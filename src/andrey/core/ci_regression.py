@@ -6,11 +6,14 @@ regressions leave. The tests follow the :class:`~andrey.core.ci.CITest` protocol
 the data and called as ``test(x, y, condition_set)``, returning a p-value where a larger value means
 more independent.
 
-The three share one data layout and one set of regressions. Each column is standardized, and the
-columns are held in :func:`~andrey.core.ties.tie_ranks` order and the rows in lexicographic order
-of their values, so a p-value depends on neither the column nor the row order. The sample splits,
-cross-validation folds, and multiplier draws are drawn once from ``seed`` over that row order, so a
-query's p-value does not depend on which queries came before it.
+The three share one data layout and one set of regressions. Each column is standardized, rounded
+to 9 decimal places, and given the sign its sorted values fix, so the values the fits read do not
+change with the units or the sign of a column. Each fit reads only the columns it uses: their
+:func:`~andrey.core.ties.tie_ranks` order within that block gives the order of the features, and
+the rows in lexicographic order of the block's values give the order of the rows. The sample
+splits, cross-validation folds, and multiplier draws are drawn from ``seed`` over that row order,
+so a query's p-value depends only on the values of its own columns: not on the row, the column, or
+the argument order, not on the other columns, and not on which queries came before it.
 """
 
 from __future__ import annotations
@@ -26,7 +29,7 @@ from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from andrey.core.ties import tie_ranks
 
 from . import stats
-from .ci import _canonical_ranked, per_query
+from .ci import _canonical, per_query
 from .seeding import resolve_seed
 
 __all__ = ["GCM", "PCM", "WGCM"]
@@ -43,9 +46,13 @@ _BOOST_ROUNDS = 50
 _BOOST_FOLDS = 10
 _BOOST_PATIENCE = 10
 # A random forest as the PCM authors': 500 trees, every predictor tried at each split, and nodes of
-# fewer than 5 rows left unsplit.
+# 5 rows or fewer left unsplit. A node's size counts the distinct rows in it, where the authors'
+# forest counts a row its bootstrap draws twice as two.
 _FOREST_TREES = 500
-_FOREST_MIN_SPLIT = 5
+_FOREST_MIN_SPLIT = 6
+# The decimal places the standardized values keep, so that copies of a column in other units, whose
+# standardized values differ in their last bits, give the same fits.
+_DECIMALS = 9
 
 Predictor = Callable[[np.ndarray], np.ndarray]
 
@@ -120,6 +127,32 @@ def _fit_linear(features: np.ndarray, target: np.ndarray) -> Predictor:
     return lambda new: coef[0] + new @ coef[1:]
 
 
+def _canonical_columns(arr: np.ndarray) -> np.ndarray:
+    """Each column of ``arr`` standardized, rounded to ``_DECIMALS`` places, and signed.
+
+    The mean and the standard deviation are sums over the sorted values, so they do not change with
+    the row order. Of a column and its negation, the one whose sorted values are larger at the first
+    place they differ is kept; a column equal to its negation once sorted keeps its sign.
+    """
+    ordered = np.sort(arr, axis=0)
+    with np.errstate(over="ignore", under="ignore"):  # either one raises below
+        mean = ordered.mean(axis=0)
+        std = np.sqrt(np.mean((ordered - mean) ** 2, axis=0))
+    if not np.isfinite(std).all():
+        raise ValueError("data values too large to standardize; rescale the columns")
+    std[np.ptp(arr, axis=0) == 0] = np.inf  # identical values; their std is rounding, not 0
+    if (std == 0).any():
+        raise ValueError("data values too small to standardize; rescale the columns")
+    z = np.round((arr - mean) / std, _DECIMALS)
+    for j in range(z.shape[1]):
+        low = np.sort(z[:, j])
+        flipped = -low[::-1]
+        differ = np.flatnonzero(low != flipped)
+        if differ.size and flipped[differ[0]] > low[differ[0]]:
+            z[:, j] = -z[:, j]
+    return z
+
+
 class _RegressionTest:
     """The data layout and the regressions the three tests share."""
 
@@ -131,22 +164,12 @@ class _RegressionTest:
         if regression not in REGRESSIONS:
             raise ValueError(f"regression must be one of {REGRESSIONS}, got {regression!r}")
         arr = stats.checked_matrix(data, f"run a {name} test", min_rows=min_rows)
-        # The test holds data column j at index _tie_rank[j], and the rows in lexicographic order
-        # of those columns, so a query reads the same values whatever the column or row order.
-        self._tie_rank = tie_ranks(arr).tolist()
-        arr = arr[:, np.argsort(self._tie_rank)]
-        arr = np.ascontiguousarray(arr[np.lexsort(arr.T[::-1])])
-        with np.errstate(over="ignore", under="ignore"):  # either one raises below
-            std = arr.std(axis=0)
-        if not np.isfinite(std).all():
-            raise ValueError("data values too large to standardize; rescale the columns")
-        std[np.ptp(arr, axis=0) == 0] = np.inf  # identical values; their std is rounding, not 0
-        if (std == 0).any():
-            raise ValueError("data values too small to standardize; rescale the columns")
-        self._data = (arr - arr.mean(axis=0)) / std
+        self._data = _canonical_columns(arr)
         self._n = arr.shape[0]
         self._regression = regression
         self._seed = resolve_seed(seed)
+        self._layouts: dict[tuple[int, ...], tuple[np.ndarray, list[int]]] = {}
+        self._residuals: dict[tuple[int, tuple[int, ...]], np.ndarray] = {}
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the p-value for ``x`` independent of ``y`` given ``condition_set``."""
@@ -166,13 +189,45 @@ class _RegressionTest:
         self, x: int, y: int, condition_set: Iterable[int]
     ) -> tuple[float, float]:
         """The statistic and p-value of one query."""
-        x_int, y_int, cond = _canonical_ranked(x, y, condition_set, self._tie_rank)
+        x_int, y_int, cond = _canonical(x, y, condition_set)
         if not (np.ptp(self._data[:, x_int]) > 0.0 and np.ptp(self._data[:, y_int]) > 0.0):
             return 0.0, 1.0  # a constant variable: no variation to depend on
         return self._answer(x_int, y_int, cond)
 
     def _answer(self, x: int, y: int, cond: list[int]) -> tuple[float, float]:
         raise NotImplementedError
+
+    def _layout(self, columns: Iterable[int]) -> tuple[np.ndarray, list[int]]:
+        """The row order and the column order in which a fit reads a block of columns.
+
+        The columns are in their :func:`~andrey.core.ties.tie_ranks` order within the block, and
+        the rows in lexicographic order of the block's values in that column order, so the layout
+        depends on the block's values alone.
+        """
+        key = tuple(sorted(set(columns)))
+        layout = self._layouts.get(key)
+        if layout is None:
+            cols = [key[i] for i in np.argsort(tie_ranks(self._data[:, key]), kind="stable")]
+            layout = (np.lexsort(self._data[:, cols].T[::-1]), cols)
+            self._layouts[key] = layout
+        return layout
+
+    def _full_residual(self, column: int, cond: list[int]) -> np.ndarray:
+        """``column`` minus its regression on ``cond`` over every row, in the data's row order.
+
+        The fit reads the layout of ``column`` and ``cond``, and the residual is kept for later
+        queries.
+        """
+        key = (column, tuple(cond))
+        residual = self._residuals.get(key)
+        if residual is None:
+            rows, cols = self._layout([column, *cond])
+            block = self._data[rows]
+            features = [c for c in cols if c != column]
+            residual = np.empty(self._n)
+            residual[rows] = self._residual(block[:, column], block[:, features])
+            self._residuals[key] = residual
+        return residual
 
     def _fit(self, features: np.ndarray, target: np.ndarray) -> Predictor:
         """The regression of ``target`` on ``features``; no features gives the mean."""
@@ -227,8 +282,10 @@ class GCM(_RegressionTest):
     regression : {"boosting", "forest", "linear"}, default="boosting"
         The regression of each variable on the conditioning set. ``"boosting"`` is boosted
         regression trees whose depth (1, 3, 4, 5, or 6) and number of rounds (up to 50, learning
-        rate 0.3) minimize the 10-fold cross-validated error, as the authors' code does by default;
-        ``"forest"`` a random forest of 500 trees; ``"linear"`` ordinary least squares.
+        rate 0.3) minimize the 10-fold cross-validated error, the authors' default grid; the trees'
+        leaf values carry no penalty, where the authors' boosting shrinks them, so the fits can
+        leave smaller residuals. ``"forest"`` is a random forest of 500 trees; ``"linear"``
+        ordinary least squares.
     seed : int or None, default=None
         Seed for the cross-validation folds of ``"boosting"`` and the trees of ``"forest"``.
         ``None`` uses ``ANDREY_SEED``, or ``0`` when it is unset.
@@ -254,7 +311,12 @@ class GCM(_RegressionTest):
     mean of ``R`` over its standard deviation (dividing by ``n``), and the p-value is twice the
     standard normal tail beyond its absolute value [1]_. An empty conditioning set uses ``x`` and
     ``y`` minus their means. A residual depends only on the variable and the conditioning set, so
-    it is kept on the test object and reused by every later query on the same pair of them.
+    it is kept on the test object and reused by every later query on the same pair of them. Each
+    column is standardized and rounded to 9 decimal places, and the folds and the trees are drawn
+    over the rows in lexicographic order of the variable and the conditioning set alone, so the
+    p-value does not change with the row or column order, with columns outside the query, or,
+    except where a change of units moves a value across the rounding, with a column's units or
+    sign.
     Products that are all zero give the statistic ``0`` and the p-value ``1``; products that are
     one nonzero constant, a covariance without noise, give an infinite statistic and the p-value
     ``0``.
@@ -263,33 +325,34 @@ class GCM(_RegressionTest):
     ``"boosting"`` regression fits 51 boosted models, once per variable and conditioning set. Its
     level depends on the regressions: a conditional mean the method cannot learn, such as a function
     of several variables of ``z`` jointly under ``"linear"``, leaves a covariance in the residuals
-    and reads as dependence. With an empty conditioning set the test is a test of correlation: a
-    dependence without one, such as ``y = x**2`` for a symmetric ``x``, goes unseen.
+    and reads as dependence. At a few hundred rows, where the conditional means are hard to learn,
+    the test can reject a true independence more often than its level, as the authors' simulations
+    of it show at 100 and 200 rows [2]_. With an empty conditioning set the test is a test of
+    correlation: a dependence without one, such as ``y = x**2`` for a symmetric ``x``, goes unseen.
 
     References
     ----------
     .. [1] Shah, R. D., and Peters, J. (2020). The hardness of conditional independence testing and
        the generalised covariance measure. Annals of Statistics 48(3), 1514-1538.
        https://doi.org/10.1214/19-AOS1857
+    .. [2] Scheidegger, C., Hoerrmann, J., and Buehlmann, P. (2022). The weighted generalised
+       covariance measure. Journal of Machine Learning Research 23(273), 1-68.
+       https://jmlr.org/papers/v23/21-1328.html
     """
 
     def __init__(
         self, data: np.ndarray, *, regression: str = "boosting", seed: int | None = None
     ) -> None:
         super().__init__(data, regression=regression, seed=seed, name="GCM")
-        self._residuals: dict[tuple[int, tuple[int, ...]], np.ndarray] = {}
 
     def _answer(self, x: int, y: int, cond: list[int]) -> tuple[float, float]:
-        return _gcm_answer(self._cached_residual(x, cond), self._cached_residual(y, cond))
+        return _gcm_pair(self, x, y, cond)
 
-    def _cached_residual(self, column: int, cond: list[int]) -> np.ndarray:
-        """``column`` minus its regression on ``cond``, kept for later queries."""
-        key = (column, tuple(cond))
-        residual = self._residuals.get(key)
-        if residual is None:
-            residual = self._residual(self._data[:, column], self._data[:, cond])
-            self._residuals[key] = residual
-        return residual
+
+def _gcm_pair(test: _RegressionTest, x: int, y: int, cond: list[int]) -> tuple[float, float]:
+    """The GCM answer of a query from residuals over every row, in the query's row order."""
+    rows, _ = test._layout([x, y, *cond])
+    return _gcm_answer(test._full_residual(x, cond)[rows], test._full_residual(y, cond)[rows])
 
 
 # The weighted GCM as its paper runs it: 30% of the rows estimate the weight function, the fixed
@@ -327,7 +390,7 @@ class WGCM(_RegressionTest):
     Raises
     ------
     ValueError
-        If ``data`` is not 2-D, has fewer than 14 rows (4 for ``"fix"``), contains NaN or
+        If ``data`` is not 2-D, has fewer than 17 rows (4 for ``"fix"``), contains NaN or
         infinity, or has values too large or too small to standardize, or ``variant`` or
         ``regression`` is not one of the choices.
 
@@ -352,13 +415,16 @@ class WGCM(_RegressionTest):
     [1]_. An empty conditioning set has no weight to estimate, and both variants give the
     GCM's p-value of ``x`` and ``y`` minus their means. The statistic reported for ``"est"`` is the
     statistic or ``0``, whichever is larger, so a larger statistic always means a smaller p-value.
-    The split and the multiplier draws are drawn once from ``seed``.
+    The split and the multiplier draws are drawn from ``seed`` over the rows in lexicographic order
+    of the query's own columns, so they do not depend on other columns.
 
     **Limitations.** Not benchmarked yet. The tests run it on up to 4 variables and 400 rows.
     ``"est"`` tests on 70% of the rows, and its p-value changes with the seed. A ``"boosting"``
-    regression fits 51 boosted models; ``"est"`` fits five per query,
-    of which four are kept for later queries on the same variables. ``"fix"`` uses 7 weights per
-    conditioning variable, so with many conditioning variables the maximum spreads its power thin.
+    regression fits 51 boosted models; ``"est"`` fits five per query, its split being the query's
+    own. ``"fix"`` uses 7 weights per conditioning variable, so with many conditioning variables
+    the maximum spreads its power thin. At a few hundred rows, where the conditional means are hard
+    to learn, both variants can reject a true independence more often than their level, as the
+    paper's simulations show at 100 and 200 rows [1]_.
 
     References
     ----------
@@ -380,55 +446,40 @@ class WGCM(_RegressionTest):
     ) -> None:
         if variant not in WGCM_VARIANTS:
             raise ValueError(f"variant must be one of {WGCM_VARIANTS}, got {variant!r}")
-        # "est" needs the rows a forest splits in its 30% part: ceil(0.3 n) >= 5.
-        min_rows = 14 if variant == "est" else 4
+        # "est" needs the rows a forest splits in its 30% part: ceil(0.3 n) >= 6.
+        min_rows = 17 if variant == "est" else 4
         super().__init__(data, regression=regression, seed=seed, name="wGCM", min_rows=min_rows)
         self._variant = variant
         n = self._n
         n_estimate = int(np.ceil(_WEIGHT_FRACTION * n))
         perm = np.random.default_rng([self._seed, n, 1]).permutation(n)
+        # The positions of the two parts in a query's row order.
         self._parts = (np.sort(perm[:n_estimate]), np.sort(perm[n_estimate:]))
         self._multipliers: np.ndarray | None = None
-        self._residuals: dict[tuple[int, int, tuple[int, ...]], np.ndarray] = {}
 
     def _answer(self, x: int, y: int, cond: list[int]) -> tuple[float, float]:
         if not cond:
-            column = self._data[:, [x, y]]
-            centered = column - column.mean(axis=0)
-            return _gcm_answer(centered[:, 0], centered[:, 1])
+            return _gcm_pair(self, x, y, cond)
+        rows, cols = self._layout([x, y, *cond])
+        block, features = self._data[rows], [c for c in cols if c not in (x, y)]
         if self._variant == "fix":
-            return self._fixed(x, y, cond)
-        estimate, test = self._parts
-        products = self._part_residual(0, x, cond) * self._part_residual(0, y, cond)
-        z = self._data[:, cond]
-        weight = np.sign(self._fit(z[estimate], products)(z[test]))
-        return _estimated_answer(
-            self._part_residual(1, x, cond) * self._part_residual(1, y, cond), weight
-        )
+            products = (self._full_residual(x, cond) * self._full_residual(y, cond))[rows]
+            return _fixed_answer(products, block[:, features], self._multiplier_draws())
+        estimate, test = (block[part] for part in self._parts)
 
-    def _fixed(self, x: int, y: int, cond: list[int]) -> tuple[float, float]:
-        """The statistic and multiplier p-value of the fixed weight functions."""
-        products = self._part_residual(2, x, cond) * self._part_residual(2, y, cond)
-        return _fixed_answer(products, self._data[:, cond], self._multiplier_draws())
+        def products(rows: np.ndarray) -> np.ndarray:
+            z = rows[:, features]
+            return self._residual(rows[:, x], z) * self._residual(rows[:, y], z)
+
+        weight = np.sign(self._fit(estimate[:, features], products(estimate))(test[:, features]))
+        return _estimated_answer(products(test), weight)
 
     def _multiplier_draws(self) -> np.ndarray:
-        """The ``(n, 499)`` standard normal multipliers, drawn once."""
+        """The ``(n, 499)`` standard normal multipliers by position in a query's row order."""
         if self._multipliers is None:
             rng = np.random.default_rng([self._seed, self._n, 3])
             self._multipliers = rng.standard_normal((self._n, _MULTIPLIER_DRAWS))
         return self._multipliers
-
-    def _part_residual(self, part: int, column: int, cond: list[int]) -> np.ndarray:
-        """``column`` minus its regression on ``cond`` over the estimation part (``0``), the test
-        part (``1``), or every row (``2``), kept for later queries."""
-        key = (part, column, tuple(cond))
-        residual = self._residuals.get(key)
-        if residual is None:
-            rows = self._parts[part] if part < 2 else slice(None)
-            data = self._data[rows]
-            residual = self._residual(data[:, column], data[:, cond])
-            self._residuals[key] = residual
-        return residual
 
 
 def _estimated_answer(products: np.ndarray, weight: np.ndarray) -> tuple[float, float]:
@@ -488,7 +539,7 @@ class PCM(_RegressionTest):
         Observed data, one row per sample. Each column is standardized to unit variance.
     regression : {"forest", "boosting", "linear"}, default="forest"
         The regressions of the test. ``"forest"`` is a random forest of 500 trees that tries every
-        predictor at each split and leaves nodes of fewer than 5 rows unsplit, as the authors' code
+        predictor at each split and leaves nodes of 5 rows or fewer unsplit, as the authors' code
         does for its random-forest experiments; ``"boosting"`` and ``"linear"`` are as for
         :class:`~andrey.core.ci_regression.GCM`.
     n_splits : int, default=6
@@ -500,7 +551,7 @@ class PCM(_RegressionTest):
     Raises
     ------
     ValueError
-        If ``data`` is not 2-D, has fewer than 10 rows, contains NaN or infinity, or has values too
+        If ``data`` is not 2-D, has fewer than 12 rows, contains NaN or infinity, or has values too
         large or too small to standardize, ``regression`` is not one of the choices, or
         ``n_splits`` is below 1.
 
@@ -513,8 +564,9 @@ class PCM(_RegressionTest):
     enough, whatever the regression that learns the dependence [1]_.
 
     **How it works.** Of a query's two variables, the one with the larger
-    :func:`~andrey.core.ties.tie_ranks` rank is the response ``y`` and the other the predictor
-    ``x``, so the direction depends on the data and not on the column order or the argument order.
+    :func:`~andrey.core.ties.tie_ranks` rank within the query's columns is the response ``y`` and
+    the other the predictor ``x``, so the direction depends on the values of those columns and not
+    on the column order, the argument order, or the other columns.
     Each split puts half of the rows, at random, in the first part [1]_ (Algorithm 1). On the first
     part, ``y`` is regressed on ``(x, z)`` to give ``g``, ``g`` on ``z`` to give ``m``, and
     ``h = g - m`` takes the sign of the mean of ``(y - m) h``; the squared residuals of ``g`` are
@@ -526,14 +578,18 @@ class PCM(_RegressionTest):
     one-sided test of Algorithm 1DR with its threshold at the normal quantile [1]_. The reported
     statistic is the average or ``0``, whichever is larger. A split whose products are all zero adds
     ``0``, and one whose products are one nonzero constant an infinity of its sign. The splits are
-    drawn once from ``seed``.
+    drawn from ``seed`` over the rows in lexicographic order of the query's own columns, so they
+    do not depend on other columns.
 
     **Limitations.** Not benchmarked yet. The tests run it on up to 4 variables and 400 rows. Each
-    query fits 30 regressions with the default 6 splits, 24 of them for the pair, each of 500 trees
-    under ``"forest"``. The variance floor of 0.01, in units of the
-    standardized response, is the authors' code's value; the paper sets none. The test detects a
-    dependence of the mean of ``y`` on ``x``; one that changes only the spread of ``y`` goes unseen,
-    as does a dependence of the mean of ``x`` on ``y`` that leaves the mean of ``y`` unchanged.
+    query fits 30 regressions with the default 6 splits, each of 500 trees under ``"forest"``. The
+    variance floor of 0.01, in units of the standardized response, is the authors' code's value;
+    the paper sets none. The test detects a dependence of the mean of ``y`` on ``x``; one that
+    changes only the spread of ``y`` goes unseen, as does a dependence of the mean of ``x`` on
+    ``y`` that leaves the mean of ``y`` unchanged. Which variable is the response follows a rule on
+    the data that has nothing to do with the causal question, so swapping the roles can change the
+    answer. At a few hundred rows, where the conditional means are hard to learn, the test can
+    reject a true independence more often than its level.
 
     References
     ----------
@@ -558,26 +614,43 @@ class PCM(_RegressionTest):
         )
         n = self._n
         rng = np.random.default_rng([self._seed, n, 2])
+        # The positions of each split's two halves in a query's row order.
         self._splits = []
         for _ in range(int(n_splits)):
             perm = rng.permutation(n)
             self._splits.append((np.sort(perm[: n // 2]), np.sort(perm[n // 2 :])))
-        self._residuals: dict[tuple[int, int, tuple[int, ...]], np.ndarray] = {}
 
     def _answer(self, x: int, y: int, cond: list[int]) -> tuple[float, float]:
+        rows, cols = self._layout([x, y, *cond])
+        block, features = self._data[rows], [c for c in cols if c not in (x, y)]
+        response = max(x, y, key=cols.index)  # the later of the two in the block's order
+        predictor = x + y - response
         mean = float(
-            np.mean([self._split_statistic(b, y, x, cond) for b in range(len(self._splits))])
+            np.mean(
+                [
+                    self._split_statistic(block, split, response, predictor, features)
+                    for split in self._splits
+                ]
+            )
         )
         if np.isnan(mean):  # splits of opposite noiseless signs: no direction to report
             mean = 0.0
         return max(mean, 0.0), float(ndtr(-mean))
 
-    def _split_statistic(self, split: int, response: int, predictor: int, cond: list[int]) -> float:
-        """The statistic of one sample split, ``response`` regressed on ``predictor``."""
-        learn, test = self._splits[split]
-        y = self._data[:, response]
-        xz = self._data[:, [predictor, *cond]]
-        z = self._data[:, cond]
+    def _split_statistic(
+        self,
+        block: np.ndarray,
+        split: tuple[np.ndarray, np.ndarray],
+        response: int,
+        predictor: int,
+        features: list[int],
+    ) -> float:
+        """The statistic of one sample split of ``block``, ``response`` regressed on ``predictor``
+        and the conditioning ``features``."""
+        learn, test = split
+        y = block[:, response]
+        xz = block[:, [predictor, *features]]
+        z = block[:, features]
         g = self._fit(xz[learn], y[learn])
         g_learn = g(xz[learn])
         m = self._fit(z[learn], g_learn)
@@ -589,20 +662,8 @@ class PCM(_RegressionTest):
         shift = _variance_shift(squares, np.maximum(v(xz[learn]), 0.0))
         variance = np.maximum(np.maximum(v(xz[test]), 0.0) + shift, _VARIANCE_FLOOR)
         f = sign * (g(xz[test]) - m(z[test])) / variance
-        statistic = _normalized_mean(
-            self._test_residual(split, response, cond) * self._residual(f, z[test])
-        )
+        statistic = _normalized_mean(self._residual(y[test], z[test]) * self._residual(f, z[test]))
         return 0.0 if np.isnan(statistic) else statistic
-
-    def _test_residual(self, split: int, column: int, cond: list[int]) -> np.ndarray:
-        """``column`` minus its regression on ``cond`` over the test part of ``split``, kept."""
-        key = (split, column, tuple(cond))
-        residual = self._residuals.get(key)
-        if residual is None:
-            rows = self._data[self._splits[split][1]]
-            residual = self._residual(rows[:, column], rows[:, cond])
-            self._residuals[key] = residual
-        return residual
 
 
 def _variance_shift(squares: np.ndarray, fitted: np.ndarray) -> float:
