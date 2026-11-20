@@ -151,16 +151,15 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         default=str(MIN_SHARED_FACTOR_WORK),
         effect=(
             "Per-scan gate for the grow scans of IAMB and Inter-IAMB (also in RSMAX2's restrict "
-            "phase) with `fisherz`, `student_t`, or `normal_scores` on complete data: a scan of "
-            "two or more candidates against one conditioning set of two or more variables is "
-            "answered from one Cholesky factor of "
-            "the set's correlation block only when its candidates times the block size (the set "
-            "plus two) reach this value, else each candidate inverts its own submatrix. The "
-            "factor's p-values agree with the per-query ones to about 1e-10 relative, not bit "
-            "for bit; the per-query path is the exact one. `0` factors every such scan. The "
-            "default was measured on an AMD EPYC 7713 server running Linux on one core, where the "
-            "factor was slower below a value of about 64 and faster from 128 for every set size "
-            "sampled."
+            'phase with `restrict="iamb"` or `"inter_iamb"`) with `fisherz`, `student_t`, or '
+            "`normal_scores` on complete data: a scan of two or more candidates against one "
+            "conditioning set of two or more variables is answered from one Cholesky factor of the "
+            "set's correlation block only when its candidates times the block size (the set plus "
+            "two) reach this value, else each candidate inverts its own submatrix. The factor's "
+            "p-values agree with the per-query ones to about 1e-10 relative, not bit for bit; the "
+            "per-query path is the exact one. `0` factors every such scan. The default was "
+            "measured on an AMD EPYC 7713 server running Linux on one core, where the factor was "
+            "slower below a value of about 64 and faster from 128 for every set size sampled."
         ),
         group="backend",
     ),

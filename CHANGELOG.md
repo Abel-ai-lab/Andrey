@@ -43,20 +43,20 @@ names its pull request.
   (up to 256 MB, as its other matrix caches do), so `pc`, `fci`, and `cdnod` with it run faster on
   many variables at few rows. Every graph, p-value, and `metadata["n_tests"]` is the same bit for
   bit. ([#1072], [#1073])
-- A grow scan of `iamb` and `inter_iamb` (also as the restrict phase of `rsmax2`) asks many
-  candidates against one conditioning set. With `fisherz`, `student_t`, or `normal_scores` on
-  complete data, a scan given two or more variables is answered from one Cholesky factor of the
-  set's correlation block, where each candidate inverted its own submatrix, and a smaller scan in
-  one batched call, with the same bits as one call per candidate. At 5,000 rows on one core, `iamb`
-  at one target on 1,000 variables is 3.9 times faster, and `iamb` on 100 variables 4.4 times.
-  Every graph of `iamb`, `inter_iamb`, and `rsmax2` on the identity corpus is unchanged, column
-  shuffles included. The factor's p-values agree with the per-query ones to about 1e-10 relative,
-  not bit for bit, so a p-value on a rounding boundary can differ in its ninth significant digit.
-  `ANDREY_SHARED_SCAN_MIN_WORK` (default `128`, candidates times the set size plus two) sets the
-  smallest scan that takes the factor; blocks near the singular threshold, missing values, and the
-  other tests keep the per-query path. A repeated variable in the conditioning set counts once, and
-  a correlation matrix that is not exactly symmetric gives each pair one answer whichever variable
-  is the target. ([#1047], [#1048])
+- A grow scan of `iamb` and `inter_iamb` (also as the restrict phase of `rsmax2` with
+  `restrict="iamb"` or `"inter_iamb"`) asks many candidates against one conditioning set. With
+  `fisherz`, `student_t`, or `normal_scores` on complete data, a scan given two or more variables is
+  answered from one Cholesky factor of the set's correlation block, where each candidate inverted
+  its own submatrix, and a smaller scan in one batched call, with the same bits as one call per
+  candidate. At 5,000 rows on one core, `iamb` at one target on 1,000 variables is 3.9 times faster,
+  and `iamb` on 100 variables 4.4 times. Every graph of `iamb` and `inter_iamb` on the identity
+  corpus is unchanged, column shuffles included. The factor's p-values agree with the per-query ones
+  to about 1e-10 relative, not bit for bit, so a p-value on a rounding boundary can differ in its
+  ninth significant digit. `ANDREY_SHARED_SCAN_MIN_WORK` (default `128`, candidates times the set
+  size plus two) sets the smallest scan that takes the factor; blocks near the singular threshold,
+  missing values, and the other tests keep the per-query path. A repeated variable in the
+  conditioning set counts once, and a correlation matrix that is not exactly symmetric gives each
+  pair one answer whichever variable is the target. ([#1047], [#1048])
 
 ### Fixed
 

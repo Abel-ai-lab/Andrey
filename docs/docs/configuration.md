@@ -90,10 +90,11 @@ forkserver, as on Linux from Python 3.14; otherwise it keeps the default.
 ## Scan dispatch
 
 - `ANDREY_SHARED_SCAN_MIN_WORK`: with `fisherz`, `student_t`, or `normal_scores` on complete data,
-  a grow scan of `iamb` or `inter_iamb` (also as the restrict phase of `rsmax2`) of two or more
-  candidates against one conditioning set of two or more variables is answered from one Cholesky factor of the set's correlation block only when its
-  candidates times the block size (the set plus two) reach this value; below it each candidate
-  inverts its own submatrix. The default is `128`, measured on an AMD EPYC 7713 server running
+  a grow scan of `iamb` or `inter_iamb` (also as the restrict phase of `rsmax2` with
+  `restrict="iamb"` or `"inter_iamb"`) of two or more candidates against one conditioning set of
+  two or more variables is answered from one Cholesky factor of the set's correlation block only
+  when its candidates times the block size (the set plus two) reach this value; below it each
+  candidate inverts its own submatrix. The default is `128`, measured on an AMD EPYC 7713 server running
   Linux on one core, where the factor was slower below about 64 and faster from 128 for every set
   size sampled. The two paths agree to about 1e-10 relative in the p-value; the per-query path is
   the exact one, and `0` factors every such scan.
