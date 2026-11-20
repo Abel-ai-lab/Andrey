@@ -28,10 +28,11 @@ class IndicatorTest:
     """A test of a missingness indicator, column ``indicator`` of the data ``test`` was built on.
 
     A query whose rows hold one value of the indicator, every value of it observed or every one
-    missing, has nothing to detect: it returns 1, so the column it pairs with is not a parent, and
-    counts as a test of those rows that returned 1 (:func:`~andrey.core.ci_missing.count_answer`).
-    Every other query is ``test``'s, including one with no rows where its other columns are
-    observed, which ``test`` answers :data:`~andrey.core.ci_missing.NOT_TESTED` and counts.
+    missing, on at least the rows ``test`` needs (its ``least_rows``, else 2), has nothing to
+    detect: it returns 1, so the column it pairs with is not a parent, and counts as a test of those
+    rows that returned 1 (:func:`~andrey.core.ci_missing.count_answer`). Every other query is
+    ``test``'s, including one on fewer rows, which ``test`` answers
+    :data:`~andrey.core.ci_missing.NOT_TESTED` and counts: too few rows never separate the pair.
     """
 
     def __init__(self, test: CITest, data: np.ndarray, indicator: int) -> None:
@@ -42,12 +43,14 @@ class IndicatorTest:
         self.pin_blas = pins_blas(test)
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
-        others = [int(v) for v in (x, y, *condition_set) if int(v) != self._indicator]
+        given = [int(v) for v in condition_set]
+        others = [int(v) for v in (x, y, *given) if int(v) != self._indicator]
         values = self._values[self._observed[:, others].all(axis=1)]
-        if values.size and values.min() == values.max():
+        least = getattr(self._test, "least_rows", lambda size: 2)(len(given))
+        if values.size >= least and values.min() == values.max():
             count_answer(values.size, 1.0, int(x), int(y))
             return 1.0
-        return self._test(x, y, condition_set)
+        return self._test(x, y, given)
 
 
 class PermutationCorrection:

@@ -239,6 +239,27 @@ def test_an_indicator_constant_on_a_query_rows_separates_the_pair():
     assert test(0, 2) < 1.0
 
 
+def test_an_indicator_constant_on_fewer_rows_than_the_test_needs_is_not_tested():
+    X = np.random.default_rng(0).standard_normal((50, 3))
+    X[3:, 1] = np.nan  # column 1 observed on 3 rows, fewer than the 4 a Fisher z needs
+    R = X.copy()
+    R[:, 0] = 0.0  # an indicator constant everywhere
+    test = IndicatorTest(make_indep_test("fisherz", R), R, 0)
+    with rows_tested() as rows:
+        assert np.isnan(test(0, 1))
+    assert rows.not_tested == {(0, 1): 1} and rows.p_one == 0 and not rows
+
+
+def test_an_indicator_constant_on_few_rows_leaves_the_fewest_rows_tested_at_the_floor():
+    X = np.random.default_rng(0).standard_normal((60, 3))
+    X[:, 2] += X[:, 0]
+    X[3:, 1] = np.nan  # column 1 observed on 3 rows
+    X[30:40, 2] = np.nan  # column 2 observed on all of them: its indicator is constant there
+    metadata = andrey.pc(X, missing="mvpc").metadata
+    assert metadata["rows_tested"]["min"] >= 4  # a Fisher z with no conditioning set needs 4
+    assert "p_one_tests" not in metadata
+
+
 def test_an_indicator_query_without_rows_is_not_tested_and_counted():
     X = np.random.default_rng(0).standard_normal((50, 3))
     X[:25, 1] = np.nan

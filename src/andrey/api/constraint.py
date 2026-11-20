@@ -328,9 +328,10 @@ def pc(
     variable's column is replaced by its 0/1 indicator, and the skeleton search tests the indicator
     against each other variable given subsets of the indicator's neighbors, with ``indep_test``,
     ``alpha``, and ``max_depth``; a test whose rows hold one value of the indicator separates the
-    pair. Step 3 marks as candidates the adjacent pairs that share an adjacent variable or an
-    indicator they both cause. Step 4 runs the skeleton search again over the candidates, every
-    other edge kept, with the permutation-based correction (PermC, their Algorithm 2): a test of
+    pair, unless they are fewer than the test needs, when it is not tested. Step 3 marks as
+    candidates the adjacent pairs that share an adjacent variable or an indicator they both cause.
+    Step 4 runs the skeleton search again over the candidates, every other edge kept, with the
+    permutation-based correction (PermC, their Algorithm 2): a test of
     ``x`` and ``y`` given ``S`` reads ``W``, the parents of the indicators of ``x``, ``y``, and
     ``S``, and of the indicators of ``W``'s own variables. On the rows where all of them are
     observed, each of ``x``, ``y``, and ``S`` is regressed on ``W``; ``W``'s values on as many rows,
