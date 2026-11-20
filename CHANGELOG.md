@@ -94,6 +94,13 @@ names its pull request.
 
 ### Changed
 
+- `das` is supported. On the simulation of its paper with z-scored or rescaled columns it made fewer
+  errors than the code published with the paper in all 20 settings from 10 to 200 variables, in a
+  tenth to a fiftieth of the time, and fewer than the empty graph up to 1,000 variables. On the
+  simulation's own units that code made fewer errors on sparse graphs, since DAS standardizes the
+  columns in its order search; its Limitations state this, and the
+  [0.19.0 release card][card-0190-das] has the numbers, with `cam`, SCORE, and NoGAM on the same
+  datasets. ([#PRNUM])
 - With `fisherz` and `student_t` on data with missing values, test-wise deletion groups the rows by
   their missingness patterns once and computes a test's sums from the groups' tables, removing the
   scattered missing cells exactly, when that costs less than summing every row; a query whose
@@ -2880,6 +2887,7 @@ First alpha release.
 [#1068]: https://github.com/Abel-ai-lab/Andrey/pull/1068
 [#1090]: https://github.com/Abel-ai-lab/Andrey/pull/1090
 [#1099]: https://github.com/Abel-ai-lab/Andrey/pull/1099
+[card-0190-das]: https://andrey.abel.ai/docs/benchmarks/0.19.0.html#das
 [card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
 [#1142]: https://github.com/Abel-ai-lab/Andrey/pull/1142
 [#1102]: https://github.com/Abel-ai-lab/Andrey/pull/1102

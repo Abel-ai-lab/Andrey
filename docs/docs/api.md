@@ -504,6 +504,7 @@ variable.
    resit
    score_matching
    nogam
+   das
    camuv
    anm
    pnl
@@ -578,6 +579,15 @@ regression on all the others, takes as the next leaf the variable whose score en
 predicts best, and prunes the complete DAG of the order as SCORE does. It returns a DAG and a causal
 order. The [0.17.0](benchmarks/0.17.0.md#score-and-nogam) release card measures it at 10 and 20
 variables against dodiscover.
+
+DAS (Montagna et al. 2023), {py:func}`~andrey.das`, finds SCORE's causal order with the same Stein
+estimator and then reads the edges from it: for a leaf, the second derivative of the log density in
+the leaf and another variable is zero at every point unless that variable is a parent. Each leaf
+keeps the variables before it whose derivatives are clearly above zero, at most `max_parents=20`
+of them by Welch tests at 0.01, and CAM's smooth-term tests at `alpha=0.001` prune only those, so
+its pruning does not grow with every variable before a node in the order. It returns a DAG and
+SCORE's causal order. The [0.19.0](benchmarks/0.19.0.md#das) release card measures it from 10 to
+200 variables against the authors' code, and up to 1,000 against the empty graph.
 
 LOCI decides the direction of a variable pair whose noise scale changes with the cause, the
 location-scale noise model of Immer et al. (2023), which the additive noise of `anm` does not
@@ -727,20 +737,11 @@ in a process.
 
    skewd
    skewd_mv
-   das
    cpcm
    cpcm_graph
    lges
    rpcmci
 ```
-
-DAS (Montagna et al. 2023), {py:func}`~andrey.das`, finds SCORE's causal order with the same Stein
-estimator and then reads the edges from it: for a leaf, the second derivative of the log density in
-the leaf and another variable is zero at every point unless that variable is a parent. Each leaf
-keeps the variables before it whose derivatives are clearly above zero, at most `max_parents=20`
-of them by Welch tests at 0.01, and CAM's smooth-term tests at `alpha=0.001` prune only those, so
-its pruning does not grow with every variable before a node in the order. It returns a DAG and
-SCORE's causal order. It is experimental until its comparison with the authors' code is published.
 
 CPCM, conditionally parametric causal models (Bodik and Chavez-Demoulin 2025), models each
 variable given its parents by a parametric family whose parameters are smooth functions of the

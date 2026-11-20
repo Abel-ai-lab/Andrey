@@ -70,6 +70,7 @@ RELEASES = (
     "0.16.0",
     "0.17.0",
     "0.18.0",
+    "0.19.0",
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 
@@ -556,11 +557,11 @@ NOT_SHOWN = {("nonlinear", "anm_er"), ("boss-grasp", "diabetes")}
 # paper's 0.05, and omits the default 0.01, its context-link errors, the draws that break the
 # paper's Assumption 3, and its nonlinear cells with GPDC, whose reference reads one column of the
 # dummies. LOCI shows its default criterion, independence, and omits the likelihood criterion.
-# SCORE and NoGAM show their z-scored and rescaled cells and omit the cells in the simulation's
-# own units, where the references read those units and Andrey standardizes. NOTEARS omits its
-# cells in the simulation's own units and its rescaled cells, which its release card reports and
-# does not judge; its z-scored cells are at mean degrees 4 and 8, the paper's, so ``MEAN_DEGREE``
-# leaves them to the card too.
+# SCORE, NoGAM, and DAS show their z-scored and rescaled cells and omit the cells in the
+# simulation's own units, where the references read those units and Andrey standardizes. NOTEARS
+# omits its cells in the simulation's own units and its rescaled cells, which its release card
+# reports and does not judge; its z-scored cells are at mean degrees 4 and 8, the paper's, so
+# ``MEAN_DEGREE`` leaves them to the card too.
 NOT_SHOWN_LANES = {
     "igsp.alpha_1e-2_starts_5",
     "igsp.alpha_1e-2_starts_10",
@@ -577,6 +578,7 @@ NOT_SHOWN_LANES = {
     "loci.likelihood",
     "score_matching.raw",
     "nogam.raw",
+    "das.raw",
     "notears.raw",
     "notears.rescaled",
 }

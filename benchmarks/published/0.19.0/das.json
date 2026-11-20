@@ -1,0 +1,3409 @@
+{
+ "release": "0.19.0",
+ "generated": "2026-11-20",
+ "lane": "das",
+ "methods": [
+  "das"
+ ],
+ "status": "supported",
+ "about": "DAS's published measurements; the release summary's DAS entries are built from it",
+ "build": "Andrey development build of 18 November 2026 (version string 0.17.1, the functional-models line with DAS as released in 0.18.0); the 0.19.0 release branch returns the same graph on 40 of 40 check datasets (50 variables, ER4, raw and z-scored)",
+ "comparators": {
+  "dodiscover": "DAS in dodiscover at commit 6e644561, the code published with the DAS paper, DAS(eta_G=0.001, eta_H=0.001, alpha=0.001, das_cutoff=0.01, min_parents=5, max_parents=20, n_splines=10, splines_degree=3), the paper's settings, with torch 2.13.0+cpu",
+  "cam": "andrey.cam at its defaults, the same build",
+  "score_matching": "andrey.score_matching at its defaults, the same build",
+  "nogam": "andrey.nogam at its defaults, the same build, at 10 and 20 variables"
+ },
+ "packages": {
+  "dodiscover": "commit 6e644561",
+  "torch (dodiscover)": "2.13.0+cpu",
+  "CausalDisco": "0.3.0",
+  "NumPy (Andrey)": "2.5.4"
+ },
+ "hardware": {
+  "cpu_models": [
+   "AMD EPYC 9534 64-Core Processor",
+   "AMD EPYC 9555 64-Core Processor",
+   "Intel(R) Xeon(R) Gold 5418Y"
+  ],
+  "cores_per_fit": 1,
+  "blas_threads": 1
+ },
+ "verdict_rule": "DAS: per cell (scale, graph density, variables; 20 datasets): D = SHD(Andrey) - SHD(reference) per dataset, on the datasets both fitted; worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise. 10,000 resamples of the datasets, default_rng(0). The decision cells are the z-scored and rescaled ones (claim in); the raw cells, where the reference reads the simulation's units and Andrey standardizes inside its order search, are reported, not judged (claim out). A cell worse on its first seeds was rerun on fresh seeds (replication); no decision cell was worse, so none was rerun, and the raw ER1 cells at 20 and 50 variables, worse on their first seeds, were rerun. result is the published verdict, better or worse only where the fresh seeds agree and a tie otherwise; replicated says which. Floor: SHD against the empty graph's",
+ "fit_protocol": "DAS: each fit in a fresh process on one core with one BLAS thread, one timed fit without warm-up, a cap of 1,800 s per fit up to 100 variables and 3,600 s at 200, past which a fit is a timeout and never scored as a graph; no fit of these rows failed or timed out. Times are process CPU seconds; ratio is the median over the paired datasets of the reference's time over Andrey's",
+ "seeds_note": "DAS: every cell holds 20 datasets: seeds 0-19 for ER1 and for ER4 at 10 variables, seeds 20-39 for ER4 at 20 variables and more, whose seeds 0-19 were used while the method was built; the raw ER4 cell at 50 variables is the one on seeds 0-19, reported as context. A replication holds 20 fresh datasets, seeds 20-39",
+ "regimes": {
+  "score_paper_standardized": "the papers' simulation: Erdos-Renyi graphs with d edges (ER1) or 4 d (ER4), each link one draw of a Gaussian process over the node's parents, Gaussian noise of variance uniform on [0.4, 0.8], 1,000 rows, every column z-scored",
+  "score_paper_rescaled": "the papers' simulation: Erdos-Renyi graphs with d edges (ER1) or 4 d (ER4), each link one draw of a Gaussian process over the node's parents, Gaussian noise of variance uniform on [0.4, 0.8], 1,000 rows, each variable divided by its standard deviation before its children read it",
+  "score_paper": "the papers' simulation: Erdos-Renyi graphs with d edges (ER1) or 4 d (ER4), each link one draw of a Gaussian process over the node's parents, Gaussian noise of variance uniform on [0.4, 0.8], 1,000 rows, in the simulation's own units"
+ },
+ "parity": {
+  "score_paper_standardized": [
+   {
+    "mean_degree": 2.0,
+    "d": 10,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 0.5094,
+    "comparator_s": 5.9956,
+    "ratio": 11.69,
+    "ratio_quartiles": [
+     11.15,
+     12.54
+    ],
+    "same_graph": 2,
+    "andrey_shd": 3.0,
+    "comparator_shd": 4.0,
+    "empty_shd": 10.0,
+    "andrey_shd_mean": 2.9,
+    "comparator_shd_mean": 4.05,
+    "empty_shd_mean": 10.0,
+    "mean_D": -1.15,
+    "bootstrap_95": [
+     -1.9,
+     -0.55
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -7.1,
+      "bootstrap_95": [
+       -7.65,
+       -6.55
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -5.95,
+      "bootstrap_95": [
+       -6.6,
+       -5.3
+      ]
+     }
+    },
+    "first_seeds": "0-19",
+    "replicated": "better, not rerun",
+    "result": "tie",
+    "cell": "DAS|score_paper_standardized|ER1|d=10",
+    "card_verdict": "tie"
+   },
+   {
+    "mean_degree": 2.0,
+    "d": 20,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 1.2312,
+    "comparator_s": 18.5674,
+    "ratio": 14.39,
+    "ratio_quartiles": [
+     12.96,
+     16.3
+    ],
+    "same_graph": 0,
+    "andrey_shd": 8.5,
+    "comparator_shd": 11.0,
+    "empty_shd": 20.0,
+    "andrey_shd_mean": 8.15,
+    "comparator_shd_mean": 11.0,
+    "empty_shd_mean": 20.0,
+    "mean_D": -2.85,
+    "bootstrap_95": [
+     -3.85,
+     -1.9
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -11.85,
+      "bootstrap_95": [
+       -12.7,
+       -11.0
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -9.0,
+      "bootstrap_95": [
+       -9.95,
+       -8.05
+      ]
+     }
+    },
+    "first_seeds": "0-19",
+    "replicated": "better, not rerun",
+    "result": "tie",
+    "cell": "DAS|score_paper_standardized|ER1|d=20",
+    "card_verdict": "tie"
+   },
+   {
+    "mean_degree": 2.0,
+    "d": 50,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 4.0752,
+    "comparator_s": 79.6473,
+    "ratio": 19.09,
+    "ratio_quartiles": [
+     18.83,
+     20.2
+    ],
+    "same_graph": 0,
+    "andrey_shd": 28.5,
+    "comparator_shd": 31.0,
+    "empty_shd": 50.0,
+    "andrey_shd_mean": 28.3,
+    "comparator_shd_mean": 31.7,
+    "empty_shd_mean": 50.0,
+    "mean_D": -3.4,
+    "bootstrap_95": [
+     -5.05,
+     -1.85
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -21.7,
+      "bootstrap_95": [
+       -23.9,
+       -19.75
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -18.3,
+      "bootstrap_95": [
+       -20.15,
+       -16.4
+      ]
+     }
+    },
+    "first_seeds": "0-19",
+    "replicated": "better, not rerun",
+    "result": "tie",
+    "cell": "DAS|score_paper_standardized|ER1|d=50",
+    "card_verdict": "tie"
+   },
+   {
+    "mean_degree": 2.0,
+    "d": 100,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 9.2343,
+    "comparator_s": 295.5101,
+    "ratio": 31.77,
+    "ratio_quartiles": [
+     30.16,
+     32.64
+    ],
+    "same_graph": 0,
+    "andrey_shd": 62.5,
+    "comparator_shd": 72.5,
+    "empty_shd": 100.0,
+    "andrey_shd_mean": 62.05,
+    "comparator_shd_mean": 72.55,
+    "empty_shd_mean": 100.0,
+    "mean_D": -10.5,
+    "bootstrap_95": [
+     -13.7,
+     -7.45
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -37.95,
+      "bootstrap_95": [
+       -41.7,
+       -34.25
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -27.45,
+      "bootstrap_95": [
+       -29.95,
+       -24.85
+      ]
+     }
+    },
+    "first_seeds": "0-19",
+    "replicated": "better, not rerun",
+    "result": "tie",
+    "cell": "DAS|score_paper_standardized|ER1|d=100",
+    "card_verdict": "tie"
+   },
+   {
+    "mean_degree": 2.0,
+    "d": 200,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 22.7928,
+    "comparator_s": 1094.4465,
+    "ratio": 46.41,
+    "ratio_quartiles": [
+     42.74,
+     50.38
+    ],
+    "same_graph": 0,
+    "andrey_shd": 139.0,
+    "comparator_shd": 152.5,
+    "empty_shd": 200.0,
+    "andrey_shd_mean": 139.85,
+    "comparator_shd_mean": 151.75,
+    "empty_shd_mean": 200.0,
+    "mean_D": -11.9,
+    "bootstrap_95": [
+     -15.8,
+     -7.9
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -60.15,
+      "bootstrap_95": [
+       -63.35,
+       -57.05
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -48.25,
+      "bootstrap_95": [
+       -51.35,
+       -45.3
+      ]
+     }
+    },
+    "first_seeds": "0-19",
+    "replicated": "better, not rerun",
+    "result": "tie",
+    "cell": "DAS|score_paper_standardized|ER1|d=200",
+    "card_verdict": "tie"
+   },
+   {
+    "mean_degree": 8.0,
+    "d": 10,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 0.516,
+    "comparator_s": 6.8776,
+    "ratio": 13.05,
+    "ratio_quartiles": [
+     12.05,
+     14.53
+    ],
+    "same_graph": 0,
+    "andrey_shd": 21.5,
+    "comparator_shd": 24.5,
+    "empty_shd": 40.0,
+    "andrey_shd_mean": 22.0,
+    "comparator_shd_mean": 24.9,
+    "empty_shd_mean": 40.0,
+    "mean_D": -2.9,
+    "bootstrap_95": [
+     -3.85,
+     -2.0
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -18.0,
+      "bootstrap_95": [
+       -19.4,
+       -16.55
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -15.1,
+      "bootstrap_95": [
+       -16.25,
+       -13.9
+      ]
+     }
+    },
+    "first_seeds": "0-19",
+    "replicated": "better, not rerun",
+    "result": "tie",
+    "cell": "DAS|score_paper_standardized|ER4|d=10",
+    "card_verdict": "tie"
+   },
+   {
+    "mean_degree": 8.0,
+    "d": 20,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 1.2162,
+    "comparator_s": 18.255,
+    "ratio": 15.01,
+    "ratio_quartiles": [
+     13.71,
+     16.13
+    ],
+    "same_graph": 0,
+    "andrey_shd": 53.0,
+    "comparator_shd": 56.0,
+    "empty_shd": 80.0,
+    "andrey_shd_mean": 51.9,
+    "comparator_shd_mean": 56.35,
+    "empty_shd_mean": 80.0,
+    "mean_D": -4.45,
+    "bootstrap_95": [
+     -5.8,
+     -3.05
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -28.1,
+      "bootstrap_95": [
+       -30.55,
+       -25.65
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -23.65,
+      "bootstrap_95": [
+       -25.7,
+       -21.6
+      ]
+     }
+    },
+    "first_seeds": "20-39",
+    "replicated": "better, not rerun",
+    "result": "tie",
+    "cell": "DAS|score_paper_standardized|ER4|d=20",
+    "card_verdict": "tie"
+   },
+   {
+    "mean_degree": 8.0,
+    "d": 50,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 3.993,
+    "comparator_s": 78.7895,
+    "ratio": 19.21,
+    "ratio_quartiles": [
+     18.35,
+     20.22
+    ],
+    "same_graph": 0,
+    "andrey_shd": 151.0,
+    "comparator_shd": 159.0,
+    "empty_shd": 200.0,
+    "andrey_shd_mean": 151.0,
+    "comparator_shd_mean": 159.4,
+    "empty_shd_mean": 200.0,
+    "mean_D": -8.4,
+    "bootstrap_95": [
+     -10.55,
+     -6.15
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -49.0,
+      "bootstrap_95": [
+       -51.45,
+       -46.5
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -40.6,
+      "bootstrap_95": [
+       -42.7,
+       -38.4
+      ]
+     }
+    },
+    "first_seeds": "20-39",
+    "replicated": "better, not rerun",
+    "result": "tie",
+    "cell": "DAS|score_paper_standardized|ER4|d=50",
+    "card_verdict": "tie"
+   },
+   {
+    "mean_degree": 8.0,
+    "d": 100,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 9.1211,
+    "comparator_s": 278.2564,
+    "ratio": 30.31,
+    "ratio_quartiles": [
+     29.01,
+     32.0
+    ],
+    "same_graph": 0,
+    "andrey_shd": 325.5,
+    "comparator_shd": 347.0,
+    "empty_shd": 400.0,
+    "andrey_shd_mean": 326.2,
+    "comparator_shd_mean": 347.1,
+    "empty_shd_mean": 400.0,
+    "mean_D": -20.9,
+    "bootstrap_95": [
+     -24.3,
+     -17.45
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -73.8,
+      "bootstrap_95": [
+       -76.8,
+       -70.8
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -52.9,
+      "bootstrap_95": [
+       -55.05,
+       -50.7
+      ]
+     }
+    },
+    "first_seeds": "20-39",
+    "replicated": "better, not rerun",
+    "result": "tie",
+    "cell": "DAS|score_paper_standardized|ER4|d=100",
+    "card_verdict": "tie"
+   },
+   {
+    "mean_degree": 8.0,
+    "d": 200,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 23.6921,
+    "comparator_s": 1168.2934,
+    "ratio": 49.01,
+    "ratio_quartiles": [
+     45.13,
+     52.14
+    ],
+    "same_graph": 0,
+    "andrey_shd": 686.5,
+    "comparator_shd": 720.0,
+    "empty_shd": 800.0,
+    "andrey_shd_mean": 688.9,
+    "comparator_shd_mean": 720.25,
+    "empty_shd_mean": 800.0,
+    "mean_D": -31.35,
+    "bootstrap_95": [
+     -35.9,
+     -26.25
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -111.1,
+      "bootstrap_95": [
+       -115.95,
+       -106.15
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -79.75,
+      "bootstrap_95": [
+       -84.2,
+       -75.2
+      ]
+     }
+    },
+    "first_seeds": "20-39",
+    "replicated": "better, not rerun",
+    "result": "tie",
+    "cell": "DAS|score_paper_standardized|ER4|d=200",
+    "card_verdict": "tie"
+   }
+  ],
+  "score_paper_rescaled": [
+   {
+    "mean_degree": 2.0,
+    "d": 10,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 0.5119,
+    "comparator_s": 6.0479,
+    "ratio": 11.79,
+    "ratio_quartiles": [
+     11.02,
+     12.39
+    ],
+    "same_graph": 3,
+    "andrey_shd": 2.0,
+    "comparator_shd": 4.0,
+    "empty_shd": 10.0,
+    "andrey_shd_mean": 2.5,
+    "comparator_shd_mean": 3.75,
+    "empty_shd_mean": 10.0,
+    "mean_D": -1.25,
+    "bootstrap_95": [
+     -2.05,
+     -0.5
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -7.5,
+      "bootstrap_95": [
+       -8.2,
+       -6.75
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -6.25,
+      "bootstrap_95": [
+       -7.05,
+       -5.45
+      ]
+     }
+    },
+    "first_seeds": "0-19",
+    "replicated": "better, not rerun",
+    "result": "tie",
+    "cell": "DAS|score_paper_rescaled|ER1|d=10",
+    "card_verdict": "tie"
+   },
+   {
+    "mean_degree": 2.0,
+    "d": 20,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 1.38,
+    "comparator_s": 18.5591,
+    "ratio": 13.06,
+    "ratio_quartiles": [
+     12.26,
+     14.09
+    ],
+    "same_graph": 0,
+    "andrey_shd": 7.5,
+    "comparator_shd": 10.0,
+    "empty_shd": 20.0,
+    "andrey_shd_mean": 7.6,
+    "comparator_shd_mean": 10.45,
+    "empty_shd_mean": 20.0,
+    "mean_D": -2.85,
+    "bootstrap_95": [
+     -4.0,
+     -1.7
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -12.4,
+      "bootstrap_95": [
+       -13.4,
+       -11.35
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -9.55,
+      "bootstrap_95": [
+       -10.55,
+       -8.5
+      ]
+     }
+    },
+    "first_seeds": "0-19",
+    "replicated": "better, not rerun",
+    "result": "tie",
+    "cell": "DAS|score_paper_rescaled|ER1|d=20",
+    "card_verdict": "tie"
+   },
+   {
+    "mean_degree": 2.0,
+    "d": 50,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 4.776,
+    "comparator_s": 78.1269,
+    "ratio": 16.59,
+    "ratio_quartiles": [
+     15.34,
+     18.16
+    ],
+    "same_graph": 0,
+    "andrey_shd": 26.0,
+    "comparator_shd": 32.0,
+    "empty_shd": 50.0,
+    "andrey_shd_mean": 26.05,
+    "comparator_shd_mean": 31.1,
+    "empty_shd_mean": 50.0,
+    "mean_D": -5.05,
+    "bootstrap_95": [
+     -7.05,
+     -3.2
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -23.95,
+      "bootstrap_95": [
+       -25.55,
+       -22.35
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -18.9,
+      "bootstrap_95": [
+       -20.95,
+       -17.0
+      ]
+     }
+    },
+    "first_seeds": "0-19",
+    "replicated": "better, not rerun",
+    "result": "tie",
+    "cell": "DAS|score_paper_rescaled|ER1|d=50",
+    "card_verdict": "tie"
+   },
+   {
+    "mean_degree": 2.0,
+    "d": 100,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 9.7433,
+    "comparator_s": 266.653,
+    "ratio": 27.31,
+    "ratio_quartiles": [
+     25.86,
+     28.06
+    ],
+    "same_graph": 0,
+    "andrey_shd": 60.0,
+    "comparator_shd": 71.5,
+    "empty_shd": 100.0,
+    "andrey_shd_mean": 61.4,
+    "comparator_shd_mean": 71.75,
+    "empty_shd_mean": 100.0,
+    "mean_D": -10.35,
+    "bootstrap_95": [
+     -12.15,
+     -8.7
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -38.6,
+      "bootstrap_95": [
+       -42.35,
+       -34.7
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -28.25,
+      "bootstrap_95": [
+       -31.8,
+       -24.7
+      ]
+     }
+    },
+    "first_seeds": "0-19",
+    "replicated": "better, not rerun",
+    "result": "tie",
+    "cell": "DAS|score_paper_rescaled|ER1|d=100",
+    "card_verdict": "tie"
+   },
+   {
+    "mean_degree": 2.0,
+    "d": 200,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 22.1476,
+    "comparator_s": 983.2155,
+    "ratio": 45.85,
+    "ratio_quartiles": [
+     43.6,
+     47.14
+    ],
+    "same_graph": 0,
+    "andrey_shd": 142.0,
+    "comparator_shd": 154.5,
+    "empty_shd": 200.0,
+    "andrey_shd_mean": 141.05,
+    "comparator_shd_mean": 153.25,
+    "empty_shd_mean": 200.0,
+    "mean_D": -12.2,
+    "bootstrap_95": [
+     -15.65,
+     -8.45
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -58.95,
+      "bootstrap_95": [
+       -62.75,
+       -55.05
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -46.75,
+      "bootstrap_95": [
+       -49.5,
+       -44.1
+      ]
+     }
+    },
+    "first_seeds": "0-19",
+    "replicated": "better, not rerun",
+    "result": "tie",
+    "cell": "DAS|score_paper_rescaled|ER1|d=200",
+    "card_verdict": "tie"
+   },
+   {
+    "mean_degree": 8.0,
+    "d": 10,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 0.5414,
+    "comparator_s": 6.0094,
+    "ratio": 10.93,
+    "ratio_quartiles": [
+     10.57,
+     11.53
+    ],
+    "same_graph": 0,
+    "andrey_shd": 20.5,
+    "comparator_shd": 22.5,
+    "empty_shd": 40.0,
+    "andrey_shd_mean": 20.6,
+    "comparator_shd_mean": 22.65,
+    "empty_shd_mean": 40.0,
+    "mean_D": -2.05,
+    "bootstrap_95": [
+     -2.95,
+     -1.1
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -19.4,
+      "bootstrap_95": [
+       -20.65,
+       -18.2
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -17.35,
+      "bootstrap_95": [
+       -18.65,
+       -16.0
+      ]
+     }
+    },
+    "first_seeds": "0-19",
+    "replicated": "better, not rerun",
+    "result": "tie",
+    "cell": "DAS|score_paper_rescaled|ER4|d=10",
+    "card_verdict": "tie"
+   },
+   {
+    "mean_degree": 8.0,
+    "d": 20,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 1.4402,
+    "comparator_s": 18.3482,
+    "ratio": 12.72,
+    "ratio_quartiles": [
+     11.55,
+     13.22
+    ],
+    "same_graph": 0,
+    "andrey_shd": 50.5,
+    "comparator_shd": 55.0,
+    "empty_shd": 80.0,
+    "andrey_shd_mean": 50.75,
+    "comparator_shd_mean": 55.65,
+    "empty_shd_mean": 80.0,
+    "mean_D": -4.9,
+    "bootstrap_95": [
+     -6.3,
+     -3.5
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -29.25,
+      "bootstrap_95": [
+       -31.35,
+       -26.95
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -24.35,
+      "bootstrap_95": [
+       -26.05,
+       -22.6
+      ]
+     }
+    },
+    "first_seeds": "20-39",
+    "replicated": "better, not rerun",
+    "result": "tie",
+    "cell": "DAS|score_paper_rescaled|ER4|d=20",
+    "card_verdict": "tie"
+   },
+   {
+    "mean_degree": 8.0,
+    "d": 50,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 4.51,
+    "comparator_s": 79.9394,
+    "ratio": 17.74,
+    "ratio_quartiles": [
+     16.89,
+     18.47
+    ],
+    "same_graph": 0,
+    "andrey_shd": 148.0,
+    "comparator_shd": 156.5,
+    "empty_shd": 200.0,
+    "andrey_shd_mean": 146.9,
+    "comparator_shd_mean": 157.85,
+    "empty_shd_mean": 200.0,
+    "mean_D": -10.95,
+    "bootstrap_95": [
+     -14.05,
+     -7.9
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -53.1,
+      "bootstrap_95": [
+       -56.45,
+       -49.85
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -42.15,
+      "bootstrap_95": [
+       -45.4,
+       -38.9
+      ]
+     }
+    },
+    "first_seeds": "20-39",
+    "replicated": "better, not rerun",
+    "result": "tie",
+    "cell": "DAS|score_paper_rescaled|ER4|d=50",
+    "card_verdict": "tie"
+   },
+   {
+    "mean_degree": 8.0,
+    "d": 100,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 9.8391,
+    "comparator_s": 282.2072,
+    "ratio": 28.04,
+    "ratio_quartiles": [
+     27.64,
+     28.89
+    ],
+    "same_graph": 0,
+    "andrey_shd": 318.0,
+    "comparator_shd": 343.5,
+    "empty_shd": 400.0,
+    "andrey_shd_mean": 320.0,
+    "comparator_shd_mean": 343.6,
+    "empty_shd_mean": 400.0,
+    "mean_D": -23.6,
+    "bootstrap_95": [
+     -26.9,
+     -20.2
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -80.0,
+      "bootstrap_95": [
+       -83.85,
+       -75.9
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -56.4,
+      "bootstrap_95": [
+       -59.85,
+       -53.1
+      ]
+     }
+    },
+    "first_seeds": "20-39",
+    "replicated": "better, not rerun",
+    "result": "tie",
+    "cell": "DAS|score_paper_rescaled|ER4|d=100",
+    "card_verdict": "tie"
+   },
+   {
+    "mean_degree": 8.0,
+    "d": 200,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 21.6855,
+    "comparator_s": 1133.8933,
+    "ratio": 50.2,
+    "ratio_quartiles": [
+     47.53,
+     53.79
+    ],
+    "same_graph": 0,
+    "andrey_shd": 681.5,
+    "comparator_shd": 718.0,
+    "empty_shd": 800.0,
+    "andrey_shd_mean": 680.65,
+    "comparator_shd_mean": 716.55,
+    "empty_shd_mean": 800.0,
+    "mean_D": -35.9,
+    "bootstrap_95": [
+     -40.05,
+     -31.7
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -119.35,
+      "bootstrap_95": [
+       -124.4,
+       -114.35
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -83.45,
+      "bootstrap_95": [
+       -88.3,
+       -78.85
+      ]
+     }
+    },
+    "first_seeds": "20-39",
+    "replicated": "better, not rerun",
+    "result": "tie",
+    "cell": "DAS|score_paper_rescaled|ER4|d=200",
+    "card_verdict": "tie"
+   }
+  ],
+  "score_paper": [
+   {
+    "mean_degree": 2.0,
+    "d": 10,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 0.5189,
+    "comparator_s": 5.9865,
+    "ratio": 11.73,
+    "ratio_quartiles": [
+     10.83,
+     12.05
+    ],
+    "same_graph": 1,
+    "andrey_shd": 3.0,
+    "comparator_shd": 2.5,
+    "empty_shd": 10.0,
+    "andrey_shd_mean": 2.9,
+    "comparator_shd_mean": 2.2,
+    "empty_shd_mean": 10.0,
+    "mean_D": 0.7,
+    "bootstrap_95": [
+     -0.3,
+     1.65
+    ],
+    "above_zero": false,
+    "verdict": "tie",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -7.1,
+      "bootstrap_95": [
+       -7.65,
+       -6.55
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -7.8,
+      "bootstrap_95": [
+       -8.45,
+       -7.15
+      ]
+     }
+    },
+    "first_seeds": "0-19",
+    "replicated": "tie",
+    "result": "tie",
+    "cell": "DAS|score_paper|ER1|d=10",
+    "card_verdict": null
+   },
+   {
+    "mean_degree": 2.0,
+    "d": 20,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 1.3169,
+    "comparator_s": 16.1246,
+    "ratio": 12.41,
+    "ratio_quartiles": [
+     11.27,
+     13.09
+    ],
+    "same_graph": 0,
+    "andrey_shd": 8.5,
+    "comparator_shd": 6.0,
+    "empty_shd": 20.0,
+    "andrey_shd_mean": 8.15,
+    "comparator_shd_mean": 5.8,
+    "empty_shd_mean": 20.0,
+    "mean_D": 2.35,
+    "bootstrap_95": [
+     1.15,
+     3.45
+    ],
+    "above_zero": true,
+    "verdict": "worse",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -11.85,
+      "bootstrap_95": [
+       -12.7,
+       -11.0
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -14.2,
+      "bootstrap_95": [
+       -15.2,
+       -13.3
+      ]
+     }
+    },
+    "first_seeds": "0-19",
+    "replication": {
+     "seeds": [
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39
+     ],
+     "paired": 20,
+     "andrey_shd_mean": 7.2,
+     "comparator_shd_mean": 4.85,
+     "mean_D": 2.35,
+     "bootstrap_95": [
+      1.3,
+      3.4
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     }
+    },
+    "replicated": "worse again",
+    "result": "worse",
+    "cell": "DAS|score_paper|ER1|d=20",
+    "card_verdict": null
+   },
+   {
+    "mean_degree": 2.0,
+    "d": 50,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 4.3285,
+    "comparator_s": 67.2693,
+    "ratio": 15.43,
+    "ratio_quartiles": [
+     14.87,
+     16.0
+    ],
+    "same_graph": 0,
+    "andrey_shd": 28.5,
+    "comparator_shd": 18.5,
+    "empty_shd": 50.0,
+    "andrey_shd_mean": 28.3,
+    "comparator_shd_mean": 18.9,
+    "empty_shd_mean": 50.0,
+    "mean_D": 9.4,
+    "bootstrap_95": [
+     6.85,
+     11.85
+    ],
+    "above_zero": true,
+    "verdict": "worse",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -21.7,
+      "bootstrap_95": [
+       -23.85,
+       -19.75
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -31.1,
+      "bootstrap_95": [
+       -32.7,
+       -29.4
+      ]
+     }
+    },
+    "first_seeds": "0-19",
+    "replication": {
+     "seeds": [
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39
+     ],
+     "paired": 20,
+     "andrey_shd_mean": 28.65,
+     "comparator_shd_mean": 17.15,
+     "mean_D": 11.5,
+     "bootstrap_95": [
+      9.6,
+      13.55
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     }
+    },
+    "replicated": "worse again",
+    "result": "worse",
+    "cell": "DAS|score_paper|ER1|d=50",
+    "card_verdict": null
+   },
+   {
+    "mean_degree": 8.0,
+    "d": 10,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 0.4832,
+    "comparator_s": 6.1151,
+    "ratio": 12.66,
+    "ratio_quartiles": [
+     11.45,
+     13.26
+    ],
+    "same_graph": 0,
+    "andrey_shd": 21.5,
+    "comparator_shd": 25.0,
+    "empty_shd": 40.0,
+    "andrey_shd_mean": 22.0,
+    "comparator_shd_mean": 24.65,
+    "empty_shd_mean": 40.0,
+    "mean_D": -2.65,
+    "bootstrap_95": [
+     -3.85,
+     -1.4
+    ],
+    "above_zero": false,
+    "verdict": "better",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -18.0,
+      "bootstrap_95": [
+       -19.35,
+       -16.5
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -15.35,
+      "bootstrap_95": [
+       -16.65,
+       -14.1
+      ]
+     }
+    },
+    "first_seeds": "0-19",
+    "replicated": "better, not rerun",
+    "result": "tie",
+    "cell": "DAS|score_paper|ER4|d=10",
+    "card_verdict": null
+   },
+   {
+    "mean_degree": 8.0,
+    "d": 20,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 1.2376,
+    "comparator_s": 16.5059,
+    "ratio": 13.23,
+    "ratio_quartiles": [
+     12.53,
+     13.73
+    ],
+    "same_graph": 0,
+    "andrey_shd": 53.0,
+    "comparator_shd": 53.0,
+    "empty_shd": 80.0,
+    "andrey_shd_mean": 51.9,
+    "comparator_shd_mean": 52.95,
+    "empty_shd_mean": 80.0,
+    "mean_D": -1.05,
+    "bootstrap_95": [
+     -2.9,
+     0.75
+    ],
+    "above_zero": false,
+    "verdict": "tie",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -28.1,
+      "bootstrap_95": [
+       -30.6,
+       -25.65
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -27.05,
+      "bootstrap_95": [
+       -28.9,
+       -25.05
+      ]
+     }
+    },
+    "first_seeds": "20-39",
+    "replicated": "tie",
+    "result": "tie",
+    "cell": "DAS|score_paper|ER4|d=20",
+    "card_verdict": null
+   },
+   {
+    "mean_degree": 8.0,
+    "d": 50,
+    "n": 1000,
+    "seeds": 20,
+    "fits": 20,
+    "datasets": 20,
+    "andrey_ok": 20,
+    "comparator_ok": 20,
+    "paired": 20,
+    "andrey_s": 3.8609,
+    "comparator_s": 81.9187,
+    "ratio": 21.97,
+    "ratio_quartiles": [
+     17.65,
+     26.39
+    ],
+    "same_graph": 0,
+    "andrey_shd": 156.0,
+    "comparator_shd": 157.0,
+    "empty_shd": 200.0,
+    "andrey_shd_mean": 153.55,
+    "comparator_shd_mean": 155.4,
+    "empty_shd_mean": 200.0,
+    "mean_D": -1.85,
+    "bootstrap_95": [
+     -4.0,
+     0.3
+    ],
+    "above_zero": false,
+    "verdict": "tie",
+    "coverage": {
+     "datasets": 20,
+     "andrey_short": 0,
+     "reference_short": 0
+    },
+    "floor": {
+     "applies": true,
+     "pass": true,
+     "andrey_minus_empty": {
+      "paired": 20,
+      "mean": -46.45,
+      "bootstrap_95": [
+       -49.3,
+       -43.5
+      ]
+     },
+     "reference_minus_empty": {
+      "paired": 20,
+      "mean": -44.6,
+      "bootstrap_95": [
+       -47.4,
+       -41.7
+      ]
+     }
+    },
+    "first_seeds": "0-19",
+    "replicated": "tie",
+    "result": "tie",
+    "cell": "DAS|score_paper|ER4|d=50",
+    "card_verdict": null
+   }
+  ]
+ },
+ "floor": {
+  "about": "DAS's SHD minus the better of the empty graph and the complete DAG in column order, per cell; the truth scored per dataset; pass when the 95% interval lies below 0",
+  "rows": [
+   {
+    "regime": "score_paper",
+    "graph": "ER1",
+    "d": 10,
+    "datasets": 20,
+    "das_shd_mean": 2.9,
+    "empty_shd_mean": 10.0,
+    "complete_shd_mean": 40.05,
+    "floor": "empty graph",
+    "das_minus_floor": -7.1,
+    "bootstrap_95": [
+     -7.65,
+     -6.55
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper",
+    "graph": "ER1",
+    "d": 20,
+    "datasets": 20,
+    "das_shd_mean": 8.15,
+    "empty_shd_mean": 20.0,
+    "complete_shd_mean": 180.75,
+    "floor": "empty graph",
+    "das_minus_floor": -11.85,
+    "bootstrap_95": [
+     -12.7,
+     -11.0
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper",
+    "graph": "ER1",
+    "d": 50,
+    "datasets": 20,
+    "das_shd_mean": 28.3,
+    "empty_shd_mean": 50.0,
+    "complete_shd_mean": 1200.05,
+    "floor": "empty graph",
+    "das_minus_floor": -21.7,
+    "bootstrap_95": [
+     -23.85,
+     -19.75
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper",
+    "graph": "ER4",
+    "d": 10,
+    "datasets": 20,
+    "das_shd_mean": 22.0,
+    "empty_shd_mean": 40.0,
+    "complete_shd_mean": 27.1,
+    "floor": "complete DAG in column order",
+    "das_minus_floor": -5.1,
+    "bootstrap_95": [
+     -7.65,
+     -2.5
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper",
+    "graph": "ER4",
+    "d": 20,
+    "datasets": 20,
+    "das_shd_mean": 51.9,
+    "empty_shd_mean": 80.0,
+    "complete_shd_mean": 147.05,
+    "floor": "empty graph",
+    "das_minus_floor": -28.1,
+    "bootstrap_95": [
+     -30.6,
+     -25.65
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper",
+    "graph": "ER4",
+    "d": 50,
+    "datasets": 20,
+    "das_shd_mean": 153.55,
+    "empty_shd_mean": 200.0,
+    "complete_shd_mean": 1124.0,
+    "floor": "empty graph",
+    "das_minus_floor": -46.45,
+    "bootstrap_95": [
+     -49.3,
+     -43.5
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_rescaled",
+    "graph": "ER1",
+    "d": 10,
+    "datasets": 20,
+    "das_shd_mean": 2.5,
+    "empty_shd_mean": 10.0,
+    "complete_shd_mean": 40.05,
+    "floor": "empty graph",
+    "das_minus_floor": -7.5,
+    "bootstrap_95": [
+     -8.2,
+     -6.75
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_rescaled",
+    "graph": "ER1",
+    "d": 20,
+    "datasets": 20,
+    "das_shd_mean": 7.6,
+    "empty_shd_mean": 20.0,
+    "complete_shd_mean": 180.75,
+    "floor": "empty graph",
+    "das_minus_floor": -12.4,
+    "bootstrap_95": [
+     -13.4,
+     -11.35
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_rescaled",
+    "graph": "ER1",
+    "d": 50,
+    "datasets": 20,
+    "das_shd_mean": 26.05,
+    "empty_shd_mean": 50.0,
+    "complete_shd_mean": 1200.05,
+    "floor": "empty graph",
+    "das_minus_floor": -23.95,
+    "bootstrap_95": [
+     -25.55,
+     -22.35
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_rescaled",
+    "graph": "ER1",
+    "d": 100,
+    "datasets": 20,
+    "das_shd_mean": 61.4,
+    "empty_shd_mean": 100.0,
+    "complete_shd_mean": 4899.65,
+    "floor": "empty graph",
+    "das_minus_floor": -38.6,
+    "bootstrap_95": [
+     -42.35,
+     -34.7
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_rescaled",
+    "graph": "ER1",
+    "d": 200,
+    "datasets": 20,
+    "das_shd_mean": 141.05,
+    "empty_shd_mean": 200.0,
+    "complete_shd_mean": 19798.15,
+    "floor": "empty graph",
+    "das_minus_floor": -58.95,
+    "bootstrap_95": [
+     -62.75,
+     -55.05
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_rescaled",
+    "graph": "ER4",
+    "d": 10,
+    "datasets": 20,
+    "das_shd_mean": 20.6,
+    "empty_shd_mean": 40.0,
+    "complete_shd_mean": 27.1,
+    "floor": "complete DAG in column order",
+    "das_minus_floor": -6.5,
+    "bootstrap_95": [
+     -8.85,
+     -4.15
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_rescaled",
+    "graph": "ER4",
+    "d": 20,
+    "datasets": 20,
+    "das_shd_mean": 50.75,
+    "empty_shd_mean": 80.0,
+    "complete_shd_mean": 147.05,
+    "floor": "empty graph",
+    "das_minus_floor": -29.25,
+    "bootstrap_95": [
+     -31.35,
+     -26.95
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_rescaled",
+    "graph": "ER4",
+    "d": 50,
+    "datasets": 20,
+    "das_shd_mean": 146.9,
+    "empty_shd_mean": 200.0,
+    "complete_shd_mean": 1120.75,
+    "floor": "empty graph",
+    "das_minus_floor": -53.1,
+    "bootstrap_95": [
+     -56.45,
+     -49.85
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_rescaled",
+    "graph": "ER4",
+    "d": 100,
+    "datasets": 20,
+    "das_shd_mean": 320.0,
+    "empty_shd_mean": 400.0,
+    "complete_shd_mean": 4747.65,
+    "floor": "empty graph",
+    "das_minus_floor": -80.0,
+    "bootstrap_95": [
+     -83.85,
+     -75.9
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_rescaled",
+    "graph": "ER4",
+    "d": 200,
+    "datasets": 20,
+    "das_shd_mean": 680.65,
+    "empty_shd_mean": 800.0,
+    "complete_shd_mean": 19502.15,
+    "floor": "empty graph",
+    "das_minus_floor": -119.35,
+    "bootstrap_95": [
+     -124.4,
+     -114.35
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_standardized",
+    "graph": "ER1",
+    "d": 10,
+    "datasets": 20,
+    "das_shd_mean": 2.9,
+    "empty_shd_mean": 10.0,
+    "complete_shd_mean": 40.05,
+    "floor": "empty graph",
+    "das_minus_floor": -7.1,
+    "bootstrap_95": [
+     -7.65,
+     -6.55
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_standardized",
+    "graph": "ER1",
+    "d": 20,
+    "datasets": 20,
+    "das_shd_mean": 8.15,
+    "empty_shd_mean": 20.0,
+    "complete_shd_mean": 180.75,
+    "floor": "empty graph",
+    "das_minus_floor": -11.85,
+    "bootstrap_95": [
+     -12.7,
+     -11.0
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_standardized",
+    "graph": "ER1",
+    "d": 50,
+    "datasets": 20,
+    "das_shd_mean": 28.3,
+    "empty_shd_mean": 50.0,
+    "complete_shd_mean": 1200.05,
+    "floor": "empty graph",
+    "das_minus_floor": -21.7,
+    "bootstrap_95": [
+     -23.85,
+     -19.75
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_standardized",
+    "graph": "ER1",
+    "d": 100,
+    "datasets": 20,
+    "das_shd_mean": 62.05,
+    "empty_shd_mean": 100.0,
+    "complete_shd_mean": 4899.65,
+    "floor": "empty graph",
+    "das_minus_floor": -37.95,
+    "bootstrap_95": [
+     -41.65,
+     -34.25
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_standardized",
+    "graph": "ER1",
+    "d": 200,
+    "datasets": 20,
+    "das_shd_mean": 139.85,
+    "empty_shd_mean": 200.0,
+    "complete_shd_mean": 19798.15,
+    "floor": "empty graph",
+    "das_minus_floor": -60.15,
+    "bootstrap_95": [
+     -63.35,
+     -57.0
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_standardized",
+    "graph": "ER1",
+    "d": 500,
+    "datasets": 20,
+    "das_shd_mean": 364.05,
+    "empty_shd_mean": 500.0,
+    "complete_shd_mean": 124501.25,
+    "floor": "empty graph",
+    "das_minus_floor": -135.95,
+    "bootstrap_95": [
+     -142.7,
+     -129.5
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_standardized",
+    "graph": "ER1",
+    "d": 1000,
+    "datasets": 20,
+    "das_shd_mean": 886.5,
+    "empty_shd_mean": 1000.0,
+    "complete_shd_mean": 498999.95,
+    "floor": "empty graph",
+    "das_minus_floor": -113.5,
+    "bootstrap_95": [
+     -120.8,
+     -105.95
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_standardized",
+    "graph": "ER4",
+    "d": 10,
+    "datasets": 20,
+    "das_shd_mean": 22.0,
+    "empty_shd_mean": 40.0,
+    "complete_shd_mean": 27.1,
+    "floor": "complete DAG in column order",
+    "das_minus_floor": -5.1,
+    "bootstrap_95": [
+     -7.7,
+     -2.6
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_standardized",
+    "graph": "ER4",
+    "d": 20,
+    "datasets": 20,
+    "das_shd_mean": 51.9,
+    "empty_shd_mean": 80.0,
+    "complete_shd_mean": 147.05,
+    "floor": "empty graph",
+    "das_minus_floor": -28.1,
+    "bootstrap_95": [
+     -30.55,
+     -25.65
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_standardized",
+    "graph": "ER4",
+    "d": 50,
+    "datasets": 20,
+    "das_shd_mean": 151.0,
+    "empty_shd_mean": 200.0,
+    "complete_shd_mean": 1120.75,
+    "floor": "empty graph",
+    "das_minus_floor": -49.0,
+    "bootstrap_95": [
+     -51.4,
+     -46.5
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_standardized",
+    "graph": "ER4",
+    "d": 100,
+    "datasets": 20,
+    "das_shd_mean": 326.2,
+    "empty_shd_mean": 400.0,
+    "complete_shd_mean": 4747.65,
+    "floor": "empty graph",
+    "das_minus_floor": -73.8,
+    "bootstrap_95": [
+     -76.75,
+     -70.75
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_standardized",
+    "graph": "ER4",
+    "d": 200,
+    "datasets": 20,
+    "das_shd_mean": 688.9,
+    "empty_shd_mean": 800.0,
+    "complete_shd_mean": 19502.15,
+    "floor": "empty graph",
+    "das_minus_floor": -111.1,
+    "bootstrap_95": [
+     -115.95,
+     -106.1
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_standardized",
+    "graph": "ER4",
+    "d": 500,
+    "datasets": 20,
+    "das_shd_mean": 1817.0,
+    "empty_shd_mean": 2000.0,
+    "complete_shd_mean": 123758.5,
+    "floor": "empty graph",
+    "das_minus_floor": -183.0,
+    "bootstrap_95": [
+     -191.05,
+     -175.75
+    ],
+    "pass": true
+   },
+   {
+    "regime": "score_paper_standardized",
+    "graph": "ER4",
+    "d": 1000,
+    "datasets": 20,
+    "das_shd_mean": 3860.7,
+    "empty_shd_mean": 4000.0,
+    "complete_shd_mean": 497487.8,
+    "floor": "empty graph",
+    "das_minus_floor": -139.3,
+    "bootstrap_95": [
+     -146.25,
+     -131.65
+    ],
+    "pass": true
+   }
+  ]
+ },
+ "order_floor": {
+  "about": "z-scored, up to 200 variables: the share of true edges SCORE's order (DAS's order) puts in the true direction minus R2-SortnRegress's; pass when the 95% interval lies above 0. Every edge of DAS's graph points forward in that order on every dataset",
+  "rows": [
+   {
+    "graph": "ER1",
+    "d": 10,
+    "datasets": 20,
+    "score_order_share": 0.805,
+    "r2_sort_order_share": 0.495,
+    "difference": 0.31,
+    "bootstrap_95": [
+     0.24,
+     0.38
+    ],
+    "pass": true
+   },
+   {
+    "graph": "ER1",
+    "d": 20,
+    "datasets": 20,
+    "score_order_share": 0.727,
+    "r2_sort_order_share": 0.46,
+    "difference": 0.27,
+    "bootstrap_95": [
+     0.19,
+     0.35
+    ],
+    "pass": true
+   },
+   {
+    "graph": "ER1",
+    "d": 50,
+    "datasets": 20,
+    "score_order_share": 0.649,
+    "r2_sort_order_share": 0.427,
+    "difference": 0.22,
+    "bootstrap_95": [
+     0.16,
+     0.29
+    ],
+    "pass": true
+   },
+   {
+    "graph": "ER1",
+    "d": 100,
+    "datasets": 20,
+    "score_order_share": 0.647,
+    "r2_sort_order_share": 0.441,
+    "difference": 0.21,
+    "bootstrap_95": [
+     0.15,
+     0.26
+    ],
+    "pass": true
+   },
+   {
+    "graph": "ER1",
+    "d": 200,
+    "datasets": 20,
+    "score_order_share": 0.625,
+    "r2_sort_order_share": 0.438,
+    "difference": 0.19,
+    "bootstrap_95": [
+     0.16,
+     0.21
+    ],
+    "pass": true
+   },
+   {
+    "graph": "ER4",
+    "d": 10,
+    "datasets": 20,
+    "score_order_share": 0.97,
+    "r2_sort_order_share": 0.159,
+    "difference": 0.81,
+    "bootstrap_95": [
+     0.78,
+     0.84
+    ],
+    "pass": true
+   },
+   {
+    "graph": "ER4",
+    "d": 20,
+    "datasets": 20,
+    "score_order_share": 0.924,
+    "r2_sort_order_share": 0.161,
+    "difference": 0.76,
+    "bootstrap_95": [
+     0.73,
+     0.79
+    ],
+    "pass": true
+   },
+   {
+    "graph": "ER4",
+    "d": 50,
+    "datasets": 20,
+    "score_order_share": 0.864,
+    "r2_sort_order_share": 0.174,
+    "difference": 0.69,
+    "bootstrap_95": [
+     0.66,
+     0.72
+    ],
+    "pass": true
+   },
+   {
+    "graph": "ER4",
+    "d": 100,
+    "datasets": 20,
+    "score_order_share": 0.823,
+    "r2_sort_order_share": 0.193,
+    "difference": 0.63,
+    "bootstrap_95": [
+     0.61,
+     0.65
+    ],
+    "pass": true
+   },
+   {
+    "graph": "ER4",
+    "d": 200,
+    "datasets": 20,
+    "score_order_share": 0.797,
+    "r2_sort_order_share": 0.199,
+    "difference": 0.6,
+    "bootstrap_95": [
+     0.59,
+     0.61
+    ],
+    "pass": true
+   }
+  ]
+ },
+ "frontier": {
+  "about": "z-scored: each comparator's SHD minus DAS's (mean, 95% interval) and its time over DAS's (median of the per-dataset ratio, 95% interval); a comparator dominates DAS when both intervals lie below 0 and 1. A timeout is a timeout, never a graph. Rows with fewer than 20 datasets are descriptive",
+  "rows": [
+   {
+    "graph": "ER1",
+    "d": 10,
+    "datasets": 20,
+    "das_shd_mean": 2.9,
+    "das_s": 0.51,
+    "empty_shd_mean": 10.0,
+    "comparators": {
+     "cam": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 0.65,
+      "s": 0.58,
+      "shd_minus_das": -2.25,
+      "shd_minus_das_95": [
+       -3.0,
+       -1.5
+      ],
+      "time_over_das": 1.05,
+      "time_over_das_95": [
+       0.95,
+       1.34
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     },
+     "score_matching": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 2.8,
+      "s": 0.61,
+      "shd_minus_das": -0.1,
+      "shd_minus_das_95": [
+       -0.25,
+       0.0
+      ],
+      "time_over_das": 1.21,
+      "time_over_das_95": [
+       1.19,
+       1.25
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     },
+     "nogam": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 1.7,
+      "s": 6.36,
+      "shd_minus_das": -1.2,
+      "shd_minus_das_95": [
+       -1.9,
+       -0.5
+      ],
+      "time_over_das": 12.69,
+      "time_over_das_95": [
+       12.16,
+       12.98
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     }
+    }
+   },
+   {
+    "graph": "ER1",
+    "d": 20,
+    "datasets": 20,
+    "das_shd_mean": 8.15,
+    "das_s": 1.23,
+    "empty_shd_mean": 20.0,
+    "comparators": {
+     "cam": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 2.1,
+      "s": 2.14,
+      "shd_minus_das": -6.05,
+      "shd_minus_das_95": [
+       -6.85,
+       -5.25
+      ],
+      "time_over_das": 1.66,
+      "time_over_das_95": [
+       1.59,
+       1.94
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     },
+     "score_matching": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 7.8,
+      "s": 1.86,
+      "shd_minus_das": -0.35,
+      "shd_minus_das_95": [
+       -0.65,
+       -0.05
+      ],
+      "time_over_das": 1.47,
+      "time_over_das_95": [
+       1.3,
+       1.54
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     },
+     "nogam": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 6.0,
+      "s": 24.47,
+      "shd_minus_das": -2.15,
+      "shd_minus_das_95": [
+       -2.95,
+       -1.35
+      ],
+      "time_over_das": 20.12,
+      "time_over_das_95": [
+       18.3,
+       20.76
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     }
+    }
+   },
+   {
+    "graph": "ER1",
+    "d": 50,
+    "datasets": 20,
+    "das_shd_mean": 28.3,
+    "das_s": 4.08,
+    "empty_shd_mean": 50.0,
+    "comparators": {
+     "cam": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 5.5,
+      "s": 6.87,
+      "shd_minus_das": -22.8,
+      "shd_minus_das_95": [
+       -25.2,
+       -20.1
+      ],
+      "time_over_das": 1.56,
+      "time_over_das_95": [
+       1.48,
+       1.8
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     },
+     "score_matching": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 25.0,
+      "s": 20.32,
+      "shd_minus_das": -3.3,
+      "shd_minus_das_95": [
+       -4.35,
+       -2.25
+      ],
+      "time_over_das": 4.98,
+      "time_over_das_95": [
+       4.28,
+       6.06
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     }
+    }
+   },
+   {
+    "graph": "ER1",
+    "d": 100,
+    "datasets": 20,
+    "das_shd_mean": 62.05,
+    "das_s": 9.23,
+    "empty_shd_mean": 100.0,
+    "comparators": {
+     "cam": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 16.1,
+      "s": 13.73,
+      "shd_minus_das": -45.95,
+      "shd_minus_das_95": [
+       -50.0,
+       -42.1
+      ],
+      "time_over_das": 1.48,
+      "time_over_das_95": [
+       1.43,
+       1.57
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     },
+     "score_matching": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 58.55,
+      "s": 65.78,
+      "shd_minus_das": -3.5,
+      "shd_minus_das_95": [
+       -5.95,
+       -1.05
+      ],
+      "time_over_das": 7.0,
+      "time_over_das_95": [
+       6.51,
+       7.47
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     }
+    }
+   },
+   {
+    "graph": "ER1",
+    "d": 200,
+    "datasets": 20,
+    "das_shd_mean": 139.85,
+    "das_s": 22.79,
+    "empty_shd_mean": 200.0,
+    "comparators": {
+     "cam": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 43.65,
+      "s": 37.13,
+      "shd_minus_das": -96.2,
+      "shd_minus_das_95": [
+       -98.95,
+       -93.35
+      ],
+      "time_over_das": 1.61,
+      "time_over_das_95": [
+       1.57,
+       1.66
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     },
+     "score_matching": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 161.55,
+      "s": 192.3,
+      "shd_minus_das": 21.7,
+      "shd_minus_das_95": [
+       17.6,
+       25.45
+      ],
+      "time_over_das": 8.51,
+      "time_over_das_95": [
+       7.66,
+       9.27
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     }
+    }
+   },
+   {
+    "graph": "ER1",
+    "d": 500,
+    "datasets": 20,
+    "das_shd_mean": 364.05,
+    "das_s": 85.79,
+    "empty_shd_mean": 500.0,
+    "comparators": {
+     "cam": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 170.7,
+      "s": 221.77,
+      "shd_minus_das": -193.35,
+      "shd_minus_das_95": [
+       -201.85,
+       -184.6
+      ],
+      "time_over_das": 2.52,
+      "time_over_das_95": [
+       2.14,
+       3.0
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     }
+    }
+   },
+   {
+    "graph": "ER1",
+    "d": 1000,
+    "datasets": 20,
+    "das_shd_mean": 886.5,
+    "das_s": 245.35,
+    "empty_shd_mean": 1000.0,
+    "comparators": {
+     "cam": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 465.75,
+      "s": 669.27,
+      "shd_minus_das": -420.75,
+      "shd_minus_das_95": [
+       -432.9,
+       -408.3
+      ],
+      "time_over_das": 2.66,
+      "time_over_das_95": [
+       2.53,
+       2.88
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     }
+    }
+   },
+   {
+    "graph": "ER4",
+    "d": 10,
+    "datasets": 20,
+    "das_shd_mean": 22.0,
+    "das_s": 0.52,
+    "empty_shd_mean": 40.0,
+    "comparators": {
+     "cam": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 21.9,
+      "s": 0.86,
+      "shd_minus_das": -0.1,
+      "shd_minus_das_95": [
+       -1.4,
+       1.15
+      ],
+      "time_over_das": 1.67,
+      "time_over_das_95": [
+       1.43,
+       1.84
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     },
+     "score_matching": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 22.05,
+      "s": 0.62,
+      "shd_minus_das": 0.05,
+      "shd_minus_das_95": [
+       -0.65,
+       0.7
+      ],
+      "time_over_das": 1.24,
+      "time_over_das_95": [
+       1.11,
+       1.27
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     },
+     "nogam": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 21.1,
+      "s": 6.64,
+      "shd_minus_das": -0.9,
+      "shd_minus_das_95": [
+       -1.85,
+       0.0
+      ],
+      "time_over_das": 12.68,
+      "time_over_das_95": [
+       12.33,
+       14.06
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     }
+    }
+   },
+   {
+    "graph": "ER4",
+    "d": 20,
+    "datasets": 20,
+    "das_shd_mean": 51.9,
+    "das_s": 1.22,
+    "empty_shd_mean": 80.0,
+    "comparators": {
+     "cam": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 44.3,
+      "s": 2.42,
+      "shd_minus_das": -7.6,
+      "shd_minus_das_95": [
+       -9.0,
+       -6.1
+      ],
+      "time_over_das": 1.95,
+      "time_over_das_95": [
+       1.83,
+       2.12
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     },
+     "score_matching": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 48.65,
+      "s": 2.03,
+      "shd_minus_das": -3.25,
+      "shd_minus_das_95": [
+       -4.1,
+       -2.4
+      ],
+      "time_over_das": 1.59,
+      "time_over_das_95": [
+       1.51,
+       1.77
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     },
+     "nogam": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 47.25,
+      "s": 24.55,
+      "shd_minus_das": -4.65,
+      "shd_minus_das_95": [
+       -5.95,
+       -3.4
+      ],
+      "time_over_das": 20.62,
+      "time_over_das_95": [
+       19.91,
+       21.46
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     }
+    }
+   },
+   {
+    "graph": "ER4",
+    "d": 50,
+    "datasets": 20,
+    "das_shd_mean": 151.0,
+    "das_s": 3.99,
+    "empty_shd_mean": 200.0,
+    "comparators": {
+     "cam": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 117.45,
+      "s": 6.88,
+      "shd_minus_das": -33.55,
+      "shd_minus_das_95": [
+       -36.75,
+       -30.1
+      ],
+      "time_over_das": 1.7,
+      "time_over_das_95": [
+       1.55,
+       1.79
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     },
+     "score_matching": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 139.35,
+      "s": 22.77,
+      "shd_minus_das": -11.65,
+      "shd_minus_das_95": [
+       -13.35,
+       -10.0
+      ],
+      "time_over_das": 5.23,
+      "time_over_das_95": [
+       4.6,
+       6.01
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     }
+    }
+   },
+   {
+    "graph": "ER4",
+    "d": 100,
+    "datasets": 20,
+    "das_shd_mean": 326.2,
+    "das_s": 9.12,
+    "empty_shd_mean": 400.0,
+    "comparators": {
+     "cam": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 247.35,
+      "s": 14.81,
+      "shd_minus_das": -78.85,
+      "shd_minus_das_95": [
+       -82.55,
+       -75.3
+      ],
+      "time_over_das": 1.63,
+      "time_over_das_95": [
+       1.6,
+       1.72
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     },
+     "score_matching": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 297.05,
+      "s": 60.63,
+      "shd_minus_das": -29.15,
+      "shd_minus_das_95": [
+       -33.3,
+       -25.0
+      ],
+      "time_over_das": 6.61,
+      "time_over_das_95": [
+       6.01,
+       7.3
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     }
+    }
+   },
+   {
+    "graph": "ER4",
+    "d": 200,
+    "datasets": 20,
+    "das_shd_mean": 688.9,
+    "das_s": 23.69,
+    "empty_shd_mean": 800.0,
+    "comparators": {
+     "cam": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 502.6,
+      "s": 41.89,
+      "shd_minus_das": -186.3,
+      "shd_minus_das_95": [
+       -192.85,
+       -179.75
+      ],
+      "time_over_das": 1.79,
+      "time_over_das_95": [
+       1.7,
+       1.83
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     },
+     "score_matching": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 663.1,
+      "s": 194.02,
+      "shd_minus_das": -25.8,
+      "shd_minus_das_95": [
+       -32.05,
+       -19.6
+      ],
+      "time_over_das": 8.05,
+      "time_over_das_95": [
+       7.66,
+       8.82
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     }
+    }
+   },
+   {
+    "graph": "ER4",
+    "d": 500,
+    "datasets": 20,
+    "das_shd_mean": 1817.0,
+    "das_s": 83.33,
+    "empty_shd_mean": 2000.0,
+    "comparators": {
+     "cam": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 1327.75,
+      "s": 229.61,
+      "shd_minus_das": -489.25,
+      "shd_minus_das_95": [
+       -497.75,
+       -479.75
+      ],
+      "time_over_das": 2.22,
+      "time_over_das_95": [
+       2.17,
+       2.47
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     },
+     "score_matching": {
+      "fits": 2,
+      "timeouts": 2,
+      "cap_s": 3600
+     }
+    }
+   },
+   {
+    "graph": "ER4",
+    "d": 1000,
+    "datasets": 20,
+    "das_shd_mean": 3860.7,
+    "das_s": 364.57,
+    "empty_shd_mean": 4000.0,
+    "comparators": {
+     "cam": {
+      "fits": 20,
+      "timeouts": 0,
+      "paired": 20,
+      "shd_mean": 2790.4,
+      "s": 631.71,
+      "shd_minus_das": -1070.3,
+      "shd_minus_das_95": [
+       -1087.1,
+       -1054.9
+      ],
+      "time_over_das": 2.7,
+      "time_over_das_95": [
+       1.61,
+       4.99
+      ],
+      "dominates_das": false,
+      "descriptive": false
+     }
+    }
+   }
+  ]
+ },
+ "paired_at_500": {
+  "about": "the authors' code at 500 variables, ER4, z-scored, seeds 0-4, a cap of 7,200 s, one fit per single-core job on an AMD EPYC 9555; descriptive (5 datasets). Andrey's fits ran on an AMD EPYC 9534, so the time ratio crosses CPU models",
+  "datasets": 5,
+  "andrey_ok": 5,
+  "comparator_ok": 5,
+  "paired": 5,
+  "andrey_s": 73.8165,
+  "comparator_s": 2459.0492,
+  "ratio": 33.31,
+  "ratio_quartiles": [
+   33.25,
+   34.24
+  ],
+  "same_graph": 0,
+  "andrey_shd": 1819.0,
+  "comparator_shd": 1929.0,
+  "empty_shd": 2000.0,
+  "andrey_shd_mean": 1816.4,
+  "comparator_shd_mean": 1922.4,
+  "empty_shd_mean": 2000.0,
+  "mean_D": -106.0,
+  "bootstrap_95": [
+   -121.4,
+   -91.6
+  ],
+  "above_zero": false,
+  "verdict": "better",
+  "coverage": {
+   "datasets": 5,
+   "andrey_short": 0,
+   "reference_short": 0
+  },
+  "floor": {
+   "applies": true,
+   "pass": true,
+   "andrey_minus_empty": {
+    "paired": 5,
+    "mean": -183.6,
+    "bootstrap_95": [
+     -193.4,
+     -173.8
+    ]
+   },
+   "reference_minus_empty": {
+    "paired": 5,
+    "mean": -77.6,
+    "bootstrap_95": [
+     -94.4,
+     -67.0
+    ]
+   }
+  }
+ },
+ "paper_check": {
+  "about": "DAS's mean SHD against the paper's Tables 1-2 (mean and SD over its 10 runs, raw columns); Andrey's graph is the same on z-scored and raw columns. The gaps at 500 variables are not traced",
+  "rows": [
+   {
+    "graph": "ER1",
+    "d": 10,
+    "datasets": 20,
+    "das_shd_mean": 2.9,
+    "paper_mean": 1.0,
+    "paper_sd": 0.8,
+    "within_mean_plus_2sd": false
+   },
+   {
+    "graph": "ER1",
+    "d": 20,
+    "datasets": 20,
+    "das_shd_mean": 8.15,
+    "paper_mean": 3.2,
+    "paper_sd": 1.4,
+    "within_mean_plus_2sd": false
+   },
+   {
+    "graph": "ER1",
+    "d": 50,
+    "datasets": 20,
+    "das_shd_mean": 28.3,
+    "paper_mean": 17.3,
+    "paper_sd": 3.4,
+    "within_mean_plus_2sd": false
+   },
+   {
+    "graph": "ER1",
+    "d": 100,
+    "datasets": 20,
+    "das_shd_mean": 62.05,
+    "paper_mean": 46.6,
+    "paper_sd": 9.1,
+    "within_mean_plus_2sd": true
+   },
+   {
+    "graph": "ER1",
+    "d": 200,
+    "datasets": 20,
+    "das_shd_mean": 139.85,
+    "paper_mean": 110,
+    "paper_sd": 6.6,
+    "within_mean_plus_2sd": false
+   },
+   {
+    "graph": "ER1",
+    "d": 500,
+    "datasets": 20,
+    "das_shd_mean": 364.05,
+    "paper_mean": 291,
+    "paper_sd": 13,
+    "within_mean_plus_2sd": false
+   },
+   {
+    "graph": "ER1",
+    "d": 1000,
+    "datasets": 20,
+    "das_shd_mean": 886.5,
+    "paper_mean": 994,
+    "paper_sd": 15,
+    "within_mean_plus_2sd": true
+   },
+   {
+    "graph": "ER4",
+    "d": 10,
+    "datasets": 20,
+    "das_shd_mean": 22.0,
+    "paper_mean": 27.0,
+    "paper_sd": 2.2,
+    "within_mean_plus_2sd": true
+   },
+   {
+    "graph": "ER4",
+    "d": 20,
+    "datasets": 20,
+    "das_shd_mean": 51.9,
+    "paper_mean": 56.4,
+    "paper_sd": 2.5,
+    "within_mean_plus_2sd": true
+   },
+   {
+    "graph": "ER4",
+    "d": 50,
+    "datasets": 20,
+    "das_shd_mean": 151.0,
+    "paper_mean": 156,
+    "paper_sd": 4,
+    "within_mean_plus_2sd": true
+   },
+   {
+    "graph": "ER4",
+    "d": 100,
+    "datasets": 20,
+    "das_shd_mean": 326.2,
+    "paper_mean": 335,
+    "paper_sd": 5,
+    "within_mean_plus_2sd": true
+   },
+   {
+    "graph": "ER4",
+    "d": 200,
+    "datasets": 20,
+    "das_shd_mean": 688.9,
+    "paper_mean": 691,
+    "paper_sd": 13,
+    "within_mean_plus_2sd": true
+   },
+   {
+    "graph": "ER4",
+    "d": 500,
+    "datasets": 20,
+    "das_shd_mean": 1817.0,
+    "paper_mean": 1761,
+    "paper_sd": 15,
+    "within_mean_plus_2sd": false
+   },
+   {
+    "graph": "ER4",
+    "d": 1000,
+    "datasets": 20,
+    "das_shd_mean": 3860.7,
+    "paper_mean": 3951,
+    "paper_sd": 9,
+    "within_mean_plus_2sd": true
+   }
+  ]
+ },
+ "scale_trace": {
+  "about": "raw ER1 cells, where DAS made more errors than the authors' code on the first and the fresh seeds: DAS refit with its order search on the centered columns, unscaled (a development variant, not an option of the method), minus the authors' code on the same datasets. The unscaled order search closes the gap: the code published with the paper reads the columns' scales, which grow along the causal order in this simulation (varsortability 0.8-0.9), and DAS reads standardized columns by design",
+  "rows": [
+   {
+    "d": 20,
+    "seeds": "0-19",
+    "variant": "as shipped",
+    "datasets": 20,
+    "shd_mean": 8.15,
+    "authors_shd_mean": 5.8,
+    "minus_authors": 2.35,
+    "bootstrap_95": [
+     1.15,
+     3.4
+    ],
+    "arrowhead_precision": 0.714,
+    "skeleton_recall": 0.86
+   },
+   {
+    "d": 20,
+    "seeds": "0-19",
+    "variant": "order search on the centered columns, unscaled",
+    "datasets": 20,
+    "shd_mean": 4.35,
+    "authors_shd_mean": 5.8,
+    "minus_authors": -1.45,
+    "bootstrap_95": [
+     -2.3,
+     -0.75
+    ],
+    "arrowhead_precision": 0.907,
+    "skeleton_recall": 0.87
+   },
+   {
+    "d": 20,
+    "seeds": "0-19",
+    "variant": "unscaled, and four predecessors kept untested",
+    "datasets": 20,
+    "shd_mean": 4.3,
+    "authors_shd_mean": 5.8,
+    "minus_authors": -1.5,
+    "bootstrap_95": [
+     -2.3,
+     -0.75
+    ],
+    "arrowhead_precision": 0.913,
+    "skeleton_recall": 0.865
+   },
+   {
+    "d": 20,
+    "seeds": "20-39",
+    "variant": "as shipped",
+    "datasets": 20,
+    "shd_mean": 7.2,
+    "authors_shd_mean": 4.85,
+    "minus_authors": 2.35,
+    "bootstrap_95": [
+     1.3,
+     3.4
+    ],
+    "arrowhead_precision": 0.74,
+    "skeleton_recall": 0.887
+   },
+   {
+    "d": 20,
+    "seeds": "20-39",
+    "variant": "order search on the centered columns, unscaled",
+    "datasets": 20,
+    "shd_mean": 3.7,
+    "authors_shd_mean": 4.85,
+    "minus_authors": -1.15,
+    "bootstrap_95": [
+     -1.95,
+     -0.3
+    ],
+    "arrowhead_precision": 0.925,
+    "skeleton_recall": 0.885
+   },
+   {
+    "d": 20,
+    "seeds": "20-39",
+    "variant": "unscaled, and four predecessors kept untested",
+    "datasets": 20,
+    "shd_mean": 3.95,
+    "authors_shd_mean": 4.85,
+    "minus_authors": -0.9,
+    "bootstrap_95": [
+     -1.75,
+     -0.05
+    ],
+    "arrowhead_precision": 0.925,
+    "skeleton_recall": 0.87
+   },
+   {
+    "d": 50,
+    "seeds": "0-19",
+    "variant": "as shipped",
+    "datasets": 20,
+    "shd_mean": 28.3,
+    "authors_shd_mean": 18.9,
+    "minus_authors": 9.4,
+    "bootstrap_95": [
+     6.8,
+     11.9
+    ],
+    "arrowhead_precision": 0.602,
+    "skeleton_recall": 0.793
+   },
+   {
+    "d": 50,
+    "seeds": "0-19",
+    "variant": "order search on the centered columns, unscaled",
+    "datasets": 20,
+    "shd_mean": 16.35,
+    "authors_shd_mean": 18.9,
+    "minus_authors": -2.55,
+    "bootstrap_95": [
+     -4.0,
+     -1.1
+    ],
+    "arrowhead_precision": 0.867,
+    "skeleton_recall": 0.788
+   },
+   {
+    "d": 50,
+    "seeds": "0-19",
+    "variant": "unscaled, and four predecessors kept untested",
+    "datasets": 20,
+    "shd_mean": 16.9,
+    "authors_shd_mean": 18.9,
+    "minus_authors": -2.0,
+    "bootstrap_95": [
+     -3.5,
+     -0.55
+    ],
+    "arrowhead_precision": 0.869,
+    "skeleton_recall": 0.772
+   },
+   {
+    "d": 50,
+    "seeds": "20-39",
+    "variant": "as shipped",
+    "datasets": 20,
+    "shd_mean": 28.65,
+    "authors_shd_mean": 17.15,
+    "minus_authors": 11.5,
+    "bootstrap_95": [
+     9.55,
+     13.6
+    ],
+    "arrowhead_precision": 0.602,
+    "skeleton_recall": 0.777
+   },
+   {
+    "d": 50,
+    "seeds": "20-39",
+    "variant": "order search on the centered columns, unscaled",
+    "datasets": 20,
+    "shd_mean": 14.5,
+    "authors_shd_mean": 17.15,
+    "minus_authors": -2.65,
+    "bootstrap_95": [
+     -4.05,
+     -1.15
+    ],
+    "arrowhead_precision": 0.889,
+    "skeleton_recall": 0.806
+   },
+   {
+    "d": 50,
+    "seeds": "20-39",
+    "variant": "unscaled, and four predecessors kept untested",
+    "datasets": 20,
+    "shd_mean": 15.1,
+    "authors_shd_mean": 17.15,
+    "minus_authors": -2.05,
+    "bootstrap_95": [
+     -3.6,
+     -0.4
+    ],
+    "arrowhead_precision": 0.889,
+    "skeleton_recall": 0.793
+   }
+  ]
+ }
+}
