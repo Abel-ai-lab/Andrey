@@ -391,16 +391,6 @@ class TestwiseDeletion:
         self._cache.clear()
         self._held = 0
 
-    def undecidable(self) -> np.ndarray:
-        """``[i, j]`` when columns ``i`` and ``j`` are observed together on fewer rows than their
-        test without conditions needs, never together included: no query of the pair can be
-        tested, as every condition keeps fewer rows and needs more. A symmetric boolean matrix with
-        a ``False`` diagonal."""
-        observed = self._observed.astype(np.float64)
-        out = observed.T @ observed < self.least_rows(0)
-        np.fill_diagonal(out, False)
-        return out
-
     @property
     def environments(self) -> np.ndarray:
         """The columns :meth:`mark_environments` marked."""

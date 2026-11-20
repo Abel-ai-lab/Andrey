@@ -374,7 +374,10 @@ def parents_children(
     largest p-values agree to ``KEY_DP`` decimals, the smallest strength, then the rank. Forward:
     add the candidate whose weakest association is the strongest, until every candidate has a
     conditioning set with a p-value above ``alpha``; such a candidate is dropped for good, since
-    adding members only weakens an association. Each addition tests every remaining candidate
+    adding members only weakens an association. A set that was not tested is left out of a
+    candidate's association, and a candidate whose test with ``target`` alone was not tested, as
+    one never observed with it, joins the members after the others, in rank order: a test without
+    rows separates no pair. Each addition tests every remaining candidate
     against the conditioning sets that hold the new member, by increasing size, and stops testing
     a candidate after the first size at which a set separates it. Backward: visit the members in the
     order they joined and drop each one some subset of the other current members separates; the
@@ -403,6 +406,7 @@ def parents_children(
         x for x in range(d) if x != target and x not in required and (allowed is None or allowed[x])
     ]
     weakest = dict(zip(others, _weakest(test, target, others, [()]), strict=True))
+    untested = [x for x, (p, _) in weakest.items() if not_tested(p)]
     if sepsets is not None:
         sepsets.update({x: () for x, (p, _) in weakest.items() if p > alpha})
     members: list[int] = []
@@ -442,6 +446,9 @@ def parents_children(
         del open_[best]
         admit(best, open_)
         weakest = open_
+    # A candidate whose test with target was not tested stays: a test without rows separates no
+    # pair, and no test with fewer conditions can run on fewer rows.
+    members.extend(sorted(untested, key=lambda x: ranks[x]))
     for x in list(members):
         if x in required:
             continue
@@ -885,11 +892,6 @@ class LocalSearch:
             mb = self._sets(lambda i: self.local(method, i)[1] or [])
             blankets = mb & mb.T
             skeleton = blankets if structure == "moral" else sets & sets.T
-        if isinstance(self.test, TestwiseDeletion):  # pairs no test with rows can decide
-            apart = self.test.undecidable()
-            if self.constraints is not None:
-                apart &= self.constraints.support()
-            skeleton, blankets = skeleton | apart, blankets | apart
         if structure != "cpdag":
             return np.where(skeleton, TAIL, NULL).astype(np.int8)
         return blanket_cpdag(
@@ -961,10 +963,7 @@ def local_structure(
     parents and children and the moral graph from its blankets, both by the AND rule.
     ``"cpdag"`` orients the skeleton (:func:`blanket_cpdag`) against the blankets: the moral graph,
     or for a ``"pc"`` learner each variable's set together with its members' sets before the
-    symmetry check (:func:`reach`). On data with missing values, a pair no query of which can be
-    tested (:meth:`~andrey.core.ci_missing.TestwiseDeletion.undecidable`), a pair never observed
-    together included, joins both graphs, as a skeleton search keeps such a pair adjacent. The
-    other arguments are :func:`local_search`'s.
+    symmetry check (:func:`reach`). The other arguments are :func:`local_search`'s.
     """
     search = local_search(
         X,

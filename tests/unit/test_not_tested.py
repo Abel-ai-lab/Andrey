@@ -188,3 +188,11 @@ def test_an_environment_constant_on_a_block_is_not_tested(method, k):
     moved = getattr(andrey, method)(df.iloc[order].reset_index(drop=True), env[order])
     assert np.array_equal(moved.structure.adjacency, out.structure.adjacency)
     assert moved.metadata.get("not_tested") == out.metadata.get("not_tested")
+
+
+@pytest.mark.parametrize("name", ["iamb", "inter_iamb", "mmpc"])
+def test_a_target_set_holds_a_variable_never_observed_with_the_target(name):
+    out = getattr(andrey, name)(_cohorts(0), target="B")
+    key = "parents_and_children" if name == "mmpc" else "markov_blanket"
+    assert {"A", "S1"} <= set(out.metadata[key])
+    assert ["A", "B"] in out.metadata["undecided_pairs"]
