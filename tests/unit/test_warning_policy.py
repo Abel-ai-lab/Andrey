@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import io
 import json
 import logging
 import os
@@ -305,17 +306,28 @@ def test_held_records_in_two_threads_keep_their_own_records_and_restore_the_logg
     assert (list(logger.handlers), logger.propagate, logger.level) == before
 
 
-def test_held_records_keep_the_records_of_an_andrey_logger_set_above_warning():
+@pytest.mark.parametrize("setting", ["level", "propagate", "handler"])
+def test_held_records_keep_the_records_of_an_andrey_logger_configured_apart(setting):
+    """A logger below ``andrey`` set above ``WARNING``, not propagating, or with its own handler."""
     child = logging.getLogger("andrey.search.em")
-    level = child.level
-    child.setLevel(logging.ERROR)
+    seen = io.StringIO()
+    own = logging.StreamHandler(seen)
+    before = (list(child.handlers), child.propagate, child.level)
+    if setting == "level":
+        child.setLevel(logging.ERROR)
+    elif setting == "propagate":
+        child.propagate = False
+    else:
+        child.addHandler(own)
+    configured = (list(child.handlers), child.propagate, child.level)
     try:
         with held_records() as records:
             child.warning("held")
-        assert child.level == logging.ERROR
+        assert (list(child.handlers), child.propagate, child.level) == configured
     finally:
-        child.setLevel(level)
-    assert [r.getMessage() for r in records] == ["held"]
+        child.handlers, child.propagate = before[0], before[1]
+        child.setLevel(before[2])
+    assert [r.getMessage() for r in records] == ["held"] and seen.getvalue() == ""
 
 
 def test_held_records_hold_the_records_a_lower_level_lets_through():

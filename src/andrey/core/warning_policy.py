@@ -156,11 +156,11 @@ def held_records() -> Generator[list[logging.LogRecord]]:
     During the block the ``andrey`` logger holds only the handler that keeps them and does not
     propagate, so no record reaches standard error, through the root logger's handlers or an
     embedding application's either; its level is lowered to ``WARNING`` when it, or the logger it
-    inherits from, is set above it, and so is the level of each ``andrey.`` logger set above it,
-    so the block keeps every warning-level record whatever the caller's thresholds. The handlers,
-    the propagation, and the levels are restored after it. A
-    block in another thread waits until this one ends, so each restores what it found; a block
-    nested in this thread holds the records of its own span.
+    inherits from, is set above it. Each ``andrey.`` logger below it holds no handler and
+    propagates, with its level lowered to ``WARNING`` when it is set above it, so every record
+    reaches the held handler and none goes out on its way. The handlers, the propagation, and the
+    levels are restored after the block. A block in another thread waits until this one ends, so
+    each restores what it found; a block nested in this thread holds the records of its own span.
     """
     with _holding:
         handler = _Held()
@@ -168,23 +168,24 @@ def held_records() -> Generator[list[logging.LogRecord]]:
         handlers, propagate, level = logger.handlers[:], logger.propagate, logger.level
         held: list[logging.Handler] = [handler]
         logger.handlers, logger.propagate = held, False
-        loggers = logging.Logger.manager.loggerDict
-        raised = [
-            (child, child.level)
-            for name, child in list(loggers.items())
+        logger.setLevel(min(logger.getEffectiveLevel(), logging.WARNING))
+        children = [
+            (child, child.handlers[:], child.propagate, child.level)
+            for name, child in list(logging.Logger.manager.loggerDict.items())
             if name.startswith(f"{_PACKAGE}.")
             and isinstance(child, logging.Logger)
-            and child.level > logging.WARNING
+            and (child.handlers or not child.propagate or child.level > logging.WARNING)
         ]
-        logger.setLevel(min(logger.getEffectiveLevel(), logging.WARNING))
-        for child, _ in raised:
-            child.setLevel(logging.WARNING)
+        for child, _, _, before in children:
+            child.handlers, child.propagate = [], True
+            child.setLevel(min(before, logging.WARNING))
         try:
             yield handler.records
         finally:
             logger.handlers, logger.propagate = handlers, propagate
             logger.setLevel(level)
-            for child, before in raised:
+            for child, own, passes, before in children:
+                child.handlers, child.propagate = own, passes
                 child.setLevel(before)
 
 

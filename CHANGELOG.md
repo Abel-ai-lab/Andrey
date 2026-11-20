@@ -85,7 +85,8 @@ names its pull request.
   `CopiedColumnsError` before a pair of columns that shares no observed row, as on complete data.
   ([#1151])
 - The CLI records a fit's warning-level log records in `run.warnings` when the `andrey` logger, a
-  logger under it, or the root logger is set above `WARNING`, and `bootstrap` logs the records of fits that ran in worker
+  logger under it, or the root logger is set above `WARNING`, or a logger under `andrey` has its
+  own handler or does not propagate, and `bootstrap` logs the records of fits that ran in worker
   processes in the calling process, once each, so they reach `run.warnings` instead of standard
   error. ([#1151])
 
