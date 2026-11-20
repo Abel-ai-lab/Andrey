@@ -253,6 +253,7 @@ _PUBLIC_CORE = [
     "TemporalStructure",
     "SummaryGraph",
     "StructureOutput",
+    "RegimeOutput",
 ]
 
 

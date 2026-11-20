@@ -3,6 +3,7 @@ facade's contract."""
 
 from __future__ import annotations
 
+import itertools
 import warnings
 
 import numpy as np
@@ -155,6 +156,29 @@ def test_column_order_relabels_the_result(fitted, series):
         np.testing.assert_array_equal(
             a.structure.lag(1).to_numpy(), b.structure.lag(1).to_numpy()[::-1, ::-1]
         )
+
+
+def test_every_column_order_relabels_the_result():
+    """Three variables in all six orders: the same regime weights to the bit, the graphs
+    relabeled."""
+    rng = np.random.default_rng(4)
+    x = np.zeros((400, 3))
+    for t in range(1, 400):
+        sign = 1.0 if (t // 80) % 2 == 0 else -1.0
+        x[t] = 0.3 * x[t - 1] + rng.standard_normal(3)
+        x[t, 1] += sign * 0.8 * x[t - 1, 0]
+    fits = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for order in itertools.permutations(range(3)):
+            fits[order] = andrey.rpcmci(x[:, order], max_transitions=5, n_starts=3, seed=0)
+    base = fits[(0, 1, 2)]
+    for order, out in fits.items():
+        np.testing.assert_array_equal(out.weights, base.weights)
+        back = np.argsort(order)
+        for a, b in zip(out.outputs, base.outputs, strict=True):
+            relabeled = a.structure.lag(1).to_numpy()[np.ix_(back, back)]
+            np.testing.assert_array_equal(relabeled, b.structure.lag(1).to_numpy())
 
 
 def test_column_units_change_nothing(fitted, series):

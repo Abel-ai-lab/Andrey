@@ -9,9 +9,9 @@ DataFrame or a NumPy array of one row per sample and one column per variable::
     print(out)
 
 Every algorithm (``andrey.ges``, ``andrey.fci``, ...) returns a ``StructureOutput``
-(``multi_group_direct_lingam``, one per group) wrapping a first-class ``Structure`` (a
-``GraphStructure`` or ``TemporalStructure``). The public graph types are re-exported here
-(``andrey.GraphStructure``) alongside ``andrey.core.*``.
+(``multi_group_direct_lingam``, one per group; ``rpcmci``, a ``RegimeOutput`` with one per regime)
+wrapping a first-class ``Structure`` (a ``GraphStructure`` or ``TemporalStructure``). The public
+graph types are re-exported here (``andrey.GraphStructure``) alongside ``andrey.core.*``.
 
 For a coding agent, the command line carries the same methods: ``andrey --skill`` prints the guide
 to save as its ``SKILL.md``, and ``andrey --help --json`` prints every method's contract as JSON.
