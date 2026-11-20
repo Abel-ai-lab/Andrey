@@ -27,11 +27,13 @@ TARBALLS=(
 PCM_REPO="https://github.com/ARLundborg/pcm_code.git"
 PCM_COMMIT="3822659390510d65c36857f8801c893e94850774"
 
-if command -v module >/dev/null 2>&1 || [ -f /usr/share/lmod/lmod/init/bash ]; then
+if [ -f /usr/share/lmod/lmod/init/bash ]; then
     set +u
     # shellcheck disable=SC1091
     source /usr/share/lmod/lmod/init/bash
     set -u
+fi
+if command -v module >/dev/null 2>&1; then
     # Unquoted on purpose: one word per module.
     # shellcheck disable=SC2086
     module load $R_MODULE

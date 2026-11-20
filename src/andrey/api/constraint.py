@@ -86,8 +86,8 @@ def pc(
         more tests detect nonlinear dependence in continuous data, at a far higher cost per test:
         ``"kci"`` is the kernel test; ``"rcot"`` its random-feature approximation; ``"cmiknn"`` a
         nearest-neighbor conditional mutual information test; ``"gpdc"`` Gaussian-process regression
-        with a distance correlation test; and ``"gcm"``, ``"wgcm"``, and ``"pcm"`` the generalised,
-        weighted generalised, and projected covariance measures, which test the covariance of
+        with a distance correlation test; and ``"gcm"``, ``"wgcm"``, and ``"pcm"`` the generalized,
+        weighted generalized, and projected covariance measures, which test the covariance of
         regression residuals. ``None`` picks from the declared column types: ``"gsq"`` when every
         column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
         declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
@@ -638,8 +638,8 @@ def fci(
         nonlinear dependence in continuous data, at a far higher cost per test: ``"kci"`` is the
         kernel test; ``"rcot"`` its random-feature approximation; ``"cmiknn"`` a nearest-neighbor
         conditional mutual information test; ``"gpdc"`` Gaussian-process regression with a distance
-        correlation test; and ``"gcm"``, ``"wgcm"``, and ``"pcm"`` the generalised, weighted
-        generalised, and projected covariance measures, which test the covariance of regression
+        correlation test; and ``"gcm"``, ``"wgcm"``, and ``"pcm"`` the generalized, weighted
+        generalized, and projected covariance measures, which test the covariance of regression
         residuals. ``None`` picks from the declared column types: ``"gsq"`` when every column is
         categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared
         categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type,
