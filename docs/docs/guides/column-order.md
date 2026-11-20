@@ -50,7 +50,7 @@ the rank order of their possible-d-separation step.
 ```{include} ../../_generated/column-order.md
 ```
 
-The CI tests `kci`, `rcot`, `cmiknn`, and `gpdc` are not methods, so the table leaves them out.
+The CI tests `kci`, `rcot`, `cmiknn`, `gpdc`, `gcm`, `wgcm`, and `pcm` are not methods, so the table leaves them out.
 They seed their random draws and order their variables by the same rank, so a p-value depends on
 neither the argument order nor the column order, and `tie_break="position"` ranks their columns by
 position instead. Every method that takes `indep_test` follows the setting through them when

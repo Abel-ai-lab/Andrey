@@ -937,12 +937,12 @@ def igsp(
         partial correlation: ``"fisherz"`` and ``"student_t"``; for categorical data coded by whole
         numbers: ``"chisq"`` and ``"gsq"``; for mixed data, with the categorical columns named by
         ``categorical``: ``"degen_gauss"`` and ``"cond_gauss"``; for nonlinear effects in continuous
-        data, each far slower: ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"``, as for
-        :func:`~andrey.pc`. ``"normal_scores"`` is not offered: the invariance tests compare a
-        setting with the observational rows, and ranked over both, a column's normal scores mix
-        their distributions. ``None`` picks from the declared column types: ``"gsq"`` when every
-        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``.
-        ``metadata["indep_test"]`` names the test the fit used.
+        data, each far slower: ``"kci"``, ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``,
+        ``"wgcm"``, and ``"pcm"``, as for :func:`~andrey.pc`. ``"normal_scores"`` is not offered:
+        the invariance tests compare a setting with the observational rows, and ranked over both, a
+        column's normal scores mix their distributions. ``None`` picks from the declared column
+        types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are, else
+        ``"fisherz"``. ``metadata["indep_test"]`` names the test the fit used.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
@@ -969,9 +969,9 @@ def igsp(
         default.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
-        not a fresh random one, so a fit repeats. Seed for the searches after the first, and for
-        the random draws of ``"rcot"``, ``"cmiknn"``, and ``"gpdc"``. With ``n_starts=1`` and
-        another test, the result does not depend on it.
+        not a fresh random one, so a fit repeats. Seed for the searches after the first, and for the
+        random draws of ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"``.
+        With ``n_starts=1`` and another test, the result does not depend on it.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1284,12 +1284,12 @@ def ut_igsp(
         partial correlation: ``"fisherz"`` and ``"student_t"``; for categorical data coded by whole
         numbers: ``"chisq"`` and ``"gsq"``; for mixed data, with the categorical columns named by
         ``categorical``: ``"degen_gauss"`` and ``"cond_gauss"``; for nonlinear effects in continuous
-        data, each far slower: ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"``, as for
-        :func:`~andrey.pc`. ``"normal_scores"`` is not offered: the invariance tests compare a
-        setting with the observational rows, and ranked over both, a column's normal scores mix
-        their distributions. ``None`` picks from the declared column types: ``"gsq"`` when every
-        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``.
-        ``metadata["indep_test"]`` names the test the fit used.
+        data, each far slower: ``"kci"``, ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``,
+        ``"wgcm"``, and ``"pcm"``, as for :func:`~andrey.pc`. ``"normal_scores"`` is not offered:
+        the invariance tests compare a setting with the observational rows, and ranked over both, a
+        column's normal scores mix their distributions. ``None`` picks from the declared column
+        types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are, else
+        ``"fisherz"``. ``metadata["indep_test"]`` names the test the fit used.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
@@ -1315,9 +1315,9 @@ def ut_igsp(
         is strictly lower. See Notes for the choice of the default.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
-        not a fresh random one, so a fit repeats. Seed for the searches after the first, and for
-        the random draws of ``"rcot"``, ``"cmiknn"``, and ``"gpdc"``. With ``n_starts=1`` and
-        another test, the result does not depend on it.
+        not a fresh random one, so a fit repeats. Seed for the searches after the first, and for the
+        random draws of ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"``.
+        With ``n_starts=1`` and another test, the result does not depend on it.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1655,16 +1655,16 @@ def boss_fci(
         against the data, and the graph can change with it. Must be finite and positive. Only
         ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     indep_test : str or None, default=None
-        Conditional-independence test for the FCI phase, as for :func:`~andrey.gfci`:
-        ``"fisherz"``, ``"student_t"``, and ``"normal_scores"`` for continuous data, ``"chisq"``
-        and ``"gsq"`` for categorical data, ``"degen_gauss"`` and ``"cond_gauss"`` for mixed data,
-        and ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"``, which also detect nonlinear
-        dependence in continuous data, at a far higher cost per test. It must read the same kind of
-        data as ``score_func``. ``None`` picks from the declared column types: ``"gsq"`` when every
-        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
-        declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
-        type, never by its values. ``metadata["indep_test"]`` names the test the fit used: the one
-        picked from the declared column types when this is ``None``.
+        Conditional-independence test for the FCI phase, as for :func:`~andrey.gfci`: ``"fisherz"``,
+        ``"student_t"``, and ``"normal_scores"`` for continuous data, ``"chisq"`` and ``"gsq"`` for
+        categorical data, ``"degen_gauss"`` and ``"cond_gauss"`` for mixed data, and ``"kci"``,
+        ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"``, which also
+        detect nonlinear dependence in continuous data, at a far higher cost per test. It must read
+        the same kind of data as ``score_func``. ``None`` picks from the declared column types:
+        ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are, else
+        ``"fisherz"``. A column is declared categorical by ``categorical`` or by a DataFrame's
+        ``category``, ``bool``, or text type, never by its values. ``metadata["indep_test"]`` names
+        the test the fit used: the one picked from the declared column types when this is ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
@@ -1705,8 +1705,8 @@ def boss_fci(
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random order in which the BOSS phase
         visits variables, as for :func:`~andrey.boss`, and for the random draws of ``indep_test``,
-        which only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make. Different seeds can reach
-        different graphs.
+        which only ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"`` make.
+        Different seeds can reach different graphs.
     n_starts : int, default=1
         Number of BOSS searches, at least ``1``, as for :func:`~andrey.boss`: the first starts from
         the columns' tie-rank order, each later one from a random order drawn from ``seed`` and its
@@ -2003,16 +2003,16 @@ def grasp_fci(
         :func:`~andrey.grasp`. Larger depths search more chains, which can reach a better score,
         and run longer.
     indep_test : str or None, default=None
-        Conditional-independence test for the FCI phase, as for :func:`~andrey.gfci`:
-        ``"fisherz"``, ``"student_t"``, and ``"normal_scores"`` for continuous data, ``"chisq"``
-        and ``"gsq"`` for categorical data, ``"degen_gauss"`` and ``"cond_gauss"`` for mixed data,
-        and ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"``, which also detect nonlinear
-        dependence in continuous data, at a far higher cost per test. It must read the same kind of
-        data as ``score_func``. ``None`` picks from the declared column types: ``"gsq"`` when every
-        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
-        declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
-        type, never by its values. ``metadata["indep_test"]`` names the test the fit used: the one
-        picked from the declared column types when this is ``None``.
+        Conditional-independence test for the FCI phase, as for :func:`~andrey.gfci`: ``"fisherz"``,
+        ``"student_t"``, and ``"normal_scores"`` for continuous data, ``"chisq"`` and ``"gsq"`` for
+        categorical data, ``"degen_gauss"`` and ``"cond_gauss"`` for mixed data, and ``"kci"``,
+        ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"``, which also
+        detect nonlinear dependence in continuous data, at a far higher cost per test. It must read
+        the same kind of data as ``score_func``. ``None`` picks from the declared column types:
+        ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are, else
+        ``"fisherz"``. A column is declared categorical by ``categorical`` or by a DataFrame's
+        ``category``, ``bool``, or text type, never by its values. ``metadata["indep_test"]`` names
+        the test the fit used: the one picked from the declared column types when this is ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
@@ -2053,8 +2053,8 @@ def grasp_fci(
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random starting order and the order
         in which the GRaSP phase visits variables, as for :func:`~andrey.grasp`, and for the random
-        draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make.
-        Different seeds can reach different graphs.
+        draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``,
+        ``"wgcm"``, and ``"pcm"`` make. Different seeds can reach different graphs.
     n_starts : int, default=1
         Number of GRaSP searches, at least ``1``, as for :func:`~andrey.grasp`, each from its own
         random starting order: the first from ``seed``'s, each later one from an order drawn from

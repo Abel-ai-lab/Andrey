@@ -492,16 +492,17 @@ def pcmci(
         of the lagged values, for monotone effects. ``"chisq"`` (Pearson's chi-square) and ``"gsq"``
         (G-square, the likelihood ratio) test categorical series, coded by whole numbers.
         ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
-        mixed series, continuous and categorical columns, by a likelihood ratio. Four more tests
+        mixed series, continuous and categorical columns, by a likelihood ratio. Seven more tests
         detect nonlinear dependence in continuous data, at a far higher cost per test: ``"cmiknn"``,
         a nearest-neighbor conditional mutual information test, and ``"gpdc"``, Gaussian-process
         regression with a distance correlation test, the nonlinear tests the method was published
-        with; ``"kci"``, the kernel test; and ``"rcot"``, its random-feature approximation. ``None``
-        picks from the declared column types: ``"gsq"`` when every column is categorical,
-        ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
-        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
-        values. ``metadata["indep_test"]`` names the test the fit used: the one picked from the
-        declared column types when this is ``None``.
+        with; ``"kci"``, the kernel test; ``"rcot"``, its random-feature approximation; and
+        ``"gcm"``, ``"wgcm"``, and ``"pcm"``, the generalized, weighted generalized, and projected
+        covariance measures of regression residuals. ``None`` picks from the declared column types:
+        ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are, else
+        ``"fisherz"``. A column is declared categorical by ``categorical`` or by a DataFrame's
+        ``category``, ``bool``, or text type, never by its values. ``metadata["indep_test"]`` names
+        the test the fit used: the one picked from the declared column types when this is ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
@@ -523,8 +524,8 @@ def pcmci(
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
-        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
-        tests, ``metadata["seed"]`` records the seed used.
+        only ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"`` make; the
+        other tests ignore it. With those tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test of the PC1
         step, at least ``0``: round ``p`` of PC1 conditions on the ``p`` strongest other
@@ -594,29 +595,31 @@ def pcmci(
     causal links and noise do not change over time), with no unmeasured variable that causes two
     measured ones, in which every independence follows from the graph (faithfulness), and in which
     every effect takes at least one time step [1]_. With a partial-correlation test, the default for
-    continuous data, it assumes linear effects; ``"cmiknn"``, ``"gpdc"``, ``"kci"``, and ``"rcot"``
-    detect nonlinear effects at a far higher cost per test, and the categorical and mixed-data tests
-    take other data. It is designed for many variables, each strongly dependent on its own past
-    (autocorrelated) and with few lagged parents [1]_, and returns a temporal structure of lagged
-    links only: a directed graph at each lag ``1`` to ``tau_max``. When effects can act within one
-    time step, use :func:`~andrey.pcmciplus`; when unmeasured common causes are plausible, use
-    :func:`~andrey.lpcmci`.
+    continuous data, it assumes linear effects; ``"cmiknn"``, ``"gpdc"``, ``"kci"``, ``"rcot"``,
+    ``"gcm"``, ``"wgcm"``, and ``"pcm"`` detect nonlinear effects at a far higher cost per test, and
+    the categorical and mixed-data tests take other data. It is designed for many variables, each
+    strongly dependent on its own past (autocorrelated) and with few lagged parents [1]_, and
+    returns a temporal structure of lagged links only: a directed graph at each lag ``1`` to
+    ``tau_max``. When effects can act within one time step, use :func:`~andrey.pcmciplus`; when
+    unmeasured common causes are plausible, use :func:`~andrey.lpcmci`.
 
     Every test reads the lagged values as the columns of one design. ``"fisherz"`` and
     ``"student_t"`` report the partial correlation, ``"chisq"`` and ``"gsq"`` their chi-square
     statistic, ``"degen_gauss"`` and ``"cond_gauss"`` the likelihood ratio, ``"cmiknn"`` its
     estimate of the conditional mutual information, ``"gpdc"`` the squared distance correlation,
-    ``"rcot"`` its statistic, and ``"kci"`` its statistic over the statistic's mean under
-    independence. A candidate's strength is the smallest absolute statistic it has had; strengths
-    compare within one test only. A test registered with :func:`~andrey.core.ci.register_indep_test`
-    that reports only p-values is asked one query at a time, its candidates are ranked by p-value,
-    smallest first, and its statistic reads ``-log10(p)``. The default, ``"fisherz"``, takes the
-    p-value from Fisher's z-transform of the partial correlation. ``"student_t"`` takes it from the
-    Student-t distribution with ``n - |S| - 2`` degrees of freedom, for ``|S|`` conditions; its
-    p-values differ slightly, so a link close to ``alpha`` can flip. The partial correlation is the
-    correlation of the least-squares residuals of the two tested values given the conditions. It is
-    computed from the correlation matrix, and from the residuals themselves when the conditions are
-    collinear to working precision, as lagged copies of a strongly autocorrelated series can be.
+    ``"rcot"`` its statistic, ``"gcm"`` its normalized covariance of residual products, ``"wgcm"``
+    and ``"pcm"`` theirs or ``0``, whichever is larger, and ``"kci"`` its statistic over the
+    statistic's mean under independence. A candidate's strength is the smallest absolute statistic
+    it has had; strengths compare within one test only. A test registered with
+    :func:`~andrey.core.ci.register_indep_test` that reports only p-values is asked one query at a
+    time, its candidates are ranked by p-value, smallest first, and its statistic reads
+    ``-log10(p)``. The default, ``"fisherz"``, takes the p-value from Fisher's z-transform of the
+    partial correlation. ``"student_t"`` takes it from the Student-t distribution with ``n - |S| -
+    2`` degrees of freedom, for ``|S|`` conditions; its p-values differ slightly, so a link close to
+    ``alpha`` can flip. The partial correlation is the correlation of the least-squares residuals of
+    the two tested values given the conditions. It is computed from the correlation matrix, and from
+    the residuals themselves when the conditions are collinear to working precision, as lagged
+    copies of a strongly autocorrelated series can be.
 
     **Choosing fdr_method.** The MCI step tests ``n_variables ** 2 * tau_max`` links, each at level
     ``alpha``. With ``"none"`` about ``alpha`` of the absent links are returned by chance, so the
@@ -808,16 +811,17 @@ def pcmciplus(
         of the lagged values, for monotone effects. ``"chisq"`` (Pearson's chi-square) and ``"gsq"``
         (G-square, the likelihood ratio) test categorical series, coded by whole numbers.
         ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
-        mixed series, continuous and categorical columns, by a likelihood ratio. Four more tests
+        mixed series, continuous and categorical columns, by a likelihood ratio. Seven more tests
         detect nonlinear dependence in continuous data, at a far higher cost per test: ``"cmiknn"``,
         a nearest-neighbor conditional mutual information test, and ``"gpdc"``, Gaussian-process
         regression with a distance correlation test, the nonlinear tests the method was published
-        with; ``"kci"``, the kernel test; and ``"rcot"``, its random-feature approximation. ``None``
-        picks from the declared column types: ``"gsq"`` when every column is categorical,
-        ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
-        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
-        values. ``metadata["indep_test"]`` names the test the fit used: the one picked from the
-        declared column types when this is ``None``.
+        with; ``"kci"``, the kernel test; ``"rcot"``, its random-feature approximation; and
+        ``"gcm"``, ``"wgcm"``, and ``"pcm"``, the generalized, weighted generalized, and projected
+        covariance measures of regression residuals. ``None`` picks from the declared column types:
+        ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are, else
+        ``"fisherz"``. A column is declared categorical by ``categorical`` or by a DataFrame's
+        ``category``, ``bool``, or text type, never by its values. ``metadata["indep_test"]`` names
+        the test the fit used: the one picked from the declared column types when this is ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
@@ -839,8 +843,8 @@ def pcmciplus(
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
-        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
-        tests, ``metadata["seed"]`` records the seed used.
+        only ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"`` make; the
+        other tests ignore it. With those tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test of the lagged
         skeleton (phase 1, PC1 as in :func:`~andrey.pcmci`), at least ``0``; ``None`` sets no
@@ -970,17 +974,18 @@ def pcmciplus(
     ``"student_t"`` report the partial correlation, ``"chisq"`` and ``"gsq"`` their chi-square
     statistic, ``"degen_gauss"`` and ``"cond_gauss"`` the likelihood ratio, ``"cmiknn"`` its
     estimate of the conditional mutual information, ``"gpdc"`` the squared distance correlation,
-    ``"rcot"`` its statistic, and ``"kci"`` its statistic over the statistic's mean under
-    independence. A candidate's strength is the smallest absolute statistic it has had; strengths
-    compare within one test only. A test registered with :func:`~andrey.core.ci.register_indep_test`
-    that reports only p-values is asked one query at a time, its candidates are ranked by p-value,
-    smallest first, and its statistic reads ``-log10(p)``. The default test, ``"fisherz"``, takes
-    the p-value from Fisher's z-transform of the partial correlation, and ``"student_t"`` from the
-    Student-t distribution with ``n - |S| - 2`` degrees of freedom, for ``|S|`` conditions. The
-    partial correlation is the correlation of the least-squares residuals of the two tested values
-    given the conditions. It is computed from the correlation matrix, and from the residuals
-    themselves when the conditions are collinear to working precision, as lagged copies of a
-    strongly autocorrelated series can be.
+    ``"rcot"`` its statistic, ``"gcm"`` its normalized covariance of residual products, ``"wgcm"``
+    and ``"pcm"`` theirs or ``0``, whichever is larger, and ``"kci"`` its statistic over the
+    statistic's mean under independence. A candidate's strength is the smallest absolute statistic
+    it has had; strengths compare within one test only. A test registered with
+    :func:`~andrey.core.ci.register_indep_test` that reports only p-values is asked one query at a
+    time, its candidates are ranked by p-value, smallest first, and its statistic reads
+    ``-log10(p)``. The default test, ``"fisherz"``, takes the p-value from Fisher's z-transform of
+    the partial correlation, and ``"student_t"`` from the Student-t distribution with ``n - |S| -
+    2`` degrees of freedom, for ``|S|`` conditions. The partial correlation is the correlation of
+    the least-squares residuals of the two tested values given the conditions. It is computed from
+    the correlation matrix, and from the residuals themselves when the conditions are collinear to
+    working precision, as lagged copies of a strongly autocorrelated series can be.
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Every row of the lagged design
     that reads it holds it, and each test reads only the design rows where all of its lagged
@@ -1142,16 +1147,17 @@ def jpcmciplus(
     indep_test : str or None, default=None
         The conditional-independence test behind every p-value, a test of continuous data, as in
         :func:`~andrey.pcmciplus`: ``"fisherz"`` and ``"student_t"`` test partial correlation, and
-        ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` detect nonlinear dependence at a far
-        higher cost per test. The dummies enter a test as numeric columns, so a categorical or
-        mixed-data test raises ``ValueError``. ``"normal_scores"`` is not offered: ranked over every
-        dataset's rows, a column's normal scores mix the datasets' distributions. ``None`` picks
-        ``"fisherz"``. ``metadata["indep_test"]`` names the test the fit used.
+        ``"kci"``, ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"`` detect
+        nonlinear dependence at a far higher cost per test. The dummies enter a test as numeric
+        columns, so a categorical or mixed-data test raises ``ValueError``. ``"normal_scores"`` is
+        not offered: ranked over every dataset's rows, a column's normal scores mix the datasets'
+        distributions. ``None`` picks ``"fisherz"``. ``metadata["indep_test"]`` names the test the
+        fit used.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
-        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
-        tests, ``metadata["seed"]`` records the seed used.
+        only ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"`` make; the
+        other tests ignore it. With those tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test of the lagged
         phase (PC1 as in :func:`~andrey.pcmci`), at least ``0``; ``None`` sets no limit. It does
@@ -1412,16 +1418,17 @@ def lpcmci(
         of the lagged values, for monotone effects. ``"chisq"`` (Pearson's chi-square) and ``"gsq"``
         (G-square, the likelihood ratio) test categorical series, coded by whole numbers.
         ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
-        mixed series, continuous and categorical columns, by a likelihood ratio. Four more tests
+        mixed series, continuous and categorical columns, by a likelihood ratio. Seven more tests
         detect nonlinear dependence in continuous data, at a far higher cost per test: ``"cmiknn"``,
         a nearest-neighbor conditional mutual information test, and ``"gpdc"``, Gaussian-process
         regression with a distance correlation test, the nonlinear tests the method was published
-        with; ``"kci"``, the kernel test; and ``"rcot"``, its random-feature approximation. ``None``
-        picks from the declared column types: ``"gsq"`` when every column is categorical,
-        ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
-        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
-        values. ``metadata["indep_test"]`` names the test the fit used: the one picked from the
-        declared column types when this is ``None``.
+        with; ``"kci"``, the kernel test; ``"rcot"``, its random-feature approximation; and
+        ``"gcm"``, ``"wgcm"``, and ``"pcm"``, the generalized, weighted generalized, and projected
+        covariance measures of regression residuals. ``None`` picks from the declared column types:
+        ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are, else
+        ``"fisherz"``. A column is declared categorical by ``categorical`` or by a DataFrame's
+        ``category``, ``bool``, or text type, never by its values. ``metadata["indep_test"]`` names
+        the test the fit used: the one picked from the declared column types when this is ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
@@ -1443,8 +1450,8 @@ def lpcmci(
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
-        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
-        tests, ``metadata["seed"]`` records the seed used.
+        only ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"`` make; the
+        other tests ignore it. With those tests, ``metadata["seed"]`` records the seed used.
     max_p_global : int or None, default=None
         The most conditions a test takes beyond the default conditions, at least ``0``: every test
         of the removal phases conditions on the parents of both ends, the default conditions, and on
@@ -1577,15 +1584,16 @@ def lpcmci(
     reads the lagged values as the columns of one design. ``"fisherz"`` and ``"student_t"`` report
     the partial correlation, ``"chisq"`` and ``"gsq"`` their chi-square statistic, ``"degen_gauss"``
     and ``"cond_gauss"`` the likelihood ratio, ``"cmiknn"`` its estimate of the conditional mutual
-    information, ``"gpdc"`` the squared distance correlation, ``"rcot"`` its statistic, and
-    ``"kci"`` its statistic over the statistic's mean under independence. A candidate's strength is
-    the smallest absolute statistic it has had; strengths compare within one test only. A test
-    registered with :func:`~andrey.core.ci.register_indep_test` that reports only p-values is asked
-    one query at a time, its candidates are ranked by p-value, smallest first, and its statistic
-    reads ``-log10(p)``. A test's partial correlation is computed from the correlation matrix, and
-    from the least-squares residuals when the conditions are collinear to working precision. The
-    defaults are the authors' published defaults. The earlier end of a lagged link is searched with
-    the empty set only, since time order already rules out the later end as its cause.
+    information, ``"gpdc"`` the squared distance correlation, ``"rcot"`` its statistic, ``"gcm"``
+    its normalized covariance of residual products, ``"wgcm"`` and ``"pcm"`` theirs or ``"0"``,
+    whichever is larger, and ``"kci"`` its statistic over the statistic's mean under independence. A
+    candidate's strength is the smallest absolute statistic it has had; strengths compare within one
+    test only. A test registered with :func:`~andrey.core.ci.register_indep_test` that reports only
+    p-values is asked one query at a time, its candidates are ranked by p-value, smallest first, and
+    its statistic reads ``-log10(p)``. A test's partial correlation is computed from the correlation
+    matrix, and from the least-squares residuals when the conditions are collinear to working
+    precision. The defaults are the authors' published defaults. The earlier end of a lagged link is
+    searched with the empty set only, since time order already rules out the later end as its cause.
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Every row of the lagged design
     that reads it holds it, and each test reads only the design rows where all of its lagged

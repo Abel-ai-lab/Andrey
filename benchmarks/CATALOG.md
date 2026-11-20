@@ -62,8 +62,9 @@ whose Reproduce table lists the driver.
 `start.sh` builds the benchmark environment; `start_r.sh`, `start_cam_r.sh`, `start_resit_r.sh`,
 `start_mvpc_r.sh`, `start_missdag.sh`, `start_xges.sh`, `start_tigramite.sh`, `start_lingam.sh`,
 `start_lingam_ts.sh`, `start_causalnex.sh`, `start_utigsp.sh`, `start_loci.sh`, `start_skewd.sh`,
-`start_stein.sh`, `start_notears.sh`, `start_qccd.sh`, `start_heci.sh`, and `start_grci.sh` build
-the separate environments some comparisons need ([setup](README.md#setup)).
+`start_stein.sh`, `start_notears.sh`, `start_qccd.sh`, `start_heci.sh`, `start_grci.sh`, and
+`start_regression_ci_r.sh` build the separate environments some comparisons need
+([setup](README.md#setup)).
 
 ## Release cards
 

@@ -158,6 +158,11 @@ ALGORITHMS = {
     "RCoT": (_run_ci_test, "nonmonotone_4v"),
     "CMIknn": (_run_ci_test, "nonmonotone_4v"),
     "GPDC": (_run_ci_test, "nonmonotone_4v"),
+    "GCM": (_run_ci_test, "nonmonotone_4v"),
+    "WGCM": (_run_ci_test, "nonmonotone_4v"),
+    "WGCM_FIX": (_run_ci_test, "nonmonotone_4v"),
+    "PCM": (_run_ci_test, "nonmonotone_4v"),
+    "PCM6": (_run_ci_test, "nonmonotone_4v"),
 }
 
 # Multi-group, panel, and multi-dataset methods take a list of matrices (runner receives
