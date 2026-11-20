@@ -315,3 +315,20 @@ def test_a_pair_is_first_tested_from_its_end_of_higher_rank() -> None:
         back = np.argsort(order)
         assert np.array_equal(refit.p_values[:, back][:, :, back], first.p_values)
         assert np.array_equal(refit.adjacency[:, back][:, :, back], first.adjacency)
+
+
+@pytest.mark.parametrize(
+    ("separating", "skipped", "rule", "verdict"),
+    [
+        ([{1}], [{7}], "conservative", "ambiguous"),  # the skipped set might hold the middle
+        ([{1}], [{2}], "conservative", "collider"),  # either way no separating set holds it
+        ([{7}, {7, 1}], [{2}], "conservative", "ambiguous"),
+        ([{7}, {7, 1}, {7, 2}], [{3}], "majority", "non-collider"),  # 3 of 4 at the least
+        ([{7}, {1}, {7, 2}], [{3}], "majority", "ambiguous"),  # 2 of 4 is a tie
+        ([], [{3}], "majority", "ambiguous"),
+    ],
+)
+def test_a_subset_not_tested_keeps_a_verdict_only_when_either_outcome_does(
+    separating, skipped, rule, verdict
+):
+    assert collider_verdict(separating, 7, rule, skipped) == verdict

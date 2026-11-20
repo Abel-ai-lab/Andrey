@@ -301,8 +301,9 @@ def _separating_subsets(
     j: int,
     max_p_global: int | None = None,
     middles: Sequence[int] | None = None,
-) -> list[frozenset[int]]:
-    """Every distinct subset of the lag-0 neighbors of ``j`` (and of ``i`` at lag 0) that separates.
+) -> tuple[list[frozenset[int]], list[frozenset[int]]]:
+    """Every distinct subset of the lag-0 neighbors of ``j`` (and of ``i`` at lag 0) that
+    separates, and every one not tested for want of rows.
 
     A subset separates ``X^i_{t-lag}`` and ``X^j_t`` when its test, with the phase-2 conditions
     added, gives a p-value above ``pc_alpha``. ``max_p_global`` caps the subsets' size, and a
@@ -313,6 +314,7 @@ def _separating_subsets(
         families = [[k for k in family if k in middles] for family in families]
     largest = max(len(family) for family in families)
     separating = []
+    skipped = []
     for size in range(largest + 1 if max_p_global is None else min(largest, max_p_global) + 1):
         subsets = list(
             dict.fromkeys(
@@ -324,7 +326,8 @@ def _separating_subsets(
         if subsets:
             _, p_values = _test_subsets(test, n_vars, parents, i, lag, j, subsets)
             separating += [frozenset(subsets[k]) for k in np.flatnonzero(p_values > pc_alpha)]
-    return separating
+            skipped += [frozenset(subsets[k]) for k in np.flatnonzero(np.isnan(p_values))]
+    return separating, skipped
 
 
 def apply_orientations(marks: np.ndarray, requests: Iterable[tuple[int, int]]) -> bool:
@@ -373,7 +376,7 @@ def colliders(
         check_knowledge_cycle((marks == TAIL) & (marks.T == ARROW))
         apart = constraints.forbidden.copy()
         apart[0] = ~lag0.support()
-    cache: dict[tuple[int, int, int], list[frozenset[int]]] = {}
+    cache: dict[tuple[int, int, int], tuple[list[frozenset[int]], list[frozenset[int]]]] = {}
     requests: list[tuple[int, int]] = []
     ambiguous: set[Triple] = set()
     inner = range(n_vars) if middles is None else middles
@@ -401,7 +404,8 @@ def colliders(
                         cache[key] = _separating_subsets(
                             test, n_vars, parents, adjacency, pc_alpha, *key, max_p_global, middles
                         )
-                    verdict = collider_verdict(cache[key], k, collider_rule)
+                    separating, skipped = cache[key]
+                    verdict = collider_verdict(separating, k, collider_rule, skipped)
                 if verdict == "collider":
                     requests.append((j, k))
                     if lag == 0:
