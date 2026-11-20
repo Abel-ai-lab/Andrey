@@ -653,13 +653,18 @@ def never_observed_together(data: object) -> list[list]:
     :func:`~andrey.core.ci_missing.named_pairs` lists pairs; ``[]`` for data that is not one table.
     From one product of the observed masks, so it costs one pass over the data.
     """
-    try:
-        values = np.asarray(data, dtype=np.float64)
-    except (TypeError, ValueError):
+    import pandas as pd
+
+    if isinstance(data, pd.DataFrame):  # of any column types
+        missing = np.asarray(data.isna(), dtype=bool)
+    else:
+        try:
+            missing = np.isnan(np.asarray(data, dtype=np.float64))
+        except (TypeError, ValueError):
+            return []
+    if missing.ndim != 2:
         return []
-    if values.ndim != 2:
-        return []
-    observed = (~np.isnan(values)).astype(np.float64)
+    observed = (~missing).astype(np.float64)
     together = observed.T @ observed
     pairs = zip(*np.nonzero(np.triu(together == 0, 1)))
     return named_pairs(((int(a), int(b)) for a, b in pairs), label_of(column_labels(data)))
