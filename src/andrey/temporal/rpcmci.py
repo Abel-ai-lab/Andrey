@@ -25,8 +25,9 @@ uniformly in ``[0, 1]`` and alternates two steps up to ``max_iter`` times:
 A start stops when ``Gamma`` no longer changes, or from its sixth iteration on when the summed
 absolute change is at most ``2 * K * T // 100``. A start fails when a regime keeps fewer than
 :data:`FEWEST_STEPS` steps, holds a lagged value constant over its steps, or has a test that cannot
-run on them. The start with the lowest objective is returned, the first on ties: its ``Gamma`` from
-the last linear program and the PCMCI results of its last discovery step.
+run on them. The start with the lowest objective is returned, the first of objectives equal per step
+to :data:`~andrey.core.ties.KEY_DP` decimals (:func:`~andrey.core.ties.stable_key`): its ``Gamma``
+from the last linear program and the PCMCI results of its last discovery step.
 
 References
 ----------
@@ -43,7 +44,7 @@ import numpy as np
 import scipy.sparse as sp
 from scipy.optimize import linprog
 
-from andrey.core.ties import tie_ranks
+from andrey.core.ties import stable_key, tie_ranks
 
 from .pcmci import PCMCIResult, lagged_design, pcmci
 
@@ -252,6 +253,7 @@ def rpcmci(
     }
     best: RPCMCIResult | None = None
     n_failed = 0
+    n_steps = data.shape[0]
     for a in range(n_starts):
         weights = np.random.default_rng(seed + a).uniform(0, 1, size=(n_regimes, data.shape[0]))
         run = _start(
@@ -266,7 +268,9 @@ def rpcmci(
         )
         if run is None:
             n_failed += 1
-        elif best is None or run.objective < best.objective:
+        elif best is None or stable_key(run.objective, n_steps) < stable_key(
+            best.objective, n_steps
+        ):
             best = replace(run, start=a)
     if best is None:
         raise RegimeFitError(

@@ -2274,7 +2274,8 @@ def rpcmci(
     ``max_iter`` iterations. A start fails when a regime is left with fewer than 6 time steps, the
     limit of the authors' code, a variable constant over its steps, or a test that cannot run on its
     steps, such as one with more conditions than steps; failed starts are skipped. The returned
-    start has the lowest objective among the others, the earliest on ties.
+    start has the lowest objective among the others that ran, the earliest of objectives that agree
+    to 9 decimals per time step.
 
     The paper's threshold for joining a regime is ``0.5`` [1]_, the default, and a step joins at the
     threshold; the authors' code defaults to ``0.05`` and joins a step above it, which differs for a
