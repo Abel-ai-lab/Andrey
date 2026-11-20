@@ -1283,11 +1283,13 @@ def das(
     **Limitations.** On the papers' simulation with z-scored or rescaled columns, DAS made no more
     errors than the code published with the paper from 10 to 200 variables, and fewer on the first
     20 datasets of every setting, and fewer than the empty graph up to 1,000. That code ran on five
-    datasets of 500 variables and on none of 1,000, and at 500 variables DAS's errors are above the
-    paper's, a gap not traced. The order search reads standardized columns, so the result does not
-    depend on the columns' units; on raw columns whose variance grows along the causal order, code
-    that reads the units can order more edges correctly, and there the code published with the paper
-    made fewer errors on sparse graphs (19 against 28 at 50 variables). The `0.19.0 release card
+    datasets of 500 variables and on none of 1,000. The order search reads standardized columns, so
+    the result does not depend on the columns' units; on raw columns whose variance grows along the
+    causal order, code that reads the units can order more edges correctly, and there the code
+    published with the paper made fewer errors on sparse graphs (19 against 28 at 50 variables).
+    This is the likely reason that, on sparse graphs, DAS's errors are above the paper's where they
+    are, since the paper used raw columns; on dense graphs of 500 variables they are above the
+    paper's too, a gap the units do not explain. The `0.19.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#das>`_ has the numbers. Its causal order is
     SCORE's, so the limits :func:`~andrey.score_matching` states for the order are its own: where
     links have a strong linear part, it did no better than a random order. The leaf rule is exact
