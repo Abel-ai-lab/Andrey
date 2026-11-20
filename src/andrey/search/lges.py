@@ -7,7 +7,7 @@ any valid ``Insert(x, y, T)`` worsens the score (ConservativeInsert). The Delete
 GES (:func:`~andrey.search._parallel_ges.backward_chunk_best`) and the turning phase that of GIES
 on observational data (:func:`~andrey.search.gies._turning_best`). Two schedules run them: LGES
 (``schedule="lges"``) deletes, then turns, until neither improves the score, before each single
-Insert, and stops when no Insert improves it; LGES-0 in the phase order of the released code
+Insert, and stops when no move improves it; LGES-0 in the phase order of the released code
 (``schedule="lges0_released"``) runs Insert, Delete, then turning once, each until no move
 improves the score. The algorithm, its settings, and its reference are described on
 :func:`andrey.lges`.
@@ -114,7 +114,8 @@ def lges(
 
     Starts from the empty graph. Under ``schedule="lges"`` it repeats: Delete moves until none
     improves, turning moves until none improves, then the best Insert of :func:`insert_moves`,
-    stopping when no Insert improves. Under ``schedule="lges0_released"`` it runs the Insert phase,
+    stopping when no move of any kind improves: when no Insert improves after a pass without a
+    turning move. Under ``schedule="lges0_released"`` it runs the Insert phase,
     then the Delete phase, then the turning phase, each until no move improves. A move improves when
     it lowers the score by more than :data:`~andrey.core.ties.EPS_IMPROVE`; the CPDAG is re-formed
     after every move. Returns the CPDAG and its total score (lower is better), recomputed from it
@@ -174,23 +175,25 @@ def lges(
                 adj = ops.delete_cpdag(adj, x, y, H)
             return adj
 
-        def turns(adj: np.ndarray) -> np.ndarray:
+        def turns(adj: np.ndarray) -> tuple[np.ndarray, bool]:
+            turned = False
             while (turn := _turning_best(adj, family, n, ranks)) is not None:
                 u, v, C, essential = turn
-                adj = _turn(adj, u, v, C, essential, cut)
-            return adj
+                adj, turned = _turn(adj, u, v, C, essential, cut), True
+            return adj, turned
 
         if schedule == "lges":
             while True:
-                adj = turns(deletes(adj))
-                if (move := insert_best(adj, score, n, ranks, conservative)) is None:
-                    break
-                _, x, y, T = move
-                adj = ops.insert_cpdag(adj, x, y, T)
+                adj, turned = turns(deletes(adj))
+                if (move := insert_best(adj, score, n, ranks, conservative)) is not None:
+                    _, x, y, T = move
+                    adj = ops.insert_cpdag(adj, x, y, T)
+                elif not turned:
+                    break  # no Delete, turning move, or Insert improves
         else:
             while (move := insert_best(adj, score, n, ranks, conservative)) is not None:
                 _, x, y, T = move
                 adj = ops.insert_cpdag(adj, x, y, T)
-            adj = turns(deletes(adj))
+            adj, _ = turns(deletes(adj))
         total = recompute_objective(adj, score, n)
     return to_structure(adj, kind="cpdag"), total

@@ -118,30 +118,32 @@ def test_turning_phase_reaches_the_authors_cpdag(insertion, tie_break, schedule,
     assert shd(full, unturned) > 0
 
 
-_SCHEDULE_CASE = [
-    (0, 1, "undirected"),
-    (0, 5, "directed"),
-    (1, 2, "undirected"),
-    (1, 5, "directed"),
-    (2, 4, "directed"),
-    (2, 5, "directed"),
-    (3, 4, "directed"),
-    (4, 5, "directed"),
-]
+def _edges(undirected: str, directed: str) -> list[tuple[int, int, str]]:
+    """Edges written as ``"01 23"``: pairs of node digits, undirected and directed (tail first)."""
+    out = [(int(e[0]), int(e[1]), "undirected") for e in undirected.split()]
+    return out + [(int(e[0]), int(e[1]), "directed") for e in directed.split()]
 
 
 @pytest.mark.parametrize("tie_break", ["position", "rank"])
 @pytest.mark.parametrize("insertion", INSERTIONS)
 @pytest.mark.parametrize(
-    ("schedule", "extra"), [("lges", [(1, 4, "directed")]), ("lges0_released", [])]
+    ("seed", "schedule", "edges"),
+    [
+        (45, "lges", _edges("01 12", "05 14 15 24 25 34 45")),
+        (45, "lges0_released", _edges("01 12", "05 15 24 25 34 45")),
+        (47, "lges", _edges("03 04 23 34", "01 15 21 25 35 45")),
+        (47, "lges0_released", _edges("03 04 23 34", "01 15 21 25 31 35 41 45")),
+    ],
 )
-def test_each_schedule_returns_its_references_cpdag(schedule, extra, insertion, tie_break):
-    """Six variables, 300 rows: the authors' code returns the eight edges of ``_SCHEDULE_CASE``
-    after four deletions; its step functions run in Algorithm 1's order also keep ``1 -> 4``."""
-    x = _random_case(6, 300, 45)
+def test_each_schedule_returns_its_references_cpdag(seed, schedule, edges, insertion, tie_break):
+    """Six variables, 300 rows, where the authors' code and its step functions run in Algorithm 1's
+    order return different classes. Seed 45: the code deletes four edges; Algorithm 1 also keeps
+    ``1 -> 4``. Seed 47: Algorithm 1 reverses an edge after its last addition and then deletes
+    ``4 -> 1``, so it stops only once no move of any kind improves the score."""
+    x = _random_case(6, 300, seed)
     with andrey.config(tie_break=tie_break):
         out = andrey.lges(x, insertion=insertion, schedule=schedule, ebic_gamma=0.0)
-    assert sorted(out.structure.oriented_edges()) == sorted(_SCHEDULE_CASE + extra)
+    assert sorted(out.structure.oriented_edges()) == sorted(edges)
 
 
 def test_matches_the_recorded_output_on_gauss_5v():

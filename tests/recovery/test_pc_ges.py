@@ -154,7 +154,7 @@ def test_the_rank_based_score_recovers_gaussian_data_and_ignores_a_monotone_dist
         )
     rank_errors, bic_errors, distorted_errors, empty_errors = np.sum(errors, axis=0)
     # Over the 10 graphs of 8 true edges: ges 23 errors with the rank-based score, 25 with the BIC,
-    # 84 with the BIC after the maps; lges 22, 23, and 86; gfci 22, 22, and 76; the empty graph 80.
+    # 84 with the BIC after the maps; lges 14, 17, and 82; gfci 22, 22, and 76; the empty graph 80.
     assert rank_errors < empty_errors / 2
     assert abs(rank_errors - bic_errors) <= 3
     assert distorted_errors >= 3 * rank_errors

@@ -142,11 +142,14 @@ def test_xges_ties() -> None:
 
 
 def test_lges_ties() -> None:
-    """LGES meets the tie GES meets, under each insertion rule; the DAG SafeInsert reads follows
-    the same ranks."""
+    """LGES meets the tie GES meets, under each insertion rule and schedule; the DAG SafeInsert
+    reads follows the same ranks."""
     x = _swap_symmetric(0)
     for insertion in ("safe", "conservative"):
-        _assert_order_free(lambda data: lges(data, insertion=insertion)[0].to_numpy(), x)
+        for schedule in ("lges", "lges0_released"):
+            _assert_order_free(
+                lambda data: lges(data, insertion=insertion, schedule=schedule)[0].to_numpy(), x
+            )
 
 
 def test_calm_moral_graph_ties() -> None:

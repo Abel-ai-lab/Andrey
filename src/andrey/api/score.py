@@ -1715,12 +1715,13 @@ def lges(
     schedule : {"lges", "lges0_released"}, default="lges"
         The order of the search's phases (see Notes). ``"lges"`` is the paper's main method, LGES
         (its Algorithm 1): before each single edge addition it deletes, then reverses, edges until
-        neither improves the score, and it stops when no addition improves it. ``"lges0_released"``
+        neither improves the score, and it stops when no move improves it. ``"lges0_released"``
         is the paper's LGES-0 (its Algorithm 8) in the phase order of the code published with the
         paper: additions, then deletions, then reversals, each phase run once until no move improves
         the score. ``"lges"`` is the default: on the paper's linear-Gaussian simulation, with 10
         to 100 variables, it made fewer errors than LGES-0 in most settings, the denser graphs
-        above all, and LGES-0 fewer in some sparse ones; LGES took up to about 1.4 times as long.
+        above all, and LGES-0 fewer in some sparse ones. LGES rescans the deletions and reversals
+        after every addition, so it takes longer.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1797,7 +1798,7 @@ def lges(
 
     The two schedules order these moves differently. LGES (``schedule="lges"``, the paper's
     Algorithm 1) repeats: deletions until none improves the score, reversals until none improves
-    it, then one addition; it stops when no addition improves the score. LGES-0
+    it, then one addition; it stops when no move improves the score. LGES-0
     (``schedule="lges0_released"``) runs additions until none improves the score, then deletions,
     then reversals, once, as the code published with the paper does; the paper's Algorithm 8
     itself runs the reversals before the deletions, and the two orders can return different
