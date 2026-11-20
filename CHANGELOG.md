@@ -72,8 +72,10 @@ names its pull request.
   only the query's columns, standardized, rounded, and signed, with the rows in an order of their
   values, so a p-value depends on neither the row nor the column order, nor on columns outside the
   query, and changes with a column's units or sign only where the rounding moves a value or a
-  column is symmetric about its mean once sorted. A contributor's script compares them with the
-  authors' code. ([#1147])
+  column is symmetric about its mean once sorted. On data with missing values, a query with fewer
+  rows than its test needs, 4 for `"gcm"` and for `"wgcm"` with `variant="fix"`, 17 for `"wgcm"`'s
+  default `variant="est"`, and 12 for `"pcm"`, is not tested. A contributor's script compares them
+  with the authors' code. ([#1147], [#1129])
 - `target` takes a list of columns on `iamb`, `inter_iamb`, `mmpc`, and `icp`: one call returns one
   result per target, in the list's order, each equal to a call for that target alone. The three set
   learners answer every target with one search, which sets up the test once, and MMPC learns the
@@ -2882,6 +2884,7 @@ First alpha release.
 [#1148]: https://github.com/Abel-ai-lab/Andrey/pull/1148
 [#1151]: https://github.com/Abel-ai-lab/Andrey/pull/1151
 [#1156]: https://github.com/Abel-ai-lab/Andrey/pull/1156
+[#1129]: https://github.com/Abel-ai-lab/Andrey/pull/1129
 [#1094]: https://github.com/Abel-ai-lab/Andrey/pull/1094
 [#1095]: https://github.com/Abel-ai-lab/Andrey/pull/1095
 [#969]: https://github.com/Abel-ai-lab/Andrey/pull/969

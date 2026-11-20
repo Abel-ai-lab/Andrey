@@ -362,6 +362,27 @@ def test_a_test_with_too_few_rows_is_not_tested_and_counted(name, size):
         assert 0.0 <= make_indep_test(name, x)(0, 1, list(range(2, 2 + size))) <= 1.0
 
 
+@pytest.mark.parametrize(
+    ("name", "options", "least"),
+    [("gcm", {}, 4), ("wgcm", {}, 17), ("wgcm", {"variant": "fix"}, 4), ("pcm", {}, 12)],
+)
+def test_a_regression_test_with_too_few_rows_is_not_tested_and_counted(name, options, least):
+    """A regression test needs the rows its fits split, whatever the conditioning set's size."""
+    settings = OPTIONS[name] | options
+    x = _continuous(60)[:40]
+    x[least - 1 :, 0] = np.nan  # column 0 observed on least - 1 rows
+    test = make_indep_test(name, x, seed=0, **settings)
+    for size in (0, 1, 2, 3):
+        assert test.least_rows(size) == least
+        with rows_tested() as rows:
+            assert np.isnan(test(0, 1, list(range(2, 2 + size))))
+        assert rows.not_tested == {(0, 1): 1} and not rows  # counted apart, reading no rows
+    x[least - 1, 0] = 1.0  # one row more: the test runs
+    test = make_indep_test(name, x, seed=0, **settings)
+    for size in (0, 1, 2, 3):
+        assert 0.0 <= test(0, 1, list(range(2, 2 + size))) <= 1.0
+
+
 @pytest.mark.parametrize("name", list(TESTS))
 def test_a_small_block_gives_a_p_value_or_raises(name):
     make, mask = TESTS[name]
