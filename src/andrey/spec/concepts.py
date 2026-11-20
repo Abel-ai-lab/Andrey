@@ -553,6 +553,12 @@ _CONCEPTS = (
                 )
                 for m in ("boss_fci", "grasp_fci")
             ),
+            Deviation(
+                method="lges",
+                name="ebic_gamma",
+                default=0.0,
+                reason="The standard BIC of the published method.",
+            ),
         ),
     ),
     Concept(

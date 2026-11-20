@@ -1,12 +1,12 @@
 """Less greedy equivalence search over a decomposable score, the engine behind :func:`andrey.lges`.
 
-The search runs three phases once, each until no move improves the score: Insert, Delete, then
-turning. The Insert phase is less greedy than that of GES: at each step it reads one DAG ``G`` of
-the current class and leaves out every pair ``(x, y)`` for which ``G`` scores better than ``G``
-with ``x -> y`` added (SafeInsert); under ``insertion="conservative"`` it also leaves out a pair
-when any valid ``Insert(x, y, T)`` worsens the score (ConservativeInsert). The Delete phase is that
-of GES (:func:`~andrey.search._parallel_ges.backward_chunk_best`) and the turning phase that of
-GIES on observational data (:func:`~andrey.search.gies._turning_best`). The algorithm, its
+The search is LGES-0 with three phases run once, each until no move improves the score: Insert,
+Delete, then turning. The Insert phase is less greedy than that of GES: at each step it reads one
+DAG ``G`` of the current class and leaves out every pair ``(x, y)`` for which ``G`` scores better
+than ``G`` with ``x -> y`` added (SafeInsert); under ``insertion="conservative"`` it also leaves out
+a pair when any valid ``Insert(x, y, T)`` worsens the score (ConservativeInsert). The Delete phase
+is that of GES (:func:`~andrey.search._parallel_ges.backward_chunk_best`) and the turning phase that
+of GIES on observational data (:func:`~andrey.search.gies._turning_best`). The algorithm, its
 settings, and its reference are described on :func:`andrey.lges`.
 """
 
@@ -98,7 +98,7 @@ def lges(
     *,
     score_func: str = "bic",
     penalty_discount: float = 1.0,
-    ebic_gamma: float = 1.0,
+    ebic_gamma: float = 0.0,
     equivalent_sample_size: float = 1.0,
     insertion: str = "safe",
     categorical: np.ndarray | None = None,

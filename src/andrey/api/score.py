@@ -1652,7 +1652,7 @@ def lges(
     *,
     score_func: str | None = None,
     penalty_discount: float = 1.0,
-    ebic_gamma: float = 1.0,
+    ebic_gamma: float = 0.0,
     equivalent_sample_size: float = 1.0,
     insertion: str = "safe",
     categorical: Sequence[str | int] | None = None,
@@ -1662,7 +1662,9 @@ def lges(
     LGES searches the equivalence classes that GES searches [2]_, with GES's moves, the turning
     move of GIES [3]_, and a decomposable score, the BIC by default, but adds fewer edges [1]_: it
     leaves out an edge between two variables when the score says that some graph of the current
-    class already makes them independent given the parents of one of them (see Notes).
+    class already makes them independent given the parents of one of them. This is the paper's
+    LGES-0 variant, with its phases in the order of the code published with the paper (see
+    Notes).
 
     Parameters
     ----------
@@ -1684,16 +1686,18 @@ def lges(
         declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
-        linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is
-        the standard BIC, the score of the method's paper [1]_. Must be finite and non-negative.
+        linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0``,
+        the defaults, is the standard BIC, the score of the method's paper [1]_. Must be finite and
+        non-negative.
         BDeu ignores it; for the multinomial BIC it weighs ``log(n)`` per free parameter of a
         variable's conditional probability table.
     ebic_gamma : float, default=1.0
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
-        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be from 0 to 1. Only ``"bic"`` and ``"normal_scores"`` use it: passing it
-        with another score raises ``ValueError``. See Notes.
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0``, the
+        default, is the standard BIC, the score of the method's paper [1]_. Must be from 0 to 1.
+        Only ``"bic"`` and ``"normal_scores"`` use it: passing it with another score raises
+        ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
@@ -1702,7 +1706,8 @@ def lges(
     insertion : {"safe", "conservative"}, default="safe"
         Which pairs of variables an edge addition leaves out (see Notes). ``"safe"`` (SafeInsert)
         leaves out a pair when one graph of the current class scores better without the edge; the
-        paper proves that the search then recovers the true class as the rows grow [1]_.
+        paper proves that LGES-0 then recovers the true class as the rows grow (its Corollary C.1)
+        [1]_.
         ``"conservative"`` (ConservativeInsert) also leaves out a pair when any valid addition of
         the edge worsens the score; it made fewer errors in the paper's simulations, with no such
         proof.
@@ -1759,12 +1764,12 @@ def lges(
     **When to use.** LGES makes the assumptions of :func:`~andrey.ges`: i.i.d. observational data,
     no unmeasured common causes and, with the default BIC score on continuous data, linear relations
     with Gaussian noise. Its moves need only a score that adds one term per variable and gives
-    equivalent graphs the same score, which each of the scores does. The paper claims it for sparse
-    linear-Gaussian graphs of up to 150 variables with 1,000 or 10,000 rows, where it added fewer
-    wrong edges than GES and ran faster [1]_; it returns a CPDAG. When unmeasured common causes are
-    plausible, use :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be
-    oriented, use :func:`~andrey.direct_lingam`; when some rows come from interventions, use
-    :func:`~andrey.gies`.
+    equivalent graphs the same score, which each of the scores does. The paper claims LGES-0, with
+    the standard BIC, for sparse linear-Gaussian graphs of up to 150 variables with 1,000 or 10,000
+    rows, where it added fewer wrong edges than GES and ran faster [1]_; it returns a CPDAG. When
+    unmeasured common causes are plausible, use :func:`~andrey.fci`; when the noise is non-Gaussian
+    and every edge should be oriented, use :func:`~andrey.direct_lingam`; when some rows come from
+    interventions, use :func:`~andrey.gies`.
 
     **How it works.** The search starts from the empty graph and runs three phases once, each until
     no move improves the score: edge additions, edge deletions, then reversals of an edge, the
@@ -1781,23 +1786,24 @@ def lges(
     (:doc:`column-order guide </docs/guides/column-order>`), so the result does not depend on the
     column order; moves whose score changes are equal after rounding are taken in that order too.
 
-    The phase order is that of the code published with the paper, whose experiments run it: the
-    additions, then the deletions, then the reversals, once. The paper's Algorithm 1 instead
-    deletes and reverses before each addition, and its LGES+ variant also retries each deletion;
-    neither is implemented here. The paper's pseudocode leaves out a pair ``(x, y)`` also when
-    ``x`` is a descendant of ``y`` in ``G``, where adding ``x -> y`` to ``G`` would close a cycle;
-    the published code compares the two scores for every pair, and so does this search. A move
-    counts as improving when it lowers the score by more than ``1e-9``, the rule of every greedy
-    search here; the published code applies a move when it raises its score, ``-1/2`` of this one
-    up to a constant, by more than ``1e-6``. The
-    paper's prior knowledge, which orders the additions by required and forbidden edges and lets
-    the data overrule them, and its orientation of the result with interventional data are not
-    implemented.
+    This is the paper's LGES-0 (its Algorithm 8) with the phases in the order of the code published
+    with the paper: the additions, then the deletions, then the reversals, once. Algorithm 8 itself
+    runs the reversals before the deletions, and the two orders can return different classes. The
+    paper's main variant, LGES (its Algorithm 1), deletes and reverses before each addition, and
+    LGES+ also retries each deletion; neither is implemented here. The paper's pseudocode leaves out
+    a pair ``(x, y)`` also when ``x`` is a descendant of ``y`` in ``G``, where adding ``x -> y`` to
+    ``G`` would close a cycle; the published code compares the two scores for every pair, and so
+    does this search. A move counts as improving when it lowers the score by more than ``1e-9``, the
+    rule of every greedy search here; the published code applies a move when it raises its score,
+    ``-1/2`` of this one up to a constant, by more than ``1e-6``. The paper's prior knowledge, which
+    orders the additions by required and forbidden edges and lets the data overrule them, and its
+    orientation of the result with interventional data are not implemented.
 
     **Choosing the penalty.** The score charges a variable ``penalty_discount * log(n_samples)`` per
     parent plus the extended-BIC term ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``
-    [4]_, as for :func:`~andrey.ges`, whose default this follows. The paper uses the standard BIC,
-    ``ebic_gamma=0.0`` with ``penalty_discount=1.0``.
+    [4]_, as for :func:`~andrey.ges`. The defaults, ``penalty_discount=1.0`` and
+    ``ebic_gamma=0.0``, give the standard BIC of the paper; :func:`~andrey.ges` defaults to
+    ``ebic_gamma=1.0``, so the two searches score the same data differently unless it is set.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
     variable, each over every row, and terms over different rows do not add up to the score of one
@@ -1806,10 +1812,11 @@ def lges(
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Not benchmarked yet. Its tests run it on up to 20 variables with 5,000 rows,
-    and it was compared with the authors' code, with the linear-Gaussian BIC, on the paper's
-    simulation with up to 50 variables and 10,000 rows. The categorical and mixed-data scores were
-    not compared: the package's checks run them on small tables only. The paper proves the recovery
-    of the true class as the rows grow only for ``insertion="safe"``. Each step of the first phase
+    and it was compared with the authors' code on the paper's simulation, with the linear-Gaussian
+    BIC, up to 50 variables and 10,000 rows, and on the paper's Sachs data, continuous and
+    discretized, the latter with the multinomial BIC. BDeu and the mixed-data scores were not
+    compared: the package's checks run them on small tables only. The paper proves the recovery of
+    the true class as the rows grow only for ``insertion="safe"``. Each step of the first phase
     scores every pair of non-adjacent variables, and every valid addition for each pair it keeps, in
     one process. The numbers are a reference, not a hard limit: they change with the data generator,
     the density, the method's settings, and the machine.

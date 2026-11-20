@@ -392,12 +392,12 @@ lowest penalty of its solution path.
 `boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take `ebic_gamma`, the weight of the extended BIC,
 from 0 to 1 (Chen and Chen 2008): their linear-Gaussian BIC adds `2 * ebic_gamma * log
 C(n_variables - 1, n_parents)` to each variable's score, a penalty that grows with the number of
-variables. `gfci`, `boss_fci`, and `grasp_fci` default to `ebic_gamma=0.0`, the standard BIC, and
-the others to `1.0`; {py:func}`~andrey.ges` describes the choice and {py:func}`~andrey.gfci` says
-why its default differs. Only `score_func="bic"` and `"normal_scores"` add the term, so passing
-`ebic_gamma` with another score, named or picked by `None`, raises a `ValueError`;
-`metadata["ebic_gamma"]` records the value a `"bic"` or `"normal_scores"` fit used. `gnies`, which
-has one score, always adds it.
+variables. `gfci`, `boss_fci`, `grasp_fci`, and `lges` default to `ebic_gamma=0.0`, the standard
+BIC, and the others to `1.0`; {py:func}`~andrey.ges` describes the choice, and
+{py:func}`~andrey.gfci` and {py:func}`~andrey.lges` say why their defaults differ. Only
+`score_func="bic"` and `"normal_scores"` add the term, so passing `ebic_gamma` with another score,
+named or picked by `None`, raises a `ValueError`; `metadata["ebic_gamma"]` records the value a
+`"bic"` or `"normal_scores"` fit used. `gnies`, which has one score, always adds it.
 
 % concept: equivalent_sample_size
 `ges`, `gies`, `xges`, `lges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `boss_fci`,
@@ -731,9 +731,11 @@ LGES, less greedy equivalence search (Ejaz and Bareinboim 2025), {py:func}`~andr
 with fewer edge additions: it adds no edge between two variables when one graph of the current
 class scores better without it (SafeInsert), and with `insertion="conservative"` also when any
 valid addition of the edge worsens the score (ConservativeInsert). It then deletes and reverses
-edges as GES and GIES do, and returns a CPDAG. On the paper's linear-Gaussian simulation it returns
-the authors' CPDAGs when both read the same graph of each class; it is experimental until it is
-benchmarked in that setting.
+edges as GES and GIES do, and returns a CPDAG. This is the paper's LGES-0 variant (its Algorithm 8)
+with the phases in the order of the authors' code, deletions before reversals; Algorithm 8 itself
+runs the reversals first, and the paper's main variant, LGES, is not implemented. With the standard
+BIC, its default, it returns the authors' CPDAGs on the paper's linear-Gaussian simulation when both
+read the same graph of each class; it is experimental until it is benchmarked in that setting.
 
 A method becomes supported once it has:
 
