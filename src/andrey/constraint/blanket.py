@@ -44,7 +44,7 @@ from typing import Literal
 
 import numpy as np
 
-from andrey.constraint._skeleton import CHUNK, adjacent_pairs, scan_conditioning_sets
+from andrey.constraint._skeleton import CHUNK, adjacent_pairs, kept_apart, scan_conditioning_sets
 from andrey.core import ARROW, NULL, TAIL, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
 from andrey.core.ci_missing import NOT_TESTED, TestwiseDeletion, not_tested
@@ -543,6 +543,12 @@ def prune_spouses(
     return skeleton
 
 
+def _side_sets(sides: list[list[int]]) -> list[tuple[list[int], set[int] | None]]:
+    """The sides of :func:`_collider_sets` as :func:`~andrey.constraint._skeleton.kept_apart`
+    reads them: each later side skips the subsets the first side holds."""
+    return [(side, None if n == 0 else set(sides[0])) for n, side in enumerate(sides)]
+
+
 def _collider_sets(sides: list[list[int]], size: int, middle: int) -> Iterator[tuple[int, ...]]:
     """The conditioning sets of a collider test, each once: ``middle`` with every size-``size``
     subset of ``sides[0]``, then of the other side, less the subsets the first side holds."""
@@ -605,7 +611,8 @@ def blanket_colliders(
                 continue
             p, strength = -np.inf, np.inf
             for size in range(top + 1):
-                conds = _collider_sets(sides, size, b)
+                kept, left = kept_apart(test, (a, c, b), _side_sets(sides), size)
+                conds = iter(()) if kept is None else _collider_sets([s for s, _ in kept], size, b)
                 width = CHUNK if every else min(_FIRST_CHUNK, CHUNK)
                 while (every or p <= alpha) and (chunk := list(islice(conds, width))):
                     [(p_chunk, strength_chunk)] = _weakest(test, a, [c], chunk, alpha=alpha)
@@ -613,6 +620,8 @@ def blanket_colliders(
                     p = _weaker(float(np.fmax(p, p_chunk)), skipped, alpha)
                     strength = float(np.fmin(strength, strength_chunk))
                     width = min(2 * width, CHUNK)
+                if left:  # a set left out keeps no rows: not tested
+                    p = _weaker(p, True, alpha)
                 if p > alpha:
                     sepsets[a, c] = (*sepsets[a, c], b)
                     break

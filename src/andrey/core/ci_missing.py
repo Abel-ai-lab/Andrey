@@ -385,6 +385,7 @@ class TestwiseDeletion:
         self._held = 0
         self._source: np.ndarray | None = None
         self._environments = np.zeros(data.shape[1], dtype=bool)
+        self._together: np.ndarray | None = None
         self.pin_blas = _pins_blas(test_class, data.shape[0])
 
     def mark_environments(self, columns: Iterable[int]) -> None:
@@ -530,6 +531,24 @@ class TestwiseDeletion:
         """The rows of ``data`` observed in every one of ``columns``."""
         index = np.asarray(list(columns), dtype=np.intp)
         return np.flatnonzero(self._observed[:, index].all(axis=1))
+
+    def together(self) -> np.ndarray:
+        """``(d, d)`` booleans: ``[i, j]`` when some row observes columns ``i`` and ``j`` together.
+        A query over a pair that is ``False`` keeps no rows, so it is not tested."""
+        if self._together is None:
+            seen = self._observed.astype(np.float32)
+            self._together = (seen.T @ seen) > 0
+        return self._together
+
+    def count_not_tested(self, x: int, y: int, queries: int) -> None:
+        """Count ``queries`` queries of ``x`` and ``y`` as not tested in the running
+        :func:`rows_tested` counter without asking them, as a search counts the conditioning sets
+        that keep no rows (:meth:`together`); the pair is recorded as :meth:`_count` records it."""
+        counter = _ROWS.get()
+        if counter is None or not queries:
+            return
+        pair = (x, y) if self._source is None else self._source[[x, y]].tolist()
+        counter.not_tested[min(pair), max(pair)] += queries
 
     def _block(self, columns: Iterable[int]) -> np.ndarray:
         """The rows of ``data`` observed in every one of ``columns``, those columns only."""
