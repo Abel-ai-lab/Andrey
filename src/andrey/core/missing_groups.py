@@ -126,14 +126,16 @@ class Grouping:
         """The bytes :class:`GroupedSums` allocates for these groups, counted before it does: per
         group, the count, sums, and cross products over all its rows and over its rows missing
         each scattered column, the pair counts of the rows missing two or more columns, and those
-        rows' values and masks."""
-        total = 0
+        rows' values and masks, and the lookups of each group's columns."""
+        d = self.observed.shape[1]
+        total = self.observed.nbytes
         for g, columns in enumerate(self.observed):
             o = int(columns.sum())
             members = self.missed[self.group == g][:, columns]
             spread = int(members.any(axis=0).sum())
             twice = int((members.sum(axis=1) >= 2).sum())
             total += 8 * (1 + o + o * o) * (2 + spread) + 8 * o * o + 9 * o * twice
+            total += 8 * (d + o)  # each group's lookups: its local index and spread index
         return total
 
 
@@ -398,7 +400,8 @@ class GroupedSums:
         step = max(1, _STEP_BYTES // (2 * width))
         for start in range(0, b, step):
             part = local[start : start + step]
-            m = missed[part[:, 0]].copy()
+            # A count of up to k columns: one byte holds it while k < 256.
+            m = missed[part[:, 0]].astype(np.uint8 if k < 256 else np.int32)
             for i in range(1, k):
                 m += missed[part[:, i]]
             block, row = np.nonzero(m >= 2)

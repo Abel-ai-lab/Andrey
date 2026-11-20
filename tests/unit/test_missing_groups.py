@@ -274,3 +274,19 @@ def test_the_correction_step_gives_the_same_bits_in_smaller_steps(monkeypatch, g
     assert sum(corrected) > 0  # rows missing several columns were added, in many small steps
     assert r.tolist() == r_small.tolist()
     assert np.array_equal(p, p_small, equal_nan=True)
+
+
+def test_a_row_missing_more_than_255_columns_of_a_block_is_corrected_once():
+    rng = np.random.default_rng(14)
+    n, d = 60, 300
+    observed = rng.random((n, d)) >= 0.01
+    observed[:3, :280] = False  # three rows miss 280 columns of the block
+    values = np.where(observed, rng.standard_normal((n, d)), 0.0).T.copy()
+    grouping = missing_groups.Grouping(
+        np.zeros(n, dtype=np.int64), np.ones((1, d), dtype=bool), ~observed
+    )
+    block = np.arange(d)[None, :]
+    count, sums, _ = missing_groups.GroupedSums(values, grouping).blocks(block)
+    kept = observed.all(axis=1)
+    assert count[0] == kept.sum()
+    assert np.allclose(sums[0], values[:, kept].sum(axis=1), atol=1e-9)
