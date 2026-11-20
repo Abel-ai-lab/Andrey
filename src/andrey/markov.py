@@ -212,7 +212,8 @@ def markov_check(
     ValueError
         If ``graph`` is not a DAG or a CPDAG that has a DAG, if the graph and the data disagree on
         the columns, if an argument is out of range, if a test would read fewer than the
-        conditioning set size plus four rows, or if a test returns a p-value outside ``[0, 1]``.
+        conditioning set size plus four rows, or if a test returns a p-value outside ``[0, 1]``,
+        ``NaN`` included unless its fact was not tested for want of rows.
 
     Warns
     -----
@@ -326,8 +327,11 @@ def markov_check(
 
     with copies_named(column_labels(data)), rows_tested() as rows:
         p_values = _p_values(X, mask, columns, facts, test_name, sample_fraction, seed)
-    tested = ~not_tested(p_values)  # a fact without the rows its test needs reads NaN
-    if not np.all((p_values[tested] >= 0) & (p_values[tested] <= 1)):
+    # A fact without the rows its test needs reads NaN, counted as not tested; any other NaN is
+    # a p-value outside [0, 1].
+    tested = ~not_tested(p_values)
+    unexplained = int((~tested).sum()) > rows.total_not_tested()
+    if unexplained or not np.all((p_values[tested] >= 0) & (p_values[tested] <= 1)):
         raise ValueError(f"markov_check: the {test_name!r} test returned a p-value outside [0, 1]")
     if test_name in TABLE_TESTS:
         _warn_sparse(X, columns, facts, test_name, rows_per_test)
