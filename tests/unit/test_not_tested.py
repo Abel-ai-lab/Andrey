@@ -63,6 +63,14 @@ def _env(df: pd.DataFrame) -> np.ndarray:
     return np.arange(len(df)) % 2
 
 
+def _cohort_env(df: pd.DataFrame) -> np.ndarray:
+    """The environment is the cohort, so it is constant on the rows that observe ``A`` or ``B``
+    when ``k = 0``; the rows that observe every column are a third environment."""
+    env = np.full(len(df), 2)
+    env[:COHORT], env[COHORT : 2 * COHORT] = 0, 1
+    return env
+
+
 TABLE_METHODS = {
     "pc": lambda df: andrey.pc(df),
     "pc_student_t": lambda df: andrey.pc(df, indep_test="student_t"),
@@ -165,3 +173,18 @@ def test_pairs_never_observed_together_are_found_in_a_table_of_text():
         }
     )
     assert never_observed_together(frame) == [["a", "c"]]
+
+
+@pytest.mark.parametrize("k", [0, 1, 2, 3])
+@pytest.mark.parametrize("method", ["cdnod", "fci_jci"])
+def test_an_environment_constant_on_a_block_is_not_tested(method, k):
+    df = _cohorts(k)
+    env = _cohort_env(df)
+    out = getattr(andrey, method)(df, env)
+    assert out.metadata["missing"] == "testwise"
+    if k == 0:  # every block that holds A or B holds one cohort, one environment
+        assert out.metadata["not_tested"] > 0
+    order = np.random.default_rng(3).permutation(len(df))
+    moved = getattr(andrey, method)(df.iloc[order].reset_index(drop=True), env[order])
+    assert np.array_equal(moved.structure.adjacency, out.structure.adjacency)
+    assert moved.metadata.get("not_tested") == out.metadata.get("not_tested")

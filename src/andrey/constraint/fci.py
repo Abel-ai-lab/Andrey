@@ -631,6 +631,8 @@ def possible_dsep_step(
         )
     else:
         by_rank, ranked_test = _test_in_rank_order(X, indep_test, categorical, seed)
+        if isinstance(test, TestwiseDeletion) and isinstance(ranked_test, TestwiseDeletion):
+            ranked_test.mark_environments(np.flatnonzero(np.isin(by_rank, test.environments)))
         _remove_by_possible_dsep(
             marks,
             ranked_test,

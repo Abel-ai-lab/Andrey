@@ -381,7 +381,21 @@ class TestwiseDeletion:
         self._cache: OrderedDict[tuple[int, ...], tuple[CITest, int, int]] = OrderedDict()
         self._held = 0
         self._source: np.ndarray | None = None
+        self._environments = np.zeros(data.shape[1], dtype=bool)
         self.pin_blas = _pins_blas(test_class, data.shape[0])
+
+    def mark_environments(self, columns: Iterable[int]) -> None:
+        """Read ``columns`` as environment indicators, as CD-NOD and FCI-JCI add: a query whose
+        block holds one of them constant is not tested, since the block's rows come from one
+        environment and no test there can tell environments apart."""
+        self._environments[list(columns)] = True
+        self._cache.clear()
+        self._held = 0
+
+    @property
+    def environments(self) -> np.ndarray:
+        """The columns :meth:`mark_environments` marked."""
+        return np.flatnonzero(self._environments)
 
     def from_columns(self, source: npt.ArrayLike) -> None:
         """Record the pairs of the queries in the counter as columns ``source[x]`` and
@@ -497,6 +511,9 @@ class TestwiseDeletion:
         if len(rows) < self.least_rows(len(cond)):
             return None, list(columns), len(rows)
         block = self._data[rows[:, None], np.asarray(columns, dtype=np.intp)]
+        held = self._environments[list(columns)]
+        if held.any() and (np.ptp(block[:, held], axis=0) == 0).any():
+            return None, list(columns), len(rows)  # one environment only: not tested
         self._check_block(block, columns)
         test = self._new_test(block, list(columns))
         if self._reuse and block.nbytes <= _CACHE_BYTES:
@@ -1024,6 +1041,14 @@ def testwise_deletion(
         check_copies=check_copies,
         least=None if floor is None else lambda size: int(floor(size, **options)),
     )
+
+
+def mark_environment(test: CITest, column: int) -> CITest:
+    """``test``, with ``column`` marked as an environment indicator when it deletes rows per test
+    (:meth:`TestwiseDeletion.mark_environments`)."""
+    if isinstance(test, TestwiseDeletion):
+        test.mark_environments([column])
+    return test
 
 
 def _block_correlations(
