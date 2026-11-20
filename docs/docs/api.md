@@ -24,10 +24,11 @@ Every method has the same shape:
   keyword arguments. `andrey run pc --data data.csv` runs it from the shell, with `--data` once per
   table for a method that takes a list ([Command-line interface](#command-line-interface)).
 - **A result out.** Each call returns a {py:class}`~andrey.StructureOutput`, one per table for
-  `multi_group_direct_lingam` and one per regime, in a {py:class}`~andrey.RegimeOutput`, for
-  `rpcmci`: the graph in `out.structure` and, where the method gives them, a
+  `multi_group_direct_lingam`: the graph in `out.structure` and, where the method gives them, a
   causal order in `out.ordering`, edge weights in `out.weighted_adjacency`, and run details such as
-  the test, the score, and the seed in `out.metadata`.
+  the test, the score, and the seed in `out.metadata`. `rpcmci` returns a
+  {py:class}`~andrey.RegimeOutput` instead: the regime of each time step in `out.regimes`, run
+  details in `out.metadata`, and one such result per regime in `out.outputs[k]`.
 - **Supported or experimental.** A [supported](#supported-methods) method is benchmarked against
   other packages and checked against known graphs before each release; an
   [experimental](#experimental-methods) one is not yet. `andrey list` prints each method's status.
