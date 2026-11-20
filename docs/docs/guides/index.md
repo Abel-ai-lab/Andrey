@@ -14,8 +14,8 @@ Practical guides for using Andrey.
   what each graph a method returns claims, and which methods fit which assumptions.
 - [Getting started](getting-started.md): install Andrey, learn a graph from real measurements,
   and check how far to trust it.
-- [Missing values](missing-values.md): which `missing` value to use for your data and the reason
-  its values are missing, the methods that take it, and what each handling assumes.
+- [Handling missing values](missing-values.md): which `missing` value to use for your data and the
+  reason its values are missing, the methods that take it, and what each handling assumes.
 - [Graph types](graph-types.md): what a DAG, a CPDAG, a PAG, and a temporal graph each claim, with
   diagrams, which methods return each, and a legend of the marks in a drawing.
 - [Graph representation](graph-representation.md): how Andrey stores a graph, how to read and

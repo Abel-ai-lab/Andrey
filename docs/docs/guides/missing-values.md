@@ -10,7 +10,7 @@ kernelspec:
   display_name: Python 3
 ---
 
-# Missing values
+# Handling missing values
 
 Real tables have gaps. This guide says how to mark them, which handling fits your data and the
 reason its values are missing, and what each handling assumes. Every output on this page is
