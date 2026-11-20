@@ -303,3 +303,16 @@ def test_held_records_in_two_threads_keep_their_own_records_and_restore_the_logg
         thread.join(10)
     assert got == {"first": ["first"], "second": ["second"]}
     assert (list(logger.handlers), logger.propagate, logger.level) == before
+
+
+def test_held_records_keep_the_records_of_an_andrey_logger_set_above_warning():
+    child = logging.getLogger("andrey.search.em")
+    level = child.level
+    child.setLevel(logging.ERROR)
+    try:
+        with held_records() as records:
+            child.warning("held")
+        assert child.level == logging.ERROR
+    finally:
+        child.setLevel(level)
+    assert [r.getMessage() for r in records] == ["held"]

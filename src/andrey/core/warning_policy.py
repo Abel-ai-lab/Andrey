@@ -153,8 +153,9 @@ def held_records() -> Generator[list[logging.LogRecord]]:
     During the block the ``andrey`` logger holds only the handler that keeps them and does not
     propagate, so no record reaches standard error, through the root logger's handlers or an
     embedding application's either; its level is lowered to ``WARNING`` when it, or the logger it
-    inherits from, is set above it, so the block keeps every warning-level record whatever the
-    caller's threshold. The handlers, the propagation, and the level are restored after it. A
+    inherits from, is set above it, and so is the level of each ``andrey.`` logger set above it,
+    so the block keeps every warning-level record whatever the caller's thresholds. The handlers,
+    the propagation, and the levels are restored after it. A
     block in another thread waits until this one ends, so each restores what it found; a block
     nested in this thread holds the records of its own span.
     """
@@ -164,12 +165,24 @@ def held_records() -> Generator[list[logging.LogRecord]]:
         handlers, propagate, level = logger.handlers[:], logger.propagate, logger.level
         held: list[logging.Handler] = [handler]
         logger.handlers, logger.propagate = held, False
+        loggers = logging.Logger.manager.loggerDict
+        raised = [
+            (child, child.level)
+            for name, child in list(loggers.items())
+            if name.startswith(f"{_PACKAGE}.")
+            and isinstance(child, logging.Logger)
+            and child.level > logging.WARNING
+        ]
         logger.setLevel(min(logger.getEffectiveLevel(), logging.WARNING))
+        for child, _ in raised:
+            child.setLevel(logging.WARNING)
         try:
             yield handler.records
         finally:
             logger.handlers, logger.propagate = handlers, propagate
             logger.setLevel(level)
+            for child, before in raised:
+                child.setLevel(before)
 
 
 def warn_each(message: str, category: type[AndreyWarning]) -> None:

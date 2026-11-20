@@ -79,12 +79,13 @@ names its pull request.
   the notice of the default handling under `missing=None`. ([#1151])
 - `pc(missing="mvpc")` counts the indicator queries it answers 1 in `metadata["p_one_tests"]`, and
   the corrected tests that return a p-value of 1 in `metadata["corrected_edges"]["p_one_tests"]`.
-  ([#1151])
+  A corrected test needs the rows that leave its test a degree of freedom, `|S| + 4` for `fisherz`,
+  or the pair keeps its test-wise answer. ([#1151])
 - Under `missing="em"` with the linear-Gaussian BIC, copies among the observed values raise
   `CopiedColumnsError` before a pair of columns that shares no observed row, as on complete data.
   ([#1151])
-- The CLI records a fit's warning-level log records in `run.warnings` when the `andrey` or the
-  root logger is set above `WARNING`, and `bootstrap` logs the records of fits that ran in worker
+- The CLI records a fit's warning-level log records in `run.warnings` when the `andrey` logger, a
+  logger under it, or the root logger is set above `WARNING`, and `bootstrap` logs the records of fits that ran in worker
   processes in the calling process, once each, so they reach `run.warnings` instead of standard
   error. ([#1151])
 
