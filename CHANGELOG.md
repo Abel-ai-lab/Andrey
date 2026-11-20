@@ -15,13 +15,13 @@ names its pull request.
 - A test-wise test with fewer rows than it needs, a pair never observed together included, or with
   zero degrees of freedom left is not tested: it never separates a pair and never confirms a link,
   in every conditional-independence search that deletes rows per test; `markov_check` leaves such
-  facts out of its summary. `metadata["not_tested"]` counts those tests,
-  `metadata["undecided_pairs"]` lists the pairs no tested query could decide, and
+  facts out of its summary and of its sparse-table warning. `metadata["not_tested"]` counts those
+  tests, `metadata["undecided_pairs"]` lists the pairs no tested query could decide, and
   `metadata["never_observed_together"]` the pairs of columns no row observes together; the notice
-  for `missing=None` names the first of them. A pair no tested query could decide stays adjacent
-  in PC, FCI, CD-NOD, and FCI-JCI and in the Markov-blanket searches' sets; PCMCI, PCMCI+, and
-  J-PCMCI+ condition no test on a lagged parent without a tested result, and LPCMCI none on a node
-  whose link to either end of the tested pair has none. ([#1151])
+  for `missing=None` names the first of them, over every fit of a `bootstrap`. A pair no tested
+  query could decide stays adjacent in PC, FCI, CD-NOD, and FCI-JCI and in the Markov-blanket
+  searches' sets; PCMCI, PCMCI+, and J-PCMCI+ condition no test on a lagged parent without a tested
+  result, and LPCMCI none on a node whose link to either end of the tested pair has none. ([#1151])
 
 - `metadata["p_one_tests"]` counts every test of a fit on data with missing values that returned
   `p = 1`, whichever test it is, as a test whose statistic is exactly zero answers. ([#1102])
@@ -87,10 +87,11 @@ names its pull request.
   indicator, and so carry no information on it, or fewer rows than its test needs is not tested, as
   every test-wise test is, where it returned `p = 1`: it counts in `metadata["not_tested"]`, and its
   rows no longer count in `metadata["rows_tested"]`. A column on whose observed rows the indicator
-  holds one value conditions no test of that indicator and, as before, is not its parent; the
-  parents and graphs of the fits compared are unchanged. A corrected test needs the rows that leave
-  its test a degree of freedom, `|S| + 4` for `fisherz`, or the pair keeps its test-wise answer.
-  ([#1151])
+  holds one value conditions no test of that indicator and, as before, is not its parent, and a
+  column that a tested query kept adjacent stays a parent when a later query of it is not tested;
+  the parents and graphs of the fits compared are unchanged. A corrected test needs the rows that
+  leave its test a degree of freedom, `|S| + 4` for `fisherz`, or the pair keeps its test-wise
+  answer. ([#1151])
 - Under `missing="em"` with the linear-Gaussian BIC, copies among the observed values raise
   `CopiedColumnsError` before a pair of columns that shares no observed row, as on complete data.
   The error for such a pair names a DataFrame's columns by their labels. ([#1151])
