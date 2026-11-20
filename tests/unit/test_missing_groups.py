@@ -43,6 +43,7 @@ def _cohorts(n: int = 6_000, bridge: float = 0.03, scatter: float = 0.08, seed: 
 def grouped(monkeypatch):
     """Every gapped Gaussian test takes the grouped path when its patterns allow it."""
     monkeypatch.setenv("ANDREY_TESTWISE_GROUP_MAX_SCATTER", "1")
+    monkeypatch.setenv("ANDREY_TESTWISE_GROUP_MAX_SHARED", "1")
 
 
 def _spy(monkeypatch, cls, name: str) -> list[int]:
@@ -56,6 +57,14 @@ def _spy(monkeypatch, cls, name: str) -> list[int]:
 
     monkeypatch.setattr(cls, name, counted)
     return calls
+
+
+def _grouping_for(x: np.ndarray):
+    """:func:`~andrey.core.missing_groups.grouping_for` on ``x``'s observed mask."""
+    seen = ~np.isnan(x)
+    return missing_groups.grouping_for(
+        seen, lambda: tie_ranks(x), lambda: seen.T.astype(np.int64) @ seen
+    )
 
 
 def _per_row(monkeypatch) -> None:
@@ -97,19 +106,20 @@ def test_patterns_with_no_structure_take_the_per_row_path():
     rng = np.random.default_rng(2)
     x = rng.standard_normal((4_000, 30))
     x[rng.random(x.shape) < 0.3] = np.nan
-    assert missing_groups.grouping_for(~np.isnan(x), lambda: tie_ranks(x)) is None
+    assert _grouping_for(x) is None
 
 
-def test_one_group_whose_rows_mostly_miss_two_columns_takes_the_per_row_path():
+def test_one_group_whose_rows_mostly_miss_two_columns_takes_the_per_row_path(monkeypatch):
     """Cells missing completely at random at 10% over 50 columns form one group in which nearly
     every row misses two or more columns, so no block can take the grouped sums."""
+    monkeypatch.setenv("ANDREY_TESTWISE_GROUP_MAX_SHARED", "1")  # past the pair gate
     rng = np.random.default_rng(3)
     x = rng.standard_normal((4_000, 50))
     x[rng.random(x.shape) < 0.1] = np.nan
     grouping = missing_groups.pattern_groups(~np.isnan(x), tie_ranks(x))
     assert grouping is not None and len(grouping.observed) == 1
     assert not grouping.some_block_cheaper(missing_groups.MIN_GAIN)
-    assert missing_groups.grouping_for(~np.isnan(x), lambda: tie_ranks(x)) is None
+    assert _grouping_for(x) is None
 
 
 def test_small_groups_beside_one_scattered_group_take_the_per_row_path():
@@ -124,18 +134,36 @@ def test_small_groups_beside_one_scattered_group_take_the_per_row_path():
     assert not grouping.some_block_cheaper(missing_groups.MIN_GAIN)
 
 
+def test_outages_that_leave_every_pair_half_the_rows_take_the_per_row_path(monkeypatch):
+    """Each column of a series is out for three stretches of a twelfth of the rows, and 5% of the
+    cells are missing besides: every pair of columns is observed together in about half the rows,
+    so the patterns form many overlapping groups that cost more than the blocks save."""
+    rng = np.random.default_rng(6)
+    n, d = 6_000, 12
+    seen = rng.random((n, d)) >= 0.05
+    for j in range(d):
+        for start in rng.integers(0, n, 3).tolist():
+            seen[start : start + n // 12, j] = False
+    x = np.where(seen, rng.standard_normal((n, d)), np.nan)
+    assert _grouping_for(x) is None
+    monkeypatch.setenv("ANDREY_TESTWISE_GROUP_MAX_SHARED", "1")
+    assert _grouping_for(x) is not None
+    assert _grouping_for(_cohorts()) is not None  # a quarter of the cohorts' pairs share few rows
+
+
 def test_a_zero_byte_budget_keeps_the_per_row_path(monkeypatch):
     x = _cohorts()
-    assert missing_groups.grouping_for(~np.isnan(x), lambda: tie_ranks(x)) is not None
+    assert _grouping_for(x) is not None
     _per_row(monkeypatch)
-    assert missing_groups.grouping_for(~np.isnan(x), lambda: tie_ranks(x)) is None
+    assert _grouping_for(x) is None
 
 
 @pytest.mark.parametrize("value", ["-0.1", "1.5", "a lot"])
-def test_a_scatter_cutoff_outside_zero_to_one_is_refused(monkeypatch, value):
-    monkeypatch.setenv("ANDREY_TESTWISE_GROUP_MAX_SCATTER", value)
-    with pytest.raises(ValueError, match="ANDREY_TESTWISE_GROUP_MAX_SCATTER"):
-        env.TESTWISE_GROUP_MAX_SCATTER.read()
+@pytest.mark.parametrize("name", ["MAX_SCATTER", "MAX_SHARED"])
+def test_a_share_cutoff_outside_zero_to_one_is_refused(monkeypatch, name, value):
+    monkeypatch.setenv(f"ANDREY_TESTWISE_GROUP_{name}", value)
+    with pytest.raises(ValueError, match=f"ANDREY_TESTWISE_GROUP_{name}"):
+        getattr(env, f"TESTWISE_GROUP_{name}").read()
 
 
 def _queries(d: int, seed: int = 4):
@@ -196,7 +224,7 @@ def test_a_grouped_query_gives_the_same_bits_alone_and_in_any_batch(monkeypatch,
 
 
 @pytest.mark.parametrize("method", ["pc", "fci", "iamb"])
-def test_a_fit_on_merged_cohorts_finds_the_same_graph_on_either_path(monkeypatch, method):
+def test_a_fit_on_merged_cohorts_finds_the_same_graph_on_either_path(monkeypatch, grouped, method):
     x = _cohorts(n=4_000, seed=8)[:, :10]
     fit = getattr(andrey, method)
     summed = _spy(monkeypatch, missing_groups.GroupedSums, "blocks")

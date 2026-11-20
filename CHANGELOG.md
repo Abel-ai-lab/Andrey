@@ -44,9 +44,10 @@ names its pull request.
   groups hold too few rows for it is not tested without a scan. On synthetic merged cohorts, with
   or without a few rows that observe every column, `pc` ran 2.1 to 5.6 times faster and `iamb` 1.4
   to 3.6 times, with the same graphs, the same tests not tested, and the same row counts for every
-  tested query. Data missing completely at random keep the per-row sums. On `pcmci` with station
-  outages, grouping the patterns adds a fixed cost, about 0.8 s on a fit of 1 s. P-values change
-  in their last digits. Five `ANDREY_TESTWISE_GROUP_*` settings set when the path is used.
+  tested query. Data missing completely at random keep the per-row sums, and so do series with
+  outages, where nearly every pair of columns is observed together in about half the rows or more.
+  P-values change in their last digits. Six `ANDREY_TESTWISE_GROUP_*` settings set when the path is
+  used.
   ([#1148])
 - A test-wise test with too few rows no longer raises `ValueError`, nor does a CD-NOD or FCI-JCI
   test whose `env` is constant on its rows: both are not tested. Each test sets its own row floor:

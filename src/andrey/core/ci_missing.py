@@ -1001,7 +1001,9 @@ class GaussianDeletion(PartialCorrelationDeletion):
         if not self._chosen:
             from .ties import tie_ranks
 
-            grouping = grouping_for(self._observed, lambda: tie_ranks(self._data))
+            grouping = grouping_for(
+                self._observed, lambda: tie_ranks(self._data), lambda: self._pairwise()[0]
+            )
             self._grouped = None if grouping is None else GroupedSums(self._values, grouping)
             self._chosen = True
         return self._grouped

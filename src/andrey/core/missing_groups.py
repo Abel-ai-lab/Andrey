@@ -70,6 +70,18 @@ MAX_GROUPS = 64
 #: distinct blocks, each summed once, so the groups cannot repay their setup.
 MIN_COLUMNS = 8
 
+#: The default of ``ANDREY_TESTWISE_GROUP_MAX_SHARED``: the grouped sums are used only when at
+#: least a quarter of the pairs of columns (:data:`_SHARED_QUANTILE`) are observed together in at
+#: most this share of the rows. When nearly every pair shares about half the rows or more, as with
+#: outages or cells missing at random, the patterns form groups that each hold most columns, a
+#: block lies in many of them, and grouping costs more than the blocks save.
+MAX_SHARED = 0.4
+
+#: The share of the pairs of columns that ``ANDREY_TESTWISE_GROUP_MAX_SHARED`` reads: the grouped
+#: sums need this share of the pairs, at least, to be observed together in few rows. Fixed, not a
+#: setting: the setting moves the cutoff, and this names which pairs it is read on.
+_SHARED_QUANTILE = 0.25
+
 #: The default of ``ANDREY_TESTWISE_GROUP_MIN_GAIN``: a block takes the grouped sums when its
 #: estimated per-row cost is at least this many times its grouped cost
 #: (:meth:`GroupedSums.cheaper`).
@@ -220,12 +232,17 @@ def pattern_groups(
     return Grouping(group, held, held[group] & ~observed)
 
 
-def grouping_for(observed: np.ndarray, ranks: Callable[[], np.ndarray]) -> Grouping | None:
+def grouping_for(
+    observed: np.ndarray, ranks: Callable[[], np.ndarray], shared: Callable[[], np.ndarray]
+) -> Grouping | None:
     """The groups the grouped sums use on ``observed``, or ``None`` for the per-row path.
 
-    ``ranks`` returns each column's tie rank; it is called only once the cheap checks pass. The
+    ``ranks`` returns each column's tie rank and ``shared`` the ``(d, d)`` counts of the rows each
+    pair of columns observes together; each is called only once the checks before it pass. The
     grouped sums are used when the data have at least ``ANDREY_TESTWISE_GROUP_MIN_COLUMNS``
-    columns, the patterns form at most ``ANDREY_TESTWISE_GROUP_MAX_GROUPS`` groups, their
+    columns, a quarter of the pairs of columns or more are observed together in at most
+    ``ANDREY_TESTWISE_GROUP_MAX_SHARED`` of the rows, the patterns form at most
+    ``ANDREY_TESTWISE_GROUP_MAX_GROUPS`` groups, their
     scattered share is at most ``ANDREY_TESTWISE_GROUP_MAX_SCATTER``, their tables fit in
     ``ANDREY_TESTWISE_GROUP_BYTES``, and some block can pass the block gate
     (:meth:`Grouping.some_block_cheaper`). The choice depends on the data alone.
@@ -235,6 +252,11 @@ def grouping_for(observed: np.ndarray, ranks: Callable[[], np.ndarray]) -> Group
     most = _read(env.TESTWISE_GROUP_MAX_GROUPS, MAX_GROUPS)
     fewest = _read(env.TESTWISE_GROUP_MIN_COLUMNS, MIN_COLUMNS)
     if budget <= 0 or most <= 0 or observed.shape[1] < fewest or observed.all():
+        return None
+    pairs = shared()[np.triu_indices(observed.shape[1], 1)] / observed.shape[0]
+    common = float(np.quantile(pairs, _SHARED_QUANTILE))
+    if common > _read(env.TESTWISE_GROUP_MAX_SHARED, MAX_SHARED):
+        logger.debug("test-wise deletion: per-row sums, pairs share %.3f of the rows", common)
         return None
     grouping = pattern_groups(observed, ranks(), most)
     if grouping is None:

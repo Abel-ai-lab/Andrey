@@ -115,6 +115,10 @@ up to the last digits of the p-values.
   correcting for the rows that miss several columns of a test costs more than summing every row.
 - `ANDREY_TESTWISE_GROUP_MAX_GROUPS`: the grouped path is used only when the patterns form at most
   this many groups (default `64`).
+- `ANDREY_TESTWISE_GROUP_MAX_SHARED`: the grouped path is used only when at least a quarter of the
+  pairs of columns are observed together in at most this share of the rows (default `0.4`). When
+  nearly every pair shares more, as with outages in a time series or cells missing at random, each
+  block lies in many groups, and grouping costs more than it saves.
 - `ANDREY_TESTWISE_GROUP_MIN_COLUMNS`: the grouped path is used only for a test over at least this
   many columns (default `8`). A test over fewer asks too few distinct blocks to repay the grouping.
 - `ANDREY_TESTWISE_GROUP_MIN_GAIN`: on the grouped path, a block takes the groups' sums only when

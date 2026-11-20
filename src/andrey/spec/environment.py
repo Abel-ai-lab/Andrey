@@ -19,6 +19,7 @@ from andrey.core.missing_groups import (
     GROUP_BYTES,
     GROUP_MAX_SCATTER,
     MAX_GROUPS,
+    MAX_SHARED,
     MIN_COLUMNS,
     MIN_GAIN,
 )
@@ -188,6 +189,21 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "`ANDREY_TESTWISE_GROUP_BYTES`): the grouped path is used only when the missingness "
             "patterns form at most this many groups. Data with as many patterns as rows stop "
             "early, at little cost. `0` keeps every test on the per-row path."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_TESTWISE_GROUP_MAX_SHARED",
+        values="number from 0 to 1 (share of rows)",
+        default=str(MAX_SHARED),
+        effect=(
+            "Path gate for test-wise deletion with `fisherz` or `student_t` (see "
+            "`ANDREY_TESTWISE_GROUP_BYTES`): the grouped path is used only when at least a "
+            "quarter of the pairs of columns are observed together in at most this share of the "
+            "rows. When nearly every pair shares more, as with outages or cells missing at "
+            "random, each block lies in many groups and grouping costs more than it saves. `0` "
+            "keeps every test on the per-row path unless a quarter of the pairs are never "
+            "observed together."
         ),
         group="backend",
     ),
