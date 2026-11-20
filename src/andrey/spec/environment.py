@@ -14,6 +14,7 @@ from andrey.constraint._parallel_skeleton import (
     MIN_POOL_RCOT_WORK,
 )
 from andrey.core.backend import GPU_THRESHOLDS
+from andrey.core.ci import MIN_SHARED_FACTOR_WORK
 from andrey.core.env import SEED_MAX
 from andrey.lingam.pwling import MIN_PRUNE_WORK
 from andrey.search._parallel_ges import MIN_POOL_GES_WORK
@@ -141,6 +142,25 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "candidate in full. Both give the same order bit for bit. `0` prunes every step. The "
             "default was measured on an AMD EPYC 7713 server running Linux on one core, where "
             "pruning broke even at 60,000 to 80,000."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_SHARED_SCAN_MIN_WORK",
+        values="integer (candidates times block size per scan)",
+        default=str(MIN_SHARED_FACTOR_WORK),
+        effect=(
+            "Per-scan gate for the grow scans of IAMB and Inter-IAMB (also in RSMAX2's restrict "
+            "phase) with `fisherz`, `student_t`, or `normal_scores` on complete data: a scan of "
+            "two or more candidates against one conditioning set of two or more variables is "
+            "answered from one Cholesky factor of "
+            "the set's correlation block only when its candidates times the block size (the set "
+            "plus two) reach this value, else each candidate inverts its own submatrix. The "
+            "factor's p-values agree with the per-query ones to about 1e-10 relative, not bit "
+            "for bit; the per-query path is the exact one. `0` factors every such scan. The "
+            "default was measured on an AMD EPYC 7713 server running Linux on one core, where the "
+            "factor was slower below a value of about 64 and faster from 128 for every set size "
+            "sampled."
         ),
         group="backend",
     ),
