@@ -590,7 +590,8 @@ def render_skill() -> str:
         "no tested query could decide, and `metadata.never_observed_together` the pairs of "
         "columns no row observes together. A fit that runs the deletion under `null` logs one "
         "notice per process that names it and gives the number of undecided pairs and of pairs "
-        "never observed together, naming them when there are few. They are "
+        "never observed together, naming them when there are at most five. The searches that "
+        "delete rows per test are "
         + ", ".join(f"`{s.name}`" for s in REGISTRY.values() if s.data.missing)
         + f". {TESTWISE_CLAIM} The searches whose fit "
         "reads only a covariance, "

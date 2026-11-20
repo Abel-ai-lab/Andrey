@@ -23,7 +23,7 @@ names its pull request.
   names them when there are at most five. A pair no tested query could decide stays adjacent in PC,
   FCI, CD-NOD, and FCI-JCI and in the Markov-blanket searches' sets; PCMCI, PCMCI+, and J-PCMCI+
   condition no test on a lagged parent without a tested result, and LPCMCI none on a node whose
-  link to either end of the tested pair has none. ([#1151])
+  link to either end of the tested pair has none. ([#1151], [#1156])
 
 - `metadata["p_one_tests"]` counts every test of a fit on data with missing values that returned
   `p = 1`, whichever test it is, as a test whose statistic is exactly zero answers. ([#1102])
@@ -41,11 +41,6 @@ names its pull request.
 
 ### Changed
 
-- The notice for `missing=None` gives the number of undecided pairs and of pairs never observed
-  together, naming them when there are at most five, in place of the number of conditioning sets
-  not tested. That number counts the sets the search skipped because no row can test them and
-  reached billions on merged cohorts; `metadata["not_tested"]` keeps it, with the same value.
-  ([#1156])
 - With `fisherz` and `student_t` on data with missing values, test-wise deletion groups the rows by
   their missingness patterns once and computes a test's sums from the groups' tables, removing the
   scattered missing cells exactly, when that costs less than summing every row; a query whose

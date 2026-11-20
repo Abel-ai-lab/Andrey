@@ -1341,8 +1341,8 @@ def _not_tested_over(fits: list) -> dict:
     """
     merged: dict = {"not_tested": sum(out.metadata.get("not_tested", 0) for out in fits)}
     for key in ("never_observed_together", "undecided_pairs"):
-        pairs = [pair for out in fits for pair in out.metadata.get(key, [])]
-        merged[key] = [pair for k, pair in enumerate(pairs) if pair not in pairs[:k]]
+        pairs = (pair for out in fits for pair in out.metadata.get(key, []))
+        merged[key] = [list(pair) for pair in dict.fromkeys(map(tuple, pairs))]
     return merged
 
 

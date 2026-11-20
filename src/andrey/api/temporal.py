@@ -2352,4 +2352,4 @@ def undecided_links(undecided: np.ndarray | None, labels: tuple[str, ...] | None
         (lag * n + i, j) for lag, i, j in zip(lags.tolist(), sources.tolist(), targets.tolist())
     }
     named = named_pairs(pairs, name)
-    return {"undecided_pairs": [pair for k, pair in enumerate(named) if pair not in named[:k]]}
+    return {"undecided_pairs": [list(pair) for pair in dict.fromkeys(map(tuple, named))]}

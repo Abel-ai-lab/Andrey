@@ -317,6 +317,23 @@ def test_the_notice_counts_many_pairs_without_naming_them():
     assert "A0" not in notice
 
 
+def test_the_notice_names_at_most_five_pairs():
+    pairs = [[f"A{i}", f"B{i}"] for i in range(6)]
+    named = _not_tested_notice({"undecided_pairs": pairs[:5]})
+    assert named.endswith(
+        "5 pairs (A0 and B0, A1 and B1, A2 and B2, A3 and B3, A4 and B4) are undecided."
+    )
+    counted = _not_tested_notice({"undecided_pairs": pairs})
+    assert counted.endswith("6 pairs are undecided.")
+    assert not any(a in counted for a, _ in pairs)
+
+
+def test_the_notice_names_undecided_pairs_without_a_count_of_sets():
+    assert _not_tested_notice({"undecided_pairs": [["A", "B"]]}).endswith(
+        "1 pair (A and B) is undecided."
+    )
+
+
 def test_the_notice_says_no_pair_is_undecided_when_every_pair_was_decided():
     assert _not_tested_notice({"not_tested": 3}).endswith("No pair is undecided.")
     assert _not_tested_notice({"not_tested": 3, "undecided_pairs": []}).endswith(

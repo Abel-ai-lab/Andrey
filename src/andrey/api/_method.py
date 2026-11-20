@@ -702,9 +702,10 @@ def notice_default_missing(method: str, metadata: dict | None = None) -> None:
 
     The notice says which handling ran, when it is valid
     (:data:`~andrey.core.ci_missing.TESTWISE_CLAIM`), and how to choose it by name. When the fit's
-    ``metadata`` names pairs never observed together or has tests not tested, the notice says so
-    too (:func:`_not_tested_notice`); the metadata holds every pair of every fit. The worker
-    processes of :func:`~andrey.bootstrap` log none: the calling process logs it for their fits.
+    ``metadata`` names pairs never observed together, has tests not tested, or names undecided
+    pairs, the notice says so too (:func:`_not_tested_notice`); the metadata holds every pair of
+    every fit. The worker processes of :func:`~andrey.bootstrap` log none: the calling process
+    logs it for their fits.
     """
     log_once(
         _log,
@@ -720,12 +721,13 @@ def notice_default_missing(method: str, metadata: dict | None = None) -> None:
 def _not_tested_notice(metadata: dict) -> str:
     """Return what :func:`notice_default_missing` says of a fit's ``metadata``.
 
-    ``""`` when the fit has no pair never observed together and no test not tested. Otherwise it
-    gives the number of pairs never observed together and, with tests not tested, the
-    :data:`~andrey.core.ci_missing.NOT_TESTED_CLAIM` and the number of undecided pairs, naming the
-    pairs when there are at most ``_NOTICE_PAIRS``. The number of conditioning sets not tested,
-    ``metadata["not_tested"]``, is left out: it includes the sets the search skipped because no row
-    can test them, so its size follows the search, not what a user can change.
+    ``""`` when the fit has no pair never observed together, no test not tested, and no undecided
+    pair. Otherwise it gives the number of pairs never observed together and, with tests not
+    tested or undecided pairs, the :data:`~andrey.core.ci_missing.NOT_TESTED_CLAIM` and the number
+    of undecided pairs, naming the pairs when there are at most ``_NOTICE_PAIRS``. The number of
+    conditioning sets not tested, ``metadata["not_tested"]``, is left out: it includes the sets the
+    search skipped because no row can test them, so its size follows the search, not what a user
+    can change.
     """
 
     def counted(pairs: list[list], of: str = "") -> str:
