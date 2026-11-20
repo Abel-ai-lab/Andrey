@@ -851,7 +851,7 @@ class GaussianDeletion(PartialCorrelationDeletion):
 
         ``rows`` is each query's row count and ``flagged`` marks the queries the exact path
         answers instead (see the class); their ``r`` and ``p`` are meaningless. A query with fewer
-        than ``|S| + 3`` rows is not flagged and answers :data:`NOT_TESTED`.
+        rows than :meth:`least_rows` is not flagged and answers :data:`NOT_TESTED`.
         """
         size = conds.shape[1]
         columns = np.empty((len(lo), size + 2), dtype=np.intp)

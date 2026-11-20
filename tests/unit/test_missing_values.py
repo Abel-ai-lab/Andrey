@@ -167,7 +167,7 @@ def test_a_partial_correlation_matches_the_test_on_its_block_on_random_gaps(name
                 columns = sorted({a, b, *cond})
                 at = {c: i for i, c in enumerate(columns)}
                 block = _block(x, columns)
-                if len(block) < size + 3:
+                if len(block) < ci._CI_REGISTRY[name].least_rows(size):
                     assert np.isnan(test.statistic_pvalue(a, b, cond)).all()  # not tested
                     continue
                 alone = make_indep_test(name, block)
@@ -288,15 +288,36 @@ def test_rows_tested_reports_the_fewest_and_the_median_rows():
 # --- edge cases -----------------------------------------------------------------------------------
 
 
+#: A row floor ``|S| + k`` and the tests it is given for, in backticks, as Notes and pages write it.
+FLOOR = re.compile(
+    r'`{1,2}\|S\| \+ (\d)`{1,2}(?: rows)? for ((?:`{1,2}"?\w+"?`{1,2}(?:,? and |, )?)+)'
+)
+
+
+def named_floors(text: str) -> list[tuple[int, list[str]]]:
+    """Each ``|S| + k`` of ``text`` given for tests by name: ``k`` and the names."""
+    return [(int(k), re.findall(r'`{1,2}"?(\w+)"?`{1,2}', run)) for k, run in FLOOR.findall(text)]
+
+
+def assert_floors_match_the_tests(text: str) -> None:
+    """Every test named beside ``|S| + k`` in ``text`` needs ``|S| + k`` rows (``least_rows``), and
+    every partial-correlation test is named with its floor."""
+    floors = named_floors(text)
+    assert len(floors) == text.count("|S| + ")
+    for offset, names in floors:
+        for name in names:
+            least = ci._CI_REGISTRY[name].least_rows
+            assert [least(size) - size for size in range(4)] == [offset] * 4, name
+    assert set(PARTIAL) <= {name for _, names in floors for name in names}
+
+
 @pytest.mark.parametrize("page", ["api.md", "guides/getting-started.md"])
-def test_a_page_that_names_the_tests_needing_more_rows_names_each_partial_correlation_test(page):
-    """A partial-correlation test needs ``|S| + 3`` rows; the other tests need 2."""
+def test_a_page_that_names_the_tests_needing_more_rows_gives_each_its_floor(page):
+    """A page gives each partial-correlation test, and each other test it names, the rows its
+    ``least_rows`` asks for."""
     text = " ".join((Path(__file__).parents[2] / "docs" / "docs" / page).read_text().split())
-    spans = re.findall(r"\|S\| \+ 3` for (.*?) and 2 for the other tests", text)
-    assert spans
-    for span in spans:
-        named = set(re.findall(r'`"?(\w+)"?`', span)) & set(ci.SHIPPED_INDEP_TESTS)
-        assert named in (set(), set(PARTIAL))
+    assert named_floors(text)
+    assert_floors_match_the_tests(text)
 
 
 def _advises_more_rows(error) -> None:
@@ -382,11 +403,13 @@ def test_a_column_constant_on_a_test_rows_raises_for_a_continuous_test():
     assert 0.0 <= make_indep_test("fisherz", x)(1, 2) <= 1.0
 
 
-def test_a_category_alone_on_a_test_rows_is_left_to_the_test():
+def test_a_category_alone_on_a_test_rows_is_not_tested():
     x = _categorical(60)
     x[:30, 1] = 2.0
     x[30:, 0] = np.nan
-    assert make_indep_test("chisq", x)(0, 1) == 1.0  # no degree of freedom
+    with rows_tested() as rows:
+        assert np.isnan(make_indep_test("chisq", x)(0, 1))  # no degree of freedom
+    assert rows.not_tested == {(0, 1): 1} and rows.p_one == 0
 
 
 def test_copies_raise_naming_the_data_columns():
@@ -820,8 +843,7 @@ def _starved_queries(name: str) -> tuple[np.ndarray, np.ndarray | None, list[tup
 
     Categorical and mixed tests get a column with one category on the rows that observe another
     (zero degrees of freedom); the others get a column observed on 4 rows, so a test given one
-    conditioner reads ``|S| + 3`` rows, where the partial-correlation tests have no degrees of
-    freedom left.
+    conditioner reads ``|S| + 3`` rows, fewer than ``"fisherz"`` and ``"normal_scores"`` need.
     """
     if name in ci.DISCRETE_INDEP_TESTS or name in ci.MIXED_INDEP_TESTS:
         x = _one_category_where_observed()
