@@ -11,15 +11,14 @@ number of switches.
 
     ANDREY_BENCH_TIGRAMITE_PYTHON=<interpreter of benchmarks/start_tigramite.sh> \\
         uv run python benchmarks/rpcmci_agreement.py <empty folder> [--steps 1000] [--seeds 3] \\
-        [--starts 3] [--threshold 0.5] [--strict]
+        [--starts 3] [--threshold 0.5]
 
 tigramite is GPL-licensed: its fits run in its own environment (``--reference``, below), which
-imports this module for nothing but numpy and the models. Andrey joins a step to a regime at
-``gamma >= threshold`` (the paper's Eq. 11), tigramite above it; ``--strict`` gives Andrey the
-threshold plus ``1e-10``, tigramite's rule. The script prints one row per model: the starts with
-the same regime path and graphs, those with also the same per-iteration changes, those that
-differ or fail, and each package's regime accuracy and lagged SHD (summed over the regimes)
-against the truth.
+imports this module for nothing but numpy and the models. Both join a step to a regime when its
+weight is above ``threshold``. The script prints one row per model and one for all of them: the
+starts with the same regime path and graphs, those with also the same per-iteration changes, those
+that differ or fail, and each package's mean regime accuracy and mean lagged SHD (summed over the
+regimes) against the truth over its fits that did not fail.
 """
 
 from __future__ import annotations
@@ -173,7 +172,6 @@ def main() -> None:
     parser.add_argument("--seeds", type=int, default=3)
     parser.add_argument("--starts", type=int, default=3)
     parser.add_argument("--threshold", type=float, default=0.5)
-    parser.add_argument("--strict", action="store_true")
     parser.add_argument("--reference", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.reference:
@@ -196,12 +194,11 @@ def main() -> None:
     command = [python, __file__, str(args.folder), "--reference"]
     command += ["--starts", str(args.starts), "--threshold", str(args.threshold)]
     subprocess.run(command, check=True)
-    threshold = args.threshold + 1e-10 if args.strict else args.threshold
     tally: dict[str, dict] = {}
     for name, (model, x, regimes) in cases.items():
         t_rows = json.loads((args.folder / f"{name}.tigramite.json").read_text())
         a_rows = andrey_fits(
-            x, len(MODELS[model]), int((np.diff(regimes) != 0).sum()), args.starts, threshold
+            x, len(MODELS[model]), int((np.diff(regimes) != 0).sum()), args.starts, args.threshold
         )
         row = tally.setdefault(
             model,
@@ -249,6 +246,10 @@ def main() -> None:
         "tigramite: accuracy, SHD, failed",
     ]
     print("| " + " | ".join(header) + " |\n|" + "---|" * len(header))
+    counts = ["same", "identical", "differ", "both fail", "one fails"]
+    tally["all"] = {c: sum(r[c] for r in tally.values()) for c in counts}
+    for side in ("andrey", "tigramite"):
+        tally["all"][side] = [f for model in MODELS for f in tally[model][side]]
     for model, r in tally.items():
         cells = [model, r["same"], r["identical"], r["differ"], r["both fail"], r["one fails"]]
         cells += [summary(r["andrey"]), summary(r["tigramite"])]

@@ -13,9 +13,10 @@ import pytest
 import andrey
 from andrey.core import RegimeOutput, StructureOutput
 from andrey.core.seeding import start_generator
+from andrey.core.ties import tie_ranks
 from andrey.core.warning_policy import SearchLimitWarning
 from andrey.temporal.pcmci import pcmci
-from andrey.temporal.rpcmci import FEWEST_STEPS, regime_costs, regime_lp
+from andrey.temporal.rpcmci import FEWEST_STEPS, _start, regime_costs, regime_lp
 from tests.recovery.helpers import datagen
 
 CASE = "regime_var_2v"
@@ -97,6 +98,46 @@ def test_pcmci_rows_read_the_lagged_values_of_unselected_steps(series):
     result = pcmci(series, tau_max=1, alpha_level=0.01, rows=rows & (regime == 0))
     assert result.graph[0, 0, 1]
     assert result.statistics[0, 0, 1] > 0.5
+
+
+# --- the regime threshold --------------------------------------------------------------------
+
+
+def start_once(series, weights):
+    """One iteration of one start from ``weights`` at the default threshold."""
+    return _start(
+        series,
+        weights,
+        max_transitions=7,
+        switch_threshold=0.5,
+        max_iter=1,
+        tau_max=1,
+        pcmci_args={
+            "pc_alpha": 0.2,
+            "alpha_level": 0.01,
+            "fdr_method": "none",
+            "indep_test": "student_t",
+        },
+        ranks=tie_ranks(series),
+    )
+
+
+def test_a_step_at_the_threshold_joins_no_regime(series):
+    """A stretch weighted exactly 0.5 in both regimes is fit as if weighted 0 in both."""
+    path = datagen.regime_path(CASE)
+    true = np.stack([path == 0, path == 1]).astype(np.float64)
+    half, empty = true.copy(), true.copy()
+    half[:, 100:200] = 0.5
+    empty[:, 100:200] = 0.0
+    at, out = start_once(series, half), start_once(series, empty)
+    assert at is not None and out is not None
+    for a, b in zip(at.results, out.results, strict=True):
+        np.testing.assert_array_equal(a.p_values, b.p_values)
+    np.testing.assert_array_equal(at.weights, out.weights)
+
+
+def test_weights_all_at_the_threshold_leave_every_regime_empty(series):
+    assert start_once(series, np.full((2, len(series)), 0.5)) is None
 
 
 # --- the result type -------------------------------------------------------------------------
