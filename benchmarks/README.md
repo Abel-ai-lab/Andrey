@@ -85,8 +85,9 @@ benchmarks/start_xges.sh
 export ANDREY_BENCH_XGES_PYTHON=$PWD/benchmarks/.venv-xges/bin/python
 ```
 
-tigramite (GPL-3.0), the reference for the CMIknn and GPDC conditional-independence tests, also
-fits in an environment of its own, so it and its dependencies stay out of bench-env:
+tigramite (GPL-3.0), the reference for the CMIknn and GPDC conditional-independence tests and for
+Regime-PCMCI (`rpcmci_agreement.py`), also fits in an environment of its own, so it and its
+dependencies stay out of bench-env:
 
 ```shell
 benchmarks/start_tigramite.sh

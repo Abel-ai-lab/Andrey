@@ -25,7 +25,7 @@ names its pull request.
   causal links switch between a few persistent regimes. It returns an `andrey.RegimeOutput`: the
   regime of each time step, the regime weights, and one temporal result per regime, as `pcmci`
   returns it. The regime step solves the paper's linear program with SciPy, so it needs no new
-  dependency. ([#1149])
+  dependency. A contributor's script compares it with the authors' code start by start. ([#1149])
 - Three experimental regression-based conditional-independence tests, as `indep_test` options of
   every method that takes one: `"gcm"`, the generalized covariance measure (Shah and Peters 2020),
   which tests the covariance of the residuals of boosted-tree regressions; `"wgcm"`, the weighted
