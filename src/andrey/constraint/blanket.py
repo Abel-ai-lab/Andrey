@@ -107,9 +107,29 @@ def _dependences(
 ) -> Callable[[int, Sequence[int], Sequence[int]], list[tuple[float, float]]]:
     """:func:`_dependence` of every candidate in ``xs`` against one conditioning set.
 
-    A test with ``pvalues_given`` and no ``statistic_pvalue`` scans the candidates together, which
-    gives the p-values of the calls one by one and the key :func:`_dependence` derives from them.
+    A partial-correlation test on complete data (``statistic_pvalue`` and
+    ``statistic_pvalues_given``) answers two or more candidates in one call, from one factor of the
+    set's correlation block, equal to the calls one by one up to rounding. A test with
+    ``pvalues_given`` and no ``statistic_pvalue`` scans the candidates together, which gives the
+    p-values of the calls one by one and the key :func:`_dependence` derives from them. Any other
+    test answers one call at a time.
     """
+    given = getattr(test, "statistic_pvalues_given", None)
+    if given is not None and getattr(test, "statistic_pvalue", None) is not None:
+        one = _dependence(test, significant=significant)
+
+        def by_factor(
+            target: int, xs: Sequence[int], cond: Sequence[int]
+        ) -> list[tuple[float, float]]:
+            if len(xs) < 2:
+                return [one(target, x, cond) for x in xs]
+            r, p = given(target, xs, cond)
+            return [
+                (q, -round(abs(s), KEY_DP))
+                for s, q in zip(np.asarray(r).tolist(), np.asarray(p).tolist(), strict=True)
+            ]
+
+        return by_factor
     scan = getattr(test, "pvalues_given", None)
     if scan is not None and getattr(test, "statistic_pvalue", None) is None:
 
