@@ -2220,8 +2220,9 @@ def rpcmci(
         the time scale of the regimes.
     switch_threshold : float, default=0.5
         The weight above which a time step joins a regime's PCMCI step and model fit, in
-        ``(0, 1)``: step ``t`` joins regime ``k`` when ``gamma_k(t) > switch_threshold``. The first
-        weights are drawn in ``[0, 1)``, so ``1`` would leave every regime empty.
+        ``(0, 1)``: step ``t`` joins regime ``k`` when ``gamma_k(t) > switch_threshold``, with the
+        weight rounded to 9 decimals. The first weights are drawn in ``[0, 1)``, so ``1`` would
+        leave every regime empty.
     tau_max : int, default=1
         The largest lag tested, at least ``1``: links at lags ``1`` to ``tau_max`` are tested.
     pc1_alpha : float, default=0.2
@@ -2331,11 +2332,12 @@ def rpcmci(
 
     The paper's threshold for joining a regime is ``0.5`` [1]_, the default, and its Eq. 11 reads
     ``>=``; Andrey follows the authors' code, which joins a step only above the threshold, so a step
-    the linear program weighs half in each of two regimes joins neither fit. Dividing each residual
-    by its regime's standard deviation follows the authors' code, so rescaling a column changes no
-    result. Equal PC1 strengths are ordered by each variable's rank, as in :func:`~andrey.pcmci`,
-    and the residuals enter the cost in rank order, so reordering the columns relabels the result
-    and changes nothing else.
+    the linear program weighs half in each of two regimes joins neither fit. Each weight is rounded
+    to 9 decimals before the comparison, so this holds when the solver returns half with an error in
+    its last bits. Dividing each residual by its regime's standard deviation follows the authors'
+    code, so rescaling a column changes no result. Equal PC1 strengths are ordered by each
+    variable's rank, as in :func:`~andrey.pcmci`, and the residuals enter the cost in rank order, so
+    reordering the columns relabels the result and changes nothing else.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: a missing value would remove
     its step from every regime's fit and leave its regime unknown. Use :func:`~andrey.pcmci`,
