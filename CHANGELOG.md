@@ -76,17 +76,17 @@ names its pull request.
   than 8,192 rows the last bits followed the queries computed with it. ([#1142])
 - A test-wise fit that runs no test on data with missing values, such as `pc` on one column, sets
   `metadata["missing"]`, gives `metadata["rows_tested"]` as `{"min": 0, "median": 0}`, and logs
-  the notice of the default handling under `missing=None`. ([#PR_1129_FIXES])
+  the notice of the default handling under `missing=None`. ([#1151])
 - `pc(missing="mvpc")` counts the indicator queries it answers 1 in `metadata["p_one_tests"]`, and
   the corrected tests that return a p-value of 1 in `metadata["corrected_edges"]["p_one_tests"]`.
-  ([#PR_1129_FIXES])
+  ([#1151])
 - Under `missing="em"` with the linear-Gaussian BIC, copies among the observed values raise
   `CopiedColumnsError` before a pair of columns that shares no observed row, as on complete data.
-  ([#PR_1129_FIXES])
+  ([#1151])
 - The CLI records a fit's warning-level log records in `run.warnings` when the `andrey` or the
   root logger is set above `WARNING`, and `bootstrap` logs the records of fits that ran in worker
   processes in the calling process, once each, so they reach `run.warnings` instead of standard
-  error. ([#PR_1129_FIXES])
+  error. ([#1151])
 
 ## [0.18.0] - 2026-11-19
 
@@ -2757,6 +2757,6 @@ First alpha release.
 [card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
 [#1142]: https://github.com/Abel-ai-lab/Andrey/pull/1142
 [#1102]: https://github.com/Abel-ai-lab/Andrey/pull/1102
-[#PR_1129_FIXES]: https://github.com/Abel-ai-lab/Andrey/pull/PR_1129_FIXES
+[#1151]: https://github.com/Abel-ai-lab/Andrey/pull/1151
 [#1094]: https://github.com/Abel-ai-lab/Andrey/pull/1094
 [#1095]: https://github.com/Abel-ai-lab/Andrey/pull/1095
