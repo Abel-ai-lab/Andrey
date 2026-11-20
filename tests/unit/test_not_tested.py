@@ -7,6 +7,7 @@ The fixed case is a merged-cohort table: one cohort observes ``{S1, S2, S3, A}``
 
 from __future__ import annotations
 
+import logging
 from functools import partial
 
 import numpy as np
@@ -236,3 +237,48 @@ def test_a_registered_variant_keeps_the_row_floor_of_its_test(monkeypatch):
     test = ci.make_indep_test("cmiknn_k5", x)
     assert test.least_rows(0) == 6
     assert np.isnan(test(0, 1))
+
+
+def _never_together() -> pd.DataFrame:
+    """``X <- Z -> Y``: the first half of the rows observes only ``X`` and ``Z``, the second only
+    ``Y`` and ``Z``, so ``X`` and ``Y`` are never observed together (a case from a user report)."""
+    rng = np.random.default_rng(0)
+    n = 1000
+    z = rng.normal(size=n)
+    x = 0.8 * z + rng.normal(scale=0.6, size=n)
+    y = 0.8 * z + rng.normal(scale=0.6, size=n)
+    df = pd.DataFrame({"X": x, "Y": y, "Z": z})
+    df.loc[: n // 2 - 1, "Y"] = np.nan
+    df.loc[n // 2 :, "X"] = np.nan
+    return df
+
+
+@pytest.mark.parametrize(
+    "fit",
+    [
+        partial(andrey.pc, missing="testwise"),
+        partial(andrey.pc, missing="mvpc"),
+        partial(andrey.fci, missing="testwise"),
+    ],
+)
+def test_a_pair_never_observed_together_is_undecided_and_makes_no_collider(fit):
+    out = fit(_never_together())
+    for a, b in (("X", "Z"), ("Y", "Z"), ("X", "Y")):
+        assert _adjacent(out, a, b), (a, b)
+    assert out.metadata["undecided_pairs"] == [["X", "Y"]]
+    assert out.metadata["never_observed_together"] == [["X", "Y"]]
+    assert out.metadata["not_tested"] > 0
+    assert not all(out.structure.endpoints(v, "Z")[1] == ARROW for v in ("X", "Y"))
+
+
+def test_the_notice_names_a_pair_never_observed_together(caplog):
+    with caplog.at_level(logging.WARNING, logger="andrey"):
+        andrey.pc(_never_together())
+        andrey.fci(_never_together())
+    (notice,) = [r.getMessage() for r in caplog.records if r.name == "andrey.api._method"]
+    assert "never observed together (X and Y)" in notice
+
+
+def test_em_refuses_a_pair_never_observed_together_by_name():
+    with pytest.raises(ValueError, match=r"^drop column 'X' or column 'Y', .*share none"):
+        andrey.ges(_never_together(), missing="em")
