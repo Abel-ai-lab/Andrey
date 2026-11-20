@@ -214,11 +214,6 @@ class RowCounts(Counter[int]):
         could decide them, as a pair never observed together."""
         return [pair for pair in self.not_tested if pair not in self.largest]
 
-    def undecided(self, alpha: float) -> list[tuple[int, int]]:
-        """The pairs with a query that was not tested and no tested query with ``p > alpha``:
-        no test with rows separated them, and one without rows might have."""
-        return [pair for pair in self.not_tested if not self.largest.get(pair, -np.inf) > alpha]
-
 
 def not_tested(p: npt.ArrayLike) -> np.ndarray:
     """Mark the p-values that are :data:`NOT_TESTED`: the queries whose block held fewer rows than
@@ -246,7 +241,7 @@ def rows_tested() -> Generator[RowCounts]:
 def count_answer(rows: int, p: float, x: int, y: int) -> None:
     """Count, in the running :func:`rows_tested` counter if any, a query of ``x`` and ``y``
     answered ``p`` on ``rows`` rows by a test that is no :class:`TestwiseDeletion`, as MVPC's
-    indicator search answers one whose indicator is constant on its rows."""
+    indicator search answers :data:`NOT_TESTED` one whose indicator is constant on its rows."""
     if (counter := _ROWS.get()) is not None:
         counter.add([rows], [p], [min(x, y)], [max(x, y)])
 

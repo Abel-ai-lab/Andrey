@@ -7,7 +7,12 @@ The fixed case is a merged-cohort table: one cohort observes ``{S1, S2, S3, A}``
 
 from __future__ import annotations
 
+import logging
+import os
+import subprocess
+import sys
 from functools import partial
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -137,8 +142,9 @@ def test_a_link_between_columns_never_observed_together_is_undecided_not_found(n
         assert out.metadata["never_observed_together"] == [["A", "B"]]
         undecided = out.metadata["undecided_pairs"]
         assert ["A at lag 1", "B"] in undecided or ["A", "B at lag 1"] in undecided
-        if name != "lpcmci":  # PC1 and phase 2 condition on no link without a tested result
-            assert all({a.split()[0], b.split()[0]} == {"A", "B"} for a, b in undecided)
+        # No test conditions on a link without a tested result, so only the links of A and B are
+        # left undecided.
+        assert all({a.split()[0], b.split()[0]} == {"A", "B"} for a, b in undecided)
         p = np.asarray(out.metadata["p_values"], dtype=np.float64)
         labels = list(out.structure.labels)
         a, b = labels.index("A"), labels.index("B")
@@ -235,3 +241,90 @@ def test_a_registered_variant_keeps_the_row_floor_of_its_test(monkeypatch):
     test = ci.make_indep_test("cmiknn_k5", x)
     assert test.least_rows(0) == 6
     assert np.isnan(test(0, 1))
+
+
+def _never_together() -> pd.DataFrame:
+    """``X <- Z -> Y``: the first half of the rows observes only ``X`` and ``Z``, the second only
+    ``Y`` and ``Z``, so ``X`` and ``Y`` are never observed together (a case from a user report)."""
+    rng = np.random.default_rng(0)
+    n = 1000
+    z = rng.normal(size=n)
+    x = 0.8 * z + rng.normal(scale=0.6, size=n)
+    y = 0.8 * z + rng.normal(scale=0.6, size=n)
+    df = pd.DataFrame({"X": x, "Y": y, "Z": z})
+    df.loc[: n // 2 - 1, "Y"] = np.nan
+    df.loc[n // 2 :, "X"] = np.nan
+    return df
+
+
+@pytest.mark.parametrize(
+    "fit",
+    [
+        partial(andrey.pc, missing="testwise"),
+        partial(andrey.pc, missing="mvpc"),
+        partial(andrey.fci, missing="testwise"),
+    ],
+)
+def test_a_pair_never_observed_together_is_undecided_and_makes_no_collider(fit):
+    out = fit(_never_together())
+    for a, b in (("X", "Z"), ("Y", "Z"), ("X", "Y")):
+        assert _adjacent(out, a, b), (a, b)
+    assert out.metadata["undecided_pairs"] == [["X", "Y"]]
+    assert out.metadata["never_observed_together"] == [["X", "Y"]]
+    assert out.metadata["not_tested"] > 0
+    assert not all(out.structure.endpoints(v, "Z")[1] == ARROW for v in ("X", "Y"))
+
+
+def test_the_notice_names_a_pair_never_observed_together(caplog):
+    with caplog.at_level(logging.WARNING, logger="andrey"):
+        andrey.pc(_never_together())
+        andrey.fci(_never_together())
+    (notice,) = [r.getMessage() for r in caplog.records if r.name == "andrey.api._method"]
+    assert "never observed together (X and Y)" in notice
+
+
+_BOOTSTRAP_PROBE = """
+import andrey
+from test_not_tested import _never_together
+
+if __name__ == "__main__":
+    with andrey.config(n_jobs=2):
+        andrey.bootstrap("pc", _never_together(), n_resamples=4, seed=0)
+"""
+
+
+def test_the_notice_of_a_bootstrap_on_worker_processes_names_a_pair_never_observed_together(
+    tmp_path,
+):
+    probe = tmp_path / "probe.py"
+    probe.write_text(_BOOTSTRAP_PROBE)
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join([str(Path(__file__).parent), *sys.path])}
+    run = subprocess.run(
+        [sys.executable, str(probe)], capture_output=True, text=True, check=True, env=env
+    )
+    assert run.stderr.count("the default handling, test-wise deletion") == 1
+    assert "never observed together (X and Y)" in run.stderr and "Undecided: X and Y" in run.stderr
+
+
+def test_em_refuses_a_pair_never_observed_together_by_name():
+    with pytest.raises(ValueError, match=r"^drop column 'X' or column 'Y', .*share none"):
+        andrey.ges(_never_together(), missing="em")
+
+
+def test_lpcmci_conditions_no_test_on_a_link_never_observed_together(monkeypatch):
+    from andrey.temporal.lpcmci import LPCMCISearch
+
+    searches = []
+    initialize = LPCMCISearch.initialize
+
+    def kept(self, *args, **kwargs):
+        searches.append(self)
+        return initialize(self, *args, **kwargs)
+
+    monkeypatch.setattr(LPCMCISearch, "initialize", kept)
+    df = _series(0)
+    andrey.lpcmci(df, tau_max=1)
+    a, b = list(df.columns).index("A"), list(df.columns).index("B")
+    (search,) = set(searches)
+    # Only the tests of A and B lack rows: no test of another link conditions on A given B.
+    assert search.skipped and all({i, j} == {a, b} for i, j, _ in search.skipped)

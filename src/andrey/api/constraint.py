@@ -327,8 +327,10 @@ def pc(
     descendant of one (their Proposition 2). Step 2 finds the parents of each indicator: the
     variable's column is replaced by its 0/1 indicator, and the skeleton search tests the indicator
     against each other variable given subsets of the indicator's neighbors, with ``indep_test``,
-    ``alpha``, and ``max_depth``; a test whose rows hold one value of the indicator separates the
-    pair, unless they are fewer than the test needs, when it is not tested. Step 3 marks as
+    ``alpha``, and ``max_depth``. A test whose rows hold one value of the indicator, which then
+    carry no information on it, or fewer rows than the test needs is not tested; a variable on
+    whose rows the indicator holds one value conditions no test, and one left adjacent with no
+    test of its pair tested is no parent. Step 3 marks as
     candidates the adjacent pairs that share an adjacent variable or an indicator they both cause.
     Step 4 runs the skeleton search again over the candidates, every other edge kept, with the
     permutation-based correction (PermC, their Algorithm 2): a test of

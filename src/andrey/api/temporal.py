@@ -1594,7 +1594,8 @@ def lpcmci(
     tests), or with no degrees of freedom left, is not tested: it never separates a pair and never
     confirms a link, and ``metadata["not_tested"]`` counts such tests. A link no tested query could
     decide, as one between variables never observed together, has no p-value (``NaN``) and is listed
-    in ``metadata["undecided_pairs"]``. A continuous column constant on a test's rows raises
+    in ``metadata["undecided_pairs"]``, and no test conditions on a node whose link to either end
+    of the tested pair has no tested result. A continuous column constant on a test's rows raises
     ``ValueError``. The categorical, mixed-data, and nonlinear tests delete rows the same way.
     Test-wise deletion is valid when values are missing completely at random, which means that
     whether a value is missing depends on no value in the data; the rows a test reads are then a
