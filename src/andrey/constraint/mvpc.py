@@ -62,11 +62,13 @@ class PermutationCorrection:
     value is its regression's prediction at the drawn ``W`` plus its own residual. The query's
     partial-correlation test runs on those virtual rows (Tu et al. 2019, Algorithm 2).
 
-    The regressions and the test need ``max(|S| + 3, |W| + 2)`` rows in that block. A query with
-    fewer is answered by ``deletion``, as a query with an empty ``W`` is, and its pair joins
-    ``uncorrected``: the paper leaves the case open, the correction can only remove an edge the
-    deletion tests kept, and without the rows to compute it the pair keeps the deletion test's
-    answer for that conditioning set. ``rows`` counts the rows of the block of each query PermC
+    The regressions and the test need ``max(t, |W| + 2)`` rows in that block, ``t`` being the rows
+    the test needs (its ``least_rows``): ``|S| + 4`` for ``FisherZ`` and ``|S| + 3`` for
+    ``StudentT``, so the test keeps a degree of freedom. A query with fewer is answered by
+    ``deletion``, as a query with an empty ``W`` is, and its pair joins ``uncorrected``: the paper
+    leaves the case open, the correction can only remove an edge the deletion tests kept, and
+    without the rows to compute it the pair keeps the deletion test's answer for that conditioning
+    set. ``rows`` counts the rows of the block of each query PermC
     answers, which holds no more rows than the deletion test of the same query reads, and the
     queries it answers ``p = 1``.
 
@@ -131,7 +133,7 @@ class PermutationCorrection:
         tested = [x, y, *given]
         rows = self._observed[:, tested + parents].all(axis=1)
         m = int(rows.sum())
-        least = max(len(given) + 3, len(parents) + 2)
+        least = max(self._test.least_rows(len(given)), len(parents) + 2)
         if m < least:
             self.uncorrected.add((x, y))
             return self._deletion(x, y, given)

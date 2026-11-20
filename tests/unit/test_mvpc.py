@@ -126,6 +126,18 @@ def test_a_corrected_test_with_too_few_rows_is_the_deletion_test():
     assert not test.rows  # no query was corrected
 
 
+def test_a_corrected_test_needs_the_rows_that_leave_its_test_a_degree_of_freedom():
+    X = np.random.default_rng(0).standard_normal((40, 3))
+    X[3:, 2] = np.nan  # x, y, and the parent w observed together on 3 rows
+    fisher = _correction(X, {1: [2]})
+    assert fisher(0, 1) == make_indep_test("fisherz", X)(0, 1)  # needs |S| + 4 = 4 rows
+    assert fisher.uncorrected == {(0, 1)} and not fisher.rows
+    deletion = make_indep_test("student_t", X)
+    student = PermutationCorrection(X, "student_t", {1: [2]}, ~np.eye(3, dtype=bool), deletion, 0)
+    student(0, 1)  # needs |S| + 3 = 3 rows
+    assert not student.uncorrected and student.rows == {3: 1}
+
+
 def _gapped(seed: int) -> np.ndarray:
     """Figure 1b with rows that miss ``x`` or the indicator's parent ``w``, whatever they hold."""
     X = figure_1b(seed)
@@ -163,6 +175,8 @@ def test_a_fit_records_the_fewest_and_the_median_rows_its_corrected_tests_read(s
 def test_a_corrected_test_that_returns_one_counts_with_the_corrected_tests(monkeypatch):
     class Flat:
         """A partial-correlation test whose statistic is exactly zero."""
+
+        least_rows = FisherZ.least_rows
 
         def __init__(self, data):
             pass

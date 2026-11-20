@@ -337,8 +337,9 @@ def pc(
     drawn in random order from the rows where ``W`` is observed, plus each variable's residuals give
     virtual data distributed as the complete values of ``x``, ``y``, and ``S`` are on the rows where
     ``W`` is observed (their Eq. (4)), and the test runs on them. A test with an empty ``W`` is the
-    test-wise one. So is a test with fewer than ``max(|S| + 3, |W| + 2)`` rows where ``x``, ``y``,
-    ``S``, and ``W`` are all observed, too few for the regressions on ``W`` or for the test: the
+    test-wise one. So is a test with fewer than ``max(t, |W| + 2)`` rows where ``x``, ``y``, ``S``,
+    and ``W`` are all observed, ``t`` being the rows the test needs, ``|S| + 4`` for ``"fisherz"``
+    and ``|S| + 3`` for ``"student_t"``, too few for the regressions on ``W`` or for the test: the
     paper leaves that case open, and as the correction can only remove an edge the test-wise tests
     kept, the pair keeps its test-wise answer for that ``S`` and is listed in
     ``metadata["corrected_edges"]["uncorrected"]``. A corrected test reads no more rows than the
