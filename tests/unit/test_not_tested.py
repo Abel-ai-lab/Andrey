@@ -282,3 +282,22 @@ def test_the_notice_names_a_pair_never_observed_together(caplog):
 def test_em_refuses_a_pair_never_observed_together_by_name():
     with pytest.raises(ValueError, match=r"^drop column 'X' or column 'Y', .*share none"):
         andrey.ges(_never_together(), missing="em")
+
+
+def test_lpcmci_conditions_no_test_on_a_link_never_observed_together(monkeypatch):
+    from andrey.temporal.lpcmci import LPCMCISearch
+
+    searches = []
+    initialize = LPCMCISearch.initialize
+
+    def kept(self, *args, **kwargs):
+        searches.append(self)
+        return initialize(self, *args, **kwargs)
+
+    monkeypatch.setattr(LPCMCISearch, "initialize", kept)
+    df = _series(0)
+    andrey.lpcmci(df, tau_max=1)
+    a, b = list(df.columns).index("A"), list(df.columns).index("B")
+    (search,) = set(searches)
+    # Only the tests of A and B lack rows: no test of another link conditions on A given B.
+    assert search.skipped and all({i, j} == {a, b} for i, j, _ in search.skipped)
