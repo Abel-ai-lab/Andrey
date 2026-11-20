@@ -207,9 +207,10 @@ their expected values given the row's observed ones and adds their uncertainty. 
 expected covariance of the data. The search then runs on that covariance over every row, and the
 model is fit again to the graph it returns. It runs 10 rounds, or the number you pass as
 `n_em_iterations`. Before each search after the first, 5 more steps refit the model on the graph it
-has (Friedman's alternating scheme). `metadata["em"]` records whether each round changed the graph
-(`graph_changed`; when the last round still did, the fit logs a warning) and the observed-data
-log-likelihood after each round:
+has, so the search reads a covariance that graph's fit has settled on (Friedman's alternating
+scheme). `metadata["em"]` records whether each round changed the graph (`graph_changed`; when the
+last round still did, the fit logs a warning) and the observed-data log-likelihood after each
+round:
 
 ```{code-cell} ipython3
 em = andrey.ges(gappy, missing="em")
@@ -219,7 +220,8 @@ em.metadata["em"]["log_likelihood"][-1]
 EM suits data that fit its model, a linear model with Gaussian noise, when whether a value is
 missing depends at most on variables that are always observed, and when the variables are observed
 together often enough. This is measured, not proved: no result we know of covers the loop as it
-runs. When whether a value is missing depends on missing values, it has no guarantee. Where a search
+runs. When whether a value is missing depends on the value itself or on other columns that have
+missing values, EM has no guarantee. Where a search
 takes a `score_func` or an `env`, `missing="em"` takes only `"bic"` and no `env`. A row with no
 observed value is dropped first, and two columns that share no observed row raise a `ValueError`:
 the data hold no covariance for them. `metadata["em"]` records the rows dropped (`rows_dropped`) and
@@ -231,21 +233,25 @@ measured `ges`, `boss`, and `grasp` at `ebic_gamma=0.0`, up to 50 variables, aga
 that estimates one covariance by EM before its search, a simpler method than structural EM, at two
 settings of the sample size its score counts. `boss` and `grasp` were better than the empty graph
 in 102 and 103 of 108 settings. In {{ em_experimental_names }} it is experimental: no reference
-implementation exists to compare them with. What to expect from a fit:
+implementation exists to compare them with, so the
+[0.16.0 release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data) reports them beside
+test-wise deletion, dropping rows, and mean imputation. What to expect from a fit:
 
 - EM costs time. With 10 rounds a fit runs the search 10 times and the E-step 56 times, and it took
   2 to 72 times as long as the same search on complete data.
 - EM does not always settle within its 10 rounds. The last round still changed the graph in 2 to 6%
   of the fits we measured, and in 20% of `grasp`'s, most often with 50 variables and 100 rows. Such
-  a fit logs a warning, and more rows help.
-  A larger `n_em_iterations` runs more rounds, which lets some of these fits settle while others
-  keep changing between graphs; we have not benchmarked values other than 10 yet.
+  a fit logs a warning, and more rows help. A larger `n_em_iterations` runs more rounds, which lets
+  some of these fits settle while others keep changing between graphs; we have not benchmarked
+  values other than 10 yet.
 - With about 100 rows, `hc` and `tabu` are often no better than the empty graph, with EM and on
   complete data alike. From 500 rows on they were better in every setting.
 - On denser graphs (mean degree 4) `ges` at `ebic_gamma=0.0` was rarely better than the empty
   graph, with EM and on complete data alike.
 
-The [0.17.0 release card](../benchmarks/0.17.0.md#missing-data) has the numbers.
+The [0.17.0 release card](../benchmarks/0.17.0.md#missing-data) has the numbers, and the
+[missing-data comparison](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/missing-data.md)
+has every number.
 
 ## Methods that refuse missing values
 
