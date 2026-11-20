@@ -153,8 +153,8 @@ before the fit. A test needs, where its variables are observed, `|S| + 4` rows f
 `"normal_scores"`, `|S| + 3` for `"student_t"` and `"cond_gauss"`, 4 for `"gcm"` and for `"wgcm"`
 with `variant="fix"`, 17 for `"wgcm"`'s default `variant="est"`, 12 for `"pcm"`, and 2 for most
 other tests; a test with fewer is not tested. `cdnod` and `fci_jci` need a complete `env`. Every
-other method raises a `ValueError` that names it and says what to do instead, as
-[Missing values](guides/getting-started.md#missing-values) describes; each method's Notes say why.
+other method raises a `ValueError` that names it and says what to do instead, as the
+[Missing values](guides/missing-values.md) guide describes; each method's Notes say why.
 
 % concept: n_em_iterations
 `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm` take

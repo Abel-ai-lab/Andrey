@@ -35,6 +35,7 @@ from sphinx.errors import ConfigError
 
 import andrey
 import andrey.viz
+from andrey.core.ci_missing import EM_SUPPORTED
 from andrey.data import benchmarks
 from andrey.spec import list_specs
 
@@ -620,7 +621,9 @@ METHOD_LISTS = {
         any(p.type == "targets" for p in s.params) and s.output.graph_kind == "cpdag"
     ),
     "missing": lambda s: s.data.missing,
-    "em": lambda s: any(p.name == "missing" and "em" in (p.choices or ()) for p in s.params),
+    "em": lambda s: _takes(s, "missing", "em"),
+    "em_supported": lambda s: s.name in EM_SUPPORTED,
+    "em_experimental": lambda s: _takes(s, "missing", "em") and s.name not in EM_SUPPORTED,
     # The rows of the concepts guide's table, by the assumptions and the graph returned.
     "class_cpdag": lambda s: (
         s.output.graph_kind in ("cpdag", "undirected")

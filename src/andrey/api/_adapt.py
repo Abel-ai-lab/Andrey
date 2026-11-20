@@ -17,7 +17,7 @@ from andrey.core.ci import (
     RANK_INDEP_TESTS,
     SingularCorrelationError,
 )
-from andrey.core.ci_missing import EM, EM_METHODS, EM_SUPPORTED
+from andrey.core.ci_missing import EM, EM_METHODS, EM_SUPPORTED, MISSING_GUIDE
 from andrey.core.knowledge import as_node, column_position, resolve
 from andrey.core.score import (
     DISCRETE_SCORES,
@@ -241,7 +241,7 @@ def _refusal(method: str | None, name: str, where: str, fix: str = DROP_ROWS) ->
     base = name.split("[")[0]
     return (
         f"{lead}{fix.format(name=base)}; {who} does not accept missing values, and {name} {where} "
-        "(see Missing values in the getting-started guide)"
+        f"(see the Missing values guide, {MISSING_GUIDE})"
     )
 
 

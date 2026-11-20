@@ -8,6 +8,7 @@ accept ``NaN``; every other method raises a ``ValueError`` that names it.
 
 from __future__ import annotations
 
+import inspect
 import json
 import logging
 import re
@@ -22,7 +23,7 @@ import pytest
 
 import andrey
 from andrey.cli import main
-from andrey.core import ci, warning_policy
+from andrey.core import ci, ci_missing, warning_policy
 from andrey.core.ci import (
     FisherZ,
     PartialCorrelationTest,
@@ -33,6 +34,7 @@ from andrey.core.ci import (
 from andrey.core.ci_missing import (
     _STEP_BYTES,
     EM_METHODS,
+    MISSING_GUIDE,
     MORE_ROWS,
     TESTWISE_CLAIM,
     rows_metadata,
@@ -40,6 +42,7 @@ from andrey.core.ci_missing import (
 )
 from andrey.core.score import CopiedColumnsError
 from andrey.spec import REGISTRY
+from andrey.spec.generate import render_skill
 from andrey.temporal.pcmci import design_test, lagged_design
 from tests.recovery.helpers.ci_tests import PValueOnly
 from tests.unit.methods import SHORT
@@ -322,7 +325,7 @@ def assert_floors_match_the_tests(text: str) -> None:
     assert set(PARTIAL) <= {name for _, names in floors for name in names}
 
 
-@pytest.mark.parametrize("page", ["api.md", "guides/getting-started.md"])
+@pytest.mark.parametrize("page", ["api.md", "guides/missing-values.md"])
 def test_a_page_that_names_the_tests_needing_more_rows_gives_each_its_floor(page):
     """A page gives each partial-correlation test, and each other test it names, the rows its
     ``least_rows`` asks for."""
@@ -645,6 +648,7 @@ def test_every_other_method_refuses_missing_values_naming_itself(name):
     )
     with pytest.raises(ValueError, match=pattern) as error:
         getattr(andrey, name)(*_refused_inputs(name))
+    assert MISSING_GUIDE in str(error.value)
     if name == "longitudinal_lingam":  # a panel: a unit's rows go together
         assert (
             f"{name}: drop the units that hold a missing value from every dataset of data"
@@ -684,6 +688,22 @@ def test_the_refusal_lists_every_supported_method_but_the_pair_tests():
 
     tables = [name for name in SUPPORTED if REGISTRY[name].family != "pairwise"]
     assert [*TESTWISE_METHODS, *TESTWISE_SERIES_METHODS] == tables
+
+
+def test_the_guide_the_refusal_names_is_a_page_of_the_docs():
+    site, page = MISSING_GUIDE.split("/docs/", 1)
+    source = Path(__file__).parents[2] / "docs" / "docs" / page.replace(".html", ".md")
+    assert site == "https://andrey.abel.ai" and source.is_file()
+
+
+def test_no_text_says_that_fci_stays_sound_when_values_are_missing_for_a_reason():
+    """FCI with one test per query is valid for values missing completely at random only."""
+    texts = {name: inspect.getdoc(getattr(andrey, name)) or "" for name in SUPPORTED}
+    texts |= {"ci_missing": ci_missing.__doc__ or "", "agent text": render_skill()}
+    texts = {name: " ".join(text.split()) for name, text in texts.items()}
+    assert not [name for name, text in texts.items() if "missingness mechanism" in text]
+    assert TESTWISE_CLAIM in texts["fci"]
+    assert TESTWISE_CLAIM in texts["agent text"]
 
 
 @pytest.mark.parametrize("name", ["anm", "pnl", "loci"])
