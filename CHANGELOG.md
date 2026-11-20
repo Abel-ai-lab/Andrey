@@ -52,9 +52,9 @@ names its pull request.
 - The Markov-blanket searches count a conditioning set that holds a column no row observes with the
   tested pair, or with a collider's middle variable, as not tested without building its query. On
   synthetic merged cohorts of 50 columns with 134 pairs never observed together, `iamb` finished in
-  17 s where it ran past 14 minutes, with the same graph and counts. Their spouse step now tests
-  both candidate sets of each size, so `metadata["not_tested"]` no longer depends on the column
-  order. ([#1148])
+  17 s where it ran past 14 minutes, with the same graph and counts. Under test-wise deletion,
+  their spouse step now tests both candidate sets of each size, so `metadata["not_tested"]` no
+  longer depends on the column order. ([#1148])
 - A test-wise test with too few rows no longer raises `ValueError`, nor does a CD-NOD or FCI-JCI
   test whose `env` is constant on its rows: both are not tested. Each test sets its own row floor:
   `fisherz` and `normal_scores` need `|S| + 4` rows, `cond_gauss` `|S| + 3`, and `cmiknn` with an

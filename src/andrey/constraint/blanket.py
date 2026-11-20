@@ -516,13 +516,15 @@ def prune_spouses(
     For each pair ``x``, ``y`` of ``moral``, the candidates are the smaller of ``moral[x]`` less
     ``y`` and ``moral[y]`` less ``x``, or both when they hold as many members; the pair leaves when
     ``x`` and ``y`` test independent (a p-value above ``alpha``) given some subset of them, the
-    empty set included, by increasing size up to ``max_depth``; both candidate sets of a size are
-    tested before the pair's verdict at that size. The blankets are the moral graph
-    the search starts from, so each pair's verdict does not depend on another's. A pair a required
-    edge of ``constraints`` joins is not tested. Returns a new symmetric boolean matrix.
+    empty set included, by increasing size up to ``max_depth``. A test that deletes rows per test
+    (:func:`_tests_every_set`) tests both candidate sets of a size before the pair's verdict at
+    that size, so the tests it counts do not depend on the column order. The blankets are the moral
+    graph the search starts from, so each pair's verdict does not depend on another's. A pair a
+    required edge of ``constraints`` joins is not tested. Returns a new symmetric boolean matrix.
     """
     skeleton = moral.copy()
     required = None if constraints is None else constraints.required | constraints.required.T
+    every = _tests_every_set(test)
     for x, y in adjacent_pairs(moral):
         if required is not None and required[x, y]:
             continue
@@ -531,11 +533,13 @@ def prune_spouses(
         for size in range(top + 1 if max_depth is None else min(top, max_depth) + 1):
             seen: set[int] | None = None
             separated = False
-            for side in sides:  # both sides, so the tests asked do not depend on column order
+            for side in sides:
                 if size <= len(side) and scan_conditioning_sets(
                     test, x, y, side, size, alpha, set(), seen
                 ):
                     separated = True
+                    if not every:  # a test that deletes rows counts both sides' tests
+                        break
                 seen = set(side)
             if separated:
                 skeleton[x, y] = skeleton[y, x] = False

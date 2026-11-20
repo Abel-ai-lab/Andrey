@@ -747,9 +747,9 @@ FCI-JCI test whose `env` is constant on its rows, which then come from one envir
 no test with rows could decide stays adjacent in PC, FCI, CD-NOD, and FCI-JCI, stays in the
 Markov-blanket searches' sets, and in PCMCI and its variants has no p-value (`NaN`, `null` on the
 command line); `metadata["undecided_pairs"]` lists each such pair. On merged cohorts, every pair of
-variables measured only in different cohorts is therefore an edge of these searches' output and an
-undecided pair: a fact about the data, not a finding. PCMCI, PCMCI+, and J-PCMCI+
-condition no test on a lagged parent without a tested result, and LPCMCI none on a node whose link
+variables measured only in different cohorts is therefore an edge of the output of PC, FCI, CD-NOD,
+FCI-JCI, and the Markov-blanket searches and an undecided pair: a fact about the data, not a
+finding. PCMCI, PCMCI+, and J-PCMCI+ condition no test on a lagged parent without a tested result, and LPCMCI none on a node whose link
 to either end of the tested pair has none. `metadata["not_tested"]` counts the
 tests not tested, and `metadata["never_observed_together"]` lists the pairs of columns no row
 observes together; the notice for `missing=None` names the first of them. Merged cohorts often

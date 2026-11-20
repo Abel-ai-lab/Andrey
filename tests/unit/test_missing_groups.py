@@ -271,6 +271,7 @@ def test_the_queries_not_tested_do_not_depend_on_the_column_order(method):
             graph = np.asarray(moved.structure.to_numpy())[np.ix_(back, back)]
             assert np.array_equal(graph, found.structure.to_numpy())
             assert moved.metadata["not_tested"] == found.metadata["not_tested"]
+            assert moved.metadata["rows_tested"] == found.metadata["rows_tested"]
             undecided = {
                 frozenset(int(order[i]) for i in pair) for pair in moved.metadata["undecided_pairs"]
             }
