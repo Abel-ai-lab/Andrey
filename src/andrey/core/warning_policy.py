@@ -30,6 +30,8 @@ _warned: set[tuple[type[Warning], str]] = set()
 _logged: set[str] = set()
 # Reentrant: a warning handler that warns again from the same thread must not deadlock.
 _lock = threading.RLock()
+#: Held for the whole of a :func:`held_records` block, which changes the one ``andrey`` logger.
+_holding = threading.RLock()
 
 
 class AndreyWarning(UserWarning):
@@ -152,19 +154,22 @@ def held_records() -> Generator[list[logging.LogRecord]]:
     propagate, so no record reaches standard error, through the root logger's handlers or an
     embedding application's either; its level is lowered to ``WARNING`` when it, or the logger it
     inherits from, is set above it, so the block keeps every warning-level record whatever the
-    caller's threshold. The handlers, the propagation, and the level are restored after it.
+    caller's threshold. The handlers, the propagation, and the level are restored after it. A
+    block in another thread waits until this one ends, so each restores what it found; a block
+    nested in this thread holds the records of its own span.
     """
-    handler = _Held()
-    logger = logging.getLogger(_PACKAGE)
-    handlers, propagate, level = logger.handlers[:], logger.propagate, logger.level
-    held: list[logging.Handler] = [handler]
-    logger.handlers, logger.propagate = held, False
-    logger.setLevel(min(logger.getEffectiveLevel(), logging.WARNING))
-    try:
-        yield handler.records
-    finally:
-        logger.handlers, logger.propagate = handlers, propagate
-        logger.setLevel(level)
+    with _holding:
+        handler = _Held()
+        logger = logging.getLogger(_PACKAGE)
+        handlers, propagate, level = logger.handlers[:], logger.propagate, logger.level
+        held: list[logging.Handler] = [handler]
+        logger.handlers, logger.propagate = held, False
+        logger.setLevel(min(logger.getEffectiveLevel(), logging.WARNING))
+        try:
+            yield handler.records
+        finally:
+            logger.handlers, logger.propagate = handlers, propagate
+            logger.setLevel(level)
 
 
 def warn_each(message: str, category: type[AndreyWarning]) -> None:
@@ -202,13 +207,15 @@ def convergence_as_search_limit(source: str, fit: Callable[[], _T]) -> _T:
 
 
 def _reset_after_fork() -> None:
-    """Replace the inherited lock in a forked child.
+    """Replace the inherited locks in a forked child.
 
-    A child forked while another thread is warning inherits the lock held, with no thread left to
-    release it. The warned messages are kept: the child does not repeat what the parent showed.
+    A child forked while another thread is warning, or holding records, inherits the lock held,
+    with no thread left to release it. The warned messages are kept: the child does not repeat
+    what the parent showed.
     """
-    global _lock
+    global _lock, _holding
     _lock = threading.RLock()
+    _holding = threading.RLock()
 
 
 if hasattr(os, "register_at_fork"):
