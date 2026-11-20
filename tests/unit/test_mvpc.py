@@ -226,7 +226,7 @@ def test_a_fit_whose_corrected_tests_lack_rows_returns_the_test_wise_edges_and_n
     assert np.array_equal(out.structure.to_numpy(), testwise.structure.to_numpy())
 
 
-def test_an_indicator_constant_on_a_query_rows_separates_the_pair():
+def test_an_indicator_constant_on_a_query_rows_is_not_tested():
     X = np.random.default_rng(0).standard_normal((50, 3))
     X[:5, 0] = np.nan  # missing only where column 1 is missing too
     X[:5, 1] = np.nan
@@ -234,9 +234,23 @@ def test_an_indicator_constant_on_a_query_rows_separates_the_pair():
     R[:, 0] = np.isnan(X[:, 0])
     test = IndicatorTest(make_indep_test("fisherz", R), R, 0)
     with rows_tested() as rows:
-        assert test(0, 1) == 1.0
-    assert rows.p_one == 1 and rows == {45: 1}  # a test of the 45 rows that observe column 1
+        assert np.isnan(test(0, 1))
+    assert rows.not_tested == {(0, 1): 1} and rows.p_one == 0 and not rows
+    assert test.constant_on(1) and not test.constant_on(2)
     assert test(0, 2) < 1.0
+
+
+def test_a_column_missing_with_another_neither_is_a_parent_nor_hides_the_true_one():
+    # Columns 0 and 1 go missing together on the rows where column 2 is low: 0's indicator is
+    # constant on the rows that observe 1, so no query of 1 is tested, and 2 stays its parent.
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((2000, 4))
+    X[:, 3] += X[:, 2]
+    low = X[:, 2] < np.quantile(X[:, 2], 0.3)
+    X[low, 0] = X[low, 1] = np.nan
+    out = andrey.pc(X, missing="mvpc")
+    assert out.metadata["missingness_parents"] == {0: [2], 1: [2]}
+    assert out.metadata["not_tested"] == 2 and "p_one_tests" not in out.metadata
 
 
 def test_an_indicator_constant_on_fewer_rows_than_the_test_needs_is_not_tested():

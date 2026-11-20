@@ -234,8 +234,9 @@ def indicator_parents(
     tested against it given subsets of the indicator's neighbors, with ``indep_test`` on test-wise
     deletion, at ``alpha`` and ``max_depth``. The columns left adjacent are its parents, in
     ascending order, and an indicator with none is left out. A query whose rows hold one value of
-    the indicator separates its pair when they are at least the rows the test needs, and is not
-    tested on fewer (:class:`~andrey.constraint.mvpc.IndicatorTest`). A column
+    the indicator, or that has fewer rows than the test needs, is not tested
+    (:class:`~andrey.constraint.mvpc.IndicatorTest`). A column on whose observed rows the
+    indicator holds one value has no query tested: it is no parent and conditions no test. A column
     left adjacent only because a query of its pair was not tested
     (:meth:`~andrey.core.ci_missing.RowCounts.undecided`) is not a parent: no test with rows
     found it. The tests count in the fit's rows, without their pairs, which are the indicator's.
@@ -249,6 +250,10 @@ def indicator_parents(
         pairs[column, :] = pairs[:, column] = True
         test = IndicatorTest(make_indep_test(indep_test, R, seed=seed), R, int(column))
         with rows_tested_elsewhere() as rows:
+            for other in range(d):  # no query of such a column is tested: it conditions none
+                if other != column and test.constant_on(other):
+                    pairs[column, other] = pairs[other, column] = False
+                    test(column, other)
             found, _, _ = adjacency_search(test, d, alpha, support=pairs, max_depth=max_depth)
         undecided = {a if b == column else b for a, b in rows.undecided(alpha)}
         adjacent = [c for c in np.flatnonzero(found[column] != NULL) if c not in undecided]

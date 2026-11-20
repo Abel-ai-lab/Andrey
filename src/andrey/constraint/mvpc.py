@@ -16,7 +16,7 @@ from collections.abc import Iterable, Mapping
 import numpy as np
 
 from andrey.core.ci import CITest, FisherZ, StudentT, pins_blas
-from andrey.core.ci_missing import RowCounts, count_answer
+from andrey.core.ci_missing import NOT_TESTED, RowCounts, count_answer
 
 __all__ = ["IndicatorTest", "PermutationCorrection", "candidate_edges"]
 
@@ -28,11 +28,11 @@ class IndicatorTest:
     """A test of a missingness indicator, column ``indicator`` of the data ``test`` was built on.
 
     A query whose rows hold one value of the indicator, every value of it observed or every one
-    missing, on at least the rows ``test`` needs (its ``least_rows``, else 2), has nothing to
-    detect: it returns 1, so the column it pairs with is not a parent, and counts as a test of those
-    rows that returned 1 (:func:`~andrey.core.ci_missing.count_answer`). Every other query is
-    ``test``'s, including one on fewer rows, which ``test`` answers
-    :data:`~andrey.core.ci_missing.NOT_TESTED` and counts: too few rows never separate the pair.
+    missing, holds no information on it: it is not tested, returns
+    :data:`~andrey.core.ci_missing.NOT_TESTED`, and counts as such
+    (:func:`~andrey.core.ci_missing.count_answer`), so it never separates the pair. Every other
+    query is ``test``'s, including one on fewer rows than ``test`` needs, which ``test`` answers
+    :data:`~andrey.core.ci_missing.NOT_TESTED` and counts.
     """
 
     def __init__(self, test: CITest, data: np.ndarray, indicator: int) -> None:
@@ -42,14 +42,19 @@ class IndicatorTest:
         self._indicator = indicator
         self.pin_blas = pins_blas(test)
 
+    def constant_on(self, column: int) -> bool:
+        """Whether the rows that observe ``column`` hold one value of the indicator: then so do
+        the rows of every query of ``column``, and none is tested."""
+        values = self._values[self._observed[:, column]]
+        return bool(values.size) and values.min() == values.max()
+
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         given = [int(v) for v in condition_set]
         others = [int(v) for v in (x, y, *given) if int(v) != self._indicator]
         values = self._values[self._observed[:, others].all(axis=1)]
-        least = getattr(self._test, "least_rows", lambda size: 2)(len(given))
-        if values.size >= least and values.min() == values.max():
-            count_answer(values.size, 1.0, int(x), int(y))
-            return 1.0
+        if values.size and values.min() == values.max():
+            count_answer(values.size, NOT_TESTED, int(x), int(y))
+            return NOT_TESTED
         return self._test(x, y, given)
 
 
