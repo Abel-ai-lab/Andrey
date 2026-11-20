@@ -681,9 +681,13 @@ andrey.pc(gappy, missing="testwise").structure == out.structure
 ```
 
 With `fisherz` and `student_t`, each test computes its correlations directly from its rows, for many
-tests at once. The other tests are built anew on each test's rows, which costs more. A time series
-keeps every step: each row of the lagged design that reads a missing value holds it. Each test of
-PCMCI, PCMCI+, or LPCMCI reads the design rows where all of its lagged variables are observed.
+tests at once. When the rows fall into a few missingness patterns, as in data merged from cohorts
+that each measure their own variables, those sums come from tables kept once per pattern group
+instead of from every row, with the same results up to the last digits
+([Configuration](../configuration.md#test-wise-deletion) says when). The other tests are built
+anew on each test's rows, which costs more. A time series keeps every step: each row of the lagged
+design that reads a missing value holds it. Each test of PCMCI, PCMCI+, or LPCMCI reads the design
+rows where all of its lagged variables are observed.
 
 Test-wise deletion is valid when values are missing completely at random, which means that whether
 a value is missing depends on no value in the data; the rows a test reads are then a random sample
@@ -742,8 +746,11 @@ observed together included: it never separates a pair and never confirms a link.
 FCI-JCI test whose `env` is constant on its rows, which then come from one environment. A pair that
 no test with rows could decide stays adjacent in PC, FCI, CD-NOD, and FCI-JCI, stays in the
 Markov-blanket searches' sets, and in PCMCI and its variants has no p-value (`NaN`, `null` on the
-command line); `metadata["undecided_pairs"]` lists each such pair. PCMCI, PCMCI+, and J-PCMCI+
-condition no test on a lagged parent without a tested result, and LPCMCI none on a node whose link
+command line); `metadata["undecided_pairs"]` lists each such pair. On merged cohorts, every pair of
+variables measured only in different cohorts is therefore an undecided pair and an edge of the
+output of PC, FCI, CD-NOD, FCI-JCI, and the Markov-blanket searches, unless knowledge forbids the
+edge or, in IAMB and Inter-IAMB, `max_depth` stops the blanket's growth first: a fact about the
+data, not a finding. PCMCI, PCMCI+, and J-PCMCI+ condition no test on a lagged parent without a tested result, and LPCMCI none on a node whose link
 to either end of the tested pair has none. `metadata["not_tested"]` counts the
 tests not tested, and `metadata["never_observed_together"]` lists the pairs of columns no row
 observes together; the notice for `missing=None` names the first of them. Merged cohorts often

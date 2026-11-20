@@ -64,6 +64,7 @@ from .ci import (
     p_value_statistics,
     per_query,
 )
+from .missing_groups import GroupedSums, few_rows, grouping_for
 from .score import (
     ZERO_RESIDUAL,
     CopiedColumnsError,
@@ -146,6 +147,8 @@ _MARGIN = 100.0
 # n - |S| - offset.
 _DF_OFFSET: dict[type, int] = {FisherZ: 3, StudentT: 2}
 
+#: The rows :meth:`TestwiseDeletion.together` counts in one product, which bounds its temporaries.
+_TOGETHER_ROWS = 1 << 16
 #: The tests run inside :func:`rows_tested`, or ``None`` outside it.
 _ROWS: ContextVar[RowCounts | None] = ContextVar("andrey_rows_tested", default=None)
 
@@ -384,6 +387,7 @@ class TestwiseDeletion:
         self._held = 0
         self._source: np.ndarray | None = None
         self._environments = np.zeros(data.shape[1], dtype=bool)
+        self._together: np.ndarray | None = None
         self.pin_blas = _pins_blas(test_class, data.shape[0])
 
     def mark_environments(self, columns: Iterable[int]) -> None:
@@ -529,6 +533,28 @@ class TestwiseDeletion:
         """The rows of ``data`` observed in every one of ``columns``."""
         index = np.asarray(list(columns), dtype=np.intp)
         return np.flatnonzero(self._observed[:, index].all(axis=1))
+
+    def together(self) -> np.ndarray:
+        """``(d, d)`` booleans: ``[i, j]`` when some row observes columns ``i`` and ``j`` together.
+        A query over a pair that is ``False`` keeps no rows, so it is not tested."""
+        if self._together is None:
+            d = self._observed.shape[1]
+            counts = np.zeros((d, d), dtype=np.float32)
+            for start in range(0, self._observed.shape[0], _TOGETHER_ROWS):
+                seen = self._observed[start : start + _TOGETHER_ROWS].astype(np.float32)
+                counts += seen.T @ seen
+            self._together = counts > 0
+        return self._together
+
+    def count_not_tested(self, x: int, y: int, queries: int) -> None:
+        """Count ``queries`` queries of ``x`` and ``y`` as not tested in the running
+        :func:`rows_tested` counter without asking them, as a search counts the conditioning sets
+        that keep no rows (:meth:`together`); the pair is recorded as :meth:`_count` records it."""
+        counter = _ROWS.get()
+        if counter is None or not queries:
+            return
+        pair = (x, y) if self._source is None else self._source[[x, y]].tolist()
+        counter.not_tested[min(pair), max(pair)] += queries
 
     def _block(self, columns: Iterable[int]) -> np.ndarray:
         """The rows of ``data`` observed in every one of ``columns``, those columns only."""
@@ -684,12 +710,17 @@ class GaussianDeletion(PartialCorrelationDeletion):
     :meth:`statistic_pvalues`, and the canonical query arrays the skeleton searches pass) gives it
     the same bits.
 
+    When the rows fall into a few missingness patterns, the sums come from tables kept once per
+    group of patterns instead of from every row (:mod:`~andrey.core.missing_groups`); the path is
+    chosen once per test, from the data, and the two paths give the same row counts and agree up to
+    rounding.
+
     A query whose block has fewer rows than the test needs is not tested: its rows are counted from
-    the observed masks and its block is never summed. A query with a continuous column that may be
-    constant on the block, columns within ``_MARGIN`` of a copy, a correlation submatrix within
-    ``_MARGIN`` of the singular bound, or a partial correlation or p-value that is not a number is
-    answered by :class:`PartialCorrelationDeletion` instead, which raises where it raises. So every
-    error is the exact path's, at the same query.
+    the observed masks, or from the groups, and its block is never summed. A query with a continuous
+    column that may be constant on the block, columns within ``_MARGIN`` of a copy, a correlation
+    submatrix within ``_MARGIN`` of the singular bound, or a partial correlation or p-value that is
+    not a number is answered by :class:`PartialCorrelationDeletion` instead, which raises where it
+    raises. So every error is the exact path's, at the same query.
     """
 
     def __init__(
@@ -723,6 +754,8 @@ class GaussianDeletion(PartialCorrelationDeletion):
         self._pairs: tuple[np.ndarray, np.ndarray] | None = None
         self._blocks: OrderedDict[tuple[int, ...], tuple[np.ndarray, int]] = OrderedDict()
         self._kept = 0
+        self._grouped: GroupedSums | None = None
+        self._chosen = False  # whether the path is chosen
         self._repeats(list(range(data.shape[1])))
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
@@ -882,6 +915,12 @@ class GaussianDeletion(PartialCorrelationDeletion):
         r[short] = p[short] = NOT_TESTED
         return r, p, rows, flagged
 
+    def together(self) -> np.ndarray:
+        """:meth:`TestwiseDeletion.together`, read from the pair counts :meth:`_pairwise` keeps."""
+        if self._together is None:
+            self._together = self._pairwise()[0] > 0
+        return self._together
+
     def _pairwise(self) -> tuple[np.ndarray, np.ndarray]:
         """The rows each pair of columns shares and the pair's correlation on them, ``(d, d)``.
 
@@ -910,25 +949,41 @@ class GaussianDeletion(PartialCorrelationDeletion):
         same columns within ``_CACHE_BYTES``, each taking ``_ENTRY_BYTES`` besides its matrix; a
         query reads it in its own order. The blocks not kept are computed in steps of at most
         ``_STEP_BYTES`` of row values. A block's rows are counted from the observed masks first,
-        and a block with fewer than :meth:`least_rows` is never summed: its matrix is ``NaN``.
+        and a block with fewer than :meth:`least_rows` is never summed: its matrix is ``NaN``. On
+        the grouped path, a block whose groups hold fewer rows than that is not counted either: its
+        count is its groups' rows, an upper bound, which no answer reads, since its queries are not
+        tested.
         """
         k = columns.shape[1]
         keys = [tuple(row) for row in np.sort(columns, axis=1).tolist()]
         new = list(dict.fromkeys(key for key in keys if key not in self._blocks))
-        step = max(1, _STEP_BYTES // (8 * k * self._data.shape[0]))
         least = self.least_rows(k - 2)
-        for start in range(0, len(new), step):
-            chunk = np.array(new[start : start + step], dtype=np.intp)
-            kept = self._seen[chunk[:, 0]].copy()
-            for c in range(1, k):
-                kept &= self._seen[chunk[:, c]]
-            counts = np.count_nonzero(kept, axis=1)
+        grouped = self._grouped_sums()
+        step = len(new) if grouped is None else max(1, _STEP_BYTES // (32 * k * k))
+        for start in range(0, len(new), max(step, 1)):
+            chunk = np.array(new[start : start + step], dtype=np.intp).reshape(-1, k)
             blocks = np.full((len(chunk), k, k), np.nan)
-            enough = counts >= least
-            if enough.any():
-                blocks[enough] = _block_correlations(
-                    self._values, kept[enough], chunk[enough], counts[enough]
+            counts = np.zeros(len(chunk), dtype=np.int64)
+            per_row = np.ones(len(chunk), dtype=bool)
+            summed = np.empty(0, dtype=np.intp)  # the blocks the groups sum
+            if grouped is not None:
+                bound = grouped.counts(chunk)
+                short = bound < least
+                counts[short] = bound[short]
+                cheaper = ~short & grouped.cheaper(chunk)
+                per_row = ~short & ~cheaper
+                summed = np.flatnonzero(cheaper)
+            if per_row.any():
+                blocks[per_row], counts[per_row] = self._summed(chunk[per_row], least)
+            if grouped is not None and len(summed):
+                count, sums, products = grouped.blocks(chunk[summed])
+                counts[summed] = count
+                blocks[summed] = np.where(
+                    (count >= least)[:, None, None], _correlations(products, sums, count), np.nan
                 )
+                again = summed[(count >= least) & few_rows(count, bound[summed], k)]
+                if len(again):
+                    blocks[again], counts[again] = self._summed(chunk[again], least)
             for key, block, count in zip(map(tuple, chunk.tolist()), blocks, counts.tolist()):
                 self._blocks[key] = (block, count)
                 self._kept += block.nbytes + _ENTRY_BYTES
@@ -942,6 +997,42 @@ class GaussianDeletion(PartialCorrelationDeletion):
         at = np.arange(len(columns))[:, None, None]
         stack = ordered[at, rank[:, :, None], rank[:, None, :]]
         return stack, np.array([count for _, count in found], dtype=np.int64)
+
+    def _summed(self, columns: np.ndarray, least: int) -> tuple[np.ndarray, np.ndarray]:
+        """The correlation matrices and row counts of the blocks ``columns`` summed over every row,
+        in steps of at most ``_STEP_BYTES`` of row values; a block with fewer than ``least`` rows
+        is never summed and its matrix is ``NaN``."""
+        b, k = columns.shape
+        blocks = np.full((b, k, k), np.nan)
+        counts = np.zeros(b, dtype=np.int64)
+        step = max(1, _STEP_BYTES // (8 * k * self._data.shape[0]))
+        for start in range(0, b, step):
+            chunk = columns[start : start + step]
+            kept = self._seen[chunk[:, 0]].copy()
+            for c in range(1, k):
+                kept &= self._seen[chunk[:, c]]
+            count = np.count_nonzero(kept, axis=1)
+            counts[start : start + step] = count
+            enough = count >= least
+            if enough.any():
+                blocks[start + np.flatnonzero(enough)] = _block_correlations(
+                    self._values, kept[enough], chunk[enough], count[enough]
+                )
+        return blocks, counts
+
+    def _grouped_sums(self) -> GroupedSums | None:
+        """The grouped sums of :mod:`~andrey.core.missing_groups` when the data take that path
+        (:func:`~andrey.core.missing_groups.grouping_for`), else ``None`` for the per-row sums;
+        chosen from the data at the first block, so every block of the test takes one path."""
+        if not self._chosen:
+            from .ties import tie_ranks
+
+            grouping = grouping_for(
+                self._observed, lambda: tie_ranks(self._data), lambda: self._pairwise()[0]
+            )
+            self._grouped = None if grouping is None else GroupedSums(self._values, grouping)
+            self._chosen = True
+        return self._grouped
 
     def copies(self) -> tuple[tuple[int, ...], ...]:
         """The groups of columns that repeat one another up to scale and shift.
@@ -1098,6 +1189,13 @@ def _block_correlations(
         for j in range(i, k):
             np.multiply(block[:, i], block[:, j], out=pair)
             products[:, i, j] = products[:, j, i] = pair.sum(axis=1)
+    return _correlations(products, sums, count)
+
+
+def _correlations(products: np.ndarray, sums: np.ndarray, count: np.ndarray) -> np.ndarray:
+    """The correlation matrices of blocks from their cross products ``(B, k, k)``, sums ``(B,
+    k)``, and row counts ``(B,)`` of values less each column's observed mean, clipped to ``[-1,
+    1]``, as :func:`numpy.corrcoef` clips."""
     cov = products - sums[:, :, None] * sums[:, None, :] / count[:, None, None]
     spread = np.sqrt(np.diagonal(cov, axis1=1, axis2=2))
     return np.clip(cov / spread[:, :, None] / spread[:, None, :], -1.0, 1.0)

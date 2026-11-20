@@ -39,6 +39,22 @@ names its pull request.
 
 ### Changed
 
+- With `fisherz` and `student_t` on data with missing values, test-wise deletion groups the rows by
+  their missingness patterns once and computes a test's sums from the groups' tables, removing the
+  scattered missing cells exactly, when that costs less than summing every row; a query whose
+  groups hold too few rows for it is not tested without a scan. On synthetic merged cohorts, with
+  or without a few rows that observe every column, `pc` ran 2.5 to 6.6 times faster, and `iamb`
+  1.6 to 4.2 times, with the same graphs, the same tests not tested, and the same
+  row counts for every tested query. Data missing completely at random keep the per-row sums, and
+  so do series with outages, where nearly every pair of columns is observed together in about half
+  the rows or more. P-values change in their last digits. Six `ANDREY_TESTWISE_GROUP_*` settings
+  set when the path is used. ([#1148])
+- The Markov-blanket searches count a conditioning set that holds a column no row observes with the
+  tested pair, or with a collider's middle variable, as not tested without building its query. On
+  synthetic merged cohorts of 50 columns with 134 pairs never observed together, `iamb` finished in
+  17 s where it ran past 14 minutes, with the same graph and counts. Under test-wise deletion,
+  their spouse step now tests both candidate sets of each size, so `metadata["not_tested"]` no
+  longer depends on the column order. ([#1148])
 - A test-wise test with too few rows no longer raises `ValueError`, nor does a CD-NOD or FCI-JCI
   test whose `env` is constant on its rows: both are not tested. Each test sets its own row floor:
   `fisherz` and `normal_scores` need `|S| + 4` rows, `cond_gauss` `|S| + 3`, and `cmiknn` with an
@@ -2771,6 +2787,7 @@ First alpha release.
 [card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
 [#1142]: https://github.com/Abel-ai-lab/Andrey/pull/1142
 [#1102]: https://github.com/Abel-ai-lab/Andrey/pull/1102
+[#1148]: https://github.com/Abel-ai-lab/Andrey/pull/1148
 [#1151]: https://github.com/Abel-ai-lab/Andrey/pull/1151
 [#1094]: https://github.com/Abel-ai-lab/Andrey/pull/1094
 [#1095]: https://github.com/Abel-ai-lab/Andrey/pull/1095

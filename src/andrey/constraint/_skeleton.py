@@ -29,7 +29,7 @@ import numpy as np
 
 from andrey.core import NULL, backend
 from andrey.core.ci import CITest, DGTest, FisherZ, NormalScores, StudentT, pins_blas
-from andrey.core.ci_missing import GaussianDeletion, not_tested
+from andrey.core.ci_missing import GaussianDeletion, TestwiseDeletion, not_tested
 from andrey.core.orient import separating_set
 
 if TYPE_CHECKING:
@@ -93,8 +93,16 @@ def scan_conditioning_sets(
     accumulated ``separating``, the largest p-value, and the return value are identical.
 
     With ``trace`` given, one record per test is appended (see :func:`record_tests`); the check
-    runs once per chunk.
+    runs once per chunk. Without it, a test that deletes rows per test asks no subset holding a
+    candidate that no row observes together with ``a`` or ``b``: such a query keeps no rows, so it
+    is counted as not tested without being built (:func:`kept_apart`), which changes neither the
+    counts nor the return value.
     """
+    if trace is None:
+        kept, _ = kept_apart(test, (a, b), [(candidates, skip_within)], size)
+        if kept is None:
+            return False
+        [(candidates, skip_within)] = kept
     subsets = _subsets(candidates, size, skip_within)
     # CMIknn's _bounded_pvalue stops its shuffles once the side of alpha is certain; a p-value
     # above alpha that `largest` records comes from every shuffle.
@@ -134,6 +142,46 @@ def _subsets(
     if skip_within is not None and len(skip_within) >= size:
         subsets = (s for s in subsets if not skip_within.issuperset(s))
     return subsets
+
+
+def kept_apart(
+    test: CITest,
+    fixed: Sequence[int],
+    sides: list[tuple[list[int], set[int] | None]],
+    size: int,
+) -> tuple[list[tuple[list[int], set[int] | None]] | None, int]:
+    """The ``sides`` of a scan less the candidates no row observes together with a column of
+    ``fixed``, the columns every query of the scan holds, its pair first, and the number of sets
+    left out.
+
+    Each side is ``(candidates, skip_within)``, its sets the size-``size`` subsets of the
+    candidates less those lying inside ``skip_within`` (:func:`_subsets`). A set holding a dropped
+    candidate keeps no rows under a test that deletes rows per test, so each such set is counted
+    as a query of the pair not tested, without being built, as asking it would count it
+    (:meth:`~andrey.core.ci_missing.TestwiseDeletion.count_not_tested`). When no row observes the
+    columns of ``fixed`` together, every set is counted and ``None`` is returned in place of the
+    sides. Another test gets ``sides`` unchanged and none left out.
+    """
+    if not isinstance(test, TestwiseDeletion):
+        return sides, 0
+    together = test.together()
+    columns = list(fixed)
+    met: np.ndarray = np.all(together[columns], axis=0)
+    whole = not met[columns].all()
+    kept = [([c for c in side if met[c]], skip) for side, skip in sides]
+    left = sum(_subset_count(side, size, skip) for side, skip in sides)
+    if not whole:
+        left -= sum(_subset_count(side, size, skip) for side, skip in kept)
+    test.count_not_tested(columns[0], columns[1], left)
+    return None if whole else kept, left
+
+
+def _subset_count(candidates: list[int], size: int, skip_within: set[int] | None) -> int:
+    """The number of sets :func:`_subsets` yields."""
+    count = comb(len(candidates), size)
+    if skip_within is not None and len(skip_within) >= size:
+        count -= comb(len(skip_within.intersection(candidates)), size)
+    return count
 
 
 def canonical_capable(test: CITest) -> bool:
