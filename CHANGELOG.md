@@ -44,7 +44,7 @@ names its pull request.
   scattered missing cells exactly, when that costs less than summing every row; a query whose
   groups hold too few rows for it is not tested without a scan. On synthetic merged cohorts, with
   or without a few rows that observe every column, `pc` ran 2.5 to 6.6 times faster, and `iamb`
-  1.6 to 3.9 times, with the same graphs, the same tests not tested, and the same
+  1.6 to 4.2 times, with the same graphs, the same tests not tested, and the same
   row counts for every tested query. Data missing completely at random keep the per-row sums, and
   so do series with outages, where nearly every pair of columns is observed together in about half
   the rows or more. P-values change in their last digits. Six `ANDREY_TESTWISE_GROUP_*` settings
