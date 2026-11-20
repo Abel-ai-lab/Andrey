@@ -423,8 +423,12 @@ class WGCM(_RegressionTest):
     [1]_. An empty conditioning set has no weight to estimate, and both variants give the
     GCM's p-value of ``x`` and ``y`` minus their means. The statistic reported for ``"est"`` is the
     statistic or ``0``, whichever is larger, so a larger statistic always means a smaller p-value.
-    The split and the multiplier draws are drawn from ``seed`` over the rows in lexicographic order
-    of the query's own columns, so they do not depend on other columns.
+    The weight is the sign of the fit, as in the paper; the fit itself, as the authors' later code
+    weights, rejected more often in the paper's settings, true independences above the level too.
+    The draws of ``"fix"`` use the centered columns, as in the paper; the authors' code's uncentered
+    columns gave less power at the same level. The split and the multiplier draws are drawn from
+    ``seed`` over the rows in lexicographic order of the query's own columns, so they do not depend
+    on other columns.
 
     **Limitations.** Not benchmarked yet. The tests run it on up to 4 variables and 400 rows.
     ``"est"`` tests on 70% of the rows, and its p-value changes with the seed. A ``"boosting"``
@@ -592,7 +596,11 @@ class PCM(_RegressionTest):
     statistic is the average or ``0``, whichever is larger. A split whose products are all zero adds
     ``0``, and one whose products are one nonzero constant an infinity of its sign. The splits are
     drawn from ``seed`` over the rows in lexicographic order of the query's own columns, so they
-    do not depend on other columns.
+    do not depend on other columns. The variance adds ``c`` to the fit's positive part, as in the
+    paper; the authors' code adds it first, the same for a forest, whose fit is never negative, and
+    less powerful with least squares. The standard deviation divides by the second part's row count
+    ``m``, as in the paper; the authors' code's ``m - 1`` scales each split's statistic by
+    ``sqrt((m - 1) / m)``, too little to change the results.
 
     **Limitations.** Not benchmarked yet. The tests run it on up to 4 variables and 400 rows. Each
     query fits 30 regressions with the default 6 splits, each of 500 trees under ``"forest"``. The
@@ -679,10 +687,16 @@ class PCM(_RegressionTest):
         squares = (y[learn] - g_learn) ** 2
         v = self._fit(xz[learn], squares)
         shift = _variance_shift(squares, np.maximum(v(xz[learn]), 0.0))
-        variance = np.maximum(np.maximum(v(xz[test]), 0.0) + shift, _VARIANCE_FLOOR)
+        variance = _conditional_variance(v(xz[test]), shift)
         f = sign * (g(xz[test]) - m(z[test])) / variance
         statistic = _normalized_mean(self._residual(y[test], z[test]) * self._residual(f, z[test]))
         return 0.0 if np.isnan(statistic) else statistic
+
+
+def _conditional_variance(fitted: np.ndarray, shift: float) -> np.ndarray:
+    """The PCM's conditional variance: the positive part of ``fitted`` plus ``shift``, at least
+    ``_VARIANCE_FLOOR``."""
+    return np.maximum(np.maximum(fitted, 0.0) + shift, _VARIANCE_FLOOR)
 
 
 def _variance_shift(squares: np.ndarray, fitted: np.ndarray) -> float:

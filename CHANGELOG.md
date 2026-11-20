@@ -78,8 +78,12 @@ names its pull request.
   query, and changes with a column's units or sign only where the rounding moves a value or a
   column is symmetric about its mean once sorted. On data with missing values, a query with fewer
   rows than its test needs, 4 for `"gcm"` and for `"wgcm"` with `variant="fix"`, 17 for `"wgcm"`'s
-  default `variant="est"`, and 12 for `"pcm"`, is not tested. A contributor's script compares them
-  with the authors' code. ([#1147], [#1129])
+  default `variant="est"`, and 12 for `"pcm"`, is not tested. Where the papers and the authors'
+  code differ, the tests follow the papers, each choice measured against the code's in the papers'
+  settings: the wGCM weight is the sign of the fitted covariance, the fixed weights' multiplier
+  draws use the centered products, the PCM variance adds its shift to the fit's positive part, and
+  the PCM statistic's standard deviation divides by the row count. A contributor's script compares
+  them with the authors' code. ([#1147], [#1129], [#PR])
 - `target` takes a list of columns on `iamb`, `inter_iamb`, `mmpc`, and `icp`: one call returns one
   result per target, in the list's order, each equal to a call for that target alone. The three set
   learners answer every target with one search, which sets up the test once, and MMPC learns the

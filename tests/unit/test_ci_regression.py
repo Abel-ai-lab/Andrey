@@ -59,7 +59,7 @@ def test_the_tests_are_registered_and_seeded():
 def test_gcm_statistic_on_fixed_residuals():
     rx = np.array([1.0, -1.0, 2.0, 0.5])
     ry = np.array([0.5, -2.0, 1.0, 1.0])
-    products = rx * ry  # 0.5, 2, 2, 0.5: mean 1.25, variance 0.5625
+    products = rx * ry  # 0.5, 2, 2, 0.5: mean 1.25, variance over n 0.5625
     statistic, p = cr._gcm_answer(rx, ry)
     assert statistic == pytest.approx(2.0 * 1.25 / 0.75)
     assert p == pytest.approx(2.0 * ndtr(-statistic))
@@ -220,6 +220,26 @@ def test_early_stopping_keeps_ten_rounds_past_the_best():
     assert np.isfinite(cut[:13]).all()
     assert np.isinf(cut[13:]).all()
     assert np.array_equal(cr._early_stopped(curve[:12]), curve[:12])
+
+
+def test_wgcm_est_weights_by_the_sign_of_the_fit(monkeypatch):
+    weights = []
+    answer = cr._estimated_answer
+
+    def record(products, weight):
+        weights.append(weight)
+        return answer(products, weight)
+
+    monkeypatch.setattr(cr, "_estimated_answer", record)
+    cr.WGCM(_sign_changing(), regression="linear")(0, 1, [2])
+    assert set(np.unique(weights[0])) == {-1.0, 1.0}
+
+
+def test_pcm_variance_adds_the_shift_to_the_positive_part():
+    fitted = np.array([-0.5, 0.2, -0.005, -1.0])
+    variance = cr._conditional_variance(fitted, 0.3)
+    assert np.array_equal(variance, [0.3, 0.5, 0.3, 0.3])
+    assert np.array_equal(cr._conditional_variance(fitted, 0.0), [0.01, 0.2, 0.01, 0.01])
 
 
 def test_variance_shift_brings_the_mean_ratio_to_one():
