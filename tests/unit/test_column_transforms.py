@@ -301,7 +301,11 @@ def test_reordering_the_columns_relabels_the_rank_based_score_graph(spec):
     np.testing.assert_array_equal(got, want[np.ix_(ORDER, ORDER)])
 
 
-@pytest.mark.parametrize("spec", RANK_SCORED, ids=lambda spec: spec.name)
+@pytest.mark.parametrize(
+    "spec",
+    [spec for spec in RANK_SCORED if any(p.name == "knowledge" for p in spec.params)],
+    ids=lambda spec: spec.name,
+)
 def test_the_rank_based_score_honors_a_required_edge(spec):
     knowledge = andrey.Knowledge(required=[(0, 5)])
     assert not fit(spec, lambda x: x, **rank_settings(spec)).structure.to_numpy()[0, 5]
