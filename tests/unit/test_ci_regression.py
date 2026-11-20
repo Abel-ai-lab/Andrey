@@ -98,10 +98,11 @@ def test_one_sided_statistics_report_zero_below_the_null():
 def test_fixed_weights_on_fixed_input():
     products = np.array([1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, -1.0])
     z = np.arange(8.0)[:, None]
-    # With every multiplier 2, each draw is twice the statistic, so all 9 draws exceed it.
+    # The draws use the centered columns: a constant multiplier gives draws of 0, below any
+    # positive statistic, and so the smallest p-value.
     statistic, p = cr._fixed_answer(products, z, np.full((8, 9), 2.0))
     assert statistic > 0.0
-    assert p == 1.0
+    assert p == 0.1
 
 
 @pytest.mark.parametrize("name", LINEAR)
@@ -190,6 +191,8 @@ def test_variance_shift_brings_the_mean_ratio_to_one():
         (cr.GCM, {"regression": "spline"}, "regression"),
         (cr.WGCM, {"variant": "both"}, "variant"),
         (cr.PCM, {"n_splits": 0}, "n_splits"),
+        (cr.PCM, {"n_splits": 1.9}, "n_splits"),
+        (cr.PCM, {"n_splits": True}, "n_splits"),
     ],
 )
 def test_invalid_settings_raise(cls, options, match):

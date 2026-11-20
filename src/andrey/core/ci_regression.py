@@ -347,8 +347,9 @@ class WGCM(_RegressionTest):
     covariance up. ``"fix"`` takes the constant weight and the signs of each variable of ``z`` about
     its empirical 1/8, ..., 7/8 quantiles, normalizes each weighted product by its standard
     deviation, and the statistic is ``sqrt(n)`` times the largest absolute mean; its p-value is
-    ``(b + 1) / 500``, where ``b`` of 499 Gaussian multiplier draws of the same maximum are at least
-    as large [1]_. An empty conditioning set has no weight to estimate, and both variants give the
+    ``(b + 1) / 500``, where ``b`` of 499 Gaussian multiplier draws of the same maximum over the
+    centered columns, whose covariance is the products' sample correlation, are at least as large
+    [1]_. An empty conditioning set has no weight to estimate, and both variants give the
     GCM's p-value of ``x`` and ``y`` minus their means. The statistic reported for ``"est"`` is the
     statistic or ``0``, whichever is larger, so a larger statistic always means a smaller p-value.
     The split and the multiplier draws are drawn once from ``seed``.
@@ -457,8 +458,11 @@ def _fixed_answer(
         return 0.0, 1.0
     normalized = weighted[:, keep] / std[keep]
     root_n = np.sqrt(n)
-    statistic = float(root_n * np.abs(normalized.mean(axis=0)).max())
-    draws = np.abs(normalized.T @ multipliers).max(axis=0) / root_n
+    means = normalized.mean(axis=0)
+    statistic = float(root_n * np.abs(means).max())
+    # Centered columns give the draws the sample correlation of the weighted products as their
+    # covariance, the null of the paper's maximum.
+    draws = np.abs((normalized - means).T @ multipliers).max(axis=0) / root_n
     exceed = np.count_nonzero(draws >= statistic)
     return statistic, (exceed + 1) / (multipliers.shape[1] + 1)
 
@@ -546,8 +550,8 @@ class PCM(_RegressionTest):
         n_splits: int = _PCM_SPLITS,
         seed: int | None = None,
     ) -> None:
-        if n_splits < 1:
-            raise ValueError(f"n_splits must be at least 1, got {n_splits}")
+        if isinstance(n_splits, bool) or not isinstance(n_splits, int | np.integer) or n_splits < 1:
+            raise ValueError(f"n_splits must be a whole number of at least 1, got {n_splits!r}")
         # Each half needs the rows a forest splits, so the learned function can vary.
         super().__init__(
             data, regression=regression, seed=seed, name="PCM", min_rows=2 * _FOREST_MIN_SPLIT
