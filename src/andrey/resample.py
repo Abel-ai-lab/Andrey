@@ -876,8 +876,8 @@ def _draw(job: Job, b: int) -> list[np.ndarray]:
     return [rng.integers(0, n, size=n) for n in sizes]
 
 
-#: What one resample's fit returns: the fit, the warnings it raised, and its warning-level log
-#: records as ``(logger name, level, message)``, which pickle as a record may not.
+#: What one resample's fit returns: the fit, the warnings it raised, and its log records as
+#: ``(logger name, level, message)``, which pickle as a record may not.
 Fitted = tuple[Any, list[tuple[type[Warning], str]], list[tuple[str, int, str]]]
 
 
@@ -1077,8 +1077,9 @@ def bootstrap(
         Each distinct warning the fits raised, once; and, with ``strict=False``, when the vote has
         no valid graph of the method's kind, so the averaged graph is the valid resample graph
         nearest the others, or, when no resample is valid, the resample graph nearest the others.
-        Each distinct warning-level record the fits logged is logged once too, after the fits,
-        through its own logger, whether the fits ran in this process or in worker processes.
+        Each distinct record the fits logged, at least each warning-level one, is logged once
+        too, after the fits, through its own logger, whether the fits ran in this process or in
+        worker processes.
 
     Notes
     -----

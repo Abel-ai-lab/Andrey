@@ -316,3 +316,18 @@ def test_held_records_keep_the_records_of_an_andrey_logger_set_above_warning():
     finally:
         child.setLevel(level)
     assert [r.getMessage() for r in records] == ["held"]
+
+
+def test_held_records_hold_the_records_a_lower_level_lets_through():
+    logger, log = logging.getLogger("andrey"), logging.getLogger("andrey.test")
+    level = logger.level
+    try:
+        with held_records() as records:
+            log.info("dropped at the default level")
+        logger.setLevel(logging.INFO)
+        with held_records() as more:
+            log.info("held")
+        assert logger.level == logging.INFO
+    finally:
+        logger.setLevel(level)
+    assert not records and [r.getMessage() for r in more] == ["held"]

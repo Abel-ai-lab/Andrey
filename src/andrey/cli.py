@@ -18,6 +18,7 @@ import importlib.metadata
 import inspect
 import io
 import json
+import logging
 import math
 import os
 import platform
@@ -1086,8 +1087,8 @@ class LogWarning(Warning):
 def recorded_warnings() -> Generator[list[warnings.WarningMessage]]:
     """Record a fit's warnings and the warning-level records of its loggers, for ``run.warnings``.
 
-    The list fills when the block exits, the warnings first and the log records after, each record
-    as a :class:`LogWarning`. The records are held by
+    The list fills when the block exits, the warnings first and the warning-level log records
+    after, each record as a :class:`LogWarning`. The records are held by
     :func:`~andrey.core.warning_policy.held_records`, so none reaches standard error, and none is
     lost to a logger whose level is above ``WARNING``.
     """
@@ -1098,6 +1099,7 @@ def recorded_warnings() -> Generator[list[warnings.WarningMessage]]:
         caught.extend(
             warnings.WarningMessage(r.getMessage(), LogWarning, r.pathname, r.lineno)
             for r in records
+            if r.levelno >= logging.WARNING
         )
 
 

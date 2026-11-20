@@ -139,7 +139,7 @@ class _Held(logging.Handler):
     """Holds the records it is handed, in order."""
 
     def __init__(self) -> None:
-        super().__init__(logging.WARNING)
+        super().__init__()
         self.records: list[logging.LogRecord] = []
 
     def emit(self, record: logging.LogRecord) -> None:
@@ -148,7 +148,10 @@ class _Held(logging.Handler):
 
 @contextlib.contextmanager
 def held_records() -> Generator[list[logging.LogRecord]]:
-    """Hold the warning-level records of the ``andrey`` loggers inside the block, in order.
+    """Hold the records of the ``andrey`` loggers inside the block, in order.
+
+    The block holds every record their levels let through, so a lower level set by the caller
+    holds more, and every warning-level record whatever the levels.
 
     During the block the ``andrey`` logger holds only the handler that keeps them and does not
     propagate, so no record reaches standard error, through the root logger's handlers or an
