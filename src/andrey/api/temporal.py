@@ -635,14 +635,15 @@ def pcmci(
     A test with fewer rows than it needs (``|S| + 4`` rows for ``"fisherz"`` and
     ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and 2 for most other
     tests), or with no degrees of freedom left, is not tested: it never separates a pair and never
-    confirms a link, and ``metadata["not_tested"]`` counts such tests. A link no tested query could
-    decide, as one between variables never observed together, has no p-value (``NaN``) and is listed
-    in ``metadata["undecided_pairs"]``, and no test conditions on a lagged parent without a tested
-    result. A continuous column constant on a test's rows raises ``ValueError``. The categorical,
-    mixed-data, and nonlinear tests delete rows the same way. Test-wise deletion is valid when
-    values are missing completely at random, which means that whether a value is missing depends on
-    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
-    they are a selected sample that more rows do not correct.
+    confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not tested. A link
+    no tested query could decide, as one between variables never observed together, has no p-value
+    (``NaN``) and is listed in ``metadata["undecided_pairs"]``, and no test conditions on a lagged
+    parent without a tested result. A continuous column constant on a test's rows raises
+    ``ValueError``. The categorical, mixed-data, and nonlinear tests delete rows the same way.
+    Test-wise deletion is valid when values are missing completely at random, which means that
+    whether a value is missing depends on no value in the data; the rows a test reads are then a
+    random sample of all rows, and otherwise they are a selected sample that more rows do not
+    correct.
 
     **Limitations.** Measured with ``fdr_method="none"`` on simulated linear-Gaussian time series
     with lagged links, of ``max(1000, 8 * (d + 1))`` time steps for ``d`` variables and of five
@@ -984,14 +985,15 @@ def pcmciplus(
     A test with fewer rows than it needs (``|S| + 4`` rows for ``"fisherz"`` and
     ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and 2 for most other
     tests), or with no degrees of freedom left, is not tested: it never separates a pair and never
-    confirms a link, and ``metadata["not_tested"]`` counts such tests. A link no tested query could
-    decide, as one between variables never observed together, has no p-value (``NaN``) and is listed
-    in ``metadata["undecided_pairs"]``, and no test conditions on a lagged parent without a tested
-    result. A continuous column constant on a test's rows raises ``ValueError``. The categorical,
-    mixed-data, and nonlinear tests delete rows the same way. Test-wise deletion is valid when
-    values are missing completely at random, which means that whether a value is missing depends on
-    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
-    they are a selected sample that more rows do not correct.
+    confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not tested. A link
+    no tested query could decide, as one between variables never observed together, has no p-value
+    (``NaN``) and is listed in ``metadata["undecided_pairs"]``, and no test conditions on a lagged
+    parent without a tested result. A continuous column constant on a test's rows raises
+    ``ValueError``. The categorical, mixed-data, and nonlinear tests delete rows the same way.
+    Test-wise deletion is valid when values are missing completely at random, which means that
+    whether a value is missing depends on no value in the data; the rows a test reads are then a
+    random sample of all rows, and otherwise they are a selected sample that more rows do not
+    correct.
 
     **Limitations.** Measured on simulated linear-Gaussian time series with lagged and same-step
     links, of ``max(1000, 20 * (d + 1))`` time steps for ``d`` variables and of five times as many,
@@ -1592,15 +1594,15 @@ def lpcmci(
     A test with fewer rows than it needs (``|S| + 4`` rows for ``"fisherz"`` and
     ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and 2 for most other
     tests), or with no degrees of freedom left, is not tested: it never separates a pair and never
-    confirms a link, and ``metadata["not_tested"]`` counts such tests. A link no tested query could
-    decide, as one between variables never observed together, has no p-value (``NaN``) and is listed
-    in ``metadata["undecided_pairs"]``, and no test conditions on a node whose link to either end
-    of the tested pair has no tested result. A continuous column constant on a test's rows raises
-    ``ValueError``. The categorical, mixed-data, and nonlinear tests delete rows the same way.
-    Test-wise deletion is valid when values are missing completely at random, which means that
-    whether a value is missing depends on no value in the data; the rows a test reads are then a
-    random sample of all rows, and otherwise they are a selected sample that more rows do not
-    correct.
+    confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not tested. A link
+    no tested query could decide, as one between variables never observed together, has no p-value
+    (``NaN``) and is listed in ``metadata["undecided_pairs"]``, and no test conditions on a node
+    whose link to either end of the tested pair has no tested result. A continuous column constant
+    on a test's rows raises ``ValueError``. The categorical, mixed-data, and nonlinear tests delete
+    rows the same way. Test-wise deletion is valid when values are missing completely at random,
+    which means that whether a value is missing depends on no value in the data; the rows a test
+    reads are then a random sample of all rows, and otherwise they are a selected sample that more
+    rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian time series with 30% of the series
     unobserved, of ``max(1000, 12 * (d + 1))`` time steps for ``d`` variables and of five times as

@@ -116,9 +116,10 @@ conditional-independence searches, a test with fewer rows than it needs, or with
 freedom left, is not tested: it never separates a pair and never confirms a link; the pair methods
 instead raise `ValueError` when fewer than 2 rows observe both columns. `metadata["p_one_tests"]`,
 present when it is not zero, counts the tests that returned a p-value of 1.
-`metadata["not_tested"]` counts those tests, `metadata["undecided_pairs"]` lists the pairs no tested
+`metadata["not_tested"]` counts the conditioning sets not tested, including those the search
+skipped because no row can test them, `metadata["undecided_pairs"]` lists the pairs no tested
 query could decide, and `metadata["never_observed_together"]` the pairs of columns no row
-observes together. `pc` also takes
+observes together; the notice gives the number of those pairs, not of the sets. `pc` also takes
 `missing="mvpc"`: Missing-Value PC (Tu et al., 2019) finds the parents of each missingness indicator
 and tests again the edges they could have kept; `metadata["corrected_edges"]["rows_tested"]` gives
 the fewest and the median rows such a test read, and `metadata["corrected_edges"]["p_one_tests"]`,

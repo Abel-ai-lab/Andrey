@@ -313,8 +313,9 @@ def pc(
     the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
-    pair and never confirms a link, and ``metadata["not_tested"]`` counts such tests. A pair no
-    tested query could decide, as a pair never observed together, stays adjacent and is listed in
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including those the search skipped because no row can test them. A pair no tested query
+    could decide, as a pair never observed together, stays adjacent and is listed in
     ``metadata["undecided_pairs"]``. On merged cohorts, every pair of variables measured only in
     different cohorts is therefore an undecided pair and, unless knowledge forbids it, an edge of
     the output: a fact about the data, not a finding. A continuous column constant on a test's rows
@@ -836,8 +837,9 @@ def fci(
     the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
-    pair and never confirms a link, and ``metadata["not_tested"]`` counts such tests. A pair no
-    tested query could decide, as a pair never observed together, stays adjacent and is listed in
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including those the search skipped because no row can test them. A pair no tested query
+    could decide, as a pair never observed together, stays adjacent and is listed in
     ``metadata["undecided_pairs"]``. On merged cohorts, every pair of variables measured only in
     different cohorts is therefore an undecided pair and, unless knowledge forbids it, an edge of
     the output: a fact about the data, not a finding. A continuous column constant on a test's rows
@@ -1661,8 +1663,9 @@ def cdnod(
     the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
-    pair and never confirms a link, and ``metadata["not_tested"]`` counts such tests. A pair no
-    tested query could decide, as a pair never observed together, stays adjacent and is listed in
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including those the search skipped because no row can test them. A pair no tested query
+    could decide, as a pair never observed together, stays adjacent and is listed in
     ``metadata["undecided_pairs"]``; a test whose ``env`` is constant on its rows, which come from
     one environment, is not tested. On merged cohorts, every pair of variables measured only in
     different cohorts is therefore an undecided pair and, unless knowledge forbids it, an edge of
@@ -2034,8 +2037,9 @@ def fci_jci(
     and the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
-    pair and never confirms a link, and ``metadata["not_tested"]`` counts such tests. A pair no
-    tested query could decide, as a pair never observed together, stays adjacent and is listed in
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including those the search skipped because no row can test them. A pair no tested query
+    could decide, as a pair never observed together, stays adjacent and is listed in
     ``metadata["undecided_pairs"]``; a test whose ``env`` is constant on its rows, which come from
     one environment, is not tested. On merged cohorts, every pair of variables measured only in
     different cohorts is therefore an undecided pair and, unless knowledge forbids it, an edge of
