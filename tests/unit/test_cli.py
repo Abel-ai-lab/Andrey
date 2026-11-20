@@ -1262,13 +1262,10 @@ def _collider_file(tmp_path):
 
 
 def _results(out):
-    """Each target's answer in an envelope, without its test count."""
+    """Each target's answer in an envelope."""
     env = json.loads(out)
     assert env["multi"] is True and "structure" not in env and "metadata" not in env
-    return [
-        (r["structure"], {k: v for k, v in r["metadata"].items() if k != "n_tests"})
-        for r in env["results"]
-    ]
+    return [(r["structure"], r["metadata"]) for r in env["results"]]
 
 
 def test_a_list_of_targets_gives_each_target_its_own_result(capsys, tmp_path):
@@ -1281,10 +1278,7 @@ def test_a_list_of_targets_gives_each_target_its_own_result(capsys, tmp_path):
     for target, answer in zip("ca", listed, strict=True):
         _, one, _ = _run([*base, f"target={target}"], capsys)
         env = json.loads(one)
-        assert answer == (
-            env["structure"],
-            {k: v for k, v in env["metadata"].items() if k != "n_tests"},
-        )
+        assert answer == (env["structure"], env["metadata"])
     code, by_position, _ = _run([*base, "target=[2,0]"], capsys)
     assert code == 0 and _results(by_position) == listed
     code, one_entry, _ = _run([*base, "target=[c]"], capsys)  # a list of one is still a list
