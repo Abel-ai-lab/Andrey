@@ -418,6 +418,26 @@ def test_kci_decomposes_each_conditioning_set_once(monkeypatch):
         assert [KCI(data)(*query) for query in queries] == pvalues
 
 
+def test_kci_builds_each_marginal_kernel_once_and_the_cache_changes_no_bit(monkeypatch):
+    """Queries with no conditioning set share the kernel of each variable, and their p-values and
+    statistics equal those of a test that keeps no kernel (too small a cache for two)."""
+    built = []
+    build = ci_kernel.hsic_kernel
+    monkeypatch.setattr(ci_kernel, "hsic_kernel", lambda x: built.append(1) or build(x))
+    data = np.random.default_rng(4).standard_normal((120, 5))
+    data[:, 1] += np.sin(2 * data[:, 0])
+    pairs = [(x, y) for x in range(5) for y in range(x + 1, 5)]
+    xs, ys = (np.array(v) for v in zip(*pairs, strict=True))
+    conditions = np.empty((len(pairs), 0), dtype=int)
+    kept = KCI(data).statistic_pvalues(xs, ys, conditions)
+    assert len(built) == 5
+    built.clear()
+    monkeypatch.setattr(ci_kernel, "_CACHE_BYTES", 0)
+    fresh = KCI(data).statistic_pvalues(xs, ys, conditions)
+    assert len(built) == 2 * len(pairs)
+    assert kept[0].tolist() == fresh[0].tolist() and kept[1].tolist() == fresh[1].tolist()
+
+
 def test_rcot_samples_features_per_variable_and_conditioning_set(monkeypatch):
     """Queries share the features of a variable given one conditioning set, and of the set; a
     repeated query samples nothing, and the p-values equal those of a test that samples every

@@ -172,10 +172,10 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 | Structure | Methods |
 |---|---|
 | `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`, `nogam`, `das`, `gin`, `anm`, `pnl`, `loci`, `icp`, `cpcm`, `cpcm_graph`, `skewd`, `skewd_mv` |
-| `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `gnies`, `xges`, `ages`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `iamb`, `inter_iamb` |
+| `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `gnies`, `xges`, `lges`, `ages`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `iamb`, `inter_iamb` |
 | `undirected` | `mmpc` |
 | `pag` | `fci`, `gfci`, `boss_fci`, `grasp_fci`, `fci_jci`, `rcd`, `bottom_up_parce_lingam`, `camuv` |
-| `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `dynotears` |
+| `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `rpcmci`, `granger`, `dynotears` |
 
 `cdnod` returns kind `cpdag`, but its graph is only partially directed: the domain index orients
 edges that the CPDAG of observational data leaves undirected, so score it against the graph CD-NOD
@@ -206,6 +206,10 @@ make it a target of the change, so `fci_jci` lists no `changing_variables`. With
 `changing_variables` either: the links of its dummies, in `metadata["index_edges"]` and
 `metadata["time_index_edges"]`, stand in for the hidden contexts, and the links of the measured
 contexts are in `metadata["context_links"]`.
+
+`rpcmci` returns a {py:class}`~andrey.RegimeOutput`, not one result: `regimes` holds the regime
+of each time step, `weights` the regime weights it comes from, and `outputs[k]` a `StructureOutput`
+over the `TemporalStructure` of regime `k`, lags 1 to `tau_max`, as `pcmci` returns it.
 
 `icp` returns a `dag` whose only edges point into its `target`, from the parents it estimates; an
 absent edge says nothing about the pair.

@@ -30,7 +30,7 @@ import andrey
 from andrey.core import TemporalStructure
 from andrey.core.stats import normal_scores
 from andrey.spec import list_specs
-from tests.unit.methods import fit_settings
+from tests.unit.methods import fit_settings, regime_paths, results
 
 N = 300
 P = 6
@@ -126,9 +126,7 @@ def graphs(structure) -> list[np.ndarray]:
 
 
 def marks(out) -> list[np.ndarray]:
-    return [
-        m for result in (out if isinstance(out, list) else [out]) for m in graphs(result.structure)
-    ]
+    return [m for result in results(out) for m in graphs(result.structure)] + regime_paths(out)
 
 
 def always_env(spec) -> bool:
@@ -303,7 +301,11 @@ def test_reordering_the_columns_relabels_the_rank_based_score_graph(spec):
     np.testing.assert_array_equal(got, want[np.ix_(ORDER, ORDER)])
 
 
-@pytest.mark.parametrize("spec", RANK_SCORED, ids=lambda spec: spec.name)
+@pytest.mark.parametrize(
+    "spec",
+    [spec for spec in RANK_SCORED if any(p.name == "knowledge" for p in spec.params)],
+    ids=lambda spec: spec.name,
+)
 def test_the_rank_based_score_honors_a_required_edge(spec):
     knowledge = andrey.Knowledge(required=[(0, 5)])
     assert not fit(spec, lambda x: x, **rank_settings(spec)).structure.to_numpy()[0, 5]

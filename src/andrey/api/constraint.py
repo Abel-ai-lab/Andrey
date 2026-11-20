@@ -10,7 +10,7 @@ regressions across environments and returns its estimated parents.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
@@ -30,6 +30,7 @@ from andrey.api._adapt import (
     label_of,
     split_index,
     structure_output,
+    target_columns,
 )
 from andrey.api._method import method_spec
 from andrey.core.ci_missing import rows_metadata, rows_tested
@@ -49,6 +50,7 @@ def pc(
     *,
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     collider_order: str | None = None,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
@@ -80,18 +82,26 @@ def pc(
         for data whose columns are monotone transformations of Gaussian variables: its p-values do
         not change under a strictly increasing transformation of a column. ``"chisq"`` (Pearson's
         chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by
-        whole numbers. ``"degen_gauss"`` (degenerate
-        Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test mixed data, continuous and
-        categorical columns, by a likelihood ratio. Four more tests detect nonlinear dependence in
-        continuous data, at a far higher cost per test: ``"kci"`` is the kernel test; ``"rcot"`` its
-        random-feature approximation; ``"cmiknn"`` a nearest-neighbor conditional mutual information
-        test; and ``"gpdc"`` Gaussian-process regression with a distance correlation test. ``None``
-        picks from the declared column types: ``"gsq"`` when every column is categorical,
-        ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
-        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
-        values. See **Categorical data.** and **Mixed data.** in Notes.
-        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
-        declared column types when this is ``None``.
+        whole numbers. ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional
+        Gaussian) test mixed data, continuous and categorical columns, by a likelihood ratio. Seven
+        more tests detect nonlinear dependence in continuous data, at a far higher cost per test:
+        ``"kci"`` is the kernel test; ``"rcot"`` its random-feature approximation; ``"cmiknn"`` a
+        nearest-neighbor conditional mutual information test; ``"gpdc"`` Gaussian-process regression
+        with a distance correlation test; and ``"gcm"``, ``"wgcm"``, and ``"pcm"`` the generalized,
+        weighted generalized, and projected covariance measures, which test the covariance of
+        regression residuals. ``None`` picks from the declared column types: ``"gsq"`` when every
+        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
+        declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
+        type, never by its values. See **Categorical data.** and **Mixed data.** in Notes.
+        ``metadata["indep_test"]`` names the test the fit used: the one picked from the declared
+        column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, which decides between two colliders that would
         orient one edge in opposite directions. ``"p_value"`` orients first the collider whose
@@ -127,9 +137,9 @@ def pc(
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
-        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make, and of the permutations of
-        ``missing="mvpc"``; the other tests ignore it. With those tests, or with ``"mvpc"`` on data
-        with missing values, ``metadata["seed"]`` records the seed used.
+        only ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"`` make, and of
+        the permutations of ``missing="mvpc"``; the other tests ignore it. With those tests, or with
+        ``"mvpc"`` on data with missing values, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -211,17 +221,17 @@ def pc(
     Notes
     -----
     **When to use.** PC suits i.i.d. observational data with no unmeasured common causes, in which
-    every independence follows from the graph (faithfulness) [1]_. Its default Fisher-Z test
-    assumes continuous data, where each variable depends linearly on its causes with roughly
-    Gaussian noise; for categorical data, use ``"chisq"`` or ``"gsq"``, for mixed data
-    ``"degen_gauss"`` or ``"cond_gauss"``, and for nonlinear effects in continuous data ``"kci"``,
-    ``"rcot"``, ``"cmiknn"``, or ``"gpdc"``, at a far higher cost per test. It is designed for
-    sparse graphs, where every variable has few neighbors, and then stays feasible with many
-    variables [5]_; it returns a CPDAG. When unmeasured common causes are plausible, use
+    every independence follows from the graph (faithfulness) [1]_. Its default Fisher-Z test assumes
+    continuous data, where each variable depends linearly on its causes with roughly Gaussian noise;
+    for categorical data, use ``"chisq"`` or ``"gsq"``, for mixed data ``"degen_gauss"`` or
+    ``"cond_gauss"``, and for nonlinear effects in continuous data ``"kci"``, ``"rcot"``,
+    ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, or ``"pcm"``, at a far higher cost per test. It
+    is designed for sparse graphs, where every variable has few neighbors, and then stays feasible
+    with many variables [5]_; it returns a CPDAG. When unmeasured common causes are plausible, use
     :func:`~andrey.fci`; when the noise is non-Gaussian and every edge should be oriented, use
-    :func:`~andrey.direct_lingam`. When whether a value is missing depends on the variables,
-    through variables other than itself, ``missing="mvpc"`` removes the extra edges that
-    test-wise deletion can keep [13]_.
+    :func:`~andrey.direct_lingam`. When whether a value is missing depends on the variables, through
+    variables other than itself, ``missing="mvpc"`` removes the extra edges that test-wise deletion
+    can keep [13]_.
 
     **Choosing alpha.** A test removes an edge when it cannot reject independence at ``alpha``. A
     larger ``alpha`` therefore keeps more edges, true and false. On the Sachs data in the
@@ -542,6 +552,7 @@ def pc(
             X,
             alpha=alpha,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             collider_order=resolve_collider_order(collider_order),
             collider_rule=collider_rule,
             categorical=mask,
@@ -612,6 +623,7 @@ def fci(
     *,
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
@@ -643,17 +655,25 @@ def fci(
         for data whose columns are monotone transformations of Gaussian variables: its p-values do
         not change under a strictly increasing transformation of a column. ``"chisq"`` (Pearson's
         chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by
-        whole numbers. ``"degen_gauss"`` (degenerate
-        Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test mixed data, continuous and
-        categorical columns. Four more tests detect nonlinear dependence in continuous data, at a
-        far higher cost per test: ``"kci"`` is the kernel test; ``"rcot"`` its random-feature
-        approximation; ``"cmiknn"`` a nearest-neighbor conditional mutual information test; and
-        ``"gpdc"`` Gaussian-process regression with a distance correlation test. ``None`` picks from
-        the declared column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when
-        some are, else ``"fisherz"``. A column is declared categorical by ``categorical`` or by a
-        DataFrame's ``category``, ``bool``, or text type, never by its values. See Notes.
-        ``metadata["indep_test"]`` names the test the fit used: the one picked from the
-        declared column types when this is ``None``.
+        whole numbers. ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional
+        Gaussian) test mixed data, continuous and categorical columns. Seven more tests detect
+        nonlinear dependence in continuous data, at a far higher cost per test: ``"kci"`` is the
+        kernel test; ``"rcot"`` its random-feature approximation; ``"cmiknn"`` a nearest-neighbor
+        conditional mutual information test; ``"gpdc"`` Gaussian-process regression with a distance
+        correlation test; and ``"gcm"``, ``"wgcm"``, and ``"pcm"`` the generalized, weighted
+        generalized, and projected covariance measures, which test the covariance of regression
+        residuals. ``None`` picks from the declared column types: ``"gsq"`` when every column is
+        categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared
+        categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type,
+        never by its values. See Notes. ``metadata["indep_test"]`` names the test the fit used: the
+        one picked from the declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
         How FCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
@@ -687,8 +707,8 @@ def fci(
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
-        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
-        tests, ``metadata["seed"]`` records the seed used.
+        only ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"`` make; the
+        other tests ignore it. With those tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -932,6 +952,7 @@ def fci(
             X,
             alpha=alpha,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             collider_rule=collider_rule,
             categorical=mask,
             possible_dsep=resolve_possible_dsep(possible_dsep),
@@ -1025,6 +1046,7 @@ def gfci(
     ebic_gamma: float = 0.0,
     equivalent_sample_size: float = 1.0,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     alpha: float = 0.05,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
@@ -1098,12 +1120,20 @@ def gfci(
         ranks over every environment's rows would mix their distributions. ``"chisq"`` (Pearson's
         chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by
         whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. ``"kci"``, ``"rcot"``,
-        ``"cmiknn"``, and ``"gpdc"`` also detect nonlinear dependence in continuous data, at a far
-        higher cost per test. Each as for :func:`~andrey.pc`. ``None`` picks from the declared
-        column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are,
-        else ``"fisherz"``. A column is declared categorical by ``categorical`` or by a DataFrame's
-        ``category``, ``bool``, or text type, never by its values. ``metadata["indep_test"]`` names
-        the test the fit used: the one picked from the declared column types when this is ``None``.
+        ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"`` also detect nonlinear
+        dependence in continuous data, at a far higher cost per test. Each as for
+        :func:`~andrey.pc`. ``None`` picks from the declared column types: ``"gsq"`` when every
+        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
+        declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
+        type, never by its values. ``metadata["indep_test"]`` names the test the fit used: the one
+        picked from the declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test, in ``(0, 1)``. Smaller values give
         sparser graphs.
@@ -1148,8 +1178,8 @@ def gfci(
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
-        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
-        tests, ``metadata["seed"]`` records the seed used.
+        only ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"`` make; the
+        other tests ignore it. With those tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -1405,6 +1435,7 @@ def gfci(
         env,
         score_func=score_func,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         collider_rule=collider_rule,
         possible_dsep=resolve_possible_dsep(possible_dsep),
@@ -1428,6 +1459,7 @@ def cdnod(
     *,
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     collider_order: str | None = None,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
@@ -1472,14 +1504,22 @@ def cdnod(
         test partial correlation, for continuous data. ``"chisq"`` (Pearson's chi-square) and
         ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by whole numbers,
         and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. ``"kci"``, ``"rcot"``, ``"cmiknn"``,
-        and ``"gpdc"`` also detect nonlinear dependence in continuous data, at a far higher cost per
-        test. Each as for :func:`~andrey.pc`; see Notes for the index. ``"normal_scores"`` is not
-        offered: the tests read every environment's rows, and ranked over them, a column's normal
-        scores mix the environments' distributions. ``None`` picks from the declared column types:
-        ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are, else
-        ``"fisherz"``. A column is declared categorical by ``categorical`` or by a DataFrame's
-        ``category``, ``bool``, or text type, never by its values. ``metadata["indep_test"]`` names
-        the test the fit used: the one picked from the declared column types when this is ``None``.
+        ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"`` also detect nonlinear dependence in
+        continuous data, at a far higher cost per test. Each as for :func:`~andrey.pc`; see Notes
+        for the index. ``"normal_scores"`` is not offered: the tests read every environment's rows,
+        and ranked over them, a column's normal scores mix the environments' distributions. ``None``
+        picks from the declared column types: ``"gsq"`` when every column is categorical,
+        ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
+        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
+        values. ``metadata["indep_test"]`` names the test the fit used: the one picked from the
+        declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, as for :func:`~andrey.pc`: ``"p_value"`` by the
         largest p-value that separated each collider's endpoints, so the colliders do not depend on
@@ -1517,8 +1557,8 @@ def cdnod(
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
-        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
-        tests, ``metadata["seed"]`` records the seed used.
+        only ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"`` make; the
+        other tests ignore it. With those tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -1797,6 +1837,7 @@ def cdnod(
             c,
             alpha=alpha,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             collider_order=resolve_collider_order(collider_order),
             collider_rule=collider_rule,
             categorical=mask,
@@ -1828,6 +1869,7 @@ def fci_jci(
     *,
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
@@ -1872,15 +1914,23 @@ def fci_jci(
         test partial correlation, for continuous data. ``"chisq"`` (Pearson's chi-square) and
         ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by whole numbers,
         and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. ``"kci"``, ``"rcot"``, ``"cmiknn"``,
-        and ``"gpdc"`` also detect nonlinear dependence in continuous data, at a far higher cost per
-        test. Each as for :func:`~andrey.fci`. The index is one more column of the data it tests:
-        the continuous tests read it as a number, and the categorical and mixed-data tests as a
-        category; see Notes. ``"normal_scores"`` is not offered: ranked over every domain's rows, a
-        column's normal scores mix the domains' distributions. ``None`` picks from the declared
-        column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are,
-        else ``"fisherz"``. A column is declared categorical by ``categorical`` or by a DataFrame's
-        ``category``, ``bool``, or text type, never by its values. ``metadata["indep_test"]`` names
-        the test the fit used: the one picked from the declared column types when this is ``None``.
+        ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"`` also detect nonlinear dependence in
+        continuous data, at a far higher cost per test. Each as for :func:`~andrey.fci`. The index
+        is one more column of the data it tests: the continuous tests read it as a number, and the
+        categorical and mixed-data tests as a category; see Notes. ``"normal_scores"`` is not
+        offered: ranked over every domain's rows, a column's normal scores mix the domains'
+        distributions. ``None`` picks from the declared column types: ``"gsq"`` when every column is
+        categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared
+        categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type,
+        never by its values. ``metadata["indep_test"]`` names the test the fit used: the one picked
+        from the declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
         How a collider is decided on a triple ``x - z - y`` where ``x`` and ``y`` are not adjacent,
         as for :func:`~andrey.fci`: by the separating set that removed the edge ``x - y``
@@ -1916,8 +1966,8 @@ def fci_jci(
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
-        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
-        tests, ``metadata["seed"]`` records the seed used.
+        only ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"`` make; the
+        other tests ignore it. With those tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -2142,6 +2192,7 @@ def fci_jci(
             c,
             alpha=alpha,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             collider_rule=collider_rule,
             categorical=mask,
             possible_dsep=resolve_possible_dsep(possible_dsep),
@@ -2167,12 +2218,12 @@ def icp(
     data: npt.ArrayLike,
     env: npt.ArrayLike | str | None = None,
     *,
-    target: str | int | None = None,
+    target: str | int | Sequence[str | int] | None = None,
     targets: Mapping | npt.ArrayLike | str | None = None,
     alpha: float = 0.05,
     invariance_test: str = "approximate",
     max_parents: int | None = None,
-) -> StructureOutput:
+) -> StructureOutput | list[StructureOutput]:
     """Learn one variable's causal parents from data in several environments with ICP.
 
     Invariant causal prediction [1]_ tests, for every set of the other variables, whether the
@@ -2199,9 +2250,10 @@ def icp(
         does not matter, as long as it left the target's mechanism alone. ``None`` takes the
         environments from ``data`` given as each environment's rows apart, or else from ``targets``
         given as a column or a 0/1 matrix: rows with the same targets are one environment.
-    target : str, int, or None
+    target : str, int, list of them, or None
         Required. The variable whose parents to find: a column label (a string) or a 0-based
-        position (an integer). ``None`` raises ``ValueError``.
+        position (an integer), or a list of them, each answered in turn. ``None`` raises
+        ``ValueError``.
     targets : mapping, str, array-like of shape (n_samples, n_variables), or None, default=None
         The variables intervened on in each environment, as for :func:`~andrey.gies`, by column
         label or 0-based position: a mapping ``{label: [variables]}`` from labels of ``env``, with
@@ -2228,8 +2280,10 @@ def icp(
 
     Returns
     -------
-    StructureOutput
-        Wraps a ``dag`` :class:`~andrey.core.GraphStructure` over every column, with an edge
+    StructureOutput or list of StructureOutput
+        With a list of targets, a list holding each target's result, in its order, as that target
+        alone gives it. Otherwise, wraps a ``dag`` :class:`~andrey.core.GraphStructure` over every
+        column, with an edge
         ``x -> target`` from each estimated parent ``x`` and no other edge; an absent edge says
         nothing about the pair. ``metadata["algorithm"]`` is ``"icp"``; ``metadata["target"]``
         names the target and ``metadata["parents"]`` the estimated parents, the variables in every
@@ -2370,12 +2424,29 @@ def icp(
     from andrey.core.knowledge import as_node, column_position
     from andrey.core.score import check_columns
 
+    given = data
     data, codes, env_labels, by_code = normalize_env_targets(
         data, env, targets, require_known_targets=False, method="icp"
     )
     X = data_matrix(data, method="icp")
     labels = column_labels(data)
     d = X.shape[1]
+    if target_columns(target, labels, d, "icp") is not None:
+        return [
+            cast(
+                "StructureOutput",
+                icp(
+                    given,
+                    env,
+                    target=each,
+                    targets=targets,
+                    alpha=alpha,
+                    invariance_test=invariance_test,
+                    max_parents=max_parents,
+                ),
+            )
+            for each in cast("Sequence[str | int]", target)
+        ]
     if target is None:
         raise ValueError(
             "icp: pass target, the variable whose parents to find, as a column label or a 0-based "

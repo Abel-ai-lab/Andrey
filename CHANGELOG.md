@@ -39,6 +39,53 @@ names its pull request.
   `metadata["corrected_edges"]["rows_tested"]`, so a fit shows when the correction ran on few rows.
   The graph and the other metadata are unchanged. ([#1094])
 
+- `degrees_of_freedom`, an argument of every method that takes the categorical tests, `"chisq"` and
+  `"gsq"`, and of `ChiSquare`: `"mean"`, the default and the rule so far, is the mean of the
+  statistic when `y` is shuffled within each configuration of the conditioning set; `"nonempty"` is
+  `(r_x - 1) * (r_y - 1)` per configuration over the values present, each table's empty rows and
+  columns struck (Spirtes, Glymour, and Scheines 1993). The two differ only on sparse tables.
+  Passing it with another test raises `ValueError`. ([#981])
+- For contributors, a benchmark lane runs `anm`, `pnl`, `loci`, and `resit` beside the authors'
+  code of QCCD, HECI, and GRCI on the Tübingen cause-effect pairs, and a summary script turns its
+  records into a weighted-accuracy table. ([#1127])
+- `lges`, experimental: less greedy equivalence search (Ejaz and Bareinboim 2025), a score search
+  next to `ges` and `xges` that adds no edge between two variables the score already holds
+  independent given the parents of one of them in a graph of the current class, and deletes and
+  reverses edges as GES and GIES do. `schedule` picks the paper's main method, LGES (Algorithm 1,
+  `"lges"`, the default), which deletes and reverses before each addition, or its LGES-0 in the
+  order of the authors' code (`"lges0_released"`: additions, deletions, then reversals).
+  `insertion` picks SafeInsert, the default, or ConservativeInsert. It takes the scores of `ges`,
+  with the standard BIC (`ebic_gamma=0.0`) as its default. ([#1146])
+- `rpcmci`, experimental: Regime-PCMCI (Saggioro et al. 2020) for one time series whose lagged
+  causal links switch between a few persistent regimes. It returns an `andrey.RegimeOutput`: the
+  regime of each time step, the regime weights, and one temporal result per regime, as `pcmci`
+  returns it. The regime step solves the paper's linear program with SciPy, so it needs no new
+  dependency. A contributor's script compares it with the authors' code start by start. ([#1149])
+- Three experimental regression-based conditional-independence tests, as `indep_test` options of
+  every method that takes one: `"gcm"`, the generalized covariance measure (Shah and Peters 2020),
+  which tests the covariance of the residuals of boosted-tree regressions; `"wgcm"`, the weighted
+  generalized covariance measure (Scheidegger, Hörrmann, and Bühlmann 2022), which weights that
+  covariance by an estimated sign function of the conditioning set (`variant="fix"` takes fixed
+  weights); and `"pcm"`, the projected covariance measure (Lundborg, Kim, Shah, and Samworth
+  2024), which tests whether one variable improves a random-forest prediction of the other. Each
+  takes `regression="boosting"`, `"forest"`, or `"linear"`. Each fit and each sample split reads
+  only the query's columns, standardized, rounded, and signed, with the rows in an order of their
+  values, so a p-value depends on neither the row nor the column order, nor on columns outside the
+  query, and changes with a column's units or sign only where the rounding moves a value or a
+  column is symmetric about its mean once sorted. A contributor's script compares them with the
+  authors' code. ([#1147])
+- `target` takes a list of columns on `iamb`, `inter_iamb`, `mmpc`, and `icp`: one call returns one
+  result per target, in the list's order, each equal to a call for that target alone. The three set
+  learners answer every target with one search, which sets up the test once, and MMPC learns the
+  set of a variable that two targets' symmetry checks read once; with a partial-correlation test
+  they split the targets over `andrey.config(n_jobs=...)` worker processes, with the same results
+  for any number of workers. With missing values, each target has a search of its own. A list
+  shares the work of one call, so it takes less time than separate calls. `andrey run` takes the
+  list as `'target=[a,b]'`, by header name or position, or as a list in `--config`; its envelope
+  then holds `multi: true` and `results`, one per target, and the `--help --json` schema types
+  `target` as a string or a list of strings. `andrey run icp` names the target and the parents by
+  the header's column names, for one target as for a list. ([#1058], [#1153])
+
 ### Changed
 
 - With `fisherz` and `student_t` on data with missing values, test-wise deletion groups the rows by
@@ -86,6 +133,40 @@ names its pull request.
   differ from 0.18.0 in the last digits (relative change up to about 1e-11 measured), as each
   block's sums run in a fixed order; graphs are unchanged on the fits compared. ([#1142])
 
+- The website is easier to find and quote in search and AI answers. The homepage's description, its
+  structured data, and `llms.txt` say what Andrey is, starting with the speed claim; `llms.txt` also
+  links the methods and comparison pages, says how to cite Andrey, and marks each experimental
+  method; a post a release updated carries its update date, also in the sitemap; the general index
+  and the source-code pages are not indexed; and the docs home, the example notebooks, the
+  changelog, and the blog index have their own titles and descriptions. ([#1132])
+- `iamb` and `inter_iamb` order the candidates of each grow step by their p-values to nine
+  significant digits, where they compared p-values rounded to nine decimals, which tied every
+  p-value below 5e-10 and left the choice to a rank computed from the data. On categorical data
+  their blankets can change for some targets, and so can the graphs of `rsmax2` with
+  `restrict="iamb"` or `"inter_iamb"`; results on continuous data do not change. ([#969])
+- The skeleton scans of `pc` and `fci` and the conditioning-set scans of the blanket learners
+  build each chunk of conditioning sets as the rows of an int array from cached combination
+  tables, where they built tuples and converted each chunk back. Every output,
+  `metadata["n_tests"]` included, is the same bit for bit. ([#1036], [#1042])
+- `indep_test="kci"` keeps the kernel of each column for the queries without a conditioning set
+  (up to 256 MB, as its other matrix caches do), so `pc`, `fci`, and `cdnod` with it run faster on
+  many variables at few rows. Every graph, p-value, and `metadata["n_tests"]` is the same bit for
+  bit. ([#1072], [#1073])
+- A grow scan of `iamb` and `inter_iamb` (also as the restrict phase of `rsmax2` with
+  `restrict="iamb"` or `"inter_iamb"`) asks many candidates against one conditioning set. With
+  `fisherz`, `student_t`, or `normal_scores` on complete data, a scan given two or more variables is
+  answered from one Cholesky factor of the set's correlation block, where each candidate inverted
+  its own submatrix, and a smaller scan in one batched call, with the same bits as one call per
+  candidate. At 5,000 rows on one core, `iamb` at one target on 1,000 variables is 3.9 times faster,
+  and `iamb` on 100 variables 4.4 times. Every graph of `iamb` and `inter_iamb` on the identity
+  corpus is unchanged, column shuffles included. The factor's p-values agree with the per-query ones
+  to about 1e-10 relative, not bit for bit, so a p-value on a rounding boundary can differ in its
+  ninth significant digit. `ANDREY_SHARED_SCAN_MIN_WORK` (default `128`, candidates times the set
+  size plus two) sets the smallest scan that takes the factor; blocks near the singular threshold,
+  missing values, and the other tests keep the per-query path. A repeated variable in the
+  conditioning set counts once, and a correlation matrix that is not exactly symmetric gives each
+  pair one answer whichever variable is the target. ([#1047], [#1048])
+
 ### Fixed
 
 - The docs no longer say that FCI with test-wise deletion stays sound when values are missing for a
@@ -119,6 +200,10 @@ names its pull request.
   processes in the calling process, once each, so they reach `run.warnings` instead of standard
   error. Each record keeps the file, line, and function that logged it, and those of a resample
   that raises are logged before its error. ([#1151])
+
+- The backward phase of `mmpc` keeps the best separating set of each size it tests, not a record
+  of every set, so its memory no longer grows with the number of sets. Answers are unchanged.
+  ([#1019])
 
 ## [0.18.0] - 2026-11-19
 
@@ -2478,6 +2563,7 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
+[Unreleased]: https://github.com/Abel-ai-lab/Andrey/compare/v0.18.0...HEAD
 [0.18.0]: https://github.com/Abel-ai-lab/Andrey/compare/v0.17.1...v0.18.0
 [0.17.1]: https://github.com/Abel-ai-lab/Andrey/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/Abel-ai-lab/Andrey/compare/v0.16.0...v0.17.0
@@ -2781,7 +2867,11 @@ First alpha release.
 [#1112]: https://github.com/Abel-ai-lab/Andrey/pull/1112
 [#1120]: https://github.com/Abel-ai-lab/Andrey/pull/1120
 [#1122]: https://github.com/Abel-ai-lab/Andrey/pull/1122
-[#1043]: https://github.com/Abel-ai-lab/Andrey/issues/1043
+[#1127]: https://github.com/Abel-ai-lab/Andrey/pull/1127
+[#1147]: https://github.com/Abel-ai-lab/Andrey/pull/1147
+[#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
+[#1146]: https://github.com/Abel-ai-lab/Andrey/pull/1146
+[#1149]: https://github.com/Abel-ai-lab/Andrey/pull/1149
 [#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
 [#1068]: https://github.com/Abel-ai-lab/Andrey/pull/1068
 [#1090]: https://github.com/Abel-ai-lab/Andrey/pull/1090
@@ -2794,3 +2884,14 @@ First alpha release.
 [#1156]: https://github.com/Abel-ai-lab/Andrey/pull/1156
 [#1094]: https://github.com/Abel-ai-lab/Andrey/pull/1094
 [#1095]: https://github.com/Abel-ai-lab/Andrey/pull/1095
+[#969]: https://github.com/Abel-ai-lab/Andrey/pull/969
+[#981]: https://github.com/Abel-ai-lab/Andrey/pull/981
+[#1019]: https://github.com/Abel-ai-lab/Andrey/pull/1019
+[#1036]: https://github.com/Abel-ai-lab/Andrey/pull/1036
+[#1042]: https://github.com/Abel-ai-lab/Andrey/pull/1042
+[#1072]: https://github.com/Abel-ai-lab/Andrey/issues/1072
+[#1073]: https://github.com/Abel-ai-lab/Andrey/pull/1073
+[#1047]: https://github.com/Abel-ai-lab/Andrey/pull/1047
+[#1048]: https://github.com/Abel-ai-lab/Andrey/pull/1048
+[#1058]: https://github.com/Abel-ai-lab/Andrey/pull/1058
+[#1153]: https://github.com/Abel-ai-lab/Andrey/pull/1153

@@ -25,9 +25,15 @@ import numpy as np
 from andrey.api._adapt import default_score, default_test, label_of
 from andrey.core import environments
 from andrey.core.backend import config
-from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS, available_indep_tests
+from andrey.core.ci import (
+    DISCRETE_INDEP_TESTS,
+    SHIPPED_INDEP_TESTS,
+    STOCHASTIC_INDEP_TESTS,
+    available_indep_tests,
+)
 from andrey.core.ci_missing import NOT_TESTED_CLAIM, TESTWISE, TESTWISE_CLAIM, named_pairs
 from andrey.core.knowledge import PATH_PARTS, Knowledge, resolve
+from andrey.core.output import RegimeOutput
 from andrey.core.removed import removal_hint
 from andrey.core.score import LINEAR_SCORES, PENALIZED_SCORES, RANK_SCORES
 from andrey.core.seeding import resolve_seed
@@ -80,7 +86,9 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
     (:func:`path_constraints`); a ``None`` ``indep_test`` or ``score_func`` is picked from the
     declared column types, and the facade gets the pick and the columns it reads
     (:func:`chosen_settings`); a call that passes ``ebic_gamma`` or ``equivalent_sample_size`` with
-    a score that does not use it raises ``ValueError`` (:func:`check_penalties`).
+    a score that does not use it raises ``ValueError`` (:func:`check_penalties`), and so does one
+    that passes ``degrees_of_freedom`` with a test that does not read it
+    (:func:`check_degrees_of_freedom`).
     After it: a CPDAG result keeps the DAGs it stands for that meet ``required_paths`` and
     ``forbidden_paths`` (:func:`restrict_paths`), a PAG or a DAG is checked against them
     (:func:`meet_paths`), and a claim the result does not meet is dropped with a warning
@@ -123,6 +131,7 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
                 warn_experimental(name)
             chosen = chosen_settings(spec, bound.arguments)
             check_penalties(spec, bound.arguments, chosen.get("score_func"))
+            check_degrees_of_freedom(spec, bound.arguments, chosen.get("indep_test"))
             out = facade(*bound.args, **bound.kwargs)
             if paths is not None:
                 out = (restrict_paths if spec.restricts_paths else meet_paths)(out, paths, name)
@@ -132,6 +141,10 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
                 stamp["tie_break"] = config.tie_break
             if isinstance(out, list):
                 return [stamped(o, stamp | missing_used(spec, bound.arguments, o)) for o in out]
+            if isinstance(out, RegimeOutput):  # the run and each regime's graph carry the stamp
+                outputs = tuple(stamped(o, stamp) for o in out.outputs)
+                metadata = {"algorithm": name, **out.metadata, **stamp}
+                return dataclasses.replace(out, _outputs=outputs, _metadata=metadata)
             return stamped(out, stamp | missing_used(spec, bound.arguments, out))
 
         return run  # ty: ignore[invalid-return-type]  # functools.wraps keeps the signature
@@ -446,7 +459,8 @@ def draws_random_numbers(spec: MethodSpec, arguments: dict[str, Any]) -> bool:
     """Whether a fit of the seeded method ``spec`` with ``arguments`` draws random numbers.
 
     A method that takes ``tuning_iter`` always does: its optimization draws in every fit, whatever
-    test it runs. A method with an ``indep_test`` draws them only under a randomized test
+    test it runs; so does a method that returns regimes, whose every start draws its first regime
+    assignment. A method with an ``indep_test`` draws them only under a randomized test
     (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`) or, when it takes ``n_starts``, for the starts
     after the first, with ``n_starts`` above 1, unless it also takes a ``score_func``: then a
     search over variable orders, visited in a random order, runs before the tests (``boss_fci``,
@@ -456,8 +470,8 @@ def draws_random_numbers(spec: MethodSpec, arguments: dict[str, Any]) -> bool:
     method always does. ``pc``'s ``missing="mvpc"`` draws them only on data with missing values,
     which this check does not read: ``pc`` records its seed itself when the correction ran.
     """
-    if any(p.name == "tuning_iter" for p in spec.params):
-        return True
+    if any(p.name == "tuning_iter" for p in spec.params) or spec.output.regimes:
+        return True  # an optimization's draws, or a regime search's random first assignments
     test = next((p for p in spec.params if p.name == "indep_test"), None)
     starts = next((p for p in spec.params if p.name == "n_starts"), None)
     order_search = starts is not None and any(p.name == "score_func" for p in spec.params)
@@ -563,6 +577,21 @@ def check_penalties(spec: MethodSpec, arguments: dict[str, Any], score: str | No
                 f"{spec.name}: {name} weighs {weighed} of score_func={used[0]!r}, which "
                 f"score_func={score!r} does not use; drop {name}, or pass score_func={used[0]!r}"
             )
+
+
+def check_degrees_of_freedom(spec: MethodSpec, arguments: dict[str, Any], test: str | None) -> None:
+    """Raise ``ValueError`` when the call passes ``degrees_of_freedom`` with a test that ignores it.
+
+    Only the categorical tests (:data:`~andrey.core.ci.DISCRETE_INDEP_TESTS`) read it; ``test`` is
+    the one the fit uses (:func:`chosen_settings`). A default is never checked, so a method whose
+    default is ``"nonempty"`` runs with any test.
+    """
+    if "degrees_of_freedom" in arguments and test not in DISCRETE_INDEP_TESTS:
+        raise ValueError(
+            f"{spec.name}: degrees_of_freedom sets the degrees of freedom of indep_test='chisq' "
+            f"and 'gsq', which indep_test={test!r} does not use; drop degrees_of_freedom, or pass "
+            "indep_test='gsq'"
+        )
 
 
 def runtime_choices(param: ParamSpec) -> tuple[str, ...] | None:

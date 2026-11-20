@@ -56,7 +56,9 @@ _OTHER_TESTS = (
     "Gaussian and cond_gauss = conditional Gaussian likelihood ratio. For nonlinear effects in "
     "continuous data, each far slower per test: kci = kernel test; rcot = its random-feature "
     "approximation; cmiknn = nearest-neighbor conditional mutual information; gpdc = "
-    "Gaussian-process regression and distance correlation. These four rank the columns as the "
+    "Gaussian-process regression and distance correlation; gcm, wgcm, pcm = the generalized, "
+    "weighted generalized, and projected covariance measures of regression residuals. These seven "
+    "rank the columns as the "
     "searches do, so ANDREY_TIE_BREAK=position makes their p-values depend on the column order. "
     + _DECLARED.format(every="gsq", fallback="fisherz")
 )
@@ -72,6 +74,7 @@ _POOLED_INDEP_TEST = concept_param(
     doc=_PARTIAL_CORRELATION + ". normal_scores is not offered: ranked over the rows of every "
     "environment, a column's normal scores mix their distributions. " + _OTHER_TESTS,
 )
+_DEGREES_OF_FREEDOM = concept_param("degrees_of_freedom")
 _CATEGORICAL = concept_param("categorical")
 _COLLIDER_RULE = concept_param("collider_rule")
 _POSSIBLE_DSEP = ParamSpec(
@@ -134,8 +137,8 @@ _RESTART_DOC = (
 _TEST_SEED = concept_param(
     "seed",
     doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
-    "so a fit repeats. Seed for the random draws of indep_test, which only rcot, cmiknn, and gpdc "
-    "make; the other tests ignore it.",
+    "so a fit repeats. Seed for the random draws of indep_test, which only rcot, cmiknn, gpdc, "
+    "gcm, wgcm, and pcm make; the other tests ignore it.",
 )
 _MATRIX_LAYOUT = "(n_samples, n_variables), row = sample"
 #: The environment index the score searches and their FCI hybrids take for data pooled across
@@ -208,6 +211,7 @@ _add(
         params=(
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
             _CATEGORICAL,
@@ -259,6 +263,7 @@ _add(
         params=(
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _COLLIDER_RULE,
             _CATEGORICAL,
             _POSSIBLE_DSEP,
@@ -303,6 +308,7 @@ _add(
             _EBIC_GAMMA_STANDARD,
             _EQUIVALENT_SAMPLE_SIZE,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _ALPHA,
             _COLLIDER_RULE,
             _CATEGORICAL,
@@ -378,6 +384,7 @@ _add(
         params=(
             _ALPHA,
             _POOLED_INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
             _CATEGORICAL,
@@ -444,6 +451,7 @@ _add(
         params=(
             _ALPHA,
             _POOLED_INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _COLLIDER_RULE,
             _CATEGORICAL,
             _POSSIBLE_DSEP,
@@ -487,7 +495,8 @@ _add(
             graph_kind="dag",
             doc="edges into the target from its estimated parents; metadata['parents'], "
             "metadata['p_values'] and metadata['confidence_intervals'] per column, "
-            "metadata['accepted_sets'], metadata['model_rejected']",
+            "metadata['accepted_sets'], metadata['model_rejected']; with a list of targets, a "
+            "list of those results, one per target in order",
         ),
         accel="numpy",
         status="supported",
@@ -496,10 +505,11 @@ _add(
         params=(
             ParamSpec(
                 name="target",
-                type="str",
+                type="str_or_list",
                 default=None,
                 doc="Required: the variable whose parents to find, a column name from the data "
-                "file's header or a 0-based position.",
+                "file's header or a 0-based position, or a list of them, such as target=[a,b], "
+                "for one result for each, in order.",
                 nullable=True,
             ),
             ParamSpec(
@@ -543,17 +553,19 @@ _add(
 
 _TARGET = ParamSpec(
     name="target",
-    type="str",
+    type="str_or_list",
     default=None,
     doc="The variable whose set to learn: a column name from the data file's header or a 0-based "
-    "position. null learns every variable's set and keeps a pair when each is in the other's set.",
+    "position, or a list of them, such as target=[a,b], that learns one set for each with one "
+    "search and returns one result for each, in order. null learns every variable's set and keeps "
+    "a pair when each is in the other's set.",
     nullable=True,
 )
 _LOCAL_OUTPUT_DOC = (
     "without a target, the graph structure names: the CPDAG, the skeleton, or, for the blankets, "
     "the moral graph; with a target, undirected edges from target to each member, "
     "metadata['target'] naming the target and metadata['{key}'] listing the members in the order "
-    "they joined"
+    "they joined; with a list of targets, a list of those results, one per target in order"
 )
 _BLANKET_STRUCTURE = concept_param("structure")
 for _name, _summary, _key, _structure, _kind, _refs in (
@@ -613,7 +625,15 @@ for _name, _summary, _key, _structure, _kind, _refs in (
             status="supported",
             column_order="relabels",
             tie_break=True,
-            params=(_TARGET, _structure, _ALPHA, _INDEP_TEST, _CATEGORICAL, _TEST_SEED),
+            params=(
+                _TARGET,
+                _structure,
+                _ALPHA,
+                _INDEP_TEST,
+                _DEGREES_OF_FREEDOM,
+                _CATEGORICAL,
+                _TEST_SEED,
+            ),
             references=_refs,
         )
     )
@@ -818,6 +838,64 @@ _add(
             _CATEGORICAL,
         ),
         references=("Nazaret & Blei 2024",),
+    )
+)
+_add(
+    MethodSpec(
+        name="lges",
+        family="score",
+        summary="Less greedy equivalence search: GES that adds no edge between two variables the "
+        "score already holds independent given one's parents in a graph of the current class, and "
+        "deletes and reverses edges as GES and GIES do. schedule=lges (default) is the paper's "
+        "LGES (Algorithm 1), deleting and reversing before each addition; "
+        "schedule=lges0_released is its LGES-0 in the authors' code's order (additions, "
+        "deletions, then reversals). "
+        "insertion=conservative also skips a pair when any of its additions worsens the score. "
+        "The standard BIC by default, BDeu when every column is categorical, conditional Gaussian "
+        "when some are. Returns a CPDAG + score.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
+            "a mixed-data setting read",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            _SCORE_FUNC,
+            _PENALTY_DISCOUNT,
+            _EBIC_GAMMA_STANDARD,
+            _EQUIVALENT_SAMPLE_SIZE,
+            ParamSpec(
+                name="insertion",
+                type="str",
+                default="safe",
+                choices=("safe", "conservative"),
+                doc="Which pairs an edge addition skips: safe (SafeInsert) skips a pair when one "
+                "graph of the current class scores better without the edge, and the paper proves "
+                "that it recovers the true class as the rows grow; conservative "
+                "(ConservativeInsert) also skips it when any valid addition of the edge worsens "
+                "the score, with fewer errors in the paper's simulations and no such proof.",
+            ),
+            ParamSpec(
+                name="schedule",
+                type="str",
+                default="lges",
+                choices=("lges", "lges0_released"),
+                doc="The order of the phases: lges is the paper's LGES (Algorithm 1), deleting "
+                "then reversing edges until neither improves the score before each single "
+                "addition; lges0_released is its LGES-0 (Algorithm 8) in the order of the "
+                "authors' code: additions, deletions, then reversals, once. lges is the "
+                "default as the paper's main method; on the paper's linear-Gaussian simulation "
+                "the two made about as many errors on the sparsest graphs and lges fewer on "
+                "denser ones.",
+            ),
+            _CATEGORICAL,
+        ),
+        references=("Ejaz & Bareinboim 2025",),
     )
 )
 _add(
@@ -1346,6 +1424,7 @@ _add(
         params=(
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
@@ -1395,6 +1474,7 @@ _add(
             ),
             _ALPHA,
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
             _EBIC_GAMMA,
@@ -1523,8 +1603,8 @@ _PERMUTATION_FCI_SEED = concept_param(
     "seed",
     doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
     "so a fit repeats. Seed for the random order in which the BOSS or GRaSP phase visits "
-    "variables, for GRaSP's random starting order, and for the random draws of rcot, cmiknn, and "
-    "gpdc.",
+    "variables, for GRaSP's random starting order, and for the random draws of rcot, cmiknn, "
+    "gpdc, gcm, wgcm, and pcm.",
 )
 for _name, _summary, _own, _refs in (
     (
@@ -1590,6 +1670,7 @@ for _name, _summary, _own, _refs in (
                 _EQUIVALENT_SAMPLE_SIZE,
                 *_own,
                 _INDEP_TEST,
+                _DEGREES_OF_FREEDOM,
                 _ALPHA,
                 _COLLIDER_RULE,
                 _CATEGORICAL,
@@ -1669,6 +1750,7 @@ _add(
                 nullable=True,
             ),
             _POOLED_INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             concept_param("invariance_test"),
             concept_param(
                 "n_starts",
@@ -1761,6 +1843,7 @@ _add(
                 nullable=True,
             ),
             _POOLED_INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             concept_param("invariance_test"),
             concept_param(
                 "n_starts",
@@ -2043,7 +2126,8 @@ _add(
                 "nonlinear effects, each far slower per test: kci = kernel test, the authors' "
                 "choice; rcot = its random-feature approximation; cmiknn = nearest-neighbor "
                 "conditional mutual information; gpdc = Gaussian-process regression and distance "
-                "correlation. null picks fisherz.",
+                "correlation; gcm, wgcm, pcm = the generalized, weighted generalized, and "
+                "projected covariance measures of regression residuals. null picks fisherz.",
             ),
             ParamSpec(
                 name="tuning_iter",
@@ -2373,6 +2457,7 @@ _add(
                 "adjusted p-value is at most alpha.",
             ),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
             _TEST_SEED,
             concept_param(
@@ -2440,6 +2525,7 @@ _add(
                 "middle. The default majority does not depend on the order of the variables.",
             ),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
             _TEST_SEED,
             concept_param(
@@ -2568,6 +2654,119 @@ _add(
 )
 _add(
     MethodSpec(
+        name="rpcmci",
+        family="temporal",
+        summary="Regime-PCMCI for one multivariate time series whose lagged causal links switch "
+        "between a few persistent regimes: the regime of each time step and the lagged links of "
+        "each regime. Returns one temporal structure per regime.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data", kind="matrix", doc="A multivariate time series, row = step."
+                ),
+            ),
+            layout="(n_samples, n_variables), row = time step",
+        ),
+        output=OutputSpec(
+            structure_type="temporal",
+            graph_kind=None,
+            regimes=True,
+            doc="the regime of each time step and the regime weights; per regime, lag graphs "
+            "for lags 1..tau_max with MCI p_values, statistics, and the PC1 parents in metadata.",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            ParamSpec(
+                name="n_regimes",
+                type="int",
+                default=2,
+                doc="The number of regimes, at least 2.",
+                minimum=2,
+            ),
+            ParamSpec(
+                name="max_transitions",
+                type="int",
+                default=1,
+                doc="The most times each regime may switch on or off over the series, at least 1; "
+                "about n_samples / (mean regime length * n_regimes).",
+                minimum=1,
+            ),
+            ParamSpec(
+                name="switch_threshold",
+                type="float",
+                default=0.5,
+                doc="The weight at which a time step joins a regime's PCMCI step and model fit, "
+                "in (0, 1).",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+            ),
+            concept_param(
+                "tau_max",
+                doc="The largest lag tested; links at lags 1 to tau_max are tested.",
+            ),
+            ParamSpec(
+                name="pc1_alpha",
+                type="float",
+                default=0.2,
+                doc="Significance level of each regime's PC1 parent selection; larger keeps more "
+                "parents as conditions.",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+            ),
+            concept_param(
+                "alpha",
+                default=0.01,
+                doc="Significance level of each regime's MCI test, the level that decides the "
+                "returned links; a link is kept when its p-value is at most this.",
+            ),
+            concept_param(
+                "fdr_method",
+                default="none",
+                doc="How each regime's MCI p-values are corrected for the number of links tested: "
+                "none keeps them as tested; fdr_bh replaces them with their Benjamini-Hochberg "
+                "adjusted values over all the regime's links together, and a link is kept when its "
+                "adjusted p-value is at most alpha.",
+            ),
+            concept_param(
+                "indep_test",
+                default="student_t",
+                nullable=False,
+                choices=("student_t", "fisherz"),
+                doc="The partial-correlation test, for linear effects: student_t takes the p-value "
+                "from the Student-t distribution, fisherz from Fisher's z-transform.",
+            ),
+            concept_param(
+                "n_starts",
+                default=50,
+                doc="Number of starts, each from its own random regime assignment drawn from "
+                "seed and its index; returns the start with the lowest objective.",
+            ),
+            concept_param(
+                "max_iter",
+                default=20,
+                nullable=False,
+                doc="The most iterations of each start, at least 1; one iteration learns every "
+                "regime's graph and then reassigns the time steps.",
+            ),
+            concept_param(
+                "seed",
+                doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
+                "random one, so a fit repeats. Start 0 draws its first regime weights from "
+                "seed, start a > 0 from SeedSequence(seed, spawn_key=(a,)).",
+            ),
+        ),
+        references=("Saggioro et al. 2020", "Runge et al. 2019"),
+    )
+)
+_add(
+    MethodSpec(
         name="lpcmci",
         family="temporal",
         summary="LPCMCI for a single multivariate time series with possible hidden common causes: "
@@ -2612,6 +2811,7 @@ _add(
                 "to the next as conditions.",
             ),
             _INDEP_TEST,
+            _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
             _TEST_SEED,
             concept_param(
@@ -3624,7 +3824,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "iamb": ("target", "markov_blanket"),
     "inter_iamb": ("target", "markov_blanket"),
     "mmpc": ("target", "parents_and_children"),
-    **dict.fromkeys(("gies", "xges", "mmhc", "rsmax2"), ("score",)),
+    **dict.fromkeys(("gies", "xges", "lges", "mmhc", "rsmax2"), ("score",)),
     **dict.fromkeys(
         ("ges", "hc", "tabu", "boss", "grasp"), ("score", "index_edges", "changing_variables")
     ),
@@ -3647,6 +3847,11 @@ _METADATA: dict[str, tuple[str, ...]] = {
         *("context_links", "index_edges", "time_index_edges", "time_dummy"),
     ),
     "lpcmci": ("links", "p_values", "statistics", "parents", "conflicts"),
+    # The run's keys, then each regime's.
+    "rpcmci": (
+        *("objective", "start", "n_iterations", "converged", "failed_starts"),
+        *("p_values", "statistics", "parents"),
+    ),
     **dict.fromkeys(("anm", "pnl"), ("p_values", "statistics")),
     "loci": ("log_likelihoods", "p_values", "statistics"),
     "cpcm": ("p_values", "statistics", "independence_p_value", "families"),

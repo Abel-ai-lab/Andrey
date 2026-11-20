@@ -358,6 +358,22 @@ datasets, and the methods under [Environments and interventions](#environments-a
 also take each row's environment. `andrey list` names the methods, and {doc}`graph-types` explains
 which graph each one returns.
 
+### Answers for a few variables
+
+When you need the neighborhood of a few variables rather than the whole graph, `mmpc` returns a
+`target`'s parents and children and `iamb` and `inter_iamb` its Markov blanket, testing far fewer
+pairs than a whole-graph fit. Pass a list to answer for several targets in one call: you get one
+result per target, each equal to a call for that target alone, and the work two targets share is
+done once.
+
+```python
+outs = andrey.mmpc(data, target=["pkc", "raf"])
+outs[0].metadata["parents_and_children"]
+```
+
+Set `andrey.config(n_jobs=...)` to spread the targets over worker processes; the results do not
+change with the number of workers.
+
 ### Environments and interventions
 
 % concept: env
@@ -572,7 +588,7 @@ Each test and score reads the columns as one kind of data:
 
 | Data | `indep_test` | `score_func` |
 |---|---|---|
-| Continuous | `fisherz` (the default when no column is categorical), `student_t`, `normal_scores` (monotone effects, any marginals); for nonlinear effects, `kci`, `rcot`, `cmiknn`, and `gpdc` | `bic` (the default when no column is categorical), `normal_scores` (experimental: monotone transformations of Gaussian columns) |
+| Continuous | `fisherz` (the default when no column is categorical), `student_t`, `normal_scores` (monotone effects, any marginals); for nonlinear effects, `kci`, `rcot`, `cmiknn`, `gpdc`, `gcm`, `wgcm`, and `pcm` (experimental) | `bic` (the default when no column is categorical), `normal_scores` (experimental: monotone transformations of Gaussian columns) |
 | Categorical | `chisq`, `gsq` (the default when every column is categorical) | `bdeu` (the default when every column is categorical), `discrete_bic` |
 | Mixed | `degen_gauss`, `cond_gauss` (the default when some columns are categorical) | `cond_gauss` (the default when some columns are categorical), `degen_gauss` |
 

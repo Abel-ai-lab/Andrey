@@ -1,6 +1,7 @@
 """``StructureOutput`` -- the return type of every algorithm.
 
-``multi_group_direct_lingam`` returns one per group. A thin, immutable run envelope over a
+``multi_group_direct_lingam`` returns one per group, and ``rpcmci`` a ``RegimeOutput`` that holds
+one per regime. A thin, immutable run envelope over a
 first-class ``Structure`` (``.structure``), plus the run-level slots that hang off the run rather
 than the graph: the discovered ``ordering``, a sparse ``weighted_adjacency`` (its own asymmetric
 ``float64`` CSR), and JSON-safe ``metadata``. Every dense view derives lazily and uncached.
@@ -474,6 +475,136 @@ class StructureOutput:
         return True
 
     __hash__ = None  # type: ignore[assignment]
+
+
+@dataclass(frozen=True, eq=False, slots=True, repr=False)
+class RegimeOutput:
+    """The result of a regime-dependent method: the regime of each time step and one graph per
+    regime.
+
+    ``rpcmci`` returns one. ``regimes`` holds the regime of every time step, ``weights`` the
+    regime-assigning process it comes from, and ``outputs[k]`` the ``StructureOutput`` of regime
+    ``k``, a temporal result like the one a single-regime method returns. ``metadata`` holds the
+    run's values, such as the algorithm name. ``print(out)`` shows each regime's share of the time
+    steps and its graph. The result is read-only.
+    """
+
+    _outputs: tuple[StructureOutput, ...]
+    _weights: np.ndarray  # float64, (n_regimes, n_samples), read-only
+    _metadata: Mapping[str, JSONValue] = field(default_factory=dict)
+
+    @classmethod
+    def new(
+        cls,
+        outputs: tuple[StructureOutput, ...] | list[StructureOutput],
+        weights: np.ndarray,
+        *,
+        metadata: Mapping[str, JSONValue] | None = None,
+    ) -> RegimeOutput:
+        """Build a result from the regimes' results and the regime-assigning process.
+
+        Parameters
+        ----------
+        outputs : tuple or list of StructureOutput
+            One result per regime, in the order of the rows of ``weights``.
+        weights : np.ndarray of shape (n_regimes, n_samples)
+            The weight of each regime at each time step, each in ``[0, 1]``, summing to ``1`` at
+            every step.
+        metadata : Mapping[str, JSONValue] or None, default=None
+            Run values by name, as :meth:`StructureOutput.new` takes them.
+
+        Returns
+        -------
+        RegimeOutput
+            The result.
+
+        Raises
+        ------
+        TypeError
+            If ``metadata`` has a value :meth:`StructureOutput.new` refuses.
+        ValueError
+            If ``weights`` is not a 2-D array with one row per result, holds a value outside
+            ``[0, 1]``, or has a column that does not sum to ``1`` within ``1e-9``.
+        """
+        meta = dict(metadata) if metadata is not None else {}
+        _check_json_safe(meta, "metadata")
+        W = np.asarray(weights, dtype=np.float64)
+        if W.ndim != 2 or W.shape[0] != len(outputs):
+            raise ValueError(
+                f"weights must be (n_regimes, n_samples) with {len(outputs)} rows, got {W.shape}"
+            )
+        if not ((W >= 0) & (W <= 1)).all():
+            raise ValueError("weights must lie in [0, 1]")
+        if not np.allclose(W.sum(axis=0), 1.0, rtol=0.0, atol=1e-9):
+            raise ValueError("the weights of each time step must sum to 1")
+        return cls(_outputs=tuple(outputs), _weights=_frozen(W, np.float64), _metadata=meta)
+
+    @property
+    def outputs(self) -> tuple[StructureOutput, ...]:
+        """One ``StructureOutput`` per regime: ``outputs[k]`` holds the graph of regime ``k``."""
+        return self._outputs
+
+    @property
+    def n_regimes(self) -> int:
+        """The number of regimes."""
+        return len(self._outputs)
+
+    @property
+    def weights(self) -> np.ndarray:
+        """The ``(n_regimes, n_samples)`` weight of each regime at each time step, a new array."""
+        return self._weights.copy()
+
+    @property
+    def regimes(self) -> np.ndarray:
+        """The regime of each time step, a new ``(n_samples,)`` integer array.
+
+        Step ``t`` is in the regime of the largest weight at ``t``, the first of equal weights;
+        weights equal to ``KEY_DP`` decimals (:mod:`andrey.core.ties`) count as equal.
+        """
+        from .ties import KEY_DP
+
+        return np.argmax(np.round(self._weights, KEY_DP), axis=0).astype(np.int64)
+
+    @property
+    def metadata(self) -> Mapping[str, JSONValue]:
+        """Run values such as ``algorithm``, as a read-only mapping."""
+        return MappingProxyType(dict(self._metadata))
+
+    def __repr__(self) -> str:
+        """Return each regime's share of the time steps and its structure summary."""
+        return "\n".join(regime_summary_lines(self))
+
+
+def regime_summary_lines(
+    out: RegimeOutput,
+    *,
+    name: str | None = None,
+    limit: int | None = SUMMARY_EDGES,
+    more: str = "",
+) -> list[str]:
+    """Return a regime result's summary as lines, for ``repr`` and ``andrey run``.
+
+    ``name`` defaults to ``metadata["algorithm"]``; ``limit`` and ``more`` reach
+    :func:`summary_lines` for each regime.
+    """
+    if name is None:
+        name = str(out._metadata.get("algorithm", "regimes"))
+    counts = np.bincount(out.regimes, minlength=out.n_regimes)
+    lines = [f"{name}  |  {out.n_regimes} regimes over {int(counts.sum())} time steps"]
+    for k, o in enumerate(out._outputs):
+        name_k = f"regime {k}, {int(counts[k])} time steps"
+        lines += [
+            "",
+            *("  " + line for line in summary_lines(o, name=name_k, limit=limit, more=more)),
+        ]
+    meta = [
+        f"  {key}: {_brief(key, value)}"
+        for key, value in out._metadata.items()
+        if key != "algorithm" and not (isinstance(value, (list, tuple, dict, set)) and not value)
+    ]
+    if meta:
+        lines += ["", *meta]
+    return lines
 
 
 def summary_lines(

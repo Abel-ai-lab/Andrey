@@ -100,6 +100,65 @@ def test_iamb_finds_the_true_blanket_under_an_oracle(seed, interleaved):
     np.testing.assert_array_equal(graph, oracle.moral_graph())
 
 
+class _PValues:
+    """A test of target 0 that answers each variable with its own p-value, whatever the set."""
+
+    def __init__(self, pvalues: dict[int, float]) -> None:
+        self.pvalues = pvalues
+
+    def __call__(self, x, y, cond=()):
+        return self.pvalues[y if x == 0 else x]
+
+
+@pytest.mark.parametrize("interleaved", [False, True], ids=["iamb", "inter_iamb"])
+def test_a_grow_step_admits_the_smallest_p_value_even_far_below_the_key_precision(interleaved):
+    """IAMB and Inter-IAMB order the dependent candidates of a grow step by their p-values to
+    ``KEY_DP`` significant digits, so p-values below ``10**-KEY_DP`` keep the order of their
+    sizes; the rank decides only among equal p-values, exactly zero ones included."""
+    ranks = [0, 5, 4, 3, 2, 1]
+    tiny = _PValues({1: 1e-12, 2: 1e-70, 3: 1e-41, 4: 1e-70, 5: 0.5})
+    assert markov_blanket(tiny, 0, 6, 0.05, ranks, interleaved=interleaved) == [4, 2, 3, 1]
+    zero = _PValues({1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0, 5: 0.5})
+    assert markov_blanket(zero, 0, 6, 0.05, ranks, interleaved=interleaved) == [4, 3, 2, 1]
+
+
+def _chisq_iamb(test, target, d, alpha, ranks, decimals):
+    """IAMB written out for a p-value test: grow by the smallest p-value among candidates at or
+    below ``alpha``, compared to ``KEY_DP`` significant digits (``decimals`` False) or decimals,
+    ties by rank, then shrink once in joining order."""
+    blanket = []
+    while True:
+        best_key, best_x = None, None
+        for x in range(d):
+            if x == target or x in blanket:
+                continue
+            p = test(target, x, blanket)
+            key = (round(p, KEY_DP) if decimals else float(f"{p:.{KEY_DP}g}"), ranks[x])
+            if p <= alpha and (best_key is None or key < best_key):
+                best_key, best_x = key, x
+        if best_x is None:
+            break
+        blanket.append(best_x)
+    for x in list(blanket):
+        rest = [z for z in blanket if z != x]
+        if test(target, x, rest) > alpha:
+            blanket.remove(x)
+    return blanket
+
+
+def test_iamb_on_discrete_data_orders_by_p_value_to_significant_digits():
+    """The engine's blankets equal the written-out IAMB's, which a key of decimals would not give
+    for every target."""
+    x, test = _search_data("chisq")
+    ranks = tie_ranks(x).tolist()
+    by_decimals = 0
+    for target in range(15):
+        want = _chisq_iamb(test, target, 15, 0.05, ranks, decimals=False)
+        assert markov_blanket(test, target, 15, 0.05, ranks) == want, target
+        by_decimals += _chisq_iamb(test, target, 15, 0.05, ranks, decimals=True) != want
+    assert by_decimals
+
+
 @pytest.mark.parametrize("seed", range(4))
 def test_mmpc_finds_the_true_parents_and_children_under_an_oracle(seed):
     oracle = _oracle(seed)
@@ -444,3 +503,59 @@ def test_the_recorded_set_is_the_tested_separator_beside_a_set_not_tested():
     pvalues = np.array([[np.nan, 0.3, 0.1], [np.nan, np.nan, np.nan]])
     conds = [(1,), (2,), (3,)]
     assert blanket._largest_sets(pvalues, conds, [0, 1, 2, 3]) == [(2,), (1,)]
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "student_t", "normal_scores"])
+def test_a_large_grow_scan_is_answered_from_one_factor(kind):
+    """A grow scan of enough candidates given two or more variables goes to the test's one-factor
+    path and agrees with each candidate asked alone to rounding (the p-value to 1e-9 relative, on
+    the same side of alpha); one candidate keeps the per-query answer bit for bit."""
+    x = data.sample_scm(graph="erdos_renyi", d=40, n=400, seed=3, density=3.0).data
+    test = make_indep_test(kind, x)
+    factored = []
+    factor = test._schur_partial_correlations
+    test._schur_partial_correlations = lambda *args: factored.append(1) or factor(*args)
+    scan = blanket._dependences(test, significant=True)
+    one = blanket._dependence(test, significant=True)
+    cond = [2, 9, 17]
+    xs = [v for v in range(40) if v != 4 and v not in cond]
+    got = np.array(scan(4, xs, cond))
+    assert factored == [1]
+    want = np.array([one(4, v, cond) for v in xs])
+    np.testing.assert_allclose(got[:, 0], want[:, 0], rtol=1e-9, atol=1e-300)
+    assert ((got[:, 0] <= 0.05) == (want[:, 0] <= 0.05)).all()
+    np.testing.assert_allclose(got[:, 1], want[:, 1], rtol=0.0, atol=10.0**-KEY_DP)
+    assert scan(4, xs[:1], cond) == [one(4, xs[0], cond)]
+
+
+@pytest.mark.parametrize("interleaved", [False, True])
+def test_the_shared_factor_leaves_every_blanket_unchanged(interleaved, monkeypatch):
+    """IAMB and Inter-IAMB find the same blanket at every target whether every grow scan is
+    factored or none is."""
+    x = data.sample_scm(graph="erdos_renyi", d=30, n=500, seed=1, density=3.0).data
+    ranks = tie_ranks(x).tolist()
+
+    def blankets(min_work: str) -> list[list[int]]:
+        monkeypatch.setenv("ANDREY_SHARED_SCAN_MIN_WORK", min_work)
+        test = FisherZ(x)
+        return [
+            markov_blanket(test, t, 30, 0.05, ranks, interleaved=interleaved) for t in range(30)
+        ]
+
+    assert blankets("0") == blankets("1000000000")
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "student_t", "normal_scores"])
+def test_a_small_grow_scan_keeps_the_per_query_bits(kind):
+    """A grow scan below the factor's work, or given fewer than two variables, gives each candidate
+    the p-value and key of that candidate asked alone, bit for bit."""
+    x = data.sample_scm(graph="erdos_renyi", d=12, n=400, seed=3, density=3.0).data
+    test = make_indep_test(kind, x)
+    scan = blanket._dependences(test, significant=True)
+    one = blanket._dependence(test, significant=True)
+    for cond in [[], [7], [2, 9], [0, 3, 8]]:
+        xs = [v for v in range(12) if v != 4 and v not in cond]
+        for some in (xs, xs[:3]):
+            if len(cond) >= 2 and len(some) * (len(cond) + 2) >= 128:
+                continue
+            assert scan(4, some, cond) == [one(4, v, cond) for v in some], (cond, some)

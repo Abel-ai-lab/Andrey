@@ -901,6 +901,7 @@ def igsp(
     alpha: float | None = None,
     invariance_alpha: float | None = None,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     invariance_test: str | None = None,
     n_starts: int = 10,
     seed: int | None = None,
@@ -960,12 +961,19 @@ def igsp(
         partial correlation: ``"fisherz"`` and ``"student_t"``; for categorical data coded by whole
         numbers: ``"chisq"`` and ``"gsq"``; for mixed data, with the categorical columns named by
         ``categorical``: ``"degen_gauss"`` and ``"cond_gauss"``; for nonlinear effects in continuous
-        data, each far slower: ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"``, as for
-        :func:`~andrey.pc`. ``"normal_scores"`` is not offered: the invariance tests compare a
-        setting with the observational rows, and ranked over both, a column's normal scores mix
-        their distributions. ``None`` picks from the declared column types: ``"gsq"`` when every
-        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``.
-        ``metadata["indep_test"]`` names the test the fit used.
+        data, each far slower: ``"kci"``, ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``,
+        ``"wgcm"``, and ``"pcm"``, as for :func:`~andrey.pc`. ``"normal_scores"`` is not offered:
+        the invariance tests compare a setting with the observational rows, and ranked over both, a
+        column's normal scores mix their distributions. ``None`` picks from the declared column
+        types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are, else
+        ``"fisherz"``. ``metadata["indep_test"]`` names the test the fit used.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     invariance_test : {"gaussian", "indicator"} or None, default=None
         The invariance test, which asks whether a variable's distribution given a set of others is
         the same in a setting as in the observational rows. ``"gaussian"`` compares the linear
@@ -985,9 +993,9 @@ def igsp(
         default.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
-        not a fresh random one, so a fit repeats. Seed for the searches after the first, and for
-        the random draws of ``"rcot"``, ``"cmiknn"``, and ``"gpdc"``. With ``n_starts=1`` and
-        another test, the result does not depend on it.
+        not a fresh random one, so a fit repeats. Seed for the searches after the first, and for the
+        random draws of ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"``.
+        With ``n_starts=1`` and another test, the result does not depend on it.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1209,6 +1217,7 @@ def igsp(
             alpha=level,
             invariance_alpha=level if invariance_alpha is None else invariance_alpha,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             invariance_test=invariance_test,
             categorical=mask,
             n_starts=n_starts,
@@ -1234,6 +1243,7 @@ def ut_igsp(
     alpha: float | None = None,
     invariance_alpha: float | None = None,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     invariance_test: str | None = None,
     n_starts: int = 10,
     seed: int | None = None,
@@ -1298,12 +1308,19 @@ def ut_igsp(
         partial correlation: ``"fisherz"`` and ``"student_t"``; for categorical data coded by whole
         numbers: ``"chisq"`` and ``"gsq"``; for mixed data, with the categorical columns named by
         ``categorical``: ``"degen_gauss"`` and ``"cond_gauss"``; for nonlinear effects in continuous
-        data, each far slower: ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"``, as for
-        :func:`~andrey.pc`. ``"normal_scores"`` is not offered: the invariance tests compare a
-        setting with the observational rows, and ranked over both, a column's normal scores mix
-        their distributions. ``None`` picks from the declared column types: ``"gsq"`` when every
-        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``.
-        ``metadata["indep_test"]`` names the test the fit used.
+        data, each far slower: ``"kci"``, ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``,
+        ``"wgcm"``, and ``"pcm"``, as for :func:`~andrey.pc`. ``"normal_scores"`` is not offered:
+        the invariance tests compare a setting with the observational rows, and ranked over both, a
+        column's normal scores mix their distributions. ``None`` picks from the declared column
+        types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are, else
+        ``"fisherz"``. ``metadata["indep_test"]`` names the test the fit used.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     invariance_test : {"gaussian", "indicator"} or None, default=None
         The invariance test, which asks whether a variable's distribution given a set of others is
         the same in a setting as in the observational rows. ``"gaussian"`` compares the linear
@@ -1322,9 +1339,9 @@ def ut_igsp(
         is strictly lower. See Notes for the choice of the default.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
-        not a fresh random one, so a fit repeats. Seed for the searches after the first, and for
-        the random draws of ``"rcot"``, ``"cmiknn"``, and ``"gpdc"``. With ``n_starts=1`` and
-        another test, the result does not depend on it.
+        not a fresh random one, so a fit repeats. Seed for the searches after the first, and for the
+        random draws of ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"``.
+        With ``n_starts=1`` and another test, the result does not depend on it.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1564,6 +1581,7 @@ def ut_igsp(
             alpha=level,
             invariance_alpha=level if invariance_alpha is None else invariance_alpha,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             invariance_test=invariance_test,
             categorical=mask,
             n_starts=n_starts,
@@ -1593,6 +1611,7 @@ def boss_fci(
     ebic_gamma: float = 0.0,
     equivalent_sample_size: float = 1.0,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     alpha: float = 0.05,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
@@ -1660,16 +1679,23 @@ def boss_fci(
         against the data, and the graph can change with it. Must be finite and positive. Only
         ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
     indep_test : str or None, default=None
-        Conditional-independence test for the FCI phase, as for :func:`~andrey.gfci`:
-        ``"fisherz"``, ``"student_t"``, and ``"normal_scores"`` for continuous data, ``"chisq"``
-        and ``"gsq"`` for categorical data, ``"degen_gauss"`` and ``"cond_gauss"`` for mixed data,
-        and ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"``, which also detect nonlinear
-        dependence in continuous data, at a far higher cost per test. It must read the same kind of
-        data as ``score_func``. ``None`` picks from the declared column types: ``"gsq"`` when every
-        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
-        declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
-        type, never by its values. ``metadata["indep_test"]`` names the test the fit used: the one
-        picked from the declared column types when this is ``None``.
+        Conditional-independence test for the FCI phase, as for :func:`~andrey.gfci`: ``"fisherz"``,
+        ``"student_t"``, and ``"normal_scores"`` for continuous data, ``"chisq"`` and ``"gsq"`` for
+        categorical data, ``"degen_gauss"`` and ``"cond_gauss"`` for mixed data, and ``"kci"``,
+        ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"``, which also
+        detect nonlinear dependence in continuous data, at a far higher cost per test. It must read
+        the same kind of data as ``score_func``. ``None`` picks from the declared column types:
+        ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are, else
+        ``"fisherz"``. A column is declared categorical by ``categorical`` or by a DataFrame's
+        ``category``, ``bool``, or text type, never by its values. ``metadata["indep_test"]`` names
+        the test the fit used: the one picked from the declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
@@ -1703,8 +1729,8 @@ def boss_fci(
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random order in which the BOSS phase
         visits variables, as for :func:`~andrey.boss`, and for the random draws of ``indep_test``,
-        which only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make. Different seeds can reach
-        different graphs.
+        which only ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"`` make.
+        Different seeds can reach different graphs.
     n_starts : int, default=1
         Number of BOSS searches, at least ``1``, as for :func:`~andrey.boss`: the first starts from
         the columns' tie-rank order, each later one from a random order drawn from ``seed`` and its
@@ -1901,6 +1927,7 @@ def boss_fci(
         env,
         score_func=score_func,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         collider_rule=collider_rule,
         edge_removal=edge_removal,
@@ -1928,6 +1955,7 @@ def grasp_fci(
     equivalent_sample_size: float = 1.0,
     grasp_depth: int = 3,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     alpha: float = 0.05,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
@@ -1999,16 +2027,23 @@ def grasp_fci(
         :func:`~andrey.grasp`. Larger depths search more chains, which can reach a better score,
         and run longer.
     indep_test : str or None, default=None
-        Conditional-independence test for the FCI phase, as for :func:`~andrey.gfci`:
-        ``"fisherz"``, ``"student_t"``, and ``"normal_scores"`` for continuous data, ``"chisq"``
-        and ``"gsq"`` for categorical data, ``"degen_gauss"`` and ``"cond_gauss"`` for mixed data,
-        and ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"``, which also detect nonlinear
-        dependence in continuous data, at a far higher cost per test. It must read the same kind of
-        data as ``score_func``. ``None`` picks from the declared column types: ``"gsq"`` when every
-        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
-        declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
-        type, never by its values. ``metadata["indep_test"]`` names the test the fit used: the one
-        picked from the declared column types when this is ``None``.
+        Conditional-independence test for the FCI phase, as for :func:`~andrey.gfci`: ``"fisherz"``,
+        ``"student_t"``, and ``"normal_scores"`` for continuous data, ``"chisq"`` and ``"gsq"`` for
+        categorical data, ``"degen_gauss"`` and ``"cond_gauss"`` for mixed data, and ``"kci"``,
+        ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"``, which also
+        detect nonlinear dependence in continuous data, at a far higher cost per test. It must read
+        the same kind of data as ``score_func``. ``None`` picks from the declared column types:
+        ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are, else
+        ``"fisherz"``. A column is declared categorical by ``categorical`` or by a DataFrame's
+        ``category``, ``bool``, or text type, never by its values. ``metadata["indep_test"]`` names
+        the test the fit used: the one picked from the declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
+        ``ValueError``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
@@ -2042,8 +2077,8 @@ def grasp_fci(
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random starting order and the order
         in which the GRaSP phase visits variables, as for :func:`~andrey.grasp`, and for the random
-        draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make.
-        Different seeds can reach different graphs.
+        draws of ``indep_test``, which only ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``,
+        ``"wgcm"``, and ``"pcm"`` make. Different seeds can reach different graphs.
     n_starts : int, default=1
         Number of GRaSP searches, at least ``1``, as for :func:`~andrey.grasp`, each from its own
         random starting order: the first from ``seed``'s, each later one from an order drawn from
@@ -2231,6 +2266,7 @@ def grasp_fci(
         env,
         score_func=score_func,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         collider_rule=collider_rule,
         edge_removal=edge_removal,

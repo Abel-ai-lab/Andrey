@@ -8,10 +8,10 @@ and stays finite and keeps the order of two tails below the ``1e-308`` where the
 underflows to ``0``.
 
 - :func:`hsic_test` z-scores each variable (``ddof=1``; a constant column becomes zero) and sets
-  the bandwidth by the empirical rule. :func:`hsic_statistic_log_p`, used by ANM and by KCI without
-  conditions, runs the same test and returns the statistic, divided by its mean under
-  independence, with the p-value's logarithm. PNL computes the same numbers from kernels it shares
-  across pairs.
+  the bandwidth by the empirical rule. :func:`hsic_statistic_log_p`, used by ANM, runs the same
+  test and returns the statistic, divided by its mean under independence, with the p-value's
+  logarithm. KCI without conditions and PNL compute the same numbers from kernels they share across
+  pairs (:func:`hsic_kernel`).
 - :func:`hsic_gamma_from_grams` and :func:`hsic_gamma_log_p`, used by RCD, ParceLiNGAM, and GIN
   with the grams of :func:`gamma_gram`, set the bandwidth by the median distance over the first
   rows without z-scoring and correct the variance for bias; the first returns the statistic with
@@ -34,6 +34,7 @@ and Application in Causal Discovery. https://webdav.tuebingen.mpg.de/causality/U
 from __future__ import annotations
 
 import math
+from typing import NamedTuple
 
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
@@ -183,12 +184,35 @@ def hsic_statistic_log_p(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
     independence, the gamma null's ``shape * scale``: near 1 for independent variables and larger
     the more dependent they are. Accepts 1-D vectors or ``(n, d)`` matrices.
     """
-    n = _as_columns(x).shape[0]
-    kxc = _centered_kernel(_as_columns(x))
-    kyc = _centered_kernel(_as_columns(y))
+    return hsic_kernels_statistic_log_p(hsic_kernel(x), hsic_kernel(y))
 
-    statistic = np.sum(kxc * kyc)
-    return _gamma_test(statistic, np.trace(kxc), np.sum(kxc**2), np.trace(kyc), np.sum(kyc**2), n)
+
+class HSICKernel(NamedTuple):
+    """One variable's centered kernel (:func:`hsic_kernel`) with the two sums the test reads."""
+
+    centered: np.ndarray
+    trace: float
+    sum_squares: float
+
+
+def hsic_kernel(x: np.ndarray) -> HSICKernel:
+    """Return the centered kernel of ``x`` as :func:`hsic_statistic_log_p` builds it, with its
+    trace and the sum of its squared entries.
+
+    The kernel depends on ``x`` alone, so a caller that tests ``x`` against many variables builds
+    it once and passes it to :func:`hsic_kernels_statistic_log_p`.
+    """
+    kernel = _centered_kernel(_as_columns(x))
+    return HSICKernel(kernel, np.trace(kernel), np.sum(kernel**2))
+
+
+def hsic_kernels_statistic_log_p(kx: HSICKernel, ky: HSICKernel) -> tuple[float, float]:
+    """Return ``(T / mean, log_p)`` of the HSIC test between the variables of two
+    :func:`hsic_kernel` values, the numbers :func:`hsic_statistic_log_p` returns for them."""
+    statistic = np.sum(kx.centered * ky.centered)
+    return _gamma_test(
+        statistic, kx.trace, kx.sum_squares, ky.trace, ky.sum_squares, kx.centered.shape[0]
+    )
 
 
 # ---- LiNGAM-family HSIC (median-distance bandwidth, biased V-statistic) --------------------------

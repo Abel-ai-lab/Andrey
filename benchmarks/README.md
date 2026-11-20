@@ -85,8 +85,9 @@ benchmarks/start_xges.sh
 export ANDREY_BENCH_XGES_PYTHON=$PWD/benchmarks/.venv-xges/bin/python
 ```
 
-tigramite (GPL-3.0), the reference for the CMIknn and GPDC conditional-independence tests, also
-fits in an environment of its own, so it and its dependencies stay out of bench-env:
+tigramite (GPL-3.0), the reference for the CMIknn and GPDC conditional-independence tests and for
+Regime-PCMCI (`rpcmci_agreement.py`), also fits in an environment of its own, so it and its
+dependencies stay out of bench-env:
 
 ```shell
 benchmarks/start_tigramite.sh
@@ -185,6 +186,19 @@ benchmarks/start_skewd.sh
 export ANDREY_BENCH_SKEWD_PYTHON=$PWD/benchmarks/.venv-skewd/bin/python
 export ANDREY_BENCH_SKEWD=$PWD/benchmarks/.skewd
 ```
+
+The Tübingen lane (`tuebingen_pairs.py`) runs the authors' code of QCCD, HECI, and GRCI beside
+Andrey's pairwise methods, each unmodified and read from a folder outside the repository.
+`start_qccd.sh`, `start_heci.sh`, and `start_grci.sh` download a pinned copy, check its checksum,
+build its environment, and print the exports the adapters read. GRCI's license, CC BY-NC 4.0, allows
+benchmark runs from a local download and no redistribution, so its files never enter the repository.
+QCCD runs at the paper's setting, `m = 3`, and, as a sensitivity row, at the wrapper's default
+`m = 7`.
+`load_dataset("tuebingen")` downloads the pairs from their original server, and
+`tuebingen_summary.py` turns the records of the runs into the weighted accuracy with a paired
+bootstrap interval, the coverage, and the time per pair. The `resit` arm reads its interpreter from
+`$ANDREY_BENCH_RESIT_PYTHON`; set it to `$ANDREY_BENCH_PYTHON` to measure the bench environment's
+build, as the other Andrey arms do.
 
 The missing-value lanes (`missing_cpu.py`) run two authors' codes that carry no license, unmodified
 and outside the package. Each script downloads its pinned commit, checks the archive's SHA-256, and

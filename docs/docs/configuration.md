@@ -51,7 +51,9 @@ requested backend uses `auto`, without a warning.
   workers. FCI and GFCI also send each large possible-d-separation search to them with the
   `fisherz`, `student_t`, and `normal_scores` tests on complete data, and FCI-JCI with `fisherz` and
   `student_t`; the pairs are still searched one at a time, in the serial order, and every graph is
-  the serial one. `andrey.bootstrap` fits its resamples on them, one fit per worker, with the same
+  the serial one. IAMB, Inter-IAMB, and MMPC split a list of two or more targets over them with the
+  `fisherz`, `student_t`, and `normal_scores` tests on complete data, with the same results for any
+  number of workers. `andrey.bootstrap` fits its resamples on them, one fit per worker, with the same
   result at any number. `1` (the default) and `0` run serially; `-1` uses every usable core. `pnl`
   with one worker leaves the BLAS threads unlimited and with several limits each thread to one, so
   on a machine with several cores its p-values and statistics can differ in the last digits between
@@ -87,8 +89,17 @@ a local file system to silence the warning. `andrey.data.generate`, which is dep
 working in 0.16.0, starts its workers the same way when your Python's default start method is the
 forkserver, as on Linux from Python 3.14; otherwise it keeps the default.
 
-## LiNGAM order search
+## Scan dispatch
 
+- `ANDREY_SHARED_SCAN_MIN_WORK`: with `fisherz`, `student_t`, or `normal_scores` on complete data, a
+  grow scan of `iamb` or `inter_iamb` (also as the restrict phase of `rsmax2` with `restrict="iamb"`
+  or `"inter_iamb"`) of two or more candidates against one conditioning set of two or more variables
+  is answered from one Cholesky factor of the set's correlation block only when its candidates times
+  the block size (the set plus two) reach this value; below it each candidate inverts its own
+  submatrix. The default is `128`, measured on an AMD EPYC 7713 server running Linux on one core,
+  where the factor was slower below about 64 and faster from 128 for every set size sampled. The two
+  paths agree to about 1e-10 relative in the p-value; the per-query path is the exact one, and `0`
+  factors every such scan.
 - `ANDREY_LINGAM_PRUNE_MIN_WORK`: a step of the `pwling` order search (DirectLiNGAM and the methods
   built on it) stops scoring a candidate that can no longer be picked only when its rows times
   ordered pairs of candidates reach this value (default `100000`, about the break-even on one core
@@ -159,9 +170,10 @@ already running in the process, so a CPU fit never pays to start a GPU.
 - `ANDREY_SEED`: the seed of every method that draws random numbers when the call gives no `seed=`:
   BOSS, GRaSP, ICA-LiNGAM, CALM, IGSP and UT-IGSP with `n_starts` above 1 (the default), hill
   climbing and tabu search with `n_starts` above 1, and the searches that test independence, with
-  the `rcot`, `cmiknn`, and `gpdc` tests. The default is `0`; it takes any integer from `0` to
-  `2**32 - 1`. So `seed=None` is this configured seed, not a fresh random one, and a call repeats. A
-  call that gives `seed=` does not depend on it. Deterministic methods ignore it.
+  the `rcot`, `cmiknn`, `gpdc`, `gcm`, `wgcm`, and `pcm` tests. The default is `0`; it takes any
+  integer from `0` to `2**32 - 1`. So `seed=None` is this configured seed, not a fresh random one,
+  and a call repeats. A call that gives `seed=` does not depend on it. Deterministic methods ignore
+  it.
 - `ANDREY_TIE_BREAK`: how the searches choose between tied candidates. `rank` (the default) orders
   them by a rank computed from the data, which a row shuffle, a change of units, or a sign flip
   leaves in place, with [a few exceptions](guides/column-order.md#how-andrey-breaks-ties), so

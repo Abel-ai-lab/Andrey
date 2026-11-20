@@ -165,13 +165,16 @@ def design_test(
     *,
     categorical: np.ndarray | None = None,
     seed: int | None = None,
+    degrees_of_freedom: str = "mean",
+    rows: np.ndarray | None = None,
 ) -> LinkTest:
     """The ``indep_test`` test over the lagged design of ``data``.
 
     A partial-correlation test (:data:`PARTIAL_CORRELATION_TESTS`) comes as a :class:`DesignTest`.
     Any other name is built by :func:`~andrey.core.ci.make_indep_test` over the design, with
     ``categorical``, the mask of the categorical columns of ``data``, repeated for every lag, and
-    ``seed``, which the randomized tests take. A registered test that reports no statistics, one
+    ``seed``, which the randomized tests take, and ``degrees_of_freedom``, which the categorical
+    tests take. A registered test that reports no statistics, one
     without ``statistic_pvalues``, is asked one query at a time
     (:class:`~andrey.core.ci.PValueTest`) and ranks the candidates by p-value, smallest first.
     Raises :class:`NotImplementedError` when ``indep_test`` is not registered and, for a
@@ -184,10 +187,23 @@ def design_test(
     the test deletes rows per test (:mod:`andrey.core.ci_missing`): each query reads the design
     rows observed in all of its columns. Two columns are then copies when they repeat each other on
     the rows where both are observed.
+
+    ``rows``, a boolean mask over the design rows (time steps ``2 * tau_max`` to ``T - 1``), keeps
+    the marked rows only: each test then reads the steps whose effect is marked, with the lagged
+    values of every earlier step.
     """
     mask = None if categorical is None else np.tile(categorical, 2 * tau_max + 1)
     design = lagged_design(data, 2 * tau_max)
-    return column_test(indep_test, design, data.shape[1], categorical=mask, seed=seed)
+    if rows is not None:
+        design = design[rows]
+    return column_test(
+        indep_test,
+        design,
+        data.shape[1],
+        categorical=mask,
+        seed=seed,
+        degrees_of_freedom=degrees_of_freedom,
+    )
 
 
 class RankedDesignTest:
@@ -224,9 +240,11 @@ def ranked_design_test(
     *,
     categorical: np.ndarray | None = None,
     seed: int | None = None,
+    degrees_of_freedom: str = "mean",
 ) -> RankedDesignTest:
     """:func:`design_test` over ``data``'s columns sorted by ``ranks``, their
     :func:`~andrey.core.ties.tie_ranks`, asked in ``data``'s columns (:class:`RankedDesignTest`).
+    ``categorical``, ``seed``, and ``degrees_of_freedom`` are :func:`design_test`'s.
 
     The copies error names ``data``'s design columns.
     """
@@ -235,7 +253,12 @@ def ranked_design_test(
     n_vars = len(by_rank)
     try:
         test = design_test(
-            indep_test, np.ascontiguousarray(data[:, by_rank]), tau_max, categorical=mask, seed=seed
+            indep_test,
+            np.ascontiguousarray(data[:, by_rank]),
+            tau_max,
+            categorical=mask,
+            seed=seed,
+            degrees_of_freedom=degrees_of_freedom,
         )
     except CopiedColumnsError as error:
         moved = [
@@ -254,6 +277,7 @@ def column_test(
     categorical: np.ndarray | None = None,
     n_lagged: int | None = None,
     seed: int | None = None,
+    degrees_of_freedom: str = "mean",
 ) -> LinkTest:
     """The ``indep_test`` test over the columns of ``design``, as :func:`design_test` builds it.
 
@@ -262,7 +286,13 @@ def column_test(
     counts the columns of the lagged design when more follow it; the error ignores those.
     """
     if indep_test not in PARTIAL_CORRELATION_TESTS:
-        built = make_indep_test(indep_test, design, categorical=categorical, seed=seed)
+        built = make_indep_test(
+            indep_test,
+            design,
+            categorical=categorical,
+            seed=seed,
+            degrees_of_freedom=degrees_of_freedom,
+        )
         if not callable(getattr(built, "statistic_pvalues", None)):
             built = PValueTest(built)
         return cast("LinkTest", built)
@@ -459,6 +489,8 @@ def pcmci(
     max_depth: int | None = None,
     categorical: np.ndarray | None = None,
     seed: int | None = None,
+    degrees_of_freedom: str = "mean",
+    rows: np.ndarray | None = None,
 ) -> PCMCIResult:
     """Run PC1 and MCI on a ``(T, n)`` series with the ``indep_test`` test.
 
@@ -469,13 +501,23 @@ def pcmci(
     With ``constraints``, background knowledge over lags ``0`` to ``tau_max``, PC1 and MCI test no
     forbidden or required link (:func:`pc1`, :func:`mci`): a forbidden link is not in the graph and
     a required one is. ``max_depth`` caps PC1's conditioning sets. ``categorical``, the mask of the
-    categorical columns for a mixed-data test, and ``seed`` reach :func:`design_test`, which raises
-    on an ``indep_test`` it cannot build.
+    categorical columns for a mixed-data test, ``seed``, and ``degrees_of_freedom`` reach
+    :func:`design_test`, which raises
+    on an ``indep_test`` it cannot build. ``rows`` keeps only the marked design rows
+    (:func:`design_test`).
     """
     check_fdr_method(fdr_method)
     data = np.asarray(data, dtype=np.float64)
     n_vars = data.shape[1]
-    test = design_test(indep_test, data, tau_max, categorical=categorical, seed=seed)
+    test = design_test(
+        indep_test,
+        data,
+        tau_max,
+        categorical=categorical,
+        seed=seed,
+        degrees_of_freedom=degrees_of_freedom,
+        rows=rows,
+    )
     ranks = tie_ranks(data, categorical).tolist()
     with backend.one_blas_thread():  # the stacked inversions then give the same bits on any host
         parents = tuple(

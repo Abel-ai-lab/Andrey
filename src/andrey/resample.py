@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 import numpy as np
 
 from andrey import api
-from andrey.api._adapt import flag, int_in_range
+from andrey.api._adapt import flag, int_in_range, is_column_list
 from andrey.api._method import (
     MISSING_DEFAULT_NOTICE,
     notice_default_missing,
@@ -1115,7 +1115,8 @@ def bootstrap(
         Before any fit, for ``n_boot`` or an argument name that a release removed from the method;
         the message gives its current name.
     NotImplementedError
-        For ``gin``, whose number of latent nodes varies from fit to fit.
+        For ``gin``, whose number of latent nodes varies from fit to fit, and ``rpcmci``, whose
+        regimes are numbered anew in each fit.
     RuntimeError
         If a worker process dies.
 
@@ -1294,6 +1295,11 @@ def bootstrap(
         raise NotImplementedError(
             f"bootstrap does not support {spec.name}: its latent nodes differ from fit to fit"
         )
+    if spec.output.regimes:
+        raise NotImplementedError(
+            f"bootstrap does not support {spec.name}: its regimes are numbered anew in each fit, "
+            "and a resample of the steps breaks them"
+        )
     root = resolve_seed(seed)
     if root < 0:
         raise ValueError(f"seed must be a non-negative integer, got {root}")
@@ -1428,6 +1434,10 @@ def build_job(
     within each environment.
     """
     kwargs = dict(kwargs)
+    if is_column_list(kwargs.get("target")):
+        raise ValueError(
+            f"bootstrap: {spec.name} resamples one target at a time; pass target as one column"
+        )
     entry = next((i for i in spec.data.inputs[1:] if i.name == "env"), None)
     apart = False
     if entry is not None:
