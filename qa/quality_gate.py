@@ -1332,6 +1332,7 @@ SLOWEST_FIRST: tuple[tuple[str, str], ...] = (
     ("ExactSearch", "linear_gauss_er_d15"),
     ("ScoreMatching", "score_paper_standardized_d10_er1"),
     ("DAS", "score_paper_standardized_d20_er4"),
+    ("DAS", "score_paper_standardized_d10_er1"),
     ("DAGMA", "notears_paper_raw_d10"),
     ("NOTEARS", "notears_paper_raw_d10"),
 )

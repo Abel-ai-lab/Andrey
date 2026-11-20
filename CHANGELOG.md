@@ -94,9 +94,10 @@ names its pull request.
 
 ### Changed
 
-- `das` is supported. On the simulation of its paper with z-scored or rescaled columns it made fewer
-  errors than the code published with the paper in all 20 settings from 10 to 200 variables, in a
-  tenth to a fiftieth of the time, and fewer than the empty graph up to 1,000 variables. On the
+- `das` is supported. On the simulation of its paper with z-scored or rescaled columns it made no
+  more errors than the code published with the paper in any of 20 settings from 10 to 200
+  variables, and fewer on the first 20 datasets of each, in a tenth to a fiftieth of the time, and
+  fewer than the empty graph up to 1,000 variables. On the
   simulation's own units that code made fewer errors on sparse graphs, since DAS standardizes the
   columns in its order search; its Limitations state this, and the
   [0.19.0 release card][card-0190-das] has the numbers, with `cam`, SCORE, and NoGAM on the same

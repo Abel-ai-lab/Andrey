@@ -1280,26 +1280,25 @@ def das(
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On the papers' simulation with z-scored or rescaled columns, DAS made fewer
-    errors than the code published with the paper from 10 to 200 variables, and fewer than the
-    empty graph up to 1,000. That code ran on five datasets of 500 variables and on none of 1,000,
-    and at 500 variables DAS's errors are above the paper's, a gap not traced. The order search
-    reads standardized columns, so the result does not depend on the columns' units; on raw columns
-    whose variance grows along the causal order, code that reads the units can order more edges
-    correctly, and there the code published with the paper made fewer errors on sparse graphs (19
-    against 28 at 50 variables). The `0.19.0 release card
+    **Limitations.** On the papers' simulation with z-scored or rescaled columns, DAS made no more
+    errors than the code published with the paper from 10 to 200 variables, and fewer on the first
+    20 datasets of every setting, and fewer than the empty graph up to 1,000. That code ran on five
+    datasets of 500 variables and on none of 1,000, and at 500 variables DAS's errors are above the
+    paper's, a gap not traced. The order search reads standardized columns, so the result does not
+    depend on the columns' units; on raw columns whose variance grows along the causal order, code
+    that reads the units can order more edges correctly, and there the code published with the paper
+    made fewer errors on sparse graphs (19 against 28 at 50 variables). The `0.19.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#das>`_ has the numbers. Its causal order is
     SCORE's, so the limits :func:`~andrey.score_matching` states for the order are its own: where
     links have a strong linear part, it did no better than a random order. The leaf rule is exact
     only for Gaussian noise; :func:`~andrey.nogam` and :func:`~andrey.resit` drop that assumption.
     An edge the order reverses cannot be recovered, and the screen can drop a true parent whose
-    entries are small next to the reference's, which the pruning cannot add back. Each step
-    factors a matrix with one row and one column per sample, so the order search's time grows with
-    the cube of ``n_samples`` and its memory with the square. Binary columns, and any column with
-    fewer than 3 distinct values, are not supported: the pruning fits a smooth term of each parent,
-    and such a column raises ``ValueError`` before the fit. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    entries are small next to the reference's, which the pruning cannot add back. Each step factors
+    a matrix with one row and one column per sample, so the order search's time grows with the cube
+    of ``n_samples`` and its memory with the square. Binary columns, and any column with fewer than
+    3 distinct values, are not supported: the pruning fits a smooth term of each parent, and such a
+    column raises ``ValueError`` before the fit. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
