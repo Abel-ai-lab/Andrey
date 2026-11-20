@@ -46,7 +46,8 @@ class MarkovCheckOutput:
 
     ``structure`` is the graph as checked, and ``dag`` the DAG whose independences were tested (the
     graph itself for a DAG, a consistent extension for a CPDAG). ``p_values`` and ``table`` list the
-    tested independences in order, ``uniformity_statistic`` and ``uniformity_p_value`` are the
+    tested independences in order, without those not tested for want of rows, which
+    ``metadata["not_tested"]`` counts; ``uniformity_statistic`` and ``uniformity_p_value`` are the
     Anderson-Darling test of those p-values against the uniform distribution, ``passed`` is the
     check's verdict, and ``metadata`` records the settings used.
     """
@@ -86,6 +87,12 @@ class MarkovCheckOutput:
     def verdict(self) -> str:
         """One sentence: what was tested and whether the data reject it."""
         n, a = self.n_tests, self.alpha
+        skipped = int(self.metadata.get("not_tested", 0))
+        if n == 0 and skipped:
+            return (
+                f"Not rejected: none of the {skipped} independences the graph implies had the "
+                "rows its test needs, so none was tested."
+            )
         if n == 0:
             return (
                 "Not rejected: the graph implies no independence among its variables, so the data "
@@ -342,11 +349,11 @@ def markov_check(
         structure=structure,
         dag=dag,
         alpha=alpha,
-        p_values=p_values,
+        p_values=p_values[tested],
         uniformity_statistic=statistic,
         uniformity_p_value=p_uniform,
         metadata=metadata,
-        _tests=tuple(facts),
+        _tests=tuple(fact for fact, kept in zip(facts, tested.tolist(), strict=True) if kept),
     )
 
 

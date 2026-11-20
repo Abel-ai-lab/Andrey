@@ -14,6 +14,7 @@ import pytest
 import andrey
 from andrey.constraint.mvpc import IndicatorTest, PermutationCorrection, candidate_edges
 from andrey.core.ci import FisherZ, make_indep_test
+from andrey.core.ci_missing import rows_tested
 from andrey.data import missingness
 from tests.recovery.test_mvpc import figure_1b
 
@@ -198,6 +199,19 @@ def test_an_indicator_constant_on_a_query_rows_separates_the_pair():
     test = IndicatorTest(make_indep_test("fisherz", R), R, 0)
     assert test(0, 1) == 1.0
     assert test(0, 2) < 1.0
+
+
+def test_an_indicator_query_without_rows_is_not_tested_and_counted():
+    X = np.random.default_rng(0).standard_normal((50, 3))
+    X[:25, 1] = np.nan
+    X[25:, 2] = np.nan  # columns 1 and 2 share no row
+    X[::7, 0] = np.nan
+    R = X.copy()
+    R[:, 0] = np.isnan(X[:, 0])
+    test = IndicatorTest(make_indep_test("fisherz", R), R, 0)
+    with rows_tested() as rows:
+        assert np.isnan(test(0, 1, [2]))
+    assert rows.not_tested == {(0, 1): 1}
 
 
 def test_an_mcar_mask_gives_the_indicators_few_parents():

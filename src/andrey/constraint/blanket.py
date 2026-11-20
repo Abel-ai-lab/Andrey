@@ -327,8 +327,9 @@ def _largest_sets(
     p-value at ``KEY_DP`` decimals; of sets that agree, the smaller, then the one whose ascending
     ranks come first, so the choice does not depend on the column order."""
     rounded = np.round(pvalues, KEY_DP)
-    tied = rounded == rounded.max(axis=1, keepdims=True)
-    # A row of NaN ties nothing and takes its first set; NaN is not above alpha, so none reads it.
+    tied = rounded == np.fmax.reduce(rounded, axis=1, keepdims=True)
+    # A set not tested (NaN) ties nothing. A row of NaN takes its first set; NaN is not above
+    # alpha, so none reads it.
     out = [conds[j] for j in tied.argmax(axis=1).tolist()]
     for i in np.flatnonzero(tied.sum(axis=1) > 1).tolist():
         out[i] = min(

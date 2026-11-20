@@ -13,11 +13,11 @@ names its pull request.
 ### Added
 
 - A test-wise test with fewer rows than it needs, a pair never observed together included, is not
-  tested: it never separates a pair and never confirms a link, in every method that deletes rows
-  per test. `metadata["not_tested"]` counts those tests, `metadata["undecided_pairs"]` lists the
-  pairs one of them might have separated, and `metadata["never_observed_together"]` the pairs of
-  columns no row observes together; the notice for `missing=None` names the first of them.
-  ([#PR_NOT_TESTED])
+  tested: it never separates a pair and never confirms a link, in every conditional-independence
+  search that deletes rows per test; `markov_check` leaves such facts out of its summary.
+  `metadata["not_tested"]` counts those tests, `metadata["undecided_pairs"]` lists the pairs one of
+  them might have separated, and `metadata["never_observed_together"]` the pairs of columns no row
+  observes together; the notice for `missing=None` names the first of them. ([#PR_NOT_TESTED])
 
 - `metadata["p_one_tests"]` counts every test of a fit on data with missing values that returned
   `p = 1`, whichever test it is; a test with zero degrees of freedom answers so by design.
