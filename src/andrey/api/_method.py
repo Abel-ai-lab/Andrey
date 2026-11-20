@@ -692,7 +692,8 @@ def never_observed_together(data: object) -> list[list]:
 
 #: The key of :func:`notice_default_missing` in :func:`~andrey.core.warning_policy.log_once`.
 MISSING_DEFAULT_NOTICE = "missing_default"
-#: The most pairs the notice names; the metadata lists them all.
+#: The most pairs the notice names; past it, the notice gives their number, and the metadata
+#: lists them all.
 _NOTICE_PAIRS = 5
 
 
@@ -701,10 +702,10 @@ def notice_default_missing(method: str, metadata: dict | None = None) -> None:
 
     The notice says which handling ran, when it is valid
     (:data:`~andrey.core.ci_missing.TESTWISE_CLAIM`), and how to choose it by name. When the fit's
-    ``metadata`` names pairs never observed together, counts tests not tested, or lists undecided
-    pairs, the notice says so too, naming the first pairs; the metadata holds every pair of every
-    fit. The worker processes of :func:`~andrey.bootstrap` log none: the calling process logs it
-    for their fits.
+    ``metadata`` names pairs never observed together, has tests not tested, or names undecided
+    pairs, the notice says so too (:func:`_not_tested_notice`); the metadata holds every pair of
+    every fit. The worker processes of :func:`~andrey.bootstrap` log none: the calling process
+    logs it for their fits.
     """
     log_once(
         _log,
@@ -720,24 +721,37 @@ def notice_default_missing(method: str, metadata: dict | None = None) -> None:
 def _not_tested_notice(metadata: dict) -> str:
     """Return what :func:`notice_default_missing` says of a fit's ``metadata``.
 
-    The pairs never observed together and the tests not tested; ``""`` when it has neither.
+    ``""`` when the fit has no pair never observed together, no test not tested, and no undecided
+    pair. Otherwise it gives the number of pairs never observed together and, with tests not
+    tested or undecided pairs, the :data:`~andrey.core.ci_missing.NOT_TESTED_CLAIM` and the number
+    of undecided pairs, naming the pairs when there are at most ``_NOTICE_PAIRS``. The number of
+    conditioning sets not tested, ``metadata["not_tested"]``, is left out: it includes the sets the
+    search skipped because no row can test them, so its size follows the search, not what a user
+    can change.
     """
 
-    def first(pairs: list[list]) -> str:
-        shown = ", ".join(f"{a} and {b}" for a, b in pairs[:_NOTICE_PAIRS])
-        more = len(pairs) - _NOTICE_PAIRS
-        return shown + (f", and {more} more" if more > 0 else "")
+    def counted(pairs: list[list], of: str = "") -> str:
+        n = len(pairs)
+        text = f"{n:,} {'pair' if n == 1 else 'pairs'}{of}"
+        if n <= _NOTICE_PAIRS:
+            text += " (" + ", ".join(f"{a} and {b}" for a, b in pairs) + ")"
+        return text
 
     text = ""
     if pairs := metadata.get("never_observed_together"):
+        verb = "is" if len(pairs) == 1 else "are"
         text += (
-            f" {len(pairs)} pairs of columns are never observed together ({first(pairs)}), listed "
-            'in metadata["never_observed_together"].'
+            f" {counted(pairs, ' of columns')} {verb} never observed together, listed in "
+            'metadata["never_observed_together"].'
         )
-    if count := metadata.get("not_tested"):
-        text += f" {count} tests were not tested. {NOT_TESTED_CLAIM}"
-        if undecided := metadata.get("undecided_pairs"):
-            text += f" Undecided: {first(undecided)}."
+    undecided = metadata.get("undecided_pairs") or []
+    if metadata.get("not_tested") or undecided:
+        text += f" {NOT_TESTED_CLAIM}"
+        if undecided:
+            verb = "is" if len(undecided) == 1 else "are"
+            text += f" {counted(undecided)} {verb} undecided."
+        else:
+            text += " No pair is undecided."
     return text
 
 

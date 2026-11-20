@@ -750,10 +750,13 @@ command line); `metadata["undecided_pairs"]` lists each such pair. On merged coh
 variables measured only in different cohorts is therefore an undecided pair and an edge of the
 output of PC, FCI, CD-NOD, FCI-JCI, and the Markov-blanket searches, unless knowledge forbids the
 edge or, in IAMB and Inter-IAMB, `max_depth` stops the blanket's growth first: a fact about the
-data, not a finding. PCMCI, PCMCI+, and J-PCMCI+ condition no test on a lagged parent without a tested result, and LPCMCI none on a node whose link
-to either end of the tested pair has none. `metadata["not_tested"]` counts the
-tests not tested, and `metadata["never_observed_together"]` lists the pairs of columns no row
-observes together; the notice for `missing=None` names the first of them. Merged cohorts often
+data, not a finding. PCMCI, PCMCI+, and J-PCMCI+ condition no test on a lagged parent without a
+tested result, and LPCMCI none on a node whose link to either end of the tested pair has none.
+`metadata["not_tested"]` counts the conditioning sets not tested, including those the search skipped
+because no row can test them; it measures the search more than the data, so the notice for
+`missing=None` leaves it out and gives the number of undecided pairs and of pairs never observed
+together, naming them when there are at most five. `metadata["never_observed_together"]` lists the
+pairs of columns no row observes together. Merged cohorts often
 leave such pairs, and whether a row belongs to a cohort is rarely random, so test-wise deletion may
 not be valid there. To decide more pairs, cap the conditioning sets with `max_depth` (`max_p_global`
 in LPCMCI and the same-step phases of PCMCI+), or drop a column with many missing values, which can

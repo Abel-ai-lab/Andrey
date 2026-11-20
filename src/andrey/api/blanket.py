@@ -263,9 +263,10 @@ def iamb(
     the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
-    pair and never confirms a link, and ``metadata["not_tested"]`` counts such tests. A candidate no
-    tested query separated, as a variable never observed with the target, stays in the target's set,
-    and a pair no tested query could decide is listed in ``metadata["undecided_pairs"]``. On merged
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including those the search skipped because no row can test them. A candidate no tested
+    query separated, as a variable never observed with the target, stays in the target's set, and a
+    pair no tested query could decide is listed in ``metadata["undecided_pairs"]``. On merged
     cohorts, every pair of variables measured only in different cohorts is therefore an undecided
     pair and, unless knowledge forbids it or ``max_depth`` stops the blanket's growth first, an edge
     of the output: a fact about the data, not a finding. A continuous column constant on a test's
@@ -541,9 +542,10 @@ def inter_iamb(
     the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
-    pair and never confirms a link, and ``metadata["not_tested"]`` counts such tests. A candidate no
-    tested query separated, as a variable never observed with the target, stays in the target's set,
-    and a pair no tested query could decide is listed in ``metadata["undecided_pairs"]``. On merged
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including those the search skipped because no row can test them. A candidate no tested
+    query separated, as a variable never observed with the target, stays in the target's set, and a
+    pair no tested query could decide is listed in ``metadata["undecided_pairs"]``. On merged
     cohorts, every pair of variables measured only in different cohorts is therefore an undecided
     pair and, unless knowledge forbids it or ``max_depth`` stops the blanket's growth first, an edge
     of the output: a fact about the data, not a finding. A continuous column constant on a test's
@@ -811,9 +813,10 @@ def mmpc(
     the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
-    pair and never confirms a link, and ``metadata["not_tested"]`` counts such tests. A candidate no
-    tested query separated, as a variable never observed with the target, stays in the target's set,
-    and a pair no tested query could decide is listed in ``metadata["undecided_pairs"]``. On merged
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including those the search skipped because no row can test them. A candidate no tested
+    query separated, as a variable never observed with the target, stays in the target's set, and a
+    pair no tested query could decide is listed in ``metadata["undecided_pairs"]``. On merged
     cohorts, every pair of variables measured only in different cohorts is therefore an undecided
     pair and, unless knowledge forbids it, an edge of the output: a fact about the data, not a
     finding. A continuous column constant on a test's rows raises ``ValueError``. Test-wise deletion

@@ -19,6 +19,7 @@ import pandas as pd
 import pytest
 
 import andrey
+from andrey.api._method import _not_tested_notice
 from andrey.core import ARROW, ci
 from andrey.temporal.pcmci import pc1
 
@@ -280,7 +281,65 @@ def test_the_notice_names_a_pair_never_observed_together(caplog):
         andrey.pc(_never_together())
         andrey.fci(_never_together())
     (notice,) = [r.getMessage() for r in caplog.records if r.name == "andrey.api._method"]
-    assert "never observed together (X and Y)" in notice
+    assert "1 pair of columns (X and Y) is never observed together" in notice
+    assert "1 pair (X and Y) is undecided." in notice
+
+
+@pytest.mark.parametrize(
+    ("fit", "data", "count"),
+    [
+        (andrey.pc, _never_together, 4),
+        (andrey.fci, _never_together, 4),
+        (andrey.iamb, _never_together, 15),
+        (andrey.pc, partial(_cohorts, 0), 20),
+        (andrey.iamb, partial(_cohorts, 0), 19),
+    ],
+)
+def test_the_conditioning_sets_not_tested_match_their_record(fit, data, count):
+    assert fit(data(), missing="testwise").metadata["not_tested"] == count
+
+
+def test_the_notice_names_few_undecided_pairs_and_gives_no_count_of_sets():
+    notice = _not_tested_notice(
+        {"not_tested": 2_621_200_269, "undecided_pairs": [["A", "B"], ["A", "C"]]}
+    )
+    assert notice.endswith("2 pairs (A and B, A and C) are undecided.")
+    assert "2621200269" not in notice and "2,621,200,269" not in notice
+
+
+def test_the_notice_counts_many_pairs_without_naming_them():
+    pairs = [[f"A{i}", f"B{i}"] for i in range(1_200)]
+    notice = _not_tested_notice(
+        {"never_observed_together": pairs, "not_tested": 7, "undecided_pairs": pairs}
+    )
+    assert "1,200 pairs of columns are never observed together, listed" in notice
+    assert notice.endswith("1,200 pairs are undecided.")
+    assert "A0" not in notice
+
+
+def test_the_notice_names_at_most_five_pairs():
+    pairs = [[f"A{i}", f"B{i}"] for i in range(6)]
+    named = _not_tested_notice({"undecided_pairs": pairs[:5]})
+    assert named.endswith(
+        "5 pairs (A0 and B0, A1 and B1, A2 and B2, A3 and B3, A4 and B4) are undecided."
+    )
+    counted = _not_tested_notice({"undecided_pairs": pairs})
+    assert counted.endswith("6 pairs are undecided.")
+    assert not any(a in counted for a, _ in pairs)
+
+
+def test_the_notice_names_undecided_pairs_without_a_count_of_sets():
+    assert _not_tested_notice({"undecided_pairs": [["A", "B"]]}).endswith(
+        "1 pair (A and B) is undecided."
+    )
+
+
+def test_the_notice_says_no_pair_is_undecided_when_every_pair_was_decided():
+    assert _not_tested_notice({"not_tested": 3}).endswith("No pair is undecided.")
+    assert _not_tested_notice({"not_tested": 3, "undecided_pairs": []}).endswith(
+        "No pair is undecided."
+    )
+    assert _not_tested_notice({}) == ""
 
 
 _BOOTSTRAP_PROBE = """
@@ -303,7 +362,8 @@ def test_the_notice_of_a_bootstrap_on_worker_processes_names_a_pair_never_observ
         [sys.executable, str(probe)], capture_output=True, text=True, check=True, env=env
     )
     assert run.stderr.count("the default handling, test-wise deletion") == 1
-    assert "never observed together (X and Y)" in run.stderr and "Undecided: X and Y" in run.stderr
+    assert "(X and Y) is never observed together" in run.stderr
+    assert "1 pair (X and Y) is undecided." in run.stderr
 
 
 def test_em_refuses_a_pair_never_observed_together_by_name():

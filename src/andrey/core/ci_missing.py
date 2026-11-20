@@ -271,8 +271,9 @@ def rows_metadata(
     present when it is not zero, is the number of tests answered ``p = 1`` that a
     :class:`RowCounts` holds, whichever test it is, as a test whose statistic is exactly zero
     answers; a query with zero degrees of freedom is not tested, not counted there.
-    ``"not_tested"``, present when it is not zero,
-    is the number of queries not tested (:data:`NOT_TESTED`). With ``name``, ``"undecided_pairs"``
+    ``"not_tested"``, present when it is not zero, is the number of conditioning sets not tested
+    (:data:`NOT_TESTED`), including those the search skipped because no row can test them
+    (:meth:`TestwiseDeletion.count_not_tested`). With ``name``, ``"undecided_pairs"``
     lists the pairs no tested query could decide, those of :meth:`RowCounts.untested`, as
     ``[a, b]`` lists of ``name(column)`` by :func:`named_pairs`.
     """
