@@ -1356,6 +1356,7 @@ def jpcmciplus(
         "index_edges": [[variable(j), "directed"] for j in result.space_links],
         "time_index_edges": [[variable(j), "directed"] for j in result.time_links],
         "time_dummy": inputs.time_dummy,
+        **undecided_links(result.system.undecided, inputs.system_labels),
     }
     return with_labels(adapt_pcmciplus(result.system, metadata), inputs.system_labels)
 

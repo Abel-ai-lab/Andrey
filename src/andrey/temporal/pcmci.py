@@ -334,6 +334,7 @@ def pc1(
     ranks: Sequence[int],
     constraints: LaggedConstraints | None = None,
     max_depth: int | None = None,
+    undecided: list[Link] | None = None,
 ) -> tuple[Link, ...]:
     """Select the lagged parents of variable ``target`` with the PC1 rounds; strongest first.
 
@@ -343,7 +344,10 @@ def pc1(
     variable's :func:`~andrey.core.ties.tie_ranks`. Each round is one ``test`` call over all
     remaining candidates. A test that was not tested
     (:data:`~andrey.core.ci_missing.NOT_TESTED`) neither removes its candidate nor sets its
-    strength, and a candidate none of whose tests was tested ranks after the others. With
+    strength. A candidate whose first test, given no condition, was not tested has no tested
+    result, as no later test, given more, can run on more rows: it leaves the candidates after
+    that round, so no test conditions on it, and is no parent; with ``undecided``, it is appended
+    there. With
     ``constraints``, a forbidden link is no candidate, and a required one is never tested: it
     stays, with the strength of a partial correlation of ``1``. With ``max_depth``, the rounds
     stop after ``p = max_depth``, so no test conditions on more.
@@ -372,9 +376,12 @@ def pc1(
             )
         strength = np.fmin(strength, np.abs(statistics))
         kept = np.flatnonzero(~(p_values > pc_alpha))
-        # A candidate whose every test so far was not tested has no strength: it ranks last.
-        unranked = np.isinf(strength[kept])
-        kept = kept[np.lexsort((tie[kept], -np.round(strength[kept], KEY_DP), unranked))]
+        if p == 0:  # a candidate with no tested result conditions no test
+            unranked = kept[np.isinf(strength[kept])]
+            if undecided is not None:
+                undecided.extend((int(c) % n_vars, int(c) // n_vars) for c in columns[unranked])
+            kept = kept[np.isfinite(strength[kept])]
+        kept = kept[np.lexsort((tie[kept], -np.round(strength[kept], KEY_DP)))]
         columns, strength, tie = columns[kept], strength[kept], tie[kept]
         p += 1
     return tuple((int(c) % n_vars, int(c) // n_vars) for c in columns)

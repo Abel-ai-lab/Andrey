@@ -345,7 +345,9 @@ def test_a_small_block_gives_a_p_value_or_raises(name):
                 assert str(error).endswith(MORE_ROWS)
             else:  # too few rows or no degrees of freedom: not tested
                 zero_dof = hasattr(ci._CI_REGISTRY[name], "zero_dof_pvalue") or name == "gsq"
-                assert 0.0 <= p <= 1.0 or (np.isnan(p) and (rows < test.least_rows(size) or zero_dof))
+                assert 0.0 <= p <= 1.0 or (
+                    np.isnan(p) and (rows < test.least_rows(size) or zero_dof)
+                )
 
 
 def test_a_registered_test_with_p_values_only_reports_statistics_under_deletion(monkeypatch):

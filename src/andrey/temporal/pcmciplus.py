@@ -111,12 +111,11 @@ class PCMCIPlusResult:
 
 class Recorder:
     """Passes queries to ``test``; keeps each column pair's largest p-value and its statistic, of
-    the queries that were tested, and in ``skipped`` the pairs with a query that was not."""
+    the queries that were tested."""
 
     def __init__(self, test: LinkTest) -> None:
         self.test = test
         self.largest: dict[tuple[int, int], tuple[float, float]] = {}
-        self.skipped: set[tuple[int, int]] = set()
 
     def statistic_pvalues(
         self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
@@ -128,12 +127,29 @@ class Recorder:
             p_values.tolist(),
         ):
             if math.isnan(p_value):  # not tested: no p-value to keep
-                self.skipped.add(pair)
                 continue
             best = self.largest.get(pair)
             if best is None or p_value > best[1]:
                 self.largest[pair] = (statistic, p_value)
         return statistics, p_values
+
+
+def mark_undecided(
+    adjacency: np.ndarray,
+    p_values: np.ndarray,
+    statistics: np.ndarray,
+    undecided: np.ndarray,
+    untested: list[list[Link]],
+) -> None:
+    """Mark, in place, the links phase 2's ``undecided`` misses: each lagged link of
+    ``untested[j]``, which has no tested result, stays adjacent and undecided. An undecided link
+    gets :data:`~andrey.core.ci_missing.NOT_TESTED` as its p-value and statistic."""
+    for j, links in enumerate(untested):
+        for i, lag in links:
+            adjacency[lag, i, j] = undecided[lag, i, j] = True
+            p_values[lag, i, j] = NOT_TESTED
+    p_values[undecided] = NOT_TESTED
+    statistics[np.isnan(p_values)] = NOT_TESTED
 
 
 def lagged_parents(
@@ -144,13 +160,19 @@ def lagged_parents(
     ranks: Sequence[int],
     constraints: LaggedConstraints | None = None,
     max_depth: int | None = None,
+    undecided: list[list[Link]] | None = None,
 ) -> tuple[tuple[Link, ...], ...]:
     """Phase 1: the PC1 lagged parents of every variable, strongest first; ``max_depth`` caps
-    PC1's conditioning sets."""
-    return tuple(
-        pc1(test, n_vars, j, tau_max, pc_alpha, ranks, constraints, max_depth)
+    PC1's conditioning sets. With ``undecided``, entry ``j`` gets the candidates of variable
+    ``j`` with no tested result (:func:`~andrey.temporal.pcmci.pc1`)."""
+    lists: list[list[Link]] = [[] for _ in range(n_vars)]
+    parents = tuple(
+        pc1(test, n_vars, j, tau_max, pc_alpha, ranks, constraints, max_depth, lists[j])
         for j in range(n_vars)
     )
+    if undecided is not None:
+        undecided.extend(lists)
+    return parents
 
 
 def _conditions(
@@ -199,9 +221,10 @@ def skeleton(
 ]:
     """Phase 2: return ``(adjacency, largest p-values, their statistics, sepsets, undecided)``.
 
-    ``undecided`` marks the adjacent links one of whose tests was not tested
-    (:data:`~andrey.core.ci_missing.NOT_TESTED`); such a test neither removes a link nor sets its
-    strength or largest p-value.
+    ``undecided`` marks the adjacent links that have a test not tested
+    (:data:`~andrey.core.ci_missing.NOT_TESTED`) and none tested; such a test neither removes a link
+    nor sets its strength or largest p-value, and a lag-0 neighbor whose link is undecided after a
+    round is left out of the subsets of later rounds, so no test conditions on it.
 
     The p-value array holds ``-1`` for a link phase 2 never tested. ``ranks`` holds each
     variable's :func:`~andrey.core.ties.tie_ranks`: a lag-0 pair is tested first from its end of
@@ -275,16 +298,18 @@ def skeleton(
                 if lag == 0:
                     sepsets[(j, 0, i)] = subsets[separating[0]]
         p += 1
+        # A lag-0 neighbor whose link has no tested result conditions no test.
+        conditioning = adjacency[0] & ~(skipped[0] & (p_values[0] < 0))
         neighbors = [
             tuple(
                 sorted(
-                    np.flatnonzero(adjacency[0, :, j] & pool).tolist(),
+                    np.flatnonzero(conditioning[:, j] & pool).tolist(),
                     key=lambda k: (-round(float(strength[0, k, j]), KEY_DP), ranks[k], k),
                 )
             )
             for j in range(n_vars)
         ]
-    return adjacency, p_values, statistics, sepsets, adjacency & skipped
+    return adjacency, p_values, statistics, sepsets, adjacency & skipped & (p_values < 0)
 
 
 def _neighbors(adjacency: np.ndarray, j: int) -> list[int]:
@@ -569,17 +594,14 @@ def run_phases(
     them: lag 0 is left as tested, and the corrected values decide no link.
     """
     recorder = Recorder(test)
-    parents = lagged_parents(recorder, n_vars, tau_max, pc_alpha, ranks, constraints, max_depth)
+    untested: list[list[Link]] = []
+    parents = lagged_parents(
+        recorder, n_vars, tau_max, pc_alpha, ranks, constraints, max_depth, untested
+    )
     adjacency, p_values, statistics, sepsets, undecided = skeleton(
         test, n_vars, parents, tau_max, pc_alpha, ranks, constraints, max_p_global
     )
-    # An adjacent link no test with rows decided has no largest p-value.
-    p_values[undecided & (p_values < 0)] = NOT_TESTED
-    # A lagged link phase 1 kept past a query not tested might have been removed by it.
-    for x, j in recorder.skipped:
-        lag, i = divmod(x, n_vars)
-        undecided[lag, i, j] |= bool(lag and adjacency[lag, i, j])
-    statistics[np.isnan(p_values)] = NOT_TESTED
+    mark_undecided(adjacency, p_values, statistics, undecided, untested)
     for (x, j), (statistic, p_value) in recorder.largest.items():
         lag, i = divmod(x, n_vars)
         if p_values[lag, i, j] < 0:  # removed in phase 1
