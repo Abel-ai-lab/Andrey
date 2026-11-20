@@ -310,9 +310,9 @@ def _advises_more_rows(error) -> None:
     ("name", "size"), [*((name, size) for name in PARTIAL for size in (1, 2)), ("chisq", 1)]
 )
 def test_a_test_with_too_few_rows_is_not_tested_and_counted(name, size):
-    """A partial-correlation test needs ``|S| + 3`` rows, the rows of its degrees of freedom."""
+    """A partial-correlation test needs the rows that leave it one degree of freedom."""
     make, _ = TESTS[name]
-    least = size + 3 if name in PARTIAL else 2
+    least = {"student_t": size + 3, "chisq": 2}.get(name, size + 4)
     x = make()[:40]
     x[least - 1 :, 0] = np.nan  # column 0 observed on least - 1 rows
     test = make_indep_test(name, x)
@@ -325,8 +325,9 @@ def test_a_test_with_too_few_rows_is_not_tested_and_counted(name, size):
         "not_tested": 1,
         "undecided_pairs": [[0, 1]],
     }
-    x[least - 1, 0] = 1.0  # one row more: the test runs
-    assert 0.0 <= make_indep_test(name, x)(0, 1, list(range(2, 2 + size))) <= 1.0
+    if name in PARTIAL:  # one row more: the test runs, with one degree of freedom
+        x[least - 1, 0] = 1.0
+        assert 0.0 <= make_indep_test(name, x)(0, 1, list(range(2, 2 + size))) <= 1.0
 
 
 @pytest.mark.parametrize("name", list(TESTS))
@@ -342,8 +343,9 @@ def test_a_small_block_gives_a_p_value_or_raises(name):
             except ValueError as error:
                 assert f"the {rows} rows where all" in str(error)
                 assert str(error).endswith(MORE_ROWS)
-            else:  # too few rows for the test: not tested
-                assert 0.0 <= p <= 1.0 or (np.isnan(p) and rows < test.least_rows(size))
+            else:  # too few rows or no degrees of freedom: not tested
+                zero_dof = hasattr(ci._CI_REGISTRY[name], "zero_dof_pvalue") or name == "gsq"
+                assert 0.0 <= p <= 1.0 or (np.isnan(p) and (rows < test.least_rows(size) or zero_dof))
 
 
 def test_a_registered_test_with_p_values_only_reports_statistics_under_deletion(monkeypatch):
@@ -851,19 +853,23 @@ def test_every_registered_test_counts_the_queries_it_answers_with_p_one(name):
         with rows_tested() as rows:
             answers = [p for p in (_ask(test, q, path) for q in queries) if p is not None]
         ones = sum(p == 1.0 for p in answers)
-        assert answers and sum(rows.values()) == len(answers), (name, path)
+        skipped = sum(np.isnan(p) for p in answers)
+        assert answers and sum(rows.values()) == len(answers) - skipped, (name, path)
+        assert rows.total_not_tested() == skipped, (name, path)
         assert rows.p_one == ones, (name, path)
         assert rows_metadata(rows).get("p_one_tests", 0) == ones, (name, path)
 
 
-@pytest.mark.parametrize("name", ["fisherz", "normal_scores", "chisq", "gsq", "degen_gauss"])
-def test_a_test_with_no_degrees_of_freedom_left_answers_p_one_and_is_counted(name):
+@pytest.mark.parametrize(
+    "name", ["fisherz", "normal_scores", "chisq", "gsq", "degen_gauss", "cond_gauss"]
+)
+def test_a_test_with_no_degrees_of_freedom_left_is_not_tested(name):
     x, mask, queries = _starved_queries(name)
     test = make_indep_test(name, x, categorical=mask)
     with rows_tested() as rows:
-        answers = [test(*q) for q in queries]
-    assert 1.0 in answers and rows.p_one >= 1
-    assert rows.p_one < len(queries)  # the tests with degrees of freedom are not counted
+        answers = np.array([test(*q) for q in queries])
+    assert np.isnan(answers).any() and rows.p_one == 0
+    assert rows.total_not_tested() == np.isnan(answers).sum() < len(queries)
 
 
 def test_a_registered_test_is_counted_as_the_shipped_ones_are(monkeypatch):
@@ -879,18 +885,19 @@ def test_a_registered_test_is_counted_as_the_shipped_ones_are(monkeypatch):
     assert rows.p_one == 3 and sum(rows.values()) == 4
 
 
-def test_a_fit_records_the_tests_answered_p_one_only_when_it_has_some():
+def test_a_fit_records_tests_without_degrees_of_freedom_as_not_tested():
     rng = np.random.default_rng(2)
     x = rng.standard_normal(60)
     data = np.column_stack(
         [x, x + 0.3 * rng.standard_normal(60), x + 0.3 * rng.standard_normal(60)]
     )
     data[4:, 2] = np.nan  # the tests that read column 2 and a conditioner read 4 rows: no df left
-    assert andrey.pc(data, indep_test="fisherz").metadata["p_one_tests"] >= 1
-    assert "p_one_tests" not in andrey.pc(data, indep_test="student_t").metadata
+    fisher = andrey.pc(data, indep_test="fisherz").metadata
+    assert fisher["not_tested"] >= 1 and "p_one_tests" not in fisher
+    student = andrey.pc(data, indep_test="student_t").metadata
+    assert "not_tested" not in student and "p_one_tests" not in student
     out = andrey.pc(_one_category_where_observed(), indep_test="chisq")
-    assert out.metadata["p_one_tests"] >= 1
-    assert out.metadata["rows_tested"]["min"] == 30
+    assert out.metadata["not_tested"] >= 1 and "p_one_tests" not in out.metadata
     assert "p_one_tests" not in andrey.pc(_gaps(_categorical(), 0.05), indep_test="chisq").metadata
     assert "p_one_tests" not in andrey.pc(_gaps(_continuous(400), 0.1)).metadata
     assert "p_one_tests" not in andrey.pc(_categorical(), indep_test="chisq").metadata

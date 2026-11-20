@@ -156,9 +156,8 @@ class RowCounts(Counter[int]):
 
     Every query a :class:`TestwiseDeletion` answers is counted here, whichever test it runs and
     whichever way it is asked, by :meth:`add`. A tested query counts its row count, and ``p_one``
-    when its p-value is exactly ``1``: a test with no degrees of freedom left, as a table with one
-    category, answers so by design, with no evidence for or against independence, and so does a
-    test whose statistic is exactly zero. A query answered :data:`NOT_TESTED` counts in
+    when its p-value is exactly ``1``, as a test whose statistic is exactly zero answers. A query
+    answered :data:`NOT_TESTED`, which a query with zero degrees of freedom is, counts in
     ``not_tested``, by its pair of the test's columns, ``(x, y)`` with ``x < y``. ``largest`` keeps
     each tested pair's largest p-value, which tells whether a tested query separated it.
     """
@@ -261,8 +260,9 @@ def rows_metadata(
     ``median`` the median over the tests, the mean of the two middle counts when the number of
     tests is even; ``{"min": 0, "median": 0}`` when no query was tested. ``"p_one_tests"``,
     present when it is not zero, is the number of tests answered ``p = 1`` that a
-    :class:`RowCounts` holds, whichever test it is: a test with no degrees of freedom left answers
-    so, and reads as independence without evidence. ``"not_tested"``, present when it is not zero,
+    :class:`RowCounts` holds, whichever test it is, as a test whose statistic is exactly zero
+    answers; a query with zero degrees of freedom is not tested, not counted there.
+    ``"not_tested"``, present when it is not zero,
     is the number of queries not tested (:data:`NOT_TESTED`). With ``alpha``, the level a tested
     query separates a pair at, ``"undecided_pairs"`` lists the pairs of :meth:`RowCounts.undecided`
     as ``[a, b]`` lists of ``name(column)`` by :func:`named_pairs`; ``name`` keeps the 0-based
@@ -326,7 +326,9 @@ class TestwiseDeletion:
 
     A query whose block has fewer rows than its test needs (:meth:`least_rows`) is not tested: its
     rows are counted from the observed masks, no test is built, and it answers
-    :data:`NOT_TESTED`, counted in the running :func:`rows_tested` counter with its pair. A query
+    :data:`NOT_TESTED`, counted in the running :func:`rows_tested` counter with its pair. So is a
+    query with zero degrees of freedom: a test with ``zero_dof_pvalue`` (the chi-square, G-square,
+    degenerate and conditional Gaussian tests) answers :data:`NOT_TESTED` there. A query
     raises ``ValueError`` when a continuous column is constant on the block, as a constant column
     of the data is rejected before a fit, and when the test fails on the block or gives a p-value
     that is not a number, as a mixed-data test can on a block with fewer rows than columns. A
@@ -350,6 +352,9 @@ class TestwiseDeletion:
         Raise :class:`~andrey.core.score.CopiedColumnsError` when a partial-correlation block holds
         columns that repeat others up to scale and shift, as
         :func:`~andrey.core.ci.make_indep_test` does on complete data.
+    least : callable or None
+        ``least(size)``, the fewest rows the test answers a query given ``size`` conditioning
+        variables on, with degrees of freedom left; ``None`` for ``2``, the fewest any test reads.
     """
 
     def __init__(
@@ -361,8 +366,10 @@ class TestwiseDeletion:
         test_class: type | None,
         continuous: np.ndarray | None,
         check_copies: bool,
+        least: Callable[[int], int] | None = None,
     ) -> None:
         self._data = data
+        self._least = least
         self._observed = ~np.isnan(data)
         self._build = build
         self._name = name
@@ -403,12 +410,12 @@ class TestwiseDeletion:
         )
 
     def least_rows(self, size: int) -> int:
-        """The fewest rows a query given ``size`` conditioning variables is tested on: ``size + 3``
-        for a partial-correlation test (``"fisherz"``, ``"student_t"``, ``"normal_scores"``), the
-        rows a Fisher z needs for its degrees of freedom, ``n - size - 3``, to reach ``0`` and a
-        Student t for its own, ``n - size - 2``, to reach ``1``; ``2`` for every other test, the
-        fewest rows any test reads."""
-        return size + 3 if self._partial else 2
+        """The fewest rows a query given ``size`` conditioning variables is tested on: the test's
+        own ``least_rows(size, **options)`` where it has one, as a partial-correlation test has,
+        ``size + 4`` for a Fisher z (``"fisherz"``, ``"normal_scores"``) and ``size + 3`` for a
+        Student t, the rows that leave one degree of freedom, and a CMIknn with an int ``k_cmi``,
+        ``k_cmi + 1``; ``2`` for every other test, the fewest rows any test reads."""
+        return 2 if self._least is None else self._least(size)
 
     def statistic_pvalues(
         self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
@@ -461,6 +468,10 @@ class TestwiseDeletion:
         except (ValueError, ArithmeticError) as error:
             raise self._failed(rows, f": {error}") from error
         p = np.asarray(out[-1] if isinstance(out, tuple) else out, dtype=np.float64)
+        if not_tested(p).all() and hasattr(test, "zero_dof_pvalue"):  # zero degrees of freedom
+            if counter is not None:
+                self._count(counter, [rows], [NOT_TESTED], np.array([[x, y]]))
+            return untested
         if not np.isfinite(p).all():
             raise self._failed(rows, " gives no p-value")
         if counter is not None:
@@ -538,6 +549,8 @@ class TestwiseDeletion:
         another error of the build raises as :meth:`_query` says."""
         try:
             test = self._build(block, columns)
+            if hasattr(test, "zero_dof_pvalue"):
+                test.zero_dof_pvalue = NOT_TESTED  # ty: ignore[invalid-assignment]
             if self._check_copies:
                 groups = test.copies()  # ty: ignore[unresolved-attribute]  # gated by _partial
                 if groups:
@@ -669,6 +682,7 @@ class GaussianDeletion(PartialCorrelationDeletion):
         test_class: type | None,
         continuous: np.ndarray | None,
         check_copies: bool,
+        least: Callable[[int], int] | None = None,
     ) -> None:
         super().__init__(
             data,
@@ -677,6 +691,7 @@ class GaussianDeletion(PartialCorrelationDeletion):
             test_class=test_class,
             continuous=continuous,
             check_copies=check_copies,
+            least=least,
         )
         self._kind = cast("type[PartialCorrelationTest]", test_class)  # FisherZ or StudentT
         self._offset = _DF_OFFSET[self._kind]
@@ -999,6 +1014,7 @@ def testwise_deletion(
         kind = BoundedDeletion
     else:
         kind = TestwiseDeletion
+    floor = getattr(factory if test_class is None else test_class, "least_rows", None)
     return kind(
         arr,
         build,
@@ -1006,6 +1022,7 @@ def testwise_deletion(
         test_class=test_class,
         continuous=continuous,
         check_copies=check_copies,
+        least=None if floor is None else lambda size: int(floor(size, **options)),
     )
 
 
