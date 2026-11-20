@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import importlib
+import io
 import json
+import logging
 import os
 import subprocess
 import sys
 import threading
+import time
 import warnings
 
 import numpy as np
@@ -20,6 +23,7 @@ from andrey.api._method import warn_experimental
 from andrey.cli import main
 from andrey.core import backend, ci, warning_policy
 from andrey.core.ci_kernel import RCoT
+from andrey.core.warning_policy import held_records
 
 pc_module = importlib.import_module("andrey.constraint.pc")
 hc_module = importlib.import_module("andrey.search.hc")
@@ -271,3 +275,71 @@ def test_calm_does_not_warn_about_the_device(monkeypatch):
         warnings.simplefilter("always")
         andrey.calm(data, seed=0)
     assert not [w for w in _andrey_warnings(caught) if w.category is andrey.PerformanceWarning]
+
+
+def test_held_records_in_two_threads_keep_their_own_records_and_restore_the_logger():
+    """A block entered while another thread holds one waits, so neither restores a stale state."""
+    logger, log = logging.getLogger("andrey"), logging.getLogger("andrey.test")
+    before = (list(logger.handlers), logger.propagate, logger.level)
+    entered, got = threading.Event(), {}
+
+    def first():
+        with held_records() as records:
+            log.warning("first")
+            entered.set()
+            time.sleep(0.2)
+        got["first"] = [r.getMessage() for r in records]
+
+    def second():
+        entered.wait(5)
+        with held_records() as records:
+            time.sleep(0.4)  # past the end of the first block
+            log.warning("second")
+        got["second"] = [r.getMessage() for r in records]
+
+    threads = [threading.Thread(target=first), threading.Thread(target=second)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(10)
+    assert got == {"first": ["first"], "second": ["second"]}
+    assert (list(logger.handlers), logger.propagate, logger.level) == before
+
+
+@pytest.mark.parametrize("setting", ["level", "propagate", "handler"])
+def test_held_records_keep_the_records_of_an_andrey_logger_configured_apart(setting):
+    """A logger below ``andrey`` set above ``WARNING``, not propagating, or with its own handler."""
+    child = logging.getLogger("andrey.search.em")
+    seen = io.StringIO()
+    own = logging.StreamHandler(seen)
+    before = (list(child.handlers), child.propagate, child.level)
+    if setting == "level":
+        child.setLevel(logging.ERROR)
+    elif setting == "propagate":
+        child.propagate = False
+    else:
+        child.addHandler(own)
+    configured = (list(child.handlers), child.propagate, child.level)
+    try:
+        with held_records() as records:
+            child.warning("held")
+        assert (list(child.handlers), child.propagate, child.level) == configured
+    finally:
+        child.handlers, child.propagate = before[0], before[1]
+        child.setLevel(before[2])
+    assert [r.getMessage() for r in records] == ["held"] and seen.getvalue() == ""
+
+
+def test_held_records_hold_the_records_a_lower_level_lets_through():
+    logger, log = logging.getLogger("andrey"), logging.getLogger("andrey.test")
+    level = logger.level
+    try:
+        with held_records() as records:
+            log.info("dropped at the default level")
+        logger.setLevel(logging.INFO)
+        with held_records() as more:
+            log.info("held")
+        assert logger.level == logging.INFO
+    finally:
+        logger.setLevel(level)
+    assert not records and [r.getMessage() for r in more] == ["held"]

@@ -351,10 +351,9 @@ class _SkipsFirstConditioned:
         return statistics, p_values
 
 
-def test_a_lagged_link_kept_past_a_phase_1_query_not_tested_is_undecided():
+def test_a_lagged_link_kept_past_a_phase_1_query_not_tested_keeps_its_tested_result():
     n_vars, tau_max = 2, 1
     test = _SkipsFirstConditioned(x=n_vars, y=1)  # design column of X^0_{t-1}, into X^1_t
     result = pcmciplus_module.run_phases(test, n_vars, tau_max, 0.05, "majority", [0, 1])
     assert test.skipped and result.adjacency[1, 0, 1]
-    assert result.undecided[1, 0, 1]
-    assert result.undecided.sum() == 1
+    assert not result.undecided.any() and result.p_values[1, 0, 1] == 0.0

@@ -16,11 +16,11 @@ import pytest
 import andrey
 import scripts.docstring_text as shared
 from andrey.api._method import draws_random_numbers
-from andrey.core import ci
 from andrey.core.ci_missing import TESTWISE_CLAIM
 from andrey.spec import REGISTRY
 from andrey.spec.concepts import CONCEPTS
 from tests.unit.test_concepts import docstring_section as section
+from tests.unit.test_missing_values import assert_floors_match_the_tests
 
 #: The sections of a method's docstring, in order.
 SECTIONS = ["Parameters", "Returns", "Raises", "Warns", "Notes", "References", "Examples"]
@@ -67,17 +67,11 @@ def test_a_method_that_deletes_rows_per_test_states_when_that_is_valid_in_the_sh
 
 @pytest.mark.parametrize("method", [m for m in REGISTRY if REGISTRY[m].data.missing])
 def test_the_rows_a_test_needs_are_given_for_every_partial_correlation_test(method):
-    """Where Notes give ``|S| + 3`` rows to tests by name, they name each test with that floor."""
-    partial = [
-        name
-        for name, test in ci._CI_REGISTRY.items()
-        if isinstance(test, type) and issubclass(test, ci.PartialCorrelationTest)
-    ]
+    """Where Notes give ``|S| + k`` rows to tests by name, each named test needs that many, and
+    every partial-correlation test is named with its floor."""
     notes = " ".join(section(docstring(method), "Notes").split())
-    named = re.findall(r"``\|S\| \+ 3`` for ([^.]*?) and 2 for the other tests", notes)
-    assert len(named) == notes.count("``|S| + 3`` for ")
-    for tests in named:
-        assert all(f'``"{name}"``' in tests for name in partial)
+    if "|S| + " in notes:
+        assert_floors_match_the_tests(notes)
 
 
 def test_the_missing_concept_states_the_shared_sentence():

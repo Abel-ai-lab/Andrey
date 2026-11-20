@@ -95,10 +95,10 @@ NOT_TESTED = float("nan")
 #: The sentence on a query without the rows its test needs, which the docstring of every method
 #: that deletes rows per test, the ``missing`` concept, and the notice share.
 NOT_TESTED_CLAIM = (
-    "A test whose variables are observed together on fewer rows than it needs, a pair never "
-    "observed together included, is not tested: it never separates a pair and never confirms a "
-    "link, and a pair no tested set separated after such a test is listed as undecided in "
-    'metadata["undecided_pairs"].'
+    "A test whose variables are observed together on fewer rows than it needs or that has no "
+    "degrees of freedom left, a pair never observed together included, is not tested: it never "
+    "separates a pair and never confirms a link. A pair that no test with rows could decide, such "
+    'as a pair never observed together, is listed in metadata["undecided_pairs"].'
 )
 #: What the error of a test without the rows it needs advises: a test over fewer columns keeps more
 #: rows, and a dropped column is no longer there to condition on.
@@ -157,9 +157,8 @@ class RowCounts(Counter[int]):
 
     Every query a :class:`TestwiseDeletion` answers is counted here, whichever test it runs and
     whichever way it is asked, by :meth:`add`. A tested query counts its row count, and ``p_one``
-    when its p-value is exactly ``1``: a test with no degrees of freedom left, as a table with one
-    category, answers so by design, with no evidence for or against independence, and so does a
-    test whose statistic is exactly zero. A query answered :data:`NOT_TESTED` counts in
+    when its p-value is exactly ``1``, as a test whose statistic is exactly zero answers. A query
+    answered :data:`NOT_TESTED`, which a query with zero degrees of freedom is, counts in
     ``not_tested``, by its pair of the test's columns, ``(x, y)`` with ``x < y``. ``largest`` keeps
     each tested pair's largest p-value, which tells whether a tested query separated it.
     """
@@ -210,6 +209,11 @@ class RowCounts(Counter[int]):
                 pair = (a, b)
                 self.largest[pair] = max(self.largest.get(pair, -np.inf), value)
 
+    def untested(self) -> list[tuple[int, int]]:
+        """The pairs with a query that was not tested and no query that was: no test with rows
+        could decide them, as a pair never observed together."""
+        return [pair for pair in self.not_tested if pair not in self.largest]
+
     def undecided(self, alpha: float) -> list[tuple[int, int]]:
         """The pairs with a query that was not tested and no tested query with ``p > alpha``:
         no test with rows separated them, and one without rows might have."""
@@ -239,6 +243,14 @@ def rows_tested() -> Generator[RowCounts]:
         _ROWS.reset(token)
 
 
+def count_answer(rows: int, p: float, x: int, y: int) -> None:
+    """Count, in the running :func:`rows_tested` counter if any, a query of ``x`` and ``y``
+    answered ``p`` on ``rows`` rows by a test that is no :class:`TestwiseDeletion`, as MVPC's
+    indicator search answers one whose indicator is constant on its rows."""
+    if (counter := _ROWS.get()) is not None:
+        counter.add([rows], [p], [min(x, y)], [max(x, y)])
+
+
 @contextlib.contextmanager
 def rows_tested_elsewhere() -> Generator[RowCounts]:
     """:func:`rows_tested` for tests over another matrix than the data's, as MVPC's indicator
@@ -252,9 +264,7 @@ def rows_tested_elsewhere() -> Generator[RowCounts]:
 
 
 def rows_metadata(
-    counter: Mapping[int, int],
-    alpha: float | None = None,
-    name: Callable[[int], Any] = int,
+    counter: Mapping[int, int], name: Callable[[int], Any] | None = None
 ) -> dict[str, Any]:
     """Return the metadata of the tests ``counter`` holds; ``{}`` when it holds none.
 
@@ -262,19 +272,19 @@ def rows_metadata(
     ``median`` the median over the tests, the mean of the two middle counts when the number of
     tests is even; ``{"min": 0, "median": 0}`` when no query was tested. ``"p_one_tests"``,
     present when it is not zero, is the number of tests answered ``p = 1`` that a
-    :class:`RowCounts` holds, whichever test it is: a test with no degrees of freedom left answers
-    so, and reads as independence without evidence. ``"not_tested"``, present when it is not zero,
-    is the number of queries not tested (:data:`NOT_TESTED`). With ``alpha``, the level a tested
-    query separates a pair at, ``"undecided_pairs"`` lists the pairs of :meth:`RowCounts.undecided`
-    as ``[a, b]`` lists of ``name(column)`` by :func:`named_pairs`; ``name`` keeps the 0-based
-    position by default.
+    :class:`RowCounts` holds, whichever test it is, as a test whose statistic is exactly zero
+    answers; a query with zero degrees of freedom is not tested, not counted there.
+    ``"not_tested"``, present when it is not zero,
+    is the number of queries not tested (:data:`NOT_TESTED`). With ``name``, ``"undecided_pairs"``
+    lists the pairs no tested query could decide, those of :meth:`RowCounts.untested`, as
+    ``[a, b]`` lists of ``name(column)`` by :func:`named_pairs`.
     """
     skipped = counter.total_not_tested() if isinstance(counter, RowCounts) else 0
     if not counter and not skipped:
         return {}
     if not counter:
         metadata: dict[str, Any] = {"rows_tested": {"min": 0, "median": 0}}
-        return metadata | _not_tested_metadata(counter, skipped, alpha, name)
+        return metadata | _not_tested_metadata(counter, skipped, name)
     counts = sorted(counter.items())
     total = sum(n for _, n in counts)
     middle = [(total - 1) // 2, total // 2]
@@ -287,21 +297,18 @@ def rows_metadata(
     metadata = {"rows_tested": {"min": counts[0][0], "median": (values[0] + values[1]) / 2}}
     p_one = getattr(counter, "p_one", 0)
     metadata |= {"p_one_tests": p_one} if p_one else {}
-    return metadata | _not_tested_metadata(counter, skipped, alpha, name)
+    return metadata | _not_tested_metadata(counter, skipped, name)
 
 
 def _not_tested_metadata(
-    counter: Mapping[int, int],
-    skipped: int,
-    alpha: float | None,
-    name: Callable[[int], Any],
+    counter: Mapping[int, int], skipped: int, name: Callable[[int], Any] | None
 ) -> dict[str, Any]:
     """``"not_tested"`` and ``"undecided_pairs"`` of :func:`rows_metadata`."""
     if not skipped:
         return {}
     metadata: dict[str, Any] = {"not_tested": skipped}
-    if alpha is not None and isinstance(counter, RowCounts):
-        metadata["undecided_pairs"] = named_pairs(counter.undecided(alpha), name)
+    if name is not None and isinstance(counter, RowCounts):
+        metadata["undecided_pairs"] = named_pairs(counter.untested(), name)
     return metadata
 
 
@@ -327,7 +334,9 @@ class TestwiseDeletion:
 
     A query whose block has fewer rows than its test needs (:meth:`least_rows`) is not tested: its
     rows are counted from the observed masks, no test is built, and it answers
-    :data:`NOT_TESTED`, counted in the running :func:`rows_tested` counter with its pair. A query
+    :data:`NOT_TESTED`, counted in the running :func:`rows_tested` counter with its pair. So is a
+    query with zero degrees of freedom: a test with ``zero_dof_pvalue`` (the chi-square, G-square,
+    degenerate and conditional Gaussian tests) answers :data:`NOT_TESTED` there. A query
     raises ``ValueError`` when a continuous column is constant on the block, as a constant column
     of the data is rejected before a fit, and when the test fails on the block or gives a p-value
     that is not a number, as a mixed-data test can on a block with fewer rows than columns. A
@@ -351,6 +360,9 @@ class TestwiseDeletion:
         Raise :class:`~andrey.core.score.CopiedColumnsError` when a partial-correlation block holds
         columns that repeat others up to scale and shift, as
         :func:`~andrey.core.ci.make_indep_test` does on complete data.
+    least : callable or None
+        ``least(size)``, the fewest rows the test answers a query given ``size`` conditioning
+        variables on, with degrees of freedom left; ``None`` for ``2``, the fewest any test reads.
     """
 
     def __init__(
@@ -362,8 +374,10 @@ class TestwiseDeletion:
         test_class: type | None,
         continuous: np.ndarray | None,
         check_copies: bool,
+        least: Callable[[int], int] | None = None,
     ) -> None:
         self._data = data
+        self._least = least
         self._observed = ~np.isnan(data)
         self._build = build
         self._name = name
@@ -375,7 +389,21 @@ class TestwiseDeletion:
         self._cache: OrderedDict[tuple[int, ...], tuple[CITest, int, int]] = OrderedDict()
         self._held = 0
         self._source: np.ndarray | None = None
+        self._environments = np.zeros(data.shape[1], dtype=bool)
         self.pin_blas = _pins_blas(test_class, data.shape[0])
+
+    def mark_environments(self, columns: Iterable[int]) -> None:
+        """Read ``columns`` as environment indicators, as CD-NOD and FCI-JCI add: a query whose
+        block holds one of them constant is not tested, since the block's rows come from one
+        environment and no test there can tell environments apart."""
+        self._environments[list(columns)] = True
+        self._cache.clear()
+        self._held = 0
+
+    @property
+    def environments(self) -> np.ndarray:
+        """The columns :meth:`mark_environments` marked."""
+        return np.flatnonzero(self._environments)
 
     def from_columns(self, source: npt.ArrayLike) -> None:
         """Record the pairs of the queries in the counter as columns ``source[x]`` and
@@ -404,12 +432,12 @@ class TestwiseDeletion:
         )
 
     def least_rows(self, size: int) -> int:
-        """The fewest rows a query given ``size`` conditioning variables is tested on: ``size + 3``
-        for a partial-correlation test (``"fisherz"``, ``"student_t"``, ``"normal_scores"``), the
-        rows a Fisher z needs for its degrees of freedom, ``n - size - 3``, to reach ``0`` and a
-        Student t for its own, ``n - size - 2``, to reach ``1``; ``2`` for every other test, the
-        fewest rows any test reads."""
-        return size + 3 if self._partial else 2
+        """The fewest rows a query given ``size`` conditioning variables is tested on: the test's
+        own ``least_rows(size, **options)`` where it has one, as a partial-correlation test has,
+        ``size + 4`` for a Fisher z (``"fisherz"``, ``"normal_scores"``) and ``size + 3`` for a
+        Student t, the rows that leave one degree of freedom, and a CMIknn with an int ``k_cmi``,
+        ``k_cmi + 1``; ``2`` for every other test, the fewest rows any test reads."""
+        return 2 if self._least is None else self._least(size)
 
     def statistic_pvalues(
         self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
@@ -462,6 +490,10 @@ class TestwiseDeletion:
         except (ValueError, ArithmeticError) as error:
             raise self._failed(rows, f": {error}") from error
         p = np.asarray(out[-1] if isinstance(out, tuple) else out, dtype=np.float64)
+        if not_tested(p).all() and hasattr(test, "zero_dof_pvalue"):  # zero degrees of freedom
+            if counter is not None:
+                self._count(counter, [rows], [NOT_TESTED], np.array([[x, y]]))
+            return untested
         if not np.isfinite(p).all():
             raise self._failed(rows, " gives no p-value")
         if counter is not None:
@@ -487,6 +519,9 @@ class TestwiseDeletion:
         if len(rows) < self.least_rows(len(cond)):
             return None, list(columns), len(rows)
         block = self._data[rows[:, None], np.asarray(columns, dtype=np.intp)]
+        held = self._environments[list(columns)]
+        if held.any() and (np.ptp(block[:, held], axis=0) == 0).any():
+            return None, list(columns), len(rows)  # one environment only: not tested
         self._check_block(block, columns)
         test = self._new_test(block, list(columns))
         if self._reuse and block.nbytes <= _CACHE_BYTES:
@@ -539,6 +574,8 @@ class TestwiseDeletion:
         another error of the build raises as :meth:`_query` says."""
         try:
             test = self._build(block, columns)
+            if hasattr(test, "zero_dof_pvalue"):
+                test.zero_dof_pvalue = NOT_TESTED  # ty: ignore[invalid-assignment]
             if self._check_copies:
                 groups = test.copies()  # ty: ignore[unresolved-attribute]  # gated by _partial
                 if groups:
@@ -675,6 +712,7 @@ class GaussianDeletion(PartialCorrelationDeletion):
         test_class: type | None,
         continuous: np.ndarray | None,
         check_copies: bool,
+        least: Callable[[int], int] | None = None,
     ) -> None:
         super().__init__(
             data,
@@ -683,6 +721,7 @@ class GaussianDeletion(PartialCorrelationDeletion):
             test_class=test_class,
             continuous=continuous,
             check_copies=check_copies,
+            least=least,
         )
         self._kind = cast("type[PartialCorrelationTest]", test_class)  # FisherZ or StudentT
         self._offset = _DF_OFFSET[self._kind]
@@ -820,7 +859,7 @@ class GaussianDeletion(PartialCorrelationDeletion):
 
         ``rows`` is each query's row count and ``flagged`` marks the queries the exact path
         answers instead (see the class); their ``r`` and ``p`` are meaningless. A query with fewer
-        than ``|S| + 3`` rows is not flagged and answers :data:`NOT_TESTED`.
+        rows than :meth:`least_rows` is not flagged and answers :data:`NOT_TESTED`.
         """
         size = conds.shape[1]
         columns = np.empty((len(lo), size + 2), dtype=np.intp)
@@ -1057,6 +1096,7 @@ def testwise_deletion(
         kind = BoundedDeletion
     else:
         kind = TestwiseDeletion
+    floor, floor_options = _row_floor(factory, test_class, options)
     return kind(
         arr,
         build,
@@ -1064,7 +1104,39 @@ def testwise_deletion(
         test_class=test_class,
         continuous=continuous,
         check_copies=check_copies,
+        least=None if floor is None else lambda size: int(floor(size, **floor_options)),
     )
+
+
+def _row_floor(
+    factory: Callable[..., CITest], test_class: type | None, options: Mapping[str, Any]
+) -> tuple[Callable[..., int] | None, Mapping[str, Any]]:
+    """The ``least_rows`` of the test ``factory`` builds and the options it reads.
+
+    A variant registered as ``partial(make_indep_test, name, **settings)`` has the floor of the
+    test ``name`` with ``settings`` and ``options``; ``(None, options)`` when no test has one.
+    """
+    from . import ci
+
+    if test_class is not None:
+        return getattr(test_class, "least_rows", None), options
+    if (
+        isinstance(factory, partial)
+        and factory.func is ci.make_indep_test
+        and factory.args
+        and factory.args[0] in ci._CI_REGISTRY
+    ):
+        inner = ci._CI_REGISTRY[factory.args[0]]
+        return _row_floor(inner, _shipped_class(inner), {**factory.keywords, **options})
+    return getattr(factory, "least_rows", None), options
+
+
+def mark_environment(test: CITest, column: int) -> CITest:
+    """``test``, with ``column`` marked as an environment indicator when it deletes rows per test
+    (:meth:`TestwiseDeletion.mark_environments`)."""
+    if isinstance(test, TestwiseDeletion):
+        test.mark_environments([column])
+    return test
 
 
 def _block_correlations(

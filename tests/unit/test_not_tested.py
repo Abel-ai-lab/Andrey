@@ -7,12 +7,15 @@ The fixed case is a merged-cohort table: one cohort observes ``{S1, S2, S3, A}``
 
 from __future__ import annotations
 
+from functools import partial
+
 import numpy as np
 import pandas as pd
 import pytest
 
 import andrey
-from andrey.core import ARROW
+from andrey.core import ARROW, ci
+from andrey.temporal.pcmci import pc1
 
 COHORT = 300
 
@@ -63,6 +66,14 @@ def _env(df: pd.DataFrame) -> np.ndarray:
     return np.arange(len(df)) % 2
 
 
+def _cohort_env(df: pd.DataFrame) -> np.ndarray:
+    """The environment is the cohort, so it is constant on the rows that observe ``A`` or ``B``
+    when ``k = 0``; the rows that observe every column are a third environment."""
+    env = np.full(len(df), 2)
+    env[:COHORT], env[COHORT : 2 * COHORT] = 0, 1
+    return env
+
+
 TABLE_METHODS = {
     "pc": lambda df: andrey.pc(df),
     "pc_student_t": lambda df: andrey.pc(df, indep_test="student_t"),
@@ -102,7 +113,7 @@ def test_every_table_method_runs_when_a_pair_shares_few_or_no_rows(name, k):
         assert "never_observed_together" not in out.metadata
 
 
-@pytest.mark.parametrize("name", SKELETON)
+@pytest.mark.parametrize("name", [*SKELETON, "iamb", "inter_iamb", "mmpc"])
 def test_a_pair_never_observed_together_stays_adjacent_and_keeps_the_true_edges(name):
     out = TABLE_METHODS[name](_cohorts(0))
     for a, b in (("A", "B"), ("A", "S1"), ("B", "S1")):
@@ -126,6 +137,8 @@ def test_a_link_between_columns_never_observed_together_is_undecided_not_found(n
         assert out.metadata["never_observed_together"] == [["A", "B"]]
         undecided = out.metadata["undecided_pairs"]
         assert ["A at lag 1", "B"] in undecided or ["A", "B at lag 1"] in undecided
+        if name != "lpcmci":  # PC1 and phase 2 condition on no link without a tested result
+            assert all({a.split()[0], b.split()[0]} == {"A", "B"} for a, b in undecided)
         p = np.asarray(out.metadata["p_values"], dtype=np.float64)
         labels = list(out.structure.labels)
         a, b = labels.index("A"), labels.index("B")
@@ -165,3 +178,60 @@ def test_pairs_never_observed_together_are_found_in_a_table_of_text():
         }
     )
     assert never_observed_together(frame) == [["a", "c"]]
+
+
+@pytest.mark.parametrize("k", [0, 1, 2, 3])
+@pytest.mark.parametrize("method", ["cdnod", "fci_jci"])
+def test_an_environment_constant_on_a_block_is_not_tested(method, k):
+    df = _cohorts(k)
+    env = _cohort_env(df)
+    out = getattr(andrey, method)(df, env)
+    assert out.metadata["missing"] == "testwise"
+    if k == 0:  # every block that holds A or B holds one cohort, one environment
+        assert out.metadata["not_tested"] > 0
+    order = np.random.default_rng(3).permutation(len(df))
+    moved = getattr(andrey, method)(df.iloc[order].reset_index(drop=True), env[order])
+    assert np.array_equal(moved.structure.adjacency, out.structure.adjacency)
+    assert moved.metadata.get("not_tested") == out.metadata.get("not_tested")
+
+
+@pytest.mark.parametrize("name", ["iamb", "inter_iamb", "mmpc"])
+def test_a_target_set_holds_a_variable_never_observed_with_the_target(name):
+    out = getattr(andrey, name)(_cohorts(0), target="B")
+    key = "parents_and_children" if name == "mmpc" else "markov_blanket"
+    assert {"A", "S1"} <= set(out.metadata[key])
+    assert ["A", "B"] in out.metadata["undecided_pairs"]
+
+
+class _InfiniteStatistic:
+    """A link test answering every query of ``given`` columns: candidate 2 has an infinite statistic
+    and a p-value of 0, candidate 3 is not tested."""
+
+    def statistic_pvalues(self, x, y, conditions):
+        statistics = np.where(x == 2, np.inf, np.nan)
+        return statistics, np.where(x == 2, 0.0, np.nan)
+
+
+def test_a_tested_candidate_with_an_infinite_statistic_stays_a_parent():
+    undecided: list = []
+    parents = pc1(_InfiniteStatistic(), 2, 0, 1, 0.05, [0, 1], max_depth=0, undecided=undecided)
+    assert parents == ((0, 1),) and undecided == [(1, 1)]
+
+
+def test_markov_check_rejects_a_nan_no_deletion_counted(monkeypatch):
+    df = _cohorts(1).fillna(0.0)
+    dag = andrey.pc(df)
+    failing = lambda data, **options: lambda x, y, s=(): float("nan")  # noqa: E731
+    monkeypatch.setitem(ci._CI_REGISTRY, "fisherz", failing)
+    with pytest.raises(ValueError, match="outside"):
+        andrey.markov_check(dag, df, indep_test="fisherz", seed=0)
+
+
+def test_a_registered_variant_keeps_the_row_floor_of_its_test(monkeypatch):
+    variant = partial(ci.make_indep_test, "cmiknn", k_cmi=5)
+    monkeypatch.setitem(ci._CI_REGISTRY, "cmiknn_k5", variant)
+    x = np.random.default_rng(0).standard_normal((60, 3))
+    x[5:, 1] = np.nan  # column 1 observed on 5 rows, fewer than the 6 that k_cmi=5 needs
+    test = ci.make_indep_test("cmiknn_k5", x)
+    assert test.least_rows(0) == 6
+    assert np.isnan(test(0, 1))

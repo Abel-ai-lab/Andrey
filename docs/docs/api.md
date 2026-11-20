@@ -111,18 +111,18 @@ which means that whether a value is missing depends on no value in the data; the
 are then a random sample of all rows, and otherwise they are a selected sample that more rows do not
 correct. Their argument `missing` names the handling: `"testwise"` is test-wise deletion, and
 `None`, the default, picks the method's default handling, `"testwise"`, and logs one notice per
-process that names it; `metadata["missing"]` records the one a fit used. A test with zero degrees of
-freedom returns a p-value of 1, and `metadata["p_one_tests"]`, present when it is not zero, counts
-every test of the fit that returned a p-value of 1, whichever test it is. In the
-conditional-independence searches, a test with fewer rows than it needs is not tested: it never
-separates a pair and never confirms a link; the pair methods instead raise `ValueError` when fewer
-than 2 rows observe both columns.
-`metadata["not_tested"]` counts those tests, `metadata["undecided_pairs"]` lists the pairs one of
-them might have separated, and `metadata["never_observed_together"]` the pairs of columns no row
+process that names it; `metadata["missing"]` records the one a fit used. In the
+conditional-independence searches, a test with fewer rows than it needs, or with zero degrees of
+freedom left, is not tested: it never separates a pair and never confirms a link; the pair methods
+instead raise `ValueError` when fewer than 2 rows observe both columns. `metadata["p_one_tests"]`,
+present when it is not zero, counts the tests that returned a p-value of 1.
+`metadata["not_tested"]` counts those tests, `metadata["undecided_pairs"]` lists the pairs no tested
+query could decide, and `metadata["never_observed_together"]` the pairs of columns no row
 observes together. `pc` also takes
 `missing="mvpc"`: Missing-Value PC (Tu et al., 2019) finds the parents of each missingness indicator
 and tests again the edges they could have kept; `metadata["corrected_edges"]["rows_tested"]` gives
-the fewest and the median rows such a test read.
+the fewest and the median rows such a test read, and `metadata["corrected_edges"]["p_one_tests"]`,
+present when it is not zero, counts those that returned a p-value of 1.
 `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm`, whose
 fits read the data only through their covariance, refuse missing values under `None` and take
 `missing="em"`: structural EM runs the search on the expected covariance of the data in rounds,
@@ -145,9 +145,9 @@ last round still changed the graph in 2 to 6% of the fits, and in 20% of `grasp`
 reference implementation exists to compare them with; the benchmark reports their results beside the
 baselines. A value a method does not list raises a `ValueError` that names the values it takes. A
 column with no observed value, or a constant one over its observed values, raises a `ValueError`
-before the fit, and a test with fewer rows than it needs, `|S| + 3` for the partial-correlation
-tests (`"fisherz"`, `"student_t"`, and `"normal_scores"`) and 2 for the other tests, raises one
-during it. `cdnod` and `fci_jci` need a complete `env`. Every other method raises a `ValueError`
+before the fit. A test needs, where its variables are observed, `|S| + 4` rows for `"fisherz"` and
+`"normal_scores"`, `|S| + 3` for `"student_t"` and `"cond_gauss"`, and 2 for most other tests; a
+test with fewer is not tested. `cdnod` and `fci_jci` need a complete `env`. Every other method raises a `ValueError`
 that names it and says what to do instead, as
 [Missing values](guides/getting-started.md#missing-values) describes; each method's Notes say why.
 

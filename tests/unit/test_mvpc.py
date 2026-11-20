@@ -12,9 +12,10 @@ import pandas as pd
 import pytest
 
 import andrey
+from andrey.constraint import mvpc
 from andrey.constraint.mvpc import IndicatorTest, PermutationCorrection, candidate_edges
 from andrey.core.ci import FisherZ, make_indep_test
-from andrey.core.ci_missing import rows_tested
+from andrey.core.ci_missing import rows_metadata, rows_tested
 from andrey.data import missingness
 from tests.recovery.test_mvpc import figure_1b
 
@@ -125,6 +126,18 @@ def test_a_corrected_test_with_too_few_rows_is_the_deletion_test():
     assert not test.rows  # no query was corrected
 
 
+def test_a_corrected_test_needs_the_rows_that_leave_its_test_a_degree_of_freedom():
+    X = np.random.default_rng(0).standard_normal((40, 3))
+    X[3:, 2] = np.nan  # x, y, and the parent w observed together on 3 rows
+    fisher = _correction(X, {1: [2]})
+    assert fisher(0, 1) == make_indep_test("fisherz", X)(0, 1)  # needs |S| + 4 = 4 rows
+    assert fisher.uncorrected == {(0, 1)} and not fisher.rows
+    deletion = make_indep_test("student_t", X)
+    student = PermutationCorrection(X, "student_t", {1: [2]}, ~np.eye(3, dtype=bool), deletion, 0)
+    student(0, 1)  # needs |S| + 3 = 3 rows
+    assert not student.uncorrected and student.rows == {3: 1}
+
+
 def _gapped(seed: int) -> np.ndarray:
     """Figure 1b with rows that miss ``x`` or the indicator's parent ``w``, whatever they hold."""
     X = figure_1b(seed)
@@ -157,6 +170,29 @@ def test_a_fit_records_the_fewest_and_the_median_rows_its_corrected_tests_read(s
     assert out.metadata["corrected_edges"]["rows_tested"] == {"min": complete, "median": complete}
     assert complete < pair
     assert out.metadata["rows_tested"]["median"] > complete
+
+
+def test_a_corrected_test_that_returns_one_counts_with_the_corrected_tests(monkeypatch):
+    class Flat:
+        """A partial-correlation test whose statistic is exactly zero."""
+
+        least_rows = FisherZ.least_rows
+
+        def __init__(self, data):
+            pass
+
+        def __call__(self, x, y, condition_set=()):
+            return 1.0
+
+    monkeypatch.setitem(mvpc.PERMC_TESTS, "fisherz", Flat)
+    test = _correction(_gapped(0), {1: [2]})
+    with rows_tested() as rows:
+        assert test(0, 1) == 1.0
+    assert rows_metadata(test.rows)["p_one_tests"] == 1
+    assert not rows  # the corrected tests count under their own key
+    out = andrey.pc(_gapped(0), missing="mvpc")
+    assert out.metadata["corrected_edges"]["p_one_tests"] >= 1
+    assert out.metadata["corrected_edges"]["removed"]
 
 
 def _blocked(seed: int, n: int = 450) -> np.ndarray:
@@ -197,8 +233,31 @@ def test_an_indicator_constant_on_a_query_rows_separates_the_pair():
     R = X.copy()
     R[:, 0] = np.isnan(X[:, 0])
     test = IndicatorTest(make_indep_test("fisherz", R), R, 0)
-    assert test(0, 1) == 1.0
+    with rows_tested() as rows:
+        assert test(0, 1) == 1.0
+    assert rows.p_one == 1 and rows == {45: 1}  # a test of the 45 rows that observe column 1
     assert test(0, 2) < 1.0
+
+
+def test_an_indicator_constant_on_fewer_rows_than_the_test_needs_is_not_tested():
+    X = np.random.default_rng(0).standard_normal((50, 3))
+    X[3:, 1] = np.nan  # column 1 observed on 3 rows, fewer than the 4 a Fisher z needs
+    R = X.copy()
+    R[:, 0] = 0.0  # an indicator constant everywhere
+    test = IndicatorTest(make_indep_test("fisherz", R), R, 0)
+    with rows_tested() as rows:
+        assert np.isnan(test(0, 1))
+    assert rows.not_tested == {(0, 1): 1} and rows.p_one == 0 and not rows
+
+
+def test_an_indicator_constant_on_few_rows_leaves_the_fewest_rows_tested_at_the_floor():
+    X = np.random.default_rng(0).standard_normal((60, 3))
+    X[:, 2] += X[:, 0]
+    X[3:, 1] = np.nan  # column 1 observed on 3 rows
+    X[30:40, 2] = np.nan  # column 2 observed on all of them: its indicator is constant there
+    metadata = andrey.pc(X, missing="mvpc").metadata
+    assert metadata["rows_tested"]["min"] >= 4  # a Fisher z with no conditioning set needs 4
+    assert "p_one_tests" not in metadata
 
 
 def test_an_indicator_query_without_rows_is_not_tested_and_counted():
