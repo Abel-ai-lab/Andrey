@@ -12,9 +12,21 @@ names its pull request.
 
 ### Added
 
+- A test-wise test with fewer rows than it needs, a pair never observed together included, or with
+  zero degrees of freedom left is not tested: it never separates a pair and never confirms a link,
+  in every conditional-independence search that deletes rows per test; `markov_check` leaves such
+  facts out of its summary and of its sparse-table warning. `metadata["not_tested"]` counts the
+  conditioning sets not tested, including those the search skipped because no row can test them,
+  `metadata["undecided_pairs"]` lists the pairs no tested query could decide, and
+  `metadata["never_observed_together"]` the pairs of columns no row observes together; the notice
+  for `missing=None` gives the number of each kind of pair, over every fit of a `bootstrap`, and
+  names them when there are at most five. A pair no tested query could decide stays adjacent in PC,
+  FCI, CD-NOD, and FCI-JCI and in the Markov-blanket searches' sets; PCMCI, PCMCI+, and J-PCMCI+
+  condition no test on a lagged parent without a tested result, and LPCMCI none on a node whose
+  link to either end of the tested pair has none. ([#1151], [#1156])
+
 - `metadata["p_one_tests"]` counts every test of a fit on data with missing values that returned
-  `p = 1`, whichever test it is; a test with zero degrees of freedom answers so by design.
-  ([#1102])
+  `p = 1`, whichever test it is, as a test whose statistic is exactly zero answers. ([#1102])
 - `metadata["em"]` records `rows_dropped`, the rows dropped for observing no value, and
   `min_shared_rows`, the fewest rows that observe both columns of a pair. A fit whose every missing
   value sat in a dropped row records its handling too. ([#1102])
@@ -29,6 +41,32 @@ names its pull request.
 
 ### Changed
 
+- With `fisherz` and `student_t` on data with missing values, test-wise deletion groups the rows by
+  their missingness patterns once and computes a test's sums from the groups' tables, removing the
+  scattered missing cells exactly, when that costs less than summing every row; a query whose
+  groups hold too few rows for it is not tested without a scan. On synthetic merged cohorts, with
+  or without a few rows that observe every column, `pc` ran 2.5 to 6.6 times faster, and `iamb`
+  1.6 to 4.2 times, with the same graphs, the same tests not tested, and the same
+  row counts for every tested query. Data missing completely at random keep the per-row sums, and
+  so do series with outages, where nearly every pair of columns is observed together in about half
+  the rows or more. P-values change in their last digits. Six `ANDREY_TESTWISE_GROUP_*` settings
+  set when the path is used. ([#1148])
+- The Markov-blanket searches count a conditioning set that holds a column no row observes with the
+  tested pair, or with a collider's middle variable, as not tested without building its query. On
+  synthetic merged cohorts of 50 columns with 134 pairs never observed together, `iamb` finished in
+  17 s where it ran past 14 minutes, with the same graph and counts. Under test-wise deletion,
+  their spouse step now tests both candidate sets of each size, so `metadata["not_tested"]` no
+  longer depends on the column order. ([#1148])
+- A test-wise test with too few rows no longer raises `ValueError`, nor does a CD-NOD or FCI-JCI
+  test whose `env` is constant on its rows: both are not tested. Each test sets its own row floor:
+  `fisherz` and `normal_scores` need `|S| + 4` rows, `cond_gauss` `|S| + 3`, and `cmiknn` with an
+  int `k_cmi` `k_cmi + 1`. LPCMCI's collider votes leave a triple ambiguous when a subset not tested
+  could change the verdict. On the command line, a number that is not finite, as the p-value of a
+  test not tested, is `null` in the JSON output. A test variant registered as
+  `partial(make_indep_test, "cmiknn", k_cmi=5)` keeps the row floor of its test. In
+  `markov_check`, a p-value that is `NaN` though no row shortage explains it raises, as one
+  outside `[0, 1]` does. In the PCMCI family, a lagged candidate is undecided when its first test
+  is not tested, whatever its statistic. ([#1151])
 - With `missing=None` on data with missing values, a method whose tests delete rows logs one notice
   per process that names the handling, test-wise deletion, and when it is valid. Pass
   `missing="testwise"` to choose it by name. `bootstrap` logs it once for all of its worker
@@ -44,6 +82,9 @@ names its pull request.
   values can remove a common cause of the columns that stay. ([#1102])
 - `missing="em"` raises `ValueError` when two columns share no observed row, as the data hold no
   covariance for them. Such data ran before, on a covariance the model alone supplied. ([#1102])
+- On data with missing values, `fisherz` and `student_t` p-values with a conditioning set can
+  differ from 0.18.0 in the last digits (relative change up to about 1e-11 measured), as each
+  block's sums run in a fixed order; graphs are unchanged on the fits compared. ([#1142])
 
 ### Fixed
 
@@ -51,8 +92,33 @@ names its pull request.
   reason: the cited result covers another procedure. Every method that deletes rows per test now
   states one shared sentence, valid when values are missing completely at random, and the guide's
   text on `None` and on structural EM is corrected. ([#1102])
-- The docs name `normal_scores` among the tests that need `|S| + 3` rows where their variables are
-  observed; they gave it the 2 rows of the other tests. ([#1102])
+- The docs name `normal_scores` among the partial-correlation tests that need more rows where their
+  variables are observed; they gave it the 2 rows of the other tests. ([#1102])
+- On data with missing values, a `fisherz` or `student_t` query gets the same statistic and
+  p-value, bit for bit, whether it is asked alone or with other queries, in any order. On more
+  than 8,192 rows the last bits followed the queries computed with it. ([#1142])
+- A test-wise fit that runs no test on data with missing values, such as `pc` on one column, sets
+  `metadata["missing"]`, gives `metadata["rows_tested"]` as `{"min": 0, "median": 0}`, and logs
+  the notice of the default handling under `missing=None`. ([#1151])
+- `pc(missing="mvpc")` counts the corrected tests that return a p-value of 1 in
+  `metadata["corrected_edges"]["p_one_tests"]`. An indicator query whose rows hold one value of the
+  indicator, and so carry no information on it, or fewer rows than its test needs is not tested, as
+  every test-wise test is, where it returned `p = 1`: it counts in `metadata["not_tested"]`, and its
+  rows no longer count in `metadata["rows_tested"]`. A column on whose observed rows the indicator
+  holds one value conditions no test of that indicator and, as before, is not its parent, and a
+  column that a tested query kept adjacent stays a parent when a later query of it is not tested;
+  the parents and graphs of the fits compared are unchanged. A corrected test needs the rows that
+  leave its test a degree of freedom, `|S| + 4` for `fisherz`, or the pair keeps its test-wise
+  answer. ([#1151])
+- Under `missing="em"` with the linear-Gaussian BIC, copies among the observed values raise
+  `CopiedColumnsError` before a pair of columns that shares no observed row, as on complete data.
+  The error for such a pair names a DataFrame's columns by their labels. ([#1151])
+- The CLI records a fit's warning-level log records in `run.warnings` when the `andrey` logger, a
+  logger under it, or the root logger is set above `WARNING`, or a logger under `andrey` has its
+  own handler or does not propagate, and `bootstrap` logs the records of fits that ran in worker
+  processes in the calling process, once each, so they reach `run.warnings` instead of standard
+  error. Each record keeps the file, line, and function that logged it, and those of a resample
+  that raises are logged before its error. ([#1151])
 
 ## [0.18.0] - 2026-11-19
 
@@ -2721,6 +2787,10 @@ First alpha release.
 [#1090]: https://github.com/Abel-ai-lab/Andrey/pull/1090
 [#1099]: https://github.com/Abel-ai-lab/Andrey/pull/1099
 [card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
+[#1142]: https://github.com/Abel-ai-lab/Andrey/pull/1142
 [#1102]: https://github.com/Abel-ai-lab/Andrey/pull/1102
+[#1148]: https://github.com/Abel-ai-lab/Andrey/pull/1148
+[#1151]: https://github.com/Abel-ai-lab/Andrey/pull/1151
+[#1156]: https://github.com/Abel-ai-lab/Andrey/pull/1156
 [#1094]: https://github.com/Abel-ai-lab/Andrey/pull/1094
 [#1095]: https://github.com/Abel-ai-lab/Andrey/pull/1095

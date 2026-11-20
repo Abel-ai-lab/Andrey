@@ -365,6 +365,19 @@ def test_a_copy_among_the_observed_values_raises_as_on_complete_data():
             getattr(andrey, name)(x, missing="em")
 
 
+def test_a_copy_among_the_observed_values_raises_before_a_pair_that_shares_no_row():
+    x = _chain()
+    x[:, 4] = 3.0 * x[:, 2] - 1.0
+    x[:200, 0] = nan
+    x[200:, 1] = nan  # columns 0 and 1 share no observed row
+    for name in ("ges", "xges", "exact_search", "boss"):
+        with pytest.raises(CopiedColumnsError, match=r"\b4 repeats 2\b"):
+            getattr(andrey, name)(x, missing="em")
+    with pytest.raises(ValueError, match=r"^drop column 0 or column 1 .*share none") as error:
+        andrey.notears(x, missing="em")  # a score without the BIC's copies check
+    assert not isinstance(error.value, CopiedColumnsError)
+
+
 def _labeled_marks(out) -> dict:
     m, labels = out.structure.to_numpy(), out.structure.labels
     return {(a, b): int(m[i, j]) for i, a in enumerate(labels) for j, b in enumerate(labels)}

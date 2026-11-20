@@ -637,6 +637,7 @@ def fit_missing(
     n_em_iterations: int,
     rows: int,
     bic: bool = False,
+    labels: tuple[str, ...] | None = None,
 ) -> tuple[R, dict[str, object]]:
     """Run a fit on ``X``, by structural EM when ``missing="em"`` and the data hold ``NaN``.
 
@@ -652,11 +653,12 @@ def fit_missing(
     value sat in a dropped row, ``fit(None)`` runs once on the rows left and the record holds no
     round.
 
-    Raises ``ValueError`` when two columns share no observed row: the data hold no covariance for
-    the pair, and a value for it would come from the model alone. With ``bic``, the fit scores by
-    the linear-Gaussian BIC, so copies among the observed values raise
-    :class:`~andrey.core.score.CopiedColumnsError` first
-    (:func:`~andrey.search.em.observed_copies`), as on complete data.
+    With ``bic``, the fit scores by the linear-Gaussian BIC, so copies among the observed values
+    raise :class:`~andrey.core.score.CopiedColumnsError` first
+    (:func:`~andrey.search.em.observed_copies`), as on complete data. Then ``ValueError`` is raised
+    when two columns share no observed row: the data hold no covariance for the pair, and a value
+    for it would come from the model alone. The message names the pair by ``labels``, or by
+    position without them.
     """
     dropped = rows - X.shape[0] if missing == EM else 0
     gaps = bool(np.isnan(X).any())
@@ -664,12 +666,18 @@ def fit_missing(
         return fit(None)[0], {}
     from andrey.search.em import PARAMETER_STEPS, observed_copies, shared_rows, structural_em
 
+    if bic and gaps and (groups := observed_copies(X)):
+        raise copies_error(groups)
     shared = shared_rows(X)
     apart = np.argwhere(np.triu(shared == 0, 1))
     if apart.size:
         i, j = (int(k) for k in apart[0])
+        name = column_namer(labels)
+        pair = f"column {name(i)} or column {name(j)}" + (
+            " (counted from 0)" if labels is None else ""
+        )
         raise ValueError(
-            f"drop column {i} or column {j} (counted from 0), or add rows that observe both: "
+            f"drop {pair}, or add rows that observe both: "
             f'missing="em" needs every pair of columns observed together in at least one row, and '
             "these two share none, so the data hold no covariance for them"
         )
@@ -682,8 +690,6 @@ def fit_missing(
             "graph_changed": [],
         }
         return fit(None)[0], {"em": record | extra}
-    if bic and (groups := observed_copies(X)):
-        raise copies_error(groups)
     result, record = structural_em(X, fit, iterations=n_em_iterations)
     return result, {"em": record | extra}
 
@@ -760,6 +766,7 @@ def cpdag_search(
             n_em_iterations=n_em_iterations,
             rows=np.shape(data)[0],
             bic=True,
+            labels=labels,
         )
     cpdag, index_edges = split_index(cpdag, column)
     metadata = {"score": json_safe(score), **categorical_metadata(mask, data), **em}

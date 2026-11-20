@@ -734,6 +734,39 @@ def test_a_run_isolates_the_loggers_during_the_fit_and_restores_them(capsys, gap
     assert json.loads(out)["run"]["warnings"][0]["category"] == "LogWarning"
 
 
+@pytest.mark.parametrize("name", ["andrey", ""])
+def test_a_logger_set_above_warning_keeps_the_fit_notice_and_its_level(capsys, gappy_path, name):
+    """A threshold above ``WARNING`` on the ``andrey`` or the root logger drops no record."""
+    import logging
+
+    logger = logging.getLogger(name or None)
+    level = logger.level
+    logger.setLevel(logging.ERROR)
+    try:
+        code, out, err = _run(["run", "pc", "--data", str(gappy_path), "--json"], capsys)
+        assert logger.level == logging.ERROR
+    finally:
+        logger.setLevel(level)
+    assert code == 0 and err == ""
+    [notice] = json.loads(out)["run"]["warnings"]
+    assert notice["category"] == "LogWarning"
+
+
+def test_the_records_bootstrap_workers_log_go_in_the_envelope_not_stderr(capfd, tmp_path):
+    """Structural EM's warning, logged in worker processes, reaches ``run.warnings`` once."""
+    x = np.random.default_rng(0).standard_normal((300, 3))
+    x[:, 1] += x[:, 0]
+    x[np.random.default_rng(1).random(x.shape) < 0.1] = np.nan
+    path = tmp_path / "gaps.csv"
+    np.savetxt(path, x, delimiter=",", header="a,b,c", comments="")
+    argv = ["bootstrap", "ges", "--data", str(path), "--n-resamples", "4", "--json"]
+    with andrey.config(n_jobs=2):
+        code, out, err = _run([*argv, "missing=em", "n_em_iterations=1"], capfd)
+    assert code == 0 and err == ""
+    logged = [w for w in json.loads(out)["run"]["warnings"] if w["category"] == "LogWarning"]
+    assert [w["message"][:44] for w in logged] == ["structural EM: the graph still changed in th"]
+
+
 # --- shell-aware output ---------------------------------------------------------------------------
 
 
@@ -1363,3 +1396,17 @@ def test_the_bootstrap_reads_contexts_and_blocks_of_every_dataset(tmp_path, caps
     code, out, err = _run(argv, capsys)
     assert code == 0, err
     assert json.loads(out)["structure"]["labels"] == ["x", "y"]
+
+
+def test_a_p_value_not_tested_is_null_in_strict_json(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr("sys.stdout.isatty", lambda: False)
+    rng = np.random.default_rng(0)
+    x = rng.standard_normal((200, 3))
+    x[:100, 1] = np.nan  # columns 1 and 2 never observed together
+    x[100:, 2] = np.nan
+    path = tmp_path / "gaps.csv"
+    np.savetxt(path, x, delimiter=",", header="a,b,c", comments="")
+    code, out, _ = _run(["run", "pcmci", "--data", str(path)], capsys)
+    assert code == 0
+    env = json.loads(out, parse_constant=lambda token: pytest.fail(f"non-standard {token}"))
+    assert None in [p for lag in env["metadata"]["p_values"] for row in lag for p in row]

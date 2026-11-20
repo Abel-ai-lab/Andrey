@@ -259,6 +259,13 @@ class CMIknn:
 
     pin_blas = True  # read by pins_blas: the skeleton scans run it on one BLAS thread
 
+    @staticmethod
+    def least_rows(size: int, *, k_cmi: float = 0.1, **options: object) -> int:
+        """The fewest rows a query given ``size`` conditioning variables is tested on: ``k_cmi + 1``
+        for an int ``k_cmi``, so each row has that many neighbors, else ``2``."""
+        count = isinstance(k_cmi, Integral) and not isinstance(k_cmi, bool)
+        return int(k_cmi) + 1 if count else 2
+
     def __init__(
         self,
         data: np.ndarray,

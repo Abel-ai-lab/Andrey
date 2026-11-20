@@ -18,7 +18,7 @@ unshielded triples of a final skeleton by the conservative or majority collider 
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Collection, Hashable, Iterable, Iterator, Mapping, Sequence
 from contextlib import nullcontext
 from functools import cache, partial
 from itertools import chain, combinations, groupby, islice
@@ -29,7 +29,7 @@ import numpy as np
 
 from andrey.core import NULL, backend
 from andrey.core.ci import CITest, DGTest, FisherZ, NormalScores, StudentT, pins_blas
-from andrey.core.ci_missing import GaussianDeletion
+from andrey.core.ci_missing import GaussianDeletion, TestwiseDeletion, not_tested
 from andrey.core.orient import separating_set
 
 if TYPE_CHECKING:
@@ -93,8 +93,16 @@ def scan_conditioning_sets(
     accumulated ``separating``, the largest p-value, and the return value are identical.
 
     With ``trace`` given, one record per test is appended (see :func:`record_tests`); the check
-    runs once per chunk.
+    runs once per chunk. Without it, a test that deletes rows per test asks no subset holding a
+    candidate that no row observes together with ``a`` or ``b``: such a query keeps no rows, so it
+    is counted as not tested without being built (:func:`kept_apart`), which changes neither the
+    counts nor the return value.
     """
+    if trace is None:
+        kept, _ = kept_apart(test, (a, b), [(candidates, skip_within)], size)
+        if kept is None:
+            return False
+        [(candidates, skip_within)] = kept
     subsets = _subsets(candidates, size, skip_within)
     # CMIknn's _bounded_pvalue stops its shuffles once the side of alpha is certain; a p-value
     # above alpha that `largest` records comes from every shuffle.
@@ -134,6 +142,46 @@ def _subsets(
     if skip_within is not None and len(skip_within) >= size:
         subsets = (s for s in subsets if not skip_within.issuperset(s))
     return subsets
+
+
+def kept_apart(
+    test: CITest,
+    fixed: Sequence[int],
+    sides: list[tuple[list[int], set[int] | None]],
+    size: int,
+) -> tuple[list[tuple[list[int], set[int] | None]] | None, int]:
+    """The ``sides`` of a scan less the candidates no row observes together with a column of
+    ``fixed``, the columns every query of the scan holds, its pair first, and the number of sets
+    left out.
+
+    Each side is ``(candidates, skip_within)``, its sets the size-``size`` subsets of the
+    candidates less those lying inside ``skip_within`` (:func:`_subsets`). A set holding a dropped
+    candidate keeps no rows under a test that deletes rows per test, so each such set is counted
+    as a query of the pair not tested, without being built, as asking it would count it
+    (:meth:`~andrey.core.ci_missing.TestwiseDeletion.count_not_tested`). When no row observes the
+    columns of ``fixed`` together, every set is counted and ``None`` is returned in place of the
+    sides. Another test gets ``sides`` unchanged and none left out.
+    """
+    if not isinstance(test, TestwiseDeletion):
+        return sides, 0
+    together = test.together()
+    columns = list(fixed)
+    met: np.ndarray = np.all(together[columns], axis=0)
+    whole = not met[columns].all()
+    kept = [([c for c in side if met[c]], skip) for side, skip in sides]
+    left = sum(_subset_count(side, size, skip) for side, skip in sides)
+    if not whole:
+        left -= sum(_subset_count(side, size, skip) for side, skip in kept)
+    test.count_not_tested(columns[0], columns[1], left)
+    return None if whole else kept, left
+
+
+def _subset_count(candidates: list[int], size: int, skip_within: set[int] | None) -> int:
+    """The number of sets :func:`_subsets` yields."""
+    count = comb(len(candidates), size)
+    if skip_within is not None and len(skip_within) >= size:
+        count -= comb(len(skip_within.intersection(candidates)), size)
+    return count
 
 
 def canonical_capable(test: CITest) -> bool:
@@ -354,8 +402,8 @@ def first_order_removals(
             record_tests(trace, 1, x, y, subsets, pvals, alpha)
         passing = np.flatnonzero(pvals > alpha)
         if passing.size:
-            # Some candidate separates, so the largest p-value is a separating one.
-            p = max(pvals.tolist()) if record_pvalues else None
+            # The largest separating p-value: a query not tested (NaN) never separates.
+            p = max(pvals[passing].tolist()) if record_pvalues else None
             removals.append((x, y, tuple(subsets[k][0] for k in passing.tolist()), p))
     return removals
 
@@ -753,15 +801,36 @@ def check_collider_rule(collider_rule: str) -> None:
         )
 
 
-def collider_verdict(separating: Sequence[Iterable[int]], b: int, rule: str) -> str:
+def collider_verdict(
+    separating: Sequence[Collection[Hashable]],
+    b: Hashable,
+    rule: str,
+    skipped: Sequence[Collection[Hashable]] = (),
+) -> str:
     """``"collider"``, ``"non-collider"``, or ``"ambiguous"``: what ``rule`` makes of middle node
     ``b`` from the ``separating`` subsets of its endpoints.
 
     ``"conservative"`` makes ``b`` a collider when no subset contains it and a non-collider when
     every subset does. ``"majority"`` makes it a collider when fewer than half contain it and a
     non-collider when more than half do. Any other share, an exact half under ``"majority"``
-    included, is ambiguous, and so is an empty ``separating``.
+    included, is ambiguous, and so is an empty ``separating``. The ``skipped`` subsets were not
+    tested and might have separated: the verdict stands only when it holds with none of them
+    separating, with those holding ``b``, and with those without it, the least and the most share
+    of subsets holding ``b`` they allow; otherwise the triple is ambiguous.
     """
+    verdict = _verdict(separating, b, rule)
+    if not skipped or verdict == "ambiguous":
+        return verdict
+    holding = [subset for subset in skipped if b in subset]
+    lacking = [subset for subset in skipped if b not in subset]
+    for extra in (holding, lacking):
+        if _verdict([*separating, *extra], b, rule) != verdict:
+            return "ambiguous"
+    return verdict
+
+
+def _verdict(separating: Sequence[Collection[Hashable]], b: Hashable, rule: str) -> str:
+    """:func:`collider_verdict` from the ``separating`` subsets alone."""
     if not separating:
         return "ambiguous"
     share = sum(b in subset for subset in separating) / len(separating)
@@ -788,7 +857,8 @@ def vote_triples(
     ``a``'s neighbors, then every subset of ``c``'s, the empty set included, up to ``max_depth``
     members when one is given: a subset both endpoints offer is tested and counted twice. A subset
     separates the pair when its p-value is at least ``alpha``. :func:`collider_verdict` decides the
-    triple from the separating subsets, and a pair no subset separates leaves its triples ambiguous:
+    triple from the separating subsets and those not tested for want of rows, and a pair no subset
+    separates leaves its triples ambiguous:
     the conservative and majority rules call a triple unambiguous only when at least one subset of
     its ends' neighbors separates them [1]_ (Section 4.2), in PC and, after the
     possible-d-separation step, in FCI (Section 4.4). The separating sets already recorded do not
@@ -808,7 +878,7 @@ def vote_triples(
        structure learning. JMLR 15, 3921-3962.
     """
     neighbors = [np.flatnonzero(row).tolist() for row in marks != NULL]
-    votes: dict[tuple[int, int], list[tuple[int, ...]]] = {}
+    votes: dict[tuple[int, int], tuple[list[tuple[int, ...]], list[tuple[int, ...]]]] = {}
     ambiguous = set()
     for b, adjacent in enumerate(neighbors):
         for a, c in combinations(adjacent, 2):
@@ -816,7 +886,8 @@ def vote_triples(
                 continue
             if (a, c) not in votes:
                 votes[a, c] = _separating_votes(test, a, c, neighbors, alpha, max_depth)
-            verdict = collider_verdict(votes[a, c], b, rule)
+            found, skipped = votes[a, c]
+            verdict = collider_verdict(found, b, rule, skipped)
             if verdict == "ambiguous":
                 ambiguous.add((a, b, c))
                 continue
@@ -834,9 +905,10 @@ def _separating_votes(
     neighbors: list[list[int]],
     alpha: float,
     max_depth: int | None,
-) -> list[tuple[int, ...]]:
+) -> tuple[list[tuple[int, ...]], list[tuple[int, ...]]]:
     """The subsets of ``a``'s neighbors, then of ``c``'s, that separate ``a`` and ``c``
-    (``p >= alpha``), each endpoint's by increasing size, as :func:`vote_triples` counts them."""
+    (``p >= alpha``), each endpoint's by increasing size, as :func:`vote_triples` counts them, and
+    those not tested for want of rows (:data:`~andrey.core.ci_missing.NOT_TESTED`)."""
     subsets = (
         subset
         for endpoint in (a, c)
@@ -849,10 +921,12 @@ def _separating_votes(
     )
     batched = getattr(test, "batched_call", None)
     found: list[tuple[int, ...]] = []
+    skipped: list[tuple[int, ...]] = []
     while chunk := list(islice(subsets, _VOTE_CHUNK)):
         pvalues = batched(a, c, chunk) if callable(batched) else [test(a, c, s) for s in chunk]
         found.extend(subset for subset, p in zip(chunk, pvalues) if p >= alpha)
-    return found
+        skipped.extend(subset for subset, p in zip(chunk, pvalues) if not_tested(p))
+    return found, skipped
 
 
 def adjacent_pairs(adjacency: np.ndarray) -> list[tuple[int, int]]:

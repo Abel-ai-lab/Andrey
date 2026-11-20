@@ -78,7 +78,7 @@ def fit_blanket(
             marks = np.where(adjacent, TAIL, NULL).astype(np.int8)
             name = label_of(labels)
             metadata |= {"target": name(t), _SETS[method]: [name(j) for j in members]}
-    metadata |= categorical_metadata(mask, data) | rows_metadata(rows)
+    metadata |= categorical_metadata(mask, data) | rows_metadata(rows, label_of(labels))
     return structure_output(to_structure(marks, kind=kind), labels=labels, metadata=metadata)
 
 
@@ -260,13 +260,20 @@ def iamb(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [5]_ [6]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. A test raises ``ValueError`` when it has fewer rows than it needs,
-    ``|S| + 3`` for the partial-correlation tests (``"fisherz"``, ``"student_t"``, and
-    ``"normal_scores"``) and 2 for the other tests, or when a continuous column is constant on its
-    rows. Test-wise deletion is valid when values are missing completely at random, which means that
-    whether a value is missing depends on no value in the data; the rows a test reads are then a
-    random sample of all rows, and otherwise they are a selected sample that more rows do not
-    correct.
+    the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
+    ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including those the search skipped because no row can test them. A candidate no tested
+    query separated, as a variable never observed with the target, stays in the target's set, and a
+    pair no tested query could decide is listed in ``metadata["undecided_pairs"]``. On merged
+    cohorts, every pair of variables measured only in different cohorts is therefore an undecided
+    pair and, unless knowledge forbids it or ``max_depth`` stops the blanket's growth first, an edge
+    of the output: a fact about the data, not a finding. A continuous column constant on a test's
+    rows raises ``ValueError``. Test-wise deletion is valid when values are missing completely at
+    random, which means that whether a value is missing depends on no value in the data; the rows a
+    test reads are then a random sample of all rows, and otherwise they are a selected sample that
+    more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data with Fisher-z tests at alpha 0.05,
     on one core: 20, 50, and 100 variables with 1,000 and 5,000 rows and mean degree 2 and 4, with
@@ -532,13 +539,20 @@ def inter_iamb(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [5]_ [6]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. A test raises ``ValueError`` when it has fewer rows than it needs,
-    ``|S| + 3`` for the partial-correlation tests (``"fisherz"``, ``"student_t"``, and
-    ``"normal_scores"``) and 2 for the other tests, or when a continuous column is constant on its
-    rows. Test-wise deletion is valid when values are missing completely at random, which means that
-    whether a value is missing depends on no value in the data; the rows a test reads are then a
-    random sample of all rows, and otherwise they are a selected sample that more rows do not
-    correct.
+    the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
+    ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including those the search skipped because no row can test them. A candidate no tested
+    query separated, as a variable never observed with the target, stays in the target's set, and a
+    pair no tested query could decide is listed in ``metadata["undecided_pairs"]``. On merged
+    cohorts, every pair of variables measured only in different cohorts is therefore an undecided
+    pair and, unless knowledge forbids it or ``max_depth`` stops the blanket's growth first, an edge
+    of the output: a fact about the data, not a finding. A continuous column constant on a test's
+    rows raises ``ValueError``. Test-wise deletion is valid when values are missing completely at
+    random, which means that whether a value is missing depends on no value in the data; the rows a
+    test reads are then a random sample of all rows, and otherwise they are a selected sample that
+    more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data with 20, 50, and 100 variables,
     1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05, on one core.
@@ -796,13 +810,19 @@ def mmpc(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [5]_ [6]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. A test raises ``ValueError`` when it has fewer rows than it needs,
-    ``|S| + 3`` for the partial-correlation tests (``"fisherz"``, ``"student_t"``, and
-    ``"normal_scores"``) and 2 for the other tests, or when a continuous column is constant on its
-    rows. Test-wise deletion is valid when values are missing completely at random, which means that
-    whether a value is missing depends on no value in the data; the rows a test reads are then a
-    random sample of all rows, and otherwise they are a selected sample that more rows do not
-    correct.
+    the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
+    ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including those the search skipped because no row can test them. A candidate no tested
+    query separated, as a variable never observed with the target, stays in the target's set, and a
+    pair no tested query could decide is listed in ``metadata["undecided_pairs"]``. On merged
+    cohorts, every pair of variables measured only in different cohorts is therefore an undecided
+    pair and, unless knowledge forbids it, an edge of the output: a fact about the data, not a
+    finding. A continuous column constant on a test's rows raises ``ValueError``. Test-wise deletion
+    is valid when values are missing completely at random, which means that whether a value is
+    missing depends on no value in the data; the rows a test reads are then a random sample of all
+    rows, and otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data with Fisher-z tests at alpha 0.05,
     on one core: 20, 50, and 100 variables with 1,000 and 5,000 rows and mean degree 2 and 4, with
