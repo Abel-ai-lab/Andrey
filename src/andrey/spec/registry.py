@@ -193,8 +193,9 @@ _add(
             "data with missing values, metadata['missingness_parents'] maps each column whose "
             "missingness indicator has parents to them, and metadata['corrected_edges'] lists the "
             "edges tested again (retested), removed (removed), and left with a test that had too "
-            "few rows to correct (uncorrected), by name or 0-based position, and the fewest and "
-            "the median rows a corrected test read (rows_tested)",
+            "few rows to correct (uncorrected), by name or 0-based position, the fewest and the "
+            "median rows a corrected test read (rows_tested), and, when it is not zero, the number "
+            "of corrected tests that returned p = 1 (p_one_tests)",
         ),
         accel="numpy",
         status="supported",
@@ -3677,7 +3678,17 @@ for _name, _spec in REGISTRY.items():
         ),
         *(("tie_break",) if _spec.tie_break else ()),
         *(("categorical",) if "categorical" in _concepts else ()),
-        *(("rows_tested", "p_one_tests") if _spec.data.missing else ()),
+        *(
+            (
+                "rows_tested",
+                "p_one_tests",
+                "not_tested",
+                "undecided_pairs",
+                "never_observed_together",
+            )
+            if _spec.data.missing
+            else ()
+        ),
         *(("missing",) if "missing" in _concepts else ()),
         *(("em",) if _name in EM_METHODS else ()),
         *(("ambiguous_triples",) if "collider_rule" in _concepts else ()),

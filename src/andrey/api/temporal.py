@@ -15,7 +15,7 @@ import numpy as np
 
 from andrey.api._method import drop_unmet, method_spec
 from andrey.core.backend import one_blas_thread
-from andrey.core.ci_missing import rows_metadata, rows_tested
+from andrey.core.ci_missing import named_pairs, rows_metadata, rows_tested
 from andrey.core.knowledge import Knowledge, KnowledgeError, resolve_lagged
 from andrey.core.score import copies_error, copy_groups
 
@@ -632,8 +632,13 @@ def pcmci(
     that reads it holds it, and each test reads only the design rows where all of its lagged
     variables are observed (test-wise deletion) [2]_ [3]_, so the tests no longer share one set of
     time steps; ``metadata["rows_tested"]`` gives the fewest and the median design rows a test read.
-    A partial-correlation test with fewer than ``|S| + 3`` rows, another test with fewer than ``2``,
-    or a test with a continuous column constant on its rows raises ``ValueError``. The categorical,
+    A test with fewer rows than it needs (``|S| + 4`` rows for ``"fisherz"`` and
+    ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and 2 for most other
+    tests), or with no degrees of freedom left, is not tested: it never separates a pair and never
+    confirms a link, and ``metadata["not_tested"]`` counts such tests. A link no tested query could
+    decide, as one between variables never observed together, has no p-value (``NaN``) and is listed
+    in ``metadata["undecided_pairs"]``, and no test conditions on a lagged parent without a tested
+    result. A continuous column constant on a test's rows raises ``ValueError``. The categorical,
     mixed-data, and nonlinear tests delete rows the same way. Test-wise deletion is valid when
     values are missing completely at random, which means that whether a value is missing depends on
     no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
@@ -731,7 +736,13 @@ def pcmci(
             categorical=mask,
             seed=seed,
         )
-    metadata = {**categorical_metadata(mask, data), **rows_metadata(rows)}
+    undecided = np.zeros((tau_max + 1, *result.p_values.shape[1:]), dtype=bool)
+    undecided[1:] = np.isnan(result.p_values)
+    metadata = {
+        **categorical_metadata(mask, data),
+        **rows_metadata(rows),
+        **undecided_links(undecided, labels),
+    }
     return with_labels(adapt_pcmci(result, metadata), labels)
 
 
@@ -970,8 +981,13 @@ def pcmciplus(
     that reads it holds it, and each test reads only the design rows where all of its lagged
     variables are observed (test-wise deletion) [2]_ [3]_, so the tests no longer share one set of
     time steps; ``metadata["rows_tested"]`` gives the fewest and the median design rows a test read.
-    A partial-correlation test with fewer than ``|S| + 3`` rows, another test with fewer than ``2``,
-    or a test with a continuous column constant on its rows raises ``ValueError``. The categorical,
+    A test with fewer rows than it needs (``|S| + 4`` rows for ``"fisherz"`` and
+    ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and 2 for most other
+    tests), or with no degrees of freedom left, is not tested: it never separates a pair and never
+    confirms a link, and ``metadata["not_tested"]`` counts such tests. A link no tested query could
+    decide, as one between variables never observed together, has no p-value (``NaN``) and is listed
+    in ``metadata["undecided_pairs"]``, and no test conditions on a lagged parent without a tested
+    result. A continuous column constant on a test's rows raises ``ValueError``. The categorical,
     mixed-data, and nonlinear tests delete rows the same way. Test-wise deletion is valid when
     values are missing completely at random, which means that whether a value is missing depends on
     no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
@@ -1055,7 +1071,11 @@ def pcmciplus(
             categorical=mask,
             seed=seed,
         )
-    metadata = {**categorical_metadata(mask, data), **rows_metadata(rows)}
+    metadata = {
+        **categorical_metadata(mask, data),
+        **rows_metadata(rows),
+        **undecided_links(result.undecided, labels),
+    }
     return with_labels(adapt_pcmciplus(result, metadata), labels)
 
 
@@ -1346,6 +1366,7 @@ def jpcmciplus(
         "index_edges": [[variable(j), "directed"] for j in result.space_links],
         "time_index_edges": [[variable(j), "directed"] for j in result.time_links],
         "time_dummy": inputs.time_dummy,
+        **undecided_links(result.system.undecided, inputs.system_labels),
     }
     return with_labels(adapt_pcmciplus(result.system, metadata), inputs.system_labels)
 
@@ -1568,12 +1589,18 @@ def lpcmci(
     that reads it holds it, and each test reads only the design rows where all of its lagged
     variables are observed (test-wise deletion) [2]_ [3]_, so the tests no longer share one set of
     time steps; ``metadata["rows_tested"]`` gives the fewest and the median design rows a test read.
-    A partial-correlation test with fewer than ``|S| + 3`` rows, another test with fewer than ``2``,
-    or a test with a continuous column constant on its rows raises ``ValueError``. The categorical,
-    mixed-data, and nonlinear tests delete rows the same way. Test-wise deletion is valid when
-    values are missing completely at random, which means that whether a value is missing depends on
-    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
-    they are a selected sample that more rows do not correct.
+    A test with fewer rows than it needs (``|S| + 4`` rows for ``"fisherz"`` and
+    ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and 2 for most other
+    tests), or with no degrees of freedom left, is not tested: it never separates a pair and never
+    confirms a link, and ``metadata["not_tested"]`` counts such tests. A link no tested query could
+    decide, as one between variables never observed together, has no p-value (``NaN``) and is listed
+    in ``metadata["undecided_pairs"]``, and no test conditions on a node whose link to either end
+    of the tested pair has no tested result. A continuous column constant on a test's rows raises
+    ``ValueError``. The categorical, mixed-data, and nonlinear tests delete rows the same way.
+    Test-wise deletion is valid when values are missing completely at random, which means that
+    whether a value is missing depends on no value in the data; the rows a test reads are then a
+    random sample of all rows, and otherwise they are a selected sample that more rows do not
+    correct.
 
     **Limitations.** Measured on simulated linear-Gaussian time series with 30% of the series
     unobserved, of ``max(1000, 12 * (d + 1))`` time steps for ``d`` variables and of five times as
@@ -1655,7 +1682,14 @@ def lpcmci(
             categorical=mask,
             seed=seed,
         )
-    metadata = {**categorical_metadata(mask, data), **rows_metadata(rows)}
+    undecided = np.zeros(result.p_values.shape, dtype=bool)
+    for i, j, lag in result.undecided:
+        undecided[lag, i, j] = True
+    metadata = {
+        **categorical_metadata(mask, data),
+        **rows_metadata(rows),
+        **undecided_links(undecided, labels),
+    }
     out = with_labels(adapt_lpcmci(result, metadata), labels)
     if constraints is None or constraints.required_paths is None:
         return out
@@ -2295,3 +2329,25 @@ def check_series_rows(X: np.ndarray, tau_max: int, min_rows: int) -> None:
             f"data needs at least {min_rows} rows (time steps) for tau_max={tau_max} over "
             f"{X.shape[1]} variables, got {X.shape[0]}"
         )
+
+
+def undecided_links(undecided: np.ndarray | None, labels: tuple[str, ...] | None) -> dict:
+    """``{"undecided_pairs": ...}`` for the links ``undecided[lag, i, j]`` marks, or ``{}``.
+
+    A link ``X^i_{t-lag} -> X^j_t`` is the pair of its ends, a lagged end named as
+    :func:`~andrey.temporal.pcmci.design_column_name` names it (``"A at lag 1"``), a column
+    without a label by its 0-based position as text, listed as
+    :func:`~andrey.core.ci_missing.named_pairs` lists pairs; a lag-0 link appears once.
+    """
+    from andrey.temporal.pcmci import design_column_name
+
+    if undecided is None or not undecided.any():
+        return {}
+    n = undecided.shape[1]
+    name = design_column_name(n, str if labels is None else labels.__getitem__)
+    lags, sources, targets = np.nonzero(undecided)
+    pairs = {
+        (lag * n + i, j) for lag, i, j in zip(lags.tolist(), sources.tolist(), targets.tolist())
+    }
+    named = named_pairs(pairs, name)
+    return {"undecided_pairs": [pair for k, pair in enumerate(named) if pair not in named[:k]]}

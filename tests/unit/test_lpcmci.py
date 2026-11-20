@@ -363,9 +363,17 @@ def _listed_share(search: engine.LPCMCISearch, a, b, c) -> float:
 OUTER = [((0, 0), (1, 0)), ((0, 1), (1, 1)), ((0, 1), (2, 0))]
 
 
+def _counted_share(search: engine.LPCMCISearch, a, b, c) -> float:
+    key, _ = engine._key(a, c)
+    found, skipped = search.vote(key)
+    assert not skipped  # every subset of this test is tested
+    frame = min(a[1], c[1])
+    return sum((b[0], b[1] - frame) in s for s in found) / len(found) if found else 0.5
+
+
 def _shares(search: engine.LPCMCISearch, listed: bool) -> list[float]:
-    share = (lambda a, b, c: _listed_share(search, a, b, c)) if listed else search.share
-    return [share(a, b, c) for a, c in OUTER for b in search.window if b not in (a, c)]
+    share = _listed_share if listed else _counted_share
+    return [share(search, a, b, c) for a, c in OUTER for b in search.window if b not in (a, c)]
 
 
 def test_the_counted_vote_matches_the_listed_vote_before_and_after_a_change():
@@ -451,3 +459,19 @@ def test_weakly_minimal_drops_the_node_that_leaves_the_largest_p_value(relabel):
     search.initialize()
     found = search.weakly_minimal((0, 0), (1, 0), frozenset({(2, 0), (3, 0)}))
     assert _relabeled([found], relabel) == {frozenset({(3, 0)})}
+
+
+def test_a_vote_with_a_subset_not_tested_is_ambiguous_when_that_subset_could_change_it():
+    search = engine.LPCMCISearch(HashTest(), 4, 1, 0.5, range(4))
+    search.initialize()
+    key = engine._key((0, 0), (1, 0))[0]
+    b = (2, 0)
+    search.votes_version = search.version
+    search.votes[key] = ([frozenset({b}), frozenset()], [])  # an exact half: ambiguous
+    assert search.verdict((0, 0), b, (1, 0)) == "ambiguous"
+    search.votes[key] = ([frozenset()], [frozenset({b})])  # collider unless the skipped separates
+    assert search.verdict((0, 0), b, (1, 0)) == "ambiguous" and not search.outside_sepset(
+        (0, 0), b, (1, 0)
+    )
+    search.votes[key] = ([frozenset(), frozenset()], [frozenset({b})])  # 1/3 at most: collider
+    assert search.outside_sepset((0, 0), b, (1, 0))

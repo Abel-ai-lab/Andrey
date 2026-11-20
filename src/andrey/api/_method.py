@@ -26,7 +26,7 @@ from andrey.api._adapt import default_score, default_test, label_of
 from andrey.core import environments
 from andrey.core.backend import config
 from andrey.core.ci import SHIPPED_INDEP_TESTS, STOCHASTIC_INDEP_TESTS, available_indep_tests
-from andrey.core.ci_missing import TESTWISE, TESTWISE_CLAIM
+from andrey.core.ci_missing import NOT_TESTED_CLAIM, TESTWISE, TESTWISE_CLAIM, named_pairs
 from andrey.core.knowledge import PATH_PARTS, Knowledge, resolve
 from andrey.core.removed import removal_hint
 from andrey.core.score import LINEAR_SCORES, PENALIZED_SCORES, RANK_SCORES
@@ -626,29 +626,85 @@ def missing_used(
 ) -> dict[str, object]:
     """Return ``{"missing": value}`` when the fit ``out`` met missing values, else ``{}``.
 
-    A fit met them when its tests counted the rows they read, ``metadata["rows_tested"]``, or when
-    it ran structural EM, ``metadata["em"]``. The value is the call's ``missing`` or, for ``None``,
-    the method's default handling, ``"testwise"``, which the call did not name: the first such fit
-    of the process logs :func:`notice_default_missing`.
+    A fit met them when its tests counted the rows they read, ``metadata["rows_tested"]``, when it
+    ran structural EM, ``metadata["em"]``, or when its data hold a missing value, as a fit that
+    runs no test does; such a fit also gets ``{"rows_tested": {"min": 0, "median": 0}}``, as
+    :func:`~andrey.core.ci_missing.rows_metadata` gives when no query was tested. The value is the
+    call's ``missing`` or, for ``None``, the method's default handling, ``"testwise"``, which the
+    call did not name: the first such fit of the process logs :func:`notice_default_missing`. A
+    fit without structural EM on data with pairs of columns never observed together also gets
+    ``{"never_observed_together": ...}``, the pairs by name (:func:`never_observed_together`),
+    counted from the data before the tests read them.
     """
-    met = "rows_tested" in out.metadata or "em" in out.metadata
-    if not met or not any(p.concept == "missing" for p in spec.params):
+    if not any(p.concept == "missing" for p in spec.params):
         return {}
+    data = arguments.get(spec.data.inputs[0].name)
+    stamp: dict[str, object] = {}
+    if "rows_tested" not in out.metadata and "em" not in out.metadata:
+        missing = _missing_cells(data)
+        if missing is None or not missing.any():
+            return {}
+        stamp["rows_tested"] = {"min": 0, "median": 0}
+    stamp["missing"] = arguments.get("missing") or TESTWISE
+    if "em" not in out.metadata and (pairs := never_observed_together(data)):
+        stamp["never_observed_together"] = pairs
     if arguments.get("missing") is None:
-        notice_default_missing(spec.name)
-    return {"missing": arguments.get("missing") or TESTWISE}
+        notice_default_missing(spec.name, {**out.metadata, **stamp})
+    return stamp
+
+
+def _missing_cells(data: object) -> np.ndarray | None:
+    """Return where the table ``data`` holds a missing value.
+
+    ``None`` for data that is neither a DataFrame nor one table of numbers.
+    """
+    import pandas as pd
+
+    if isinstance(data, pd.DataFrame):  # of any column types
+        return np.asarray(data.isna(), dtype=bool)
+    try:
+        array = np.asarray(data)
+        if array.dtype.kind in "biu":  # no value of these types is missing
+            missing = np.zeros(array.shape, dtype=bool)
+        elif array.dtype.kind == "f":
+            missing = np.isnan(array)
+        else:
+            missing = np.isnan(np.asarray(array, dtype=np.float64))
+    except (TypeError, ValueError):
+        return None
+    return missing if missing.ndim == 2 else None
+
+
+def never_observed_together(data: object) -> list[list]:
+    """Return the pairs of columns of ``data`` with no row observing both, by name.
+
+    Named by the DataFrame's labels, or by 0-based position, as
+    :func:`~andrey.core.ci_missing.named_pairs` lists pairs; ``[]`` for data that is not one table.
+    From one product of the observed masks, so it costs one pass over the data.
+    """
+    if (missing := _missing_cells(data)) is None:
+        return []
+    observed = (~missing).astype(np.float64)
+    together = observed.T @ observed
+    pairs = zip(*np.nonzero(np.triu(together == 0, 1)))
+    return named_pairs(((int(a), int(b)) for a, b in pairs), label_of(column_labels(data)))
 
 
 #: The key of :func:`notice_default_missing` in :func:`~andrey.core.warning_policy.log_once`.
 MISSING_DEFAULT_NOTICE = "missing_default"
+#: The most pairs the notice names; the metadata lists them all.
+_NOTICE_PAIRS = 5
 
 
-def notice_default_missing(method: str) -> None:
+def notice_default_missing(method: str, metadata: dict | None = None) -> None:
     """Log, once per process, that ``method`` ran test-wise deletion as its default handling.
 
     The notice says which handling ran, when it is valid
-    (:data:`~andrey.core.ci_missing.TESTWISE_CLAIM`), and how to choose it by name. The worker
-    processes of :func:`~andrey.bootstrap` log none: the calling process logs it for their fits.
+    (:data:`~andrey.core.ci_missing.TESTWISE_CLAIM`), and how to choose it by name. When the fit's
+    ``metadata`` names pairs never observed together, counts tests not tested, or lists undecided
+    pairs, the notice says so too, naming the first pairs; the metadata holds every pair of every
+    fit. The worker processes of :func:`~andrey.bootstrap` log none: the calling process logs it
+    for their fits.
     """
     log_once(
         _log,
@@ -656,9 +712,33 @@ def notice_default_missing(method: str) -> None:
         f"andrey.{method}: the data hold missing values and missing=None, so the fit ran the "
         "default handling, test-wise deletion: each test read only the rows where its variables "
         f'are observed. {TESTWISE_CLAIM} Pass missing="testwise" to choose it by name, and read '
-        'the rows the tests kept in metadata["rows_tested"]. This notice is logged once per '
-        "process.",
+        f'the rows the tests kept in metadata["rows_tested"].{_not_tested_notice(metadata or {})} '
+        "This notice is logged once per process.",
     )
+
+
+def _not_tested_notice(metadata: dict) -> str:
+    """Return what :func:`notice_default_missing` says of a fit's ``metadata``.
+
+    The pairs never observed together and the tests not tested; ``""`` when it has neither.
+    """
+
+    def first(pairs: list[list]) -> str:
+        shown = ", ".join(f"{a} and {b}" for a, b in pairs[:_NOTICE_PAIRS])
+        more = len(pairs) - _NOTICE_PAIRS
+        return shown + (f", and {more} more" if more > 0 else "")
+
+    text = ""
+    if pairs := metadata.get("never_observed_together"):
+        text += (
+            f" {len(pairs)} pairs of columns are never observed together ({first(pairs)}), listed "
+            'in metadata["never_observed_together"].'
+        )
+    if count := metadata.get("not_tested"):
+        text += f" {count} tests were not tested. {NOT_TESTED_CLAIM}"
+        if undecided := metadata.get("undecided_pairs"):
+            text += f" Undecided: {first(undecided)}."
+    return text
 
 
 def stamped(out: StructureOutput, stamp: dict[str, object]) -> StructureOutput:

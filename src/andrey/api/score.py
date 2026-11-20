@@ -1665,7 +1665,13 @@ def xges(
 
     with copies_named(labels):
         (cpdag, score), em = fit_missing(
-            X, missing, fit, n_em_iterations=n_em_iterations, rows=np.shape(data)[0], bic=True
+            X,
+            missing,
+            fit,
+            n_em_iterations=n_em_iterations,
+            rows=np.shape(data)[0],
+            bic=True,
+            labels=labels,
         )
     metadata = {"score": json_safe(score), **categorical_metadata(mask, data), **em}
     return structure_output(cpdag, labels=labels, metadata=metadata)
@@ -2813,7 +2819,13 @@ def exact_search(
 
     with copies_named(labels):
         dag, em = fit_missing(
-            X, missing, fit, n_em_iterations=n_em_iterations, rows=np.shape(data)[0], bic=True
+            X,
+            missing,
+            fit,
+            n_em_iterations=n_em_iterations,
+            rows=np.shape(data)[0],
+            bic=True,
+            labels=labels,
         )
     marks = dag.to_numpy()
     cpdag = dag2cpdag(marks)
@@ -3141,7 +3153,12 @@ def calm(
 
     with copies_named(labels):
         result, em = fit_missing(
-            X, missing, fit, n_em_iterations=n_em_iterations, rows=np.shape(data)[0]
+            X,
+            missing,
+            fit,
+            n_em_iterations=n_em_iterations,
+            rows=np.shape(data)[0],
+            labels=labels,
         )
     return structure_output(
         result.dag,
