@@ -24,11 +24,11 @@ names its pull request.
 - `lges`, experimental: less greedy equivalence search (Ejaz and Bareinboim 2025), a score search
   next to `ges` and `xges` that adds no edge between two variables the score already holds
   independent given the parents of one of them in a graph of the current class, and deletes and
-  reverses edges as GES and GIES do. `schedule` picks the paper's LGES (Algorithm 1, `"lges"`, the
-  default), which deletes and reverses before each addition, or its LGES-0 in the order of the
-  authors' code (`"lges0_released"`: additions, deletions, then reversals). `insertion` picks
-  SafeInsert, the default, or ConservativeInsert. It takes the scores of `ges`, with the standard
-  BIC (`ebic_gamma=0.0`) as its default. ([#1146])
+  reverses edges as GES and GIES do. `schedule` picks the paper's main method, LGES (Algorithm 1,
+  `"lges"`, the default), which deletes and reverses before each addition, or its LGES-0 in the
+  order of the authors' code (`"lges0_released"`: additions, deletions, then reversals).
+  `insertion` picks SafeInsert, the default, or ConservativeInsert. It takes the scores of `ges`,
+  with the standard BIC (`ebic_gamma=0.0`) as its default. ([#1146])
 - Three experimental regression-based conditional-independence tests, as `indep_test` options of
   every method that takes one: `"gcm"`, the generalized covariance measure (Shah and Peters 2020),
   which tests the covariance of the residuals of boosted-tree regressions; `"wgcm"`, the weighted

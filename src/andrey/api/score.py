@@ -1707,8 +1707,8 @@ def lges(
     insertion : {"safe", "conservative"}, default="safe"
         Which pairs of variables an edge addition leaves out (see Notes). ``"safe"`` (SafeInsert)
         leaves out a pair when one graph of the current class scores better without the edge; the
-        paper proves that each schedule then recovers the true class as the rows grow (its
-        Corollaries 1 and C.1) [1]_.
+        paper proves that each schedule then recovers the true class as the rows grow (see
+        Notes) [1]_.
         ``"conservative"`` (ConservativeInsert) also leaves out a pair when any valid addition of
         the edge worsens the score; it made fewer errors in the paper's simulations, with no such
         proof.
@@ -1718,9 +1718,10 @@ def lges(
         neither improves the score, and it stops when no move improves it. ``"lges0_released"``
         is the paper's LGES-0 (its Algorithm 8) in the phase order of the code published with the
         paper: additions, then deletions, then reversals, each phase run once until no move improves
-        the score. ``"lges"`` is the default: on the paper's linear-Gaussian simulation, with 10
-        to 100 variables, it made fewer errors than LGES-0 in most settings, the denser graphs
-        above all, and LGES-0 fewer in some sparse ones. LGES rescans the deletions and reversals
+        the score. ``"lges"`` is the default as the paper's main method. On the paper's
+        linear-Gaussian simulation, with 10 to 100 variables, the two made about as many errors on
+        the sparsest graphs (mean degree 1 and 2), with LGES-0 slightly ahead more often, and LGES
+        made fewer on denser ones (mean degree 3 and up). LGES rescans the deletions and reversals
         after every addition, so it takes longer.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
@@ -1802,11 +1803,15 @@ def lges(
     (``schedule="lges0_released"``) runs additions until none improves the score, then deletions,
     then reversals, once, as the code published with the paper does; the paper's Algorithm 8
     itself runs the reversals before the deletions, and the two orders can return different
-    classes. With ``insertion="safe"``, the paper proves that each recovers the true class as the
-    rows grow (its Corollary 1 for LGES, Corollary C.1 for LGES-0). Its LGES+, which also retries
-    each deletion, is not implemented. The paper's pseudocode leaves out a pair ``(x, y)`` also
-    when ``x`` is a descendant of ``y`` in ``G``, where adding ``x -> y`` to ``G`` would close a
-    cycle; the published code compares the two scores for every pair, and so does this search. A
+    classes. With ``insertion="safe"``, the paper proves that LGES recovers the true class as the
+    rows grow (its Corollary 1), and LGES-0 in Algorithm 8's order (its Corollary C.1). The same
+    argument (its Theorem 1) covers the published code's order: its reversals run once the
+    additions and deletions have reached the true class in that limit. Its LGES+, which also
+    retries each deletion, is not implemented. The paper's pseudocode leaves out a pair ``(x, y)``
+    also when ``x`` is a descendant of ``y`` in ``G``, where adding ``x -> y`` to ``G`` would close
+    a cycle; the published code compares the two scores for every pair, and so does this search.
+    Testing every pair keeps more pairs than the pseudocode, never fewer, so the paper's recovery
+    result for SafeInsert still holds; only the path of the search can differ. A
     move counts as improving when it lowers the score by more than ``1e-9``, the rule of every
     greedy search here; the published code applies a move when it raises its score, ``-1/2`` of
     this one up to a constant, by more than ``1e-6``. The paper's prior knowledge, which orders the

@@ -738,10 +738,12 @@ edges as GES and GIES do, and returns a CPDAG. `schedule` picks the order of the
 `"lges"`, the default, is the paper's main method, LGES (its Algorithm 1), which deletes and
 reverses edges before each single addition; `"lges0_released"` is its LGES-0 variant (Algorithm 8)
 with the phases in the order of the authors' code: additions, deletions, then reversals, once. LGES
-is the default because it made fewer errors than LGES-0 in most settings of the paper's
-linear-Gaussian simulation, the denser graphs above all. With the standard BIC, its default, each
-schedule returns the CPDAGs of the authors' code run in its order on that simulation when both read
-the same graph of each class; it is experimental until it is benchmarked in that setting.
+is the default as the paper's main method. On the paper's linear-Gaussian simulation the two made
+about as many errors on the sparsest graphs (mean degree 1 and 2), with LGES-0 slightly ahead more
+often, and LGES made fewer on denser ones (mean degree 3 and up). With the standard BIC, its
+default, each schedule returns the CPDAGs of the authors' code run in its order on that simulation
+when both read the same graph of each class; it is experimental until it is benchmarked in that
+setting.
 
 A method becomes supported once it has:
 

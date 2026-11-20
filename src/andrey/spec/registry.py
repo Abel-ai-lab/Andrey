@@ -883,8 +883,9 @@ _add(
                 "then reversing edges until neither improves the score before each single "
                 "addition; lges0_released is its LGES-0 (Algorithm 8) in the order of the "
                 "authors' code: additions, deletions, then reversals, once. lges is the "
-                "default: it made fewer errors on the paper's linear-Gaussian simulation in most "
-                "settings.",
+                "default as the paper's main method; on the paper's linear-Gaussian simulation "
+                "the two made about as many errors on the sparsest graphs and lges fewer on "
+                "denser ones.",
             ),
             _CATEGORICAL,
         ),
