@@ -28,7 +28,7 @@ from typing import NamedTuple
 
 from andrey.api._adapt import MAX_CATEGORIES
 from andrey.api._boundary import CAP_STOPS, measured
-from andrey.core.ci_missing import EM_METHODS, EM_SUPPORTED
+from andrey.core.ci_missing import EM_METHODS, EM_SUPPORTED, TESTWISE, TESTWISE_CLAIM
 from andrey.spec import REGISTRY
 from andrey.spec.concepts import CONCEPTS
 
@@ -41,6 +41,8 @@ SENTENCE_END = re.compile(r"\.\s+(?=[A-Z`:])")
 PENALTIES = ("penalty_discount", "ebic_gamma", "equivalent_sample_size")
 #: The score searches followed by FCI's tests and rules, which refuse missing values.
 FCI_SEARCHES = ("gfci", "boss_fci", "grasp_fci")
+# The refusing temporal methods that read units or datasets, not one series.
+PANELS = ("longitudinal_lingam", "jpcmciplus")
 
 
 class Shared(NamedTuple):
@@ -72,6 +74,13 @@ def can_pass_boundary(method: str) -> bool:
 def records_penalties(method: str) -> bool:
     """Whether a fit of ``method`` records the penalties its score used."""
     return any(key in REGISTRY[method].output.metadata for key in PENALTIES)
+
+
+def deletes_testwise(method: str) -> bool:
+    """Whether ``method``'s ``missing`` takes ``"testwise"``."""
+    return any(
+        p.concept == "missing" and TESTWISE in (p.choices or ()) for p in REGISTRY[method].params
+    )
 
 
 def refuses_missing(method: str, *, series: bool) -> bool:
@@ -209,7 +218,9 @@ SHARED = {
         "expectation-maximization (EM) over the expected covariance of the data, which assumes "
         "values missing completely at random or at random given observed values. ``None`` refuses "
         'missing values. On data with missing values, ``metadata["missing"]`` records the handling '
-        'used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.',
+        'used and ``metadata["em"]`` the EM record, with the rows dropped for observing no value and '
+        "the fewest rows two columns share; two columns that share no observed row raise "
+        "``ValueError``. See **Missing values.** in Notes.",
         lambda m: m in EM_SUPPORTED,
     ),
     "missing_em_experimental": Shared(
@@ -220,15 +231,21 @@ SHARED = {
         "structural expectation-maximization (EM) over the expected covariance of the data, which "
         "assumes values missing completely at random or at random given observed values. ``None`` "
         'refuses missing values. On data with missing values, ``metadata["missing"]`` records the '
-        'handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.',
+        'handling used and ``metadata["em"]`` the EM record, with the rows dropped for observing no '
+        "value and the fewest rows two columns share; two columns that share no observed row raise "
+        "``ValueError``. See **Missing values.** in Notes.",
         lambda m: m in EM_METHODS and m not in EM_SUPPORTED,
+    ),
+    # One sentence for every method that deletes rows per test, the pair methods included.
+    "testwise_claim": Shared(
+        "Notes", "**Missing values.**", "last", TESTWISE_CLAIM, deletes_testwise
     ),
     # icp, igsp, and ut_igsp end on "Drop the incomplete rows first."
     "drop_rows": Shared(
         "Notes",
         "**Missing values.**",
         "last",
-        "Drop the incomplete rows first, which suits values missing completely at random, or use "
+        "Drop the incomplete rows yourself, which suits values missing completely at random, or use "
         ":func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.",
         lambda m: (
             refuses_missing(m, series=False)
@@ -239,27 +256,37 @@ SHARED = {
         "Notes",
         "**Missing values.**",
         "last",
-        'Without ``"em"``, drop the incomplete rows first, which suits values missing completely at '
-        "random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.",
+        'Without ``"em"``, drop the incomplete rows yourself, which suits values missing completely '
+        "at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.",
         lambda m: m in EM_METHODS,
     ),
     "drop_rows_fci": Shared(
         "Notes",
         "**Missing values.**",
         "last",
-        "Drop the incomplete rows first, which suits values missing completely at random, or use "
+        "Drop the incomplete rows yourself, which suits values missing completely at random, or use "
         ":func:`~andrey.fci`, whose tests delete rows per test.",
         lambda m: m in FCI_SEARCHES,
     ),
-    # longitudinal_lingam reads units at each time point, not one series.
-    "fill_steps": Shared(
+    # longitudinal_lingam and jpcmciplus read units or datasets, not one series.
+    "keep_steps": Shared(
         "Notes",
         "**Missing values.**",
         "last",
-        "Fill in the missing steps first, as dropping one would join the steps around it, or use "
-        ":func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests "
-        "delete rows per test.",
-        lambda m: refuses_missing(m, series=True) and m != "longitudinal_lingam",
+        "Use :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose "
+        "tests delete rows per test and keep every time step, as dropping a step would join the "
+        "steps around it.",
+        lambda m: refuses_missing(m, series=True) and m not in PANELS,
+    ),
+    # jpcmciplus reads several series with their contexts, which the three methods above do not.
+    "drop_datasets": Shared(
+        "Notes",
+        "**Missing values.**",
+        "last",
+        "No method that accepts missing values reads several datasets with their contexts, as "
+        ":func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, and :func:`~andrey.lpcmci` read one "
+        "series, so drop the datasets that hold one.",
+        lambda m: m == "jpcmciplus",
     ),
     "limits": Shared(
         "Notes",

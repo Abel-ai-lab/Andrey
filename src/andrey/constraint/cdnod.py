@@ -60,6 +60,7 @@ from andrey.constraint.pc import (
 )
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import make_indep_test
+from andrey.core.ci_missing import mark_environment
 from andrey.core.independence import _center_kernel, _gaussian_kernel
 from andrey.core.knowledge import orient
 from andrey.core.orient import _is_directed, _reaches_directed, meek, to_structure
@@ -191,12 +192,15 @@ def cdnod(
         padded = None if constraints is None else constraints.padded(d + 1)
         allowed, keep, apart = knowledge_masks(padded)
         skeleton, sepsets, pvalues = adjacency_search(
-            make_indep_test(
-                indep_test,
-                augmented,
-                categorical=mask,
-                seed=seed,
-                degrees_of_freedom=degrees_of_freedom,
+            mark_environment(
+                make_indep_test(
+                    indep_test,
+                    augmented,
+                    categorical=mask,
+                    seed=seed,
+                    degrees_of_freedom=degrees_of_freedom,
+                ),
+                d,
             ),
             d + 1,
             alpha,
@@ -211,12 +215,15 @@ def cdnod(
         if _index_edges is not None:
             _index_edges.extend(np.flatnonzero(skeleton[d] != NULL).tolist())
         if collider_rule != "sepsets":
-            test = make_indep_test(
-                indep_test,
-                augmented,
-                categorical=mask,
-                seed=seed,
-                degrees_of_freedom=degrees_of_freedom,
+            test = mark_environment(
+                make_indep_test(
+                    indep_test,
+                    augmented,
+                    categorical=mask,
+                    seed=seed,
+                    degrees_of_freedom=degrees_of_freedom,
+                ),
+                d,
             )
             sources = np.flatnonzero(skeleton[d] != NULL).tolist()
             through_context = {(a, d, c) for a, c in combinations(sources, 2)}

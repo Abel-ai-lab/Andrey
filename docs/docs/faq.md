@@ -187,14 +187,18 @@ empty in a CSV file. Each conditional-independence test then reads only the samp
 variables are observed (test-wise deletion), so the fit keeps the samples that dropping every
 incomplete one would lose; `missing="testwise"` names this handling, the default, and PC also takes
 `missing="mvpc"`, a correction for values whose missingness depends on the variables.
-Test-wise deletion is sound when values are missing completely at random; when whether a value is
-missing depends on the variables, a test can be biased. The [release cards](benchmarks.md) measure
+Test-wise deletion is valid when values are missing completely at random; when whether a value is
+missing depends on the variables, a test can be biased. A test with too few rows, as for two
+columns never observed together in merged cohorts, is not tested and decides nothing; the pairs it
+leaves undecided are listed in `metadata["undecided_pairs"]`. The [release cards](benchmarks.md) measure
 it against dropping incomplete samples. The searches whose fit reads the data only through their
 covariance, {{ em_methods }}, take `missing="em"`: structural EM over the expected covariance of
-the data, sound when values are missing completely at random or at random given observed values. It
+the data, which suits linear-Gaussian data whose missing values depend at most on columns that
+have none; this is measured, not proved. It
 is supported in GES, hill climbing, Tabu search, BOSS, GRaSP, and NOTEARS, where it runs Friedman's
-alternating scheme: 10 searches, with 5 parameter-only EM steps before each after the first. It is
-experimental in the others, which have no reference implementation to compare with; the
+alternating scheme: 10 searches unless you pass `n_em_iterations`, with 5 parameter-only EM steps
+before each after the first. It is experimental in the others, which have no reference
+implementation to compare with; the
 [missing-data comparison](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/missing-data.md)
 has what we measured.
 The other methods refuse missing values with an error that says what to do

@@ -35,6 +35,7 @@ from andrey.constraint.pc import (
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
 from andrey.core._bitset import row_masks, semidirected_reach_set
 from andrey.core.ci import CITest, make_indep_test, pins_blas
+from andrey.core.ci_missing import TestwiseDeletion
 from andrey.core.orient import separating_set
 from andrey.core.ties import tie_mask, tie_ranks
 
@@ -638,6 +639,8 @@ def possible_dsep_step(
         by_rank, ranked_test = _test_in_rank_order(
             X, indep_test, categorical, seed, degrees_of_freedom
         )
+        if isinstance(test, TestwiseDeletion) and isinstance(ranked_test, TestwiseDeletion):
+            ranked_test.mark_environments(np.flatnonzero(np.isin(by_rank, test.environments)))
         _remove_by_possible_dsep(
             marks,
             ranked_test,
@@ -731,13 +734,16 @@ def _test_in_rank_order(
     """
     by_rank = np.argsort(tie_ranks(X, tie_mask(indep_test, categorical, X.shape[1])))
     mask = None if categorical is None else np.asarray(categorical)[by_rank]
-    return by_rank, make_indep_test(
+    test = make_indep_test(
         indep_test,
         np.ascontiguousarray(X[:, by_rank]),
         categorical=mask,
         seed=seed,
         degrees_of_freedom=degrees_of_freedom,
     )
+    if isinstance(test, TestwiseDeletion):
+        test.from_columns(by_rank)  # its queries count as pairs of X's columns
+    return by_rank, test
 
 
 def _remove_in_node_order(

@@ -6,6 +6,8 @@ import io
 import json
 import re
 import shlex
+import subprocess
+import sys
 import textwrap
 import tomllib
 import warnings
@@ -695,6 +697,101 @@ def test_fit_warnings_go_in_the_envelope_not_stderr(capsys, csv_path, filter_act
     [warning] = json.loads(out)["run"]["warnings"]
     assert warning["category"] == "SearchLimitWarning"
     assert warning["message"].startswith("hc stopped at its limit of max_iter=1 moves")
+
+
+@pytest.fixture
+def gappy_path(tmp_path, csv_path):
+    """The chain of ``csv_path`` with about one cell in ten missing, as empty fields."""
+    data = np.loadtxt(csv_path, delimiter=",")
+    data[np.random.default_rng(1).random(data.shape) < 0.1] = np.nan
+    path = tmp_path / "gappy.csv"
+    path.write_text(
+        "\n".join(",".join("" if np.isnan(v) else repr(float(v)) for v in row) for row in data)
+    )
+    return path
+
+
+def test_the_notice_of_a_default_goes_in_the_envelope_not_stderr(capsys, gappy_path):
+    code, out, err = _run(["run", "pc", "--data", str(gappy_path), "--json"], capsys)
+    assert code == 0 and err == ""
+    [notice] = json.loads(out)["run"]["warnings"]
+    assert notice["category"] == "LogWarning"
+    assert notice["message"].startswith("andrey.pc: the data hold missing values and missing=None")
+
+
+def test_a_run_on_data_with_gaps_writes_nothing_to_stderr(tmp_path, gappy_path):
+    """In a fresh process, where a logger with no handler would print to standard error."""
+    run = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; from andrey.cli import main; sys.exit(main())",
+            "run",
+            "pc",
+            "--data",
+            str(gappy_path),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=tmp_path,
+    )
+    assert run.stderr == ""
+    assert json.loads(run.stdout)["run"]["warnings"][0]["category"] == "LogWarning"
+
+
+def test_a_run_isolates_the_loggers_during_the_fit_and_restores_them(capsys, gappy_path):
+    """A handler on the root or the ``andrey`` logger sees none of the fit's records."""
+    import logging
+
+    seen = io.StringIO()
+    own = logging.StreamHandler(seen)
+    root, logger = logging.getLogger(), logging.getLogger("andrey")
+    root.addHandler(own)
+    logger.addHandler(own)
+    before = (list(logger.handlers), logger.propagate)
+    try:
+        code, out, err = _run(["run", "pc", "--data", str(gappy_path), "--json"], capsys)
+        assert (list(logger.handlers), logger.propagate) == before
+    finally:
+        root.removeHandler(own)
+        logger.removeHandler(own)
+    assert code == 0 and err == "" and seen.getvalue() == ""
+    assert json.loads(out)["run"]["warnings"][0]["category"] == "LogWarning"
+
+
+@pytest.mark.parametrize("name", ["andrey", ""])
+def test_a_logger_set_above_warning_keeps_the_fit_notice_and_its_level(capsys, gappy_path, name):
+    """A threshold above ``WARNING`` on the ``andrey`` or the root logger drops no record."""
+    import logging
+
+    logger = logging.getLogger(name or None)
+    level = logger.level
+    logger.setLevel(logging.ERROR)
+    try:
+        code, out, err = _run(["run", "pc", "--data", str(gappy_path), "--json"], capsys)
+        assert logger.level == logging.ERROR
+    finally:
+        logger.setLevel(level)
+    assert code == 0 and err == ""
+    [notice] = json.loads(out)["run"]["warnings"]
+    assert notice["category"] == "LogWarning"
+
+
+def test_the_records_bootstrap_workers_log_go_in_the_envelope_not_stderr(capfd, tmp_path):
+    """Structural EM's warning, logged in worker processes, reaches ``run.warnings`` once."""
+    x = np.random.default_rng(0).standard_normal((300, 3))
+    x[:, 1] += x[:, 0]
+    x[np.random.default_rng(1).random(x.shape) < 0.1] = np.nan
+    path = tmp_path / "gaps.csv"
+    np.savetxt(path, x, delimiter=",", header="a,b,c", comments="")
+    argv = ["bootstrap", "ges", "--data", str(path), "--n-resamples", "4", "--json"]
+    with andrey.config(n_jobs=2):
+        code, out, err = _run([*argv, "missing=em", "n_em_iterations=1"], capfd)
+    assert code == 0 and err == ""
+    logged = [w for w in json.loads(out)["run"]["warnings"] if w["category"] == "LogWarning"]
+    assert [w["message"][:44] for w in logged] == ["structural EM: the graph still changed in th"]
 
 
 # --- shell-aware output ---------------------------------------------------------------------------
@@ -1415,3 +1512,17 @@ def test_the_bootstrap_reads_contexts_and_blocks_of_every_dataset(tmp_path, caps
     code, out, err = _run(argv, capsys)
     assert code == 0, err
     assert json.loads(out)["structure"]["labels"] == ["x", "y"]
+
+
+def test_a_p_value_not_tested_is_null_in_strict_json(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr("sys.stdout.isatty", lambda: False)
+    rng = np.random.default_rng(0)
+    x = rng.standard_normal((200, 3))
+    x[:100, 1] = np.nan  # columns 1 and 2 never observed together
+    x[100:, 2] = np.nan
+    path = tmp_path / "gaps.csv"
+    np.savetxt(path, x, delimiter=",", header="a,b,c", comments="")
+    code, out, _ = _run(["run", "pcmci", "--data", str(path)], capsys)
+    assert code == 0
+    env = json.loads(out, parse_constant=lambda token: pytest.fail(f"non-standard {token}"))
+    assert None in [p for lag in env["metadata"]["p_values"] for row in lag for p in row]

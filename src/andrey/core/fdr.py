@@ -48,13 +48,14 @@ def corrected_pvalues(
 
     ``"none"`` returns ``p_values`` itself. ``"fdr_bh"`` returns a copy whose entries are replaced
     with their :func:`benjamini_hochberg` adjustment over all the entries together. An entry
-    ``excluded`` (a mask of the same shape) is no test: it is not counted and keeps its value.
+    ``excluded`` (a mask of the same shape) is no test, and neither is a ``NaN`` entry, a test not
+    tested (:data:`~andrey.core.ci_missing.NOT_TESTED`): it is not counted and keeps its value.
     Raises :class:`ValueError` for another ``fdr_method``.
     """
     check_fdr_method(fdr_method)
     if fdr_method == "none":
         return p_values
-    tested = np.ones(p_values.shape, dtype=bool) if excluded is None else ~excluded
+    tested = ~np.isnan(p_values) if excluded is None else ~excluded & ~np.isnan(p_values)
     corrected = p_values.copy()
     corrected[tested] = benjamini_hochberg(p_values[tested])
     return corrected

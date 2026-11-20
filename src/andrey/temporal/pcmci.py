@@ -65,7 +65,7 @@ from andrey.core.ci import (
     StudentT,
     make_indep_test,
 )
-from andrey.core.ci_missing import PartialCorrelationDeletion, testwise_deletion
+from andrey.core.ci_missing import PartialCorrelationDeletion, not_tested, testwise_deletion
 from andrey.core.fdr import check_fdr_method, corrected_pvalues
 from andrey.core.score import CopiedColumnsError, copies_error
 from andrey.core.ties import KEY_DP, tie_ranks
@@ -364,6 +364,7 @@ def pc1(
     ranks: Sequence[int],
     constraints: LaggedConstraints | None = None,
     max_depth: int | None = None,
+    undecided: list[Link] | None = None,
 ) -> tuple[Link, ...]:
     """Select the lagged parents of variable ``target`` with the PC1 rounds; strongest first.
 
@@ -371,9 +372,15 @@ def pc1(
     re-sorts the survivors by strength rounded to ``KEY_DP`` decimals, strongest first, and equal
     ones by ``ranks[i]``, then by lag, for the candidate ``(i, lag)``; ``ranks`` holds each
     variable's :func:`~andrey.core.ties.tie_ranks`. Each round is one ``test`` call over all
-    remaining candidates. With ``constraints``, a forbidden link is no candidate, and a required one
-    is never tested: it stays, with the strength of a partial correlation of ``1``. With
-    ``max_depth``, the rounds stop after ``p = max_depth``, so no test conditions on more.
+    remaining candidates. A test that was not tested
+    (:data:`~andrey.core.ci_missing.NOT_TESTED`) neither removes its candidate nor sets its
+    strength. A candidate whose first test, given no condition, was not tested has no tested
+    result, as no later test, given more, can run on more rows: it leaves the candidates after
+    that round, so no test conditions on it, and is no parent; with ``undecided``, it is appended
+    there. With
+    ``constraints``, a forbidden link is no candidate, and a required one is never tested: it
+    stays, with the strength of a partial correlation of ``1``. With ``max_depth``, the rounds
+    stop after ``p = max_depth``, so no test conditions on more.
     """
     columns = np.array(
         [_column((i, lag), n_vars) for i in range(n_vars) for lag in range(1, tau_max + 1)],
@@ -399,6 +406,13 @@ def pc1(
             )
         strength = np.fmin(strength, np.abs(statistics))
         kept = np.flatnonzero(~(p_values > pc_alpha))
+        if p == 0:  # a candidate with no tested result conditions no test
+            untested = not_tested(p_values[kept])
+            if undecided is not None:
+                undecided.extend(
+                    (int(c) % n_vars, int(c) // n_vars) for c in columns[kept[untested]]
+                )
+            kept = kept[~untested]
         kept = kept[np.lexsort((tie[kept], -np.round(strength[kept], KEY_DP)))]
         columns, strength, tie = columns[kept], strength[kept], tie[kept]
         p += 1

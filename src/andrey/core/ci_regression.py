@@ -158,6 +158,12 @@ class _RegressionTest:
 
     pin_blas = True  # read by pins_blas: the skeleton scans run it on one BLAS thread
 
+    @staticmethod
+    def least_rows(size: int, **options: object) -> int:
+        """The fewest rows a query given ``size`` conditioning variables is tested on: ``4``, the
+        rows each column needs to be standardized and regressed."""
+        return 4
+
     def __init__(
         self, data: np.ndarray, *, regression: str, seed: int | None, name: str, min_rows: int = 4
     ) -> None:
@@ -438,6 +444,12 @@ class WGCM(_RegressionTest):
        https://doi.org/10.1214/19-AOS1857
     """
 
+    @staticmethod
+    def least_rows(size: int, *, variant: object = "est", **options: object) -> int:
+        """The fewest rows a query given ``size`` conditioning variables is tested on: ``17`` for
+        ``variant="est"``, whose 30% part then holds the 6 rows a forest splits, else ``4``."""
+        return 17 if variant == "est" else 4
+
     def __init__(
         self,
         data: np.ndarray,
@@ -448,8 +460,7 @@ class WGCM(_RegressionTest):
     ) -> None:
         if variant not in WGCM_VARIANTS:
             raise ValueError(f"variant must be one of {WGCM_VARIANTS}, got {variant!r}")
-        # "est" needs the rows a forest splits in its 30% part: ceil(0.3 n) >= 6.
-        min_rows = 17 if variant == "est" else 4
+        min_rows = self.least_rows(0, variant=variant)
         super().__init__(data, regression=regression, seed=seed, name="wGCM", min_rows=min_rows)
         self._variant = variant
         n = self._n
@@ -600,6 +611,13 @@ class PCM(_RegressionTest):
        52(6), 2851-2878. https://doi.org/10.1214/24-AOS2447
     """
 
+    @staticmethod
+    def least_rows(size: int, **options: object) -> int:
+        """The fewest rows a query given ``size`` conditioning variables is tested on: ``12``, so
+        each half of a split holds the 6 rows a forest splits and the learned function can
+        vary."""
+        return 2 * _FOREST_MIN_SPLIT
+
     def __init__(
         self,
         data: np.ndarray,
@@ -610,9 +628,8 @@ class PCM(_RegressionTest):
     ) -> None:
         if isinstance(n_splits, bool) or not isinstance(n_splits, int | np.integer) or n_splits < 1:
             raise ValueError(f"n_splits must be a whole number of at least 1, got {n_splits!r}")
-        # Each half needs the rows a forest splits, so the learned function can vary.
         super().__init__(
-            data, regression=regression, seed=seed, name="PCM", min_rows=2 * _FOREST_MIN_SPLIT
+            data, regression=regression, seed=seed, name="PCM", min_rows=self.least_rows(0)
         )
         n = self._n
         rng = np.random.default_rng([self._seed, n, 2])

@@ -19,6 +19,7 @@ import importlib.metadata
 import inspect
 import io
 import json
+import logging
 import math
 import os
 import platform
@@ -42,6 +43,7 @@ from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgeError
 from andrey.core.output import RegimeOutput, regime_summary_lines, summary_lines
 from andrey.core.removed import removal_hint
 from andrey.core.structure import SUMMARY_EDGES, edge_count_text, edge_lines, node_labels
+from andrey.core.warning_policy import held_records
 from andrey.resample import bootstrap_summary_lines
 from andrey.spec import ENV_VARS, REGISTRY, SCHEMA_VERSION, get_spec, help_schema, list_specs
 from andrey.spec.concepts import BOOTSTRAP_PARAMS, MARKOV_CHECK_PARAMS
@@ -1114,6 +1116,30 @@ def fit_errors() -> Generator[None]:
         raise CliError("algorithm_failure", str(exc), EXIT_ALGORITHM) from exc
 
 
+class LogWarning(Warning):
+    """The category ``run.warnings`` gives a warning-level log record of a fit."""
+
+
+@contextlib.contextmanager
+def recorded_warnings() -> Generator[list[warnings.WarningMessage]]:
+    """Record a fit's warnings and the warning-level records of its loggers, for ``run.warnings``.
+
+    The list fills when the block exits, the warnings first and the warning-level log records
+    after, each record as a :class:`LogWarning`. The records are held by
+    :func:`~andrey.core.warning_policy.held_records`, so none reaches standard error, and none is
+    lost to a logger whose level is above ``WARNING``.
+    """
+    with held_records() as records:
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            yield caught
+        caught.extend(
+            warnings.WarningMessage(r.getMessage(), LogWarning, r.pathname, r.lineno)
+            for r in records
+            if r.levelno >= logging.WARNING
+        )
+
+
 def run_info(
     positional: list,
     resolved: dict,
@@ -1134,20 +1160,37 @@ def run_info(
     return run
 
 
+def strict_json(value: object) -> str:
+    """``value`` as standard JSON, indented: a number that is not finite, as the p-value of a test
+    that was not tested, is ``null``."""
+
+    def finite(item: object) -> object:
+        if isinstance(item, float) and not math.isfinite(item):
+            return None
+        if isinstance(item, dict):
+            return {key: finite(v) for key, v in item.items()}
+        if isinstance(item, (list, tuple)):
+            return [finite(v) for v in item]
+        return item
+
+    return json.dumps(finite(value), indent=2, allow_nan=False)
+
+
 def emit(env: dict, human: Callable[[], str], *, output: str | None, as_json: bool, full: bool):
-    """Write the envelope to ``output``, or print it: capped JSON, or ``human()`` on a terminal."""
+    """Write the envelope to ``output``, or print it: capped JSON (:func:`strict_json`), or
+    ``human()`` on a terminal."""
     if output:  # a file is not context-bounded -> always the complete envelope
-        _atomic_write(output, json.dumps(env, indent=2))
+        _atomic_write(output, strict_json(env))
         return
     if not full:  # bound stdout so a large graph can't flood it
         apply_output_cap(env, EDGE_LIMIT)
     if as_json or not sys.stdout.isatty():  # piped / agent / CI / forced -> JSON
-        typer.echo(json.dumps(env, indent=2))
+        typer.echo(strict_json(env))
         return
     try:  # an interactive terminal -> a human summary (never fail to produce output)
         typer.echo(human())
     except Exception:
-        typer.echo(json.dumps(env, indent=2))
+        typer.echo(strict_json(env))
 
 
 def execute_run(
@@ -1170,8 +1213,7 @@ def execute_run(
     start = time.perf_counter()
     with fit_errors():
         # The fit's warnings travel in the envelope: stderr carries only a failure's JSON.
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
+        with recorded_warnings() as caught:
             out = fn(*positional, **fkwargs)
     elapsed = time.perf_counter() - start
     if isinstance(out, list):
@@ -1275,8 +1317,7 @@ def execute_bootstrap(
     aligned = {inp.name: x for inp, x in zip(spec.data.inputs[1:], positional[1:])}
     start = time.perf_counter()
     with fit_errors():
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
+        with recorded_warnings() as caught:
             out = andrey.bootstrap(
                 spec.name,
                 positional[0],
@@ -1397,8 +1438,7 @@ def execute_markov_check(
     table = _table(data, labels)
     start = time.perf_counter()
     with fit_errors():
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
+        with recorded_warnings() as caught:
             out = andrey.markov_check(
                 graph,
                 table,  # ty: ignore[invalid-argument-type]  # one table; _table also takes a list

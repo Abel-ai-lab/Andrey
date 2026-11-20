@@ -602,6 +602,12 @@ class FisherZ(PartialCorrelationTest):
         return df
 
     @staticmethod
+    def least_rows(size: int, **options: object) -> int:
+        """The fewest rows a query given ``size`` conditioning variables has degrees of freedom on,
+        ``n - size - 3 >= 1``: ``size + 4``."""
+        return size + 4
+
+    @staticmethod
     def _pvalue(r: np.ndarray | float, df: int) -> np.ndarray | float:
         z = 0.5 * np.log((1.0 + r) / (1.0 - r))
         return 2.0 * ndtr(-np.sqrt(df) * np.abs(z))
@@ -625,6 +631,12 @@ class StudentT(PartialCorrelationTest):
                 "need n > |S| + 2"
             )
         return df
+
+    @staticmethod
+    def least_rows(size: int, **options: object) -> int:
+        """The fewest rows a query given ``size`` conditioning variables has degrees of freedom on,
+        ``n - size - 2 >= 1``: ``size + 3``."""
+        return size + 3
 
     @staticmethod
     def _pvalue(r: np.ndarray | float, df: int) -> np.ndarray | float:
@@ -976,7 +988,9 @@ class ChiSquare:
     the configurations, each table's empty rows and columns struck: the degrees of freedom of
     Spirtes et al. [1]_, less one for each cell with no expected count, in the exact form for cells
     of an empty row or column [6]_. The two rules differ only on sparse tables, and the statistic
-    is the same under both. With zero degrees of freedom the p-value is ``1``.
+    is the same under both. With zero degrees of freedom the p-value is :attr:`zero_dof_pvalue`,
+    ``1`` by default: the rows hold no evidence for or against independence, and the answer reads
+    as independence.
 
     **Limitations.** Referring the statistic to ``(r_x - 1) * (r_y - 1)`` degrees of freedom
     over-rejects a true independence once the table is sparse, G-square more than Pearson [5]_.
@@ -1049,6 +1063,10 @@ class ChiSquare:
     .. [6] Bishop, Y. M. M., Fienberg, S. E., and Holland, P. W. (1975). Discrete Multivariate
        Analysis: Theory and Practice. MIT Press.
     """
+
+    #: The p-value of a query with zero degrees of freedom. Test-wise deletion sets it to
+    #: :data:`~andrey.core.ci_missing.NOT_TESTED` on the test of each block.
+    zero_dof_pvalue: float = 1.0
 
     def __init__(
         self, data: np.ndarray, *, g_square: bool = False, degrees_of_freedom: str = "mean"
@@ -1268,7 +1286,7 @@ class ChiSquare:
         per_table = self._dofs([(n_sx, n_sy, n_s)])[0]
         dof = float(np.sum(per_table))
         if dof == 0.0:
-            return statistic, 1.0
+            return statistic, self.zero_dof_pvalue
         return statistic, float(chdtrc(dof, max(statistic, 0.0)))
 
     def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
@@ -1491,14 +1509,13 @@ class ChiSquare:
         statistic = 2.0 * sums if self._g_square else sums - float(self._n)
         return statistic, (n_sx, n_sy, n_s)
 
-    @staticmethod
     def _table_pvalue(
-        statistic: np.ndarray, bounds: np.ndarray, per_table: np.ndarray
+        self, statistic: np.ndarray, bounds: np.ndarray, per_table: np.ndarray
     ) -> np.ndarray:
         """The p-values of tests with ``statistic`` and the null means ``per_table`` of their
         tables, test ``i`` owning ``per_table[bounds[i]:bounds[i + 1]]``."""
         dof = _segment_sums(per_table, bounds)
-        out = np.ones(len(dof))
+        out = np.full(len(dof), self.zero_dof_pvalue)
         live = dof != 0
         out[live] = chdtrc(dof[live], np.maximum(statistic[live], 0.0))
         return out
@@ -1524,9 +1541,9 @@ class DGTest:
     correlations of ``x``'s and ``y``'s columns after the linear regression on ``S``'s. Its degrees
     of freedom are the product of the two variables' numbers of columns, and its p-value is the
     chi-square survival function. A direction of ``x`` or ``y`` that ``S`` determines exactly
-    carries no information and adds no degree of freedom; with none left, the p-value is ``1``. On
-    continuous columns only, the statistic is ``-n log(1 - r**2)`` with ``r`` the partial
-    correlation.
+    carries no information and adds no degree of freedom; with none left, the p-value is ``1``,
+    which reads as independence without evidence. On continuous columns only, the statistic is
+    ``-n log(1 - r**2)`` with ``r`` the partial correlation.
 
     The statistic does not depend on the columns' units, and queries are canonicalized as
     :class:`FisherZ`'s are, so the p-value does not depend on the argument order.
@@ -1555,6 +1572,11 @@ class DGTest:
     .. [2] Andrews, B., Ramsey, J., and Cooper, G. F. (2018). Scoring Bayesian networks of mixed
        variables. International Journal of Data Science and Analytics 6(1), 3-18.
     """
+
+    #: The p-value of a query with zero degrees of freedom, ``1``: the rows hold no evidence for or
+    #: against independence. Test-wise deletion sets it to
+    #: :data:`~andrey.core.ci_missing.NOT_TESTED` on the test of each block.
+    zero_dof_pvalue: float = 1.0
 
     def __init__(self, data: np.ndarray, categorical: npt.ArrayLike | None = None) -> None:
         self._dg = DegenerateGaussian(data, categorical)
@@ -1740,7 +1762,7 @@ class DGTest:
         wy = _whitener(block[px:, px:])
         dof = wx.shape[1] * wy.shape[1]
         if dof == 0:
-            return 0.0, 1.0
+            return 0.0, self.zero_dof_pvalue
         rho = np.linalg.svd(wx.T @ block[:px, px:] @ wy, compute_uv=False)
         rho = np.minimum(rho, ONE_MINUS_EPS)
         statistic = -self._dg.n * float(np.sum(np.log1p(-(rho * rho))))
@@ -1796,6 +1818,17 @@ class CGTest:
        variables. International Journal of Data Science and Analytics 6(1), 3-18.
     """
 
+    #: The p-value of a query with zero degrees of freedom, ``1``: the rows hold no evidence for or
+    #: against independence. Test-wise deletion sets it to
+    #: :data:`~andrey.core.ci_missing.NOT_TESTED` on the test of each block.
+    zero_dof_pvalue: float = 1.0
+
+    @staticmethod
+    def least_rows(size: int, **options: object) -> int:
+        """The fewest rows a query given ``size`` conditioning variables is tested on, ``size + 3``:
+        the rows that fit ``x``, ``y``, and the set when all are continuous."""
+        return size + 3
+
     def __init__(self, data: np.ndarray, categorical: npt.ArrayLike | None = None) -> None:
         self._cg = ConditionalGaussian(data, categorical)
         self._d: int = np.shape(data)[1]
@@ -1829,6 +1862,8 @@ class CGTest:
         k = [cg.dof(s) for s in sets]
         statistic = 2.0 * (ll[0] - ll[1] - ll[2] + ll[3])
         dof = k[0] - k[1] - k[2] + k[3]
+        if dof == 0:
+            return statistic, self.zero_dof_pvalue
         return statistic, float(chdtrc(dof, max(statistic, 0.0)))
 
     def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
@@ -1885,8 +1920,9 @@ class CGTest:
         k = [cg.dof(s) for s in sets]
         quads = range(0, len(sets), 4)
         statistic = [2.0 * (ll[i] - ll[i + 1] - ll[i + 2] + ll[i + 3]) for i in quads]
-        dof = [k[i] - k[i + 1] - k[i + 2] + k[i + 3] for i in quads]
-        return np.asarray(chdtrc(dof, np.maximum(statistic, 0.0)), dtype=np.float64).reshape(-1)
+        dof = np.array([k[i] - k[i + 1] - k[i + 2] + k[i + 3] for i in quads], dtype=np.float64)
+        p = np.asarray(chdtrc(dof, np.maximum(statistic, 0.0)), dtype=np.float64).reshape(-1)
+        return np.where(dof == 0, self.zero_dof_pvalue, p)
 
 
 # The module and class of each nonlinear test. Building one imports only its own module: GPDC's

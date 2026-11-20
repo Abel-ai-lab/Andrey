@@ -12,6 +12,7 @@ the same at any worker count, and the first ``k`` resamples of a longer run are 
 from __future__ import annotations
 
 import inspect
+import logging
 import math
 import warnings
 from collections.abc import Callable, Mapping, Sequence
@@ -25,10 +26,15 @@ import numpy as np
 
 from andrey import api
 from andrey.api._adapt import flag, int_in_range, is_column_list
-from andrey.api._method import removed_name_error
+from andrey.api._method import (
+    MISSING_DEFAULT_NOTICE,
+    notice_default_missing,
+    removed_name_error,
+)
 from andrey.core import ARROW, CIRCLE, LATENT, TAIL, GraphStructure, StructureOutput, environments
 from andrey.core import backend as _backend
 from andrey.core._convert import extend_in_order, mag_of_pag, pag_of
+from andrey.core.ci_missing import TESTWISE
 from andrey.core.knowledge import mpdag
 from andrey.core.knowledge import orient as knowledge_orient
 from andrey.core.orient import cpdag_of_pdag
@@ -42,7 +48,13 @@ from andrey.core.structure import (
     is_ancestral_kind,
 )
 from andrey.core.ties import tie_ranks
-from andrey.core.warning_policy import AndreyWarning, warn_once
+from andrey.core.warning_policy import (
+    AndreyWarning,
+    held_records,
+    logged_later,
+    mark_logged,
+    warn_once,
+)
 from andrey.search._parallel import pick_context
 
 if TYPE_CHECKING:
@@ -870,8 +882,40 @@ def _draw(job: Job, b: int) -> list[np.ndarray]:
     return [rng.integers(0, n, size=n) for n in sizes]
 
 
-def _run_one(job: Job, b: int) -> tuple[Any, list[tuple[type[Warning], str]]]:
-    """Fit resample ``b``; return the fit and the warnings it raised."""
+#: A log record as ``(logger name, level, message, path, line, function)``, which pickles as a
+#: record may not.
+Logged = tuple[str, int, str, str, int, str]
+#: What one resample's fit returns: the fit, the warnings it raised, and its log records.
+Fitted = tuple[Any, list[tuple[type[Warning], str]], list[Logged]]
+#: The attribute of a resample's error that holds the records its fit logged before it raised.
+_RECORDS = "andrey_bootstrap_records"
+
+
+def _logged(records: list[logging.LogRecord]) -> list[Logged]:
+    return [(r.name, r.levelno, r.getMessage(), r.pathname, r.lineno, r.funcName) for r in records]
+
+
+def _relog(records: Sequence[Logged], seen: set[tuple[str, int, str]]) -> None:
+    """Log each of ``records`` through its own logger, from where it was logged, once.
+
+    A record whose logger, level, and message are in ``seen`` is skipped; ``seen`` gains the others.
+    """
+    for name, level, message, path, line, function in records:
+        if (name, level, message) in seen:
+            continue
+        seen.add((name, level, message))
+        logger = logging.getLogger(name)
+        if logger.isEnabledFor(level):
+            logger.handle(logger.makeRecord(name, level, path, line, message, (), None, function))
+
+
+def _run_one(job: Job, b: int) -> Fitted:
+    """Fit resample ``b``; return the fit, the warnings it raised, and the records it logged.
+
+    The records are held (:func:`~andrey.core.warning_policy.held_records`) in a worker process as
+    in this one, so :func:`fit_resamples` logs them in the calling process, whatever the workers. A
+    fit that raises carries its records on the error, as its attribute ``_RECORDS``.
+    """
     idx = _draw(job, b)
     if job.unit in _PANEL_UNITS:
         data = [_take(x, ix) for x, ix in zip(job.data, idx)]
@@ -883,16 +927,18 @@ def _run_one(job: Job, b: int) -> tuple[Any, list[tuple[type[Warning], str]]]:
         sequence = np.random.SeedSequence(job.seed, spawn_key=(b, 1))
         kwargs["seed"] = int(sequence.generate_state(1)[0])
     fit = getattr(api, job.name)
+    records: list[logging.LogRecord] = []
     try:
-        with warnings.catch_warnings(record=True) as caught:
+        with held_records() as records, warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             out = fit(data, **aligned, **kwargs)
     except Exception as exc:
         exc.add_note(
             f"raised in bootstrap resample {b} of seed {job.seed}; its rows are the draw's"
         )
+        setattr(exc, _RECORDS, _logged(records))
         raise
-    return out, [(w.category, str(w.message)) for w in caught]
+    return out, [(w.category, str(w.message)) for w in caught], _logged(records)
 
 
 _JOB: Job | None = None
@@ -900,34 +946,69 @@ _BLAS: object = None  # a held threadpoolctl controller capping this worker's BL
 
 
 def _init_worker(job: Job) -> None:
-    """Pin a worker to one fit at a time on one BLAS thread, with the parent's settings."""
+    """Pin a worker to one fit at a time on one BLAS thread, with the parent's settings.
+
+    A worker logs no notice of a default handling of missing values: :func:`bootstrap` logs it in
+    the calling process, once for every worker.
+    """
     global _JOB, _BLAS
     from threadpoolctl import threadpool_limits
 
     _BLAS = threadpool_limits(limits=1)  # held for the worker's lifetime
+    mark_logged(MISSING_DEFAULT_NOTICE)
     _backend.config.n_jobs = 1
     _backend.config.backend = job.backend
     _backend.config.tie_break = job.tie_break
     _JOB = job
 
 
-def _task(b: int) -> tuple[Any, list[tuple[type[Warning], str]]]:
+def _task(b: int) -> Fitted:
     """Worker side of one resample."""
     assert _JOB is not None  # _init_worker runs before any task
     return _run_one(_JOB, b)
 
 
-def fit_resamples(job: Job, n_resamples: int, workers: int) -> list[tuple[Any, list]]:
-    """Fit every resample, in order, in this process or on ``workers`` worker processes."""
-    if workers <= 1:
-        with _backend.one_blas_thread(), _backend.config(n_jobs=1):
-            return [_run_one(job, b) for b in range(n_resamples)]
+def fit_resamples(job: Job, n_resamples: int, workers: int) -> list[Fitted]:
+    """Fit every resample, in order, in this process or on ``workers`` worker processes.
+
+    The records each fit logged are logged here as its result comes in, in order, once each by
+    logger, level, and message (:func:`_relog`); a fit that raises has its records logged before
+    its error goes on, after those of the fits before it.
+    """
+    seen: set[tuple[str, int, str]] = set()
+    results: list[Fitted] = []
+    try:
+        if workers <= 1:
+            # As on workers, the fits log no notice of a default handling of missing values:
+            # bootstrap logs it once, from every fit's metadata.
+            with (
+                _backend.one_blas_thread(),
+                _backend.config(n_jobs=1),
+                logged_later(MISSING_DEFAULT_NOTICE),
+            ):
+                for b in range(n_resamples):
+                    results.append(_run_one(job, b))
+                    _relog(results[-1][2], seen)
+            return results
+        return _fit_on_workers(job, n_resamples, workers, results, seen)
+    except Exception as exc:
+        _relog(getattr(exc, _RECORDS, ()), seen)
+        raise
+
+
+def _fit_on_workers(
+    job: Job, n_resamples: int, workers: int, results: list[Fitted], seen: set[tuple[str, int, str]]
+) -> list[Fitted]:
+    """:func:`fit_resamples` on ``workers`` worker processes, appending to ``results``."""
     pool = ProcessPoolExecutor(
         max_workers=workers, mp_context=pick_context(), initializer=_init_worker, initargs=(job,)
     )
     try:
         futures = [pool.submit(_task, b) for b in range(n_resamples)]
-        return [future.result() for future in futures]
+        for future in futures:
+            results.append(future.result())
+            _relog(results[-1][2], seen)
+        return results
     except BrokenProcessPool as exc:
         raise RuntimeError(
             "a bootstrap worker died, most likely out of memory; rerun with andrey.config(n_jobs=1)"
@@ -1057,6 +1138,12 @@ def bootstrap(
         Each distinct warning the fits raised, once; and, with ``strict=False``, when the vote has
         no valid graph of the method's kind, so the averaged graph is the valid resample graph
         nearest the others, or, when no resample is valid, the resample graph nearest the others.
+        Each distinct record the fits logged, at least each warning-level one, is logged once
+        too, through its own logger and from where it was logged, as its fit returns, in the
+        order of the resamples, whether the fits ran in this process or in worker processes;
+        those of a fit that raises are logged before its error goes on. While a fit runs in this
+        process, a record an ``andrey`` logger logs in another thread is held with the fit's own
+        and logged with them.
 
     Notes
     -----
@@ -1232,8 +1319,14 @@ def bootstrap(
     workers = min(_backend.worker_count(None), n_resamples)
     results = fit_resamples(job, n_resamples, workers)
     ranks = _column_ranks(job) if spec.output.graph_kind == "dag" else None
-    for category, message in dict.fromkeys(w for _, caught in results for w in caught):
+    for category, message in dict.fromkeys(w for _, caught, _ in results for w in caught):
         warnings.warn(message, category, stacklevel=2)
+    fits = [out for out, *_ in results]
+    groups = list(zip(*fits)) if spec.output.multi else [fits]
+    if method_kwargs.get("missing") is None and any(
+        out.metadata.get("missing") == TESTWISE for group in groups for out in group
+    ):
+        notice_default_missing(spec.name, _not_tested_over([out for g in groups for out in g]))
     metadata: dict[str, JSONValue] = {
         "method": spec.name,
         "seed": root,
@@ -1242,8 +1335,6 @@ def bootstrap(
         "sample_fraction": job.sample_fraction if job.resampling == "subsample" else None,
         "block_length": job.block_length,
     }
-    fits = [out for out, _ in results]
-    groups = list(zip(*fits)) if spec.output.multi else [fits]
     outs = [
         BootstrapOutput._count(
             group,
@@ -1257,6 +1348,20 @@ def bootstrap(
         for group in groups
     ]
     return outs if spec.output.multi else outs[0]
+
+
+def _not_tested_over(fits: list) -> dict:
+    """Return the not-tested metadata of ``fits`` for the notice.
+
+    The pairs never observed together and the undecided pairs of any fit, in order of first
+    appearance, and the conditioning sets not tested over all of them, which the notice reads only
+    as whether any was.
+    """
+    merged: dict = {"not_tested": sum(out.metadata.get("not_tested", 0) for out in fits)}
+    for key in ("never_observed_together", "undecided_pairs"):
+        pairs = (pair for out in fits for pair in out.metadata.get(key, []))
+        merged[key] = [list(pair) for pair in dict.fromkeys(map(tuple, pairs))]
+    return merged
 
 
 def _column_ranks(job: Job) -> np.ndarray:

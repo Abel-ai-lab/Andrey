@@ -109,22 +109,37 @@ accept missing values, a `NaN` cell, pandas' `NA`, or an empty, `NA`, or `N/A` f
 each conditional-independence test reads only the rows where all of its variables are observed
 (test-wise deletion), and so do the pair tests `anm`, `pnl`, `loci`, and `skewd`, which read the
 rows where both columns are observed; `metadata["rows_tested"]` gives the fewest (`min`) and the
-median rows a test read.
-Their argument `missing` names the handling: `"testwise"` is test-wise deletion, and
-`None`, the default, picks the method's default handling, `"testwise"`; `metadata["missing"]`
-records the one a fit used. `pc` also takes `missing="mvpc"`: Missing-Value PC (Tu et al., 2019)
-finds the parents of each missingness indicator and tests again the edges they could have kept.
+median rows a test read. Test-wise deletion is valid when values are missing completely at random,
+which means that whether a value is missing depends on no value in the data; the rows a test reads
+are then a random sample of all rows, and otherwise they are a selected sample that more rows do not
+correct. Their argument `missing` names the handling: `"testwise"` is test-wise deletion, and
+`None`, the default, picks the method's default handling, `"testwise"`, and logs one notice per
+process that names it; `metadata["missing"]` records the one a fit used. In the
+conditional-independence searches, a test with fewer rows than it needs, or with zero degrees of
+freedom left, is not tested: it never separates a pair and never confirms a link; the pair methods
+instead raise `ValueError` when fewer than 2 rows observe both columns. `metadata["p_one_tests"]`,
+present when it is not zero, counts the tests that returned a p-value of 1.
+`metadata["not_tested"]` counts the conditioning sets not tested, including those the search
+skipped because no row can test them, `metadata["undecided_pairs"]` lists the pairs no tested
+query could decide, and `metadata["never_observed_together"]` the pairs of columns no row
+observes together; the notice gives the number of those pairs, not of the sets. `pc` also takes
+`missing="mvpc"`: Missing-Value PC (Tu et al., 2019) finds the parents of each missingness indicator
+and tests again the edges they could have kept; `metadata["corrected_edges"]["rows_tested"]` gives
+the fewest and the median rows such a test read, and `metadata["corrected_edges"]["p_one_tests"]`,
+present when it is not zero, counts those that returned a p-value of 1.
 `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm`, whose
 fits read the data only through their covariance, refuse missing values under `None` and take
-`missing="em"`: structural EM runs the search on the expected covariance of the data 10 times,
+`missing="em"`: structural EM runs the search on the expected covariance of the data in rounds,
 refitting a linear-Gaussian model of each graph it returns, with 5 parameter-only EM steps on that
 graph before the next search (Friedman's alternating scheme). `metadata["em"]` records the rounds,
 the observed-data log-likelihood after each, and whether each changed the graph; a fit whose last
-round changed it logs a warning. A row that observes no value is dropped first. It takes
+round changed it logs a warning. A row that observes no value is dropped first, and `metadata["em"]`
+records how many (`rows_dropped`) and the fewest rows that observe both columns of a pair
+(`min_shared_rows`); two columns that share no observed row raise a `ValueError`. It takes
 `score_func="bic"` only and no `env`, and it assumes values missing completely at random or at
 random given observed values. `missing="mvpc"` is supported, and so is `missing="em"` in `ges`,
-`hc`, `tabu`, `boss`, `grasp`, and `notears`: in the
-[missing-data comparison](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/missing-data.md),
+`hc`, `tabu`, `boss`, `grasp`, and `notears`: in the [missing-data
+comparison](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/missing-data.md),
 none was less accurate than its reference implementation in a setting that repeated on fresh
 datasets. For `ges`, `boss`, and `grasp` the reference estimates one covariance by EM before its
 search, a simpler method than structural EM, and the comparison is at `ebic_gamma=0.0`, up to 50
@@ -132,16 +147,22 @@ variables, at two settings of the sample size the reference's score counts. In t
 last round still changed the graph in 2 to 6% of the fits, and in 20% of `grasp`'s, most often with
 50 variables and 100 rows. In `xges`, `exact_search`, `dagma`, and `calm` it is experimental, as no
 reference implementation exists to compare them with; the benchmark reports their results beside the
-baselines. A value a method does not list raises a
-`ValueError` that
-names the values it takes. A column with no observed value, or a constant one over its observed
-values, raises a `ValueError` before the fit, and a test with fewer rows than it needs, `|S| + 3`
-for `"fisherz"` and `"student_t"`; 4 for `"gcm"` and for `"wgcm"` with `variant="fix"`, 17 for
-`"wgcm"`'s default `variant="est"`, and 12 for `"pcm"`; and 2 for the other tests, raises one
-during it. `cdnod` and
-`fci_jci` need a complete `env`. Every other method raises a `ValueError` that names it and says
-what to do instead, as [Missing values](guides/getting-started.md#missing-values) describes; each
-method's Notes say why.
+baselines. A value a method does not list raises a `ValueError` that names the values it takes. A
+column with no observed value, or a constant one over its observed values, raises a `ValueError`
+before the fit. A test needs, where its variables are observed, `|S| + 4` rows for `"fisherz"` and
+`"normal_scores"`, `|S| + 3` for `"student_t"` and `"cond_gauss"`, 4 for `"gcm"` and for `"wgcm"`
+with `variant="fix"`, 17 for `"wgcm"`'s default `variant="est"`, 12 for `"pcm"`, and 2 for most
+other tests; a test with fewer is not tested. `cdnod` and `fci_jci` need a complete `env`. Every
+other method raises a `ValueError` that names it and says what to do instead, as
+[Missing values](guides/getting-started.md#missing-values) describes; each method's Notes say why.
+
+% concept: n_em_iterations
+`ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm` take
+`n_em_iterations`, the number of rounds `missing="em"` runs on data with missing values, each with
+one search. The default, 10, is the number Gao et al. (2022) run. A fit whose last round still
+changed the graph logs a warning that names the argument: more rounds let some such fits settle on a
+graph, others keep changing between graphs, and the time grows with the rounds. Values other than 10
+are not benchmarked yet. On complete data or without `missing="em"` it changes nothing.
 
 % concept: indep_test
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
@@ -868,7 +889,8 @@ On data with a `NaN`, {py:func}`~andrey.core.ci.make_indep_test` returns a
 {py:class}`~andrey.core.ci_missing.TestwiseDeletion` of the test: each query reads the rows observed
 in all of its columns. `fisherz` and `student_t` compute the query's correlations directly from
 those rows, many queries at once, so the p-value is the one the test gives on that block up to
-rounding in its last digits. Every other test is built on that block, its columns in data order,
+rounding in its last digits; a query gets the same bits asked alone or with any others, in any
+order. Every other test is built on that block, its columns in data order,
 and gives that test's p-value exactly; `normal_scores` therefore ranks each column within the rows
 its query reads; a registered test works the same way, built anew for each
 query.
@@ -1127,7 +1149,8 @@ module.
 From the command line, `-W error::UserWarning` escalates Andrey's warnings along with every other
 `UserWarning`; for one category, use `warnings.filterwarnings` or pytest's flag. `andrey run`
 returns a fit's warnings in the `run.warnings` field of its JSON output, each with its category
-name.
+name; a notice the fit logs, as the default handling of missing values, has the category
+`LogWarning`.
 
 ```{eval-rst}
 .. autosummary::

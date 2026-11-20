@@ -16,6 +16,7 @@ from collections.abc import Iterable, Mapping
 import numpy as np
 
 from andrey.core.ci import CITest, FisherZ, StudentT, pins_blas
+from andrey.core.ci_missing import NOT_TESTED, RowCounts, count_answer
 
 __all__ = ["IndicatorTest", "PermutationCorrection", "candidate_edges"]
 
@@ -27,8 +28,11 @@ class IndicatorTest:
     """A test of a missingness indicator, column ``indicator`` of the data ``test`` was built on.
 
     A query whose rows hold one value of the indicator, every value of it observed or every one
-    missing, has nothing to detect: it returns 1, so the column it pairs with is not a parent.
-    Every other query is ``test``'s.
+    missing, holds no information on it: it is not tested, returns
+    :data:`~andrey.core.ci_missing.NOT_TESTED`, and counts as such
+    (:func:`~andrey.core.ci_missing.count_answer`), so it never separates the pair. Every other
+    query is ``test``'s, including one on fewer rows than ``test`` needs, which ``test`` answers
+    :data:`~andrey.core.ci_missing.NOT_TESTED` and counts.
     """
 
     def __init__(self, test: CITest, data: np.ndarray, indicator: int) -> None:
@@ -38,12 +42,20 @@ class IndicatorTest:
         self._indicator = indicator
         self.pin_blas = pins_blas(test)
 
+    def constant_on(self, column: int) -> bool:
+        """Whether the rows that observe ``column`` hold one value of the indicator: then so do
+        the rows of every query of ``column``, and none is tested."""
+        values = self._values[self._observed[:, column]]
+        return bool(values.size) and values.min() == values.max()
+
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
-        others = [int(v) for v in (x, y, *condition_set) if int(v) != self._indicator]
+        given = [int(v) for v in condition_set]
+        others = [int(v) for v in (x, y, *given) if int(v) != self._indicator]
         values = self._values[self._observed[:, others].all(axis=1)]
-        if values.size == 0 or values.min() == values.max():
-            return 1.0
-        return self._test(x, y, condition_set)
+        if values.size and values.min() == values.max():
+            count_answer(values.size, NOT_TESTED, int(x), int(y))
+            return NOT_TESTED
+        return self._test(x, y, given)
 
 
 class PermutationCorrection:
@@ -58,11 +70,15 @@ class PermutationCorrection:
     value is its regression's prediction at the drawn ``W`` plus its own residual. The query's
     partial-correlation test runs on those virtual rows (Tu et al. 2019, Algorithm 2).
 
-    The regressions and the test need ``max(|S| + 3, |W| + 2)`` rows in that block. A query with
-    fewer is answered by ``deletion``, as a query with an empty ``W`` is, and its pair joins
-    ``uncorrected``: the paper leaves the case open, the correction can only remove an edge the
-    deletion tests kept, and without the rows to compute it the pair keeps the deletion test's
-    answer for that conditioning set.
+    The regressions and the test need ``max(t, |W| + 2)`` rows in that block, ``t`` being the rows
+    the test needs (its ``least_rows``): ``|S| + 4`` for ``FisherZ`` and ``|S| + 3`` for
+    ``StudentT``, so the test keeps a degree of freedom. A query with fewer is answered by
+    ``deletion``, as a query with an empty ``W`` is, and its pair joins ``uncorrected``: the paper
+    leaves the case open, the correction can only remove an edge the deletion tests kept, and
+    without the rows to compute it the pair keeps the deletion test's answer for that conditioning
+    set. ``rows`` counts the rows of the block of each query PermC
+    answers, which holds no more rows than the deletion test of the same query reads, and the
+    queries it answers ``p = 1``.
 
     The draw comes from a generator seeded by ``seed`` and by the fingerprints of the queried
     columns, a digest of where each one's values are missing: a p-value then depends on neither the
@@ -92,6 +108,9 @@ class PermutationCorrection:
         self._seed = seed
         #: The pairs ``(x, y)``, ``x < y``, with a query too short of rows to correct.
         self.uncorrected: set[tuple[int, int]] = set()
+        #: The rows the corrected queries read, a row count to the number of queries with it, and
+        #: the queries answered ``p = 1``.
+        self.rows = RowCounts()
         gaps = np.packbits(~self._observed, axis=0).T
         self._fingerprints = [
             int.from_bytes(hashlib.blake2b(g.tobytes(), digest_size=8).digest(), "big")
@@ -122,7 +141,7 @@ class PermutationCorrection:
         tested = [x, y, *given]
         rows = self._observed[:, tested + parents].all(axis=1)
         m = int(rows.sum())
-        least = max(len(given) + 3, len(parents) + 2)
+        least = max(self._test.least_rows(len(given)), len(parents) + 2)
         if m < least:
             self.uncorrected.add((x, y))
             return self._deletion(x, y, given)
@@ -135,7 +154,9 @@ class PermutationCorrection:
         drawn = self._generator(x, y, given).permutation(pool)[:m]
         shuffled = np.column_stack([np.ones(m), self._data[drawn][:, parents]])
         virtual = shuffled @ coefficients + residuals
-        return float(self._test(virtual)(0, 1, range(2, len(tested))))
+        p = float(self._test(virtual)(0, 1, range(2, len(tested))))
+        self.rows.add([m], [p], [x], [y])
+        return p
 
     def _generator(self, x: int, y: int, given: list[int]) -> np.random.Generator:
         pair = sorted((self._fingerprints[x], self._fingerprints[y]))
