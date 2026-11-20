@@ -733,23 +733,24 @@ its search for those variables can take a long time; `max_depth` bounds it. On l
 deletion in 12 settings, on two sets of datasets each. The
 [0.16.0 release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data) has the numbers.
 
-A test needs enough rows where its variables are observed: `|S| + 3` for the partial-correlation
-tests (`fisherz`, `student_t`, and `normal_scores`), with `|S|` the size of its conditioning set,
-and 2 for the other tests. A test with fewer rows is not tested, a pair never observed together
-included: it never separates a pair and never confirms a link. A search keeps such a pair adjacent
-(a Markov-blanket search neither admits nor removes it, and PCMCI and its variants report its link
-as neither found nor absent), and `metadata["undecided_pairs"]` lists each pair that a test
-without rows might have separated. `metadata["not_tested"]` counts those tests, and
-`metadata["never_observed_together"]` lists the pairs of columns no row observes together; the
-notice for `missing=None` names the first of them. Merged cohorts often leave such pairs, and
-whether a row belongs to a cohort is rarely random, so test-wise deletion may not be valid there.
-To decide more pairs, cap the conditioning sets with `max_depth` (`max_p_global` in LPCMCI and the
-same-step phases of PCMCI+), or drop a column with many missing values, which can remove a common
-cause of the columns that stay.
-A test with zero degrees of freedom, as when a column holds one category on the test's rows or
-`fisherz` reads `|S| + 3` rows, returns a p-value of 1, which reads as independence without
-evidence. `metadata["p_one_tests"]`, present when it is not zero, counts every test of the fit that
-returned a p-value of 1, whichever test it is. A column with no observed value, or with one value
+A test needs enough rows where its variables are observed: `|S| + 4` for `fisherz` and
+`normal_scores`, `|S| + 3` for `student_t` and `cond_gauss`, with `|S|` the size of its
+conditioning set, and 2 for most other tests. A test with fewer rows, or with zero degrees of
+freedom left, as when a column holds one category on the test's rows, is not tested, a pair never
+observed together included: it never separates a pair and never confirms a link. So is a CD-NOD or
+FCI-JCI test whose `env` is constant on its rows, which then come from one environment. A pair that
+no test with rows could decide stays adjacent in PC, FCI, CD-NOD, and FCI-JCI, stays in the
+Markov-blanket searches' sets, and in PCMCI and its variants has no p-value (`NaN`, `null` on the
+command line); `metadata["undecided_pairs"]` lists each such pair. PCMCI and its variants
+condition no test on a lagged parent without a tested result. `metadata["not_tested"]` counts the
+tests not tested, and `metadata["never_observed_together"]` lists the pairs of columns no row
+observes together; the notice for `missing=None` names the first of them. Merged cohorts often
+leave such pairs, and whether a row belongs to a cohort is rarely random, so test-wise deletion may
+not be valid there. To decide more pairs, cap the conditioning sets with `max_depth` (`max_p_global`
+in LPCMCI and the same-step phases of PCMCI+), or drop a column with many missing values, which can
+remove a common cause of the columns that stay. `metadata["p_one_tests"]`, present when it is not
+zero, counts the tests that returned a p-value of 1, as a test whose statistic is exactly zero
+does. A column with no observed value, or with one value
 throughout, raises before the fit, and so does infinity, which is not a missing value. CD-NOD needs
 a complete `env`.
 

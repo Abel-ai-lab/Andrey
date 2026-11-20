@@ -111,14 +111,13 @@ which means that whether a value is missing depends on no value in the data; the
 are then a random sample of all rows, and otherwise they are a selected sample that more rows do not
 correct. Their argument `missing` names the handling: `"testwise"` is test-wise deletion, and
 `None`, the default, picks the method's default handling, `"testwise"`, and logs one notice per
-process that names it; `metadata["missing"]` records the one a fit used. A test with zero degrees of
-freedom returns a p-value of 1, and `metadata["p_one_tests"]`, present when it is not zero, counts
-every test of the fit that returned a p-value of 1, whichever test it is. In the
-conditional-independence searches, a test with fewer rows than it needs is not tested: it never
-separates a pair and never confirms a link; the pair methods instead raise `ValueError` when fewer
-than 2 rows observe both columns.
-`metadata["not_tested"]` counts those tests, `metadata["undecided_pairs"]` lists the pairs one of
-them might have separated, and `metadata["never_observed_together"]` the pairs of columns no row
+process that names it; `metadata["missing"]` records the one a fit used. In the
+conditional-independence searches, a test with fewer rows than it needs, or with zero degrees of
+freedom left, is not tested: it never separates a pair and never confirms a link; the pair methods
+instead raise `ValueError` when fewer than 2 rows observe both columns. `metadata["p_one_tests"]`,
+present when it is not zero, counts the tests that returned a p-value of 1.
+`metadata["not_tested"]` counts those tests, `metadata["undecided_pairs"]` lists the pairs no tested
+query could decide, and `metadata["never_observed_together"]` the pairs of columns no row
 observes together. `pc` also takes
 `missing="mvpc"`: Missing-Value PC (Tu et al., 2019) finds the parents of each missingness indicator
 and tests again the edges they could have kept; `metadata["corrected_edges"]["rows_tested"]` gives

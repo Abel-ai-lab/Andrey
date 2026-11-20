@@ -715,7 +715,7 @@ def _not_tested_notice(metadata: dict) -> str:
             'in metadata["never_observed_together"].'
         )
     if count := metadata.get("not_tested"):
-        text += f" {count} tests had too few rows and were not tested. {NOT_TESTED_CLAIM}"
+        text += f" {count} tests were not tested. {NOT_TESTED_CLAIM}"
         if undecided := metadata.get("undecided_pairs"):
             text += f" Undecided: {first(undecided)}."
     return text

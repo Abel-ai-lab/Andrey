@@ -309,13 +309,16 @@ def pc(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [12]_ [13]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. A test raises ``ValueError`` when it has fewer rows than it needs,
-    ``|S| + 3`` for the partial-correlation tests (``"fisherz"``, ``"student_t"``, and
-    ``"normal_scores"``) and 2 for the other tests, or when a continuous column is constant on its
-    rows. With missing values, the skeleton search runs in one process. Test-wise deletion is valid
-    when values are missing completely at random, which means that whether a value is missing
-    depends on no value in the data; the rows a test reads are then a random sample of all rows, and
-    otherwise they are a selected sample that more rows do not correct.
+    the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
+    ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts such tests. A pair no
+    tested query could decide, as a pair never observed together, stays adjacent and is listed in
+    ``metadata["undecided_pairs"]``. A continuous column constant on a test's rows raises
+    ``ValueError``. With missing values, the skeleton search runs in one process. Test-wise deletion
+    is valid when values are missing completely at random, which means that whether a value is
+    missing depends on no value in the data; the rows a test reads are then a random sample of all
+    rows, and otherwise they are a selected sample that more rows do not correct.
 
     **Missing-Value PC.** ``missing="mvpc"`` follows Algorithm 1 of Tu et al. [13]_. The test-wise
     skeleton keeps every true edge but can keep extra ones: an extra edge ``x - y`` needs the
@@ -822,13 +825,16 @@ def fci(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [6]_ [7]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. A test raises ``ValueError`` when it has fewer rows than it needs,
-    ``|S| + 3`` for the partial-correlation tests (``"fisherz"``, ``"student_t"``, and
-    ``"normal_scores"``) and 2 for the other tests, or when a continuous column is constant on its
-    rows. With missing values, the skeleton search runs in one process. Test-wise deletion is valid
-    when values are missing completely at random, which means that whether a value is missing
-    depends on no value in the data; the rows a test reads are then a random sample of all rows, and
-    otherwise they are a selected sample that more rows do not correct.
+    the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
+    ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts such tests. A pair no
+    tested query could decide, as a pair never observed together, stays adjacent and is listed in
+    ``metadata["undecided_pairs"]``. A continuous column constant on a test's rows raises
+    ``ValueError``. With missing values, the skeleton search runs in one process. Test-wise deletion
+    is valid when values are missing completely at random, which means that whether a value is
+    missing depends on no value in the data; the rows a test reads are then a random sample of all
+    rows, and otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs with no
     hidden variable, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through which
@@ -1642,15 +1648,19 @@ def cdnod(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [5]_ [6]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. A test raises ``ValueError`` when it has fewer rows than it needs,
-    ``|S| + 3`` for the partial-correlation tests (``"fisherz"``, ``"student_t"``, and
-    ``"normal_scores"``) and 2 for the other tests, or when a continuous column is constant on its
-    rows. ``env`` must be complete, and ``dependence_threshold``, whose kernel measures read every
-    row, raises ``ValueError`` on data with missing values. With missing values, the skeleton search
-    runs in one process. Test-wise deletion is valid when values are missing completely at random,
-    which means that whether a value is missing depends on no value in the data; the rows a test
-    reads are then a random sample of all rows, and otherwise they are a selected sample that more
-    rows do not correct.
+    the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
+    ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts such tests. A pair no
+    tested query could decide, as a pair never observed together, stays adjacent and is listed in
+    ``metadata["undecided_pairs"]``; a test whose ``env`` is constant on its rows, which come from
+    one environment, is not tested. A continuous column constant on a test's rows raises
+    ``ValueError``. ``env`` must be complete, and ``dependence_threshold``, whose kernel measures
+    read every row, raises ``ValueError`` on data with missing values. With missing values, the
+    skeleton search runs in one process. Test-wise deletion is valid when values are missing
+    completely at random, which means that whether a value is missing depends on no value in the
+    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
+    selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs whose means
     shift across 4 domains, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes
@@ -2009,13 +2019,17 @@ def fci_jci(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value; ``env`` must be complete. Each
     test reads only the rows where all of its variables are observed (test-wise deletion) [6]_ [7]_,
     the index among them, as for :func:`~andrey.fci`; ``metadata["rows_tested"]`` gives the fewest
-    and the median rows a test read. A test raises ``ValueError`` when it has fewer rows than it
-    needs, ``|S| + 3`` for the partial-correlation tests (``"fisherz"``, ``"student_t"``, and
-    ``"normal_scores"``) and 2 for the other tests, or when a continuous column is constant on its
-    rows. With missing values, the skeleton search runs in one process. Test-wise deletion is valid
-    when values are missing completely at random, which means that whether a value is missing
-    depends on no value in the data; the rows a test reads are then a random sample of all rows, and
-    otherwise they are a selected sample that more rows do not correct.
+    and the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
+    ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts such tests. A pair no
+    tested query could decide, as a pair never observed together, stays adjacent and is listed in
+    ``metadata["undecided_pairs"]``; a test whose ``env`` is constant on its rows, which come from
+    one environment, is not tested. A continuous column constant on a test's rows raises
+    ``ValueError``. With missing values, the skeleton search runs in one process. Test-wise deletion
+    is valid when values are missing completely at random, which means that whether a value is
+    missing depends on no value in the data; the rows a test reads are then a random sample of all
+    rows, and otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on its authors' simulation [1]_, linear-Gaussian data with hidden
     common causes and one context variable that changes one variable: 4, 10, and 100 variables with
