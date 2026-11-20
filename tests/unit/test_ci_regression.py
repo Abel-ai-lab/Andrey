@@ -242,6 +242,25 @@ def test_pcm_variance_adds_the_shift_to_the_positive_part():
     assert np.array_equal(cr._conditional_variance(fitted, 0.0), [0.01, 0.2, 0.01, 0.01])
 
 
+def test_pcm_split_statistic_divides_its_standard_deviation_by_the_test_rows(monkeypatch):
+    products = []
+    normalized_mean = cr._normalized_mean
+
+    def record(values):
+        products.append(values)
+        return normalized_mean(values)
+
+    monkeypatch.setattr(cr, "_normalized_mean", record)
+    test = cr.PCM(_chain(40), regression="linear", n_splits=1)
+    rows, _ = test._layout([0, 1, 2])
+    split = test._splits[0]
+    statistic = test._split_statistic(test._data[rows], split, 1, 0, [2])
+    (values,) = products
+    m = split[1].size
+    assert values.size == m
+    assert statistic == pytest.approx(np.sqrt(m) * values.mean() / values.std(ddof=0))
+
+
 def test_variance_shift_brings_the_mean_ratio_to_one():
     squares = np.array([1.0, 4.0, 9.0])
     fitted = np.array([0.0, 1.0, 1.0])
