@@ -175,9 +175,17 @@ def _queries(d: int, seed: int = 4):
     return out
 
 
+# Cohorts with no row observing every column: some pairs are never observed together, so some
+# queries are not tested.
+APART = {"n": 1_500, "bridge": 0.0, "seed": 3}
+
+
+@pytest.mark.parametrize("cohorts", [{}, APART])
 @pytest.mark.parametrize("name", GAUSSIAN)
-def test_grouped_sums_answer_as_the_per_row_sums_up_to_rounding(monkeypatch, grouped, name):
-    x = _cohorts()
+def test_grouped_sums_answer_as_the_per_row_sums_up_to_rounding(
+    monkeypatch, grouped, name, cohorts
+):
+    x = _cohorts(**cohorts)
     summed = _spy(monkeypatch, missing_groups.GroupedSums, "blocks")
     test = make_indep_test(name, x)
     paths = {}
@@ -204,6 +212,8 @@ def test_grouped_sums_answer_as_the_per_row_sums_up_to_rounding(monkeypatch, gro
         assert np.array_equal(rows[tested], rows_ref[tested])
         assert np.allclose(r, r_ref, rtol=RTOL, atol=1e-12, equal_nan=True)
         assert np.allclose(p, p_ref, rtol=RTOL, atol=1e-12, equal_nan=True)
+    if cohorts:
+        assert any(np.isnan(p).any() for _, p, _ in paths["grouped"].values())
 
 
 @pytest.mark.parametrize("name", GAUSSIAN)
@@ -223,9 +233,12 @@ def test_a_grouped_query_gives_the_same_bits_alone_and_in_any_batch(monkeypatch,
     assert sum(summed) > 0
 
 
+@pytest.mark.parametrize("apart", [False, True])
 @pytest.mark.parametrize("method", ["pc", "fci", "iamb"])
-def test_a_fit_on_merged_cohorts_finds_the_same_graph_on_either_path(monkeypatch, grouped, method):
-    x = _cohorts(n=4_000, seed=8)[:, :10]
+def test_a_fit_on_merged_cohorts_finds_the_same_graph_on_either_path(
+    monkeypatch, grouped, method, apart
+):
+    x = _cohorts(**APART) if apart else _cohorts(n=4_000, seed=8)[:, :10]
     fit = getattr(andrey, method)
     summed = _spy(monkeypatch, missing_groups.GroupedSums, "blocks")
     with warnings.catch_warnings():
@@ -238,6 +251,30 @@ def test_a_fit_on_merged_cohorts_finds_the_same_graph_on_either_path(monkeypatch
     for key in ("not_tested", "undecided_pairs", "rows_tested", "never_observed_together"):
         assert found.metadata.get(key) == reference.metadata.get(key)
     assert found.metadata["rows_tested"]["min"] > 0
+    if apart:
+        assert found.metadata["not_tested"] > 0
+        assert found.metadata["never_observed_together"]
+
+
+@pytest.mark.parametrize("method", ["pc", "fci", "iamb"])
+def test_the_queries_not_tested_do_not_depend_on_the_column_order(method):
+    x = _cohorts(**APART)
+    fit = getattr(andrey, method)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        found = fit(x, indep_test="fisherz", missing="testwise")
+        assert found.metadata["not_tested"] > 0
+        for seed in range(3):
+            order = np.random.default_rng(seed).permutation(x.shape[1])
+            moved = fit(x[:, order], indep_test="fisherz", missing="testwise")
+            back = np.argsort(order)
+            graph = np.asarray(moved.structure.to_numpy())[np.ix_(back, back)]
+            assert np.array_equal(graph, found.structure.to_numpy())
+            assert moved.metadata["not_tested"] == found.metadata["not_tested"]
+            undecided = {
+                frozenset(int(order[i]) for i in pair) for pair in moved.metadata["undecided_pairs"]
+            }
+            assert undecided == {frozenset(pair) for pair in found.metadata["undecided_pairs"]}
 
 
 def test_a_block_with_few_of_its_groups_rows_takes_the_per_row_sums(monkeypatch, grouped):
@@ -318,3 +355,32 @@ def test_a_row_missing_more_than_255_columns_of_a_block_is_corrected_once():
     kept = observed.all(axis=1)
     assert count[0] == kept.sum()
     assert np.allclose(sums[0], values[:, kept].sum(axis=1), atol=1e-9)
+
+
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb"])
+def test_sets_left_out_for_keeping_no_rows_count_as_asking_them_would(monkeypatch, method):
+    from andrey.constraint import _skeleton, blanket
+
+    x = _cohorts(**APART)
+    fit = getattr(andrey, method)
+    left: list[int] = []
+    kept_apart = _skeleton.kept_apart
+
+    def counted(*args):
+        kept = kept_apart(*args)
+        left.append(kept[1])
+        return kept
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for module in (_skeleton, blanket):
+            monkeypatch.setattr(module, "kept_apart", counted)
+        found = fit(x, indep_test="fisherz", missing="testwise")
+        assert sum(left) > 0  # some sets were left out
+        for module in (_skeleton, blanket):
+            monkeypatch.setattr(module, "kept_apart", lambda test, fixed, sides, size: (sides, 0))
+        asked = fit(x, indep_test="fisherz", missing="testwise")
+    assert np.array_equal(found.structure.to_numpy(), asked.structure.to_numpy())
+    for key in ("not_tested", "undecided_pairs", "rows_tested", "never_observed_together"):
+        assert found.metadata.get(key) == asked.metadata.get(key), key
+    assert found.metadata["not_tested"] > 0

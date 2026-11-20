@@ -49,6 +49,11 @@ names its pull request.
   so do series with outages, where nearly every pair of columns is observed together in about half
   the rows or more. P-values change in their last digits. Six `ANDREY_TESTWISE_GROUP_*` settings
   set when the path is used. ([#1148])
+- The Markov-blanket searches count a conditioning set that holds a column no row observes with the
+  tested pair, or with a collider's middle variable, as not tested without building its query. On
+  24 columns of synthetic merged cohorts with 58 pairs never observed together, `iamb` took 1.5 s
+  instead of 29 s, with the same graph and counts. Their spouse step now tests both candidate sets
+  of each size, so `metadata["not_tested"]` no longer depends on the column order. ([#1148])
 - A test-wise test with too few rows no longer raises `ValueError`, nor does a CD-NOD or FCI-JCI
   test whose `env` is constant on its rows: both are not tested. Each test sets its own row floor:
   `fisherz` and `normal_scores` need `|S| + 4` rows, `cond_gauss` `|S| + 3`, and `cmiknn` with an

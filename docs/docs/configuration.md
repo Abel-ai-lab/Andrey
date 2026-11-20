@@ -124,9 +124,11 @@ up to the last digits of the p-values.
 - `ANDREY_TESTWISE_GROUP_MIN_GAIN`: on the grouped path, a block takes the groups' sums only when
   its estimated per-row cost is at least this many times its grouped cost (default `2`).
 
-Two constants are fixed. The cost of opening a group sets how the rows split into groups, not
-whether a test uses them. The share of its groups' rows below which a block is summed over every
-row, one sixteenth, bounds the rounding, which no speed setting loosens.
+Three constants are fixed. The cost of opening a group sets how the rows split into groups, not
+whether a test uses them. The share of the pairs of columns that `ANDREY_TESTWISE_GROUP_MAX_SHARED`
+is read on is a quarter. A block that keeps fewer than one sixteenth of its groups' rows, or fewer
+rows than twice its columns, is summed over every row; this bounds the rounding, which no speed
+setting loosens.
 
 ## GPU dispatch
 
