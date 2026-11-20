@@ -83,7 +83,8 @@ names its pull request.
   versions of the papers' simulation designs: the wGCM weight is the sign of the fitted
   covariance, the fixed weights' multiplier draws use the centered products, the PCM variance adds
   its shift to the fit's positive part, and the PCM statistic's standard deviation divides by the
-  row count. A contributor's script compares them with the authors' code. ([#1147], [#1129], [#1162])
+  row count. A contributor's script compares them with the authors' code.
+  ([#1147], [#1129], [#1162])
 - `target` takes a list of columns on `iamb`, `inter_iamb`, `mmpc`, and `icp`: one call returns one
   result per target, in the list's order, each equal to a call for that target alone. The three set
   learners answer every target with one search, which sets up the test once, and MMPC learns the
