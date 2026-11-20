@@ -137,8 +137,9 @@ def test_a_link_between_columns_never_observed_together_is_undecided_not_found(n
         assert out.metadata["never_observed_together"] == [["A", "B"]]
         undecided = out.metadata["undecided_pairs"]
         assert ["A at lag 1", "B"] in undecided or ["A", "B at lag 1"] in undecided
-        if name != "lpcmci":  # PC1 and phase 2 condition on no link without a tested result
-            assert all({a.split()[0], b.split()[0]} == {"A", "B"} for a, b in undecided)
+        # No test conditions on a link without a tested result, so only the links of A and B are
+        # left undecided.
+        assert all({a.split()[0], b.split()[0]} == {"A", "B"} for a, b in undecided)
         p = np.asarray(out.metadata["p_values"], dtype=np.float64)
         labels = list(out.structure.labels)
         a, b = labels.index("A"), labels.index("B")

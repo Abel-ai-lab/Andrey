@@ -128,9 +128,10 @@ class LPCMCIResult:
     separating sets of a removed link (``i < j`` at lag 0) as ``(variable, lag)`` nodes relative
     to ``X^j_t``. ``parents[j]`` holds the ``(i, lag)`` nodes the last preliminary iteration found
     to be parents of ``X^j_t``, kept as directed links for the final phase. ``undecided`` holds
-    the links ``(i, j, lag)`` left in the graph that a test without the rows it needs
-    (:data:`~andrey.core.ci_missing.NOT_TESTED`) could have removed; one with no test that had
-    rows reads ``NaN`` in ``statistics`` and ``p_values``.
+    the links ``(i, j, lag)`` left in the graph with a test without the rows it needs
+    (:data:`~andrey.core.ci_missing.NOT_TESTED`) and no test with rows; they read ``NaN`` in
+    ``statistics`` and ``p_values``, and no test conditions on an end of such a link given the
+    other end.
     """
 
     start_marks: np.ndarray
@@ -232,8 +233,10 @@ class LPCMCISearch:
         self.shifted: dict[tuple[Key, int], list[frozenset[Node]]] = {}
         self.imin: dict[Key, float] = {}
         self.best: dict[Key, tuple[float, float]] = {}
-        #: The links with a test that was not tested (:data:`~andrey.core.ci_missing.NOT_TESTED`).
+        #: The links with a test that was not tested (:data:`~andrey.core.ci_missing.NOT_TESTED`),
+        #: and those with a test that was.
         self.skipped: set[Key] = set()
+        self.tested: set[Key] = set()
         self.sepsets: dict[Key, list[frozenset[Node]]] = {}
         self.ever_directed: set[tuple[Key, bool]] = set()
         self.version = 0
@@ -482,6 +485,18 @@ class LPCMCISearch:
     def _column(self, node: Node) -> int:
         return node[1] * self.n + node[0]
 
+    def untested(self) -> frozenset[Key]:
+        """The links with a test not tested (:data:`~andrey.core.ci_missing.NOT_TESTED`) and none
+        tested: no test with rows decided them."""
+        return frozenset(self.skipped - self.tested)
+
+    def unconditioned(self, a: Node, b: Node, untested: frozenset[Key]) -> set[Node]:
+        """The nodes linked to ``a`` or ``b`` by a link in ``untested``: no test of the pair
+        conditions on them, as the rows that observe both are likely too few."""
+        if not untested:
+            return set()
+        return {c for end in (a, b) for c in self.linked(end) if _key(end, c)[0] in untested}
+
     def run_tests(
         self,
         a: Node,
@@ -538,6 +553,7 @@ class LPCMCISearch:
         if math.isnan(p_value):
             self.skipped.add(key)
             return
+        self.tested.add(key)
         if rank:
             self.imin[key] = min(abs(statistic), self.imin.get(key, np.inf))
         if report and (key not in self.best or p_value > self.best[key][1]):
@@ -640,6 +656,7 @@ class LPCMCISearch:
             statistics, p_values = statistics[tested], p_values[tested]
         if not len(p_values):
             return
+        self.tested.add(key)
         self.imin[key] = min(float(np.abs(statistics).min()), self.imin.get(key, np.inf))
         best = int(np.argmax(p_values))  # the first of equal largest p-values, as _record keeps
         if key not in self.best or p_values[best] > self.best[key][1]:
@@ -681,12 +698,13 @@ class LPCMCISearch:
             return counted
         i, j, lag = key
         start, end = (i, lag), (j, 0)
-        sdef = (self.parents(start) | self.parents(end)) - {start, end}
+        dropped = self.unconditioned(start, end, self.untested())
+        sdef = (self.parents(start) | self.parents(end)) - {start, end} - dropped
         stored = set(self.sepsets.get(key, []))
         separating, skipped = list(stored), []
         tested: frozenset[Node] | None = None  # subsets of these were tested from ``start``
         for anchor, other in ((start, end), (end, start)):
-            candidates = sorted(self.apds(anchor, other) - sdef, key=_order)
+            candidates = sorted(self.apds(anchor, other) - sdef - dropped, key=_order)
             if anchor == start and lag > 0:
                 candidates = []
             fresh = (
@@ -771,19 +789,20 @@ class LPCMCISearch:
         while True:
             removed = False
             for in_group in self._groups():
-                ranked = self._ranking()
+                ranked, untested = self._ranking(), self.untested()
                 marked = []
                 for key in sorted(k for k in self.edges if in_group(k)):
                     i, j, lag = key
                     start, end = (i, lag), (j, 0)
-                    sdef = (self.parents(start) | self.parents(end)) - {start, end}
+                    dropped = self.unconditioned(start, end, untested)
+                    sdef = (self.parents(start) | self.parents(end)) - {start, end} - dropped
                     separated = False
                     for forward in (True, False):
                         letters = ("?", "L") if forward else ("?", "R")
                         if self.edges[key][1] not in letters:
                             continue
                         anchor, other = (end, start) if forward else (start, end)
-                        search = ranked(self.apds(anchor, other) - sdef, anchor)
+                        search = ranked(self.apds(anchor, other) - sdef - dropped, anchor)
                         if not forward and lag > 0:
                             search = search[:0]  # time order: the later node is no ancestor
                         if len(search) < p or self._past_depth(p):
@@ -877,17 +896,18 @@ class LPCMCISearch:
         while True:
             removed = False
             for in_group in self._groups():
-                ranked = self._ranking()
+                ranked, untested = self._ranking(), self.untested()
                 marked = []
                 for key in sorted(k for k in self.edges if in_group(k)):
                     if self.edges[key][1] == "":
                         continue
                     i, j, lag = key
                     start, end = (i, lag), (j, 0)
-                    sdef1 = (self.parents(start) | self.parents(end)) - {start, end}
-                    sdef2 = (self.ever_parents(start) | self.ever_parents(end)) - {start, end}
-                    near_end = self.napds(end, start)
-                    near_start = self.napds(start, end)
+                    dropped = self.unconditioned(start, end, untested) | {start, end}
+                    sdef1 = (self.parents(start) | self.parents(end)) - dropped
+                    sdef2 = (self.ever_parents(start) | self.ever_parents(end)) - dropped
+                    near_end = self.napds(end, start) - dropped
+                    near_start = self.napds(start, end) - dropped
                     search1 = ranked(near_end - sdef1 - sdef2, end)
                     search2 = ranked(near_start - sdef1 - sdef2, start)
                     if len(search1) < p or (lag == 0 and len(search2) < p) or self._past_depth(p):
@@ -1108,13 +1128,14 @@ class LPCMCISearch:
         ``b`` are left out. Return every conditioning set that separates them.
         """
         later = min(x[1], b[1])
-        parents = (self.parents(x) | self.parents(b)) - {x, b}
+        dropped = self.unconditioned(x, b, self.untested()) | {x, b}
+        parents = self.parents(x) | self.parents(b)
         found = []
         for sepset in self.stored_sepsets(a, c) or [frozenset()]:
             nodes = frozenset(n for n in sepset | parents if later <= n[1] <= self.tau_max)
-            _, (p_value,) = self.run_tests(x, b, [nodes - {x, b}])
-            if p_value > self.alpha and nodes - {x, b} not in found:
-                found.append(nodes - {x, b})
+            _, (p_value,) = self.run_tests(x, b, [nodes - dropped])
+            if p_value > self.alpha and nodes - dropped not in found:
+                found.append(nodes - dropped)
         return found
 
     def rule_r0b(self) -> tuple[dict, dict, dict]:
@@ -1500,12 +1521,11 @@ def _result(search: LPCMCISearch, kept: list[tuple[Key, bool]]) -> LPCMCIResult:
         statistics[lag, i, j], p_values[lag, i, j] = statistic, p_value
         if lag == 0:
             statistics[0, j, i], p_values[0, j, i] = statistic, p_value
-    undecided = tuple(sorted(key for key in search.skipped if key in search.edges))
+    undecided = tuple(sorted(key for key in search.untested() if key in search.edges))
     for i, j, lag in undecided:  # a link no test with rows decided: its largest p-value is unknown
-        if (i, j, lag) not in search.best:
-            statistics[lag, i, j], p_values[lag, i, j] = NOT_TESTED, NOT_TESTED
-            if lag == 0:
-                statistics[0, j, i], p_values[0, j, i] = NOT_TESTED, NOT_TESTED
+        statistics[lag, i, j], p_values[lag, i, j] = NOT_TESTED, NOT_TESTED
+        if lag == 0:
+            statistics[0, j, i], p_values[0, j, i] = NOT_TESTED, NOT_TESTED
     for i, j, lag in search.required:  # never tested
         statistics[lag, i, j], p_values[lag, i, j] = 1.0, 0.0
         if lag == 0:
