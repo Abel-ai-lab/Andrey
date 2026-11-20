@@ -1050,7 +1050,8 @@ def prepare_call(
     ``andrey.Knowledge``;
     the method reads each text key of ``targets=`` that spells a number as the label of ``--env``
     it spells. A method that reads column types or knowledge, or whose graph adds latent nodes
-    (GIN), gets the data as a DataFrame, so its warnings and its graph name the header's columns.
+    (GIN), or that takes a ``target``, gets the data as a DataFrame, so its warnings, its graph, and
+    its metadata name the header's columns.
     Returns the inputs, params, and the labels still to apply to the result.
     """
     if fkwargs.get("categorical") is not None:
@@ -1072,10 +1073,11 @@ def prepare_call(
             fkwargs = {**fkwargs, "knowledge": andrey.Knowledge(**fkwargs["knowledge"])}
         except (TypeError, ValueError) as exc:
             raise CliError("bad_value", f"knowledge: {exc}", EXIT_USAGE) from exc
-    named = any(p.name in ("categorical", "knowledge") for p in spec.params)
+    named = any(p.name in ("categorical", "knowledge", "target") for p in spec.params)
     if labels is not None and (named or spec.output.has_latents):
         # A method that reads column types names the header's columns in its warnings and in
-        # metadata["categorical"]; knowledge names them too, in each group of a panel. A graph
+        # metadata["categorical"]; knowledge names them too, in each group of a panel, and a
+        # target-centered method names its target and sets in its metadata. A graph
         # with latent nodes names its observed variables from the table, and a graph that leaves
         # out the contexts names what it keeps, so no label is left to apply to the result.
         import pandas as pd

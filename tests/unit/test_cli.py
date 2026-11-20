@@ -1312,6 +1312,25 @@ def test_a_bad_list_of_targets_is_a_usage_error(capsys, tmp_path, target, code):
     assert status == 2 and json.loads(err)["error"]["code"] == code
 
 
+def test_icp_names_the_header_columns_for_one_target_and_for_a_list(capsys, tmp_path):
+    rng = np.random.default_rng(0)
+    env = np.repeat([0, 1], 300)
+    x = rng.standard_normal(600) + 2 * env
+    y = x + rng.standard_normal(600)
+    z = y + rng.standard_normal(600)
+    data = tmp_path / "icp.csv"
+    data.write_text("x,y,z\n" + "\n".join(f"{a},{b},{c}" for a, b, c in zip(x, y, z)))
+    env_path = tmp_path / "env.csv"
+    env_path.write_text("env\n" + "\n".join(str(v) for v in env))
+    base = ["run", "icp", "--data", str(data), "--env", str(env_path)]
+    code, out, _ = _run([*base, "target=y"], capsys)
+    assert code == 0 and json.loads(out)["metadata"]["target"] == "y"
+    code, out, _ = _run([*base, "target=[y,z]"], capsys)
+    assert code == 0
+    listed = [(metadata["target"], metadata["parents"]) for _, metadata in _results(out)]
+    assert listed[0] == ("y", ["x"]) and listed[1][0] == "z"
+
+
 def test_a_list_of_targets_has_a_human_summary_and_no_bootstrap(capsys, monkeypatch, tmp_path):
     path = str(_collider_file(tmp_path))
     monkeypatch.setattr("sys.stdout.isatty", lambda: True)
