@@ -2169,8 +2169,9 @@ def rpcmci(
         smallest that lets a regime start or end, allows one change point per regime; set it from
         the time scale of the regimes.
     switch_threshold : float, default=0.5
-        The weight at which a time step joins a regime's PCMCI step and model fit, in ``(0, 1]``:
-        step ``t`` joins regime ``k`` when ``gamma_k(t) >= switch_threshold``.
+        The weight at which a time step joins a regime's PCMCI step and model fit, in ``(0, 1)``:
+        step ``t`` joins regime ``k`` when ``gamma_k(t) >= switch_threshold``. The first weights
+        are drawn in ``[0, 1)``, so ``1`` would leave every regime empty.
     tau_max : int, default=1
         The largest lag tested, at least ``1``: links at lags ``1`` to ``tau_max`` are tested.
     pc1_alpha : float, default=0.2

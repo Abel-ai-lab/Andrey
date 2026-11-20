@@ -324,6 +324,7 @@ def envelope(spec: MethodSpec, out, run: dict) -> dict:
     elif isinstance(out, RegimeOutput):  # one result per regime, and the regime of each step
         env["multi"] = True
         env["regimes"] = out.regimes.tolist()
+        env["regime_weights"] = out.weights.tolist()
         env["results"] = [result_view(o) for o in out.outputs]
         env["metadata"] = dict(out.metadata)
     else:
@@ -460,6 +461,13 @@ def apply_output_cap(env: dict, limit: int) -> None:
     """
     results = env["results"] if env.get("multi") else [env]
     cut = [truncate_output(r["structure"], limit) for r in results if "structure" in r]
+    for key in ("regimes", "regime_weights"):  # a regime fit's steps and weights, O(n_samples)
+        values = env.get(key)
+        if values is not None and _size(_nested_shape(values)) > limit:
+            env[f"{key}_shape"] = _nested_shape(values)
+            env[key] = None
+            env[f"{key}_truncated"] = True
+            cut.append(True)
     check = env.get("markov_check")
     if check is not None and len(check["tests"]) > limit:  # a Markov check keeps its smallest p
         keep = sorted(

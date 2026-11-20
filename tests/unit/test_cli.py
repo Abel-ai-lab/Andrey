@@ -246,6 +246,7 @@ def test_run_regimes(capsys, tmp_path):
     env = json.loads(out)
     assert code == 0 and env["multi"] is True
     assert len(env["regimes"]) == len(data) and set(env["regimes"]) <= {0, 1}
+    assert env["regime_weights"] is None and env["regime_weights_shape"] == [2, len(data)]
     assert len(env["results"]) == 2 and env["metadata"]["algorithm"] == "rpcmci"
     assert all(r["structure"]["labels"] == ["a", "b"] for r in env["results"])
     with warnings.catch_warnings():

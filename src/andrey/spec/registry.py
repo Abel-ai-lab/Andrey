@@ -2632,10 +2632,11 @@ _add(
                 type="float",
                 default=0.5,
                 doc="The weight at which a time step joins a regime's PCMCI step and model fit, "
-                "in (0, 1].",
+                "in (0, 1).",
                 minimum=0,
                 maximum=1,
                 exclusive_minimum=True,
+                exclusive_maximum=True,
             ),
             concept_param(
                 "tau_max",

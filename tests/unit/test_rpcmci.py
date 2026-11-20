@@ -106,6 +106,8 @@ def test_regime_output_rejects_weights_that_do_not_fit(fitted):
         RegimeOutput.new(fitted.outputs, np.ones((3, 5)) / 3)
     with pytest.raises(ValueError, match=r"\[0, 1\]"):
         RegimeOutput.new(fitted.outputs[:1], np.full((1, 5), 2.0))
+    with pytest.raises(ValueError, match="sum to 1"):
+        RegimeOutput.new(fitted.outputs, np.full((2, 5), 0.9))
 
 
 def test_regimes_take_the_first_of_equal_weights(fitted):

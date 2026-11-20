@@ -508,7 +508,8 @@ class RegimeOutput:
         outputs : tuple or list of StructureOutput
             One result per regime, in the order of the rows of ``weights``.
         weights : np.ndarray of shape (n_regimes, n_samples)
-            The weight of each regime at each time step, each in ``[0, 1]``.
+            The weight of each regime at each time step, each in ``[0, 1]``, summing to ``1`` at
+            every step.
         metadata : Mapping[str, JSONValue] or None, default=None
             Run values by name, as :meth:`StructureOutput.new` takes them.
 
@@ -522,8 +523,8 @@ class RegimeOutput:
         TypeError
             If ``metadata`` has a value :meth:`StructureOutput.new` refuses.
         ValueError
-            If ``weights`` is not a 2-D array with one row per result, or holds a value outside
-            ``[0, 1]``.
+            If ``weights`` is not a 2-D array with one row per result, holds a value outside
+            ``[0, 1]``, or has a column that does not sum to ``1`` within ``1e-9``.
         """
         meta = dict(metadata) if metadata is not None else {}
         _check_json_safe(meta, "metadata")
@@ -534,6 +535,8 @@ class RegimeOutput:
             )
         if not ((W >= 0) & (W <= 1)).all():
             raise ValueError("weights must lie in [0, 1]")
+        if not np.allclose(W.sum(axis=0), 1.0, rtol=0.0, atol=1e-9):
+            raise ValueError("the weights of each time step must sum to 1")
         return cls(_outputs=tuple(outputs), _weights=_frozen(W, np.float64), _metadata=meta)
 
     @property
