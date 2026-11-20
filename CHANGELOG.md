@@ -19,8 +19,8 @@ names its pull request.
   `metadata["undecided_pairs"]` lists the pairs no tested query could decide, and
   `metadata["never_observed_together"]` the pairs of columns no row observes together; the notice
   for `missing=None` names the first of them. A pair no tested query could decide stays adjacent
-  in PC, FCI, CD-NOD, and FCI-JCI and in the Markov-blanket searches' sets; PCMCI and its variants
-  condition no test on a lagged parent without a tested result. ([#PR_NOT_TESTED])
+  in PC, FCI, CD-NOD, and FCI-JCI and in the Markov-blanket searches' sets; PCMCI, PCMCI+, and
+  J-PCMCI+ condition no test on a lagged parent without a tested result. ([#PR_NOT_TESTED])
 
 - `metadata["p_one_tests"]` counts every test of a fit on data with missing values that returned
   `p = 1`, whichever test it is, as a test whose statistic is exactly zero answers. ([#1102])

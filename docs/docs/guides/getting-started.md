@@ -741,7 +741,7 @@ observed together included: it never separates a pair and never confirms a link.
 FCI-JCI test whose `env` is constant on its rows, which then come from one environment. A pair that
 no test with rows could decide stays adjacent in PC, FCI, CD-NOD, and FCI-JCI, stays in the
 Markov-blanket searches' sets, and in PCMCI and its variants has no p-value (`NaN`, `null` on the
-command line); `metadata["undecided_pairs"]` lists each such pair. PCMCI and its variants
+command line); `metadata["undecided_pairs"]` lists each such pair. PCMCI, PCMCI+, and J-PCMCI+
 condition no test on a lagged parent without a tested result. `metadata["not_tested"]` counts the
 tests not tested, and `metadata["never_observed_together"]` lists the pairs of columns no row
 observes together; the notice for `missing=None` names the first of them. Merged cohorts often
