@@ -679,6 +679,9 @@ CI_QUERIES: dict[str, Callable[..., Iterable[tuple[int, int, Any, float]]]] = {
         (x, y, s, p) for s, p in zip(sets, ps)
     ],
     "first_order_pvalues": lambda ps, test, x, y, zs: [(x, y, (z,), p) for z, p in zip(zs, ps)],
+    "statistic_pvalues_given": lambda rp, test, x, ys, condition_set: [
+        (x, y, condition_set, p) for y, p in zip(ys, rp[1])
+    ],
     "pvalues_given": lambda ps, test, target, xs, condition_set=(): [
         (target, x, condition_set, p) for x, p in zip(xs, ps)
     ],
@@ -804,7 +807,8 @@ def _counted(
 # The run and the manifest
 # ==================================================================================================
 
-#: The environment variables that set thread and worker counts, recorded in the header.
+#: The environment variables that set thread and worker counts, recorded in the header, and
+#: ``ANDREY_SHARED_SCAN_MIN_WORK``, which picks between two paths whose p-values agree to rounding.
 THREAD_VARIABLES = (
     "OMP_NUM_THREADS",
     "OPENBLAS_NUM_THREADS",
@@ -812,6 +816,7 @@ THREAD_VARIABLES = (
     "VECLIB_MAXIMUM_THREADS",
     "ANDREY_N_JOBS",
     "ANDREY_GES_PARALLEL_MIN_WORK",
+    "ANDREY_SHARED_SCAN_MIN_WORK",
 )
 ROOT = Path(__file__).resolve().parents[1]
 
