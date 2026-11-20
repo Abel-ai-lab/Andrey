@@ -766,6 +766,21 @@ def test_a_fit_by_em_logs_no_notice_of_a_default(caplog):
     assert out.metadata["missing"] == "em" and not _notices(caplog)
 
 
+@pytest.mark.parametrize("name", ["pc", "fci", "iamb", "mmpc"])
+def test_a_fit_that_runs_no_test_on_data_with_gaps_logs_the_notice_and_records_it(name, caplog):
+    fit = getattr(andrey, name)
+    x = _gaps(_continuous(400), 0.1)[:, :1]  # one column: no pair to test
+    with caplog.at_level(logging.WARNING, logger="andrey"):
+        assert "missing" not in fit(_continuous(400)[:, :1]).metadata
+        out = fit(x)
+    assert out.metadata["missing"] == "testwise"
+    assert out.metadata["rows_tested"] == {"min": 0, "median": 0}
+    (notice,) = _notices(caplog)
+    assert notice.startswith(f"andrey.{name}: ")
+    if name == "pc":
+        assert andrey.pc(x, missing="mvpc").metadata["missing"] == "mvpc"
+
+
 _BOOTSTRAP_PROBE = """
 import numpy as np
 

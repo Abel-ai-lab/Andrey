@@ -626,24 +626,47 @@ def missing_used(
 ) -> dict[str, object]:
     """Return ``{"missing": value}`` when the fit ``out`` met missing values, else ``{}``.
 
-    A fit met them when its tests counted the rows they read, ``metadata["rows_tested"]``, or when
-    it ran structural EM, ``metadata["em"]``. The value is the call's ``missing`` or, for ``None``,
-    the method's default handling, ``"testwise"``, which the call did not name: the first such fit
-    of the process logs :func:`notice_default_missing`. A test-wise fit on data with pairs of
-    columns never observed together also gets ``{"never_observed_together": ...}``, the pairs by
-    name (:func:`never_observed_together`), counted from the data before the tests read them.
+    A fit met them when its tests counted the rows they read, ``metadata["rows_tested"]``, when it
+    ran structural EM, ``metadata["em"]``, or when its data hold a missing value, as a fit that
+    runs no test does; such a fit also gets ``{"rows_tested": {"min": 0, "median": 0}}``, as
+    :func:`~andrey.core.ci_missing.rows_metadata` gives when no query was tested. The value is the
+    call's ``missing`` or, for ``None``, the method's default handling, ``"testwise"``, which the
+    call did not name: the first such fit of the process logs :func:`notice_default_missing`. A
+    fit without structural EM on data with pairs of columns never observed together also gets
+    ``{"never_observed_together": ...}``, the pairs by name (:func:`never_observed_together`),
+    counted from the data before the tests read them.
     """
-    met = "rows_tested" in out.metadata or "em" in out.metadata
-    if not met or not any(p.concept == "missing" for p in spec.params):
+    if not any(p.concept == "missing" for p in spec.params):
         return {}
-    stamp: dict[str, object] = {"missing": arguments.get("missing") or TESTWISE}
-    if "rows_tested" in out.metadata:
-        data = arguments.get(spec.data.inputs[0].name)
-        if pairs := never_observed_together(data):
-            stamp["never_observed_together"] = pairs
+    data = arguments.get(spec.data.inputs[0].name)
+    stamp: dict[str, object] = {}
+    if "rows_tested" not in out.metadata and "em" not in out.metadata:
+        missing = _missing_cells(data)
+        if missing is None or not missing.any():
+            return {}
+        stamp["rows_tested"] = {"min": 0, "median": 0}
+    stamp["missing"] = arguments.get("missing") or TESTWISE
+    if "em" not in out.metadata and (pairs := never_observed_together(data)):
+        stamp["never_observed_together"] = pairs
     if arguments.get("missing") is None:
         notice_default_missing(spec.name, {**out.metadata, **stamp})
     return stamp
+
+
+def _missing_cells(data: object) -> np.ndarray | None:
+    """Return where the table ``data`` holds a missing value.
+
+    ``None`` for data that is neither a DataFrame nor one table of numbers.
+    """
+    import pandas as pd
+
+    if isinstance(data, pd.DataFrame):  # of any column types
+        return np.asarray(data.isna(), dtype=bool)
+    try:
+        missing = np.isnan(np.asarray(data, dtype=np.float64))
+    except (TypeError, ValueError):
+        return None
+    return missing if missing.ndim == 2 else None
 
 
 def never_observed_together(data: object) -> list[list]:
@@ -653,16 +676,7 @@ def never_observed_together(data: object) -> list[list]:
     :func:`~andrey.core.ci_missing.named_pairs` lists pairs; ``[]`` for data that is not one table.
     From one product of the observed masks, so it costs one pass over the data.
     """
-    import pandas as pd
-
-    if isinstance(data, pd.DataFrame):  # of any column types
-        missing = np.asarray(data.isna(), dtype=bool)
-    else:
-        try:
-            missing = np.isnan(np.asarray(data, dtype=np.float64))
-        except (TypeError, ValueError):
-            return []
-    if missing.ndim != 2:
+    if (missing := _missing_cells(data)) is None:
         return []
     observed = (~missing).astype(np.float64)
     together = observed.T @ observed
