@@ -599,8 +599,9 @@ class PCM(_RegressionTest):
     do not depend on other columns. The variance adds ``c`` to the fit's positive part, as in the
     paper; the authors' code adds it first, the same for a forest, whose fit is never negative, and
     less powerful with least squares. The standard deviation divides by the second part's row count
-    ``m``, as in the paper; the authors' code's ``m - 1`` scales each split's statistic by
-    ``sqrt((m - 1) / m)``, too little to change the results.
+    ``m``, as in the paper; the authors' code's ``m - 1`` shrinks each split's statistic by the
+    factor ``sqrt((m - 1) / m)``, which in the measurements turned a few rejections near the level
+    into acceptances and changed no other decision.
 
     **Limitations.** Not benchmarked yet. The tests run it on up to 4 variables and 400 rows. Each
     query fits 30 regressions with the default 6 splits, each of 500 trees under ``"forest"``. The
