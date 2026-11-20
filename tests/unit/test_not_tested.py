@@ -7,12 +7,15 @@ The fixed case is a merged-cohort table: one cohort observes ``{S1, S2, S3, A}``
 
 from __future__ import annotations
 
+from functools import partial
+
 import numpy as np
 import pandas as pd
 import pytest
 
 import andrey
-from andrey.core import ARROW
+from andrey.core import ARROW, ci
+from andrey.temporal.pcmci import pc1
 
 COHORT = 300
 
@@ -198,3 +201,37 @@ def test_a_target_set_holds_a_variable_never_observed_with_the_target(name):
     key = "parents_and_children" if name == "mmpc" else "markov_blanket"
     assert {"A", "S1"} <= set(out.metadata[key])
     assert ["A", "B"] in out.metadata["undecided_pairs"]
+
+
+class _InfiniteStatistic:
+    """A link test answering every query of ``given`` columns: candidate 2 has an infinite statistic
+    and a p-value of 0, candidate 3 is not tested."""
+
+    def statistic_pvalues(self, x, y, conditions):
+        statistics = np.where(x == 2, np.inf, np.nan)
+        return statistics, np.where(x == 2, 0.0, np.nan)
+
+
+def test_a_tested_candidate_with_an_infinite_statistic_stays_a_parent():
+    undecided: list = []
+    parents = pc1(_InfiniteStatistic(), 2, 0, 1, 0.05, [0, 1], max_depth=0, undecided=undecided)
+    assert parents == ((0, 1),) and undecided == [(1, 1)]
+
+
+def test_markov_check_rejects_a_nan_no_deletion_counted(monkeypatch):
+    df = _cohorts(1).fillna(0.0)
+    dag = andrey.pc(df)
+    failing = lambda data, **options: lambda x, y, s=(): float("nan")  # noqa: E731
+    monkeypatch.setitem(ci._CI_REGISTRY, "fisherz", failing)
+    with pytest.raises(ValueError, match="outside"):
+        andrey.markov_check(dag, df, indep_test="fisherz", seed=0)
+
+
+def test_a_registered_variant_keeps_the_row_floor_of_its_test(monkeypatch):
+    variant = partial(ci.make_indep_test, "cmiknn", k_cmi=5)
+    monkeypatch.setitem(ci._CI_REGISTRY, "cmiknn_k5", variant)
+    x = np.random.default_rng(0).standard_normal((60, 3))
+    x[5:, 1] = np.nan  # column 1 observed on 5 rows, fewer than the 6 that k_cmi=5 needs
+    test = ci.make_indep_test("cmiknn_k5", x)
+    assert test.least_rows(0) == 6
+    assert np.isnan(test(0, 1))

@@ -43,7 +43,11 @@ names its pull request.
   `fisherz` and `normal_scores` need `|S| + 4` rows, `cond_gauss` `|S| + 3`, and `cmiknn` with an
   int `k_cmi` `k_cmi + 1`. LPCMCI's collider votes leave a triple ambiguous when a subset not tested
   could change the verdict. On the command line, a number that is not finite, as the p-value of a
-  test not tested, is `null` in the JSON output. ([#1151])
+  test not tested, is `null` in the JSON output. A test variant registered as
+  `partial(make_indep_test, "cmiknn", k_cmi=5)` keeps the row floor of its test. In
+  `markov_check`, a p-value that is `NaN` though no row shortage explains it raises, as one
+  outside `[0, 1]` does. In the PCMCI family, a lagged candidate is undecided when its first test
+  is not tested, whatever its statistic. ([#1151])
 - With `missing=None` on data with missing values, a method whose tests delete rows logs one notice
   per process that names the handling, test-wise deletion, and when it is valid. Pass
   `missing="testwise"` to choose it by name. `bootstrap` logs it once for all of its worker
