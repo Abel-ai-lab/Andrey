@@ -102,11 +102,11 @@ cohorts that each measure their own variables, the rows are grouped by pattern o
 test's sums come from the groups' tables instead of from every row. The groups follow the
 patterns, not the row or the column order. The path is chosen once per test from the data, by the
 variables below, and only when the groups in which a block can take the cheaper grouped sums hold
-enough rows to repay the tables. Within it, each block of columns takes the cheaper of the two sums, and a block
-that keeps only a small share of its groups' rows is summed over every row, where the groups' sums
-would lose digits. A block whose groups hold too few rows for its test is not tested without
-being summed. The two paths count the same rows for every tested query and agree up to the last
-digits of the p-values.
+enough rows to repay the tables. Within it, each block of columns takes the cheaper of the two
+sums, and a block that keeps only a small share of its groups' rows is summed over every row, where
+the groups' sums would lose digits. A block whose groups hold too few rows for its test is not
+tested without being summed. The two paths count the same rows for every tested query and agree
+up to the last digits of the p-values.
 
 - `ANDREY_TESTWISE_GROUP_BYTES`: the grouped path is used only when its tables fit in this many
   bytes (default `268435456`, 256 MiB); `0` keeps every test on the per-row path.
