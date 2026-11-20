@@ -438,3 +438,9 @@ def test_table_size_counts_cells_and_degrees_of_freedom():
 def test_a_learner_row_names_one_search_or_one_pc_learner(row):
     with pytest.raises(ValueError, match="pc_spouses"):
         Learner(**row)
+
+
+def test_the_recorded_set_is_the_tested_separator_beside_a_set_not_tested():
+    pvalues = np.array([[np.nan, 0.3, 0.1], [np.nan, np.nan, np.nan]])
+    conds = [(1,), (2,), (3,)]
+    assert blanket._largest_sets(pvalues, conds, [0, 1, 2, 3]) == [(2,), (1,)]

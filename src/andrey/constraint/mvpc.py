@@ -17,7 +17,6 @@ from collections.abc import Iterable, Mapping
 import numpy as np
 
 from andrey.core.ci import CITest, FisherZ, StudentT, pins_blas
-from andrey.core.ci_missing import NOT_TESTED
 
 __all__ = ["IndicatorTest", "PermutationCorrection", "candidate_edges"]
 
@@ -28,11 +27,10 @@ PERMC_TESTS = {"fisherz": FisherZ, "student_t": StudentT}
 class IndicatorTest:
     """A test of a missingness indicator, column ``indicator`` of the data ``test`` was built on.
 
-    A query with no rows where its other columns are observed is not tested: it returns
-    :data:`~andrey.core.ci_missing.NOT_TESTED`, as ``test`` answers a query short of rows. A query
-    whose rows hold one value of the indicator, every value of it observed or every one missing,
-    has nothing to detect: it returns 1, so the column it pairs with is not a parent. Every other
-    query is ``test``'s.
+    A query whose rows hold one value of the indicator, every value of it observed or every one
+    missing, has nothing to detect: it returns 1, so the column it pairs with is not a parent.
+    Every other query is ``test``'s, including one with no rows where its other columns are
+    observed, which ``test`` answers :data:`~andrey.core.ci_missing.NOT_TESTED` and counts.
     """
 
     def __init__(self, test: CITest, data: np.ndarray, indicator: int) -> None:
@@ -45,9 +43,7 @@ class IndicatorTest:
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         others = [int(v) for v in (x, y, *condition_set) if int(v) != self._indicator]
         values = self._values[self._observed[:, others].all(axis=1)]
-        if values.size == 0:
-            return NOT_TESTED
-        if values.min() == values.max():
+        if values.size and values.min() == values.max():
             return 1.0
         return self._test(x, y, condition_set)
 
