@@ -516,7 +516,8 @@ def prune_spouses(
     For each pair ``x``, ``y`` of ``moral``, the candidates are the smaller of ``moral[x]`` less
     ``y`` and ``moral[y]`` less ``x``, or both when they hold as many members; the pair leaves when
     ``x`` and ``y`` test independent (a p-value above ``alpha``) given some subset of them, the
-    empty set included, by increasing size up to ``max_depth``. The blankets are the moral graph
+    empty set included, by increasing size up to ``max_depth``; both candidate sets of a size are
+    tested before the pair's verdict at that size. The blankets are the moral graph
     the search starts from, so each pair's verdict does not depend on another's. A pair a required
     edge of ``constraints`` joins is not tested. Returns a new symmetric boolean matrix.
     """
@@ -530,12 +531,11 @@ def prune_spouses(
         for size in range(top + 1 if max_depth is None else min(top, max_depth) + 1):
             seen: set[int] | None = None
             separated = False
-            for side in sides:
+            for side in sides:  # both sides, so the tests asked do not depend on column order
                 if size <= len(side) and scan_conditioning_sets(
                     test, x, y, side, size, alpha, set(), seen
                 ):
                     separated = True
-                    break
                 seen = set(side)
             if separated:
                 skeleton[x, y] = skeleton[y, x] = False
