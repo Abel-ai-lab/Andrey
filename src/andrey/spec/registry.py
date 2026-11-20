@@ -493,7 +493,8 @@ _add(
             graph_kind="dag",
             doc="edges into the target from its estimated parents; metadata['parents'], "
             "metadata['p_values'] and metadata['confidence_intervals'] per column, "
-            "metadata['accepted_sets'], metadata['model_rejected']",
+            "metadata['accepted_sets'], metadata['model_rejected']; with a list of targets, a "
+            "list of those results, one per target in order",
         ),
         accel="numpy",
         status="supported",

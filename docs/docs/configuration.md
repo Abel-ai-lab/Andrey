@@ -51,7 +51,9 @@ requested backend uses `auto`, without a warning.
   workers. FCI and GFCI also send each large possible-d-separation search to them with the
   `fisherz`, `student_t`, and `normal_scores` tests on complete data, and FCI-JCI with `fisherz` and
   `student_t`; the pairs are still searched one at a time, in the serial order, and every graph is
-  the serial one. `andrey.bootstrap` fits its resamples on them, one fit per worker, with the same
+  the serial one. IAMB, Inter-IAMB, and MMPC split a list of two or more targets over them with the
+  `fisherz`, `student_t`, and `normal_scores` tests on complete data, with the same results for any
+  number of workers. `andrey.bootstrap` fits its resamples on them, one fit per worker, with the same
   result at any number. `1` (the default) and `0` run serially; `-1` uses every usable core. `pnl`
   with one worker leaves the BLAS threads unlimited and with several limits each thread to one, so
   on a machine with several cores its p-values and statistics can differ in the last digits between

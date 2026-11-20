@@ -1055,8 +1055,8 @@ def structure_output(
 
 
 def is_column_list(target: object) -> bool:
-    """Whether ``target`` is a list of columns: any sequence but a string."""
-    return isinstance(target, Sequence) and not isinstance(target, str | bytes)
+    """Whether ``target`` is a list of columns: a list, tuple, or NumPy array."""
+    return isinstance(target, list | tuple | np.ndarray)
 
 
 def target_columns(
@@ -1064,19 +1064,26 @@ def target_columns(
 ) -> list[int] | None:
     """Return the positions of the columns a list of targets names, in its order.
 
-    ``None`` when ``target`` is not a list (:func:`is_column_list`): one column, or none.
+    ``None`` when ``target`` is one column (a label or a position) or ``None``.
 
     Raises
     ------
     ValueError
         If the list is empty, names a column the data lack, or names one column twice.
     TypeError
-        If a member is neither a column label nor a position.
+        If ``target`` is neither a column, ``None``, nor a list of columns
+        (:func:`is_column_list`), or a member is neither a column label nor a position.
     """
-    if not is_column_list(target):
-        return None
-    assert isinstance(target, Sequence)
     what = f"{method}: target"
+    if not is_column_list(target):
+        if target is None or isinstance(target, str | int | np.integer):
+            return None
+        raise TypeError(
+            f"{what} must be a column name or position, or a list, tuple, or NumPy array of them, "
+            f"got {type(target).__name__}"
+        )
+    assert isinstance(target, list | tuple | np.ndarray)
+    target = list(target)
     if not target:
         raise ValueError(f"{what} is an empty list; pass a column or a list of columns")
     found = [column_position(as_node(t, what), labels, d, what) for t in target]

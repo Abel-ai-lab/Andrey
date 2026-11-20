@@ -292,8 +292,8 @@ def _target_list(name: str) -> Fit:
 
 #: The set learners, by their names here and in the package.
 SET_LEARNERS = {"IAMB": "iamb", "InterIAMB": "inter_iamb", "MMPC": "mmpc"}
-#: The target-centered methods with a shared search, fitted with a list of targets, each on the
-#: datasets of the method it names, with every variable a target.
+#: The set learners, each fitted with a list of targets that one search answers, on the datasets
+#: of the method it names, with every variable a target.
 TARGET_LISTS: dict[str, str] = {f"{name}-targets": name for name in SET_LEARNERS}
 FITS |= {f"{name}-targets": _target_list(SET_LEARNERS[name]) for name in SET_LEARNERS}
 

@@ -130,9 +130,31 @@ def test_rows_tested_is_the_answer_of_its_own_call_with_missing_values(method, n
         _same(out, _fit(method, data, t))
 
 
-def test_any_sequence_of_columns_is_a_list():
+def test_a_tuple_or_an_array_of_columns_is_a_list():
     data = _gaussian()
-    outs = andrey.mmpc(data, target=range(3))
+    outs = andrey.mmpc(data, target=np.arange(3))
     assert [out.metadata["target"] for out in outs] == ["x0", "x1", "x2"]
     (out,) = andrey.mmpc(data, target=("x3",))
     _same(out, andrey.mmpc(data, target="x3"))
+
+
+@pytest.mark.parametrize("method", ["mmpc", "icp"])
+@pytest.mark.parametrize("target", [{"x1", "x2"}, pd.Index(["x1", "x2"]), range(2)])
+def test_an_unordered_or_other_collection_raises(method, target):
+    data = _gaussian().assign(env=np.repeat([0, 1], 300))
+    with pytest.raises(TypeError, match="list, tuple, or NumPy array"):
+        _fit(method, data, target)
+
+
+@pytest.mark.parametrize("n_jobs", [1, 4])
+def test_a_randomized_test_with_a_seed_answers_as_separate_calls(n_jobs):
+    """GCM draws from the seed, so each listed answer is the one a call with that seed gives."""
+    rng = np.random.default_rng(4)
+    a = rng.standard_normal(100)
+    b = 0.9 * a + rng.standard_normal(100)
+    c = 0.8 * b + rng.standard_normal(100)
+    data = pd.DataFrame({"a": a, "b": b, "c": c, "d": rng.standard_normal(100)})
+    with andrey.config(n_jobs=n_jobs):
+        outs = andrey.mmpc(data, target=["c", "b"], indep_test="gcm", seed=7)
+    for out, t in zip(outs, ["c", "b"], strict=True):
+        _same(out, andrey.mmpc(data, target=t, indep_test="gcm", seed=7))

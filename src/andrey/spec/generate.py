@@ -327,7 +327,7 @@ def cli_meta() -> dict:
             "results": (
                 "with multi: true, in place of structure and metadata: one {structure, metadata} "
                 "per group (multi_group_direct_lingam) or per target, in the order of a list such "
-                "as 'target=[a,b]' on a target-centered method"
+                "as 'target=[a,b]' on a method that takes a target"
             ),
             "run": "resolved params, seed, versions, elapsed, n_samples, n_variables, and the "
             "fit's warnings (category, message)",

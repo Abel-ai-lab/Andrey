@@ -52,12 +52,12 @@ names its pull request.
   learners answer every target with one search, which sets up the test once, and MMPC learns the
   set of a variable that two targets' symmetry checks read once; with a partial-correlation test
   they split the targets over `andrey.config(n_jobs=...)` worker processes, with the same results
-  for any number of workers. With missing values, each target has a search of its own. At 200
-  variables and 1,000 rows, every variable a target on one worker, the list is about 3 times as
-  fast as separate calls for `iamb` and `inter_iamb` and 8 times for `mmpc`. `andrey run` takes
-  the list as `'target=[a,b]'`, by header name or position, or as a list in `--config`; its
-  envelope then holds `multi: true` and `results`, one per target, and the `--help --json` schema
-  types `target` as a string or a list of strings. ([#1058])
+  for any number of workers. With missing values, each target has a search of its own. A list
+  shares the work of one call, so it takes less time than separate calls. `andrey run` takes the
+  list as `'target=[a,b]'`, by header name or position, or as a list in `--config`; its envelope
+  then holds `multi: true` and `results`, one per target, and the `--help --json` schema types
+  `target` as a string or a list of strings. `andrey run icp` names the target and the parents by
+  the header's column names, for one target as for a list. ([#1058], [#1153])
 
 ### Changed
 
@@ -2783,3 +2783,4 @@ First alpha release.
 [#1047]: https://github.com/Abel-ai-lab/Andrey/pull/1047
 [#1048]: https://github.com/Abel-ai-lab/Andrey/pull/1048
 [#1058]: https://github.com/Abel-ai-lab/Andrey/pull/1058
+[#1153]: https://github.com/Abel-ai-lab/Andrey/pull/1153

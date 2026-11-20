@@ -1077,7 +1077,7 @@ def prepare_call(
     if labels is not None and (named or spec.output.has_latents):
         # A method that reads column types names the header's columns in its warnings and in
         # metadata["categorical"]; knowledge names them too, in each group of a panel, and a
-        # target-centered method names its target and sets in its metadata. A graph
+        # method that takes a target names its target and sets in its metadata. A graph
         # with latent nodes names its observed variables from the table, and a graph that leaves
         # out the contexts names what it keeps, so no label is left to apply to the result.
         import pandas as pd
