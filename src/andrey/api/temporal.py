@@ -2338,9 +2338,9 @@ def rpcmci(
     else.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: a missing value would remove
-    its step from every regime's fit and leave its regime unknown. Fill in the missing steps first,
-    as dropping one would join the steps around it, or use :func:`~andrey.pcmci`,
-    :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete rows per test.
+    its step from every regime's fit and leave its regime unknown. Use :func:`~andrey.pcmci`,
+    :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete rows per test and keep
+    every time step, as dropping a step would join the steps around it.
 
     **Limitations.** Not benchmarked yet; the tests run it on 2 to 3 variables, 2 to 3 regimes,
     and up to 1,000 time steps. The objective is not convex, so a start can end in a mixed state

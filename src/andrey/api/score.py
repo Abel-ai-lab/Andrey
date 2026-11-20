@@ -1858,7 +1858,7 @@ def lges(
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score adds one term per
     variable, each over every row, and terms over different rows do not add up to the score of one
     dataset, so the search cannot delete rows per test as the conditional-independence searches do.
-    Drop the incomplete rows first, which suits values missing completely at random, or use
+    Drop the incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Not benchmarked yet. Its tests run it on up to 20 variables with 5,000 rows.
