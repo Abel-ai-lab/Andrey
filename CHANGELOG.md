@@ -100,7 +100,7 @@ names its pull request.
   simulation's own units that code made fewer errors on sparse graphs, since DAS standardizes the
   columns in its order search; its Limitations state this, and the
   [0.19.0 release card][card-0190-das] has the numbers, with `cam`, SCORE, and NoGAM on the same
-  datasets. ([#PRNUM])
+  datasets. ([#1161])
 - With `fisherz` and `student_t` on data with missing values, test-wise deletion groups the rows by
   their missingness patterns once and computes a test's sums from the groups' tables, removing the
   scattered missing cells exactly, when that costs less than summing every row; a query whose
@@ -2880,6 +2880,7 @@ First alpha release.
 [#1122]: https://github.com/Abel-ai-lab/Andrey/pull/1122
 [#1127]: https://github.com/Abel-ai-lab/Andrey/pull/1127
 [#1147]: https://github.com/Abel-ai-lab/Andrey/pull/1147
+[#1161]: https://github.com/Abel-ai-lab/Andrey/pull/1161
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
 [#1146]: https://github.com/Abel-ai-lab/Andrey/pull/1146
 [#1149]: https://github.com/Abel-ai-lab/Andrey/pull/1149
