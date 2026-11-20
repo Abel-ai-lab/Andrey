@@ -1138,20 +1138,37 @@ def run_info(
     return run
 
 
+def strict_json(value: object) -> str:
+    """``value`` as standard JSON, indented: a number that is not finite, as the p-value of a test
+    that was not tested, is ``null``."""
+
+    def finite(item: object) -> object:
+        if isinstance(item, float) and not math.isfinite(item):
+            return None
+        if isinstance(item, dict):
+            return {key: finite(v) for key, v in item.items()}
+        if isinstance(item, (list, tuple)):
+            return [finite(v) for v in item]
+        return item
+
+    return json.dumps(finite(value), indent=2, allow_nan=False)
+
+
 def emit(env: dict, human: Callable[[], str], *, output: str | None, as_json: bool, full: bool):
-    """Write the envelope to ``output``, or print it: capped JSON, or ``human()`` on a terminal."""
+    """Write the envelope to ``output``, or print it: capped JSON (:func:`strict_json`), or
+    ``human()`` on a terminal."""
     if output:  # a file is not context-bounded -> always the complete envelope
-        _atomic_write(output, json.dumps(env, indent=2))
+        _atomic_write(output, strict_json(env))
         return
     if not full:  # bound stdout so a large graph can't flood it
         apply_output_cap(env, EDGE_LIMIT)
     if as_json or not sys.stdout.isatty():  # piped / agent / CI / forced -> JSON
-        typer.echo(json.dumps(env, indent=2))
+        typer.echo(strict_json(env))
         return
     try:  # an interactive terminal -> a human summary (never fail to produce output)
         typer.echo(human())
     except Exception:
-        typer.echo(json.dumps(env, indent=2))
+        typer.echo(strict_json(env))
 
 
 def execute_run(

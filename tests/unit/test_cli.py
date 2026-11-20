@@ -1363,3 +1363,17 @@ def test_the_bootstrap_reads_contexts_and_blocks_of_every_dataset(tmp_path, caps
     code, out, err = _run(argv, capsys)
     assert code == 0, err
     assert json.loads(out)["structure"]["labels"] == ["x", "y"]
+
+
+def test_a_p_value_not_tested_is_null_in_strict_json(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr("sys.stdout.isatty", lambda: False)
+    rng = np.random.default_rng(0)
+    x = rng.standard_normal((200, 3))
+    x[:100, 1] = np.nan  # columns 1 and 2 never observed together
+    x[100:, 2] = np.nan
+    path = tmp_path / "gaps.csv"
+    np.savetxt(path, x, delimiter=",", header="a,b,c", comments="")
+    code, out, _ = _run(["run", "pcmci", "--data", str(path)], capsys)
+    assert code == 0
+    env = json.loads(out, parse_constant=lambda token: pytest.fail(f"non-standard {token}"))
+    assert None in [p for lag in env["metadata"]["p_values"] for row in lag for p in row]
