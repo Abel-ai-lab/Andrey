@@ -40,12 +40,11 @@ names its pull request.
   their missingness patterns once and computes a test's sums from the groups' tables, removing the
   scattered missing cells exactly, when that costs less than summing every row; a query whose
   groups hold too few rows for it is not tested without a scan. On synthetic merged cohorts, with
-  or without a few rows that observe every column, `pc` ran 2.5 to 4.7 times faster and `iamb` 1.4
-  to 3.3 times, with the same graphs, the same tests not tested, and the same row counts for every
-  tested query. On data
-  missing completely at random, and on `pcmci` with station outages, the time stayed within the
-  timing noise of the earlier release, with a fixed cost of a few tenths of a second. P-values
-  change in their last digits. Five `ANDREY_TESTWISE_GROUP_*` settings set when the path is used.
+  or without a few rows that observe every column, `pc` ran 2.1 to 5.6 times faster and `iamb` 1.4
+  to 3.6 times, with the same graphs, the same tests not tested, and the same row counts for every
+  tested query. Data missing completely at random keep the per-row sums. On `pcmci` with station
+  outages, grouping the patterns adds a fixed cost, about 0.8 s on a fit of 1 s. P-values change
+  in their last digits. Five `ANDREY_TESTWISE_GROUP_*` settings set when the path is used.
   ([#1148])
 - With `missing=None` on data with missing values, a method whose tests delete rows logs one notice
   per process that names the handling, test-wise deletion, and when it is valid. Pass
