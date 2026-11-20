@@ -20,7 +20,8 @@ names its pull request.
   `metadata["never_observed_together"]` the pairs of columns no row observes together; the notice
   for `missing=None` names the first of them. A pair no tested query could decide stays adjacent
   in PC, FCI, CD-NOD, and FCI-JCI and in the Markov-blanket searches' sets; PCMCI, PCMCI+, and
-  J-PCMCI+ condition no test on a lagged parent without a tested result. ([#1151])
+  J-PCMCI+ condition no test on a lagged parent without a tested result, and LPCMCI none on a node
+  whose link to either end of the tested pair has none. ([#1151])
 
 - `metadata["p_one_tests"]` counts every test of a fit on data with missing values that returned
   `p = 1`, whichever test it is, as a test whose statistic is exactly zero answers. ([#1102])
@@ -81,15 +82,18 @@ names its pull request.
 - A test-wise fit that runs no test on data with missing values, such as `pc` on one column, sets
   `metadata["missing"]`, gives `metadata["rows_tested"]` as `{"min": 0, "median": 0}`, and logs
   the notice of the default handling under `missing=None`. ([#1151])
-- `pc(missing="mvpc")` counts the indicator queries it answers 1 in `metadata["p_one_tests"]`, and
-  the corrected tests that return a p-value of 1 in `metadata["corrected_edges"]["p_one_tests"]`.
-  An indicator query on fewer rows than its test needs is not tested, as every test-wise test is:
-  it counts in `metadata["not_tested"]`, not as `p = 1`, and its rows no longer lower
-  `metadata["rows_tested"]["min"]`; the indicator's parents are the same. A corrected test needs the rows that leave its test a degree of freedom,
-  `|S| + 4` for `fisherz`, or the pair keeps its test-wise answer. ([#1151])
+- `pc(missing="mvpc")` counts the corrected tests that return a p-value of 1 in
+  `metadata["corrected_edges"]["p_one_tests"]`. An indicator query whose rows hold one value of the
+  indicator, and so carry no information on it, or fewer rows than its test needs is not tested, as
+  every test-wise test is, where it returned `p = 1`: it counts in `metadata["not_tested"]`, and its
+  rows no longer count in `metadata["rows_tested"]`. A column on whose observed rows the indicator
+  holds one value conditions no test of that indicator and, as before, is not its parent; the
+  parents and graphs of the fits compared are unchanged. A corrected test needs the rows that leave
+  its test a degree of freedom, `|S| + 4` for `fisherz`, or the pair keeps its test-wise answer.
+  ([#1151])
 - Under `missing="em"` with the linear-Gaussian BIC, copies among the observed values raise
   `CopiedColumnsError` before a pair of columns that shares no observed row, as on complete data.
-  ([#1151])
+  The error for such a pair names a DataFrame's columns by their labels. ([#1151])
 - The CLI records a fit's warning-level log records in `run.warnings` when the `andrey` logger, a
   logger under it, or the root logger is set above `WARNING`, or a logger under `andrey` has its
   own handler or does not propagate, and `bootstrap` logs the records of fits that ran in worker
