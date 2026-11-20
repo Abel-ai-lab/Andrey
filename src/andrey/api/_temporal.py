@@ -15,9 +15,17 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.api._adapt import json_safe, structure_output
+from andrey.api._adapt import json_safe, structure_output, with_labels
 from andrey.api._marks import directed_marks
-from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput, TemporalStructure
+from andrey.core import (
+    ARROW,
+    CIRCLE,
+    TAIL,
+    GraphStructure,
+    RegimeOutput,
+    StructureOutput,
+    TemporalStructure,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -26,6 +34,7 @@ if TYPE_CHECKING:
     from andrey.temporal.lpcmci import LPCMCIResult
     from andrey.temporal.pcmci import PCMCIResult
     from andrey.temporal.pcmciplus import PCMCIPlusResult
+    from andrey.temporal.rpcmci import RPCMCIResult
 
 
 def _lag_graphs(
@@ -184,6 +193,25 @@ def adapt_pcmci(result: PCMCIResult, extra: Mapping[str, object] | None = None) 
     graphs = _lag_graphs(graph.transpose(0, 2, 1), instantaneous=False)
     temporal = TemporalStructure.from_lag_graphs(graphs, lags=range(1, graph.shape[0] + 1))
     return structure_output(temporal, metadata={**_test_metadata(result), **(extra or {})})
+
+
+def adapt_rpcmci(result: RPCMCIResult, labels: tuple[str, ...] | None) -> RegimeOutput:
+    """Regime-PCMCI result -> ``RegimeOutput``: one :func:`adapt_pcmci` output per regime.
+
+    Each regime's structure is named by ``labels``; the start's objective, index, iterations, and
+    stopping, and the number of failed starts, ride in the result's ``metadata``.
+    """
+    return RegimeOutput.new(
+        [with_labels(adapt_pcmci(fit), labels) for fit in result.results],
+        result.weights,
+        metadata={
+            "objective": result.objective,
+            "start": result.start,
+            "n_iterations": result.n_iterations,
+            "converged": result.converged,
+            "failed_starts": result.n_failed,
+        },
+    )
 
 
 def adapt_pcmciplus(

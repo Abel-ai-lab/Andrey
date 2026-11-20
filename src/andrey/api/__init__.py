@@ -30,6 +30,7 @@ from .temporal import (
     lpcmci,
     pcmci,
     pcmciplus,
+    rpcmci,
     varma_lingam,
 )
 
@@ -85,6 +86,7 @@ __all__ = [
     "pcmciplus",
     "jpcmciplus",
     "lpcmci",
+    "rpcmci",
     "granger",
     "dynotears",
     # irregular / pairwise family

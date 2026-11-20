@@ -91,6 +91,12 @@ SPEC: dict[str, dict] = {
             "statistics": {"atol": 1e-8, "rtol": 1e-6},
         },
     },
+    # Regime-PCMCI: the regime of each step and every regime's lag graphs, exactly; the linear
+    # program's objective within rounding.
+    "RPCMCI": {
+        "structural": ["regimes", "graph"],
+        "numeric": {"objective": {"atol": 1e-6, "rtol": 1e-8}},
+    },
     "PCMCIplus": {
         "structural": ["graph", "conflicts"],
         "numeric": {

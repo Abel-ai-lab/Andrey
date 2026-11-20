@@ -36,7 +36,7 @@ from andrey.spec.concepts import (
 )
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.ci_tests import PValueOnly
-from tests.unit.methods import REQUIRED, SHORT, domains, environments
+from tests.unit.methods import REQUIRED, SHORT, domains, environments, results
 
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
 CHANGELOG = API_MD.parents[2] / "CHANGELOG.md"
@@ -367,6 +367,7 @@ UNIT_CASES = {
     "pcmciplus": "var_4v_stable",
     "jpcmciplus": "mgdl_2groups",
     "lpcmci": "var_6v_hidden",
+    "rpcmci": "regime_var_2v",
     "granger": "var_4v_stable",
     "gin": "measurement_chain_9v",
     "rcd": "confounded_fork_4v",
@@ -415,9 +416,12 @@ def unit_inputs(method: str, exponents: np.ndarray) -> list:
 
 
 def graphs_and_orders(out) -> list:
-    """The endpoint marks of every graph (each lag, occasion, and group) and every causal order."""
+    """The endpoint marks of every graph (each lag, occasion, group, and regime), every causal
+    order, and the regime of each step."""
     if isinstance(out, list):
         return [graphs_and_orders(o) for o in out]
+    if isinstance(out, andrey.RegimeOutput):
+        return [out.regimes.tolist(), [graphs_and_orders(o) for o in out.outputs]]
     s = out.structure
     if isinstance(s, andrey.TemporalStructure):
         graphs = [s.at(t, k) for t in s.times for k in s.lags] if s.n_times else map(s.lag, s.lags)
@@ -441,8 +445,8 @@ def unit_free(method: str) -> bool:
 
 def declared_kind(out, method: str) -> bool:
     """Whether a fit's graph has the kind its spec declares, ``None`` for a time-series result."""
-    kind = getattr(out.structure, "kind", None)
-    return kind == REGISTRY[method].output.graph_kind
+    kinds = {getattr(o.structure, "kind", None) for o in results(out)}
+    return kinds == {REGISTRY[method].output.graph_kind}
 
 
 #: Settings that bring out the metadata keys a default fit leaves out.
@@ -460,7 +464,7 @@ def declared_metadata(method: str) -> bool:
     outs = [coded_fit(method)[0]]
     if method in METADATA_FITS:
         outs.append(fit(method, codes=False, **METADATA_FITS[method])[0])
-    keys = {key for out in outs for key in out.metadata}
+    keys = {key for out in outs for o in (out, *results(out)) for key in o.metadata}
     return keys <= set(REGISTRY[method].output.metadata)
 
 

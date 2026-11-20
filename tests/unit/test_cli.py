@@ -12,6 +12,7 @@ import warnings
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 
 import andrey
@@ -229,6 +230,32 @@ def test_run_multi_group(capsys, nongaussian_path):
     env = json.loads(out)
     assert code == 0 and env["multi"] is True
     assert len(env["results"]) == 2
+
+
+def test_run_regimes(capsys, tmp_path):
+    """A regime fit's envelope holds the regime of each step and one result per regime, named by
+    the header, and its terminal summary one block per regime."""
+    from andrey.cli import render_human
+    from tests.recovery.helpers import datagen
+
+    path = tmp_path / "regimes.csv"
+    data = pd.DataFrame(datagen.generate("regime_var_2v", shuffle=False), columns=["a", "b"])
+    data.to_csv(path, index=False)
+    settings = ["max_transitions=7", "n_starts=2"]
+    code, out, _ = _run(["run", "rpcmci", "--data", str(path), *settings], capsys)
+    env = json.loads(out)
+    assert code == 0 and env["multi"] is True
+    assert len(env["regimes"]) == len(data) and set(env["regimes"]) <= {0, 1}
+    assert env["regime_weights"] is None and env["regime_weights_shape"] == [2, len(data)]
+    assert len(env["results"]) == 2 and env["metadata"]["algorithm"] == "rpcmci"
+    assert all(r["structure"]["labels"] == ["a", "b"] for r in env["results"])
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fit = andrey.rpcmci(data, max_transitions=7, n_starts=2)
+    run = {"warnings": [], "n_samples": 600, "n_variables": 2, "elapsed_s": 0.0}
+    text = render_human(REGISTRY["rpcmci"], fit, {**run, "versions": {"andrey": "x"}})
+    assert text.startswith("rpcmci  |  2 regimes over 600 time steps")
+    assert "regime 0, " in text and "regime 1, " in text
 
 
 @pytest.mark.parametrize(

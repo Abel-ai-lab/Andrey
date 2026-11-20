@@ -9,9 +9,9 @@ DataFrame or a NumPy array of one row per sample and one column per variable::
     print(out)
 
 Every algorithm (``andrey.ges``, ``andrey.fci``, ...) returns a ``StructureOutput``
-(``multi_group_direct_lingam``, one per group) wrapping a first-class ``Structure`` (a
-``GraphStructure`` or ``TemporalStructure``). The public graph types are re-exported here
-(``andrey.GraphStructure``) alongside ``andrey.core.*``.
+(``multi_group_direct_lingam``, one per group; ``rpcmci``, a ``RegimeOutput`` with one per regime)
+wrapping a first-class ``Structure`` (a ``GraphStructure`` or ``TemporalStructure``). The public
+graph types are re-exported here (``andrey.GraphStructure``) alongside ``andrey.core.*``.
 
 For a coding agent, the command line carries the same methods: ``andrey --skill`` prints the guide
 to save as its ``SKILL.md``, and ``andrey --help --json`` prints every method's contract as JSON.
@@ -65,6 +65,7 @@ from .api import (
     pnl,
     rcd,
     resit,
+    rpcmci,
     rsmax2,
     score_matching,
     skewd,
@@ -74,7 +75,14 @@ from .api import (
     varma_lingam,
     xges,
 )
-from .core import GraphStructure, Structure, StructureOutput, SummaryGraph, TemporalStructure
+from .core import (
+    GraphStructure,
+    RegimeOutput,
+    Structure,
+    StructureOutput,
+    SummaryGraph,
+    TemporalStructure,
+)
 from .core.backend import config, describe
 from .core.knowledge import Knowledge
 from .core.seeding import seed_all
@@ -102,6 +110,7 @@ __all__ = [
     "TemporalStructure",
     "SummaryGraph",
     "StructureOutput",
+    "RegimeOutput",
     # Background knowledge every search takes as knowledge=.
     "Knowledge",
     # Refit a method on resamples of the rows: edge frequencies and an averaged graph.
@@ -175,6 +184,7 @@ __all__ = [
     "pcmciplus",
     "jpcmciplus",
     "lpcmci",
+    "rpcmci",
     "granger",
     "dynotears",
     # Pairwise direction tests.
