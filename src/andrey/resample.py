@@ -1046,7 +1046,8 @@ def bootstrap(
         Before any fit, for ``n_boot`` or an argument name that a release removed from the method;
         the message gives its current name.
     NotImplementedError
-        For ``gin``, whose number of latent nodes varies from fit to fit.
+        For ``gin``, whose number of latent nodes varies from fit to fit, and ``rpcmci``, whose
+        regimes are numbered anew in each fit.
     RuntimeError
         If a worker process dies.
 
@@ -1218,6 +1219,11 @@ def bootstrap(
     if spec.output.has_latents:
         raise NotImplementedError(
             f"bootstrap does not support {spec.name}: its latent nodes differ from fit to fit"
+        )
+    if spec.output.regimes:
+        raise NotImplementedError(
+            f"bootstrap does not support {spec.name}: its regimes are numbered anew in each fit, "
+            "and a resample of the steps breaks them"
         )
     root = resolve_seed(seed)
     if root < 0:

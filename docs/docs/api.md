@@ -24,7 +24,8 @@ Every method has the same shape:
   keyword arguments. `andrey run pc --data data.csv` runs it from the shell, with `--data` once per
   table for a method that takes a list ([Command-line interface](#command-line-interface)).
 - **A result out.** Each call returns a {py:class}`~andrey.StructureOutput`, one per table for
-  `multi_group_direct_lingam`: the graph in `out.structure` and, where the method gives them, a
+  `multi_group_direct_lingam` and one per regime, in a {py:class}`~andrey.RegimeOutput`, for
+  `rpcmci`: the graph in `out.structure` and, where the method gives them, a
   causal order in `out.ordering`, edge weights in `out.weighted_adjacency`, and run details such as
   the test, the score, and the seed in `out.metadata`.
 - **Supported or experimental.** A [supported](#supported-methods) method is benchmarked against
@@ -147,8 +148,9 @@ tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` ([Conditional-independence
 tests](#conditional-independence-tests)). `None`, the default, picks from the declared column types,
 `"fisherz"` for continuous data. `jpcmciplus` takes the continuous and nonlinear tests, as its
 dummies enter a test as numeric columns. `skewd_mv` takes them without `"normal_scores"`, as its
-likelihood stage reads the values, and its default is `"kci"`. `pcmci`, `pcmciplus`, `jpcmciplus`,
-and `lpcmci` run each test on the lagged values of the series, and order the candidate conditions by
+likelihood stage reads the values, and its default is `"kci"`. `rpcmci` takes `"student_t"`, its
+default, and `"fisherz"`, as its regime step fits linear models. `pcmci`, `pcmciplus`, `jpcmciplus`,
+`lpcmci`, and `rpcmci` run each test on the lagged values of the series, and order the candidate conditions by
 the test's statistic, as tigramite does: the partial correlation, the chi-square statistic, the
 likelihood ratio, CMIknn's conditional mutual information estimate, or GPDC's distance correlation.
 A test you register that reports only p-values is ordered by its p-value, smallest first.
@@ -235,8 +237,8 @@ return the CPDAG of a DAG, which always has a consistent extension.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 % concept: tau_max
-`pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `longitudinal_lingam`, and `dynotears` take
-`tau_max`, the largest lag, at least 1, with a default of 1; for `longitudinal_lingam` a lag counts
+`pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `rpcmci`, `granger`, `longitudinal_lingam`, and
+`dynotears` take `tau_max`, the largest lag, at least 1, with a default of 1; for `longitudinal_lingam` a lag counts
 time points of the panel. The ARMA order of VARMA-LiNGAM, `order=(p, q)`, is a different setting and
 keeps its name.
 
@@ -258,12 +260,13 @@ from outside, as in a randomized experiment (FCI-JCI123), so every edge the inde
 of it.
 
 % concept: fdr_method
-`pcmci`, `pcmciplus`, `jpcmciplus`, and `granger` take `fdr_method`, tigramite's name for the
+`pcmci`, `pcmciplus`, `jpcmciplus`, `rpcmci`, and `granger` take `fdr_method`, tigramite's name for the
 correction of the lagged links' p-values for the number of links tested. `"fdr_bh"`, the default,
 replaces them with their Benjamini-Hochberg adjusted values over all the lagged links together,
 which holds the false discovery rate at or below the level when the tests are independent or
 positively dependent. `"none"` keeps each p-value as tested, so about `alpha` of the absent links
-appear as links. `pcmci` and `granger` keep a link when its adjusted p-value is at most `alpha`;
+appear as links. `pcmci` and `granger` keep a link when its adjusted p-value is at most `alpha`, and so does `rpcmci`
+in each regime, whose default is `"none"`, as in its paper's experiments;
 `pcmciplus` and `jpcmciplus` decide their links in the skeleton phase and report the adjusted values
 in `metadata["p_values"]` without changing them. LPCMCI takes none, as tigramite's LPCMCI does not.
 
@@ -333,8 +336,9 @@ the PAG their tests then orient can put more arrowheads at a node.
 
 % concept: seed
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
-`mmhc`, `rsmax2`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`,
-`hc`, `tabu`, `calm`, `ica_lingam`, `cpcm`, `cpcm_graph`, `skewd`, and `skewd_mv` take `seed`, a
+`mmhc`, `rsmax2`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `rpcmci`, `boss`, `grasp`, `igsp`,
+`ut_igsp`, `hc`, `tabu`, `calm`, `ica_lingam`, `cpcm`, `cpcm_graph`, `skewd`, and `skewd_mv` take
+`seed`, a
 whole number from 0 to 2**32 - 1 that fixes their random draws. `None`, the default, is the
 configured seed, `ANDREY_SEED` or 0 when it is unset, not a fresh random one, so a call repeats
 exactly. Apart from `boss_fci` and `grasp_fci`, whose BOSS or GRaSP phase visits the variables in a
@@ -343,13 +347,14 @@ random order on every fit, the methods that test independence draw random number
 values, `igsp` and `ut_igsp` also with `n_starts` above 1, `hc` and `tabu` only with `n_starts`
 above 1, and `cpcm` and `cpcm_graph` only for a column under `family="poisson"` or
 `"negative_binomial"`; `skewd` and `skewd_mv` draw in every fit, in their Bayesian optimization and
-CMA-ES, whatever test PC runs. Otherwise `seed` changes nothing, and `metadata["seed"]` is not set.
+CMA-ES, whatever test PC runs, and `rpcmci` draws the first regime weights of every start.
+Otherwise `seed` changes nothing, and `metadata["seed"]` is not set.
 A call that gives `seed` does not depend on `ANDREY_SEED`. Every other method is deterministic and
 takes no seed.
 
 % concept: n_starts
-`boss`, `grasp`, `boss_fci`, `grasp_fci`, `igsp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the
-number of searches a fit runs: the first from the start the method describes, each later one from a
+`boss`, `grasp`, `boss_fci`, `grasp_fci`, `igsp`, `ut_igsp`, `hc`, `tabu`, and `rpcmci` take
+`n_starts`, the number of searches a fit runs: the first from the start the method describes, each later one from a
 start drawn from `seed` and the search's index. `boss`, `grasp`, `boss_fci`, and `grasp_fci` start
 it from a random order, `igsp` and `ut_igsp` from a minimum-degree order with its ties drawn from
 `seed`, and `hc` and `tabu` from the best DAG so far after `n_perturbations` random edge changes.
@@ -365,7 +370,9 @@ can stop at a much worse order: with 50 variables, mean degree 4, and 500 rows a
 its mean SHD over 40 datasets was 29.6 with one start, 18.8 with `n_starts=4`, and 16.3 with
 `n_starts=8`, at median fits of 1.3, 5.1, and 10.4 s, while at mean degree 2 one start was enough.
 Each search builds its own caches and drops the previous one's, so more starts take more time but
-little more memory. `1`, the default for the others, runs one search.
+little more memory. `rpcmci` draws every start's regime weights from `seed` and the start's index
+and returns the start with the lowest objective, 50 by default, as in its paper's experiments.
+`1`, the default for the others, runs one search.
 
 % concept: n_perturbations
 `hc` and `tabu` take `n_perturbations`, the number of random edge additions, removals, or
@@ -687,6 +694,7 @@ in a process.
    das
    cpcm
    cpcm_graph
+   rpcmci
 ```
 
 DAS (Montagna et al. 2023), {py:func}`~andrey.das`, finds SCORE's causal order with the same Stein
@@ -724,6 +732,15 @@ given its parents, have the largest likelihood. It suits a few variables: it fit
 distinct parent set the class allows, and `max_fits` (100 by default, the order up to which the
 paper expects it to apply) makes it refuse a class that needs more, before it fits any. It is
 experimental until its comparison with the authors' code is published.
+
+Regime-PCMCI (Saggioro et al. 2020), {py:func}`~andrey.rpcmci`, takes one time series whose lagged
+links switch between a few persistent regimes. Each start draws random regime weights, then
+alternates PCMCI on each regime's time steps with a linear program that reassigns the steps to the
+regime whose linear model predicts them best, with at most `max_transitions` switches per regime;
+the start with the lowest objective is returned, the regime of each step and one lagged graph per
+regime in a {py:class}`~andrey.RegimeOutput`. SciPy's HiGHS solver solves the linear program
+exactly, so it needs no further package. It is experimental until its benchmark in the paper's
+setting is published.
 
 A method becomes supported once it has:
 
@@ -904,6 +921,7 @@ DoWhy for effect estimation.
    :toctree: api
 
    GraphStructure
+   RegimeOutput
    Structure
    StructureOutput
    SummaryGraph

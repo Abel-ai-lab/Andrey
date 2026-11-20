@@ -12,7 +12,7 @@ shared backend-selection layer they dispatch through is ``andrey.core.backend``.
 extra and never at package import. Method-specific fused kernels stay private -- not here.
 """
 
-from .output import StructureOutput
+from .output import RegimeOutput, StructureOutput
 from .structure import (
     ARROW,
     CIRCLE,
@@ -33,6 +33,7 @@ __all__ = [
     "GraphStructure",
     "TemporalStructure",
     "SummaryGraph",
+    "RegimeOutput",
     "StructureOutput",
     # Endpoint mark codes + graph-type aliases - adapter authors need these for the
     # signed->unsigned remap and edge-list construction.

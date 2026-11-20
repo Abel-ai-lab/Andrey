@@ -14,6 +14,7 @@ result. Failures print a structured JSON error on stderr and exit non-zero.
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import importlib.metadata
 import inspect
 import io
@@ -38,7 +39,7 @@ from andrey.core import LATENT, GraphStructure
 from andrey.core.backend import usable_cpus
 from andrey.core.env import SETTINGS
 from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgeError
-from andrey.core.output import summary_lines
+from andrey.core.output import RegimeOutput, regime_summary_lines, summary_lines
 from andrey.core.removed import removal_hint
 from andrey.core.structure import SUMMARY_EDGES, edge_count_text, edge_lines, node_labels
 from andrey.resample import bootstrap_summary_lines
@@ -320,6 +321,11 @@ def envelope(spec: MethodSpec, out, run: dict) -> dict:
     if isinstance(out, list):  # multi-output (multi_group_direct_lingam)
         env["multi"] = True
         env["results"] = [result_view(o) for o in out]
+    elif isinstance(out, RegimeOutput):  # one result per regime, and the regime of each step
+        env["multi"] = True
+        env["regimes"] = out.regimes.tolist()
+        env["results"] = [result_view(o) for o in out.outputs]
+        env["metadata"] = dict(out.metadata)
     else:
         result = result_view(out)
         env["structure"] = result["structure"]
@@ -488,7 +494,11 @@ def _run_footer(run: dict) -> str:
 
 
 def render_human(
-    spec: MethodSpec, out: StructureOutput | list[StructureOutput], run: dict, *, full: bool = False
+    spec: MethodSpec,
+    out: StructureOutput | list[StructureOutput] | RegimeOutput,
+    run: dict,
+    *,
+    full: bool = False,
 ) -> str:
     """Render a terminal summary of the result and run details.
 
@@ -496,6 +506,9 @@ def render_human(
     most ``SUMMARY_EDGES`` edges. The run footer follows the result.
     """
     limit = None if full else SUMMARY_EDGES
+    if isinstance(out, RegimeOutput):
+        lines = regime_summary_lines(out, name=spec.name, limit=limit, more=_MORE_HINT)
+        return "\n".join(lines) + _run_footer(run)
     if not isinstance(out, list):
         lines = summary_lines(out, name=spec.name, limit=limit, more=_MORE_HINT)
         return "\n".join(lines) + _run_footer(run)
@@ -1139,6 +1152,9 @@ def execute_run(
     elapsed = time.perf_counter() - start
     if isinstance(out, list):
         out = [with_labels(o, labels) for o in out]
+    elif isinstance(out, RegimeOutput):
+        outputs = tuple(with_labels(o, labels) for o in out.outputs)
+        out = dataclasses.replace(out, _outputs=outputs)
     else:
         out = with_labels(out, labels)
 

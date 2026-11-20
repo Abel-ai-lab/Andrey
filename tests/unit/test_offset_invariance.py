@@ -22,7 +22,7 @@ from andrey.core import TemporalStructure
 from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
 from andrey.spec import list_specs
 from tests.recovery.helpers import datagen
-from tests.unit.methods import domains, environments, fit_settings
+from tests.unit.methods import domains, environments, fit_settings, regime_paths, results
 
 N = 400
 #: The grid spacing, ``2**-23``: the spacing of the floats in ``[2**29, 2**30)``, so a column on it
@@ -77,7 +77,8 @@ def graphs(structure) -> list[np.ndarray]:
 
 def marks(out) -> list[np.ndarray]:
     return [
-        m for result in (out if isinstance(out, list) else [out]) for m in graphs(result.structure)
+        *(m for result in results(out) for m in graphs(result.structure)),
+        *regime_paths(out),
     ]
 
 
