@@ -106,6 +106,19 @@ _STEP_BYTES = 1 << 23
 _PART_BYTES = 1 << 23
 
 
+def _pair_counts(missed: np.ndarray) -> np.ndarray:
+    """``[i, j]``, ``i < j``: the rows of ``missed``'s columns, ``(o, E)`` 0/1 bytes, missing both
+    ``i`` and ``j``; zero on and below the diagonal. The product runs over chunks of columns, so a
+    chunk's float copy holds at most about ``_STEP_BYTES``."""
+    o, rows = missed.shape
+    counts = np.zeros((o, o))
+    step = max(1, _STEP_BYTES // (8 * max(o, 1)))
+    for start in range(0, rows, step):
+        both = missed[:, start : start + step].astype(np.float64)
+        counts += both @ both.T
+    return np.triu(np.rint(counts), 1)
+
+
 @dataclass(frozen=True)
 class Grouping:
     """The groups :func:`pattern_groups` chose: ``group[i]`` is row ``i``'s group and
@@ -346,8 +359,7 @@ class GroupedSums:
                 self.lost_c.append(lost_c)
                 self.twice_values.append(np.ascontiguousarray(x[:, twice]))
                 self.twice_missed.append(np.ascontiguousarray(missed[:, twice]).view(np.uint8))
-                both = missed[:, twice].astype(np.float64)
-                self.pairs.append(np.triu(np.rint(both @ both.T), 1))
+                self.pairs.append(_pair_counts(self.twice_missed[-1]))
         self.n = int(len(grouping.group))
         self.gain = _read(env.TESTWISE_GROUP_MIN_GAIN, MIN_GAIN)
 
