@@ -80,7 +80,7 @@ with latent confounders. Advances in Neural Information Processing Systems 33 (N
 from __future__ import annotations
 
 import math
-from collections import Counter, OrderedDict
+from collections import OrderedDict
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from itertools import combinations, islice
@@ -88,6 +88,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from andrey.constraint._skeleton import collider_verdict
 from andrey.core import backend
 from andrey.core.ci_missing import NOT_TESTED, PartialCorrelationDeletion
 from andrey.core.structure import ARROW, CIRCLE, NULL, TAIL
@@ -238,7 +239,7 @@ class LPCMCISearch:
         self.version = 0
         self.cache: OrderedDict[tuple[int, int, tuple[int, ...]], tuple[float, float]]
         self.cache = OrderedDict()
-        self.votes: dict[Key, tuple[int, Counter[Node]]] = {}
+        self.votes: dict[Key, tuple[list[frozenset[Node]], list[frozenset[Node]]]] = {}
         self.votes_version = -1
 
     # ---- the graph -----------------------------------------------------------------------
@@ -664,14 +665,14 @@ class LPCMCISearch:
 
     # ---- separating-set queries -------------------------------------------------------------
 
-    def vote(self, key: Key) -> tuple[int, Counter[Node]]:
-        """The separating sets of the pair ``key`` for a majority vote, counted.
+    def vote(self, key: Key) -> tuple[list[frozenset[Node]], list[frozenset[Node]]]:
+        """The separating sets of the pair ``key`` for a majority vote, and the sets not tested.
 
         The sets are the stored ones and the separating sets among the subsets of ``apds_t`` of
         each node, given the parents of both; the earlier node of a lagged pair contributes the
-        empty subset only. Each distinct set counts once. Return how many sets there are and, for
-        each node, how many hold it, in the frame of ``key``. The counts last until the graph
-        changes.
+        empty subset only. Each distinct set counts once. A subset that was not tested
+        (:data:`~andrey.core.ci_missing.NOT_TESTED`) might have separated the pair, and goes in
+        the second list. Both are in the frame of ``key`` and last until the graph changes.
         """
         if self.votes_version != self.version:
             self.votes, self.votes_version = {}, self.version
@@ -682,7 +683,7 @@ class LPCMCISearch:
         start, end = (i, lag), (j, 0)
         sdef = (self.parents(start) | self.parents(end)) - {start, end}
         stored = set(self.sepsets.get(key, []))
-        total, holding = len(stored), Counter(node for s in stored for node in s)
+        separating, skipped = list(stored), []
         tested: frozenset[Node] | None = None  # subsets of these were tested from ``start``
         for anchor, other in ((start, end), (end, start)):
             candidates = sorted(self.apds(anchor, other) - sdef, key=_order)
@@ -702,23 +703,26 @@ class LPCMCISearch:
                     _, p_values = self.run_tests(start, end, sets, rank=False)
                     for s, p_value in zip(sets, p_values):
                         if p_value > self.alpha and s not in stored:
-                            total += 1
-                            holding.update(s)
+                            separating.append(s)
+                        elif math.isnan(p_value):
+                            skipped.append(s)
             if anchor == start:
                 tested = frozenset(candidates)
-        self.votes[key] = (total, holding)
-        return total, holding
+        self.votes[key] = (separating, skipped)
+        return separating, skipped
 
-    def share(self, a: Node, b: Node, c: Node) -> float:
-        """The share of the voting separating sets of ``a`` and ``c`` that contain ``b``."""
+    def verdict(self, a: Node, b: Node, c: Node) -> str:
+        """The majority verdict on ``b`` from the voting separating sets of ``a`` and ``c``
+        (:func:`~andrey.constraint._skeleton.collider_verdict`): ambiguous when the sets not
+        tested could change it."""
         key, _ = _key(a, c)
-        total, holding = self.vote(key)
+        separating, skipped = self.vote(key)
         frame = min(a[1], c[1])
-        return holding[(b[0], b[1] - frame)] / total if total else 0.5
+        return collider_verdict(separating, (b[0], b[1] - frame), "majority", skipped)
 
     def outside_sepset(self, a: Node, b: Node, c: Node) -> bool:
         """Whether ``b`` is outside the separating set of ``a`` and ``c``, by majority."""
-        return self.share(a, b, c) < 0.5
+        return self.verdict(a, b, c) == "collider"
 
     def inside_sepset(self, a: Node, b: Node, c: Node) -> bool:
         """Whether ``b`` is inside a weakly minimal separating set of ``a`` and ``c``."""
@@ -728,7 +732,7 @@ class LPCMCISearch:
             and self.middle(a, b) == ""
             and self.middle(b, c) == ""
         ):
-            return self.share(a, b, c) > 0.5
+            return self.verdict(a, b, c) == "non-collider"
         stored = self.stored_sepsets(a, c)
         return bool(stored) and all(b in s for s in stored)
 

@@ -18,7 +18,7 @@ unshielded triples of a final skeleton by the conservative or majority collider 
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Collection, Hashable, Iterable, Iterator, Mapping, Sequence
 from contextlib import nullcontext
 from functools import cache, partial
 from itertools import chain, combinations, groupby, islice
@@ -754,10 +754,10 @@ def check_collider_rule(collider_rule: str) -> None:
 
 
 def collider_verdict(
-    separating: Sequence[Iterable[int]],
-    b: int,
+    separating: Sequence[Collection[Hashable]],
+    b: Hashable,
     rule: str,
-    skipped: Sequence[Iterable[int]] = (),
+    skipped: Sequence[Collection[Hashable]] = (),
 ) -> str:
     """``"collider"``, ``"non-collider"``, or ``"ambiguous"``: what ``rule`` makes of middle node
     ``b`` from the ``separating`` subsets of its endpoints.
@@ -781,7 +781,7 @@ def collider_verdict(
     return verdict
 
 
-def _verdict(separating: Sequence[Iterable[int]], b: int, rule: str) -> str:
+def _verdict(separating: Sequence[Collection[Hashable]], b: Hashable, rule: str) -> str:
     """:func:`collider_verdict` from the ``separating`` subsets alone."""
     if not separating:
         return "ambiguous"
