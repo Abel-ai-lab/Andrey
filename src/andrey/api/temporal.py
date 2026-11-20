@@ -2206,8 +2206,9 @@ def rpcmci(
         graph and then reassigns the steps.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
-        not a fresh random one, so a fit repeats. Start ``a`` draws its first regime weights
-        from ``seed + a``. ``metadata["seed"]`` records the seed used.
+        not a fresh random one, so a fit repeats. Start ``0`` draws its first regime weights
+        from ``seed``, start ``a > 0`` from ``SeedSequence(seed, spawn_key=(a,))``, so each start
+        depends on ``seed`` and ``a`` only. ``metadata["seed"]`` records the seed used.
 
     Returns
     -------

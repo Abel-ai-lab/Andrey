@@ -66,14 +66,14 @@ def truth(links: dict) -> TemporalStructure:
     return TemporalStructure.from_lag_graphs(graphs, lags=range(1, TAU_MAX + 1))
 
 
-def fit(x: np.ndarray, regimes: np.ndarray):
+def fit(x: np.ndarray, regimes: np.ndarray, n_starts: int = 10):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         return andrey.rpcmci(
             x,
             max_transitions=int((np.diff(regimes) != 0).sum()),
             tau_max=TAU_MAX,
-            n_starts=10,
+            n_starts=n_starts,
             seed=0,
         )
 
@@ -107,7 +107,5 @@ def test_independent_series_have_no_link_in_any_regime():
 def test_more_starts_never_raise_the_objective():
     """The returned start has the lowest objective, so ten starts include the first one's."""
     x, regimes = simulate("sign", 1001)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        one = andrey.rpcmci(x, max_transitions=12, n_starts=1, seed=0)
+    one = fit(x, regimes, n_starts=1)
     assert fit(x, regimes).metadata["objective"] <= one.metadata["objective"]

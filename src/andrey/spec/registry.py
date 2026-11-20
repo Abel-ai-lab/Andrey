@@ -2694,8 +2694,8 @@ _add(
             concept_param(
                 "seed",
                 doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
-                "random one, so a fit repeats. Start a draws its first regime weights from "
-                "seed + a.",
+                "random one, so a fit repeats. Start 0 draws its first regime weights from "
+                "seed, start a > 0 from SeedSequence(seed, spawn_key=(a,)).",
             ),
         ),
         references=("Saggioro et al. 2020", "Runge et al. 2019"),

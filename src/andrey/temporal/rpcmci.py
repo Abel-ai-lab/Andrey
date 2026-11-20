@@ -1,9 +1,9 @@
 """Regime-PCMCI: the regimes of a time series and the lagged causal links within each regime.
 
 The series ``x_t``, ``t = 0 .. T - 1``, is assumed to switch between ``K`` persistent regimes, each
-with its own lagged causal graph. A regime-assigning process ``Gamma``, a ``(K, T)`` matrix with
-columns on the probability simplex, weights the regimes at each step. Each start draws ``Gamma``
-uniformly in ``[0, 1]`` and alternates two steps up to ``max_iter`` times:
+with its own lagged causal graph. A regime-assigning process ``Gamma``, a ``(K, T)`` matrix,
+weights the regimes at each step. Each start draws its first ``Gamma`` entry by entry, uniformly in
+``[0, 1)`` and not normalized, and alternates two steps up to ``max_iter`` times:
 
 1. **Causal discovery and model estimation.** For each regime ``k``, PCMCI runs on the steps ``t``
    with ``gamma_k(t) >= switch_threshold``: every test reads those steps as its effect's time and
@@ -12,7 +12,7 @@ uniformly in ``[0, 1]`` and alternates two steps up to ``max_iter`` times:
    the same steps from ``tau_max`` on, and the fit predicts every step from ``tau_max`` on.
 2. **Regime learning.** ``c_k(t)`` is the squared residual of that prediction summed over the
    variables, each residual divided by the regime's standard deviation of its variable. The new
-   ``Gamma`` solves the linear program
+   ``Gamma``, whose columns lie on the probability simplex, solves the linear program
 
    ``min sum_k sum_t gamma_k(t) c_k(t)`` subject to ``sum_k gamma_k(t) = 1`` for every ``t``,
    ``0 <= gamma_k(t) <= 1``, and ``sum_t |gamma_k(t + 1) - gamma_k(t)| <= max_transitions`` for
@@ -44,6 +44,8 @@ import numpy as np
 import scipy.sparse as sp
 from scipy.optimize import linprog
 
+from andrey.core import backend
+from andrey.core.seeding import start_generator
 from andrey.core.ties import stable_key, tie_ranks
 
 from .pcmci import PCMCIResult, lagged_design, pcmci
@@ -239,9 +241,9 @@ def rpcmci(
 ) -> RPCMCIResult:
     """Run Regime-PCMCI on a ``(T, n)`` series: ``n_starts`` starts, the best one returned.
 
-    Start ``a`` draws its ``Gamma`` from ``numpy.random.default_rng(seed + a)``, uniform in
-    ``[0, 1)``. ``pc_alpha``, ``alpha_level``, ``fdr_method``, and ``indep_test`` reach each
-    regime's PCMCI. Raises :class:`RegimeFitError` when every start fails.
+    Start ``a`` draws its first ``Gamma`` from :func:`~andrey.core.seeding.start_generator`,
+    uniform in ``[0, 1)``. ``pc_alpha``, ``alpha_level``, ``fdr_method``, and ``indep_test`` reach
+    each regime's PCMCI. Raises :class:`RegimeFitError` when every start fails.
     """
     data = np.asarray(data, dtype=np.float64)
     ranks = tie_ranks(data)
@@ -254,24 +256,25 @@ def rpcmci(
     best: RPCMCIResult | None = None
     n_failed = 0
     n_steps = data.shape[0]
-    for a in range(n_starts):
-        weights = np.random.default_rng(seed + a).uniform(0, 1, size=(n_regimes, data.shape[0]))
-        run = _start(
-            data,
-            weights,
-            max_transitions=max_transitions,
-            switch_threshold=switch_threshold,
-            max_iter=max_iter,
-            tau_max=tau_max,
-            pcmci_args=pcmci_args,
-            ranks=ranks,
-        )
-        if run is None:
-            n_failed += 1
-        elif best is None or stable_key(run.objective, n_steps) < stable_key(
-            best.objective, n_steps
-        ):
-            best = replace(run, start=a)
+    with backend.one_blas_thread():  # the regression costs then give the same bits on any host
+        for a in range(n_starts):
+            weights = start_generator(seed, a).uniform(0, 1, size=(n_regimes, n_steps))
+            run = _start(
+                data,
+                weights,
+                max_transitions=max_transitions,
+                switch_threshold=switch_threshold,
+                max_iter=max_iter,
+                tau_max=tau_max,
+                pcmci_args=pcmci_args,
+                ranks=ranks,
+            )
+            if run is None:
+                n_failed += 1
+            elif best is None or stable_key(run.objective, n_steps) < stable_key(
+                best.objective, n_steps
+            ):
+                best = replace(run, start=a)
     if best is None:
         raise RegimeFitError(
             f"rpcmci: every one of the {n_starts} starts left a regime with fewer than "

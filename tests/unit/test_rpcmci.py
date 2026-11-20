@@ -12,6 +12,7 @@ import pytest
 
 import andrey
 from andrey.core import RegimeOutput, StructureOutput
+from andrey.core.seeding import start_generator
 from andrey.core.warning_policy import SearchLimitWarning
 from andrey.temporal.pcmci import pcmci
 from andrey.temporal.rpcmci import FEWEST_STEPS, regime_costs, regime_lp
@@ -146,6 +147,17 @@ def test_fit_repeats(fitted, series):
     np.testing.assert_array_equal(again.weights, fitted.weights)
     for a, b in zip(again.outputs, fitted.outputs, strict=True):
         assert a == b
+
+
+def test_nearby_seeds_share_no_start():
+    """Start 0 draws from the seed itself, and no start of seed 0 repeats one of seed 1."""
+    np.testing.assert_array_equal(
+        start_generator(3, 0).uniform(size=8), np.random.default_rng(3).uniform(size=8)
+    )
+    draws = {
+        (s, a): start_generator(s, a).uniform(size=8).tobytes() for s in (0, 1) for a in range(8)
+    }
+    assert len(set(draws.values())) == len(draws)
 
 
 def test_column_order_relabels_the_result(fitted, series):
