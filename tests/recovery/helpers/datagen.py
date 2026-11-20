@@ -1027,6 +1027,11 @@ def defined_edges(case_id: str) -> tuple[int, int, np.ndarray]:
         effect, cause = np.nonzero(np.any(np.asarray(spec["lags"]) != 0, axis=0))
         keep = effect != cause
         return len(spec["lags"][0]), len(spec["lags"][0]), np.stack([cause, effect], 1)[keep]
+    if model == "regime_var":  # the lagged effects between variables of any regime
+        effect, cause = np.nonzero(np.any(np.asarray(spec["lags"]) != 0, axis=(0, 1)))
+        keep = effect != cause
+        n = len(spec["lags"][0][0])
+        return n, n, np.stack([cause, effect], 1)[keep]
     if model in ("anm", "lsnm"):
         return 2, 2, np.array([[0, 1]])
     if model in ("nonmonotone", "rational_chain"):
