@@ -326,9 +326,10 @@ class GCM(_RegressionTest):
     level depends on the regressions: a conditional mean the method cannot learn, such as a function
     of several variables of ``z`` jointly under ``"linear"``, leaves a covariance in the residuals
     and reads as dependence. At a few hundred rows, where the conditional means are hard to learn,
-    the test can reject a true independence more often than its level, as the authors' simulations
-    of it show at 100 and 200 rows [2]_. With an empty conditioning set the test is a test of
-    correlation: a dependence without one, such as ``y = x**2`` for a symmetric ``x``, goes unseen.
+    the test can reject a true independence more often than its level, as the weighted GCM's
+    paper reports for it at 100 and 200 rows [2]_. With an empty conditioning set the test is a
+    test of correlation: a dependence without one, such as ``y = x**2`` for a symmetric ``x``, goes
+    unseen.
 
     References
     ----------

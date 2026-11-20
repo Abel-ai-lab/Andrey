@@ -73,11 +73,13 @@ def pcm_case(setting: int, n: int, rng: np.random.Generator, *, forest: bool) ->
     return np.column_stack([x, y, z])
 
 
-def write_case(folder: Path, name: str, test: cr._RegressionTest) -> None:
-    """Write the test's values as the reference reads them: the columns x, y, z1, ..., the rows in
-    the order of the query of x and y given the rest, so a row's position is its position there."""
+def write_case(folder: Path, name: str, test: cr._RegressionTest, raw: np.ndarray) -> None:
+    """Write the test's values as the reference reads them: the columns x, y, z1, ... in the sign of
+    ``raw``, the data the test was built on, and the rows in the order of the query of x and y given
+    the rest, so a row's position is its position there."""
     rows, _ = test._layout(range(test._data.shape[1]))
-    data = test._data[rows]
+    sign = np.where(np.sum((raw - raw.mean(axis=0)) * test._data, axis=0) < 0, -1.0, 1.0)
+    data = test._data[rows] * sign
     header = ",".join(["x", "y", *(f"z{j}" for j in range(1, data.shape[1] - 1))])
     np.savetxt(folder / f"{name}.csv", data, delimiter=",", header=header, comments="", fmt="%.17g")
 
@@ -116,7 +118,7 @@ def gcm_and_wgcm(folder: Path) -> None:
                 name = f"w{len(names)}"
                 data = wgcm_case(setting, n, np.random.default_rng([seed, n]))
                 tests[name] = (setting, n, seed, data)
-                write_case(folder, name, cr.GCM(data, seed=seed))
+                write_case(folder, name, cr.GCM(data, seed=seed), data)
                 names.append(name)
                 seeds.append(seed)
     gcm_rows = run_reference(folder, "gcm", names, seeds)
@@ -205,7 +207,7 @@ def pcm(folder: Path) -> None:
                     test = cr.PCM(
                         data, regression=regression, n_splits=6 if forest else 1, seed=seed
                     )
-                    write_case(folder, name, test)  # column 1 is the paper's Y
+                    write_case(folder, name, test, data)  # column 1 is the paper's Y
                     tests[name] = (setting, n, seed, test)
                     names.append(name)
                     seeds.append(seed)
