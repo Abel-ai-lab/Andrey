@@ -16,9 +16,11 @@ number of switches.
 tigramite is GPL-licensed: its fits run in its own environment (``--reference``, below), which
 imports this module for nothing but numpy and the models. Both join a step to a regime when its
 weight is above ``threshold``. The script prints one row per model and one for all of them: the
-starts with the same regime path and graphs, those with also the same per-iteration changes, those
-that differ or fail, and each package's mean regime accuracy and mean lagged SHD (summed over the
-regimes) against the truth over its fits that did not fail.
+starts with the same regime path and graphs, those with also the same per-iteration changes and
+weights within ``1e-9``, those that differ or fail, and each package's mean regime accuracy and mean
+lagged SHD (summed over the regimes) against the truth over its fits that did not fail. A step's
+regime is its largest weight rounded to 9 decimals, as ``andrey.RegimeOutput`` reads it, so weights
+that differ only in their last bits give the same path.
 """
 
 from __future__ import annotations
@@ -154,10 +156,17 @@ def andrey_fits(x: np.ndarray, n_regimes: int, switches: int, starts: int, thres
     return rows
 
 
+def regime_path(weights) -> np.ndarray:
+    """The regime of each step: its largest weight, rounded as ``andrey.RegimeOutput`` rounds it."""
+    from andrey.core.ties import KEY_DP
+
+    return np.round(np.asarray(weights), KEY_DP).argmax(axis=0)
+
+
 def against_truth(row: dict, model: str, regimes: np.ndarray) -> tuple[float, int]:
     """Regime accuracy after the first ``TAU_MAX`` steps under the best relabeling, and the lagged
     SHD summed over the regimes so matched."""
-    path = np.asarray(row["weights"]).argmax(axis=0)
+    path = regime_path(row["weights"])
     perms = list(itertools.permutations(range(len(MODELS[model]))))
     accuracy = [(np.array(p)[path] == regimes)[TAU_MAX:].mean() for p in perms]
     best = perms[int(np.argmax(accuracy))]
@@ -219,12 +228,12 @@ def main() -> None:
                 row["both fail" if a is None and t is None else "one fails"] += 1
                 continue
             wa, wt = np.asarray(a["weights"])[:, TAU_MAX:], np.asarray(t["weights"])[:, TAU_MAX:]
-            same = (wa.argmax(0) == wt.argmax(0)).all() and a["graphs"] == t["graphs"]
+            same = (regime_path(wa) == regime_path(wt)).all() and a["graphs"] == t["graphs"]
             changes = len(a["changes"]) == len(t["changes"]) and np.allclose(
                 a["changes"], t["changes"], rtol=0, atol=1e-6
             )
             row["same" if same else "differ"] += 1
-            row["identical"] += bool(same and changes and np.abs(wa - wt).max() <= 1e-15)
+            row["identical"] += bool(same and changes and np.abs(wa - wt).max() <= 1e-9)
 
     def summary(fits: list) -> str:
         ok = [f for f in fits if f is not None]
