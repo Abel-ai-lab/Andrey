@@ -15,13 +15,15 @@ names its pull request.
 - A test-wise test with fewer rows than it needs, a pair never observed together included, or with
   zero degrees of freedom left is not tested: it never separates a pair and never confirms a link,
   in every conditional-independence search that deletes rows per test; `markov_check` leaves such
-  facts out of its summary and of its sparse-table warning. `metadata["not_tested"]` counts those
-  tests, `metadata["undecided_pairs"]` lists the pairs no tested query could decide, and
+  facts out of its summary and of its sparse-table warning. `metadata["not_tested"]` counts the
+  conditioning sets not tested, including those the search skipped because no row can test them,
+  `metadata["undecided_pairs"]` lists the pairs no tested query could decide, and
   `metadata["never_observed_together"]` the pairs of columns no row observes together; the notice
-  for `missing=None` names the first of them, over every fit of a `bootstrap`. A pair no tested
-  query could decide stays adjacent in PC, FCI, CD-NOD, and FCI-JCI and in the Markov-blanket
-  searches' sets; PCMCI, PCMCI+, and J-PCMCI+ condition no test on a lagged parent without a tested
-  result, and LPCMCI none on a node whose link to either end of the tested pair has none. ([#1151])
+  for `missing=None` gives the number of each kind of pair, over every fit of a `bootstrap`, and
+  names them when there are at most five. A pair no tested query could decide stays adjacent in PC,
+  FCI, CD-NOD, and FCI-JCI and in the Markov-blanket searches' sets; PCMCI, PCMCI+, and J-PCMCI+
+  condition no test on a lagged parent without a tested result, and LPCMCI none on a node whose
+  link to either end of the tested pair has none. ([#1151])
 
 - `metadata["p_one_tests"]` counts every test of a fit on data with missing values that returned
   `p = 1`, whichever test it is, as a test whose statistic is exactly zero answers. ([#1102])
@@ -39,6 +41,11 @@ names its pull request.
 
 ### Changed
 
+- The notice for `missing=None` gives the number of undecided pairs and of pairs never observed
+  together, naming them when there are at most five, in place of the number of conditioning sets
+  not tested. That number counts the sets the search skipped because no row can test them and
+  reached billions on merged cohorts; `metadata["not_tested"]` keeps it, with the same value.
+  ([#1156])
 - With `fisherz` and `student_t` on data with missing values, test-wise deletion groups the rows by
   their missingness patterns once and computes a test's sums from the groups' tables, removing the
   scattered missing cells exactly, when that costs less than summing every row; a query whose
@@ -2789,5 +2796,6 @@ First alpha release.
 [#1102]: https://github.com/Abel-ai-lab/Andrey/pull/1102
 [#1148]: https://github.com/Abel-ai-lab/Andrey/pull/1148
 [#1151]: https://github.com/Abel-ai-lab/Andrey/pull/1151
+[#1156]: https://github.com/Abel-ai-lab/Andrey/pull/1156
 [#1094]: https://github.com/Abel-ai-lab/Andrey/pull/1094
 [#1095]: https://github.com/Abel-ai-lab/Andrey/pull/1095
