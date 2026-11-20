@@ -45,6 +45,19 @@ def grouped(monkeypatch):
     monkeypatch.setenv("ANDREY_TESTWISE_GROUP_MAX_SCATTER", "1")
 
 
+def _spy(monkeypatch, cls, name: str) -> list[int]:
+    """Count the blocks each call of ``cls.name`` computes."""
+    calls: list[int] = []
+    original = getattr(cls, name)
+
+    def counted(self, columns, *args):
+        calls.append(len(columns))
+        return original(self, columns, *args)
+
+    monkeypatch.setattr(cls, name, counted)
+    return calls
+
+
 def _per_row(monkeypatch) -> None:
     monkeypatch.setenv("ANDREY_TESTWISE_GROUP_BYTES", "0")
 
@@ -99,6 +112,18 @@ def test_one_group_whose_rows_mostly_miss_two_columns_takes_the_per_row_path():
     assert missing_groups.grouping_for(~np.isnan(x), lambda: tie_ranks(x)) is None
 
 
+def test_small_groups_beside_one_scattered_group_take_the_per_row_path():
+    """Cells missing at random over 50 columns, plus a few small cohorts: the small groups can take
+    the grouped sums, but they hold too few rows to repay the tables."""
+    rng = np.random.default_rng(4)
+    x = rng.standard_normal((6_000, 50))
+    x[rng.random(x.shape) < 0.1] = np.nan
+    x[:60, :25] = np.nan  # 60 rows of a cohort that measures half the columns
+    grouping = missing_groups.pattern_groups(~np.isnan(x), tie_ranks(x))
+    assert grouping is not None and len(grouping.observed) > 1
+    assert not grouping.some_block_cheaper(missing_groups.MIN_GAIN)
+
+
 def test_a_zero_byte_budget_keeps_the_per_row_path(monkeypatch):
     x = _cohorts()
     assert missing_groups.grouping_for(~np.isnan(x), lambda: tie_ranks(x)) is not None
@@ -125,6 +150,7 @@ def _queries(d: int, seed: int = 4):
 @pytest.mark.parametrize("name", GAUSSIAN)
 def test_grouped_sums_answer_as_the_per_row_sums_up_to_rounding(monkeypatch, grouped, name):
     x = _cohorts()
+    summed = _spy(monkeypatch, missing_groups.GroupedSums, "blocks")
     test = make_indep_test(name, x)
     paths = {}
     for path in ("grouped", "per-row"):
@@ -140,6 +166,8 @@ def test_grouped_sums_answer_as_the_per_row_sums_up_to_rounding(monkeypatch, gro
                 test._fast(lo, hi, conds)[2],
             )
         assert (test._grouped_sums() is not None) == (path == "grouped")
+        if path == "grouped":
+            assert sum(summed) > 0  # some blocks took the grouped sums
         paths[path] = found
     for size, (r, p, rows) in paths["grouped"].items():
         r_ref, p_ref, rows_ref = paths["per-row"][size]
@@ -151,8 +179,9 @@ def test_grouped_sums_answer_as_the_per_row_sums_up_to_rounding(monkeypatch, gro
 
 
 @pytest.mark.parametrize("name", GAUSSIAN)
-def test_a_grouped_query_gives_the_same_bits_alone_and_in_any_batch(grouped, name):
+def test_a_grouped_query_gives_the_same_bits_alone_and_in_any_batch(monkeypatch, grouped, name):
     x = _cohorts(n=12_000, seed=5)
+    summed = _spy(monkeypatch, missing_groups.GroupedSums, "blocks")
     rng = np.random.default_rng(6)
     for queries in _queries(x.shape[1], seed=7).values():
         alone = [make_indep_test(name, x).statistic_pvalue(q[0], q[1], q[2:]) for q in queries]
@@ -163,19 +192,7 @@ def test_a_grouped_query_gives_the_same_bits_alone_and_in_any_batch(grouped, nam
             assert test._grouped_sums() is not None
             r, p = test.statistic_pvalues(q[:, 1], q[:, 0], q[:, 2:])
             assert list(zip(r.tolist(), p.tolist())) == [alone[i] for i in batch]
-
-
-def _spy(monkeypatch, cls, name: str) -> list[int]:
-    """Count the blocks each call of ``cls.name`` computes."""
-    calls: list[int] = []
-    original = getattr(cls, name)
-
-    def counted(self, columns, *args):
-        calls.append(len(columns))
-        return original(self, columns, *args)
-
-    monkeypatch.setattr(cls, name, counted)
-    return calls
+    assert sum(summed) > 0
 
 
 @pytest.mark.parametrize("method", ["pc", "fci", "iamb"])
@@ -245,6 +262,15 @@ def test_the_correction_step_gives_the_same_bits_in_smaller_steps(monkeypatch, g
     lo, hi, conds = queries[:, 0], queries[:, 1], queries[:, 2:]
     r, p = make_indep_test("fisherz", x).statistic_pvalues(lo, hi, conds)
     monkeypatch.setattr(missing_groups, "_STEP_BYTES", 1 << 12)
+    corrected: list[int] = []
+    original = missing_groups.GroupedSums._twice
+
+    def counted(self, g, local, *sums):
+        corrected.append(len(local) if self.twice_missed[g].shape[1] else 0)
+        return original(self, g, local, *sums)
+
+    monkeypatch.setattr(missing_groups.GroupedSums, "_twice", counted)
     r_small, p_small = make_indep_test("fisherz", x).statistic_pvalues(lo, hi, conds)
+    assert sum(corrected) > 0  # rows missing several columns were added, in many small steps
     assert r.tolist() == r_small.tolist()
     assert np.array_equal(p, p_small, equal_nan=True)

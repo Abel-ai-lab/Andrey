@@ -109,11 +109,18 @@ class Grouping:
         return float(self.missed.sum()) / cells if cells else 0.0
 
     def some_block_cheaper(self, gain: float) -> bool:
-        """Whether some block can take the grouped sums: a block reads the masks of at least the
-        rows missing two or more columns of one of its groups, so when every group has more than
-        ``n / gain`` such rows, :meth:`GroupedSums.cheaper` refuses every block."""
+        """Whether the blocks that can take the grouped sums hold enough rows to repay the tables.
+
+        A block reads the masks of the rows missing two or more columns of each of its groups, so
+        :meth:`GroupedSums.cheaper` refuses every block in a group with more than ``n / gain``
+        such rows. The other groups must hold at least ``n / gain`` rows: otherwise the blocks the
+        grouped sums can take keep few rows, as when one group holds nearly every row and nearly
+        every row misses two of its columns.
+        """
+        n = len(self.group)
         twice = np.bincount(self.group[self.missed.sum(axis=1) >= 2], minlength=len(self.observed))
-        return bool(gain * twice.min() <= len(self.group))
+        rows = np.bincount(self.group, minlength=len(self.observed))
+        return bool(gain * rows[gain * twice <= n].sum() >= n)
 
     def table_bytes(self) -> int:
         """The bytes :class:`GroupedSums` allocates for these groups, counted before it does: per
