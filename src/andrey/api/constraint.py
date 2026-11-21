@@ -343,8 +343,9 @@ def pc(
     collider nor a non-collider to any rule. A drawn edge that a conditioning set not tested might
     have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
     not check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``, a
-    triple with a flagged side is neither a collider nor a non-collider to any rule. On merged
-    cohorts, every pair of variables measured only in different cohorts is therefore undecided, and
+    triple with a side it reads (see ``possibly_separable``) is neither a collider nor a
+    non-collider to any rule. On merged cohorts, every pair of variables measured only in different
+    cohorts is therefore undecided, and
     an edge whose separating set is never observed together with its pair is drawn and flagged. A
     few rows that observe every column decide such pairs on those rows alone, with little power, so
     they can remove true edges between variables observed together. A continuous column constant on
@@ -1780,11 +1781,12 @@ def cdnod(
     come from one environment, is not tested. A drawn edge that a conditioning set not tested might
     have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
     not check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``, a
-    triple with a flagged side is neither a collider nor a non-collider to any rule. On merged
-    cohorts, every pair of variables measured only in different cohorts is therefore undecided. A
-    continuous column constant on a test's rows raises ``ValueError``. ``env`` must be complete, and
-    ``dependence_threshold``, whose kernel measures read every row, raises ``ValueError`` on data
-    with missing values. With missing values, the skeleton search runs in one process. Test-wise
+    triple with a side it reads (see ``possibly_separable``) is neither a collider nor a
+    non-collider to any rule. On merged cohorts, every pair of variables measured only in different
+    cohorts is therefore undecided. A continuous column constant on a test's rows raises
+    ``ValueError``. ``env`` must be complete, and ``dependence_threshold``, whose kernel measures
+    read every row, raises ``ValueError`` on data with missing values. With missing values, the
+    skeleton search runs in one process. Test-wise
     deletion is valid when values are missing completely at random, which means that whether a value
     is missing depends on no value in the data; the rows a test reads are then a random sample of
     all rows, and otherwise they are a selected sample that more rows do not correct.
