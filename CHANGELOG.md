@@ -110,7 +110,7 @@ names its pull request.
   measured beside them was both more accurate and faster; the graph search ran about ten times
   faster. Their Limitations state the gaps: the support rule's family on location-scale pairs, and
   under `"pareto"` a test that can reject on causes with extreme values. The
-  [0.19.0 release card][card-0190-cpcm] has the numbers. ([#PRNUM])
+  [0.19.0 release card][card-0190-cpcm] has the numbers. ([#1169])
 - With `fisherz` and `student_t` on data with missing values, test-wise deletion groups the rows by
   their missingness patterns once and computes a test's sums from the groups' tables, removing the
   scattered missing cells exactly, when that costs less than summing every row; a query whose
@@ -2898,7 +2898,7 @@ First alpha release.
 [#1127]: https://github.com/Abel-ai-lab/Andrey/pull/1127
 [#1147]: https://github.com/Abel-ai-lab/Andrey/pull/1147
 [#1161]: https://github.com/Abel-ai-lab/Andrey/pull/1161
-[#PRNUM]: https://github.com/Abel-ai-lab/Andrey/pull/PRNUM
+[#1169]: https://github.com/Abel-ai-lab/Andrey/pull/1169
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
 [#1146]: https://github.com/Abel-ai-lab/Andrey/pull/1146
 [#1149]: https://github.com/Abel-ai-lab/Andrey/pull/1149
