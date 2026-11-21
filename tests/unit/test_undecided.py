@@ -193,6 +193,15 @@ def test_pcmci_and_pcmciplus_leave_undecided_links_out_alike():
     assert lagged["pcmci"] == lagged["pcmciplus"]
 
 
+@pytest.mark.parametrize("method", ["pcmci", "pcmciplus", "lpcmci"])
+def test_a_required_link_beside_an_undecided_link_is_not_flagged(method):
+    df = _cohort_series()
+    knowledge = andrey.Knowledge(required=[("C0", "M1", 1)])
+    out = getattr(andrey, method)(df, tau_max=1, knowledge=knowledge)
+    assert out.metadata["undecided_pairs"]
+    assert ("C0 at lag 1", "M1") not in _pairs(out, "possibly_separable")
+
+
 def test_lpcmci_draws_no_undecided_link():
     out = andrey.lpcmci(_cohort_series(), tau_max=1, indep_test="fisherz")
     undecided = [tuple(pair) for pair in out.metadata["undecided_pairs"]]

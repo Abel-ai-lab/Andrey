@@ -1237,8 +1237,14 @@ class LPCMCISearch:
         return marks, {}, {}
 
     def rule_r3(self) -> tuple[dict, dict, dict]:
-        """R3': ``A *-> B <-* C`` unshielded, ``A *-o D o-* C``, ``D *-o B``, ``D`` in the set."""
+        """R3': ``A *-> B <-* C`` unshielded, ``A *-o D o-* C``, ``D *-o B``, ``D`` in the set. No
+        link of ``D`` is one no test with rows decided (:meth:`usable`)."""
         marks: dict = {}
+        untested = self.untested()
+
+        def usable(x: Node, y: Node) -> bool:
+            return _key(x, y)[0] not in untested
+
         for a, b, c in self._unshielded():
             if _order(a) > _order(c):
                 continue
@@ -1248,6 +1254,8 @@ class LPCMCISearch:
                 if d in (a, c) or self.mark(b, d) != CIRCLE or self.mark(d, b) == CONFLICT:
                     continue
                 if not (self.adjacent(d, a) and self.adjacent(d, c)):
+                    continue
+                if not (usable(d, b) and usable(d, a) and usable(d, c)):
                     continue
                 if self.mark(d, a) != CIRCLE or self.mark(d, c) != CIRCLE:
                     continue

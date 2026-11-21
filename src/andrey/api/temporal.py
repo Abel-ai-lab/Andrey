@@ -765,7 +765,7 @@ def pcmci(
         **categorical_metadata(mask, data),
         **rows_metadata(rows),
         **undecided_links(undecided, labels),
-        **possibly_separable_links(rows, drawn, undecided, labels),
+        **possibly_separable_links(rows, drawn, undecided, labels, constraints),
     }
     return with_labels(adapt_pcmci(result, metadata), labels)
 
@@ -1116,7 +1116,7 @@ def pcmciplus(
         **categorical_metadata(mask, data),
         **rows_metadata(rows),
         **undecided_links(result.undecided, labels),
-        **possibly_separable_links(rows, result.adjacency, result.undecided, labels),
+        **possibly_separable_links(rows, result.adjacency, result.undecided, labels, constraints),
     }
     return with_labels(adapt_pcmciplus(result, metadata), labels)
 
@@ -1747,7 +1747,9 @@ def lpcmci(
         **categorical_metadata(mask, data),
         **rows_metadata(rows),
         **undecided_links(undecided, labels),
-        **possibly_separable_links(rows, result.start_marks != NULL, undecided, labels),
+        **possibly_separable_links(
+            rows, result.start_marks != NULL, undecided, labels, constraints
+        ),
     }
     out = with_labels(adapt_lpcmci(result, metadata), labels)
     if constraints is None or constraints.required_paths is None:
@@ -2633,7 +2635,11 @@ def undecided_links(undecided: np.ndarray | None, labels: tuple[str, ...] | None
 
 
 def possibly_separable_links(
-    rows: RowCounts, drawn: np.ndarray, undecided: np.ndarray | None, labels: tuple[str, ...] | None
+    rows: RowCounts,
+    drawn: np.ndarray,
+    undecided: np.ndarray | None,
+    labels: tuple[str, ...] | None,
+    constraints: LaggedConstraints | None = None,
 ) -> dict:
     """Return ``{"possibly_separable": ...}``, the drawn links a set not tested might separate.
 
@@ -2641,8 +2647,9 @@ def possibly_separable_links(
     the design columns ``lag * n + i`` and ``j``, was not tested in ``rows`` and another was
     (:meth:`~andrey.core.ci_missing.RowCounts.possibly_separable`), or when an end shares its
     variable with an end of a link ``undecided[lag, i, j]`` marks: no test conditions on a node an
-    undecided link joins, and a test of the link can shift that node next to its end. The
-    links are listed as :func:`undecided_links` lists them; ``{}`` when none is flagged.
+    undecided link joins, and a test of the link can shift that node next to its end. A link the
+    ``constraints`` require is never tested, so no set could separate it, and it is not flagged.
+    The links are listed as :func:`undecided_links` lists them; ``{}`` when none is flagged.
     """
     if not rows.total_not_tested():
         return {}
@@ -2655,7 +2662,8 @@ def possibly_separable_links(
     if undecided is not None and undecided.any():
         _, sources, targets = np.nonzero(undecided)
         joined = set(targets.tolist()) | set(sources.tolist())
-        flagged |= {(a, b) for a, b in pairs if a % n in joined or b % n in joined}
+        kept = set() if constraints is None else _link_pairs(constraints.required)
+        flagged |= {(a, b) for a, b in pairs - kept if a % n in joined or b % n in joined}
     return {"possibly_separable": _named_links(flagged, n, labels)} if flagged else {}
 
 
