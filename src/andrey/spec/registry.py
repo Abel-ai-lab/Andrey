@@ -2254,7 +2254,7 @@ _add(
             "search.",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         params=(

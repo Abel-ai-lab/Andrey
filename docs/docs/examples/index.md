@@ -157,7 +157,7 @@ fits several datasets, and GIN finds latent variables.
 :img-top: /_generated/thumbs/functional.svg
 :img-alt: The DAG CAM recovers in this notebook
 
-CAM, RESIT, SCORE, and NoGAM learn a DAG, with every edge oriented, when each variable is a
+CAM, RESIT, SCORE, NoGAM, and DAS learn a DAG, with every edge oriented, when each variable is a
 nonlinear function of its parents plus independent noise; CAM-UV allows hidden causes and marks the
 pairs they join.
 

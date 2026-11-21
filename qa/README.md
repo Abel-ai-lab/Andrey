@@ -166,7 +166,7 @@ fails, or no such run, runs the gate.
 The gate checks PC, FCI, GFCI, CD-NOD, FCI-JCI, IAMB, Inter-IAMB, MMPC, GES, GIES, GnIES, IGSP, ICP,
 XGES, AGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, NOTEARS, DAGMA, BOSS, GRaSP, BOSS-FCI,
 GRaSP-FCI, UT-IGSP, DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM,
-SCORE, NoGAM, CAM-UV, GIN, ANM, PNL, LOCI, PCMCI, PCMCI+, LPCMCI, J-PCMCI+, VARMA-LiNGAM,
+SCORE, NoGAM, DAS, CAM-UV, GIN, ANM, PNL, LOCI, PCMCI, PCMCI+, LPCMCI, J-PCMCI+, VARMA-LiNGAM,
 LongitudinalLiNGAM, Granger, and DYNOTEARS on the datasets whose assumptions each method needs, PC
 with each supported nonlinear conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on
 nonlinear data, and the targets UT-IGSP learns:
@@ -190,7 +190,7 @@ nonlinear data, and the targets UT-IGSP learns:
 | `latent_measurement` at `d = 8, 12`, `n = 1000` | 10 seeds each | GIN |
 | `lingam_sf` at `d = 20, 50` | 10 seeds each | DirectLiNGAM, ICA-LiNGAM |
 | `latent_lingam_er` at `d = 10, 15` | 10 seeds each | RCD, BottomUpParceLiNGAM |
-| `score_paper_standardized` at `d = 10` with `d` edges and at `d = 20` with `4 d`, `n = 1000` | 10 seeds each | SCORE |
+| `score_paper_standardized` at `d = 10` with `d` edges and at `d = 20` with `4 d`, `n = 1000` | 10 seeds each | SCORE, DAS |
 | `score_paper_laplace_standardized` at `d = 10` with `d` edges, `score_paper_gumbel_standardized` at `d = 10` with `4 d`, `n = 1000` | 10 seeds each | NoGAM |
 | `camuv_paper` at `d = 14`, `latent_anm_er_tenth` at `d = 22`, `n = 1000` | 10 seeds each | CAM-UV |
 | `anm_pair` at `n = 1000` | 10 seeds | ANM |
@@ -223,7 +223,8 @@ nonlinear data, and the targets UT-IGSP learns:
   `d = 20` with `4 d`. NoGAM's is additive noise of any distribution, run with Laplace noise
   (`score_paper_laplace_standardized`) at `d = 10` with `d` edges and with Gumbel noise
   (`score_paper_gumbel_standardized`) at `d = 10` with `4 d`; its fit time grows with `d`, so
-  `d = 20` is left out. Both run at their defaults.
+  `d = 20` is left out. DAS fits SCORE's model and runs on SCORE's cells. All three run at their
+  defaults.
 - **Hidden variables, nonlinear.** CAM-UV's published regimes, drawn by its benchmark driver
   (`benchmarks/camuv_cpu.py`) at two cells in its claim where its errors are below the empty
   graph's: `camuv_paper`, the paper's simulation, 10 observed variables, two hidden common causes,
@@ -336,7 +337,7 @@ nonlinear data, and the targets UT-IGSP learns:
 
 SHD follows the published summaries: PC, with any test, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu,
 MMHC, RSMAX2, exact search, CALM, BOSS, and GRaSP against the truth's CPDAG, the LiNGAM methods,
-NOTEARS, DAGMA, AGES, ANM, PNL, SCORE, and NoGAM against the DAG, MultiGroupDirectLiNGAM summed
+NOTEARS, DAGMA, AGES, ANM, PNL, SCORE, NoGAM, and DAS against the DAG, MultiGroupDirectLiNGAM summed
 over its groups, and FCI, GFCI, BOSS-FCI, and GRaSP-FCI by endpoint SHD against the PAG of the
 observed variables.
 GIES is scored against the interventional essential graph of the true DAG under the rows' targets,
