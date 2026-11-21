@@ -522,7 +522,8 @@ def run_phases(
     )
 
     sepsets = {**sepsets, **dummy_sepsets, **system_sepsets}
-    undecided |= (context_undecided | dummy_undecided) & adjacency
+    # A link its own pass left undecided is not carried into the system pass, so it stays undecided.
+    undecided |= context_undecided | dummy_undecided
     mark_undecided(adjacency, p_values, statistics, undecided, untested)
     for (x, j), (statistic, p_value) in recorder.largest.items():
         lag, i = divmod(x, n_nodes)

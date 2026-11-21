@@ -1578,6 +1578,8 @@ def _result(search: LPCMCISearch, kept: list[tuple[Key, bool]]) -> LPCMCIResult:
             statistics[0, j, i], p_values[0, j, i] = 1.0, 0.0
     parents: list[list[Node]] = [[] for _ in range(n)]
     for (i, j, lag), start_is_tail in kept:
+        if (i, j, lag) in undecided and (i, j, lag) not in search.required:
+            continue  # not drawn, so no parent
         if start_is_tail:
             parents[j].append((i, lag))
         else:
