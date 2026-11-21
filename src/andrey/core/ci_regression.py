@@ -405,10 +405,10 @@ class GCM(_RegressionTest):
     the test rejects a true independence more often than its level, as the weighted GCM's paper
     reports for it at 100 and 200 rows [2]_. With ``"boosting"``, pooled over draws of 12 null
     designs at 200 and 400 rows (those of [1]_ and [2]_, and example 7 of [2]_ without its
-    dependence), it rejected about 6.3% at 0.05 (6.4% on the designs of [2]_), from 4 to 11% by
-    design, and about 9% on the one-dimensional null of [2]_ at 200 rows. With an empty
-    conditioning set the test is a test of correlation: a dependence without one, such as
-    ``y = x**2`` for a symmetric ``x``, goes unseen.
+    dependence), it rejected about 6.3% at 0.05 (6.4% and 7.6% in two runs on the designs of
+    [2]_), from 4 to 11% by design, and about 9% on the one-dimensional null of [2]_ at 200 rows.
+    With an empty conditioning set the test is a test of correlation: a dependence without one,
+    such as ``y = x**2`` for a symmetric ``x``, goes unseen.
 
     References
     ----------

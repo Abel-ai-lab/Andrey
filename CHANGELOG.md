@@ -91,7 +91,7 @@ names its pull request.
   takes `regression="boosting"`, `"forest"`, or `"linear"`; `"wgcm"`'s boosted trees are tuned as
   in the wGCM authors' current code, over 28 pairs of learning rate and depth by the folds' mean
   cross-validated error. With boosted trees at 200 and 400 rows, pooled over the wGCM paper's
-  null designs, `"gcm"` and `"wgcm"` reject a true independence at 0.05 in about 6 to 6.8% of
+  null designs, `"gcm"` and `"wgcm"` reject a true independence at 0.05 in about 6 to 7.6% of
   draws, and from 4 to 13% by design over those and further null designs, as the authors' code
   does too. Each fit and each sample split reads only the query's columns,
   standardized, rounded, and signed, with the rows in an order of their values, so a p-value
