@@ -28,6 +28,7 @@ from andrey.constraint.fci import (
     orient_colliders,
     possible_dsep_step,
     shield_undecided,
+    undecided_sides,
     validate_possible_dsep,
 )
 from andrey.constraint.pc import adjacency_search, knowledge_masks
@@ -140,7 +141,7 @@ def fci_jci(
     marks = circle_pag(shielded)
     knowledge_marks(marks, padded)
     mark_index(marks, d, confounded_index)
-    orient_colliders(marks, sepsets)
+    orient_colliders(marks, sepsets, undecided_sides(marks, kept))
     # Its knowledge check runs before the index marks: no mark at the index is an arrowhead, so
     # the index cannot lie on a cycle the check reads.
     marks = possible_dsep_step(

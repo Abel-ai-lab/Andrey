@@ -122,7 +122,7 @@ def fci(
     shielded, kept = shield_undecided(skeleton, undecided)
     marks = circle_pag(shielded)
     knowledge_marks(marks, constraints)
-    orient_colliders(marks, sepsets)
+    orient_colliders(marks, sepsets, undecided_sides(marks, kept))
     marks = possible_dsep_step(
         marks,
         X,
@@ -176,6 +176,20 @@ def shield_undecided(
     for a, c in undecided:
         mask[a, c] = mask[c, a] = True
     return np.where(mask, np.int8(TAIL), skeleton), mask
+
+
+def undecided_sides(marks: np.ndarray, kept: np.ndarray | None) -> frozenset[tuple[int, int, int]]:
+    """The triples ``(a, b, c)``, ``a < c``, of ``marks`` with a side in the boolean ``kept``, the
+    undecided pairs :func:`shield_undecided` joined: no collider is read from them."""
+    if kept is None:
+        return frozenset()
+    adjacent = marks != NULL
+    triples = set()
+    for a, b in zip(*np.nonzero(kept)):
+        for c in np.flatnonzero(adjacent[b]).tolist():
+            if c != a:
+                triples.add(_triple(int(a), int(b), c))
+    return frozenset(triples)
 
 
 def circle_pag(support: np.ndarray) -> np.ndarray:
