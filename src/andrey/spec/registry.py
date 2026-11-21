@@ -2698,8 +2698,8 @@ _add(
                 name="switch_threshold",
                 type="float",
                 default=0.5,
-                doc="The weight at which a time step joins a regime's PCMCI step and model fit, "
-                "in (0, 1).",
+                doc="The weight above which a time step joins a regime's PCMCI step and model "
+                "fit, in (0, 1).",
                 minimum=0,
                 maximum=1,
                 exclusive_minimum=True,

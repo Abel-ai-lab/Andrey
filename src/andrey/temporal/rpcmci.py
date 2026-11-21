@@ -6,10 +6,11 @@ weights the regimes at each step. Each start draws its first ``Gamma`` entry by 
 ``[0, 1)`` and not normalized, and alternates two steps up to ``max_iter`` times:
 
 1. **Causal discovery and model estimation.** For each regime ``k``, PCMCI runs on the steps ``t``
-   with ``gamma_k(t) >= switch_threshold``: every test reads those steps as its effect's time and
-   the lagged values of every earlier step (:func:`~andrey.temporal.pcmci.pcmci` with ``rows``).
-   Each variable is then regressed by least squares, with an intercept, on its MCI parents over
-   the same steps from ``tau_max`` on, and the fit predicts every step from ``tau_max`` on.
+   with ``gamma_k(t) > switch_threshold``, each weight rounded to :data:`~andrey.core.ties.KEY_DP`
+   decimals first: every test reads those steps as its effect's time and the lagged values of
+   every earlier step (:func:`~andrey.temporal.pcmci.pcmci` with ``rows``). Each variable is then
+   regressed by least squares, with an intercept, on its MCI parents over the same steps from
+   ``tau_max`` on, and the fit predicts every step from ``tau_max`` on.
 2. **Regime learning.** ``c_k(t)`` is the squared residual of that prediction summed over the
    variables, each residual divided by the regime's standard deviation of its variable. The new
    ``Gamma``, whose columns lie on the probability simplex, solves the linear program
@@ -46,7 +47,7 @@ from scipy.optimize import linprog
 
 from andrey.core import backend
 from andrey.core.seeding import start_generator
-from andrey.core.ties import stable_key, tie_ranks
+from andrey.core.ties import KEY_DP, stable_key, tie_ranks
 
 from .pcmci import PCMCIResult, lagged_design, pcmci
 
@@ -187,7 +188,7 @@ def _start(
     results: tuple[PCMCIResult, ...] = ()
     converged = False
     for q in range(max_iter):
-        selected = weights >= switch_threshold
+        selected = np.round(weights, KEY_DP) > switch_threshold
         fits: list[PCMCIResult] = []
         costs = np.empty((n_regimes, n_steps), dtype=np.float64)
         for k in range(n_regimes):
