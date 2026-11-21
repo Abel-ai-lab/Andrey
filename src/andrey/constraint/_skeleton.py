@@ -818,19 +818,26 @@ def unseparated_triples(
     adjacency: np.ndarray,
     sepsets: Mapping[tuple[int, int], object],
     constraints: Constraints | None,
+    undecided: Collection[tuple[int, int]] = (),
 ) -> frozenset[tuple[int, int, int]]:
     """The unshielded triples ``(a, b, c)``, ``a < c``, over a non-adjacent pair with no
     separating set.
 
     ``adjacency`` is the boolean skeleton and ``sepsets`` the separating sets, keyed in either
     order. A pair ``constraints`` make non-adjacent that ``sepsets`` leaves out has no separating
-    set the search found, so whether ``b`` is a collider is unknown: no rule reads the triple as a
-    collider or a non-collider. Without constraints the search tested every pair it left
-    non-adjacent, and there are none.
+    set the search found, and an ``undecided`` pair, keyed ``(a, c)`` with ``a < c``, which the
+    search left out of the skeleton because no test with rows could decide it
+    (:func:`~andrey.constraint.pc.adjacency_search`), may be adjacent or not; so whether ``b`` is a
+    collider is unknown: no rule reads the triple as a collider or a non-collider, and no rule
+    reads its ends as non-adjacent. Without constraints and undecided pairs the search tested
+    every pair it left non-adjacent, and there are none.
     """
-    if constraints is None:
+    if constraints is None and not undecided:
         return frozenset()
-    apart = ~constraints.support()
+    d = len(adjacency)
+    apart = np.zeros((d, d), dtype=bool) if constraints is None else ~constraints.support()
+    for a, c in undecided:
+        apart[a, c] = apart[c, a] = True
     triples = set()
     for b, row in enumerate(adjacency):
         for a, c in combinations(np.flatnonzero(row).tolist(), 2):

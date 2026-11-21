@@ -106,6 +106,7 @@ def fci(
         indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
     )
     allowed, keep, apart = knowledge_masks(constraints)
+    undecided: set[tuple[int, int]] = set()
     skeleton, sepsets, _ = adjacency_search(
         test,
         X.shape[1],
@@ -115,6 +116,7 @@ def fci(
         apart=apart,
         max_depth=max_depth,
         workers=workers,
+        undecided=undecided,
     )
 
     marks = circle_pag(skeleton)
@@ -135,7 +137,7 @@ def fci(
         constraints=constraints,
         workers=workers,
     )
-    ambiguous = unseparated_triples(marks != NULL, sepsets, constraints)
+    ambiguous = unseparated_triples(marks != NULL, sepsets, constraints, undecided)
     if collider_rule != "sepsets":
         ambiguous |= vote_triples(
             marks, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous

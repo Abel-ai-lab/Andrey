@@ -33,6 +33,7 @@ from andrey.api._adapt import (
     target_columns,
 )
 from andrey.api._method import method_spec
+from andrey.core import NULL
 from andrey.core.ci_missing import rows_metadata, rows_tested
 from andrey.core.knowledge import Knowledge
 
@@ -41,7 +42,7 @@ if TYPE_CHECKING:
 
     import numpy.typing as npt
 
-    from andrey.core import StructureOutput
+    from andrey.core import GraphStructure, StructureOutput
 
 
 @method_spec("pc")
@@ -569,10 +570,26 @@ def pc(
         "conflicts": [list(edge) for edge in sorted(conflicts)],
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
-        **rows_metadata(rows, label_of(labels)),
+        **rows_metadata(rows, label_of(labels), _drawn(cpdag)),
         **_mvpc_metadata(found, labels, seed),
     }
     return structure_output(cpdag, labels=labels, metadata=metadata)
+
+
+def _drawn(graph: GraphStructure, index_edges: Sequence[int] = ()) -> np.ndarray:
+    """Return the boolean adjacency of ``graph``.
+
+    With ``index_edges``, the adjacency has one more node, the index the search appends, joined to
+    each of those columns.
+    """
+    marks = graph.to_numpy() != NULL
+    if not index_edges:
+        return marks
+    d = len(marks)
+    padded = np.zeros((d + 1, d + 1), dtype=bool)
+    padded[:d, :d] = marks
+    padded[list(index_edges), d] = padded[d, list(index_edges)] = True
+    return padded
 
 
 def _mvpc_metadata(found: dict, labels: Sequence[str] | None, seed: int) -> dict:
@@ -965,7 +982,7 @@ def fci(
     metadata = {
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
-        **rows_metadata(rows, label_of(labels)),
+        **rows_metadata(rows, label_of(labels), _drawn(pag)),
     }
     return structure_output(pag, labels=labels, metadata=metadata)
 
@@ -1857,7 +1874,9 @@ def cdnod(
         "changing_variables": [variable(j) for j in index_edges],
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
-        **rows_metadata(rows, lambda j: "env" if j == d else variable(j)),
+        **rows_metadata(
+            rows, lambda j: "env" if j == d else variable(j), _drawn(cpdag, index_edges)
+        ),
     }
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
@@ -2208,7 +2227,11 @@ def fci_jci(
         "index_edges": [[variable(j), kind] for j, kind in index_edges],
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
-        **rows_metadata(rows, lambda j: "env" if j == d else variable(j)),
+        **rows_metadata(
+            rows,
+            lambda j: "env" if j == d else variable(j),
+            _drawn(pag, [j for j, _ in index_edges]),
+        ),
     }
     return structure_output(pag, labels=labels, metadata=metadata)
 

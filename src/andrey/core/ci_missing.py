@@ -213,10 +213,28 @@ class RowCounts(Counter[int]):
                 pair = (a, b)
                 self.largest[pair] = max(self.largest.get(pair, -np.inf), value)
 
+    def merge(self, other: RowCounts) -> None:
+        """Add the counts of ``other``, whose tests ran over the same columns, pairs included."""
+        self.update(other)
+        self.p_one += other.p_one
+        self.not_tested.update(other.not_tested)
+        self.not_tested_elsewhere += other.not_tested_elsewhere
+        for pair, value in other.largest.items():
+            self.largest[pair] = max(self.largest.get(pair, -np.inf), value)
+
     def untested(self) -> list[tuple[int, int]]:
         """The pairs with a query that was not tested and no query that was: no test with rows
         could decide them, as a pair never observed together."""
         return [pair for pair in self.not_tested if pair not in self.largest]
+
+    def possibly_separable(self, drawn: np.ndarray) -> list[tuple[int, int]]:
+        """The pairs adjacent in the boolean ``drawn`` with a query tested and one not tested: a
+        conditioning set that no row could test might have separated them. A pair of columns
+        ``drawn`` does not hold is left out."""
+        d = len(drawn)
+        return [
+            (a, b) for a, b in self.not_tested if b < d and (a, b) in self.largest and drawn[a, b]
+        ]
 
 
 def not_tested(p: npt.ArrayLike) -> np.ndarray:
@@ -262,8 +280,22 @@ def rows_tested_elsewhere() -> Generator[RowCounts]:
         outer.absorb(counter)
 
 
+@contextlib.contextmanager
+def search_outcomes() -> Generator[RowCounts]:
+    """:func:`rows_tested` for one search, whose result reads which pairs its tests decided
+    (:meth:`RowCounts.untested`); on exit, the running counter outside, if any, takes its counts,
+    pairs included (:meth:`RowCounts.merge`)."""
+    outer = _ROWS.get()
+    with rows_tested() as counter:
+        yield counter
+    if outer is not None:
+        outer.merge(counter)
+
+
 def rows_metadata(
-    counter: Mapping[int, int], name: Callable[[int], Any] | None = None
+    counter: Mapping[int, int],
+    name: Callable[[int], Any] | None = None,
+    drawn: np.ndarray | None = None,
 ) -> dict[str, Any]:
     """Return the metadata of the tests ``counter`` holds; ``{}`` when it holds none.
 
@@ -277,14 +309,17 @@ def rows_metadata(
     (:data:`NOT_TESTED`), including those the search skipped because no row can test them
     (:meth:`TestwiseDeletion.count_not_tested`). With ``name``, ``"undecided_pairs"``
     lists the pairs no tested query could decide, those of :meth:`RowCounts.untested`, as
-    ``[a, b]`` lists of ``name(column)`` by :func:`named_pairs`.
+    ``[a, b]`` lists of ``name(column)`` by :func:`named_pairs`. With ``drawn`` too, the boolean
+    adjacency of the graph returned, ``"possibly_separable"``, present when it is not empty, lists
+    the same way the adjacent pairs a conditioning set not tested might have separated
+    (:meth:`RowCounts.possibly_separable`).
     """
     skipped = counter.total_not_tested() if isinstance(counter, RowCounts) else 0
     if not counter and not skipped:
         return {}
     if not counter:
         metadata: dict[str, Any] = {"rows_tested": {"min": 0, "median": 0}}
-        return metadata | _not_tested_metadata(counter, skipped, name)
+        return metadata | _not_tested_metadata(counter, skipped, name, drawn)
     counts = sorted(counter.items())
     total = sum(n for _, n in counts)
     middle = [(total - 1) // 2, total // 2]
@@ -297,18 +332,24 @@ def rows_metadata(
     metadata = {"rows_tested": {"min": counts[0][0], "median": (values[0] + values[1]) / 2}}
     p_one = getattr(counter, "p_one", 0)
     metadata |= {"p_one_tests": p_one} if p_one else {}
-    return metadata | _not_tested_metadata(counter, skipped, name)
+    return metadata | _not_tested_metadata(counter, skipped, name, drawn)
 
 
 def _not_tested_metadata(
-    counter: Mapping[int, int], skipped: int, name: Callable[[int], Any] | None
+    counter: Mapping[int, int],
+    skipped: int,
+    name: Callable[[int], Any] | None,
+    drawn: np.ndarray | None,
 ) -> dict[str, Any]:
-    """``"not_tested"`` and ``"undecided_pairs"`` of :func:`rows_metadata`."""
+    """``"not_tested"``, ``"undecided_pairs"``, and ``"possibly_separable"`` of
+    :func:`rows_metadata`."""
     if not skipped:
         return {}
     metadata: dict[str, Any] = {"not_tested": skipped}
     if name is not None and isinstance(counter, RowCounts):
         metadata["undecided_pairs"] = named_pairs(counter.untested(), name)
+        if drawn is not None and (pairs := counter.possibly_separable(drawn)):
+            metadata["possibly_separable"] = named_pairs(pairs, name)
     return metadata
 
 

@@ -122,6 +122,7 @@ def fci_jci(
     )
     allowed, keep, apart = knowledge_masks(padded)
     workers = backend.worker_count(workers)
+    undecided: set[tuple[int, int]] = set()
     skeleton, sepsets, _ = adjacency_search(
         test,
         d + 1,
@@ -131,6 +132,7 @@ def fci_jci(
         apart=apart,
         max_depth=max_depth,
         workers=workers,
+        undecided=undecided,
     )
 
     marks = circle_pag(skeleton)
@@ -155,7 +157,7 @@ def fci_jci(
         workers=workers,
     )
     mark_index(marks, d, confounded_index)
-    ambiguous = unseparated_triples(marks != NULL, sepsets, padded)
+    ambiguous = unseparated_triples(marks != NULL, sepsets, padded, undecided)
     if collider_rule != "sepsets":
         ambiguous |= vote_triples(
             marks, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
