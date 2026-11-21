@@ -585,7 +585,24 @@ def _first_separating(
     tuples (:func:`_separating_choice`). Every path tests the subsets in the same order and stops
     at the first that separates the pair; on the pool, tests after it may run, but the subset found
     is the serial one.
+
+    A test that deletes rows per test asks no subset holding a member that no row observes
+    together with ``x`` and ``y``, every member when no row observes the pair: such a query keeps
+    no rows and separates nothing. The subsets left out that the search would have reached are
+    counted as not tested (:func:`_left_out`), so the subset found and the counts are those of
+    asking every subset.
     """
+    if isinstance(test, TestwiseDeletion):
+        together = test.together()
+        met = together[x] & together[y] if together[x, y] else np.zeros(len(together), dtype=bool)
+        kept = [v for v in dsep if met[v]]
+        if len(kept) < len(dsep):
+            found = _first_separating(
+                test, x, y, kept, adj_a, adj_b, alpha, max_depth, tested, pool
+            )
+            within = (adj_a, adj_b, tested)
+            test.count_not_tested(x, y, _left_out(dsep, kept, within, max_depth, found))
+            return found
     sizes = range(1, _largest_size(len(dsep), max_depth) + 1)
     if canonical_capable(test) and len(dsep) <= MASK_BITS:
         subsets = sum(comb(len(dsep), size) for size in sizes)
@@ -600,6 +617,69 @@ def _first_separating(
             return first_separating_subset(test, x, y, dsep, within, order, alpha)
     choices = _iter_dsep_choices(dsep, adj_a, adj_b, max_depth, tested)
     return _separating_choice(test, x, y, choices, alpha)
+
+
+def _left_out(
+    dsep: list[int],
+    kept: list[int],
+    within: Iterable[Collection[int]],
+    max_depth: int | None,
+    found: tuple[int, ...] | None,
+) -> int:
+    """The subsets of ``dsep`` holding a member outside ``kept`` that a search of
+    :func:`_iter_dsep_choices` order, less the subsets inside one of ``within``, reaches before
+    ``found``, or reaches at all when ``found`` is ``None``.
+
+    Counted per size from the positions in ``dsep`` (:func:`_outside_count`): the subsets of
+    ``dsep`` less those of ``kept``, every size below ``found``'s whole and ``found``'s own size up
+    to ``found``.
+    """
+    position = {v: i for i, v in enumerate(dsep)}
+    every = list(range(len(dsep)))
+    inner = [position[v] for v in kept]
+    groups = [{position[v] for v in nodes if v in position} for nodes in within]
+    last = _largest_size(len(dsep), max_depth) if found is None else len(found)
+    before = None if found is None else sorted(position[v] for v in found)
+    total = 0
+    for size in range(1, last + 1):
+        bound = before if size == last else None
+        total += _outside_count(every, size, groups, bound)
+        total -= _outside_count(inner, size, groups, bound)
+    return total
+
+
+def _outside_count(
+    universe: list[int], size: int, groups: list[set[int]], before: list[int] | None
+) -> int:
+    """The size-``size`` subsets of the ascending ``universe`` inside none of ``groups``, of those
+    that come before ``before`` in ``combinations`` order when it is given, by
+    inclusion-exclusion over the groups (:func:`_count_before`)."""
+    total = 0
+    for r in range(len(groups) + 1):
+        for chosen in combinations(groups, r):
+            members = [p for p in universe if all(p in g for g in chosen)]
+            total += (-1) ** r * _count_before(members, size, before)
+    return total
+
+
+def _count_before(members: list[int], size: int, before: list[int] | None) -> int:
+    """The size-``size`` subsets of the ascending ``members`` that come before the ascending
+    ``before`` in ``combinations`` order, or all of them when it is ``None``: a subset comes
+    before it when, at the first place they differ, its member is the smaller."""
+    if before is None:
+        return comb(len(members), size)
+    held = set(members)
+    count, low = 0, -1
+    for j, bound in enumerate(before):
+        count += sum(
+            comb(len(members) - i - 1, size - j - 1)
+            for i, u in enumerate(members)
+            if low < u < bound
+        )
+        if bound not in held:
+            break
+        low = bound
+    return count
 
 
 def _separating_choice(

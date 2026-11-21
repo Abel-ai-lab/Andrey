@@ -299,9 +299,10 @@ def test_the_notice_names_a_pair_never_observed_together(caplog):
     [
         (andrey.pc, _never_together, 4),
         (andrey.fci, _never_together, 4),
-        (andrey.iamb, _never_together, 8),
+        # Each blanket beside an undecided candidate counts one set per member (X's and Y's).
+        (andrey.iamb, _never_together, 10),
         (andrey.pc, partial(_cohorts, 0), 20),
-        (andrey.iamb, partial(_cohorts, 0), 12),
+        (andrey.iamb, partial(_cohorts, 0), 14),
     ],
 )
 def test_the_conditioning_sets_not_tested_match_their_record(fit, data, count):

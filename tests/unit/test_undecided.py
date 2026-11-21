@@ -16,7 +16,8 @@ import pandas as pd
 import pytest
 
 import andrey
-from andrey.core import ARROW
+from andrey.constraint.fci import _iter_dsep_choices, _left_out
+from andrey.core import ARROW, ci_missing
 
 # case: (edges as (parent, child) over 0 = X, 1 = Y, 2 = third, cohort patterns, cohort shares)
 HAND = {
@@ -296,6 +297,48 @@ def test_uncapped_pc_finishes_on_merged_cohorts_and_leaves_out_every_pair_never_
     never = {tuple(pair) for pair in out.metadata["never_observed_together"]}
     assert never and never <= _pairs(out, "undecided_pairs")
     assert not _skeleton(out) & never
+
+
+def test_left_out_counts_the_dsep_subsets_a_pruned_search_skips():
+    rng = np.random.default_rng(0)
+    for _ in range(500):
+        dsep = rng.permutation(12)[: rng.integers(0, 9)].tolist()
+        kept = [v for v in dsep if rng.random() < 0.6]
+        within = tuple({v for v in range(12) if rng.random() < 0.3} for _ in range(3))
+        depth = [None, 1, 2, 3][rng.integers(4)]
+        choices = list(_iter_dsep_choices(dsep, *within[:2], depth, within[2]))
+        held = [c for c in choices if set(c) <= set(kept)]
+        found = held[rng.integers(len(held))] if held and rng.random() < 0.7 else None
+        reached = choices[: choices.index(found)] if found is not None else choices
+        skipped = sum(not set(c) <= set(kept) for c in reached)
+        assert _left_out(dsep, kept, within, depth, found) == skipped
+
+
+def test_fci_asks_no_possible_dsep_set_no_row_can_test_and_keeps_its_answer(monkeypatch):
+    df = _merged_cohorts()
+    pruned = andrey.fci(df, max_depth=2)
+    every = lambda self: np.ones((self._observed.shape[1],) * 2, dtype=bool)  # noqa: E731
+    for kind in (ci_missing.TestwiseDeletion, ci_missing.GaussianDeletion):
+        monkeypatch.setattr(kind, "together", every)
+    asked = andrey.fci(df, max_depth=2)
+    assert pruned.structure.oriented_edges() == asked.structure.oriented_edges()
+    assert pruned.metadata == asked.metadata
+
+
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb"])
+def test_a_blanket_beside_an_undecided_candidate_is_flagged(method):
+    # Y is never observed with X, and could separate X and Z.
+    out = getattr(andrey, method)(_hand("fork"), target="X")
+    assert _skeleton(out) == {("X", "Z")}
+    assert _pairs(out, "undecided_pairs") == {("X", "Y")}
+    assert _pairs(out, "possibly_separable") == {("X", "Z")}
+
+
+def test_bootstrap_keeps_the_undecided_pairs_and_flags_of_its_fits():
+    out = andrey.bootstrap("pc", _hand("fork"), n_resamples=4, missing="testwise", seed=0)
+    assert _pairs(out, "undecided_pairs") == {("X", "Y")}
+    assert _pairs(out, "possibly_separable") == {("X", "Z"), ("Y", "Z")}
+    assert out.frequency("absent")[0, 1] == 1.0
 
 
 def _shared_rows_cohorts(seed: int = 100, n: int = 2000) -> pd.DataFrame:

@@ -26,7 +26,9 @@ names its pull request.
   with an undecided side, is neither a collider nor a non-collider. In PC, FCI, CD-NOD, FCI-JCI,
   the Markov-blanket searches, PCMCI, PCMCI+, and LPCMCI, `metadata["possibly_separable"]` lists
   the drawn edges that a conditioning set not tested might have separated, which the notice names
-  too; MVPC's correction removes only the edges its own tests separate. PCMCI, PCMCI+, and
+  too, every edge of its target when a Markov-blanket search leaves an undecided candidate out;
+  `bootstrap` lists the pairs of all three kinds over its fits in its metadata. MVPC's correction
+  removes only the edges its own tests separate. PCMCI, PCMCI+, and
   J-PCMCI+ condition no test on a lagged parent without a tested result, and LPCMCI none on a node
   whose link to either end of the tested pair is undecided; PCMCI and PCMCI+ condition each test
   only on the candidates, strongest first, that keep its rows enough for the test, so its rows do
@@ -124,9 +126,10 @@ names its pull request.
 - The skeleton search of PC, FCI, CD-NOD, and FCI-JCI with `fisherz`, `student_t`, or
   `normal_scores` on data with missing values counts a conditioning set that holds a column no row
   observes with the tested pair as not tested without building its query, as the other tests
-  already did, with the same output, and its warning of a costly pass counts only the sets it
-  builds. On synthetic merged cohorts of 40 and 50 columns, `pc` with `max_depth=None` finishes in
-  about a second. ([#1167])
+  already did, and FCI's possible-d-sep step does so with every test, both with the same output;
+  the skeleton's warning of a costly pass counts only the sets it builds. On synthetic merged
+  cohorts of 40 and 50 columns, `pc` with `max_depth=None` finishes in about a second, and `fci`
+  in under a minute. ([#1167])
 - The Markov-blanket searches count a conditioning set that holds a column no row observes with the
   tested pair, or with a collider's middle variable, as not tested without building its query. On
   synthetic merged cohorts of 50 columns with 134 pairs never observed together, `iamb` finished in

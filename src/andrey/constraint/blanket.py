@@ -177,7 +177,9 @@ def markov_blanket(
     ``KEY_DP`` significant digits; then add, in rank order, each candidate whose test given the
     blanket was not tested and that no earlier test separated, since a test without rows separates
     no pair; a candidate with no test that had rows, as one never observed with ``target``, is
-    undecided and left out. Shrink: visit the members in the order they joined and drop each one
+    undecided and left out, and each member returned counts one conditioning set not tested, the
+    one holding it, which no test asked and which might separate the member from ``target``.
+    Shrink: visit the members in the order they joined and drop each one
     the test finds independent of ``target`` (a p-value above ``alpha``) given the other current
     members. IAMB
     grows to the end and then shrinks once; Inter-IAMB shrinks after every addition and stops when
@@ -242,10 +244,14 @@ def markov_blanket(
     if sepsets is not None:
         for x in blanket:
             sepsets.pop(x, None)
-    if constraints is None:
-        return blanket
-    support = constraints.support()[target]
-    return [x for x in blanket if support[x]]
+    undecided = any(x != target and x not in decided and x not in blanket for x in range(d))
+    if constraints is not None:
+        support = constraints.support()[target]
+        blanket = [x for x in blanket if support[x]]
+    if undecided and isinstance(test, TestwiseDeletion):
+        for x in blanket:
+            test.count_not_tested(target, x, 1)
+    return blanket
 
 
 def _shrink(
