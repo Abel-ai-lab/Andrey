@@ -1115,6 +1115,11 @@ def bootstrap(
         (:data:`andrey.config`), and ``averaged_graph``: ``"vote"``, ``"nearest_resample"`` when
         the averaged graph is the valid resample graph nearest the others, or
         ``"nearest_resample_invalid"`` when no resample is a valid graph of the method's kind.
+        On data with missing values, ``never_observed_together``, ``undecided_pairs``, and
+        ``possibly_separable``, each present when it is not empty, list the pairs any fit listed
+        under that key. A fit leaves an undecided pair out of its graph, so the pair counts as
+        not drawn in that fit's frequency, as a pair the fit separated does; the list tells them
+        apart.
 
     Raises
     ------
@@ -1341,7 +1346,7 @@ def bootstrap(
             threshold,
             strict,
             keep_fits,
-            metadata,
+            metadata | _marked_pairs(group),
             _constraints(spec, method_kwargs.get("knowledge"), group[0].structure),
             ranks,
         )
@@ -1353,15 +1358,22 @@ def bootstrap(
 def _not_tested_over(fits: list) -> dict:
     """Return the not-tested metadata of ``fits`` for the notice.
 
-    The pairs never observed together and the undecided pairs of any fit, in order of first
-    appearance, and the conditioning sets not tested over all of them, which the notice reads only
-    as whether any was.
+    The pairs never observed together, the undecided pairs, and the possibly separable edges of any
+    fit, in order of first appearance, and the conditioning sets not tested over all of them, which
+    the notice reads only as whether any was.
     """
     merged: dict = {"not_tested": sum(out.metadata.get("not_tested", 0) for out in fits)}
-    for key in ("never_observed_together", "undecided_pairs"):
+    for key in ("never_observed_together", "undecided_pairs", "possibly_separable"):
         pairs = (pair for out in fits for pair in out.metadata.get(key, []))
         merged[key] = [list(pair) for pair in dict.fromkeys(map(tuple, pairs))]
     return merged
+
+
+def _marked_pairs(fits: Sequence[StructureOutput]) -> dict[str, JSONValue]:
+    """Return the pair lists of :func:`_not_tested_over` of ``fits`` that are not empty."""
+    merged = _not_tested_over(list(fits))
+    keys = ("never_observed_together", "undecided_pairs", "possibly_separable")
+    return {key: merged[key] for key in keys if merged[key]}
 
 
 def _column_ranks(job: Job) -> np.ndarray:

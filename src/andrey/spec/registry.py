@@ -3868,6 +3868,11 @@ _METADATA: dict[str, tuple[str, ...]] = {
 # column types a mixed-data setting read, the fewest rows a test used and how missing values were
 # handled, the record of a structural EM, the triples a collider vote left ambiguous, the clauses
 # the path parts of knowledge leave, and the claims a causal order search does not meet.
+# The methods with missing values whose searches remove pairs by conditioning sets, which list the
+# drawn edges a set not tested might have removed.
+_SEPARATING_SEARCHES = frozenset(
+    ("pc", "fci", "cdnod", "fci_jci", "iamb", "inter_iamb", "mmpc", "pcmci", "pcmciplus", "lpcmci")
+)
 for _name, _spec in REGISTRY.items():
     _concepts = {p.concept for p in _spec.params}
     _shared = (
@@ -3889,6 +3894,7 @@ for _name, _spec in REGISTRY.items():
                 "p_one_tests",
                 "not_tested",
                 "undecided_pairs",
+                *(("possibly_separable",) if _name in _SEPARATING_SEARCHES else ()),
                 "never_observed_together",
             )
             if _spec.data.missing

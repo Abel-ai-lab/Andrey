@@ -27,6 +27,8 @@ from andrey.constraint.fci import (
     knowledge_marks,
     orient_colliders,
     possible_dsep_step,
+    shield_undecided,
+    undecided_sides,
     validate_possible_dsep,
 )
 from andrey.constraint.pc import adjacency_search, knowledge_masks
@@ -122,6 +124,7 @@ def fci_jci(
     )
     allowed, keep, apart = knowledge_masks(padded)
     workers = backend.worker_count(workers)
+    undecided: set[tuple[int, int]] = set()
     skeleton, sepsets, _ = adjacency_search(
         test,
         d + 1,
@@ -131,12 +134,14 @@ def fci_jci(
         apart=apart,
         max_depth=max_depth,
         workers=workers,
+        undecided=undecided,
     )
 
-    marks = circle_pag(skeleton)
+    shielded, kept = shield_undecided(skeleton, undecided)
+    marks = circle_pag(shielded)
     knowledge_marks(marks, padded)
     mark_index(marks, d, confounded_index)
-    orient_colliders(marks, sepsets)
+    orient_colliders(marks, sepsets, undecided_sides(marks, kept))
     # Its knowledge check runs before the index marks: no mark at the index is an arrowhead, so
     # the index cannot lie on a cycle the check reads.
     marks = possible_dsep_step(
@@ -152,10 +157,13 @@ def fci_jci(
         seed=seed,
         max_depth=max_depth,
         constraints=padded,
+        keep=kept,
         workers=workers,
     )
+    if kept is not None:
+        marks[kept] = NULL
     mark_index(marks, d, confounded_index)
-    ambiguous = unseparated_triples(marks != NULL, sepsets, padded)
+    ambiguous = unseparated_triples(marks != NULL, sepsets, padded, undecided)
     if collider_rule != "sepsets":
         ambiguous |= vote_triples(
             marks, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
