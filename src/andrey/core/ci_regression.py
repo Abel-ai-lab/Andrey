@@ -427,7 +427,7 @@ class WGCM(_RegressionTest):
     itself, which in reduced versions of the paper's designs with boosted trees rejected more often
     under the alternatives, also at a matched null rate, and about one percentage point more often
     under the nulls. The draws of ``"fix"`` use the centered columns, as in the paper; the authors'
-    code's uncentered draws gave the same power at a matched null rate and rejected about 0.2
+    code's uncentered draws gave the same power at a matched null rate and rejected about 0.3
     percentage points less often under the nulls. The split and the multiplier draws are drawn from
     ``seed`` over the rows in lexicographic order of the query's own columns, so they do not depend
     on other columns.
