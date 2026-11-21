@@ -33,6 +33,7 @@ from andrey.api._adapt import (
     target_columns,
 )
 from andrey.api._method import method_spec
+from andrey.core import NULL
 from andrey.core.ci_missing import rows_metadata, rows_tested
 from andrey.core.knowledge import Knowledge
 
@@ -41,7 +42,7 @@ if TYPE_CHECKING:
 
     import numpy.typing as npt
 
-    from andrey.core import StructureOutput
+    from andrey.core import GraphStructure, StructureOutput
 
 
 @method_spec("pc")
@@ -325,10 +326,15 @@ def pc(
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
     tested, including those the search skipped because no row can test them. A pair no tested query
-    could decide, as a pair never observed together, stays adjacent and is listed in
-    ``metadata["undecided_pairs"]``. On merged cohorts, every pair of variables measured only in
-    different cohorts is therefore an undecided pair and, unless knowledge forbids it, an edge of
-    the output: a fact about the data, not a finding. A continuous column constant on a test's rows
+    could decide, as a pair never observed together, is undecided: it is left out of the graph and
+    listed in ``metadata["undecided_pairs"]``, and a triple whose ends are undecided is neither a
+    collider nor a non-collider to any rule. A drawn edge that a conditioning set not tested might
+    have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
+    not check, not a finding that the edge is false. On merged cohorts, every pair of variables
+    measured only in different cohorts is therefore undecided, and an edge whose separating set is
+    never observed together with its pair is drawn and flagged. A few rows that observe every
+    column decide such pairs on those rows alone, with little power, so they can remove true edges
+    between variables observed together. A continuous column constant on a test's rows
     raises ``ValueError``. With missing values, the skeleton search runs in one process. Test-wise
     deletion is valid when values are missing completely at random, which means that whether a value
     is missing depends on no value in the data; the rows a test reads are then a random sample of
@@ -569,10 +575,26 @@ def pc(
         "conflicts": [list(edge) for edge in sorted(conflicts)],
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
-        **rows_metadata(rows, label_of(labels)),
+        **rows_metadata(rows, label_of(labels), _drawn(cpdag)),
         **_mvpc_metadata(found, labels, seed),
     }
     return structure_output(cpdag, labels=labels, metadata=metadata)
+
+
+def _drawn(graph: GraphStructure, index_edges: Sequence[int] = ()) -> np.ndarray:
+    """Return the boolean adjacency of ``graph``.
+
+    With ``index_edges``, the adjacency has one more node, the index the search appends, joined to
+    each of those columns.
+    """
+    marks = graph.to_numpy() != NULL
+    if not index_edges:
+        return marks
+    d = len(marks)
+    padded = np.zeros((d + 1, d + 1), dtype=bool)
+    padded[:d, :d] = marks
+    padded[list(index_edges), d] = padded[d, list(index_edges)] = True
+    return padded
 
 
 def _mvpc_metadata(found: dict, labels: Sequence[str] | None, seed: int) -> dict:
@@ -859,10 +881,15 @@ def fci(
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
     tested, including those the search skipped because no row can test them. A pair no tested query
-    could decide, as a pair never observed together, stays adjacent and is listed in
-    ``metadata["undecided_pairs"]``. On merged cohorts, every pair of variables measured only in
-    different cohorts is therefore an undecided pair and, unless knowledge forbids it, an edge of
-    the output: a fact about the data, not a finding. A continuous column constant on a test's rows
+    could decide, as a pair never observed together, is undecided: it is left out of the graph and
+    listed in ``metadata["undecided_pairs"]``, and a triple whose ends are undecided is neither a
+    collider nor a non-collider to any rule. A drawn edge that a conditioning set not tested might
+    have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
+    not check, not a finding that the edge is false. On merged cohorts, every pair of variables
+    measured only in different cohorts is therefore undecided, and an edge whose separating set is
+    never observed together with its pair is drawn and flagged. A few rows that observe every
+    column decide such pairs on those rows alone, with little power, so they can remove true edges
+    between variables observed together. A continuous column constant on a test's rows
     raises ``ValueError``. With missing values, the skeleton search runs in one process. Test-wise
     deletion is valid when values are missing completely at random, which means that whether a value
     is missing depends on no value in the data; the rows a test reads are then a random sample of
@@ -903,11 +930,14 @@ def fci(
     on 5 variables with 3,000 rows. ``collider_rule="conservative"`` and ``"majority"`` are not
     benchmarked yet; their tests run them on up to 8 variables. Missing values are not benchmarked
     yet; the tests run them on up to 20 variables with up to a fifth of the values missing
-    completely at random. A required path says less than a required edge and directs less: it cannot
-    restore an edge the search left out, and on simulated data a required edge, which also states
-    that the pair is adjacent, lowered the errors more. A known edge belongs in ``required``. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    completely at random. On synthetic data merged from cohorts, with ``max_depth=None``, the fit
+    took 12 to 58 s at 40 variables and 4 to 6 minutes at 50: the possible-d-separation step skips
+    the sets that hold a variable never observed with the tested pair, but asks those whose
+    variables no row observes all together; ``max_depth`` bounds it. A required path says less
+    than a required edge and directs less: it cannot restore an edge the search left out, and on
+    simulated data a required edge, which also states that the pair is adjacent, lowered the errors
+    more. A known edge belongs in ``required``. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -965,7 +995,7 @@ def fci(
     metadata = {
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
-        **rows_metadata(rows, label_of(labels)),
+        **rows_metadata(rows, label_of(labels), _drawn(pag)),
     }
     return structure_output(pag, labels=labels, metadata=metadata)
 
@@ -1705,16 +1735,18 @@ def cdnod(
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
     tested, including those the search skipped because no row can test them. A pair no tested query
-    could decide, as a pair never observed together, stays adjacent and is listed in
-    ``metadata["undecided_pairs"]``; a test whose ``env`` is constant on its rows, which come from
-    one environment, is not tested. On merged cohorts, every pair of variables measured only in
-    different cohorts is therefore an undecided pair and, unless knowledge forbids it, an edge of
-    the output: a fact about the data, not a finding. A continuous column constant on a test's rows
-    raises ``ValueError``. ``env`` must be complete, and ``dependence_threshold``, whose kernel
-    measures read every row, raises ``ValueError`` on data with missing values. With missing values,
-    the skeleton search runs in one process. Test-wise deletion is valid when values are missing
-    completely at random, which means that whether a value is missing depends on no value in the
-    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
+    could decide, as a pair never observed together, is undecided: it is left out of the graph and
+    listed in ``metadata["undecided_pairs"]``, and a triple whose ends are undecided is neither a
+    collider nor a non-collider to any rule; a test whose ``env`` is constant on its rows, which
+    come from one environment, is not tested. A drawn edge that a conditioning set not tested might
+    have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
+    not check, not a finding that the edge is false. On merged cohorts, every pair of variables
+    measured only in different cohorts is therefore undecided. A continuous column constant on a
+    test's rows raises ``ValueError``. ``env`` must be complete, and ``dependence_threshold``, whose
+    kernel measures read every row, raises ``ValueError`` on data with missing values. With missing
+    values, the skeleton search runs in one process. Test-wise deletion is valid when values are
+    missing completely at random, which means that whether a value is missing depends on no value in
+    the data; the rows a test reads are then a random sample of all rows, and otherwise they are a
     selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs whose means
@@ -1857,7 +1889,9 @@ def cdnod(
         "changing_variables": [variable(j) for j in index_edges],
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
-        **rows_metadata(rows, lambda j: "env" if j == d else variable(j)),
+        **rows_metadata(
+            rows, lambda j: "env" if j == d else variable(j), _drawn(cpdag, index_edges)
+        ),
     }
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
@@ -2089,15 +2123,18 @@ def fci_jci(
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
     tested, including those the search skipped because no row can test them. A pair no tested query
-    could decide, as a pair never observed together, stays adjacent and is listed in
-    ``metadata["undecided_pairs"]``; a test whose ``env`` is constant on its rows, which come from
-    one environment, is not tested. On merged cohorts, every pair of variables measured only in
-    different cohorts is therefore an undecided pair and, unless knowledge forbids it, an edge of
-    the output: a fact about the data, not a finding. A continuous column constant on a test's rows
-    raises ``ValueError``. With missing values, the skeleton search runs in one process. Test-wise
-    deletion is valid when values are missing completely at random, which means that whether a value
-    is missing depends on no value in the data; the rows a test reads are then a random sample of
-    all rows, and otherwise they are a selected sample that more rows do not correct.
+    could decide, as a pair never observed together, is undecided: it is left out of the graph and
+    listed in ``metadata["undecided_pairs"]``, and a triple whose ends are undecided is neither a
+    collider nor a non-collider to any rule; a test whose ``env`` is constant on its rows, which
+    come from one environment, is not tested. A drawn edge that a conditioning set not tested might
+    have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
+    not check, not a finding that the edge is false. On merged cohorts, every pair of variables
+    measured only in different cohorts is therefore undecided. A continuous column constant on a
+    test's rows raises ``ValueError``. With missing values, the skeleton search runs in one process.
+    Test-wise deletion is valid when values are missing completely at random, which means that
+    whether a value is missing depends on no value in the data; the rows a test reads are then a
+    random sample of all rows, and otherwise they are a selected sample that more rows do not
+    correct.
 
     **Limitations.** Measured on its authors' simulation [1]_, linear-Gaussian data with hidden
     common causes and one context variable that changes one variable: 4, 10, and 100 variables with
@@ -2110,19 +2147,20 @@ def fci_jci(
     domains that change different variables share one index; with 2 or 10 context variables merged
     into one index numbered by domain, its errors were still below the empty graph's on every
     dataset. Its possible-d-separation step tests subsets of each set, so its cost grows fast with
-    the number of variables. ``"fisherz"`` and ``"student_t"`` can miss a shift in a middle domain
-    of three or more, as above. Missing values are not benchmarked yet; the tests run them on up to
-    20 variables with up to a fifth of the values missing completely at random. With true
-    ``required_paths``, ``forbidden_paths``, or ``confounded`` claims on 10 or 30% of the pairs of
-    simulated linear-Gaussian data from two domains with hidden common causes (10 or 20 variables,
-    500 or 2,000 rows per domain), its result had no more wrong marks than without them in any
-    setting, and fewer with required paths in every one. The fits dropped 9.8% of the required paths
-    and 0.4% of the forbidden paths as claims their graph could not meet, and no confounded pair. No
-    reference implementation takes these claims with a domain index, so they were compared with the
-    same fit without them. A required path says less than a required edge and directs less: it
-    cannot restore an edge the search left out. A known edge belongs in ``required``. The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    the number of variables; on data merged from cohorts it asks the sets whose variables no row
+    observes all together, as :func:`~andrey.fci` does, and ``max_depth`` bounds it. ``"fisherz"``
+    and ``"student_t"`` can miss a shift in a middle domain of three or more, as above. Missing
+    values are not benchmarked yet; the tests run them on up to 20 variables with up to a fifth of
+    the values missing completely at random. With true ``required_paths``, ``forbidden_paths``, or
+    ``confounded`` claims on 10 or 30% of the pairs of simulated linear-Gaussian data from two
+    domains with hidden common causes (10 or 20 variables, 500 or 2,000 rows per domain), its result
+    had no more wrong marks than without them in any setting, and fewer with required paths in every
+    one. The fits dropped 9.8% of the required paths and 0.4% of the forbidden paths as claims their
+    graph could not meet, and no confounded pair. No reference implementation takes these claims
+    with a domain index, so they were compared with the same fit without them. A required path says
+    less than a required edge and directs less: it cannot restore an edge the search left out. A
+    known edge belongs in ``required``. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -2208,7 +2246,11 @@ def fci_jci(
         "index_edges": [[variable(j), kind] for j, kind in index_edges],
         **categorical_metadata(mask, data),
         **_ambiguous_metadata(collider_rule, ambiguous),
-        **rows_metadata(rows, lambda j: "env" if j == d else variable(j)),
+        **rows_metadata(
+            rows,
+            lambda j: "env" if j == d else variable(j),
+            _drawn(pag, [j for j, _ in index_edges]),
+        ),
     }
     return structure_output(pag, labels=labels, metadata=metadata)
 

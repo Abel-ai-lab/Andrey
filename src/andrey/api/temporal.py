@@ -15,9 +15,10 @@ import numpy as np
 
 from andrey.api._method import drop_unmet, method_spec
 from andrey.core.backend import one_blas_thread
-from andrey.core.ci_missing import named_pairs, rows_metadata, rows_tested
+from andrey.core.ci_missing import RowCounts, named_pairs, rows_metadata, rows_tested
 from andrey.core.knowledge import Knowledge, KnowledgeError, resolve_lagged
 from andrey.core.score import copies_error, copy_groups
+from andrey.core.structure import NULL
 from andrey.core.warning_policy import warn_search_limit
 
 from ._adapt import (
@@ -649,14 +650,19 @@ def pcmci(
     ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and 2 for most other
     tests), or with no degrees of freedom left, is not tested: it never separates a pair and never
     confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not tested. A link
-    no tested query could decide, as one between variables never observed together, has no p-value
-    (``NaN``) and is listed in ``metadata["undecided_pairs"]``, and no test conditions on a lagged
-    parent without a tested result. A continuous column constant on a test's rows raises
-    ``ValueError``. The categorical, mixed-data, and nonlinear tests delete rows the same way.
-    Test-wise deletion is valid when values are missing completely at random, which means that
-    whether a value is missing depends on no value in the data; the rows a test reads are then a
-    random sample of all rows, and otherwise they are a selected sample that more rows do not
-    correct.
+    no tested query could decide, as one between variables never observed together, is undecided: it
+    is left out of the graph, has no p-value (``NaN``), and is listed in
+    ``metadata["undecided_pairs"]``, and no test conditions on a lagged parent without a tested
+    result. A test conditions only on the candidates, strongest first, that keep its rows enough for
+    the test, so its rows do not mix variables no row observes together. A drawn link that a
+    conditioning set not tested might have separated, one a test left a candidate out of or one
+    with an end an undecided link joins, is listed in ``metadata["possibly_separable"]``: a flag of
+    what the data could not check, not a finding that the link is false. A continuous column
+    constant on a test's rows raises ``ValueError``. The categorical, mixed-data, and nonlinear
+    tests delete rows the same way. Test-wise deletion is valid when values are missing completely
+    at random, which means that whether a value is missing depends on no value in the data; the rows
+    a test reads are then a random sample of all rows, and otherwise they are a selected sample that
+    more rows do not correct.
 
     **Limitations.** Measured with ``fdr_method="none"`` on simulated linear-Gaussian time series
     with lagged links, of ``max(1000, 8 * (d + 1))`` time steps for ``d`` variables and of five
@@ -753,10 +759,13 @@ def pcmci(
         )
     undecided = np.zeros((tau_max + 1, *result.p_values.shape[1:]), dtype=bool)
     undecided[1:] = np.isnan(result.p_values)
+    drawn = np.zeros_like(undecided)
+    drawn[1:] = result.graph
     metadata = {
         **categorical_metadata(mask, data),
         **rows_metadata(rows),
         **undecided_links(undecided, labels),
+        **possibly_separable_links(rows, drawn, undecided, labels, constraints),
     }
     return with_labels(adapt_pcmci(result, metadata), labels)
 
@@ -1010,14 +1019,19 @@ def pcmciplus(
     ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and 2 for most other
     tests), or with no degrees of freedom left, is not tested: it never separates a pair and never
     confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not tested. A link
-    no tested query could decide, as one between variables never observed together, has no p-value
-    (``NaN``) and is listed in ``metadata["undecided_pairs"]``, and no test conditions on a lagged
-    parent without a tested result. A continuous column constant on a test's rows raises
-    ``ValueError``. The categorical, mixed-data, and nonlinear tests delete rows the same way.
-    Test-wise deletion is valid when values are missing completely at random, which means that
-    whether a value is missing depends on no value in the data; the rows a test reads are then a
-    random sample of all rows, and otherwise they are a selected sample that more rows do not
-    correct.
+    no tested query could decide, as one between variables never observed together, is undecided: it
+    is left out of the graph, has no p-value (``NaN``), and is listed in
+    ``metadata["undecided_pairs"]``, and no test conditions on a lagged parent without a tested
+    result. A test conditions only on the candidates, strongest first, that keep its rows enough for
+    the test, so its rows do not mix variables no row observes together. A drawn link that a
+    conditioning set not tested might have separated, one a test left a candidate out of or one
+    with an end an undecided link joins, is listed in ``metadata["possibly_separable"]``: a flag of
+    what the data could not check, not a finding that the link is false. A continuous column
+    constant on a test's rows raises ``ValueError``. The categorical, mixed-data, and nonlinear
+    tests delete rows the same way. Test-wise deletion is valid when values are missing completely
+    at random, which means that whether a value is missing depends on no value in the data; the rows
+    a test reads are then a random sample of all rows, and otherwise they are a selected sample that
+    more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian time series with lagged and same-step
     links, of ``max(1000, 20 * (d + 1))`` time steps for ``d`` variables and of five times as many,
@@ -1102,6 +1116,7 @@ def pcmciplus(
         **categorical_metadata(mask, data),
         **rows_metadata(rows),
         **undecided_links(result.undecided, labels),
+        **possibly_separable_links(rows, result.adjacency, result.undecided, labels, constraints),
     }
     return with_labels(adapt_pcmciplus(result, metadata), labels)
 
@@ -1631,14 +1646,18 @@ def lpcmci(
     ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and 2 for most other
     tests), or with no degrees of freedom left, is not tested: it never separates a pair and never
     confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not tested. A link
-    no tested query could decide, as one between variables never observed together, has no p-value
-    (``NaN``) and is listed in ``metadata["undecided_pairs"]``, and no test conditions on a node
-    whose link to either end of the tested pair has no tested result. A continuous column constant
-    on a test's rows raises ``ValueError``. The categorical, mixed-data, and nonlinear tests delete
-    rows the same way. Test-wise deletion is valid when values are missing completely at random,
-    which means that whether a value is missing depends on no value in the data; the rows a test
-    reads are then a random sample of all rows, and otherwise they are a selected sample that more
-    rows do not correct.
+    no tested query could decide, as one between variables never observed together, is undecided: it
+    is left out of the graph, has no p-value (``NaN``), and is listed in
+    ``metadata["undecided_pairs"]``; no rule reads a triple with an undecided side, and no test
+    conditions on a node whose link to either end of the tested pair is undecided. A drawn link
+    that a conditioning set not tested might have separated, one with an end an undecided link
+    joins included, is listed in ``metadata["possibly_separable"]``: a flag of what the data could
+    not check, not a finding that the link is false. A continuous column constant on a test's rows
+    raises ``ValueError``. The categorical, mixed-data, and
+    nonlinear tests delete rows the same way. Test-wise deletion is valid when values are missing
+    completely at random, which means that whether a value is missing depends on no value in the
+    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
+    selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian time series with 30% of the series
     unobserved, of ``max(1000, 12 * (d + 1))`` time steps for ``d`` variables and of five times as
@@ -1728,6 +1747,9 @@ def lpcmci(
         **categorical_metadata(mask, data),
         **rows_metadata(rows),
         **undecided_links(undecided, labels),
+        **possibly_separable_links(
+            rows, result.start_marks != NULL, undecided, labels, constraints
+        ),
     }
     out = with_labels(adapt_lpcmci(result, metadata), labels)
     if constraints is None or constraints.required_paths is None:
@@ -2607,15 +2629,65 @@ def undecided_links(undecided: np.ndarray | None, labels: tuple[str, ...] | None
     without a label by its 0-based position as text, listed as
     :func:`~andrey.core.ci_missing.named_pairs` lists pairs; a lag-0 link appears once.
     """
-    from andrey.temporal.pcmci import design_column_name
-
     if undecided is None or not undecided.any():
         return {}
-    n = undecided.shape[1]
+    return {"undecided_pairs": _named_links(_link_pairs(undecided), undecided.shape[1], labels)}
+
+
+def possibly_separable_links(
+    rows: RowCounts,
+    drawn: np.ndarray,
+    undecided: np.ndarray | None,
+    labels: tuple[str, ...] | None,
+    constraints: LaggedConstraints | None = None,
+) -> dict:
+    """Return ``{"possibly_separable": ...}``, the drawn links a set not tested might separate.
+
+    ``drawn[lag, i, j]`` marks the links drawn. A drawn link is flagged when a query of its ends,
+    the design columns ``lag * n + i`` and ``j``, was not tested in ``rows`` and another was
+    (:meth:`~andrey.core.ci_missing.RowCounts.possibly_separable`), or when an end shares its
+    variable with an end of a link ``undecided[lag, i, j]`` marks: no test conditions on a node an
+    undecided link joins, and a test of the link can shift that node next to its end. A link the
+    ``constraints`` require is never tested, so no set could separate it, and it is not flagged.
+    The links are listed as :func:`undecided_links` lists them; ``{}`` when none is flagged.
+    """
+    if not rows.total_not_tested():
+        return {}
+    n = drawn.shape[1]
+    pairs = _link_pairs(drawn)
+    square = np.zeros((n * drawn.shape[0],) * 2, dtype=bool)
+    for a, b in pairs:
+        square[a, b] = square[b, a] = True
+    flagged = set(rows.possibly_separable(square))
+    if undecided is not None and undecided.any():
+        _, sources, targets = np.nonzero(undecided)
+        joined = set(targets.tolist()) | set(sources.tolist())
+        kept = set() if constraints is None else _link_pairs(constraints.required)
+        flagged |= {(a, b) for a, b in pairs - kept if a % n in joined or b % n in joined}
+    return {"possibly_separable": _named_links(flagged, n, labels)} if flagged else {}
+
+
+def _link_pairs(links: np.ndarray) -> set[tuple[int, int]]:
+    """Return the links ``links[lag, i, j]`` marks as pairs of design columns.
+
+    A link's pair is ``lag * n + i`` and ``j``, the smaller first; a lag-0 link appears once.
+    """
+    n = links.shape[1]
+    lags, sources, targets = np.nonzero(links)
+    causes = (lags * n + sources).tolist()
+    return {(min(a, b), max(a, b)) for a, b in zip(causes, targets.tolist())}
+
+
+def _named_links(
+    pairs: set[tuple[int, int]], n: int, labels: tuple[str, ...] | None
+) -> list[list[str]]:
+    """Return ``pairs`` of design columns over ``n`` variables by name.
+
+    A lagged end is named as :func:`~andrey.temporal.pcmci.design_column_name` names it (``"A at
+    lag 1"``), a column without a label by its 0-based position as text, and the pairs are listed
+    as :func:`~andrey.core.ci_missing.named_pairs` lists them.
+    """
+    from andrey.temporal.pcmci import design_column_name
+
     name = design_column_name(n, str if labels is None else labels.__getitem__)
-    lags, sources, targets = np.nonzero(undecided)
-    pairs = {
-        (lag * n + i, j) for lag, i, j in zip(lags.tolist(), sources.tolist(), targets.tolist())
-    }
-    named = named_pairs(pairs, name)
-    return {"undecided_pairs": [list(pair) for pair in dict.fromkeys(map(tuple, named))]}
+    return [list(pair) for pair in dict.fromkeys(map(tuple, named_pairs(pairs, name)))]

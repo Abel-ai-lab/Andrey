@@ -144,6 +144,7 @@ def cdnod(
     ranked = collider_order == "p_value"
     rule4 = constraints is not None
     workers = backend.worker_count(workers)
+    undecided: set[tuple[int, int]] = set()
     if np.ptp(context) == 0:
         # One domain: no change to detect, and a constant has no correlation to test, so the
         # search runs on ``data`` alone and gives PC's graph.
@@ -164,8 +165,9 @@ def cdnod(
             max_depth=max_depth,
             workers=workers,
             record_pvalues=ranked,
+            undecided=undecided,
         )
-        ambiguous = unseparated_triples(skeleton != NULL, sepsets, constraints)
+        ambiguous = unseparated_triples(skeleton != NULL, sepsets, constraints, undecided)
         if collider_rule != "sepsets":
             test = make_indep_test(
                 indep_test,
@@ -210,8 +212,9 @@ def cdnod(
             max_depth=max_depth,
             workers=workers,
             record_pvalues=ranked,
+            undecided=undecided,
         )
-        ambiguous = unseparated_triples(skeleton != NULL, sepsets, padded)
+        ambiguous = unseparated_triples(skeleton != NULL, sepsets, padded, undecided)
         if _index_edges is not None:
             _index_edges.extend(np.flatnonzero(skeleton[d] != NULL).tolist())
         if collider_rule != "sepsets":

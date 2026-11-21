@@ -522,7 +522,8 @@ def run_phases(
     )
 
     sepsets = {**sepsets, **dummy_sepsets, **system_sepsets}
-    undecided |= (context_undecided | dummy_undecided) & adjacency
+    # A link its own pass left undecided is not carried into the system pass, so it stays undecided.
+    undecided |= context_undecided | dummy_undecided
     mark_undecided(adjacency, p_values, statistics, undecided, untested)
     for (x, j), (statistic, p_value) in recorder.largest.items():
         lag, i = divmod(x, n_nodes)
@@ -538,6 +539,8 @@ def run_phases(
     directions[0] = np.outer(system, ~system)
     orientation = LaggedConstraints(directions | known.forbidden, known.required, known.tier)
     middles = range(a)
+    either_order = undecided.copy()  # a lag-0 link undecided from one end is undecided both ways
+    either_order[0] |= either_order[0].T
     marks, ambiguous = colliders(
         test,
         n_nodes,
@@ -549,6 +552,7 @@ def run_phases(
         orientation,
         max_p_global,
         middles,
+        undecided=either_order,
     )
     orient(marks, adjacency, ambiguous)
 

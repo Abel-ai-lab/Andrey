@@ -20,10 +20,19 @@ names its pull request.
   `metadata["undecided_pairs"]` lists the pairs no tested query could decide, and
   `metadata["never_observed_together"]` the pairs of columns no row observes together; the notice
   for `missing=None` gives the number of each kind of pair, over every fit of a `bootstrap`, and
-  names them when there are at most five. A pair no tested query could decide stays adjacent in PC,
-  FCI, CD-NOD, and FCI-JCI and in the Markov-blanket searches' sets; PCMCI, PCMCI+, and J-PCMCI+
-  condition no test on a lagged parent without a tested result, and LPCMCI none on a node whose
-  link to either end of the tested pair has none. ([#1151], [#1156])
+  names them when there are at most five. An undecided pair is left out of the graph of PC, FCI,
+  CD-NOD, FCI-JCI, PCMCI, PCMCI+, and LPCMCI and of the Markov-blanket searches' sets, and no
+  orientation reads it as adjacent or apart: a triple whose ends are undecided, and in LPCMCI one
+  with an undecided side, is neither a collider nor a non-collider. In PC, FCI, CD-NOD, FCI-JCI,
+  the Markov-blanket searches, PCMCI, PCMCI+, and LPCMCI, `metadata["possibly_separable"]` lists
+  the drawn edges that a conditioning set not tested might have separated, which the notice names
+  too, every edge of its target when a Markov-blanket search leaves an undecided candidate out;
+  `bootstrap` lists the pairs of all three kinds over its fits in its metadata. MVPC's correction
+  removes only the edges its own tests separate. PCMCI, PCMCI+, and
+  J-PCMCI+ condition no test on a lagged parent without a tested result, and LPCMCI none on a node
+  whose link to either end of the tested pair is undecided; PCMCI and PCMCI+ condition each test
+  only on the candidates, strongest first, that keep its rows enough for the test, so its rows do
+  not mix cohorts never observed together. ([#1151], [#1156], [#1167])
 
 - `metadata["p_one_tests"]` counts every test of a fit on data with missing values that returned
   `p = 1`, whichever test it is, as a test whose statistic is exactly zero answers. ([#1102])
@@ -114,6 +123,14 @@ names its pull request.
   so do series with outages, where nearly every pair of columns is observed together in about half
   the rows or more. P-values change in their last digits. Six `ANDREY_TESTWISE_GROUP_*` settings
   set when the path is used. ([#1148])
+- The skeleton search of PC, FCI, CD-NOD, and FCI-JCI with `fisherz`, `student_t`, or
+  `normal_scores` on data with missing values counts a conditioning set that holds a column no row
+  observes with the tested pair as not tested without building its query, as the other tests
+  already did, and FCI's possible-d-sep step does so with every test, both with the same output;
+  the skeleton's warning of a costly pass counts only the sets it builds. On synthetic merged
+  cohorts of 40 and 50 columns, `pc` with `max_depth=None` finishes in about a second, and `fci`
+  in 12 to 58 s at 40 columns, where it ran past 10 minutes before, and 4 to 6 minutes at 50.
+  ([#1167])
 - The Markov-blanket searches count a conditioning set that holds a column no row observes with the
   tested pair, or with a collider's middle variable, as not tested without building its query. On
   synthetic merged cohorts of 50 columns with 134 pairs never observed together, `iamb` finished in
@@ -2906,6 +2923,7 @@ First alpha release.
 [#1148]: https://github.com/Abel-ai-lab/Andrey/pull/1148
 [#1151]: https://github.com/Abel-ai-lab/Andrey/pull/1151
 [#1156]: https://github.com/Abel-ai-lab/Andrey/pull/1156
+[#1167]: https://github.com/Abel-ai-lab/Andrey/pull/1167
 [#1129]: https://github.com/Abel-ai-lab/Andrey/pull/1129
 [#1094]: https://github.com/Abel-ai-lab/Andrey/pull/1094
 [#1095]: https://github.com/Abel-ai-lab/Andrey/pull/1095
