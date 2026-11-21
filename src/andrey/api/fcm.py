@@ -645,17 +645,17 @@ def cpcm_graph(
     graph, and no other method measured beside it was both more accurate and faster; the `0.19.0
     release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm-graph-search>`_ has the
     numbers. Graphs of 10 variables, which the paper also claims, were not measured. On the measured
-    graphs :func:`~andrey.pc` with ``indep_test="kci"`` was close in accuracy and faster. The exact
-    search scores every DAG and runs up to 4 variables; above, the greedy search refits a variable
-    for each parent set it tries. Each test builds matrices with one row and one column per sample,
-    and every distinct residual's matrix is kept for the fit, so memory grows with the square of
-    ``n_samples``. Under the count families the rank-10 spline must follow the mean to within the
-    counts' own noise, which it does for means up to a few hundred: from means of a few thousand
-    that vary strongly with the parents, the true graph's test rejects too. The family must be
-    chosen: the paper's choice of a family from each column's support, and its sequential choice
-    between one- and two-parameter families, are not offered. The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    graphs :func:`~andrey.pc` with ``indep_test="kci"`` was close in accuracy, and faster at 4, 6,
+    and 8 variables. The exact search scores every DAG and runs up to 4 variables; above, the greedy
+    search refits a variable for each parent set it tries. Each test builds matrices with one row
+    and one column per sample, and every distinct residual's matrix is kept for the fit, so memory
+    grows with the square of ``n_samples``. Under the count families the rank-10 spline must follow
+    the mean to within the counts' own noise, which it does for means up to a few hundred: from
+    means of a few thousand that vary strongly with the parents, the true graph's test rejects too.
+    The family must be chosen: the paper's choice of a family from each column's support, and its
+    sequential choice between one- and two-parameter families, are not offered. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------

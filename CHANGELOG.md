@@ -106,11 +106,11 @@ names its pull request.
   datasets. ([#1161])
 - `cpcm` and `cpcm_graph` are supported. On the pairs of their paper (its Tables 1 and 2 and model
   (16)) and its graphs of 4 to 8 variables, they made as many errors as the code published with the
-  paper and fewer than a coin flip, the majority direction, or the empty graph, and no other method
-  measured beside them was both more accurate and faster; the graph search ran about ten times
-  faster. Their Limitations state the gaps: the support rule's family on location-scale pairs, and
-  under `"pareto"` a test that can reject on causes with extreme values. The
-  [0.19.0 release card][card-0190-cpcm] has the numbers. ([#1169])
+  paper and fewer than a coin flip, the majority direction, or the empty graph, and on the first
+  seeds no other method measured beside them was both more accurate and faster; the graph search ran
+  about ten times faster. Their Limitations state the gaps: the support rule's family on
+  location-scale pairs, and under `"pareto"` a test that can reject on causes with extreme values.
+  The [0.19.0 release card][card-0190-cpcm] has the numbers. ([#1169])
 - With `fisherz` and `student_t` on data with missing values, test-wise deletion groups the rows by
   their missingness patterns once and computes a test's sums from the groups' tables, removing the
   scattered missing cells exactly, when that costs less than summing every row; a query whose
