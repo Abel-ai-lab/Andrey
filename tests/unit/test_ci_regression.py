@@ -222,6 +222,49 @@ def test_early_stopping_keeps_ten_rounds_past_the_best():
     assert np.array_equal(cr._early_stopped(curve[:12]), curve[:12])
 
 
+def test_mean_cv_error_equals_the_staged_curves(monkeypatch):
+    """The folds grown together in steps give the error and rounds of each fold's full staged
+    curve, averaged over the folds and stopped 10 rounds after its best."""
+    monkeypatch.setattr(cr, "_MEAN_CV_ROUNDS", 60)
+    rng = np.random.default_rng(0)
+    z = rng.standard_normal((60, 2))
+    target = np.sin(2 * z[:, 0]) + 0.3 * rng.standard_normal(60)
+    folds = (np.arange(60) % 10)[rng.permutation(60)]
+    for rate, depth in [(0.5, 3), (0.1, 1)]:  # stops early; runs to the last round
+        curves = []
+        for fold in range(10):
+            held = folds == fold
+            model = cr._boosting(depth, 60, rate).fit(z[~held], target[~held])
+            curves.append(
+                [np.sqrt(np.mean((target[held] - p) ** 2)) for p in model.staged_predict(z[held])]
+            )
+        mean = cr._early_stopped(np.mean(curves, axis=0))
+        best = int(np.argmin(mean))
+        assert cr._mean_cv_error(z, target, folds, rate, depth) == (mean[best], best + 1)
+
+
+def _linear_null(n: int, seed: int) -> np.ndarray:
+    """The wGCM paper's one-dimensional null at its linear grid point: ``x`` and ``y`` are
+    ``0.3 z`` plus independent noise of scale 0.3."""
+    rng = np.random.default_rng(seed)
+    z = rng.standard_normal(n)
+    return np.column_stack(
+        [0.3 * z + 0.3 * rng.standard_normal(n), 0.3 * z + 0.3 * rng.standard_normal(n), z]
+    )
+
+
+@pytest.mark.parametrize("variant", ["est", "fix"])
+def test_wgcm_holds_its_level_on_a_null_design(variant):
+    """Of 1,000 draws of a true independence, the share rejected at 0.05 stays within three
+    binomial standard deviations of 5% (29 to 71), with regressions that fit the design."""
+    rejected = sum(
+        cr.WGCM(_linear_null(200, seed), variant=variant, regression="linear", seed=seed)(0, 1, [2])
+        <= 0.05
+        for seed in range(1000)
+    )
+    assert 29 <= rejected <= 71
+
+
 def test_wgcm_est_weights_by_the_fit(monkeypatch):
     weights = []
     answer = cr._estimated_answer

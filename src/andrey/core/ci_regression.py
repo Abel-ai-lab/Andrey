@@ -6,7 +6,7 @@ regressions leave. The tests follow the :class:`~andrey.core.ci.CITest` protocol
 the data and called as ``test(x, y, condition_set)``, returning a p-value where a larger value means
 more independent.
 
-The three share one data layout and one set of regressions. Each column is standardized, rounded
+The three share one data layout and one regression layer. Each column is standardized, rounded
 to 9 decimal places, and given the sign its sorted values fix, so the values the fits read do not
 change with the units or the sign of a column. Each fit reads only the columns it uses: their
 :func:`~andrey.core.ties.tie_ranks` order within that block gives the order of the features, and
@@ -22,6 +22,7 @@ import math
 from collections.abc import Callable, Iterable
 
 import numpy as np
+import sklearn
 from scipy.optimize import brentq
 from scipy.special import ndtr
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
@@ -45,6 +46,13 @@ _BOOST_DEPTHS = (1, 3, 4, 5, 6)
 _BOOST_ROUNDS = 50
 _BOOST_FOLDS = 10
 _BOOST_PATIENCE = 10
+# Boosted trees as the wGCM authors' current code: 10-fold cross-validation over the learning rates
+# 0.1, 0.2, 0.3, 0.5 and the depths 1 to 7, up to 500 rounds, the folds' mean error stopped 10
+# rounds after its best. Every grid point uses the same folds, where the authors' code draws new
+# folds for each.
+_MEAN_CV_RATES = (0.1, 0.2, 0.3, 0.5)
+_MEAN_CV_DEPTHS = (1, 2, 3, 4, 5, 6, 7)
+_MEAN_CV_ROUNDS = 500
 # A random forest as the PCM authors': 500 trees, every predictor tried at each split, and nodes of
 # 5 rows or fewer left unsplit. A node's size counts the distinct rows in it, where the authors'
 # forest counts a row its bootstrap draws twice as two.
@@ -78,14 +86,17 @@ def _early_stopped(curve: np.ndarray) -> np.ndarray:
     return curve
 
 
-def _boosting(depth: int, rounds: int) -> GradientBoostingRegressor:
-    """Boosted regression trees of ``depth`` over ``rounds`` rounds."""
+def _boosting(
+    depth: int, rounds: int, rate: float = _BOOST_RATE, *, warm_start: bool = False
+) -> GradientBoostingRegressor:
+    """Boosted regression trees of ``depth`` over ``rounds`` rounds at learning rate ``rate``."""
     return GradientBoostingRegressor(
-        learning_rate=_BOOST_RATE,
+        learning_rate=rate,
         n_estimators=rounds,
         max_depth=depth,
         min_samples_leaf=1,
         random_state=0,  # orders the candidate features at each split; the columns are canonical
+        warm_start=warm_start,
     )
 
 
@@ -107,6 +118,60 @@ def _fit_boosting(features: np.ndarray, target: np.ndarray, folds: np.ndarray) -
     # The first minimum over the depths in turn, each over its rounds.
     j, rounds = divmod(int(np.argmin(error.T)), _BOOST_ROUNDS)
     return _boosting(_BOOST_DEPTHS[j], rounds + 1).fit(features, target).predict
+
+
+def _mean_cv_error(
+    features: np.ndarray, target: np.ndarray, folds: np.ndarray, rate: float, depth: int
+) -> tuple[float, int]:
+    """The least mean cross-validated error of boosted trees at ``rate`` and ``depth``, and the
+    number of rounds that first reaches it.
+
+    The folds' models grow together, and the rounds stop once ``_BOOST_PATIENCE`` rounds in a row
+    have not lowered the best mean error, or at ``_MEAN_CV_ROUNDS``.
+    """
+    n_folds = int(folds.max()) + 1
+    held = [folds == fold for fold in range(n_folds)]
+    # The trees read their features as float32, which staged prediction converts them to.
+    held_features = [np.ascontiguousarray(features[h], dtype=np.float32) for h in held]
+    models = [_boosting(depth, 1, rate, warm_start=True) for _ in held]
+    predictions = [np.empty(0)] * n_folds
+    best_error, best, grown = np.inf, 0, 0
+    # The inputs are checked once here, not at each of the many small fits.
+    with sklearn.config_context(assume_finite=True, skip_parameter_validation=True):
+        while grown < _MEAN_CV_ROUNDS:
+            stop = min(grown + _BOOST_PATIENCE, _MEAN_CV_ROUNDS)
+            errors = np.empty((n_folds, stop - grown))
+            for k, (model, h) in enumerate(zip(models, held, strict=True)):
+                model.set_params(n_estimators=stop).fit(features[~h], target[~h])
+                if grown == 0:
+                    predictions[k] = model.init_.predict(features[h])
+                for r in range(grown, stop):
+                    # A round adds its tree's prediction times the rate, as staged prediction does.
+                    tree = model.estimators_[r, 0]
+                    predictions[k] = predictions[k] + rate * tree.predict(
+                        held_features[k], check_input=False
+                    )
+                    errors[k, r - grown] = np.sqrt(np.mean((target[h] - predictions[k]) ** 2))
+            for r, error in enumerate(errors.mean(axis=0), start=grown):
+                if error < best_error:
+                    best_error, best = float(error), r
+                elif r - best >= _BOOST_PATIENCE:
+                    return best_error, best + 1
+            grown = stop
+    return best_error, best + 1
+
+
+def _fit_boosting_mean_cv(features: np.ndarray, target: np.ndarray, folds: np.ndarray) -> Predictor:
+    """Boosted trees whose learning rate, depth, and number of rounds minimize the folds' mean
+    cross-validated error; of equal errors, the first in the order of the depths, then the rates."""
+    best = (np.inf, _MEAN_CV_RATES[0], _MEAN_CV_DEPTHS[0], 1)
+    for depth in _MEAN_CV_DEPTHS:
+        for rate in _MEAN_CV_RATES:
+            error, rounds = _mean_cv_error(features, target, folds, rate, depth)
+            if error < best[0]:
+                best = (error, rate, depth, rounds)
+    _, rate, depth, rounds = best
+    return _boosting(depth, rounds, rate).fit(features, target).predict
 
 
 def _fit_forest(features: np.ndarray, target: np.ndarray, seed: int) -> Predictor:
@@ -157,6 +222,8 @@ class _RegressionTest:
     """The data layout and the regressions the three tests share."""
 
     pin_blas = True  # read by pins_blas: the skeleton scans run it on one BLAS thread
+    #: How ``"boosting"`` tunes its trees: the GCM authors' cross-validation.
+    _fit_boosting = staticmethod(_fit_boosting)
 
     @staticmethod
     def least_rows(size: int, **options: object) -> int:
@@ -246,7 +313,7 @@ class _RegressionTest:
             return _fit_forest(features, target, self._seed % 2**32)
         n_folds = min(_BOOST_FOLDS, m)
         perm = np.random.default_rng([self._seed, m]).permutation(m)
-        return _fit_boosting(features, target, (np.arange(m) % n_folds)[perm])
+        return self._fit_boosting(features, target, (np.arange(m) % n_folds)[perm])
 
     def _residual(self, target: np.ndarray, features: np.ndarray) -> np.ndarray:
         """``target`` minus its in-sample regression on ``features``."""
@@ -333,8 +400,10 @@ class GCM(_RegressionTest):
     level depends on the regressions: a conditional mean the method cannot learn, such as a function
     of several variables of ``z`` jointly under ``"linear"``, leaves a covariance in the residuals
     and reads as dependence. At a few hundred rows, where the conditional means are hard to learn,
-    the test can reject a true independence more often than its level, as the weighted GCM's
-    paper reports for it at 100 and 200 rows [2]_. With an empty conditioning set the test is a
+    the test rejects a true independence more often than its level, as the weighted GCM's paper
+    reports for it at 100 and 200 rows [2]_: with ``"boosting"``, on the null designs of [1]_ and
+    [2]_ at 200 and 400 rows, it rejected about 6 to 6.6% of them at 0.05, and the authors' code
+    about 5.7%. With an empty conditioning set the test is a
     test of correlation: a dependence without one, such as ``y = x**2`` for a symmetric ``x``, goes
     unseen.
 
@@ -388,8 +457,12 @@ class WGCM(_RegressionTest):
         ``"fix"`` tests a fixed set of weight functions on every row and takes the largest
         statistic.
     regression : {"boosting", "forest", "linear"}, default="boosting"
-        The regression of each variable, and of the products of residuals, on the conditioning set,
-        as for :class:`~andrey.core.ci_regression.GCM`.
+        The regression of each variable, and of the products of residuals, on the conditioning set.
+        ``"boosting"`` is boosted regression trees whose learning rate (0.1, 0.2, 0.3, or 0.5),
+        depth (1 to 7), and number of rounds (up to 500) minimize the 10-fold cross-validated error
+        averaged over the folds, stopped 10 rounds after its best, the wGCM authors' current
+        default; the trees' leaf values carry no penalty, where the authors' boosting shrinks them.
+        ``"forest"`` and ``"linear"`` are as for :class:`~andrey.core.ci_regression.GCM`.
     seed : int or None, default=None
         Seed for the sample split of ``"est"``, the multiplier draws of ``"fix"``, the
         cross-validation folds of ``"boosting"``, and the trees of ``"forest"``. ``None`` uses
@@ -431,11 +504,18 @@ class WGCM(_RegressionTest):
 
     **Limitations.** Not benchmarked yet. The tests run it on up to 4 variables and 400 rows.
     ``"est"`` tests on 70% of the rows, and its p-value changes with the seed. A ``"boosting"``
-    regression fits 51 boosted models; ``"est"`` fits five per query, its split being the query's
-    own. ``"fix"`` uses 7 weights per conditioning variable, so with many conditioning variables
-    the maximum spreads its power thin. At a few hundred rows, where the conditional means are hard
-    to learn, both variants can reject a true independence more often than their level [1]_; with
-    ``"boosting"`` they did at 400 rows on the paper's one-dimensional design.
+    regression fits 281 boosted models, 28 settings on 10 folds and the chosen one on every row;
+    ``"est"`` fits five per query, its split being the query's own. ``"fix"`` uses 7 weights per
+    conditioning variable, so with many conditioning variables the maximum spreads its power thin.
+    At a few hundred rows, where the conditional means are hard to learn, neither variant holds its
+    level: with ``"boosting"``, ``"est"`` rejected a true independence at 0.05 in about 6.8% of
+    draws on the paper's null designs at 200 and 400 rows [1]_, and 6.6% over those and further
+    null designs of [1]_ and [2]_; ``"fix"`` in about 6 to 6.4%. The authors' released code misses
+    the level too: its current release's ``"est"`` rejected 6.0% and 6.6% of such draws, and the
+    release the paper ran 6.8% and 7.8%. The GCM's tuning of the boosted trees, in place of the
+    authors' current one, makes queries three to four times faster and gives about 5 points more
+    power on the paper's alternatives, but ``"est"`` then rejects 8.3% of the null draws where this
+    tuning rejects 6.6%.
 
     References
     ----------
@@ -452,6 +532,9 @@ class WGCM(_RegressionTest):
         """The fewest rows a query given ``size`` conditioning variables is tested on: ``17`` for
         ``variant="est"``, whose 30% part then holds the 6 rows a forest splits, else ``4``."""
         return 17 if variant == "est" else 4
+
+    #: How ``"boosting"`` tunes its trees: the wGCM authors' cross-validation.
+    _fit_boosting = staticmethod(_fit_boosting_mean_cv)
 
     def __init__(
         self,

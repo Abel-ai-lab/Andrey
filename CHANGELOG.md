@@ -83,11 +83,15 @@ names its pull request.
   covariance by its fitted value given the conditioning set (`variant="fix"` takes fixed
   weights); and `"pcm"`, the projected covariance measure (Lundborg, Kim, Shah, and Samworth
   2024), which tests whether one variable improves a random-forest prediction of the other. Each
-  takes `regression="boosting"`, `"forest"`, or `"linear"`. Each fit and each sample split reads
-  only the query's columns, standardized, rounded, and signed, with the rows in an order of their
-  values, so a p-value depends on neither the row nor the column order, nor on columns outside the
-  query, and changes with a column's units or sign only where the rounding moves a value or a
-  column is symmetric about its mean once sorted. On data with missing values, a query with fewer
+  takes `regression="boosting"`, `"forest"`, or `"linear"`; `"wgcm"`'s boosted trees are tuned as
+  in the wGCM authors' current code, over 28 pairs of learning rate and depth by the folds' mean
+  cross-validated error. With boosted trees at 200 and 400 rows, on the papers' null designs,
+  `"gcm"` and `"wgcm"` reject a true independence at 0.05 in about 6 to 6.8% of draws, as the
+  authors' code does too. Each fit and each sample split reads only the query's columns,
+  standardized, rounded, and signed, with the rows in an order of their values, so a p-value
+  depends on neither the row nor the column order, nor on columns outside the query, and changes
+  with a column's units or sign only where the rounding moves a value or a column is symmetric
+  about its mean once sorted. On data with missing values, a query with fewer
   rows than its test needs, 4 for `"gcm"` and for `"wgcm"` with `variant="fix"`, 17 for `"wgcm"`'s
   default `variant="est"`, and 12 for `"pcm"`, is not tested. Where the papers and the authors'
   code differ, each choice was measured against the other in reduced versions of the papers'
