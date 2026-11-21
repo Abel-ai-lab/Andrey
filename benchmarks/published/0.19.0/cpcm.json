@@ -31,7 +31,7 @@
   "cores_per_fit": 1,
   "blas_threads": 1
  },
- "verdict_rule": "per cell (setup, family arm, size): D = error(Andrey) - error(reference) per dataset, on the datasets both fitted (pairs: 1 for the reversed forced direction; graphs: SHD, and the authors' SID beside it, a graph worse on either being worse); worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise; 10,000 resamples, default_rng(0). Pairs: 100 per cell, graphs: 20. A row worse on its first seeds was rerun on fresh seeds, and holds that rerun as replication; every other pair row with fresh seeds holds them as fresh. Fresh graph rows have no reference arm: Andrey's errors and floors only. result is the published verdict, better or worse only where the fresh seeds agree, a tie otherwise. The floor field is Andrey's and the reference's error minus the empty answer's; the lane file also gives the floor of the better of the coin flip and the cell's majority direction (pairs) or the empty and the base-rate graph (graphs). Rows of Table 1's misspecified families, the other family arm on LS, LS-s and MN-U, Table 2's PARg (out_of_claim gives the reason), and the edge penalty 1 are out of claim, reported",
+ "verdict_rule": "per cell (setup, family arm, size): D = error(Andrey) - error(reference) per dataset, on the datasets both fitted (pairs: 1 for the reversed forced direction; graphs: SHD, and the authors' SID beside it, a graph worse on either being worse); worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise; 10,000 resamples, default_rng(0). Pairs: 100 per cell, graphs: 20. A row worse on its first seeds was rerun on fresh seeds, and holds that rerun as replication; every other pair row with fresh seeds holds them as fresh. Fresh graph rows have no reference arm: Andrey's errors and floors only. result is the published verdict, better or worse only where the fresh seeds agree, a tie otherwise. The floor field is Andrey's and the reference's error minus the empty answer's; the lane file also gives the floor of the better of the coin flip and the cell's majority direction (pairs) or the empty and the base-rate graph (graphs). Rows of Table 1's misspecified families, the other family arm on LS, LS-s and MN-U, Table 2's PARg and model (16) at 500 rows (out_of_claim gives the reason), and the edge penalty 1 are out of claim, reported",
  "seeds_note": "pairs: first seeds 0-99, fresh seeds 100-199; Table 2: the first seeds are the 100 pairs of each of the five Tagasovska et al. (2020) files the paper takes them from, and the fresh seeds 100 pairs drawn by those files' generator, unmodified, under another seed. That generator at the published commit reproduces the MN-U file exactly and the AN file's causes and directions, but not the AN-s, LS and LS-s files, which match the fresh draws on summary statistics only (the cause's and the effect's spread, kurtosis). POISg and PARg have no published data and were drawn as the paper's Appendix B.3 describes them, under the pair seeds 0-99 and 100-199: the cause N(0, sqrt 2) (standard deviation sqrt 2), theta(x) = f(x) - min f + 0.5 with f a zero-mean Gaussian process with a squared-exponential kernel, sigma 1 and length 0.2, on a grid spanning the cause, and the effect Poisson with mean theta or Pareto of scale 1 and shape theta, the pair's order swapped on a coin. Both sets were also drawn by the authors' own generator (CPCM_generative_model in Simulations/Simulations2/Data generators.R, commit 2ada90e, sourced unmodified with EnvStats 3.1.0, 100 pairs of 1,000 rows per set under set.seed(0), the seed of the authors' simulation script, for the first seeds and set.seed(2026) for the fresh seeds), the pair's order swapped on a coin drawn outside R's stream; that generator differs from the description in three ways: it reads theta from a grid of 201 points that starts at 0, so theta is a step function, constant for causes below 0, and it draws the Pareto effect with EnvStats' rpareto(1, theta, 1), whose arguments are the location and the shape, which gives scale theta and shape 1. Its tables are not the authors' own draws, since their script runs the methods between draws; graphs: first seeds 0-19, fresh seeds 20-39",
  "fit_protocol": "each fit in a long-lived worker on one core with one BLAS thread, one timed fit, a cap of 1,800 s per fit (3,600 s for the reference at 8 variables); no fit timed out; the reference's errors are counted and never scored, and each cell is paired on the datasets both finished; times are wall seconds of the fit inside the worker",
  "regimes": {
@@ -45,7 +45,7 @@
   "cpcm_table1_gaussian_fixed_scale": "the CPCM paper's Table 1 pairs: X1 ~ N(2, 1) on x > 0, X2 given X1 exponential with rate theta(X1), 1,000 rows, fitted with the gaussian_fixed_scale family",
   "cpcm_table2": "the CPCM paper's Table 2 pairs, 1,000 rows: the five synthetic sets of Tagasovska et al. (2020) and the paper's Poisson and Pareto setups, each drawn as its Appendix B.3 describes and by the authors' generator, with the family the paper's rule picks from each column's support, or the Gaussian location-scale family on the location-scale and multiplicative sets",
   "cpcm_table2_other_arm": "the CPCM paper's Table 2 pairs, each fitted with the other family arm: the fixed-scale Gaussian family given on AN and AN-s, the support rule's family on LS, LS-s and MN-U",
-  "cpcm_pareto16": "the CPCM paper's model (16): X2 given X1 Pareto with theta(x) = x^gamma log x + 1, gamma 1 or 2, 500 to 2,000 rows",
+  "cpcm_pareto16": "the CPCM paper's model (16): X2 given X1 Pareto with theta(x) = x^gamma log x + 1, gamma 1 or 2, judged at 1,000 and 2,000 rows, 500 rows reported",
   "cpcm_graph_paper": "the CPCM paper's Section 6.4 graphs: random DAGs of 5 variables, 1,000 rows, linear, additive-noise, exponential CPCM, and mixed exponential and Gaussian CPCM variables, with the families the paper's rule picks from each column's support",
   "cpcm_graph_paper_lambda1": "as cpcm_graph_paper, with an edge penalty of 1, the default of the authors' scripts",
   "cpcm_graph_greedy": "the CPCM paper's Appendix B.1.1 graphs: exponential CPCM variables on random DAGs of 4, 6 and 8 variables, 1,000 rows, the families from the support rule"
@@ -5833,7 +5833,8 @@
        ]
       }
      },
-     "claim": "in",
+     "out_of_claim": "model (16) is judged at 1,000 and 2,000 rows, as fixed before the runs; 500 rows is reported, not judged",
+     "claim": "out",
      "first_seeds": "0-99",
      "seeds": 100,
      "fresh": {
@@ -5905,7 +5906,7 @@
      },
      "replicated": "tie, fresh seeds tie",
      "result": "tie",
-     "card_verdict": "tie"
+     "card_verdict": null
     },
     {
      "cell": "CPCM|pareto16|gamma=1|n=1000",
@@ -6274,7 +6275,8 @@
        ]
       }
      },
-     "claim": "in",
+     "out_of_claim": "model (16) is judged at 1,000 and 2,000 rows, as fixed before the runs; 500 rows is reported, not judged",
+     "claim": "out",
      "first_seeds": "0-99",
      "seeds": 100,
      "fresh": {
@@ -6346,7 +6348,7 @@
      },
      "replicated": "tie, fresh seeds tie",
      "result": "tie",
-     "card_verdict": "tie"
+     "card_verdict": null
     },
     {
      "cell": "CPCM|pareto16|gamma=2|n=1000",
