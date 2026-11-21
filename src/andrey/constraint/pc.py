@@ -538,13 +538,14 @@ def adjacency_search(
     ``warn_expensive`` emits a :class:`~andrey.PerformanceWarning` before each conditioning-size
     pass requiring at least ten million CI tests. The search still evaluates every conditioning set.
 
-    A pair still adjacent after the last size with no query tested, only queries without the rows
-    their test needs (:meth:`~andrey.core.ci_missing.RowCounts.untested`), as a pair never observed
-    together, is undecided: it leaves the skeleton without a separating set, before the pairs of
-    ``apart`` are searched, and the ``undecided`` sink receives it as ``(x, y)``, ``x < y``. A
-    triple over it is neither a collider nor a non-collider
-    (:func:`~andrey.constraint._skeleton.unseparated_triples`). Data without missing values have
-    none.
+    With the ``undecided`` sink, a pair still adjacent after the last size with no query tested,
+    only queries without the rows their test needs
+    (:meth:`~andrey.core.ci_missing.RowCounts.untested`), as a pair never observed together, is
+    undecided: it leaves the skeleton without a separating set, before the pairs of ``apart`` are
+    searched, and the sink receives it as ``(x, y)``, ``x < y``. A triple over it is neither a
+    collider nor a non-collider (:func:`~andrey.constraint._skeleton.unseparated_triples`). Without
+    the sink, as in a search that refines a skeleton an earlier search decided, every pair no test
+    removed stays. Data without missing values have no undecided pair.
 
     The ``trace`` sink records every test in the order it runs: ``step="test"``, ``depth``, the
     pair ``x < y``, the conditioning set ``S``, the p-value ``p`` (for CMIknn, which stops its
@@ -623,11 +624,10 @@ def adjacency_search(
                     pvalues[(x, y)] = p
             size += 1
 
-    for x, y in counted.untested():
+    for x, y in counted.untested() if undecided is not None else ():
         if x < n_vars and y < n_vars and support[x, y]:
             support[x, y] = support[y, x] = False
-            if undecided is not None:
-                undecided.add((x, y))
+            undecided.add((x, y))
     if apart is not None:
         for x, y, separating, p in separate_apart(
             test,

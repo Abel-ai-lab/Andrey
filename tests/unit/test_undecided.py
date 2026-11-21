@@ -257,6 +257,39 @@ def test_uncapped_pc_finishes_on_merged_cohorts_and_leaves_out_every_pair_never_
     assert not _skeleton(out) & never
 
 
+def _shared_rows_cohorts(seed: int = 100, n: int = 2000) -> pd.DataFrame:
+    """X0 -> X1, X0 -> X2, X1 -> X2, and X3 apart, whose sign picks the cohort: X2 is missing where
+    X3 > 0, and X0 or X1, each on half of the other rows; three rows observe every column, so every
+    pair shares rows."""
+    rng = np.random.default_rng([seed, 11])
+    x0 = rng.standard_normal(n)
+    x1 = 0.8 * x0 + 0.6 * rng.standard_normal(n)
+    x2 = 0.6 * x0 + 0.6 * x1 + 0.6 * rng.standard_normal(n)
+    x3 = rng.standard_normal(n)
+    observed = np.ones((n, 4), dtype=bool)
+    upper = x3 > 0
+    observed[upper, 2] = False
+    half = rng.random(n) < 0.5
+    observed[~upper & half, 1] = False
+    observed[~upper & ~half, 0] = False
+    observed[rng.choice(n, 3, replace=False)] = True
+    data = np.where(observed, np.column_stack([x0, x1, x2, x3]), np.nan)
+    return pd.DataFrame(data, columns=["X0", "X1", "X2", "X3"])
+
+
+def test_mvpc_keeps_the_edges_its_first_search_decided():
+    # The correction's queries fall back to deletion tests without rows: they decide nothing.
+    df = _shared_rows_cohorts()
+    first = andrey.pc(df)
+    out = andrey.pc(df, missing="mvpc")
+    corrected = out.metadata["corrected_edges"]
+    truth = {("X0", "X1"), ("X0", "X2"), ("X1", "X2")}
+    assert _skeleton(first) == truth and not out.metadata["undecided_pairs"]
+    assert corrected["uncorrected"]
+    assert corrected["removed"] == []
+    assert _skeleton(out) == truth
+
+
 def test_complete_data_have_no_undecided_pair_and_no_flag():
     df = _hand("fork").fillna(0.0)
     complete = pd.DataFrame(np.random.default_rng(1).normal(size=(500, 3)), columns=df.columns)
