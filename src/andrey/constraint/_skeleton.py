@@ -413,7 +413,7 @@ def first_order_removals(
     one stack however many pairs and conditioners it tests. With ``trace`` given, every test is
     recorded, pair by pair.
     """
-    queries = _first_order_queries(pairs, neighbors)
+    queries = _first_order_queries(pairs, neighbors, test if trace is None else None)
     canonical = _canonical_route(test)
     tested = (
         _stacked_first_order(canonical, queries)
@@ -436,12 +436,17 @@ def first_order_removals(
 
 
 def _first_order_queries(
-    pairs: list[tuple[int, int]], neighbors: list[np.ndarray]
+    pairs: list[tuple[int, int]], neighbors: list[np.ndarray], test: CITest | None = None
 ) -> Iterator[tuple[int, int, list[int]]]:
     """Yield ``(x, y, candidates)`` for each of ``pairs`` with a candidate, in order: the
-    ascending conditioners of :func:`first_order_removals`."""
+    ascending conditioners of :func:`first_order_removals`. With ``test``, a candidate no row
+    observes together with ``x`` or ``y`` is left out and counted as not tested
+    (:func:`kept_apart`)."""
     for x, y in pairs:
         candidates = sorted((set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y})
+        if test is not None and candidates:
+            kept, _ = kept_apart(test, (x, y), [(candidates, None)], 1)
+            candidates = [] if kept is None else kept[0][0]
         if candidates:
             yield x, y, candidates
 
@@ -492,7 +497,8 @@ def scan_pairs(
     """
     stacked = _stacked_route(test)
     if stacked is not None:
-        return stacked_scan(stacked, pairs, neighbors, size, alpha, trace, record_pvalues)
+        apart = test if trace is None else None
+        return stacked_scan(stacked, pairs, neighbors, size, alpha, trace, record_pvalues, apart)
     removals: list[Removal] = []
     for x, y in pairs:
         separating: set[int] = set()
@@ -531,16 +537,20 @@ def stacked_scan(
     alpha: float,
     trace: list[dict] | None,
     record_pvalues: bool,
+    test: CITest | None = None,
 ) -> list[Removal]:
     """:func:`scan_pairs` for a test whose ``pvalues`` take canonical query arrays.
 
     Each chunk is the one :func:`scan_conditioning_sets` evaluates in one call, in the per-pair
     order (:func:`_pair_chunks`); :func:`_stacks` evaluates consecutive chunks together. Every
     p-value is the one its chunk gets alone, and the chunks are read back in order, so the
-    separating sets, the largest p-values, and the trace are those of the per-pair scan.
+    separating sets, the largest p-values, and the trace are those of the per-pair scan. With
+    ``test``, the one ``pvalues`` belongs to, a set holding a candidate no row observes together
+    with the pair is counted as not tested without being asked (:func:`kept_apart`), as
+    :func:`scan_conditioning_sets` counts it.
     """
     separated: dict[int, tuple[set[int], list[float]]] = {}
-    for stack, values in _stacks(pvalues, size, _pair_chunks(pairs, neighbors, size)):
+    for stack, values in _stacks(pvalues, size, _pair_chunks(pairs, neighbors, size, test)):
         bounds = np.cumsum([0, *(len(chunk) for _, _, _, chunk in stack)]).tolist()
         passing = values > alpha
         if trace is not None:
@@ -561,13 +571,22 @@ def stacked_scan(
 
 
 def _pair_chunks(
-    pairs: list[tuple[int, int]], neighbors: list[np.ndarray], size: int
+    pairs: list[tuple[int, int]],
+    neighbors: list[np.ndarray],
+    size: int,
+    test: CITest | None = None,
 ) -> Iterator[_Chunk]:
     """Yield ``(i, x, y, chunk)``, ``x < y``, for each chunk of subsets the per-pair scan of
-    :func:`scan_pairs` evaluates in one call, in its order; ``i`` is the pair's position."""
+    :func:`scan_pairs` evaluates in one call, in its order; ``i`` is the pair's position. With
+    ``test``, each side leaves out the candidates :func:`kept_apart` drops."""
     for i, (a, b) in enumerate(pairs):
         x, y = min(a, b), max(a, b)
-        for _, _, candidates, seen in _sides(neighbors, a, b, size):
+        for side_a, side_b, candidates, seen in _sides(neighbors, a, b, size):
+            if test is not None:
+                kept, _ = kept_apart(test, (side_a, side_b), [(candidates, seen)], size)
+                if kept is None:
+                    continue
+                [(candidates, seen)] = kept
             for chunk in subset_rows(candidates, size, seen):
                 yield i, x, y, chunk
 
