@@ -623,7 +623,8 @@ def _first_separating(
                 test, x, y, kept, adj_a, adj_b, alpha, max_depth, tested, pool
             )
             within = (adj_a, adj_b, tested)
-            test.count_not_tested(x, y, _left_out(dsep, kept, within, max_depth, found))
+            dropped = [[v] for v in dsep if not met[v]]
+            test.count_not_tested(x, y, _left_out(dsep, kept, within, max_depth, found), dropped)
             return found
     sizes = range(1, _largest_size(len(dsep), max_depth) + 1)
     if canonical_capable(test) and len(dsep) <= MASK_BITS:

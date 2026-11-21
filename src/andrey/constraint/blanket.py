@@ -255,27 +255,34 @@ def markov_blanket(
     if sepsets is not None:
         for x in blanket:
             sepsets.pop(x, None)
-    undecided = any(x != target and x not in decided and x not in blanket for x in range(d))
+    undecided = [x for x in range(d) if x != target and x not in decided and x not in blanket]
     if constraints is not None:
         support = constraints.support()[target]
         blanket = [x for x in blanket if support[x]]
     if undecided:
-        _count_beside_undecided(test, target, blanket, required, max_depth)
+        _count_beside_undecided(test, target, blanket, required, max_depth, undecided)
     return blanket
 
 
 def _count_beside_undecided(
-    test: CITest, target: int, members: list[int], required: Sequence[int], max_depth: int | None
+    test: CITest,
+    target: int,
+    members: list[int],
+    required: Sequence[int],
+    max_depth: int | None,
+    undecided: list[int],
 ) -> None:
     """Count, for each of ``members`` outside ``required``, one conditioning set of it and
-    ``target`` as not tested when a search leaves an undecided candidate out: the set holding that
-    candidate, which no test asked and which might separate the member from ``target``. A required
-    member is never tested, and with ``max_depth`` 0 no set is asked, so neither counts one."""
+    ``target`` as not tested when a search leaves the ``undecided`` candidates out: a set holding
+    one of them, which no test asked and which might separate the member from ``target``. A
+    required member is never tested, and with ``max_depth`` 0 no set is asked, so neither counts
+    one."""
     if max_depth == 0 or not isinstance(test, TestwiseDeletion):
         return
+    held = [[u] for u in undecided]
     for x in members:
         if x not in required:
-            test.count_not_tested(target, x, 1)
+            test.count_not_tested(target, x, 1, held)
 
 
 def _shrink(

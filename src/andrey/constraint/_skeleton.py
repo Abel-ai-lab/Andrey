@@ -185,7 +185,8 @@ def kept_apart(
     candidates less those lying inside ``skip_within`` (:func:`subset_rows`). A set holding a
     dropped candidate keeps no rows under a test that deletes rows per test, so each such set is
     counted as a query of the pair not tested, without being built, as asking it would count it
-    (:meth:`~andrey.core.ci_missing.TestwiseDeletion.count_not_tested`). When no row observes the
+    (:meth:`~andrey.core.ci_missing.TestwiseDeletion.count_not_tested`), and kept by the dropped
+    candidate with the other columns of ``fixed``, which it holds. When no row observes the
     columns of ``fixed`` together, every set is counted and ``None`` is returned in place of the
     sides. Another test gets ``sides`` unchanged and none left out.
     """
@@ -197,9 +198,14 @@ def kept_apart(
     whole = not met[columns].all()
     kept = [([c for c in side if met[c]], skip) for side, skip in sides]
     left = sum(_subset_count(side, size, skip) for side, skip in sides)
-    if not whole:
+    held = columns[2:]
+    if whole:
+        keeping = [held]
+    else:
         left -= sum(_subset_count(side, size, skip) for side, skip in kept)
-    test.count_not_tested(columns[0], columns[1], left)
+        dropped = {c for side, _ in sides for c in side if not met[c]}
+        keeping = [[c, *held] for c in sorted(dropped)]
+    test.count_not_tested(columns[0], columns[1], left, keeping)
     return None if whole else kept, left
 
 
