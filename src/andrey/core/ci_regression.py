@@ -776,7 +776,7 @@ class PCM(_RegressionTest):
       measurements had more power in the paper's first setting at 250 rows (71.6% against 54.8%)
       and almost none in its third at 500 (1.0% against 13.4%), below the authors' code (7.6%).
     - The variance fit has half the basis functions of the mean fits, as in the authors' code; the
-      paper's full basis changed 19 of 4,500 decisions and took about 2.5 times as long.
+      paper's full basis changed 28 of 4,500 decisions and took about 2.5 times as long.
     - The variance adds ``c`` to the fit's positive part, as in the paper; the authors' code adds
       it first, the same for a forest, whose fit is never negative, and less powerful with least
       squares.

@@ -254,7 +254,10 @@ def pcm(folder: Path) -> None:
                     mean * np.sqrt((n // 2 + n % 2 - 1) / (n // 2 + n % 2)),
                     p_ref,
                     float(ndtr(-mean)),
-                    (ndtr(-mean) < 0.05) == (p_ref < 0.05),
+                    # A reference call that stopped with an error gives no decision.
+                    "reference failed"
+                    if np.isnan(p_ref)
+                    else (ndtr(-mean) < 0.05) == (p_ref < 0.05),
                     cols.index(1) > cols.index(0),
                 ]
             )
