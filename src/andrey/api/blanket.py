@@ -217,17 +217,19 @@ def iamb(
         missed.
         ``"orient"`` favors arrowheads and accuracy; it gives up protection from false colliders.
         ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them, and
-        with them accuracy. On merged cohorts of 20, 40, and 50 variables that no row bridges (20
-        seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's false colliders per fit
-        from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found from 0.54-0.72 to 0,
-        and PC's graph was then farther from the truth than the empty graph in 6 of 6 settings; on
-        bridged cohorts and complete data the two gave the same graphs. Not measured with IAMB. Read
-        under ``structure="cpdag"`` only.
+        accuracy. On merged cohorts of three graph sizes, with about 29 to 76 true edges, that no
+        row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's false
+        colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found
+        from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty graph in
+        6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs. Not
+        measured with IAMB. Read under ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read, with no model of why
+        values are missing; it gives up validity outside values missing completely at random. See
+        **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -526,17 +528,19 @@ def inter_iamb(
         missed.
         ``"orient"`` favors arrowheads and accuracy; it gives up protection from false colliders.
         ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them, and
-        with them accuracy. On merged cohorts of 20, 40, and 50 variables that no row bridges (20
-        seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's false colliders per fit
-        from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found from 0.54-0.72 to 0,
-        and PC's graph was then farther from the truth than the empty graph in 6 of 6 settings; on
-        bridged cohorts and complete data the two gave the same graphs. Not measured with
-        Inter-IAMB. Read under ``structure="cpdag"`` only.
+        accuracy. On merged cohorts of three graph sizes, with about 29 to 76 true edges, that no
+        row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's false
+        colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found
+        from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty graph in
+        6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs. Not
+        measured with Inter-IAMB. Read under ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read, with no model of why
+        values are missing; it gives up validity outside values missing completely at random. See
+        **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -832,17 +836,19 @@ def mmpc(
         missed.
         ``"orient"`` favors arrowheads and accuracy; it gives up protection from false colliders.
         ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them, and
-        with them accuracy. On merged cohorts of 20, 40, and 50 variables that no row bridges (20
-        seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's false colliders per fit
-        from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found from 0.54-0.72 to 0,
-        and PC's graph was then farther from the truth than the empty graph in 6 of 6 settings; on
-        bridged cohorts and complete data the two gave the same graphs. Not measured with MMPC. Read
-        under ``structure="cpdag"`` only.
+        accuracy. On merged cohorts of three graph sizes, with about 29 to 76 true edges, that no
+        row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's false
+        colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found
+        from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty graph in
+        6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs. Not
+        measured with MMPC. Read under ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read, with no model of why
+        values are missing; it gives up validity outside values missing completely at random. See
+        **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which

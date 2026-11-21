@@ -81,9 +81,9 @@ Choosing an option, by what each favors and what it gives up:
 
 | Option | Favors | Gives up | Measured |
 |---|---|---|---|
-| `missing="testwise"` | Any test, and no model of why values are missing | Validity outside values missing completely at random | PC and FCI with `fisherz` and `student_t`: [0.11.0 release card](../benchmarks/0.11.0.md#missing-values) |
-| A test without enough rows, under `"testwise"` | No pair separated or kept on rows that cannot test it | The pair: it is undecided and left out of the graph | Not measured against another rule |
-| `missing="mvpc"` | Values missing for a reason that other variables carry | Every test but `fisherz` and `student_t`; accuracy where each indicator has many weak parents | On Erdos-Renyi graphs of 10 to 100 variables, fewer errors than `"testwise"` in 14 of 72 settings and more in none; tied in 136 of 144 with values missing completely at random; behind in 12 of 141 with many weak parents per indicator ({py:func}`~andrey.pc`, [0.16.0 release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data)) |
+| `missing="testwise"` | Every row each test can read, with no model of why values are missing | Validity outside values missing completely at random | PC and FCI with `fisherz` and `student_t`: [0.11.0 release card](../benchmarks/0.11.0.md#missing-values) |
+| A test without enough rows, under `"testwise"` | No pair separated or kept on rows that cannot test it | The test: it never separates a pair, and a pair that no test with rows could decide is undecided and left out of the graph | Not measured against another rule |
+| `missing="mvpc"` | Values missing for a reason that other variables carry | Every test but `fisherz` and `student_t`; accuracy on large graphs where an indicator has many weak parents or parents with missing values | On Erdos-Renyi graphs of 10 to 100 variables with one observed parent per indicator, fewer errors than `"testwise"` in 14 of 72 settings and more in none; tied in 136 of 144 with values missing completely at random; behind in 12 of 141 with many weak parents per indicator (3 again on fresh seeds); with a parent that has missing values, ahead in 12 of 144 and behind in 24 (9 again); the repeated ones all had 50 or 100 variables and 20 or 30% missing ({py:func}`~andrey.pc`, [0.16.0 release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data)) |
 | `missing="em"` | The partly observed rows, under a linear model with Gaussian noise | Time: 2 to 72 times as long as the search on complete data | [0.16.0](../benchmarks/0.16.0.md#what-we-measured-on-missing-data) and [0.17.0](../benchmarks/0.17.0.md#missing-data) release cards |
 | `possibly_separable="orient"` | Arrowheads, and accuracy | Protection from false colliders | The runs of `"ambiguous"` |
 | `possibly_separable="ambiguous"` | No false collider | The true arrowheads beside them | PC's false colliders per fit from 12.8-90.0 to at most 0.2, its graph farther from the truth than the empty graph in 6 of 6 settings; FCI's errors up by 0.5 to 4.4 |
@@ -166,16 +166,16 @@ default, `"orient"`, reads it as any other triple.
 
 The choice is a trade: `"orient"` favors arrowheads and gives up protection from false colliders,
 and `"ambiguous"` favors no false collider and gives up the true arrowheads beside them. On merged
-cohorts of 20, 40, and 50 variables that no row bridges (20 seeds each, conditioning sets of up to
-3), nearly every drawn edge is flagged. There `"ambiguous"` took PC's false colliders per fit from
-12.8-90.0 to at most 0.2 and the share of true arrowheads it found from 0.54-0.72 to 0, and PC's
-graph was then farther from the truth, counted by the structural Hamming distance, than the empty
-graph in all 6 settings. FCI's false colliders fell from 21.5-165.4 to at most 0.1 and its errors
-rose by 0.5 to 4.4, still fewer than the empty graph's; its skeleton changes through the
-possible-d-separation step. On lagged series that no row bridges, PCMCI+'s same-step arrowheads
-per fit fell from 1.5-1.9 to 0. On bridged cohorts and complete data the two gave the same graphs.
-Keep the default when you read arrowheads, and use `"ambiguous"` when a false collider costs you
-more than a missing one.
+cohorts of three graph sizes, with about 29 to 76 true edges, that no row bridges (20 seeds each,
+conditioning sets of up to 3), nearly every drawn edge is flagged. There `"ambiguous"` took PC's
+false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found from
+0.54-0.72 to 0, and PC's graph was then farther from the truth, counted by the structural Hamming
+distance, than the empty graph in all 6 settings. FCI's false colliders fell from 21.5-165.4 to at
+most 0.1 and its errors rose by 0.5 to 4.4, still fewer than the empty graph's; its skeleton changes
+through the possible-d-separation step. On lagged series that no row bridges, PCMCI+'s same-step
+arrowheads per fit fell from 1.5-1.9 to 0. On bridged cohorts and complete data the two gave the
+same graphs. Keep the default when you read arrowheads, and use `"ambiguous"` when a false collider
+costs you more than a missing one.
 
 `metadata["not_tested"]` counts the conditioning sets not tested, including those the search
 skipped because no row can test them; it measures the search more than the data, so the notice for

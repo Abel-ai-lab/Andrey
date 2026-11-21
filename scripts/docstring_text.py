@@ -171,8 +171,9 @@ SHARED = {
         "next, and a forbidden path is no parent, as :class:`~andrey.Knowledge` describes; a claim "
         "the DAG does not meet is dropped with a :class:`~andrey.KnowledgeWarning` and listed in "
         '``metadata["unmet_knowledge"]``.',
-        lambda m: "required_paths" in REGISTRY[m].knowledge
-        and REGISTRY[m].output.graph_kind == "dag",
+        lambda m: (
+            "required_paths" in REGISTRY[m].knowledge and REGISTRY[m].output.graph_kind == "dag"
+        ),
     ),
     # cdnod and fci_jci read env as a variable, coerced to numbers.
     "env": Shared(
@@ -193,7 +194,9 @@ SHARED = {
         'How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test '
         "reads only the rows where all of its variables are observed. ``None`` picks the method's "
         'default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the '
-        "handling used. See **Missing values.** in Notes.",
+        'handling used. ``"testwise"`` favors every row each test can read, with no model of why '
+        "values are missing; it gives up validity outside values missing completely at random. See "
+        "**Missing values.** in Notes.",
         lambda m: m in CONCEPTS["missing"].conforming,
     ),
     # A method whose default follows its paper words its own entry.
@@ -205,8 +208,8 @@ SHARED = {
         "mean of the statistic when ``y`` is shuffled within each configuration of the conditioning "
         'set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x`` '
         "and ``y`` present in it, the table's empty rows and columns struck. The two differ only on "
-        'sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises '
-        "``ValueError``.",
+        'sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and '
+        '``"gsq"`` read it: passing it with another test raises ``ValueError``.',
         lambda m: m in CONCEPTS["degrees_of_freedom"].conforming,
     ),
     # "em" is supported where a reference implementation exists and the comparison with it passed.
@@ -220,7 +223,11 @@ SHARED = {
         'missing values. On data with missing values, ``metadata["missing"]`` records the handling '
         'used and ``metadata["em"]`` the EM record, with the rows dropped for observing no value and '
         "the fewest rows two columns share; two columns that share no observed row raise "
-        "``ValueError``. See **Missing values.** in Notes.",
+        "``ValueError``. "
+        '``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it '
+        "gives up time: each round runs the search again, and a fit took 2 to 72 times as long as "
+        "the same search on complete data in the release benchmarks. See **Missing values.** in "
+        "Notes.",
         lambda m: m in EM_SUPPORTED,
     ),
     "missing_em_experimental": Shared(
@@ -233,7 +240,11 @@ SHARED = {
         'refuses missing values. On data with missing values, ``metadata["missing"]`` records the '
         'handling used and ``metadata["em"]`` the EM record, with the rows dropped for observing no '
         "value and the fewest rows two columns share; two columns that share no observed row raise "
-        "``ValueError``. See **Missing values.** in Notes.",
+        "``ValueError``. "
+        '``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it '
+        "gives up time: each round runs the search again, and a fit took 2 to 72 times as long as "
+        "the same search on complete data in the release benchmarks. See **Missing values.** in "
+        "Notes.",
         lambda m: m in EM_METHODS and m not in EM_SUPPORTED,
     ),
     # One sentence for every method that deletes rows per test, the pair methods included.

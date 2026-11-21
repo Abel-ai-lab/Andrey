@@ -158,7 +158,9 @@ def anm(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read, with no model of why
+        values are missing; it gives up validity outside values missing completely at random. See
+        **Missing values.** in Notes.
 
     Returns
     -------
@@ -310,7 +312,9 @@ def pnl(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read, with no model of why
+        values are missing; it gives up validity outside values missing completely at random. See
+        **Missing values.** in Notes.
 
     Returns
     -------
@@ -474,8 +478,8 @@ def loci(
         ``float64``. A DataFrame's column names become the structure's ``labels``.
     alpha : float or None, default=None
         Under ``criterion="independence"``: ``None`` chooses the direction with the larger p-value,
-        or with the smaller test statistic when the p-values are equal; a significance level such
-        as ``0.05`` draws an edge only when exactly one p-value exceeds it. Must be ``None`` under
+        or with the smaller test statistic when the p-values are equal; a significance level such as
+        ``0.05`` draws an edge only when exactly one p-value exceeds it. Must be ``None`` under
         ``criterion="likelihood"``. See Notes.
     criterion : {"independence", "likelihood"}, default="independence"
         ``"independence"`` tests whether each direction's scaled residual is independent of its
@@ -485,7 +489,9 @@ def loci(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read, with no model of why
+        values are missing; it gives up validity outside values missing completely at random. See
+        **Missing values.** in Notes.
 
     Returns
     -------
@@ -681,17 +687,17 @@ def cpcm(
         ``None`` chooses the direction with the larger p-value, or with the smaller test statistic
         when the p-values are equal (the paper's forced estimate). A significance level such as
         ``0.05`` gives no edge when the two columns test independent at that level, and otherwise
-        draws an edge only when exactly one direction's p-value exceeds it (the paper's
-        conservative estimate). ``None`` favors a direction for every pair; it gives up the sign
-        that a pair fits both ways or neither. A level favors that sign; it gives up the pairs it
-        leaves undecided. On the paper's pairs at 1,000 and 2,000 rows the forced direction was
-        right as often as the code published with the paper in every setting. On the paper's
-        model (16) at 500 rows under ``"pareto"``, the conservative estimate found both directions
-        plausible, the paper's outcome at ``gamma = 0``, on 73% and 78% of the pairs of two seed
-        sets against that code's 82% and 85%, so it is not supported there; at ``gamma = 1`` it
-        named the true direction on 55% of the pairs and both on 39%. The `0.19.0 release card
-        <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#the-conservative-estimate>`_ has the
-        numbers. See Notes.
+        draws an edge only when exactly one direction's p-value exceeds it (the paper's conservative
+        estimate). ``None`` favors a direction for every pair; it gives up the sign that a pair fits
+        both ways or neither. A level favors that sign; it gives up the pairs it leaves undecided.
+        On the paper's pairs at 1,000 and 2,000 rows the forced direction was right as often as the
+        code published with the paper in every setting. On the paper's model (16) at 500 rows under
+        ``"pareto"``, the conservative estimate found both directions plausible, the paper's outcome
+        at ``gamma = 0``, on 73% and 78% of the pairs of two seed sets against that code's 82% and
+        85%, so it is not supported there; at ``gamma = 1`` it named the true direction on 55% and
+        64% of the pairs of the two seed sets, and both on 39% of the first. The `0.19.0 release
+        card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#the-conservative-estimate>`_ has
+        the numbers. See Notes.
     family : str or list of str, default="gaussian"
         The family of each variable given the other, one name for both columns or a list of two
         names, one per column: ``"gaussian"`` (mean and scale change with the cause),
@@ -928,8 +934,8 @@ def skewd(
         ``float64``. A DataFrame's column names become the structure's ``labels``.
     alpha : float or None, default=None
         Under ``criterion="independence"``: ``None`` chooses the direction with the larger p-value,
-        or with the smaller test statistic when the p-values are equal; a significance level such
-        as ``0.05`` draws an edge only when exactly one p-value exceeds it. Must be ``None`` under
+        or with the smaller test statistic when the p-values are equal; a significance level such as
+        ``0.05`` draws an edge only when exactly one p-value exceeds it. Must be ``None`` under
         ``criterion="likelihood"``.
     criterion : {"independence", "likelihood"}, default="independence"
         ``"independence"`` tests whether each direction's scaled residual is independent of its
@@ -949,7 +955,9 @@ def skewd(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read, with no model of why
+        values are missing; it gives up validity outside values missing completely at random. See
+        **Missing values.** in Notes.
 
     Returns
     -------

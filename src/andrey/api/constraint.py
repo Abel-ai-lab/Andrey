@@ -131,11 +131,11 @@ def pc(
         missed.
         ``"orient"`` favors arrowheads and accuracy; it gives up protection from false colliders.
         ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them, and
-        with them accuracy. On merged cohorts of 20, 40, and 50 variables that no row bridges (20
-        seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's false colliders per fit
-        from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found from 0.54-0.72 to 0,
-        and PC's graph was then farther from the truth than the empty graph in 6 of 6 settings; on
-        bridged cohorts and complete data the two gave the same graphs.
+        accuracy. On merged cohorts of three graph sizes, with about 29 to 76 true edges, that no
+        row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's false
+        colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found
+        from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty graph in
+        6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -145,19 +145,22 @@ def pc(
         :doc:`getting-started guide </docs/guides/getting-started>`.
     missing : {"testwise", "mvpc"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
-        reads only the rows where all of its variables are observed. ``"mvpc"`` is
-        Missing-Value PC [13]_: after the test-wise skeleton, it finds the parents of each
-        variable's missingness indicator and tests again, on virtual data that correct for them,
-        the edges such an indicator could have kept; it takes ``"fisherz"`` or ``"student_t"``.
-        ``None`` picks the method's default, ``"testwise"``. On data with missing values,
-        ``metadata["missing"]`` records the handling used. ``"testwise"`` favors any test and no
-        model of why values are missing; it gives up validity outside values missing completely at
-        random. ``"mvpc"`` favors values missing for a reason that other variables carry; it gives
-        up every test but those two and, where each indicator has many weak parents, accuracy. On
-        Erdos-Renyi graphs of 10 to 100 variables with one observed parent per indicator, ``"mvpc"``
-        had fewer errors in 14 of 72 settings and more in none; with values missing completely at
-        random it tied in 136 of 144; with many weak parents per indicator it was behind in 12 of
-        141 (see Limitations). See **Missing values.** in Notes.
+        reads only the rows where all of its variables are observed. ``"mvpc"`` is Missing-Value PC
+        [13]_: after the test-wise skeleton, it finds the parents of each variable's missingness
+        indicator and tests again, on virtual data that correct for them, the edges such an
+        indicator could have kept; it takes ``"fisherz"`` or ``"student_t"``. ``None`` picks the
+        method's default, ``"testwise"``. On data with missing values, ``metadata["missing"]``
+        records the handling used. ``"testwise"`` favors every row each test can read, with no model
+        of why values are missing; it gives up validity outside values missing completely at random.
+        ``"mvpc"`` favors values missing for a reason that other variables carry; it gives up every
+        test but those two and, where an indicator has many weak parents or parents with missing
+        values, accuracy on large graphs. On Erdos-Renyi graphs of 10 to 100 variables, with one
+        observed parent per indicator, ``"mvpc"`` had fewer errors in 14 of 72 settings and more in
+        none; with values missing completely at random it tied in 136 of 144. It was behind in 12 of
+        141 settings with many weak parents per indicator (3 again on fresh seeds) and, with one
+        parent that has missing values itself, ahead in 12 of 144 and behind in 24 (9 again); the
+        repeated ones all had 50 or 100 variables and 20 or 30% missing (see Limitations). See
+        **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -744,11 +747,11 @@ def fci(
         skeleton, and ``metadata["not_tested"]`` can change.
         ``"orient"`` favors arrowheads and accuracy; it gives up protection from false colliders.
         ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them. On
-        merged cohorts of 20, 40, and 50 variables that no row bridges (20 seeds each, conditioning
-        sets of up to 3), ``"ambiguous"`` took FCI's false colliders per fit from 21.5-165.4 to at
-        most 0.1 and the share of true arrowheads it found from 0.61-0.81 to 0, and raised its
-        errors by 0.5 to 4.4, still fewer than the empty graph's in 6 of 6 settings; on bridged
-        cohorts and complete data the two gave the same graphs.
+        merged cohorts of three graph sizes, with about 29 to 76 true edges, that no row bridges (20
+        seeds each, conditioning sets of up to 3), ``"ambiguous"`` took FCI's false colliders per
+        fit from 21.5-165.4 to at most 0.1 and the share of true arrowheads it found from 0.61-0.81
+        to 0, and raised its errors by 0.5 to 4.4, still fewer than the empty graph's in 6 of 6
+        settings; on bridged cohorts and complete data the two gave the same graphs.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -760,7 +763,9 @@ def fci(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read, with no model of why
+        values are missing; it gives up validity outside values missing completely at random. See
+        **Missing values.** in Notes.
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of FCI's possible-d-separation step [2]_ [3]_, which removes edges the first step
         kept, one at a time, so each removal changes what the step tests after it.
@@ -1622,11 +1627,12 @@ def cdnod(
         missed.
         ``"orient"`` favors arrowheads and accuracy; it gives up protection from false colliders.
         ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them, and
-        with them accuracy. On merged cohorts of 20, 40, and 50 variables that no row bridges (20
-        seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's false colliders per fit
-        from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found from 0.54-0.72 to 0,
-        and PC's graph was then farther from the truth than the empty graph in 6 of 6 settings; on
-        bridged cohorts and complete data the two gave the same graphs. Not measured with CD-NOD.
+        accuracy. On merged cohorts of three graph sizes, with about 29 to 76 true edges, that no
+        row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's false
+        colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found
+        from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty graph in
+        6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs. Not
+        measured with CD-NOD.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1639,7 +1645,9 @@ def cdnod(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read, with no model of why
+        values are missing; it gives up validity outside values missing completely at random. See
+        **Missing values.** in Notes.
     dependence_threshold : float or None, default=None
         Runs the independent-change step at this threshold, in ``(0, 1)``, on its module
         dependence measure: two modules, the distributions of a candidate cause and of its effect
@@ -2048,11 +2056,12 @@ def fci_jci(
         skeleton, and ``metadata["not_tested"]`` can change.
         ``"orient"`` favors arrowheads and accuracy; it gives up protection from false colliders.
         ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them. On
-        merged cohorts of 20, 40, and 50 variables that no row bridges (20 seeds each, conditioning
-        sets of up to 3), ``"ambiguous"`` took FCI's false colliders per fit from 21.5-165.4 to at
-        most 0.1 and the share of true arrowheads it found from 0.61-0.81 to 0, and raised its
-        errors by 0.5 to 4.4, still fewer than the empty graph's in 6 of 6 settings; on bridged
-        cohorts and complete data the two gave the same graphs. Not measured with FCI-JCI.
+        merged cohorts of three graph sizes, with about 29 to 76 true edges, that no row bridges (20
+        seeds each, conditioning sets of up to 3), ``"ambiguous"`` took FCI's false colliders per
+        fit from 21.5-165.4 to at most 0.1 and the share of true arrowheads it found from 0.61-0.81
+        to 0, and raised its errors by 0.5 to 4.4, still fewer than the empty graph's in 6 of 6
+        settings; on bridged cohorts and complete data the two gave the same graphs. Not measured
+        with FCI-JCI.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -2065,7 +2074,9 @@ def fci_jci(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read, with no model of why
+        values are missing; it gives up validity outside values missing completely at random. See
+        **Missing values.** in Notes.
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of the possible-d-separation step, as for :func:`~andrey.fci`: ``"order_free"``
         visits the pairs and nodes by a rank computed from the data, and ``"fast"`` in column
