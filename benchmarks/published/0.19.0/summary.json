@@ -1850,7 +1850,7 @@
    "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
    "lane": "cpcm",
    "output": "two-node DAG",
-   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
    "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
    "same_graph_test": "the same forced direction",
@@ -1877,11 +1877,19 @@
      "comparator_ok": 100,
      "paired": 100,
      "datasets": 100,
-     "andrey_s": 0.1036,
-     "comparator_s": 0.403,
+     "andrey_s": null,
+     "comparator_s": null,
      "ratio": null,
-     "ratio_quartiles": null,
-     "timed_on_one_cpu": 0,
+     "times_across_cpu_models": {
+      "andrey_s": 0.1036,
+      "comparator_s": 0.403,
+      "andrey_cpu": [
+       "AMD EPYC 9534 64-Core Processor"
+      ],
+      "comparator_cpu": [
+       "AMD EPYC 7713 64-Core Processor"
+      ]
+     },
      "andrey_correct": 98,
      "andrey_reversed": 2,
      "andrey_no_edge": 0,
@@ -1945,9 +1953,13 @@
       "datasets": 100,
       "andrey_s": 0.1025,
       "comparator_s": 0.3075,
-      "ratio": null,
-      "ratio_quartiles": null,
-      "timed_on_one_cpu": 0,
+      "ratio": 3.03,
+      "ratio_quartiles": [
+       2.77,
+       3.38
+      ],
+      "timed_pairs": 100,
+      "timed_on_one_node": 0,
       "andrey_correct": 97,
       "andrey_reversed": 3,
       "andrey_no_edge": 0,
@@ -2013,11 +2025,19 @@
      "comparator_ok": 100,
      "paired": 100,
      "datasets": 100,
-     "andrey_s": 0.1186,
-     "comparator_s": 0.3705,
+     "andrey_s": null,
+     "comparator_s": null,
      "ratio": null,
-     "ratio_quartiles": null,
-     "timed_on_one_cpu": 0,
+     "times_across_cpu_models": {
+      "andrey_s": 0.1186,
+      "comparator_s": 0.3705,
+      "andrey_cpu": [
+       "AMD EPYC 9534 64-Core Processor"
+      ],
+      "comparator_cpu": [
+       "AMD EPYC 7713 64-Core Processor"
+      ]
+     },
      "andrey_correct": 99,
      "andrey_reversed": 1,
      "andrey_no_edge": 0,
@@ -2086,7 +2106,8 @@
        1.83,
        2.2
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 99,
       "andrey_reversed": 1,
       "andrey_no_edge": 0,
@@ -2152,11 +2173,19 @@
      "comparator_ok": 100,
      "paired": 100,
      "datasets": 100,
-     "andrey_s": 0.1064,
-     "comparator_s": 0.3355,
+     "andrey_s": null,
+     "comparator_s": null,
      "ratio": null,
-     "ratio_quartiles": null,
-     "timed_on_one_cpu": 0,
+     "times_across_cpu_models": {
+      "andrey_s": 0.1064,
+      "comparator_s": 0.3355,
+      "andrey_cpu": [
+       "AMD EPYC 9534 64-Core Processor"
+      ],
+      "comparator_cpu": [
+       "AMD EPYC 7713 64-Core Processor"
+      ]
+     },
      "andrey_correct": 100,
      "andrey_reversed": 0,
      "andrey_no_edge": 0,
@@ -2225,7 +2254,8 @@
        1.84,
        2.26
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 96,
       "andrey_reversed": 4,
       "andrey_no_edge": 0,
@@ -2291,11 +2321,19 @@
      "comparator_ok": 100,
      "paired": 100,
      "datasets": 100,
-     "andrey_s": 0.1049,
-     "comparator_s": 0.343,
+     "andrey_s": null,
+     "comparator_s": null,
      "ratio": null,
-     "ratio_quartiles": null,
-     "timed_on_one_cpu": 0,
+     "times_across_cpu_models": {
+      "andrey_s": 0.1049,
+      "comparator_s": 0.343,
+      "andrey_cpu": [
+       "AMD EPYC 9534 64-Core Processor"
+      ],
+      "comparator_cpu": [
+       "AMD EPYC 7713 64-Core Processor"
+      ]
+     },
      "andrey_correct": 92,
      "andrey_reversed": 8,
      "andrey_no_edge": 0,
@@ -2364,7 +2402,8 @@
        1.97,
        2.44
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 93,
       "andrey_reversed": 7,
       "andrey_no_edge": 0,
@@ -2425,7 +2464,7 @@
    "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
    "lane": "cpcm",
    "output": "two-node DAG",
-   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
    "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
    "same_graph_test": "the same forced direction",
@@ -2459,7 +2498,8 @@
       1.53,
       1.91
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 98,
      "andrey_reversed": 2,
      "andrey_no_edge": 0,
@@ -2528,7 +2568,8 @@
        1.82,
        2.3
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 97,
       "andrey_reversed": 3,
       "andrey_no_edge": 0,
@@ -2601,7 +2642,8 @@
       0.9,
       1.18
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 99,
      "andrey_reversed": 1,
      "andrey_no_edge": 0,
@@ -2677,7 +2719,8 @@
       1.16,
       1.45
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 99,
      "andrey_reversed": 1,
      "andrey_no_edge": 0,
@@ -2753,7 +2796,8 @@
       1.6,
       1.97
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 94,
      "andrey_reversed": 6,
      "andrey_no_edge": 0,
@@ -2817,7 +2861,7 @@
    "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
    "lane": "cpcm",
    "output": "two-node DAG",
-   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
    "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
    "same_graph_test": "the same forced direction",
@@ -2844,11 +2888,19 @@
      "comparator_ok": 100,
      "paired": 100,
      "datasets": 100,
-     "andrey_s": 0.1028,
-     "comparator_s": 0.3955,
+     "andrey_s": null,
+     "comparator_s": null,
      "ratio": null,
-     "ratio_quartiles": null,
-     "timed_on_one_cpu": 0,
+     "times_across_cpu_models": {
+      "andrey_s": 0.1028,
+      "comparator_s": 0.3955,
+      "andrey_cpu": [
+       "AMD EPYC 9534 64-Core Processor"
+      ],
+      "comparator_cpu": [
+       "AMD EPYC 7713 64-Core Processor"
+      ]
+     },
      "andrey_correct": 100,
      "andrey_reversed": 0,
      "andrey_no_edge": 0,
@@ -2912,9 +2964,13 @@
       "datasets": 100,
       "andrey_s": 0.1024,
       "comparator_s": 0.3075,
-      "ratio": null,
-      "ratio_quartiles": null,
-      "timed_on_one_cpu": 0,
+      "ratio": 3.05,
+      "ratio_quartiles": [
+       2.77,
+       3.33
+      ],
+      "timed_pairs": 100,
+      "timed_on_one_node": 0,
       "andrey_correct": 97,
       "andrey_reversed": 3,
       "andrey_no_edge": 0,
@@ -2980,11 +3036,19 @@
      "comparator_ok": 100,
      "paired": 100,
      "datasets": 100,
-     "andrey_s": 0.115,
-     "comparator_s": 0.3645,
+     "andrey_s": null,
+     "comparator_s": null,
      "ratio": null,
-     "ratio_quartiles": null,
-     "timed_on_one_cpu": 0,
+     "times_across_cpu_models": {
+      "andrey_s": 0.115,
+      "comparator_s": 0.3645,
+      "andrey_cpu": [
+       "AMD EPYC 9534 64-Core Processor"
+      ],
+      "comparator_cpu": [
+       "AMD EPYC 7713 64-Core Processor"
+      ]
+     },
      "andrey_correct": 100,
      "andrey_reversed": 0,
      "andrey_no_edge": 0,
@@ -3053,7 +3117,8 @@
        1.83,
        2.24
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 100,
       "andrey_reversed": 0,
       "andrey_no_edge": 0,
@@ -3119,11 +3184,19 @@
      "comparator_ok": 100,
      "paired": 100,
      "datasets": 100,
-     "andrey_s": 0.1057,
-     "comparator_s": 0.342,
+     "andrey_s": null,
+     "comparator_s": null,
      "ratio": null,
-     "ratio_quartiles": null,
-     "timed_on_one_cpu": 0,
+     "times_across_cpu_models": {
+      "andrey_s": 0.1057,
+      "comparator_s": 0.342,
+      "andrey_cpu": [
+       "AMD EPYC 9534 64-Core Processor"
+      ],
+      "comparator_cpu": [
+       "AMD EPYC 7713 64-Core Processor"
+      ]
+     },
      "andrey_correct": 100,
      "andrey_reversed": 0,
      "andrey_no_edge": 0,
@@ -3192,7 +3265,8 @@
        1.88,
        2.25
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 100,
       "andrey_reversed": 0,
       "andrey_no_edge": 0,
@@ -3258,11 +3332,19 @@
      "comparator_ok": 100,
      "paired": 100,
      "datasets": 100,
-     "andrey_s": 0.1053,
-     "comparator_s": 0.345,
+     "andrey_s": null,
+     "comparator_s": null,
      "ratio": null,
-     "ratio_quartiles": null,
-     "timed_on_one_cpu": 0,
+     "times_across_cpu_models": {
+      "andrey_s": 0.1053,
+      "comparator_s": 0.345,
+      "andrey_cpu": [
+       "AMD EPYC 9534 64-Core Processor"
+      ],
+      "comparator_cpu": [
+       "AMD EPYC 7713 64-Core Processor"
+      ]
+     },
      "andrey_correct": 100,
      "andrey_reversed": 0,
      "andrey_no_edge": 0,
@@ -3331,7 +3413,8 @@
        1.93,
        2.44
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 100,
       "andrey_reversed": 0,
       "andrey_no_edge": 0,
@@ -3392,7 +3475,7 @@
    "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
    "lane": "cpcm.misspecified",
    "output": "two-node DAG",
-   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
    "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
    "same_graph_test": "the same forced direction",
@@ -3426,7 +3509,8 @@
       0.96,
       1.37
      ],
-     "timed_on_one_cpu": 41,
+     "timed_pairs": 41,
+     "timed_on_one_node": 41,
      "andrey_correct": 40,
      "andrey_reversed": 1,
      "andrey_no_edge": 0,
@@ -3496,7 +3580,8 @@
        1.07,
        1.65
       ],
-      "timed_on_one_cpu": 50,
+      "timed_pairs": 50,
+      "timed_on_one_node": 50,
       "andrey_correct": 48,
       "andrey_reversed": 2,
       "andrey_no_edge": 0,
@@ -3570,7 +3655,8 @@
       0.48,
       0.85
      ],
-     "timed_on_one_cpu": 15,
+     "timed_pairs": 15,
+     "timed_on_one_node": 15,
      "andrey_correct": 13,
      "andrey_reversed": 2,
      "andrey_no_edge": 0,
@@ -3647,7 +3733,8 @@
       0.6,
       0.83
      ],
-     "timed_on_one_cpu": 75,
+     "timed_pairs": 75,
+     "timed_on_one_node": 75,
      "andrey_correct": 49,
      "andrey_reversed": 26,
      "andrey_no_edge": 0,
@@ -3724,7 +3811,8 @@
       0.94,
       1.27
      ],
-     "timed_on_one_cpu": 76,
+     "timed_pairs": 76,
+     "timed_on_one_node": 76,
      "andrey_correct": 46,
      "andrey_reversed": 30,
      "andrey_no_edge": 0,
@@ -3789,7 +3877,7 @@
    "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
    "lane": "cpcm.misspecified",
    "output": "two-node DAG",
-   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
    "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
    "same_graph_test": "the same forced direction",
@@ -3823,7 +3911,8 @@
       1.18,
       1.86
      ],
-     "timed_on_one_cpu": 88,
+     "timed_pairs": 88,
+     "timed_on_one_node": 88,
      "andrey_correct": 86,
      "andrey_reversed": 2,
      "andrey_no_edge": 0,
@@ -3893,7 +3982,8 @@
        1.58,
        2.54
       ],
-      "timed_on_one_cpu": 93,
+      "timed_pairs": 93,
+      "timed_on_one_node": 93,
       "andrey_correct": 88,
       "andrey_reversed": 5,
       "andrey_no_edge": 0,
@@ -3967,7 +4057,8 @@
       0.9,
       1.24
      ],
-     "timed_on_one_cpu": 20,
+     "timed_pairs": 20,
+     "timed_on_one_node": 20,
      "andrey_correct": 14,
      "andrey_reversed": 6,
      "andrey_no_edge": 0,
@@ -4044,7 +4135,8 @@
       0.88,
       1.26
      ],
-     "timed_on_one_cpu": 97,
+     "timed_pairs": 97,
+     "timed_on_one_node": 97,
      "andrey_correct": 75,
      "andrey_reversed": 22,
      "andrey_no_edge": 0,
@@ -4121,7 +4213,8 @@
       1.33,
       1.75
      ],
-     "timed_on_one_cpu": 99,
+     "timed_pairs": 99,
+     "timed_on_one_node": 99,
      "andrey_correct": 73,
      "andrey_reversed": 26,
      "andrey_no_edge": 0,
@@ -4186,7 +4279,7 @@
    "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
    "lane": "cpcm.misspecified",
    "output": "two-node DAG",
-   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
    "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
    "same_graph_test": "the same forced direction",
@@ -4220,7 +4313,8 @@
       2.56,
       3.23
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 30,
      "andrey_reversed": 70,
      "andrey_no_edge": 0,
@@ -4289,7 +4383,8 @@
        3.18,
        4.01
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 35,
       "andrey_reversed": 65,
       "andrey_no_edge": 0,
@@ -4362,7 +4457,8 @@
       2.7,
       3.64
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 0,
      "andrey_reversed": 100,
      "andrey_no_edge": 0,
@@ -4437,7 +4533,8 @@
       2.07,
       3.04
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 0,
      "andrey_reversed": 100,
      "andrey_no_edge": 0,
@@ -4512,7 +4609,8 @@
       2.15,
       2.58
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 0,
      "andrey_reversed": 100,
      "andrey_no_edge": 0,
@@ -4575,7 +4673,7 @@
    "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
    "lane": "cpcm.misspecified",
    "output": "two-node DAG",
-   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
    "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
    "same_graph_test": "the same forced direction",
@@ -4609,7 +4707,8 @@
       1.28,
       1.99
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 62,
      "andrey_reversed": 38,
      "andrey_no_edge": 0,
@@ -4678,7 +4777,8 @@
        1.59,
        2.49
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 64,
       "andrey_reversed": 36,
       "andrey_no_edge": 0,
@@ -4751,7 +4851,8 @@
       0.79,
       1.28
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 29,
      "andrey_reversed": 71,
      "andrey_no_edge": 0,
@@ -4827,7 +4928,8 @@
       0.74,
       1.03
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 36,
      "andrey_reversed": 64,
      "andrey_no_edge": 0,
@@ -4903,7 +5005,8 @@
       1.14,
       1.54
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 31,
      "andrey_reversed": 69,
      "andrey_no_edge": 0,
@@ -4967,7 +5070,7 @@
    "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
    "lane": "cpcm.misspecified",
    "output": "two-node DAG",
-   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
    "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
    "same_graph_test": "the same forced direction",
@@ -5001,7 +5104,8 @@
       2.62,
       3.24
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 1,
      "andrey_reversed": 99,
      "andrey_no_edge": 0,
@@ -5069,7 +5173,8 @@
        3.23,
        3.89
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 1,
       "andrey_reversed": 99,
       "andrey_no_edge": 0,
@@ -5141,7 +5246,8 @@
       2.47,
       3.24
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 0,
      "andrey_reversed": 100,
      "andrey_no_edge": 0,
@@ -5216,7 +5322,8 @@
       1.93,
       2.25
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 0,
      "andrey_reversed": 100,
      "andrey_no_edge": 0,
@@ -5291,7 +5398,8 @@
       1.98,
       2.38
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 0,
      "andrey_reversed": 100,
      "andrey_no_edge": 0,
@@ -5354,7 +5462,7 @@
    "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
    "lane": "cpcm",
    "output": "two-node DAG",
-   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
    "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
    "same_graph_test": "the same forced direction",
@@ -5389,7 +5497,8 @@
       1.7,
       2.94
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 100,
      "andrey_reversed": 0,
      "andrey_no_edge": 0,
@@ -5458,7 +5567,8 @@
        1.41,
        2.29
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 100,
       "andrey_reversed": 0,
       "andrey_no_edge": 0,
@@ -5532,7 +5642,8 @@
       1.61,
       2.5
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 100,
      "andrey_reversed": 0,
      "andrey_no_edge": 0,
@@ -5601,7 +5712,8 @@
        1.65,
        2.81
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 100,
       "andrey_reversed": 0,
       "andrey_no_edge": 0,
@@ -5675,7 +5787,8 @@
       0.85,
       1.19
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 99,
      "andrey_reversed": 1,
      "andrey_no_edge": 0,
@@ -5744,7 +5857,8 @@
        0.86,
        1.31
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 99,
       "andrey_reversed": 1,
       "andrey_no_edge": 0,
@@ -5818,7 +5932,8 @@
       0.77,
       1.16
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 99,
      "andrey_reversed": 1,
      "andrey_no_edge": 0,
@@ -5887,7 +6002,8 @@
        0.71,
        0.98
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 98,
       "andrey_reversed": 2,
       "andrey_no_edge": 0,
@@ -5961,7 +6077,8 @@
       0.72,
       1.04
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 96,
      "andrey_reversed": 4,
      "andrey_no_edge": 0,
@@ -6030,7 +6147,8 @@
        0.75,
        1.16
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 84,
       "andrey_reversed": 16,
       "andrey_no_edge": 0,
@@ -6104,7 +6222,8 @@
       1.26,
       2.07
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 99,
      "andrey_reversed": 1,
      "andrey_no_edge": 0,
@@ -6173,7 +6292,8 @@
        1.22,
        3.22
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 99,
       "andrey_reversed": 1,
       "andrey_no_edge": 0,
@@ -6247,7 +6367,8 @@
       1.8,
       2.84
      ],
-     "timed_on_one_cpu": 98,
+     "timed_pairs": 98,
+     "timed_on_one_node": 98,
      "andrey_correct": 94,
      "andrey_reversed": 4,
      "andrey_no_edge": 0,
@@ -6317,7 +6438,8 @@
        1.49,
        2.45
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 98,
       "andrey_reversed": 2,
       "andrey_no_edge": 0,
@@ -6378,7 +6500,7 @@
    "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
    "lane": "cpcm.other_arm",
    "output": "two-node DAG",
-   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
    "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
    "same_graph_test": "the same forced direction",
@@ -6413,7 +6535,8 @@
       1.71,
       3.16
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 100,
      "andrey_reversed": 0,
      "andrey_no_edge": 0,
@@ -6482,7 +6605,8 @@
        1.4,
        2.2
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 100,
       "andrey_reversed": 0,
       "andrey_no_edge": 0,
@@ -6556,7 +6680,8 @@
       1.72,
       2.78
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 100,
      "andrey_reversed": 0,
      "andrey_no_edge": 0,
@@ -6625,7 +6750,8 @@
        1.83,
        3.19
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 100,
       "andrey_reversed": 0,
       "andrey_no_edge": 0,
@@ -6699,7 +6825,8 @@
       2.08,
       3.48
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 58,
      "andrey_reversed": 42,
      "andrey_no_edge": 0,
@@ -6768,7 +6895,8 @@
        2.05,
        2.99
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 54,
       "andrey_reversed": 46,
       "andrey_no_edge": 0,
@@ -6842,7 +6970,8 @@
       2.18,
       3.58
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 3,
      "andrey_reversed": 97,
      "andrey_no_edge": 0,
@@ -6910,7 +7039,8 @@
        1.93,
        2.91
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 0,
       "andrey_reversed": 100,
       "andrey_no_edge": 0,
@@ -6983,7 +7113,8 @@
       1.89,
       3.01
      ],
-     "timed_on_one_cpu": 100,
+     "timed_pairs": 100,
+     "timed_on_one_node": 100,
      "andrey_correct": 0,
      "andrey_reversed": 100,
      "andrey_no_edge": 0,
@@ -7051,7 +7182,8 @@
        1.96,
        3.2
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 3,
       "andrey_reversed": 97,
       "andrey_no_edge": 0,
@@ -7111,7 +7243,7 @@
    "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
    "lane": "cpcm",
    "output": "two-node DAG",
-   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
    "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
    "same_graph_test": "the same forced direction",
@@ -7138,11 +7270,19 @@
      "comparator_ok": 100,
      "paired": 100,
      "datasets": 100,
-     "andrey_s": 0.0567,
-     "comparator_s": 0.114,
+     "andrey_s": null,
+     "comparator_s": null,
      "ratio": null,
-     "ratio_quartiles": null,
-     "timed_on_one_cpu": 0,
+     "times_across_cpu_models": {
+      "andrey_s": 0.0567,
+      "comparator_s": 0.114,
+      "andrey_cpu": [
+       "AMD EPYC 9534 64-Core Processor"
+      ],
+      "comparator_cpu": [
+       "AMD EPYC 7713 64-Core Processor"
+      ]
+     },
      "andrey_correct": 90,
      "andrey_reversed": 10,
      "andrey_no_edge": 0,
@@ -7210,7 +7350,8 @@
        1.52,
        1.83
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 92,
       "andrey_reversed": 8,
       "andrey_no_edge": 0,
@@ -7276,11 +7417,19 @@
      "comparator_ok": 100,
      "paired": 100,
      "datasets": 100,
-     "andrey_s": 0.1604,
-     "comparator_s": 0.5465,
+     "andrey_s": null,
+     "comparator_s": null,
      "ratio": null,
-     "ratio_quartiles": null,
-     "timed_on_one_cpu": 0,
+     "times_across_cpu_models": {
+      "andrey_s": 0.1604,
+      "comparator_s": 0.5465,
+      "andrey_cpu": [
+       "AMD EPYC 9534 64-Core Processor"
+      ],
+      "comparator_cpu": [
+       "AMD EPYC 7713 64-Core Processor"
+      ]
+     },
      "andrey_correct": 98,
      "andrey_reversed": 2,
      "andrey_no_edge": 0,
@@ -7348,7 +7497,8 @@
        1.96,
        2.77
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 98,
       "andrey_reversed": 2,
       "andrey_no_edge": 0,
@@ -7414,11 +7564,19 @@
      "comparator_ok": 100,
      "paired": 100,
      "datasets": 100,
-     "andrey_s": 0.5901,
-     "comparator_s": 1.5105,
+     "andrey_s": null,
+     "comparator_s": null,
      "ratio": null,
-     "ratio_quartiles": null,
-     "timed_on_one_cpu": 0,
+     "times_across_cpu_models": {
+      "andrey_s": 0.5901,
+      "comparator_s": 1.5105,
+      "andrey_cpu": [
+       "AMD EPYC 9534 64-Core Processor"
+      ],
+      "comparator_cpu": [
+       "AMD EPYC 7713 64-Core Processor"
+      ]
+     },
      "andrey_correct": 99,
      "andrey_reversed": 1,
      "andrey_no_edge": 0,
@@ -7486,7 +7644,8 @@
        1.68,
        2.15
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 98,
       "andrey_reversed": 2,
       "andrey_no_edge": 0,
@@ -7552,11 +7711,19 @@
      "comparator_ok": 100,
      "paired": 100,
      "datasets": 100,
-     "andrey_s": 0.0666,
-     "comparator_s": 0.119,
+     "andrey_s": null,
+     "comparator_s": null,
      "ratio": null,
-     "ratio_quartiles": null,
-     "timed_on_one_cpu": 0,
+     "times_across_cpu_models": {
+      "andrey_s": 0.0666,
+      "comparator_s": 0.119,
+      "andrey_cpu": [
+       "AMD EPYC 9534 64-Core Processor"
+      ],
+      "comparator_cpu": [
+       "AMD EPYC 7713 64-Core Processor"
+      ]
+     },
      "andrey_correct": 96,
      "andrey_reversed": 4,
      "andrey_no_edge": 0,
@@ -7624,7 +7791,8 @@
        1.39,
        1.66
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 100,
       "andrey_reversed": 0,
       "andrey_no_edge": 0,
@@ -7690,11 +7858,19 @@
      "comparator_ok": 100,
      "paired": 100,
      "datasets": 100,
-     "andrey_s": 0.134,
-     "comparator_s": 0.3545,
+     "andrey_s": null,
+     "comparator_s": null,
      "ratio": null,
-     "ratio_quartiles": null,
-     "timed_on_one_cpu": 0,
+     "times_across_cpu_models": {
+      "andrey_s": 0.134,
+      "comparator_s": 0.3545,
+      "andrey_cpu": [
+       "AMD EPYC 9534 64-Core Processor"
+      ],
+      "comparator_cpu": [
+       "AMD EPYC 7713 64-Core Processor"
+      ]
+     },
      "andrey_correct": 98,
      "andrey_reversed": 2,
      "andrey_no_edge": 0,
@@ -7762,7 +7938,8 @@
        1.68,
        2.05
       ],
-      "timed_on_one_cpu": 100,
+      "timed_pairs": 100,
+      "timed_on_one_node": 100,
       "andrey_correct": 100,
       "andrey_reversed": 0,
       "andrey_no_edge": 0,
@@ -7828,11 +8005,19 @@
      "comparator_ok": 99,
      "paired": 99,
      "datasets": 100,
-     "andrey_s": 0.6092,
-     "comparator_s": 1.589,
+     "andrey_s": null,
+     "comparator_s": null,
      "ratio": null,
-     "ratio_quartiles": null,
-     "timed_on_one_cpu": 0,
+     "times_across_cpu_models": {
+      "andrey_s": 0.6092,
+      "comparator_s": 1.589,
+      "andrey_cpu": [
+       "AMD EPYC 9534 64-Core Processor"
+      ],
+      "comparator_cpu": [
+       "AMD EPYC 7713 64-Core Processor"
+      ]
+     },
      "andrey_correct": 95,
      "andrey_reversed": 4,
      "andrey_no_edge": 0,
@@ -7896,9 +8081,13 @@
       "datasets": 100,
       "andrey_s": 0.617,
       "comparator_s": 1.4575,
-      "ratio": null,
-      "ratio_quartiles": null,
-      "timed_on_one_cpu": 0,
+      "ratio": 2.38,
+      "ratio_quartiles": [
+       2.1,
+       2.83
+      ],
+      "timed_pairs": 100,
+      "timed_on_one_node": 0,
       "andrey_correct": 96,
       "andrey_reversed": 4,
       "andrey_no_edge": 0,
@@ -7959,7 +8148,7 @@
    "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
    "lane": "cpcm_graph",
    "output": "DAG",
-   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
    "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
    "same_graph_test": "equal SHD to the true DAG",
@@ -7994,7 +8183,8 @@
       10.5,
       14.85
      ],
-     "timed_on_one_cpu": 20,
+     "timed_pairs": 20,
+     "timed_on_one_node": 20,
      "andrey_shd": 0.0,
      "comparator_shd": 0.0,
      "empty_shd": 5.0,
@@ -8075,7 +8265,8 @@
       8.31,
       11.91
      ],
-     "timed_on_one_cpu": 20,
+     "timed_pairs": 20,
+     "timed_on_one_node": 20,
      "andrey_shd": 0.0,
      "comparator_shd": 0.0,
      "empty_shd": 5.0,
@@ -8151,9 +8342,13 @@
      "datasets": 20,
      "andrey_s": 4.2246,
      "comparator_s": 37.579,
-     "ratio": null,
-     "ratio_quartiles": null,
-     "timed_on_one_cpu": 0,
+     "ratio": 9.15,
+     "ratio_quartiles": [
+      6.87,
+      11.83
+     ],
+     "timed_pairs": 20,
+     "timed_on_one_node": 0,
      "andrey_shd": 0.0,
      "comparator_shd": 1.0,
      "empty_shd": 5.0,
@@ -8243,9 +8438,13 @@
      "datasets": 20,
      "andrey_s": 5.2048,
      "comparator_s": 43.42,
-     "ratio": null,
-     "ratio_quartiles": null,
-     "timed_on_one_cpu": 0,
+     "ratio": 8.14,
+     "ratio_quartiles": [
+      7.75,
+      10.37
+     ],
+     "timed_pairs": 20,
+     "timed_on_one_node": 0,
      "andrey_shd": 0.0,
      "comparator_shd": 0.0,
      "empty_shd": 5.0,
@@ -8327,7 +8526,7 @@
    "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
    "lane": "cpcm_graph.lambda1",
    "output": "DAG",
-   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
    "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
    "same_graph_test": "equal SHD to the true DAG",
@@ -8362,7 +8561,8 @@
       8.42,
       14.2
      ],
-     "timed_on_one_cpu": 20,
+     "timed_pairs": 20,
+     "timed_on_one_node": 20,
      "andrey_shd": 0.0,
      "comparator_shd": 0.0,
      "empty_shd": 5.0,
@@ -8443,7 +8643,8 @@
       8.4,
       11.58
      ],
-     "timed_on_one_cpu": 20,
+     "timed_pairs": 20,
+     "timed_on_one_node": 20,
      "andrey_shd": 0.0,
      "comparator_shd": 0.0,
      "empty_shd": 5.0,
@@ -8519,9 +8720,13 @@
      "datasets": 20,
      "andrey_s": 4.1493,
      "comparator_s": 38.0085,
-     "ratio": null,
-     "ratio_quartiles": null,
-     "timed_on_one_cpu": 0,
+     "ratio": 8.86,
+     "ratio_quartiles": [
+      5.26,
+      10.37
+     ],
+     "timed_pairs": 20,
+     "timed_on_one_node": 0,
      "andrey_shd": 1.0,
      "comparator_shd": 1.0,
      "empty_shd": 5.0,
@@ -8611,9 +8816,13 @@
      "datasets": 20,
      "andrey_s": 5.366,
      "comparator_s": 42.766,
-     "ratio": null,
-     "ratio_quartiles": null,
-     "timed_on_one_cpu": 0,
+     "ratio": 8.9,
+     "ratio_quartiles": [
+      7.15,
+      9.91
+     ],
+     "timed_pairs": 20,
+     "timed_on_one_node": 0,
      "andrey_shd": 0.0,
      "comparator_shd": 0.0,
      "empty_shd": 5.0,
@@ -8695,7 +8904,7 @@
    "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
    "lane": "cpcm_graph",
    "output": "DAG",
-   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
    "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
    "same_graph_test": "equal SHD to the true DAG",
@@ -8722,11 +8931,19 @@
      "comparator_ok": 20,
      "paired": 20,
      "datasets": 20,
-     "andrey_s": 15.6249,
-     "comparator_s": 216.326,
+     "andrey_s": null,
+     "comparator_s": null,
      "ratio": null,
-     "ratio_quartiles": null,
-     "timed_on_one_cpu": 0,
+     "times_across_cpu_models": {
+      "andrey_s": 15.6249,
+      "comparator_s": 216.326,
+      "andrey_cpu": [
+       "AMD EPYC 9534 64-Core Processor"
+      ],
+      "comparator_cpu": [
+       "INTEL(R) XEON(R) GOLD 6542Y"
+      ]
+     },
      "andrey_shd": 0.0,
      "comparator_shd": 0.0,
      "empty_shd": 3.5,
@@ -8814,9 +9031,13 @@
      "datasets": 20,
      "andrey_s": 9.9547,
      "comparator_s": 146.59,
-     "ratio": null,
-     "ratio_quartiles": null,
-     "timed_on_one_cpu": 0,
+     "ratio": 15.68,
+     "ratio_quartiles": [
+      10.13,
+      21.21
+     ],
+     "timed_pairs": 20,
+     "timed_on_one_node": 0,
      "andrey_shd": 0.0,
      "comparator_shd": 0.0,
      "empty_shd": 4.0,
@@ -8904,9 +9125,13 @@
      "datasets": 20,
      "andrey_s": 43.2372,
      "comparator_s": 818.9145,
-     "ratio": null,
-     "ratio_quartiles": null,
-     "timed_on_one_cpu": 0,
+     "ratio": 17.55,
+     "ratio_quartiles": [
+      11.22,
+      24.45
+     ],
+     "timed_pairs": 20,
+     "timed_on_one_node": 0,
      "andrey_shd": 1.5,
      "comparator_shd": 1.0,
      "empty_shd": 8.5,
