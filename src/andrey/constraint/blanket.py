@@ -55,7 +55,13 @@ from andrey.constraint._skeleton import (
 )
 from andrey.core import ARROW, NULL, TAIL, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
-from andrey.core.ci_missing import NOT_TESTED, TestwiseDeletion, not_tested, running_flags
+from andrey.core.ci_missing import (
+    NOT_TESTED,
+    TestwiseDeletion,
+    counts_its_tests,
+    not_tested,
+    running_flags,
+)
 from andrey.core.knowledge import Constraints, orient
 from andrey.core.orient import meek
 from andrey.core.ties import (
@@ -1058,6 +1064,7 @@ def local_search(
     )
 
 
+@counts_its_tests
 def local_structure(
     X: np.ndarray,
     method: str,

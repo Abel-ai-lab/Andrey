@@ -42,7 +42,7 @@ from collections import Counter, OrderedDict
 from collections.abc import Callable, Generator, Iterable, Mapping
 from contextvars import ContextVar
 from functools import partial
-from typing import Any, cast
+from typing import Any, ParamSpec, TypeVar, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -161,6 +161,8 @@ _DF_OFFSET: dict[type, int] = {FisherZ: 3, StudentT: 2}
 _TOGETHER_ROWS = 1 << 16
 #: The tests run inside :func:`rows_tested`, or ``None`` outside it.
 _ROWS: ContextVar[RowCounts | None] = ContextVar("andrey_rows_tested", default=None)
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
 
 
 class RowCounts(Counter[int]):
@@ -266,6 +268,19 @@ def rows_tested() -> Generator[RowCounts]:
         yield counter
     finally:
         _ROWS.reset(token)
+
+
+def counts_its_tests(search: Callable[_P, _R]) -> Callable[_P, _R]:
+    """Run ``search`` inside :func:`search_outcomes`, so the flags it reads
+    (:func:`running_flags`) count its own tests even when no :func:`rows_tested` block runs, as
+    when a search is called directly; inside one, the block takes its counts as before."""
+
+    @functools.wraps(search)
+    def counted(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+        with search_outcomes():
+            return search(*args, **kwargs)
+
+    return counted
 
 
 def running_counter() -> RowCounts | None:

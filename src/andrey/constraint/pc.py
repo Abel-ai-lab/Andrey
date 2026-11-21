@@ -31,7 +31,12 @@ from andrey.constraint._skeleton import (
 from andrey.constraint.mvpc import IndicatorTest, PermutationCorrection, candidate_edges
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
-from andrey.core.ci_missing import rows_tested_elsewhere, running_flags, search_outcomes
+from andrey.core.ci_missing import (
+    counts_its_tests,
+    rows_tested_elsewhere,
+    running_flags,
+    search_outcomes,
+)
 from andrey.core.knowledge import KnowledgeError, orient
 from andrey.core.orient import meek, separating_set, to_structure
 from andrey.core.seeding import resolve_seed
@@ -46,6 +51,7 @@ _EXPENSIVE_PASS_TESTS = 10_000_000
 COLLIDER_ORDERS = ("p_value", "column")
 
 
+@counts_its_tests
 def pc(
     data: np.ndarray,
     *,

@@ -498,3 +498,49 @@ def test_a_flagged_side_orients_nothing_and_a_decided_collider_stands(method):
     assert _arrowheads(moved) == _arrowheads(out)
     for key in ("undecided_pairs", "possibly_separable", "not_tested"):
         assert moved.metadata[key] == out.metadata[key], key
+
+
+@pytest.mark.parametrize(
+    "fit",
+    [
+        lambda df, env: andrey.cdnod(df, env=env, max_depth=1),
+        lambda df, env: andrey.fci_jci(df, env=env, max_depth=1),
+        lambda df, env: andrey.mmpc(df, structure="cpdag", max_depth=1),
+    ],
+    ids=["cdnod", "fci_jci", "mmpc"],
+)
+def test_the_other_orienting_searches_orient_nothing_from_a_flagged_side(fit):
+    """Meek's first rule, or FCI's, would orient C -> D and C -> E from the decided collider, but
+    A - C - D and B - C - E have a flagged side."""
+    df = _collider_beside_cohorts()
+    env = np.random.default_rng(7).integers(0, 2, len(df))
+    out = fit(df, env)
+    assert _skeleton(out) == {("A", "C"), ("B", "C"), ("C", "D"), ("C", "E")}
+    assert _pairs(out, "possibly_separable") == {("C", "D"), ("C", "E")}
+    assert _arrowheads(out) == {("A", "C"), ("B", "C")}
+
+
+def test_pcmciplus_reads_no_collider_from_a_flagged_side():
+    from andrey.temporal.pcmciplus import colliders
+
+    # X0 - X1 - X2 at lag 0, X0 and X2 separated by the empty set: a collider at X1.
+    adjacency = np.zeros((2, 3, 3), dtype=bool)
+    adjacency[0, 0, 1] = adjacency[0, 1, 0] = adjacency[0, 1, 2] = adjacency[0, 2, 1] = True
+    sepsets = {(0, 0, 2): (), (2, 0, 0): ()}
+    args = (None, 3, ((), (), ()), adjacency, sepsets, 0.05, "sepsets")
+    marks, ambiguous = colliders(*args)
+    assert (marks == ARROW).sum() == 2 and not ambiguous  # X0 -> X1 <- X2
+    flagged = np.zeros_like(adjacency)
+    flagged[0, 0, 1] = flagged[0, 1, 0] = True
+    marks, ambiguous = colliders(*args, flagged=flagged)
+    assert ARROW not in marks and (0, 0, 1, 2) in ambiguous
+
+
+def test_a_search_called_directly_reads_its_own_flags():
+    """Outside any counting block, as when the engine is called directly, the flags still come
+    from the search's own tests."""
+    X = _hand("fork", extra=4).to_numpy()
+    for core in (pc_core, fci_core):
+        sink: set[tuple[int, int, int]] = set()
+        core(X, max_depth=3, _ambiguous=sink)
+        assert (0, 2, 1) in sink

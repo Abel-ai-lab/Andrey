@@ -36,7 +36,7 @@ from andrey.constraint.pc import (
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
 from andrey.core._bitset import row_masks, semidirected_reach_set
 from andrey.core.ci import CITest, make_indep_test, pins_blas
-from andrey.core.ci_missing import TestwiseDeletion, running_flags
+from andrey.core.ci_missing import TestwiseDeletion, counts_its_tests, running_flags
 from andrey.core.orient import separating_set
 from andrey.core.ties import tie_mask, tie_ranks
 
@@ -49,6 +49,7 @@ _R4_PARTIAL_PATHS = 10_000
 _R5_PARTIAL_PATHS = 10_000
 
 
+@counts_its_tests
 def fci(
     data: np.ndarray,
     *,

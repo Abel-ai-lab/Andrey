@@ -65,7 +65,7 @@ from andrey.constraint.pc import (
 )
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import make_indep_test
-from andrey.core.ci_missing import mark_environment, running_flags
+from andrey.core.ci_missing import counts_its_tests, mark_environment, running_flags
 from andrey.core.independence import _center_kernel, _gaussian_kernel
 from andrey.core.knowledge import orient
 from andrey.core.orient import _is_directed, _reaches_directed, meek, to_structure
@@ -77,6 +77,7 @@ if TYPE_CHECKING:
 _RIDGE = 0.1
 
 
+@counts_its_tests
 def cdnod(
     data: np.ndarray,
     env: np.ndarray,
