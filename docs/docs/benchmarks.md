@@ -583,6 +583,7 @@ The homepage's speed claim and charts come from these release cards.
 ```{toctree}
 :hidden:
 
+0.19.0 <benchmarks/0.19.0>
 0.18.0 <benchmarks/0.18.0>
 0.17.0 <benchmarks/0.17.0>
 0.16.0 <benchmarks/0.16.0>

@@ -799,7 +799,7 @@ def _sizes(regime: str) -> tuple[str, ...]:
 # pairs only. GIES, GnIES, CD-NOD, MultiGroupDirectLiNGAM, and GIN need what only their regimes
 # have: interventions, environments that change noise variances, domains, groups, or latents
 # measured by indicators. CAM-UV runs on its benchmark's nonlinear regimes with hidden variables.
-# SCORE and NoGAM run on their papers' simulation: Gaussian-process links with additive noise.
+# SCORE, NoGAM, and DAS run on their papers' simulation: Gaussian-process links with additive noise.
 # NOTEARS runs on its benchmark's cells, the simulation its claim is measured in: its least-squares
 # fit reads the columns' units, so one cell has standardized columns and one raw. DAGMA runs on the
 # raw cell only: on standardized columns its median SHD is not below the empty graph's by a clear
@@ -816,7 +816,8 @@ INTERVENTION_DATA = tuple(f"interventional_gauss_er_d{d}" for d, _ in INTERVENTI
 NOISE_INTERVENTION_DATA = tuple(NOISE_INTERVENTION_CELLS)
 #: CAM-UV needs nonlinear additive-noise data with hidden variables.
 HIDDEN_CAUSE_DATA = tuple(HIDDEN_CAUSE_CELLS)
-#: SCORE and NoGAM need additive-noise data; each runs on the cells of its claim.
+#: SCORE, NoGAM, and DAS need additive-noise data; each runs on the cells of its claim, DAS on
+#: SCORE's, since it fits the same model.
 SCORE_DATA = ("score_paper_standardized_d10_er1", "score_paper_standardized_d20_er4")
 NOGAM_DATA = (
     "score_paper_laplace_standardized_d10_er1",
@@ -952,6 +953,7 @@ SUPPORTED: dict[str, Method] = {
     "RESIT": Method(lambda x: andrey.resit(x), "dag", ("anm_er_n1000_d5", "anm_er_n1000_d10")),
     "ScoreMatching": Method(lambda x: andrey.score_matching(x), "dag", SCORE_DATA),
     "NoGAM": Method(lambda x: andrey.nogam(x), "dag", NOGAM_DATA),
+    "DAS": Method(lambda x: andrey.das(x), "dag", SCORE_DATA),
     "ExactSearch": Method(lambda x: andrey.exact_search(x), "cpdag", SMALL_DATA),
     "CALM": Method(lambda x: andrey.calm(x, seed=0), "cpdag", CALM_DATA),
     "NOTEARS": Method(lambda x: andrey.notears(x), "dag", tuple(LINEAR_SEM_CELLS)),
@@ -1329,6 +1331,8 @@ SLOWEST_FIRST: tuple[tuple[str, str], ...] = (
     ("GPDC", "nonmonotone_er_d5"),
     ("ExactSearch", "linear_gauss_er_d15"),
     ("ScoreMatching", "score_paper_standardized_d10_er1"),
+    ("DAS", "score_paper_standardized_d20_er4"),
+    ("DAS", "score_paper_standardized_d10_er1"),
     ("DAGMA", "notears_paper_raw_d10"),
     ("NOTEARS", "notears_paper_raw_d10"),
 )
