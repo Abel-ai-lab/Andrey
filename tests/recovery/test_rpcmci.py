@@ -93,17 +93,6 @@ def test_recovers_the_regimes_and_their_graphs(model):
         assert scores["lagged"]["shd"] <= 1, (model, k, scores["lagged"])
 
 
-def test_independent_series_have_no_link_in_any_regime():
-    """Independent noise, whatever the regimes the fit draws: no regime has a lagged link."""
-    rng = np.random.default_rng(3)
-    x = rng.standard_normal((400, 2))
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        out = andrey.rpcmci(x, max_transitions=20, n_starts=10, seed=0)
-    for o in out.outputs:
-        assert o.structure.lag(1).oriented_edges() == []
-
-
 def test_more_starts_never_raise_the_objective():
     """The returned start has the lowest objective, so ten starts include the first one's."""
     x, regimes = simulate("sign", 1001)

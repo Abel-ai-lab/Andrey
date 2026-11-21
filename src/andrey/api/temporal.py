@@ -2219,9 +2219,10 @@ def rpcmci(
         smallest that lets a regime start or end, allows one change point per regime; set it from
         the time scale of the regimes.
     switch_threshold : float, default=0.5
-        The weight at which a time step joins a regime's PCMCI step and model fit, in ``(0, 1)``:
-        step ``t`` joins regime ``k`` when ``gamma_k(t) >= switch_threshold``. The first weights
-        are drawn in ``[0, 1)``, so ``1`` would leave every regime empty.
+        The weight above which a time step joins a regime's PCMCI step and model fit, in
+        ``(0, 1)``: step ``t`` joins regime ``k`` when ``gamma_k(t) > switch_threshold``, with the
+        weight rounded to 9 decimals. The first weights are drawn in ``[0, 1)``, so ``1`` would
+        leave every regime empty.
     tau_max : int, default=1
         The largest lag tested, at least ``1``: links at lags ``1`` to ``tau_max`` are tested.
     pc1_alpha : float, default=0.2
@@ -2311,7 +2312,7 @@ def rpcmci(
     or use :func:`~andrey.jpcmciplus` on series from known contexts.
 
     A start draws its regime weights uniformly in ``[0, 1)`` and repeats two steps [1]_. First, for
-    each regime ``k``, PCMCI runs on the steps ``t`` with ``gamma_k(t) >= switch_threshold``: each
+    each regime ``k``, PCMCI runs on the steps ``t`` with ``gamma_k(t) > switch_threshold``: each
     test reads those steps as the time of its effect and the lagged values of every earlier step.
     Each variable is regressed by least squares, with an intercept, on its MCI parents in the regime
     over the same steps, and the fit predicts every step from ``tau_max`` on. Second, with
@@ -2329,13 +2330,14 @@ def rpcmci(
     start has the lowest objective among the others that ran, the earliest of objectives that agree
     to 9 decimals per time step.
 
-    The paper's threshold for joining a regime is ``0.5`` [1]_, the default, and a step joins at the
-    threshold; the authors' code defaults to ``0.05`` and joins a step above it, which differs for a
-    step the linear program weighs half in each regime. Dividing each residual by its regime's
-    standard deviation follows the authors' code, so rescaling a column changes no result. Equal PC1
-    strengths are ordered by each variable's rank, as in :func:`~andrey.pcmci`, and the residuals
-    enter the cost in rank order, so reordering the columns relabels the result and changes nothing
-    else.
+    The paper's threshold for joining a regime is ``0.5`` [1]_, the default. The paper's Eq. 11
+    reads ``>=``, and Andrey follows the authors' code, which uses ``>``, so a step the linear
+    program weighs half in each of two regimes joins neither fit. Each weight is rounded
+    to 9 decimals before the comparison, so this holds when the solver returns half with an error in
+    its last bits. Dividing each residual by its regime's standard deviation follows the authors'
+    code, so rescaling a column changes no result. Equal PC1 strengths are ordered by each
+    variable's rank, as in :func:`~andrey.pcmci`, and the residuals enter the cost in rank order, so
+    reordering the columns relabels the result and changes nothing else.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: a missing value would remove
     its step from every regime's fit and leave its regime unknown. Use :func:`~andrey.pcmci`,
@@ -2347,8 +2349,10 @@ def rpcmci(
     in which a regime holds steps of several true regimes, and some starts end with a regime too
     small to fit; ``n_starts`` guards against it at a cost that grows linearly with it [1]_.
     Regimes whose models differ little, such as one link's strength alone, are hard to tell apart
-    [1]_. The number of regimes and ``max_transitions`` are not learned. Each iteration runs PCMCI
-    once per regime and solves one linear program over ``2 * n_regimes * n_samples`` variables.
+    [1]_. On a series without regimes, each regime keeps the steps its model fits best, so a
+    regime, most often a small one, can hold a spurious link. The number of regimes and
+    ``max_transitions`` are not learned. Each iteration runs PCMCI once per regime and solves one
+    linear program over ``2 * n_regimes * n_samples`` variables.
     The numbers are a reference, not a hard limit: they change with the data generator, the
     density, the method's settings, and the machine.
 
