@@ -74,6 +74,23 @@ def test_cpcm_names_the_direction_of_pairs_from_each_family(family):
     assert right >= 10
 
 
+def test_the_true_direction_of_a_pareto_pair_rejects_near_the_level():
+    # Model (16) at gamma 0: a heavy-tailed cause on [1, inf) with density proportional to
+    # 1 / ((log x + 1) x^2), and a Pareto effect of shape log x + 1. The test of the true
+    # direction rejects at the 5% level on 11 of these 100 pairs; the stiffer smoother that the
+    # Laplace approximate marginal likelihood picks leaves the residual dependent on the cause
+    # and rejects on 20.
+    rejected = 0
+    for seed in range(100):
+        rng = np.random.default_rng(seed)
+        u = rng.exponential(size=2000)
+        x = np.exp(u[rng.random(u.size) < 1.0 / (1.0 + u)][:500])
+        y = rng.random(x.size) ** (-1.0 / (np.log(x) + 1.0))
+        p = cpcm(np.column_stack([x, y]), family="pareto").metadata["p_values"]["forward"]
+        rejected += p < 0.05
+    assert rejected <= 15
+
+
 def test_the_negative_binomial_family_reads_poisson_counts_as_its_limit():
     # Poisson counts are the negative binomial's limit of infinite size, where its likelihood is
     # flat: the direction holds and the forward residual stays independent of the cause.

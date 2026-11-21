@@ -4,11 +4,13 @@ import math
 
 import numpy as np
 import pytest
+from scipy import special
 
 from andrey.api.fcm import cpcm_graph
 from andrey.api.irregular import cpcm
 from andrey.core.independence import dhsic_gram, dhsic_log_p
 from andrey.core.ties import tie_ranks
+from andrey.fcm import cpcm as cpcm_module
 from andrey.fcm.cpcm import FAMILIES, LOG_SCALE_FLOOR, _log_size_bound, _term, all_dags, fit
 
 SUPPORT = {
@@ -70,8 +72,8 @@ def test_each_family_has_the_derivatives_of_its_likelihood(name):
     [
         ("poisson", 2.5, "counts"),
         ("negative_binomial", -1.0, "counts"),
-        ("pareto", 0.5, "at least 1"),
-        ("exponential", -0.1, "non-negative"),
+        ("pareto", 1.0, "greater than 1"),
+        ("exponential", 0.0, "positive"),
         ("gamma", 0.0, "positive"),
         ("gamma_fixed_shape", -2.0, "positive"),
     ],
@@ -427,6 +429,45 @@ def test_rows_that_are_equal_in_every_column_are_at_distance_zero():
     assert np.all(gram[~same] < 1e-6)  # the width for a zero median distance
     moved = dhsic_gram(X * np.array([3.7e5, 1e-9, 12.0]), standardize=True)
     np.testing.assert_allclose(moved, gram, rtol=1e-9, atol=1e-12)
+
+
+@pytest.mark.parametrize("name", ["exponential", "pareto", "poisson"])
+def test_a_one_parameter_family_scores_its_smoothness_by_gcv_or_ubre(name, monkeypatch):
+    # The score of every point the search reads, recomputed from the fitted means: the deviance
+    # from the family's own formula and the effective degrees of freedom as the trace of the
+    # influence matrix under the Newton weights.
+    family, table = FAMILIES[name], _family_pair(name, n=200)
+    y = table[:, 1] if family.rescale is None else family.rescale(table[:, 1])
+    points = []
+    score = cpcm_module._Model.score
+
+    def spy(model, rho):
+        value, etas = score(model, rho)
+        points.append((model, rho, value, etas))
+        return value, etas
+
+    monkeypatch.setattr(cpcm_module._Model, "score", spy)
+    fit(y, [_term(table[:, 0])], family)
+    assert family.criterion == ("ubre" if name == "poisson" else "gcv")
+    finite = [p for p in points if math.isfinite(p[2])]
+    assert len(finite) > 10
+    n, z = y.size, np.log(y) if name == "pareto" else y
+    for model, rho, value, etas in finite[:: len(finite) // 5]:
+        B, mu = model.designs[0], np.exp(etas[0])
+        if name == "poisson":
+            deviance = 2.0 * np.sum(special.xlogy(z, z / mu) - (z - mu))
+            weights = mu
+        else:
+            deviance = 2.0 * np.sum(-np.log(z / mu) + (z - mu) / mu)
+            weights = z / mu
+        BW = B.T * weights
+        edf = np.trace(np.linalg.solve(BW @ B + model.penalty(rho), BW @ B))
+        expected = (
+            deviance / n + 2.0 * edf / n - 1.0
+            if name == "poisson"
+            else n * deviance / (n - edf) ** 2
+        )
+        assert value == pytest.approx(expected, rel=1e-8)
 
 
 def test_the_negative_binomial_size_bound_follows_the_counts():
