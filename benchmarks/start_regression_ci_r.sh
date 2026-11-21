@@ -53,7 +53,7 @@ trap 'rm -rf "$tmp"' EXIT
 for entry in "${TARBALLS[@]}" "${WGCM_TARBALLS[@]}"; do
     read -r path sha <<< "$entry"
     file="$tmp/$(basename "$path")"
-    curl -fsSL -o "$file" "$CONTRIB/$(basename "$path")" || curl -fsSL -o "$file" "$ARCHIVE/$path"
+    curl -fsL -o "$file" "$CONTRIB/$(basename "$path")" || curl -fsSL -o "$file" "$ARCHIVE/$path"
     echo "$sha  $file" | sha256sum --check --status || { echo "$path does not match $sha" >&2; exit 1; }
 done
 
@@ -79,10 +79,13 @@ R_LIBS="$R_LIBS_WGCM" Rscript --vanilla -e '
     need <- function(p) length(find.package(p, lib.loc = lib, quiet = TRUE)) == 0L
     deps <- Filter(need, c("Matrix", "data.table", "jsonlite", "mgcv"))
     if (length(deps)) install.packages(deps, lib = lib)
-    for (f in c("xgboost_3.2.1.1", "weightedGCM_0.1.2"))
+    # An xgboost 3.2.1.1 that the R installation already holds is used as it is.
+    have <- tryCatch(packageVersion("xgboost") == "3.2.1.1", error = function(e) FALSE)
+    for (f in c(if (!have) "xgboost_3.2.1.1", "weightedGCM_0.1.2"))
         install.packages(file.path(tmp, paste0(f, ".tar.gz")), lib = lib, repos = NULL, type = "source")
+    stopifnot(packageVersion("xgboost") == "3.2.1.1")
     for (p in c("weightedGCM", "xgboost"))
-        cat(p, as.character(packageVersion(p, lib.loc = lib)), "\n")
+        cat(p, as.character(packageVersion(p)), "\n")
 ' "$tmp"
 
 if [ ! -d "$PCM_CODE/.git" ]; then
