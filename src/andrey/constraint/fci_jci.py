@@ -171,7 +171,7 @@ def fci_jci(
         marks[kept] = NULL
     mark_index(marks, d, confounded_index)
     adjacency = marks != NULL
-    flagged = running_flags(adjacency)
+    flagged = running_flags(adjacency, latent=True)
     ambiguous = unseparated_triples(adjacency, sepsets, padded, undecided)
     if collider_rule != "sepsets":
         ambiguous |= vote_triples(

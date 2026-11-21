@@ -127,8 +127,8 @@ CD-NOD, FCI-JCI, the Markov-blanket searches, PCMCI, PCMCI+, and LPCMCI,
 `metadata["possibly_separable"]` lists the edges drawn although a conditioning set that could not
 be tested might have separated their pair; with `possibly_separable="ambiguous"`, PC, FCI, CD-NOD,
 FCI-JCI, the Markov-blanket searches' CPDAG, and PCMCI+ read no triple with such a side as a
-collider or a non-collider. The notice gives the number of those pairs and edges, not of the
-sets. `pc` also takes
+collider or a non-collider; LPCMCI lists such links but does not read them. The notice gives the
+number of those pairs and edges, not of the sets. `pc` also takes
 `missing="mvpc"`: Missing-Value PC (Tu et al., 2019) finds the parents of each missingness indicator
 and tests again the edges they could have kept; `metadata["corrected_edges"]["rows_tested"]` gives
 the fewest and the median rows such a test read, and `metadata["corrected_edges"]["p_one_tests"]`,

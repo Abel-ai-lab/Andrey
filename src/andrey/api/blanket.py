@@ -208,8 +208,9 @@ def iamb(
         ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
         any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
         rule orients through it, when a conditioning set not tested of that side lies within the
-        other adjacencies of one of its ends: a set that separates a pair lies within the parents
-        of one end, so that set might be the separating set the search missed. On merged cohorts
+        other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
+        lies within the parents of one end, so that set might be the separating set the search
+        missed. On merged cohorts
         that no row bridges, ``"ambiguous"`` removes most false colliders and most true
         arrowheads with them, and the graph can then be farther from the truth than the empty
         graph. Read under ``structure="cpdag"`` only.
@@ -510,8 +511,9 @@ def inter_iamb(
         ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
         any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
         rule orients through it, when a conditioning set not tested of that side lies within the
-        other adjacencies of one of its ends: a set that separates a pair lies within the parents
-        of one end, so that set might be the separating set the search missed. On merged cohorts
+        other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
+        lies within the parents of one end, so that set might be the separating set the search
+        missed. On merged cohorts
         that no row bridges, ``"ambiguous"`` removes most false colliders and most true
         arrowheads with them, and the graph can then be farther from the truth than the empty
         graph. Read under ``structure="cpdag"`` only.
@@ -809,8 +811,9 @@ def mmpc(
         ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
         any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
         rule orients through it, when a conditioning set not tested of that side lies within the
-        other adjacencies of one of its ends: a set that separates a pair lies within the parents
-        of one end, so that set might be the separating set the search missed. On merged cohorts
+        other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
+        lies within the parents of one end, so that set might be the separating set the search
+        missed. On merged cohorts
         that no row bridges, ``"ambiguous"`` removes most false colliders and most true
         arrowheads with them, and the graph can then be farther from the truth than the empty
         graph. Read under ``structure="cpdag"`` only.

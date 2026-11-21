@@ -3,8 +3,9 @@
 A pair that no test with rows could decide, as a pair never observed together, is left out of the
 graph and listed in ``metadata["undecided_pairs"]``; no orientation reads it. A drawn edge that a
 conditioning set not tested might have separated is listed in ``metadata["possibly_separable"]``;
-with ``possibly_separable="ambiguous"``, no rule reads a triple with such a side, one whose set not
-tested lies within an end's other adjacencies, as a collider or a non-collider.
+with ``possibly_separable="ambiguous"``, no rule reads a triple with such a side as a collider or a
+non-collider: in PC, one whose set not tested lies within the nodes adjacent to an end or undecided
+with it; in FCI, every one.
 The hand cases are three variables ``X``, ``Y`` and a third, with weights 0.8, root noise 1 and
 child noise 0.6, merged from cohorts that each observe some of them.
 """
@@ -80,15 +81,17 @@ def _arrowheads(out) -> set[tuple[str, str]]:
 
 def _ambiguous(method: str, df: pd.DataFrame, **settings):
     """The triples ``method``'s core search reads as neither a collider nor a non-collider, by name
-    with the ends in name order; the flagged pairs whose rules it vetoes, those with a set not
-    tested within an end's adjacencies; its boolean adjacency; and the names."""
+    with the ends in name order; the flagged pairs whose rules it vetoes, for PC those with a set
+    not tested within an end's possible adjacencies, for FCI every one; its boolean adjacency; and
+    the names."""
     core = {"pc": pc_core, "fci": fci_core}[method]
     sink: set[tuple[int, int, int]] = set()
     with ci_missing.rows_tested() as rows, ci_missing.reading_flags():
         graph = core(df.to_numpy(), _ambiguous=sink, **settings)
     names = [str(c) for c in df.columns]
     drawn = graph.to_numpy() != NULL
-    flagged = {tuple(sorted((names[a], names[b]))) for a, b in rows.separable_within(drawn)}
+    read = rows.possibly_separable if method == "fci" else rows.separable_within
+    flagged = {tuple(sorted((names[a], names[b]))) for a, b in read(drawn)}
     triples = {(min(names[a], names[c]), names[b], max(names[a], names[c])) for a, b, c in sink}
     return triples, flagged, drawn, names
 
@@ -196,9 +199,8 @@ def test_no_rule_reads_an_undecided_pair_as_apart(method):
 @pytest.mark.parametrize("method", list(FITS))
 @pytest.mark.parametrize("seed", [0, 1])
 def test_no_rule_reads_a_triple_with_a_flagged_side(method, seed):
-    """On merged cohorts, read as ambiguous, every unshielded triple with a flagged side whose set
-    not tested lies within an end's adjacencies is ambiguous, whether its ends are decided apart or
-    undecided."""
+    """On merged cohorts, read as ambiguous, every unshielded triple with a side the search reads
+    is ambiguous, whether its ends are decided apart or undecided."""
     df = _merged_cohorts(seed)
     triples, flagged, drawn, names = _ambiguous(method, df, max_depth=2)
     expected = set()
@@ -574,10 +576,42 @@ def test_a_search_called_directly_reads_its_own_flags():
         assert (0, 2, 1) not in sink
 
 
+def _parent_never_observed_with_its_children(seed: int = 0, n: int = 4000) -> pd.DataFrame:
+    """U -> X, U -> Y, W -> Y, with X, Y and W observed in one cohort and U and W in the other: no
+    row observes U with X or Y, so its pairs with them are undecided."""
+    rng = np.random.default_rng(seed)
+    u, w = rng.standard_normal(n), rng.standard_normal(n)
+    x = 0.8 * u + 0.6 * rng.standard_normal(n)
+    y = 0.8 * u + 0.8 * w + 0.6 * rng.standard_normal(n)
+    df = pd.DataFrame({"X": x, "Y": y, "W": w, "U": u})
+    df.loc[: n // 2 - 1, "U"] = np.nan
+    df.loc[n // 2 :, ["X", "Y"]] = np.nan
+    return df.iloc[rng.permutation(n)].reset_index(drop=True)
+
+
+@pytest.mark.parametrize("method", list(FITS))
+def test_a_separator_undecided_with_both_ends_makes_the_triple_ambiguous(method):
+    """U, undecided with X and with Y, is the separating set of X and Y that no row could test:
+    read as ambiguous, X - Y - W is no collider."""
+    df = _parent_never_observed_with_its_children()
+    out = FITS[method](df, max_depth=3)
+    assert _skeleton(out) == {("X", "Y"), ("W", "Y")}
+    assert _pairs(out, "undecided_pairs") == {("U", "X"), ("U", "Y")}
+    assert _pairs(out, "possibly_separable") == {("X", "Y"), ("W", "Y")}
+    assert {("X", "Y"), ("W", "Y")} <= _arrowheads(out)  # read as any other triple
+    on = FITS[method](df, max_depth=3, **AMBIGUOUS)
+    assert _skeleton(on) == _skeleton(out)
+    assert not _arrowheads(on)
+    triples, flagged, *_ = _ambiguous(method, df, max_depth=3)
+    assert ("W", "Y", "X") in triples
+    assert flagged == {("X", "Y"), ("W", "Y")}
+
+
 def test_a_flagged_side_is_vetoed_only_by_a_set_within_an_ends_adjacencies():
-    """A set not tested that holds a column adjacent to neither end of its pair cannot be the
-    separating set the search missed; one within an end's other adjacencies, or one not known,
-    can. The sets are kept only while flags are read."""
+    """A set not tested that holds a column adjacent to neither end of its pair, nor undecided
+    with it, cannot be the separating set the search missed; one within an end's other
+    adjacencies or undecided partners, or one not known, can. A search that allows latent
+    variables reads every flagged pair. The sets are kept only while flags are read."""
     # Pairs (0, 1), (1, 2), (2, 3) are drawn; 4 and 5 are adjacent to 3 only.
     drawn = np.zeros((6, 6), dtype=bool)
     for a, b in ((0, 1), (1, 2), (2, 3), (3, 4), (3, 5)):
@@ -593,6 +627,18 @@ def test_a_flagged_side_is_vetoed_only_by_a_set_within_an_ends_adjacencies():
         rows.add([1], [ci_missing.NOT_TESTED], [2], [3], [[4, 5]])  # 4 and 5 are beside 3
         assert sorted(rows.possibly_separable(drawn)) == tested
         assert sorted(rows.separable_within(drawn)) == [(1, 2), (2, 3)]
+        # 4 never shares rows with 0: the pair is undecided, so 4 may be adjacent to 0.
+        undecided = ci_missing.RowCounts()
+        undecided.merge(rows)
+        undecided.add([1], [ci_missing.NOT_TESTED], [0], [4], [[]])
+        assert sorted(undecided.separable_within(drawn)) == tested
         # A set not known is kept as the empty set, within every end's adjacencies.
         rows.add([1], [ci_missing.NOT_TESTED], [0], [1])
         assert sorted(rows.separable_within(drawn)) == tested
+    narrowed = ci_missing.RowCounts()
+    narrowed.add([50] * 3, [0.01] * 3, *zip(*tested))
+    with ci_missing.rows_tested() as running, ci_missing.reading_flags():
+        running.merge(narrowed)
+        running.add([1], [ci_missing.NOT_TESTED], [0], [1], [[4]])
+        assert ci_missing.running_flags(drawn) == []
+        assert ci_missing.running_flags(drawn, latent=True) == [(0, 1)]

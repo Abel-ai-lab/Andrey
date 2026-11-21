@@ -42,7 +42,8 @@ names its pull request.
 - `possibly_separable="ambiguous"` in PC, FCI, CD-NOD, FCI-JCI, the Markov-blanket searches' CPDAG,
   and PCMCI+ reads a triple with a side in `metadata["possibly_separable"]` as neither a collider
   nor a non-collider, in FCI's discriminating-path rule too, when a conditioning set not tested of
-  that side lies within the other adjacencies of one of its ends; PCMCI+ so reads every listed link.
+  that side lies within the other nodes adjacent to one of its ends or undecided with it; FCI,
+  FCI-JCI, and PCMCI+ so read every listed side. LPCMCI lists such links but does not read them.
   The default, `"orient"`, reads it as any other triple, as before. On merged cohorts that no row
   bridges it removes most false colliders and most true arrowheads with them: PC's graph is then
   farther from the truth than the empty graph, and in FCI and FCI-JCI the skeleton and

@@ -126,8 +126,9 @@ def pc(
         ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
         any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
         rule orients through it, when a conditioning set not tested of that side lies within the
-        other adjacencies of one of its ends: a set that separates a pair lies within the parents
-        of one end, so that set might be the separating set the search missed. On merged cohorts
+        other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
+        lies within the parents of one end, so that set might be the separating set the search
+        missed. On merged cohorts
         that no row bridges, ``"ambiguous"`` removes most false colliders and most true
         arrowheads with them, and the graph can then be farther from the truth than the empty
         graph.
@@ -723,16 +724,13 @@ def fci(
     possibly_separable : {"orient", "ambiguous"}, default="orient"
         How the orientation rules read a triple ``x - z - y`` with a side listed in
         ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
-        any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
-        rule orients through it, when a conditioning set not tested of that side lies within the
-        other adjacencies of one of its ends: a set that separates a pair lies within the parents
-        of one end, so that set might be the separating set the search missed. On merged cohorts
-        that no row bridges, ``"ambiguous"`` removes most false colliders and most true
-        arrowheads with them, and the graph can then be farther from the truth than the empty
-        graph. Under ``"ambiguous"``, the collider pass before the possible-d-separation step
-        reads it too, so that step's sets, the skeleton, and ``metadata["not_tested"]`` can
-        change; the reason a set beyond both ends' adjacencies is no missed separating set is
-        PC's, and the possible-d-separation sets reach beyond the adjacencies.
+        any other triple. ``"ambiguous"`` makes every such triple neither a collider nor a
+        non-collider, and no rule orients through it: with latent variables, a set that separates
+        a pair lies within the possible-d-separating set of one end, beyond its adjacencies, so
+        any conditioning set not tested might be the separating set the search missed. On merged
+        cohorts that no row bridges, ``"ambiguous"`` removes most false colliders and most true
+        arrowheads with them. The collider pass before the possible-d-separation step reads it
+        too, so that step's sets, the skeleton, and ``metadata["not_tested"]`` can change.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1601,8 +1599,9 @@ def cdnod(
         ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
         any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
         rule orients through it, when a conditioning set not tested of that side lies within the
-        other adjacencies of one of its ends: a set that separates a pair lies within the parents
-        of one end, so that set might be the separating set the search missed. On merged cohorts
+        other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
+        lies within the parents of one end, so that set might be the separating set the search
+        missed. On merged cohorts
         that no row bridges, ``"ambiguous"`` removes most false colliders and most true
         arrowheads with them, and the graph can then be farther from the truth than the empty
         graph.
@@ -2018,16 +2017,13 @@ def fci_jci(
     possibly_separable : {"orient", "ambiguous"}, default="orient"
         How the orientation rules read a triple ``x - z - y`` with a side listed in
         ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
-        any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
-        rule orients through it, when a conditioning set not tested of that side lies within the
-        other adjacencies of one of its ends: a set that separates a pair lies within the parents
-        of one end, so that set might be the separating set the search missed. On merged cohorts
-        that no row bridges, ``"ambiguous"`` removes most false colliders and most true
-        arrowheads with them, and the graph can then be farther from the truth than the empty
-        graph. Under ``"ambiguous"``, the collider pass before the possible-d-separation step
-        reads it too, so that step's sets, the skeleton, and ``metadata["not_tested"]`` can
-        change; the reason a set beyond both ends' adjacencies is no missed separating set is
-        PC's, and the possible-d-separation sets reach beyond the adjacencies.
+        any other triple. ``"ambiguous"`` makes every such triple neither a collider nor a
+        non-collider, and no rule orients through it: with latent variables, a set that separates
+        a pair lies within the possible-d-separating set of one end, beyond its adjacencies, so
+        any conditioning set not tested might be the separating set the search missed. On merged
+        cohorts that no row bridges, ``"ambiguous"`` removes most false colliders and most true
+        arrowheads with them. The collider pass before the possible-d-separation step reads it
+        too, so that step's sets, the skeleton, and ``metadata["not_tested"]`` can change.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,

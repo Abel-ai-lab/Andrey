@@ -148,7 +148,7 @@ def fci(
     if kept is not None:
         marks[kept] = NULL
     adjacency = marks != NULL
-    flagged = running_flags(adjacency)
+    flagged = running_flags(adjacency, latent=True)
     ambiguous = unseparated_triples(adjacency, sepsets, constraints, undecided)
     if collider_rule != "sepsets":
         ambiguous |= vote_triples(
@@ -212,7 +212,7 @@ def flagged_sides(marks: np.ndarray) -> frozenset[tuple[int, int, int]]:
     """The unshielded triples of ``marks`` with a side the tests so far flag as possibly separable
     (:func:`~andrey.constraint._skeleton.flagged_triples`): no collider is read from them."""
     adjacency = marks != NULL
-    return flagged_triples(adjacency, running_flags(adjacency))
+    return flagged_triples(adjacency, running_flags(adjacency, latent=True))
 
 
 def circle_pag(support: np.ndarray) -> np.ndarray:
@@ -624,8 +624,7 @@ def _first_separating(
                 test, x, y, kept, adj_a, adj_b, alpha, max_depth, tested, pool
             )
             within = (adj_a, adj_b, tested)
-            dropped = [[v] for v in dsep if not met[v]]
-            test.count_not_tested(x, y, _left_out(dsep, kept, within, max_depth, found), dropped)
+            test.count_not_tested(x, y, _left_out(dsep, kept, within, max_depth, found))
             return found
     sizes = range(1, _largest_size(len(dsep), max_depth) + 1)
     if canonical_capable(test) and len(dsep) <= MASK_BITS:

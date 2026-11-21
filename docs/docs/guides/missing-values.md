@@ -147,8 +147,11 @@ every drawn edge is flagged, since another cohort's variable could have separate
 may be absent, and the triple with it. With `possibly_separable="ambiguous"`, PC, FCI, CD-NOD,
 FCI-JCI, the Markov-blanket searches' CPDAG, and PCMCI+ read a triple with a flagged side as neither
 a collider nor a non-collider, as for a triple whose ends are undecided, when a conditioning set not
-tested of that side lies within the other adjacencies of one of its ends; PCMCI+ so reads every
-flagged link. The default, `"orient"`, reads it as any other triple.
+tested of that side lies within the other nodes adjacent to one of its ends or undecided with it,
+since a set that separates a pair lies within the parents of one end. FCI and FCI-JCI, which allow
+latent variables, so read every flagged side, since their separating sets can lie beyond the
+adjacencies, and PCMCI+ every flagged link. LPCMCI lists flagged links but does not read them. The
+default, `"orient"`, reads it as any other triple.
 
 The choice is a trade. In merged cohorts that no row bridges, nearly every drawn edge is flagged,
 and `"ambiguous"` removes most false colliders and most true arrowheads with them: the graph can

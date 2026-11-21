@@ -275,17 +275,23 @@ class RowCounts(Counter[int]):
 
     def separable_within(self, drawn: np.ndarray) -> list[tuple[int, int]]:
         """The pairs of :meth:`possibly_separable` with a conditioning set not tested that lies
-        within the other columns adjacent in ``drawn`` to one of its ends.
+        within the possible adjacencies of one of its ends: the other columns adjacent to it in
+        ``drawn``, and those it forms an undecided pair with (:meth:`untested`).
 
-        A set that separates a pair lies within the parents of one of its ends, which the
-        adjacencies of a search that removes no true edge hold; a set not tested beyond both ends'
-        adjacencies is then no separating set that the search missed. A pair whose sets not
-        tested are not known is kept."""
+        A set that separates a pair, when every variable is measured, lies within the parents of
+        one of its ends. A search that removes no true edge keeps each parent adjacent, or leaves
+        it undecided when no test with rows could decide the pair, so a set not tested beyond both
+        ends' possible adjacencies is no separating set that the search missed. A pair whose sets
+        not tested are not known is kept."""
+        undecided: dict[int, set[int]] = {}
+        for a, b in self.untested():
+            undecided.setdefault(a, set()).add(b)
+            undecided.setdefault(b, set()).add(a)
         kept = []
         for a, b in self.possibly_separable(drawn):
             sets = self.untested_sets.get((a, b), {frozenset()})
-            near_a = set(np.flatnonzero(drawn[a]).tolist()) - {b}
-            near_b = set(np.flatnonzero(drawn[b]).tolist()) - {a}
+            near_a = (set(np.flatnonzero(drawn[a]).tolist()) | undecided.get(a, set())) - {b}
+            near_b = (set(np.flatnonzero(drawn[b]).tolist()) | undecided.get(b, set())) - {a}
             if any(s <= near_a or s <= near_b for s in sets):
                 kept.append((a, b))
         return kept
@@ -349,15 +355,21 @@ def running_counter() -> RowCounts | None:
     return _ROWS.get()
 
 
-def running_flags(adjacency: np.ndarray) -> list[tuple[int, int]]:
+def running_flags(adjacency: np.ndarray, *, latent: bool = False) -> list[tuple[int, int]]:
     """The pairs adjacent in the boolean ``adjacency`` that the tests counted so far in the running
     :func:`rows_tested` block flag as possibly separable, with a conditioning set not tested within
-    an end's other adjacencies (:meth:`RowCounts.separable_within`); none outside a
+    an end's possible adjacencies (:meth:`RowCounts.separable_within`); none outside a
     :func:`reading_flags` block or a counting block, or when every query was tested, as on
-    complete data."""
+    complete data.
+
+    With ``latent``, for a search that allows latent variables, every flagged pair is listed
+    (:meth:`RowCounts.possibly_separable`): a set that separates a pair then lies within the
+    possible-d-separating set of an end, not within its adjacencies."""
     counter = _ROWS.get()
     if counter is None or not counter.not_tested or not _READ_FLAGS.get():
         return []
+    if latent:
+        return counter.possibly_separable(adjacency)
     return counter.separable_within(adjacency)
 
 
