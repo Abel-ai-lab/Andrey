@@ -31,7 +31,13 @@ from andrey.core.ci import (
     STOCHASTIC_INDEP_TESTS,
     available_indep_tests,
 )
-from andrey.core.ci_missing import NOT_TESTED_CLAIM, TESTWISE, TESTWISE_CLAIM, named_pairs
+from andrey.core.ci_missing import (
+    NOT_TESTED_CLAIM,
+    POSSIBLY_SEPARABLE_CLAIM,
+    TESTWISE,
+    TESTWISE_CLAIM,
+    named_pairs,
+)
 from andrey.core.knowledge import PATH_PARTS, Knowledge, resolve
 from andrey.core.output import RegimeOutput
 from andrey.core.removed import removal_hint
@@ -753,7 +759,9 @@ def _not_tested_notice(metadata: dict) -> str:
     ``""`` when the fit has no pair never observed together, no test not tested, and no undecided
     pair. Otherwise it gives the number of pairs never observed together and, with tests not
     tested or undecided pairs, the :data:`~andrey.core.ci_missing.NOT_TESTED_CLAIM` and the number
-    of undecided pairs, naming the pairs when there are at most ``_NOTICE_PAIRS``. The number of
+    of undecided pairs, and with possibly separable edges the
+    :data:`~andrey.core.ci_missing.POSSIBLY_SEPARABLE_CLAIM` and their number, naming the pairs when
+    there are at most ``_NOTICE_PAIRS``. The number of
     conditioning sets not tested, ``metadata["not_tested"]``, is left out: it includes the sets the
     search skipped because no row can test them, so its size follows the search, not what a user
     can change.
@@ -781,6 +789,11 @@ def _not_tested_notice(metadata: dict) -> str:
             text += f" {counted(undecided)} {verb} undecided."
         else:
             text += " No pair is undecided."
+    if possibly := metadata.get("possibly_separable"):
+        verb = "is" if len(possibly) == 1 else "are"
+        text += (
+            f" {POSSIBLY_SEPARABLE_CLAIM} {counted(possibly, ' of drawn edges')} {verb} flagged."
+        )
     return text
 
 

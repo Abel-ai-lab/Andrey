@@ -1353,12 +1353,12 @@ def bootstrap(
 def _not_tested_over(fits: list) -> dict:
     """Return the not-tested metadata of ``fits`` for the notice.
 
-    The pairs never observed together and the undecided pairs of any fit, in order of first
-    appearance, and the conditioning sets not tested over all of them, which the notice reads only
-    as whether any was.
+    The pairs never observed together, the undecided pairs, and the possibly separable edges of any
+    fit, in order of first appearance, and the conditioning sets not tested over all of them, which
+    the notice reads only as whether any was.
     """
     merged: dict = {"not_tested": sum(out.metadata.get("not_tested", 0) for out in fits)}
-    for key in ("never_observed_together", "undecided_pairs"):
+    for key in ("never_observed_together", "undecided_pairs", "possibly_separable"):
         pairs = (pair for out in fits for pair in out.metadata.get(key, []))
         merged[key] = [list(pair) for pair in dict.fromkeys(map(tuple, pairs))]
     return merged

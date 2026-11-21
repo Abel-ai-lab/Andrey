@@ -98,7 +98,15 @@ NOT_TESTED_CLAIM = (
     "A test whose variables are observed together on fewer rows than it needs or that has no "
     "degrees of freedom left, a pair never observed together included, is not tested: it never "
     "separates a pair and never confirms a link. A pair that no test with rows could decide, such "
-    'as a pair never observed together, is listed in metadata["undecided_pairs"].'
+    "as a pair never observed together, is undecided: it is left out of the graph, no orientation "
+    'reads it as adjacent or apart, and metadata["undecided_pairs"] lists it.'
+)
+#: The sentence on the edges a conditioning set not tested might have removed, which the
+#: docstring of every method that lists them and the notice share.
+POSSIBLY_SEPARABLE_CLAIM = (
+    "An edge drawn although a conditioning set that could not be tested might have separated its "
+    'pair is listed in metadata["possibly_separable"]: the flag says what the data could not '
+    "check, not that the edge is false."
 )
 #: What the error of a test without the rows it needs advises: a test over fewer columns keeps more
 #: rows, and a dropped column is no longer there to condition on.

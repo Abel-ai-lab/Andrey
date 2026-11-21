@@ -124,26 +124,40 @@ observed together included: it never separates a pair and never confirms a link.
 FCI-JCI test whose `env` is constant on its rows, which then come from one environment. CD-NOD and
 FCI-JCI need a complete `env`.
 
-A pair that no test with rows could decide stays adjacent in PC, FCI, CD-NOD, and FCI-JCI, stays in
-the Markov-blanket searches' sets, and in PCMCI and its variants has no p-value (`NaN`, `null` on
-the command line); `metadata["undecided_pairs"]` lists each such pair. PCMCI, PCMCI+, and J-PCMCI+
-condition no test on a lagged parent without a tested result, and LPCMCI none on a node whose link
-to either end of the tested pair has none. `metadata["not_tested"]` counts the conditioning sets
-not tested, including those the search skipped because no row can test them; it measures the
-search more than the data, so the notice for `missing=None` leaves it out and gives the number of
-undecided pairs and of pairs never observed together, naming them when there are at most five.
+A pair that no test with rows could decide, as a pair never observed together, is undecided: the
+graph leaves it out, and `metadata["undecided_pairs"]` lists it. No orientation reads an undecided
+pair as adjacent or as apart, so no collider or other mark comes from a triple over one: PC, FCI,
+CD-NOD, and FCI-JCI leave every triple whose ends are undecided unoriented, and LPCMCI every triple
+with an undecided side. The Markov-blanket searches leave an undecided candidate out of the
+target's set, and PCMCI, PCMCI+, and LPCMCI leave an undecided link out of the graph, where it has
+no p-value (`NaN`, `null` on the command line). In PCMCI and PCMCI+, a test conditions only on the
+candidates, strongest first, that keep its rows enough for the test, so its rows do not mix cohorts
+that are never observed together; LPCMCI conditions no test on a node whose link to either end of
+the tested pair is undecided.
+
+An edge is drawn when no test with rows separated its pair, but a conditioning set that could not be
+tested might have. PC, FCI, CD-NOD, FCI-JCI, and the Markov-blanket searches list such edges in
+`metadata["possibly_separable"]`. In data merged from cohorts, an edge between two variables whose
+true separating set is never observed together with them is one of these. The flag says what the
+data could not check, not that the edge is false: in the smallest merged cohorts, every drawn edge
+is flagged, since another cohort's variable could have separated it.
+
+`metadata["not_tested"]` counts the conditioning sets not tested, including those the search
+skipped because no row can test them; it measures the search more than the data, so the notice for
+`missing=None` leaves it out and gives the number of undecided pairs, of possibly separable edges,
+and of pairs never observed together, naming them when there are at most five.
 `metadata["never_observed_together"]` lists the pairs of columns no row observes together.
 `metadata["p_one_tests"]`, present when it is not zero, counts the tests that returned a p-value of
 1, as a test whose statistic is exactly zero does.
 
-On merged cohorts, every pair of variables measured only in different cohorts is therefore an
-undecided pair and an edge of the output of PC, FCI, CD-NOD, FCI-JCI, and the Markov-blanket
-searches, unless knowledge forbids the edge or, in IAMB and Inter-IAMB, `max_depth` stops the
-blanket's growth first: a fact about the data, not a finding. Merged cohorts often leave such
-pairs, and whether a row belongs to a cohort is rarely random, so test-wise deletion may not be
-valid there. To decide more pairs, cap the conditioning sets with `max_depth` (`max_p_global` in
-LPCMCI and the same-step phases of PCMCI+), or drop a column with many missing values, which can
-remove a common cause of the columns that stay.
+Merged cohorts often leave undecided pairs, and whether a row belongs to a cohort is rarely random,
+so test-wise deletion may not be valid there. A few rows that observe every column decide the pairs
+the cohorts keep apart, but a test of such a pair reads only those rows, and the row floor above is
+the statistical minimum: a test on a few rows has little power, so it can separate a pair that the
+rest of the data show dependent and remove a true edge. Such rows decide more pairs and cost some
+edges between variables observed together. To decide more pairs, cap the conditioning sets with
+`max_depth` (`max_p_global` in LPCMCI and the same-step phases of PCMCI+), or drop a column with
+many missing values, which can remove a common cause of the columns that stay.
 
 With `fisherz` and `student_t`, each test computes its correlations directly from its rows, for many
 tests at once. When the rows fall into a few missingness patterns, as in data merged from cohorts

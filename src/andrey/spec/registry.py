@@ -3889,6 +3889,7 @@ for _name, _spec in REGISTRY.items():
                 "p_one_tests",
                 "not_tested",
                 "undecided_pairs",
+                "possibly_separable",
                 "never_observed_together",
             )
             if _spec.data.missing

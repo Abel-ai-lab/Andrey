@@ -120,9 +120,11 @@ def test_every_table_method_runs_when_a_pair_shares_few_or_no_rows(name, k):
 
 
 @pytest.mark.parametrize("name", [*SKELETON, "iamb", "inter_iamb", "mmpc"])
-def test_a_pair_never_observed_together_stays_adjacent_and_keeps_the_true_edges(name):
+def test_a_pair_never_observed_together_is_left_out_and_the_true_edges_stay(name):
     out = TABLE_METHODS[name](_cohorts(0))
-    for a, b in (("A", "B"), ("A", "S1"), ("B", "S1")):
+    assert not _adjacent(out, "A", "B")
+    assert ["A", "B"] in out.metadata["undecided_pairs"]
+    for a, b in (("A", "S1"), ("B", "S1")):
         assert _adjacent(out, a, b), (a, b)
 
 
@@ -162,7 +164,12 @@ def test_row_and_column_order_change_neither_the_graph_nor_the_metadata(name):
         order = [list(other.structure.labels).index(v) for v in out.structure.labels]
         moved = np.asarray(other.structure.adjacency)[np.ix_(order, order)]
         assert np.array_equal(moved, out.structure.adjacency)
-        for key in ("undecided_pairs", "never_observed_together", "not_tested"):
+        for key in (
+            "undecided_pairs",
+            "possibly_separable",
+            "never_observed_together",
+            "not_tested",
+        ):
             assert other.metadata[key] == out.metadata[key], key
 
 
@@ -203,10 +210,10 @@ def test_an_environment_constant_on_a_block_is_not_tested(method, k):
 
 
 @pytest.mark.parametrize("name", ["iamb", "inter_iamb", "mmpc"])
-def test_a_target_set_holds_a_variable_never_observed_with_the_target(name):
+def test_a_target_set_leaves_out_a_variable_never_observed_with_the_target(name):
     out = getattr(andrey, name)(_cohorts(0), target="B")
     key = "parents_and_children" if name == "mmpc" else "markov_blanket"
-    assert {"A", "S1"} <= set(out.metadata[key])
+    assert "S1" in out.metadata[key] and "A" not in out.metadata[key]
     assert ["A", "B"] in out.metadata["undecided_pairs"]
 
 
@@ -268,12 +275,14 @@ def _never_together() -> pd.DataFrame:
 )
 def test_a_pair_never_observed_together_is_undecided_and_makes_no_collider(fit):
     out = fit(_never_together())
-    for a, b in (("X", "Z"), ("Y", "Z"), ("X", "Y")):
-        assert _adjacent(out, a, b), (a, b)
+    assert _adjacent(out, "X", "Z") and _adjacent(out, "Y", "Z")
+    assert not _adjacent(out, "X", "Y")
     assert out.metadata["undecided_pairs"] == [["X", "Y"]]
     assert out.metadata["never_observed_together"] == [["X", "Y"]]
     assert out.metadata["not_tested"] > 0
-    assert not all(out.structure.endpoints(v, "Z")[1] == ARROW for v in ("X", "Y"))
+    # X - Z - Y with X and Y undecided is no collider, and Y could have separated X and Z.
+    assert not any(out.structure.endpoints(v, "Z")[1] == ARROW for v in ("X", "Y"))
+    assert out.metadata["possibly_separable"] == [["X", "Z"], ["Y", "Z"]]
 
 
 def test_the_notice_names_a_pair_never_observed_together(caplog):
@@ -290,9 +299,9 @@ def test_the_notice_names_a_pair_never_observed_together(caplog):
     [
         (andrey.pc, _never_together, 4),
         (andrey.fci, _never_together, 4),
-        (andrey.iamb, _never_together, 15),
+        (andrey.iamb, _never_together, 8),
         (andrey.pc, partial(_cohorts, 0), 20),
-        (andrey.iamb, partial(_cohorts, 0), 19),
+        (andrey.iamb, partial(_cohorts, 0), 12),
     ],
 )
 def test_the_conditioning_sets_not_tested_match_their_record(fit, data, count):

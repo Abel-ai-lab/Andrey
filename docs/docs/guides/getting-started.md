@@ -676,7 +676,10 @@ conditional-independence test reads only the rows where all of its variables are
 (test-wise deletion), which is valid when values are missing completely at random. The argument
 `missing` names the handling: `pc` also takes `missing="mvpc"`, a correction for values that are
 missing for a reason, and {{ em_methods }} take `missing="em"`, structural EM. Every other method
-refuses missing values with a message that says what to do instead. The
+refuses missing values with a message that says what to do instead. A pair that no test with
+enough rows could decide, as two columns never observed together, is left out of the graph and
+listed in `metadata["undecided_pairs"]`, and an edge that a conditioning set no row could test might
+have removed is listed in `metadata["possibly_separable"]`. The
 [Missing values](missing-values.md) guide has a table from your data and the reason its values are
 missing to the handling to use, and says what each handling assumes.
 

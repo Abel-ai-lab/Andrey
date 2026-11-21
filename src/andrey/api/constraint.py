@@ -326,10 +326,15 @@ def pc(
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
     tested, including those the search skipped because no row can test them. A pair no tested query
-    could decide, as a pair never observed together, stays adjacent and is listed in
-    ``metadata["undecided_pairs"]``. On merged cohorts, every pair of variables measured only in
-    different cohorts is therefore an undecided pair and, unless knowledge forbids it, an edge of
-    the output: a fact about the data, not a finding. A continuous column constant on a test's rows
+    could decide, as a pair never observed together, is undecided: it is left out of the graph and
+    listed in ``metadata["undecided_pairs"]``, and a triple whose ends are undecided is neither a
+    collider nor a non-collider to any rule. A drawn edge that a conditioning set not tested might
+    have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
+    not check, not a finding that the edge is false. On merged cohorts, every pair of variables
+    measured only in different cohorts is therefore undecided, and an edge whose separating set is
+    never observed together with its pair is drawn and flagged. A few rows that observe every
+    column decide such pairs on those rows alone, with little power, so they can remove true edges
+    between variables observed together. A continuous column constant on a test's rows
     raises ``ValueError``. With missing values, the skeleton search runs in one process. Test-wise
     deletion is valid when values are missing completely at random, which means that whether a value
     is missing depends on no value in the data; the rows a test reads are then a random sample of
@@ -876,10 +881,15 @@ def fci(
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
     tested, including those the search skipped because no row can test them. A pair no tested query
-    could decide, as a pair never observed together, stays adjacent and is listed in
-    ``metadata["undecided_pairs"]``. On merged cohorts, every pair of variables measured only in
-    different cohorts is therefore an undecided pair and, unless knowledge forbids it, an edge of
-    the output: a fact about the data, not a finding. A continuous column constant on a test's rows
+    could decide, as a pair never observed together, is undecided: it is left out of the graph and
+    listed in ``metadata["undecided_pairs"]``, and a triple whose ends are undecided is neither a
+    collider nor a non-collider to any rule. A drawn edge that a conditioning set not tested might
+    have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
+    not check, not a finding that the edge is false. On merged cohorts, every pair of variables
+    measured only in different cohorts is therefore undecided, and an edge whose separating set is
+    never observed together with its pair is drawn and flagged. A few rows that observe every
+    column decide such pairs on those rows alone, with little power, so they can remove true edges
+    between variables observed together. A continuous column constant on a test's rows
     raises ``ValueError``. With missing values, the skeleton search runs in one process. Test-wise
     deletion is valid when values are missing completely at random, which means that whether a value
     is missing depends on no value in the data; the rows a test reads are then a random sample of
@@ -1722,16 +1732,18 @@ def cdnod(
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
     tested, including those the search skipped because no row can test them. A pair no tested query
-    could decide, as a pair never observed together, stays adjacent and is listed in
-    ``metadata["undecided_pairs"]``; a test whose ``env`` is constant on its rows, which come from
-    one environment, is not tested. On merged cohorts, every pair of variables measured only in
-    different cohorts is therefore an undecided pair and, unless knowledge forbids it, an edge of
-    the output: a fact about the data, not a finding. A continuous column constant on a test's rows
-    raises ``ValueError``. ``env`` must be complete, and ``dependence_threshold``, whose kernel
-    measures read every row, raises ``ValueError`` on data with missing values. With missing values,
-    the skeleton search runs in one process. Test-wise deletion is valid when values are missing
-    completely at random, which means that whether a value is missing depends on no value in the
-    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
+    could decide, as a pair never observed together, is undecided: it is left out of the graph and
+    listed in ``metadata["undecided_pairs"]``, and a triple whose ends are undecided is neither a
+    collider nor a non-collider to any rule; a test whose ``env`` is constant on its rows, which
+    come from one environment, is not tested. A drawn edge that a conditioning set not tested might
+    have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
+    not check, not a finding that the edge is false. On merged cohorts, every pair of variables
+    measured only in different cohorts is therefore undecided. A continuous column constant on a
+    test's rows raises ``ValueError``. ``env`` must be complete, and ``dependence_threshold``, whose
+    kernel measures read every row, raises ``ValueError`` on data with missing values. With missing
+    values, the skeleton search runs in one process. Test-wise deletion is valid when values are
+    missing completely at random, which means that whether a value is missing depends on no value in
+    the data; the rows a test reads are then a random sample of all rows, and otherwise they are a
     selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs whose means
@@ -2108,15 +2120,18 @@ def fci_jci(
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
     tested, including those the search skipped because no row can test them. A pair no tested query
-    could decide, as a pair never observed together, stays adjacent and is listed in
-    ``metadata["undecided_pairs"]``; a test whose ``env`` is constant on its rows, which come from
-    one environment, is not tested. On merged cohorts, every pair of variables measured only in
-    different cohorts is therefore an undecided pair and, unless knowledge forbids it, an edge of
-    the output: a fact about the data, not a finding. A continuous column constant on a test's rows
-    raises ``ValueError``. With missing values, the skeleton search runs in one process. Test-wise
-    deletion is valid when values are missing completely at random, which means that whether a value
-    is missing depends on no value in the data; the rows a test reads are then a random sample of
-    all rows, and otherwise they are a selected sample that more rows do not correct.
+    could decide, as a pair never observed together, is undecided: it is left out of the graph and
+    listed in ``metadata["undecided_pairs"]``, and a triple whose ends are undecided is neither a
+    collider nor a non-collider to any rule; a test whose ``env`` is constant on its rows, which
+    come from one environment, is not tested. A drawn edge that a conditioning set not tested might
+    have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
+    not check, not a finding that the edge is false. On merged cohorts, every pair of variables
+    measured only in different cohorts is therefore undecided. A continuous column constant on a
+    test's rows raises ``ValueError``. With missing values, the skeleton search runs in one process.
+    Test-wise deletion is valid when values are missing completely at random, which means that
+    whether a value is missing depends on no value in the data; the rows a test reads are then a
+    random sample of all rows, and otherwise they are a selected sample that more rows do not
+    correct.
 
     **Limitations.** Measured on its authors' simulation [1]_, linear-Gaussian data with hidden
     common causes and one context variable that changes one variable: 4, 10, and 100 variables with
