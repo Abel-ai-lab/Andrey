@@ -87,8 +87,9 @@ def fci(
     (:func:`~andrey.constraint.pc.adjacency_search`), and :func:`knowledge_marks` sets their
     endpoints before the orientation rules, which change circles only. A triple over a
     non-adjacent pair with no separating set is neither a collider nor a non-collider to any rule
-    (:func:`~andrey.constraint._skeleton.unseparated_triples`), and so is a triple with a side a
-    conditioning set no row could test might have separated
+    (:func:`~andrey.constraint._skeleton.unseparated_triples`), and so, inside a
+    :func:`~andrey.core.ci_missing.reading_flags` block, is a triple with a side a conditioning set
+    no row could test might have separated
     (:func:`~andrey.constraint._skeleton.flagged_triples`), in the collider pass before the
     possible-d-sep step (:func:`flagged_sides`), after it, and in R4. An arrowhead the knowledge
     puts at ``x`` on an edge ``x - y`` while its required edges lead from ``x`` to ``y`` raises

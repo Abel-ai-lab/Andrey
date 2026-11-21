@@ -86,9 +86,9 @@ def pc(
     colliders, and Meek's rules run with R4, so the result is the maximally oriented PDAG (MPDAG)
     of the class under the knowledge (Meek 1995; Perkovic, Kalisch, and Maathuis 2017). A triple
     over a non-adjacent pair with no separating set is neither a collider nor a non-collider to any
-    rule (:func:`~andrey.constraint._skeleton.unseparated_triples`), and so is a triple with a side
-    a conditioning set no row could test might have separated
-    (:func:`~andrey.constraint._skeleton.flagged_triples`). Edges they decide that close a
+    rule (:func:`~andrey.constraint._skeleton.unseparated_triples`), and so, inside a
+    :func:`~andrey.core.ci_missing.reading_flags` block, is a triple with a side a conditioning set
+    no row could test might have separated (:func:`~andrey.constraint._skeleton.flagged_triples`). Edges they decide that close a
     directed cycle raise ``ValueError`` (:func:`check_knowledge_cycle`). ``in_column_order`` fires
     Meek's rules one at a time in column order instead of in order-free rounds
     (:func:`~andrey.core.orient.meek`). ``workers`` worker processes share the skeleton search's

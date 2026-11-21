@@ -758,7 +758,8 @@ def blanket_cpdag(
     cycle), the colliders are oriented by
     :func:`~andrey.constraint.pc.orient_colliders` in the order ``andrey.config.tie_break``
     selects, Meek's rules complete the result, with R4 under ``constraints``, and an edge two
-    colliders of equal rank dispute is left undirected. A triple with a side a conditioning set no
+    colliders of equal rank dispute is left undirected. Inside a
+    :func:`~andrey.core.ci_missing.reading_flags` block, a triple with a side a conditioning set no
     row could test might have separated is neither a collider nor a non-collider
     (:func:`~andrey.constraint._skeleton.flagged_triples`).
     """
