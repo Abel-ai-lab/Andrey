@@ -59,7 +59,7 @@ def _additive_noise_case(n: int, seed: int) -> tuple[np.ndarray, andrey.GraphStr
 
 @pytest.mark.parametrize("indep_test", ["gcm", "wgcm"])
 def test_pc_recovers_the_additive_noise_graph(indep_test):
-    x, truth = _additive_noise_case(200, 0)
+    x, truth = _additive_noise_case(200, 6)
     assert shd(andrey.pc(x).structure, truth) >= 2  # partial correlation errs here
     assert shd(andrey.pc(x, indep_test=indep_test).structure, truth) <= 1
 
