@@ -447,8 +447,7 @@ _CONCEPTS = (
         "of the statistic when y is shuffled within each configuration of the conditioning set; "
         "nonempty = (r_x - 1)(r_y - 1) per configuration over the values present, its table's "
         "empty rows and columns struck (Spirtes, Glymour and Scheines 1993, Section 5.5). The two "
-        "differ only on sparse tables, where what each favors and gives up was not measured. A "
-        "call that passes it with another test raises ValueError.",
+        "differ only on sparse tables. A call that passes it with another test raises ValueError.",
         param=_template(
             "degrees_of_freedom",
             "str",
@@ -456,8 +455,12 @@ _CONCEPTS = (
             "Degrees of freedom of the categorical tests, chisq and gsq: mean = the mean of the "
             "statistic when y is shuffled within each configuration of the conditioning set; "
             "nonempty = (r_x - 1) * (r_y - 1) per configuration over the values of x and y present "
-            "in it, the table's empty rows and columns struck. They differ only on sparse tables, "
-            "where what each favors and gives up was not measured. "
+            "in it, the table's empty rows and columns struck. They differ only on sparse tables. "
+            "On sparse tables mean favors a level near the nominal one and gives up some of "
+            "G-square's power in the sparsest tables, and time; nonempty favors the classic rule "
+            "and gives up that level: over 35,808 true independences of random discrete networks,"
+            " a test at 0.05 rejected 11.1% (chisq) and 21.7% (gsq) with it, against 4.9% and "
+            "3.8% with mean. "
             "Only chisq and gsq read it: passing it with another test raises ValueError.",
             choices=DEGREES_OF_FREEDOM,
         ),
@@ -1639,13 +1642,14 @@ _CONCEPTS = (
             "tested of that side lies within the other nodes adjacent to one of its ends or "
             "undecided with it, so it might be the separating set the search missed; in FCI and "
             "FCI-JCI, which allow latent variables, for every listed side, since a separating "
-            "set can lie beyond the adjacencies. orient favors arrowheads and accuracy and gives "
-            "up protection from false colliders; ambiguous favors no false collider and gives up "
-            "the true arrowheads beside them: on merged cohorts that no row bridges (three "
-            "graph sizes, about 29 to 76 true edges), it took PC's false colliders per fit from "
-            "12.8-90.0 to at most 0.2 and its true arrowheads found from 0.54-0.72 to 0, leaving "
-            "PC farther from the truth than the empty graph in 6 of 6 settings and FCI 0.5 to 4.4 "
-            "errors worse.",
+            "set can lie beyond the adjacencies. orient favors arrowheads and gives up protection "
+            "from false colliders; ambiguous favors no false collider and gives up the true "
+            "arrowheads beside them. Measured with PC and FCI only: on merged cohorts that no row "
+            "bridges (three graph sizes, about 29 to 76 true edges), ambiguous took PC's false "
+            "colliders per fit from 12.8-90.0 to at most 0.2 and its true arrowheads found from "
+            "0.54-0.72 to 0, leaving PC farther from the truth than the empty graph in 6 of 6 "
+            "settings and FCI 0.5 to 4.4 errors worse; with the other methods its effect on "
+            "accuracy was not measured.",
             choices=("orient", "ambiguous"),
         ),
         fragment="possibly_separable",

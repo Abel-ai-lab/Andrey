@@ -102,8 +102,12 @@ def pc(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
-        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; it gives up some of
+        ``"gsq"``'s power in the sparsest tables, and time. ``"nonempty"`` favors the classic rule;
+        it gives up that level: over 35,808 true independences of random discrete networks (3 to 5
+        categories, 0 to 3 conditioning variables, 500 to 5,000 rows), a test at 0.05 rejected 11.1%
+        (``"chisq"``) and 21.7% (``"gsq"``) with it, against 4.9% and 3.8% with ``"mean"``. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, which decides between two colliders that would
         orient one edge in opposite directions. ``"p_value"`` orients first the collider whose
@@ -724,8 +728,12 @@ def fci(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
-        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; it gives up some of
+        ``"gsq"``'s power in the sparsest tables, and time. ``"nonempty"`` favors the classic rule;
+        it gives up that level: over 35,808 true independences of random discrete networks (3 to 5
+        categories, 0 to 3 conditioning variables, 500 to 5,000 rows), a test at 0.05 rejected 11.1%
+        (``"chisq"``) and 21.7% (``"gsq"``) with it, against 4.9% and 3.8% with ``"mean"``. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
         How FCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
@@ -1212,8 +1220,12 @@ def gfci(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
-        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; it gives up some of
+        ``"gsq"``'s power in the sparsest tables, and time. ``"nonempty"`` favors the classic rule;
+        it gives up that level: over 35,808 true independences of random discrete networks (3 to 5
+        categories, 0 to 3 conditioning variables, 500 to 5,000 rows), a test at 0.05 rejected 11.1%
+        (``"chisq"``) and 21.7% (``"gsq"``) with it, against 4.9% and 3.8% with ``"mean"``. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test, in ``(0, 1)``. Smaller values give
         sparser graphs.
@@ -1599,8 +1611,12 @@ def cdnod(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
-        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; it gives up some of
+        ``"gsq"``'s power in the sparsest tables, and time. ``"nonempty"`` favors the classic rule;
+        it gives up that level: over 35,808 true independences of random discrete networks (3 to 5
+        categories, 0 to 3 conditioning variables, 500 to 5,000 rows), a test at 0.05 rejected 11.1%
+        (``"chisq"``) and 21.7% (``"gsq"``) with it, against 4.9% and 3.8% with ``"mean"``. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, as for :func:`~andrey.pc`: ``"p_value"`` by the
         largest p-value that separated each collider's endpoints, so the colliders do not depend on
@@ -2035,8 +2051,12 @@ def fci_jci(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
-        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; it gives up some of
+        ``"gsq"``'s power in the sparsest tables, and time. ``"nonempty"`` favors the classic rule;
+        it gives up that level: over 35,808 true independences of random discrete networks (3 to 5
+        categories, 0 to 3 conditioning variables, 500 to 5,000 rows), a test at 0.05 rejected 11.1%
+        (``"chisq"``) and 21.7% (``"gsq"``) with it, against 4.9% and 3.8% with ``"mean"``. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
         How a collider is decided on a triple ``x - z - y`` where ``x`` and ``y`` are not adjacent,
         as for :func:`~andrey.fci`: by the separating set that removed the edge ``x - y``

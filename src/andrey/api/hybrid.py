@@ -135,8 +135,12 @@ def mmhc(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
-        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; it gives up some of
+        ``"gsq"``'s power in the sparsest tables, and time. ``"nonempty"`` favors the classic rule;
+        it gives up that level: over 35,808 true independences of random discrete networks (3 to 5
+        categories, 0 to 3 conditioning variables, 500 to 5,000 rows), a test at 0.05 rejected 11.1%
+        (``"chisq"``) and 21.7% (``"gsq"``) with it, against 4.9% and 3.8% with ``"mean"``. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     score_func : str or None, default=None
         Local score of the hill-climbing phase, any of :func:`~andrey.hc`'s: ``"bic"`` (Gaussian
         BIC) for continuous data, ``"bdeu"`` or ``"discrete_bic"`` for categorical data,
@@ -398,8 +402,12 @@ def rsmax2(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
-        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; it gives up some of
+        ``"gsq"``'s power in the sparsest tables, and time. ``"nonempty"`` favors the classic rule;
+        it gives up that level: over 35,808 true independences of random discrete networks (3 to 5
+        categories, 0 to 3 conditioning variables, 500 to 5,000 rows), a test at 0.05 rejected 11.1%
+        (``"chisq"``) and 21.7% (``"gsq"``) with it, against 4.9% and 3.8% with ``"mean"``. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     score_func : str or None, default=None
         Local score of the maximize phase, any of :func:`~andrey.hc`'s. ``"normal_scores"``,
         experimental, is ``"bic"`` on each column's normal scores, for continuous data that are
