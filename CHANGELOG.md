@@ -79,11 +79,13 @@ names its pull request.
   column is symmetric about its mean once sorted. On data with missing values, a query with fewer
   rows than its test needs, 4 for `"gcm"` and for `"wgcm"` with `variant="fix"`, 17 for `"wgcm"`'s
   default `variant="est"`, and 12 for `"pcm"`, is not tested. Where the papers and the authors'
-  code differ, the tests follow the papers, each choice measured against the code's in reduced
-  versions of the papers' simulation designs: the wGCM weight is the sign of the fitted
-  covariance, the fixed weights' multiplier draws use the centered products, the PCM variance adds
-  its shift to the fit's positive part, and the PCM statistic's standard deviation divides by the
-  row count. A contributor's script compares them with the authors' code.
+  code differ, the tests follow the papers, and each choice was measured against the code's in
+  reduced versions of the papers' simulation designs: the wGCM weight is the sign of the fitted
+  covariance, where the code's weight, the fit itself, rejected more often under the
+  alternatives with boosted trees; the fixed weights' multiplier draws use the centered products,
+  the PCM variance adds its shift to the fit's positive part, and the PCM statistic's standard
+  deviation divides by the row count, where the code's choices gave no more power. A contributor's
+  script compares them with the authors' code.
   ([#1147], [#1129], [#1162])
 - `target` takes a list of columns on `iamb`, `inter_iamb`, `mmpc`, and `icp`: one call returns one
   result per target, in the list's order, each equal to a call for that target alone. The three set

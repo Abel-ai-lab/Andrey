@@ -423,11 +423,12 @@ class WGCM(_RegressionTest):
     [1]_. An empty conditioning set has no weight to estimate, and both variants give the
     GCM's p-value of ``x`` and ``y`` minus their means. The statistic reported for ``"est"`` is the
     statistic or ``0``, whichever is larger, so a larger statistic always means a smaller p-value.
-    The weight is the sign of the fit, as in the paper; with the fit itself as the weight, as in
-    the authors' later code, in reduced versions of the paper's designs with boosted trees the test
-    rejected more often under both alternatives and nulls, and no gain held at the level.
-    The draws of ``"fix"`` use the centered columns, as in the paper; the authors' code's uncentered
-    columns gave less power at the same level. The split and the multiplier draws are drawn from
+    The weight is the sign of the fit, as in the paper; the authors' later code weights by the fit
+    itself, which in reduced versions of the paper's designs with boosted trees rejected more often
+    under the alternatives, also at a matched null rate, and about one percentage point more often
+    under the nulls. The draws of ``"fix"`` use the centered columns, as in the paper; the authors'
+    code's uncentered draws gave the same power at a matched null rate and rejected about 0.2
+    percentage points less often under the nulls. The split and the multiplier draws are drawn from
     ``seed`` over the rows in lexicographic order of the query's own columns, so they do not depend
     on other columns.
 
