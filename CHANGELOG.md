@@ -179,6 +179,13 @@ names its pull request.
   missing values, and the other tests keep the per-query path. A repeated variable in the
   conditioning set counts once, and a correlation matrix that is not exactly symmetric gives each
   pair one answer whichever variable is the target. ([#1047], [#1048])
+- `cpcm` and `cpcm_graph` choose the smoothing parameters of the `"exponential"` and `"pareto"`
+  fits by the generalized cross-validation score of the deviance and those of the `"poisson"` fit
+  by the unbiased risk estimate, the criteria of the authors' code; the two-parameter families keep
+  the Laplace approximate marginal likelihood. On heavy-tailed Pareto pairs the marginal likelihood
+  picked a stiffer spline, under which the test of the true direction rejected well above its
+  level. A value at the edge of the support has an infinite deviance, so `"exponential"` now
+  raises `ValueError` on a 0 and `"pareto"` on a 1. ([#1165])
 
 ### Fixed
 
@@ -2911,3 +2918,4 @@ First alpha release.
 [#1048]: https://github.com/Abel-ai-lab/Andrey/pull/1048
 [#1058]: https://github.com/Abel-ai-lab/Andrey/pull/1058
 [#1153]: https://github.com/Abel-ai-lab/Andrey/pull/1153
+[#1165]: https://github.com/Abel-ai-lab/Andrey/pull/1165

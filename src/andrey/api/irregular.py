@@ -687,7 +687,7 @@ def cpcm(
         The family of each variable given the other, one name for both columns or a list of two
         names, one per column: ``"gaussian"`` (mean and scale change with the cause),
         ``"gaussian_fixed_scale"`` (the mean alone), ``"exponential"``, ``"pareto"`` (scale 1,
-        values of at least 1), ``"poisson"``, ``"gamma"`` (mean and shape), ``"gamma_fixed_shape"``
+        values greater than 1), ``"poisson"``, ``"gamma"`` (mean and shape), ``"gamma_fixed_shape"``
         (the mean alone), ``"gumbel"`` (location and scale), ``"gumbel_fixed_scale"`` (the
         location alone), or ``"negative_binomial"`` (the mean, one size for all rows). See
         **Families.** in Notes.
@@ -718,10 +718,10 @@ def cpcm(
         method, the argument, what it accepts, and the value. Also if ``data`` does not have 2
         columns, holds ``NaN`` or ``inf``, or has fewer than 20 rows, if ``family`` names an
         unknown family or does not give one name per column, or if a column holds a value outside
-        its family's support, such as a non-integer under ``"poisson"`` or a value below 1 under
-        ``"pareto"``. Also if a column's residual is the same on every row, as when the column is
-        an exact function of the other, or if a fit ends away from a maximum; the message names
-        the columns.
+        its family's support, such as a non-integer under ``"poisson"`` or a value of at most 1
+        under ``"pareto"``. Also if a column's residual is the same on every row, as when the
+        column is an exact function of the other, or if a fit ends away from a maximum; the message
+        names the columns.
 
     Warns
     -----
@@ -760,32 +760,38 @@ def cpcm(
     **Families.** Each parameter is a smooth function of the cause through the family's usual
     link: the identity for a Gaussian or Gumbel location, the logarithm for a scale, a mean, a
     rate, or a shape. ``"pareto"`` is the Pareto law of scale 1, whose logarithm is exponential,
-    so its column must hold values of at least 1; the paper calls ``"gamma_fixed_shape"`` the gamma
+    so its column must hold values greater than 1; the paper calls ``"gamma_fixed_shape"`` the gamma
     family with a fixed scale, the scale of its fitting software, which is one over the shape. The
     paper advises families with the same number of parameters in both directions, since the more
     flexible one fits either way more often [1]_. A family applies to the column when it is the
     effect; the cause's own distribution is not modeled.
 
-    **Estimation.** Each parameter is a constant plus a rank-10 thin plate regression spline of
-    the cause, as in [1]_, or indicators when the cause holds at most 9 distinct values, as in the
+    **Estimation.** Each parameter is a constant plus a rank-10 thin plate regression spline of the
+    cause, as in [1]_, or indicators when the cause holds at most 9 distinct values, as in the
     authors' code. The coefficients maximize the log-likelihood penalized by the spline's
-    wiggliness, and the smoothing parameter of each spline maximizes the Laplace approximate
-    marginal likelihood [4]_, the estimator the paper cites, over a lattice of steps of 1/16 in
-    its logarithm around a start that follows the data. A scale fitted as a function of the cause
-    stays above a floor, without which the likelihood has no maximum where the location fits a row
-    exactly: 0.01 of the column's standard deviation under ``"gaussian"``, ``exp(-7)`` of it under
-    ``"gumbel"``, and a dispersion of ``exp(-7)`` under ``"gamma"``. Such a scale approaches the
-    floor without reaching it, so rows on which it falls to within ``exp(-12)`` of the floor are
-    held at the floor itself, outside the fit and its Laplace determinant; the rows of one cause
-    value share their scale and are held together. Likewise, under a count
-    family the mean of a cause value whose counts are all 0 is 0, and those rows leave the fit,
-    their residual a uniform draw. The size of
-    ``"negative_binomial"`` has an upper bound of ``exp(5)`` times the column's largest count,
-    kept between ``exp(12)`` and ``exp(20)``; a size at that bound is read as the Poisson limit,
-    whose variance is then within 1 part in 148 for counts up to ``exp(15)``, about 3.3 million,
-    and less close above. A fit that ends away from a maximum, or at a point where the
-    coefficients are not determined to working precision, raises ``ValueError``. The fit draws no
-    random numbers except a count family's uniforms, which follow ``seed`` and the column's values.
+    wiggliness. The smoothing parameter of each spline is chosen over a lattice of steps of 1/16 in
+    its logarithm around a start that follows the data: under a family with two parameters it
+    maximizes the Laplace approximate marginal likelihood [4]_, the estimator the paper cites; under
+    ``"exponential"`` and ``"pareto"`` it minimizes the generalized cross-validation score of the
+    deviance, and under ``"poisson"``, whose scale is known, the unbiased risk estimate [5]_, the
+    criteria of the authors' code for these families. On heavy-tailed Pareto pairs the marginal
+    likelihood picks a stiffer spline, under which the test of the true direction rejects well above
+    its level. A value at the edge of the support has an infinite deviance, so ``"exponential"``
+    takes positive values and ``"pareto"`` values greater than 1. A scale fitted as a function of
+    the cause stays above a floor, without which the likelihood has no maximum where the location
+    fits a row exactly: 0.01 of the column's standard deviation under ``"gaussian"``, ``exp(-7)`` of
+    it under ``"gumbel"``, and a dispersion of ``exp(-7)`` under ``"gamma"``. Such a scale
+    approaches the floor without reaching it, so rows on which it falls to within ``exp(-12)`` of
+    the floor are held at the floor itself, outside the fit and its Laplace determinant; the rows of
+    one cause value share their scale and are held together. Likewise, under a count family the mean
+    of a cause value whose counts are all 0 is 0, and those rows leave the fit, their residual a
+    uniform draw. The size of ``"negative_binomial"`` has an upper bound of ``exp(5)`` times the
+    column's largest count, kept between ``exp(12)`` and ``exp(20)``; a size at that bound is read
+    as the Poisson limit, whose variance is then within 1 part in 148 for counts up to ``exp(15)``,
+    about 3.3 million, and less close above. A fit that ends away from a maximum, or at a point
+    where the coefficients are not determined to working precision, raises ``ValueError``. The fit
+    draws no random numbers except a count family's uniforms, which follow ``seed`` and the column's
+    values.
 
     **Units.** A column in other units stays in the Gaussian, Gumbel, exponential, and gamma
     families, so under them the result is the same in any units, to rounding. The Gaussian and
@@ -820,6 +826,8 @@ def cpcm(
        joint independence. JRSS-B 80(1), 5-31.
     .. [4] Wood, S. N., Pya, N., and Safken, B. (2016). Smoothing parameter and model selection for
        general smooth models. JASA 111(516), 1548-1563.
+    .. [5] Wood, S. N. (2008). Fast stable direct fitting and smoothness selection for generalized
+       additive models. JRSS-B 70(3), 495-518.
 
     Examples
     --------
