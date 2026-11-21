@@ -67,6 +67,7 @@ from andrey.temporal.pcmci import (
     Link,
     LinkTest,
     conditionable,
+    count_not_tested,
     deletes_rows,
     pc1,
     ranked_design_test,
@@ -127,6 +128,10 @@ class Recorder:
     def conditionable(self, x: int, y: int, ordered: Iterable[int]) -> list[int]:
         """:func:`~andrey.temporal.pcmci.conditionable` of ``test``."""
         return conditionable(self.test, x, y, ordered)
+
+    def count_not_tested(self, x: int, y: int, queries: int) -> None:
+        """:func:`~andrey.temporal.pcmci.count_not_tested` of ``test``."""
+        count_not_tested(self.test, x, y, queries)
 
     def statistic_pvalues(
         self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
@@ -240,8 +245,9 @@ def _test_subsets(
     On data with missing values, each test conditions on its subset and on the parents, strongest
     first, that keep its block testable
     (:meth:`~andrey.core.ci_missing.TestwiseDeletion.conditionable`), so the block does not mix
-    columns no row observes together; the tests are then asked in one call per number of
-    conditions.
+    columns no row observes together, and a test that leaves a parent out counts its whole set as
+    not tested (:func:`~andrey.temporal.pcmci.count_not_tested`); the tests are then asked in one
+    call per number of conditions.
     """
     x_column = lag * n_vars + i
     if not deletes_rows(test):
@@ -252,6 +258,8 @@ def _test_subsets(
         for subset in subsets:
             kept = conditionable(test, x_column, j, [*subset, *defaults])
             whole = kept[: len(subset)] == list(subset)
+            if whole and len(kept) < len(subset) + len(defaults):
+                count_not_tested(test, x_column, j)
             rows.append(sorted(kept) if whole else _conditions(parents, n_vars, i, lag, j, subset))
     statistics = np.empty(len(rows))
     p_values = np.empty(len(rows))
@@ -332,7 +340,11 @@ def skeleton(
         for i, lag, j in pairs:
             if not adjacency[lag, i, j]:
                 continue  # removed from its other end in this round
-            pool_j = _testable(test, n_vars, i, lag, j, (k for k in neighbors[j] if lag or k != i))
+            full = [k for k in neighbors[j] if lag or k != i]
+            pool_j = _testable(test, n_vars, i, lag, j, full)
+            if lost := math.comb(len(full), p) - math.comb(len(pool_j), p):
+                # The subsets with a neighbor left out for want of rows are not tested.
+                count_not_tested(test, lag * n_vars + i, j, lost)
             subsets = list(combinations(pool_j, p))
             if not subsets:
                 continue  # fewer than p neighbors observed with both ends: no test

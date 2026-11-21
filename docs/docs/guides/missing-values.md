@@ -136,11 +136,13 @@ that are never observed together; LPCMCI conditions no test on a node whose link
 the tested pair is undecided.
 
 An edge is drawn when no test with rows separated its pair, but a conditioning set that could not be
-tested might have. PC, FCI, CD-NOD, FCI-JCI, and the Markov-blanket searches list such edges in
-`metadata["possibly_separable"]`. In data merged from cohorts, an edge between two variables whose
-true separating set is never observed together with them is one of these. The flag says what the
-data could not check, not that the edge is false: in the smallest merged cohorts, every drawn edge
-is flagged, since another cohort's variable could have separated it.
+tested might have. PC, FCI, CD-NOD, FCI-JCI, the Markov-blanket searches, PCMCI, PCMCI+, and LPCMCI
+list such edges in `metadata["possibly_separable"]`. In data merged from cohorts, an edge between
+two variables whose true separating set is never observed together with them is one of these. In
+PCMCI, PCMCI+, and LPCMCI, a link is flagged too when a test left out a candidate for want of rows,
+or when an end of it is an end of an undecided link, whose other node no test conditions on. The
+flag says what the data could not check, not that the edge is false: in the smallest merged
+cohorts, every drawn edge is flagged, since another cohort's variable could have separated it.
 
 `metadata["not_tested"]` counts the conditioning sets not tested, including those the search
 skipped because no row can test them; it measures the search more than the data, so the notice for

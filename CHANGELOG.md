@@ -24,8 +24,9 @@ names its pull request.
   CD-NOD, FCI-JCI, PCMCI, PCMCI+, and LPCMCI and of the Markov-blanket searches' sets, and no
   orientation reads it as adjacent or apart: a triple whose ends are undecided, and in LPCMCI one
   with an undecided side, is neither a collider nor a non-collider. In PC, FCI, CD-NOD, FCI-JCI,
-  and the Markov-blanket searches, `metadata["possibly_separable"]` lists the drawn edges that a
-  conditioning set not tested might have separated, which the notice names too. PCMCI, PCMCI+, and
+  the Markov-blanket searches, PCMCI, PCMCI+, and LPCMCI, `metadata["possibly_separable"]` lists
+  the drawn edges that a conditioning set not tested might have separated, which the notice names
+  too; MVPC's correction removes only the edges its own tests separate. PCMCI, PCMCI+, and
   J-PCMCI+ condition no test on a lagged parent without a tested result, and LPCMCI none on a node
   whose link to either end of the tested pair is undecided; PCMCI and PCMCI+ condition each test
   only on the candidates, strongest first, that keep its rows enough for the test, so its rows do

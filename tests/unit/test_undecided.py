@@ -206,6 +206,34 @@ def test_lpcmci_draws_no_undecided_link():
         assert marks[i, j] == 0 and marks[j, i] == 0, (a, b)
 
 
+def _hidden_separator_series(n: int = 3000, seed: int = 0) -> pd.DataFrame:
+    """Z drives X one step later and Y two steps later, so X at lag 1 and Y are joined through Z at
+    lag 2 alone; the first half observes Y and Z, the second X and Y."""
+    rng = np.random.default_rng(seed)
+    x = np.zeros((n, 3))
+    for t in range(2, n):
+        z = 0.5 * x[t - 1, 2] + rng.standard_normal()
+        cause = 0.3 * x[t - 1, 0] + 0.7 * x[t - 1, 2] + rng.standard_normal()
+        effect = 0.3 * x[t - 1, 1] + 0.7 * x[t - 2, 2] + rng.standard_normal()
+        x[t] = (cause, effect, z)
+    observed = np.ones_like(x, dtype=bool)
+    observed[: n // 2, 0] = False
+    observed[n // 2 :, 2] = False
+    return pd.DataFrame(np.where(observed, x, np.nan), columns=["X", "Y", "Z"])
+
+
+@pytest.mark.parametrize("method", ["pcmci", "pcmciplus", "lpcmci"])
+def test_a_link_a_separator_never_observed_with_it_might_remove_is_flagged(method):
+    df = _hidden_separator_series()
+    fit = getattr(andrey, method)
+    out = fit(df, tau_max=2)
+    assert ["X at lag 1", "Y"] in out.metadata["possibly_separable"]
+    assert ["X", "Z at lag 1"] in out.metadata["undecided_pairs"]
+    moved = fit(df[["Z", "Y", "X"]], tau_max=2)
+    for key in ("undecided_pairs", "possibly_separable", "not_tested"):
+        assert moved.metadata[key] == out.metadata[key], key
+
+
 def test_the_notice_names_the_possibly_separable_edges(caplog):
     df = _undecided_end()
     with caplog.at_level(logging.WARNING, logger="andrey"):

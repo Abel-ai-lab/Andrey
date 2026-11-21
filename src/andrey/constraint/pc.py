@@ -624,10 +624,11 @@ def adjacency_search(
                     pvalues[(x, y)] = p
             size += 1
 
-    for x, y in counted.untested() if undecided is not None else ():
-        if x < n_vars and y < n_vars and support[x, y]:
-            support[x, y] = support[y, x] = False
-            undecided.add((x, y))
+    if undecided is not None:
+        for x, y in counted.untested():
+            if x < n_vars and y < n_vars and support[x, y]:
+                support[x, y] = support[y, x] = False
+                undecided.add((x, y))
     if apart is not None:
         for x, y, separating, p in separate_apart(
             test,

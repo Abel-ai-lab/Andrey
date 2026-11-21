@@ -123,8 +123,9 @@ present when it is not zero, counts the tests that returned a p-value of 1.
 skipped because no row can test them, `metadata["undecided_pairs"]` lists the pairs no tested
 query could decide, which the graph leaves out and no orientation reads, and
 `metadata["never_observed_together"]` the pairs of columns no row observes together. In PC, FCI,
-CD-NOD, FCI-JCI, and the Markov-blanket searches, `metadata["possibly_separable"]` lists the edges
-drawn although a conditioning set that could not be tested might have separated their pair. The
+CD-NOD, FCI-JCI, the Markov-blanket searches, PCMCI, PCMCI+, and LPCMCI,
+`metadata["possibly_separable"]` lists the edges drawn although a conditioning set that could not
+be tested might have separated their pair. The
 notice gives the number of those pairs and edges, not of the sets. `pc` also takes
 `missing="mvpc"`: Missing-Value PC (Tu et al., 2019) finds the parents of each missingness indicator
 and tests again the edges they could have kept; `metadata["corrected_edges"]["rows_tested"]` gives
