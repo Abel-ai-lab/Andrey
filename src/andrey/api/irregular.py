@@ -739,11 +739,13 @@ def cpcm(
     density; under a one-parameter exponential family, unless the parameter is linear in the
     sufficient statistic [1]_. It is designed for effects whose whole distribution, not only the
     mean and spread, changes with the cause, such as counts, positive or heavy-tailed effects, and
-    for mixed pairs where each column gets its own family. On the paper's pairs it names the
-    direction as often as the code published with the paper, with the family the paper's rule picks
-    from each column's support, or the Gaussian location-scale family given where the noise's
-    scale changes with the cause. For an effect with additive noise use :func:`~andrey.anm`; for
-    more than two variables, :func:`~andrey.cpcm_graph`.
+    for mixed pairs where each column gets its own family. On the paper's pairs the forced
+    direction (``alpha=None``) is right as often as the code published with the paper, with the
+    family the paper's rule picks from each column's support, or the Gaussian location-scale
+    family given where the noise's scale changes with the cause; the conservative estimate (a
+    level for ``alpha``) under ``"pareto"`` is not supported (see Limitations). For an effect
+    with additive noise use :func:`~andrey.anm`; for more than two variables,
+    :func:`~andrey.cpcm_graph`.
 
     In each direction the effect's family is fitted on the cause and each value mapped through its
     fitted distribution function, ``eps = F(y; theta(x))``. A count family's function is randomized
@@ -806,27 +808,28 @@ def cpcm(
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On the paper's pairs of 500 to 2,000 rows, CPCM named the direction as often
-    as the code published with the paper and more often than a coin flip or the majority direction;
-    the `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm>`_ has the
-    numbers. The family must be chosen: the paper's rule that picks one from each column's
-    support, and its sequential choice between one- and two-parameter families, are not offered,
-    and the benchmark passed the support rule's family. On location-scale and multiplicative pairs
-    that rule picks ``"gaussian_fixed_scale"``, an additive-noise family, which named the true
-    direction on 0% to 58% of them in both implementations, so pass ``"gaussian"`` there. On fresh
+    **Limitations.** On the paper's pairs of 1,000 and 2,000 rows, CPCM's forced direction was right
+    as often as the code published with the paper and more often than a coin flip or the majority
+    direction; the `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm>`_
+    has the numbers. The family must be chosen: the paper's rule that picks one from each column's
+    support, and its sequential choice between one- and two-parameter families, are not offered, and
+    the benchmark passed the support rule's family. On location-scale and multiplicative pairs that
+    rule picks ``"gaussian_fixed_scale"``, an additive-noise family, which named the true direction
+    on 0% to 58% of them in both implementations, so pass ``"gaussian"`` there. On fresh
     multiplicative pairs, :func:`~andrey.loci` was right more often, 98% against 84%, and faster.
-    Under ``"pareto"``, when the cause's largest value is thousands of times its median, the test
-    of one direction can reject where the authors' code does not. On the paper's model (16) at
+    Under ``"pareto"``, when the cause's largest value is thousands of times its median, the test of
+    one direction can reject where the authors' code does not. On the paper's model (16) at
     ``gamma = 0`` the conservative estimate found both directions plausible, the paper's claim
     there, on 73% and 78% of the pairs of two seed sets against the reference's 82% and 85%, fewer
-    on both; counted as no orientation (empty, both, or neither), the measure of the card's verdict,
-    the gap repeats on one seed set only. At 2,000 rows the forced direction was wrong on 8 of 200
-    pairs against 1. Each HSIC test builds matrices with one row and one column per sample, so
-    time and memory grow with the square of ``n_samples``. Under the count families the rank-10
-    spline must follow the mean to within the counts' own noise, about ``1 / sqrt(mean)`` of it,
-    which it does for means up to a few hundred: from means of a few thousand that vary strongly
-    with the cause, the true direction's test rejects too. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    on both, so the conservative estimate under ``"pareto"`` is not supported until the cause, the
+    rank-10 thin plate spline of the cause on such values, is fixed. At 2,000 rows the forced
+    direction was wrong on 8 of 200 pairs against 1. Each HSIC test builds matrices with one row and
+    one column per sample, so time and memory grow with the square of ``n_samples``. Under the count
+    families the rank-10 spline must follow the mean to within the counts' own noise, about
+    ``1 / sqrt(mean)`` of it, which it does for means up to a few hundred: from means of a few
+    thousand that vary strongly with the cause, the true direction's test rejects too. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------

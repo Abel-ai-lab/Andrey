@@ -3,13 +3,13 @@
  "parity_rule": "paired bootstrap",
  "generated": "2026-11-20",
  "theme": "DAS and CPCM against the code published with their papers, on their papers' simulations and data",
- "build": "DAS: Andrey development build of 18 November 2026 (version string 0.17.1, the functional-models line with DAS as released in 0.18.0); the 0.19.0 release branch returns the same graph on 40 of 40 check datasets (50 variables, ER4, raw and z-scored) CPCM: Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+ "build": "DAS: Andrey development build of 18 November 2026 (version string 0.17.1, the functional-models line with DAS as released in 0.18.0); the 0.19.0 release branch returns the same graph on 40 of 40 check datasets (50 variables, ER4, raw and z-scored) CPCM: Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's. The loci, anm and pnl fits beside CPCM on Table 2's POISg and PARg ran on commit 68170983b, whose code for those methods is the same",
  "verdict_rule": "DAS: per cell (scale, graph density, variables; 20 datasets): D = SHD(Andrey) - SHD(reference) per dataset, on the datasets both fitted; worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise. 10,000 resamples of the datasets, default_rng(0). The decision cells are the z-scored and rescaled ones (claim in); the raw cells, where the reference reads the simulation's units and Andrey standardizes inside its order search, are reported, not judged (claim out). A cell worse on its first seeds was rerun on fresh seeds (replication); no decision cell was worse, so none was rerun, and the raw ER1 cells at 20 and 50 variables, worse on their first seeds, were rerun. result is the published verdict, better or worse only where the fresh seeds agree and a tie otherwise; replicated says which. The floor, each row's floor field, per dataset: SHD(Andrey) minus SHD(empty graph), with the same bootstrap; it applies where the reference's interval lies wholly below 0, and a row then passes when Andrey's does too. The lane file's floor section takes the better of the empty graph and the complete DAG in column order CPCM: per cell (setup, family arm, size): D = error(Andrey) - error(reference) per dataset, on the datasets both fitted (pairs: 1 for the reversed forced direction; graphs: SHD, and the authors' SID beside it, a graph worse on either being worse); worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise; 10,000 resamples, default_rng(0). Pairs: 100 per cell, graphs: 20. A row worse on its first seeds was rerun on fresh seeds, and holds that rerun as replication; every other pair row with fresh seeds holds them as fresh. Fresh graph rows have no reference arm: Andrey's errors and floors only. result is the published verdict, better or worse only where the fresh seeds agree, a tie otherwise. The floor field is Andrey's and the reference's error minus the empty answer's; the lane file also gives the floor of the better of the coin flip and the cell's majority direction (pairs) or the empty and the base-rate graph (graphs). Rows of Table 1's misspecified families, the other family arm on LS, LS-s and MN-U, and the edge penalty 1 are out of claim, reported",
  "card_verdict_rule": "card_verdict, on every row: the release card's verdict on the row's comparison, 'better', 'tie', or 'worse', and null where the card judges none (rows out of claim). Better or worse counts only where a rerun on fresh seeds agreed; one on the first seeds alone is a tie",
  "fit_protocol": "DAS: each fit in a fresh process on one core with one BLAS thread, one timed fit without warm-up, a cap of 1,800 s per fit up to 100 variables and 3,600 s at 200, past which a fit is a timeout and never scored as a graph; no fit of these rows failed or timed out. Times are process CPU seconds; ratio is the median over the paired datasets of the reference's time over Andrey's CPCM: each fit in a long-lived worker on one core with one BLAS thread, one timed fit, a cap of 1,800 s per fit (3,600 s for the reference at 8 variables); no fit timed out; the reference's errors are counted and never scored, and each cell is paired on the datasets both finished; times are wall seconds of the fit inside the worker",
  "error_metric": "DAS: SHD of the DAG against the true DAG (a reversed edge counts 1): andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means CPCM: pairs: SHD of the two-node DAG of the forced direction; graphs: SHD of the DAG, with the authors' SID under sid",
  "complete_definition": "DAS: true when every row has at least 10 paired datasets (both fitted) CPCM: true when every row has at least 10 paired datasets",
- "seeds_note": "DAS: every cell holds 20 datasets: seeds 0-19 for ER1 and for ER4 at 10 variables; seeds 20-39 for ER4 from 20 to 200 variables, kept apart from the ER4 seeds 0-19 used while the method was built; the raw ER4 cell at 50 variables is the one on seeds 0-19, reported as context, with the reference's fits from a separate run on the same datasets. A replication holds 20 fresh datasets, seeds 20-39. The lane file's rows at 500 and 1,000 variables use seeds 0-19, and its paired check at 500 seeds 0-4 CPCM: pairs: first seeds 0-99, fresh seeds 100-199; Table 2: the first seeds are the 100 pairs of each of the five Tagasovska et al. (2020) files the paper takes them from, and the fresh seeds 100 pairs drawn by those files' generator, unmodified, under another seed. That generator at the published commit reproduces the MN-U file exactly and the AN file's causes and directions, but not the AN-s, LS and LS-s files, which match the fresh draws on summary statistics only (the cause's and the effect's spread, kurtosis). POISg and PARg have no published data and were drawn for this comparison: the cause sqrt(V) Z with V uniform on (1, 2) and Z standard normal, as in that generator, theta(x) = f(x) - min f + 0.5 with f a Gaussian-process draw with a Gaussian kernel of bandwidth 1, and the effect Poisson(theta) or Pareto of scale 1 and shape theta, the pair's order swapped on a coin; one seed for the first set and another for the fresh set; graphs: first seeds 0-19, fresh seeds 20-39",
+ "seeds_note": "DAS: every cell holds 20 datasets: seeds 0-19 for ER1 and for ER4 at 10 variables; seeds 20-39 for ER4 from 20 to 200 variables, kept apart from the ER4 seeds 0-19 used while the method was built; the raw ER4 cell at 50 variables is the one on seeds 0-19, reported as context, with the reference's fits from a separate run on the same datasets. A replication holds 20 fresh datasets, seeds 20-39. The lane file's rows at 500 and 1,000 variables use seeds 0-19, and its paired check at 500 seeds 0-4 CPCM: pairs: first seeds 0-99, fresh seeds 100-199; Table 2: the first seeds are the 100 pairs of each of the five Tagasovska et al. (2020) files the paper takes them from, and the fresh seeds 100 pairs drawn by those files' generator, unmodified, under another seed. That generator at the published commit reproduces the MN-U file exactly and the AN file's causes and directions, but not the AN-s, LS and LS-s files, which match the fresh draws on summary statistics only (the cause's and the effect's spread, kurtosis). POISg and PARg have no published data and were drawn as the paper's Appendix B.3 describes them, under the pair seeds 0-99 and 100-199: the cause N(0, sqrt 2) (standard deviation sqrt 2), theta(x) = f(x) - min f + 0.5 with f a zero-mean Gaussian process with a squared-exponential kernel, sigma 1 and length 0.2, on a grid spanning the cause, and the effect Poisson with mean theta or Pareto of scale 1 and shape theta, the pair's order swapped on a coin. The authors' repository also has a generator for these two sets (CPCM_generative_model in Simulations/Simulations2/Data generators.R, commit 2ada90e), not used here; it differs from that description in two ways: it reads theta from a grid that starts at 0, so theta is constant for causes below 0, and it draws the Pareto effect with EnvStats' rpareto(1, theta, 1), whose arguments are the location and the shape, which gives scale theta and shape 1; graphs: first seeds 0-19, fresh seeds 20-39",
  "regimes": {
   "score_paper_standardized": "the papers' simulation: Erdos-Renyi graphs with d edges (ER1) or 4 d (ER4), each link one draw of a Gaussian process over the node's parents, Gaussian noise of variance uniform on [0.4, 0.8], 1,000 rows, every column z-scored",
   "score_paper_rescaled": "the papers' simulation: Erdos-Renyi graphs with d edges (ER1) or 4 d (ER4), each link one draw of a Gaussian process over the node's parents, Gaussian noise of variance uniform on [0.4, 0.8], 1,000 rows, each variable divided by its standard deviation before its children read it",
@@ -1852,7 +1852,7 @@
    "output": "two-node DAG",
    "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
-   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's. The loci, anm and pnl fits beside CPCM on Table 2's POISg and PARg ran on commit 68170983b, whose code for those methods is the same",
    "same_graph_test": "the same forced direction",
    "regime": "cpcm_table1_exponential",
    "claim": "in",
@@ -2466,7 +2466,7 @@
    "output": "two-node DAG",
    "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
-   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's. The loci, anm and pnl fits beside CPCM on Table 2's POISg and PARg ran on commit 68170983b, whose code for those methods is the same",
    "same_graph_test": "the same forced direction",
    "regime": "cpcm_table1_gamma_fixed_shape",
    "claim": "in",
@@ -2863,7 +2863,7 @@
    "output": "two-node DAG",
    "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
-   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's. The loci, anm and pnl fits beside CPCM on Table 2's POISg and PARg ran on commit 68170983b, whose code for those methods is the same",
    "same_graph_test": "the same forced direction",
    "regime": "cpcm_table1_pareto",
    "claim": "in",
@@ -3477,7 +3477,7 @@
    "output": "two-node DAG",
    "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
-   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's. The loci, anm and pnl fits beside CPCM on Table 2's POISg and PARg ran on commit 68170983b, whose code for those methods is the same",
    "same_graph_test": "the same forced direction",
    "regime": "cpcm_table1_gamma",
    "claim": "out",
@@ -3879,7 +3879,7 @@
    "output": "two-node DAG",
    "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
-   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's. The loci, anm and pnl fits beside CPCM on Table 2's POISg and PARg ran on commit 68170983b, whose code for those methods is the same",
    "same_graph_test": "the same forced direction",
    "regime": "cpcm_table1_gumbel",
    "claim": "out",
@@ -4281,7 +4281,7 @@
    "output": "two-node DAG",
    "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
-   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's. The loci, anm and pnl fits beside CPCM on Table 2's POISg and PARg ran on commit 68170983b, whose code for those methods is the same",
    "same_graph_test": "the same forced direction",
    "regime": "cpcm_table1_gumbel_fixed_scale",
    "claim": "out",
@@ -4675,7 +4675,7 @@
    "output": "two-node DAG",
    "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
-   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's. The loci, anm and pnl fits beside CPCM on Table 2's POISg and PARg ran on commit 68170983b, whose code for those methods is the same",
    "same_graph_test": "the same forced direction",
    "regime": "cpcm_table1_gaussian",
    "claim": "out",
@@ -5072,7 +5072,7 @@
    "output": "two-node DAG",
    "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
-   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's. The loci, anm and pnl fits beside CPCM on Table 2's POISg and PARg ran on commit 68170983b, whose code for those methods is the same",
    "same_graph_test": "the same forced direction",
    "regime": "cpcm_table1_gaussian_fixed_scale",
    "claim": "out",
@@ -5464,7 +5464,7 @@
    "output": "two-node DAG",
    "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
-   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's. The loci, anm and pnl fits beside CPCM on Table 2's POISg and PARg ran on commit 68170983b, whose code for those methods is the same",
    "same_graph_test": "the same forced direction",
    "regime": "cpcm_table2",
    "claim": "in",
@@ -6205,40 +6205,40 @@
      "arm": "collection1",
      "fits": 100,
      "andrey_ok": 100,
-     "andrey_direction_correct": 0.99,
+     "andrey_direction_correct": 0.96,
      "base_rate_floor": {
-      "majority_share": 0.56,
-      "coin_flip_ub": -0.47,
-      "base_rate_ub": -0.33,
+      "majority_share": 0.5,
+      "coin_flip_ub": -0.42,
+      "base_rate_ub": -0.35,
       "pass": true
      },
      "comparator_ok": 100,
      "paired": 100,
      "datasets": 100,
-     "andrey_s": 0.2189,
-     "comparator_s": 0.301,
-     "ratio": 1.56,
+     "andrey_s": 0.1042,
+     "comparator_s": 0.452,
+     "ratio": 4.47,
      "ratio_quartiles": [
-      1.26,
-      2.07
+      3.67,
+      7.37
      ],
      "timed_pairs": 100,
-     "timed_on_one_node": 100,
-     "andrey_correct": 99,
-     "andrey_reversed": 1,
+     "timed_on_one_node": 0,
+     "andrey_correct": 96,
+     "andrey_reversed": 4,
      "andrey_no_edge": 0,
-     "comparator_correct": 99,
-     "comparator_reversed": 1,
+     "comparator_correct": 98,
+     "comparator_reversed": 2,
      "comparator_no_edge": 0,
-     "andrey_right_comparator_wrong_count": 1,
-     "comparator_right_andrey_wrong_count": 1,
-     "comparator_direction_correct": 0.99,
-     "andrey_shd_mean": 0.01,
-     "comparator_shd_mean": 0.01,
-     "mean_D": 0.0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 2,
+     "comparator_direction_correct": 0.98,
+     "andrey_shd_mean": 0.04,
+     "comparator_shd_mean": 0.02,
+     "mean_D": 0.02,
      "bootstrap_95": [
-      -0.03,
-      0.03
+      0.0,
+      0.05
      ],
      "above_zero": false,
      "verdict": "tie",
@@ -6252,18 +6252,18 @@
       "pass": true,
       "andrey_minus_empty": {
        "paired": 100,
-       "mean": -0.99,
+       "mean": -0.96,
        "bootstrap_95": [
-        -1.0,
-        -0.97
+        -0.99,
+        -0.92
        ]
       },
       "reference_minus_empty": {
        "paired": 100,
-       "mean": -0.99,
+       "mean": -0.98,
        "bootstrap_95": [
         -1.0,
-        -0.97
+        -0.95
        ]
       }
      },
@@ -6275,40 +6275,40 @@
       "seeds": "100-199",
       "fits": 100,
       "andrey_ok": 100,
-      "andrey_direction_correct": 0.99,
+      "andrey_direction_correct": 1.0,
       "base_rate_floor": {
-       "majority_share": 0.52,
-       "coin_flip_ub": -0.47,
-       "base_rate_ub": -0.37,
+       "majority_share": 0.5,
+       "coin_flip_ub": -0.5,
+       "base_rate_ub": -0.4,
        "pass": true
       },
       "comparator_ok": 100,
       "paired": 100,
       "datasets": 100,
-      "andrey_s": 0.2146,
-      "comparator_s": 0.4095,
-      "ratio": 2.05,
+      "andrey_s": 0.1072,
+      "comparator_s": 0.2885,
+      "ratio": 2.72,
       "ratio_quartiles": [
-       1.22,
-       3.22
+       2.44,
+       3.36
       ],
       "timed_pairs": 100,
       "timed_on_one_node": 100,
-      "andrey_correct": 99,
-      "andrey_reversed": 1,
+      "andrey_correct": 100,
+      "andrey_reversed": 0,
       "andrey_no_edge": 0,
       "comparator_correct": 100,
       "comparator_reversed": 0,
       "comparator_no_edge": 0,
       "andrey_right_comparator_wrong_count": 0,
-      "comparator_right_andrey_wrong_count": 1,
+      "comparator_right_andrey_wrong_count": 0,
       "comparator_direction_correct": 1.0,
-      "andrey_shd_mean": 0.01,
+      "andrey_shd_mean": 0.0,
       "comparator_shd_mean": 0.0,
-      "mean_D": 0.01,
+      "mean_D": 0.0,
       "bootstrap_95": [
        0.0,
-       0.03
+       0.0
       ],
       "above_zero": false,
       "verdict": "tie",
@@ -6322,10 +6322,10 @@
        "pass": true,
        "andrey_minus_empty": {
         "paired": 100,
-        "mean": -0.99,
+        "mean": -1.0,
         "bootstrap_95": [
          -1.0,
-         -0.97
+         -1.0
         ]
        },
        "reference_minus_empty": {
@@ -6350,111 +6350,111 @@
      "arm": "collection1",
      "fits": 100,
      "andrey_ok": 100,
-     "andrey_direction_correct": 0.959,
+     "andrey_direction_correct": 0.879,
      "base_rate_floor": {
-      "majority_share": 0.56,
-      "coin_flip_ub": -0.42,
-      "base_rate_ub": -0.31,
+      "majority_share": 0.55,
+      "coin_flip_ub": -0.31,
+      "base_rate_ub": -0.21,
       "pass": true
      },
-     "comparator_ok": 98,
-     "paired": 98,
+     "comparator_ok": 99,
+     "paired": 99,
      "datasets": 100,
-     "andrey_s": 0.1952,
-     "comparator_s": 0.415,
-     "ratio": 2.18,
+     "andrey_s": 0.1039,
+     "comparator_s": 0.583,
+     "ratio": 5.58,
      "ratio_quartiles": [
-      1.8,
-      2.84
+      4.6,
+      7.92
      ],
-     "timed_pairs": 98,
-     "timed_on_one_node": 98,
-     "andrey_correct": 94,
-     "andrey_reversed": 4,
+     "timed_pairs": 99,
+     "timed_on_one_node": 0,
+     "andrey_correct": 87,
+     "andrey_reversed": 12,
      "andrey_no_edge": 0,
-     "comparator_correct": 94,
-     "comparator_reversed": 4,
+     "comparator_correct": 91,
+     "comparator_reversed": 8,
      "comparator_no_edge": 0,
-     "andrey_right_comparator_wrong_count": 1,
-     "comparator_right_andrey_wrong_count": 1,
-     "comparator_direction_correct": 0.959,
-     "andrey_shd_mean": 0.0408,
-     "comparator_shd_mean": 0.0408,
-     "mean_D": 0.0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 4,
+     "comparator_direction_correct": 0.919,
+     "andrey_shd_mean": 0.1212,
+     "comparator_shd_mean": 0.0808,
+     "mean_D": 0.0404,
      "bootstrap_95": [
-      -0.0306,
-      0.0306
+      0.0101,
+      0.0808
      ],
-     "above_zero": false,
-     "verdict": "tie",
+     "above_zero": true,
+     "verdict": "worse",
      "coverage": {
       "datasets": 100,
       "andrey_short": 0,
-      "reference_short": 2
+      "reference_short": 1
      },
      "floor": {
       "applies": true,
       "pass": true,
       "andrey_minus_empty": {
-       "paired": 98,
-       "mean": -0.9592,
+       "paired": 99,
+       "mean": -0.8788,
        "bootstrap_95": [
-        -0.9898,
-        -0.9184
+        -0.9394,
+        -0.8081
        ]
       },
       "reference_minus_empty": {
-       "paired": 98,
-       "mean": -0.9592,
+       "paired": 99,
+       "mean": -0.9192,
        "bootstrap_95": [
-        -0.9898,
-        -0.9184
+        -0.9697,
+        -0.8586
        ]
       }
      },
-     "comparator_errors": 2,
+     "comparator_errors": 1,
      "paper_accuracy_sequential_choice": 0.9,
      "claim": "in",
      "first_seeds": "0-99",
      "seeds": 100,
-     "fresh": {
+     "replication": {
       "seeds": "100-199",
       "fits": 100,
       "andrey_ok": 100,
-      "andrey_direction_correct": 0.98,
+      "andrey_direction_correct": 0.96,
       "base_rate_floor": {
-       "majority_share": 0.52,
-       "coin_flip_ub": -0.45,
-       "base_rate_ub": -0.36,
+       "majority_share": 0.56,
+       "coin_flip_ub": -0.42,
+       "base_rate_ub": -0.29,
        "pass": true
       },
       "comparator_ok": 100,
       "paired": 100,
       "datasets": 100,
-      "andrey_s": 0.2175,
-      "comparator_s": 0.3835,
-      "ratio": 2.02,
+      "andrey_s": 0.1217,
+      "comparator_s": 0.3485,
+      "ratio": 2.89,
       "ratio_quartiles": [
-       1.49,
-       2.45
+       2.39,
+       3.65
       ],
       "timed_pairs": 100,
       "timed_on_one_node": 100,
-      "andrey_correct": 98,
-      "andrey_reversed": 2,
+      "andrey_correct": 96,
+      "andrey_reversed": 4,
       "andrey_no_edge": 0,
       "comparator_correct": 98,
       "comparator_reversed": 2,
       "comparator_no_edge": 0,
-      "andrey_right_comparator_wrong_count": 1,
-      "comparator_right_andrey_wrong_count": 1,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 2,
       "comparator_direction_correct": 0.98,
-      "andrey_shd_mean": 0.02,
+      "andrey_shd_mean": 0.04,
       "comparator_shd_mean": 0.02,
-      "mean_D": 0.0,
+      "mean_D": 0.02,
       "bootstrap_95": [
-       -0.03,
-       0.03
+       0.0,
+       0.05
       ],
       "above_zero": false,
       "verdict": "tie",
@@ -6468,10 +6468,10 @@
        "pass": true,
        "andrey_minus_empty": {
         "paired": 100,
-        "mean": -0.98,
+        "mean": -0.96,
         "bootstrap_95": [
-         -1.0,
-         -0.95
+         -0.99,
+         -0.92
         ]
        },
        "reference_minus_empty": {
@@ -6484,7 +6484,7 @@
        }
       }
      },
-     "replicated": "tie, fresh seeds tie",
+     "replicated": "worse, not repeated on fresh seeds",
      "result": "tie",
      "card_verdict": "tie"
     }
@@ -6502,7 +6502,7 @@
    "output": "two-node DAG",
    "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
-   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's. The loci, anm and pnl fits beside CPCM on Table 2's POISg and PARg ran on commit 68170983b, whose code for those methods is the same",
    "same_graph_test": "the same forced direction",
    "regime": "cpcm_table2_other_arm",
    "claim": "out",
@@ -7245,7 +7245,7 @@
    "output": "two-node DAG",
    "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
-   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's. The loci, anm and pnl fits beside CPCM on Table 2's POISg and PARg ran on commit 68170983b, whose code for those methods is the same",
    "same_graph_test": "the same forced direction",
    "regime": "cpcm_pareto16",
    "claim": "in",
@@ -8150,7 +8150,7 @@
    "output": "DAG",
    "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
-   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's. The loci, anm and pnl fits beside CPCM on Table 2's POISg and PARg ran on commit 68170983b, whose code for those methods is the same",
    "same_graph_test": "equal SHD to the true DAG",
    "regime": "cpcm_graph_paper",
    "claim": "in",
@@ -8528,7 +8528,7 @@
    "output": "DAG",
    "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
-   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's. The loci, anm and pnl fits beside CPCM on Table 2's POISg and PARg ran on commit 68170983b, whose code for those methods is the same",
    "same_graph_test": "equal SHD to the true DAG",
    "regime": "cpcm_graph_paper_lambda1",
    "claim": "out",
@@ -8906,7 +8906,7 @@
    "output": "DAG",
    "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; times and their ratio pair fits on one CPU model, on one node where timed_on_one_node says so and otherwise in separate runs; a row whose two arms ran on different CPU models withholds them",
    "cores": 1,
-   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's. The loci, anm and pnl fits beside CPCM on Table 2's POISg and PARg ran on commit 68170983b, whose code for those methods is the same",
    "same_graph_test": "equal SHD to the true DAG",
    "regime": "cpcm_graph_greedy",
    "claim": "in",
