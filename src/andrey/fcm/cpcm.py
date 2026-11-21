@@ -115,9 +115,10 @@ class Family:
     ``criterion`` is what the log smoothing parameters minimize (:meth:`_Model.score`): ``"laml"``,
     the negative Laplace approximate marginal likelihood; ``"gcv"``, the generalized
     cross-validation score ``n D / (n - edf)^2``; or ``"ubre"``, the unbiased risk estimate
-    ``D / n + 2 edf / n - 1`` of a family whose scale is known to be 1. ``D`` is the deviance,
-    twice the negative log-likelihood less ``saturated(y)``, the negative log-likelihood when each
-    row's parameter fits that row alone, and ``edf`` the fit's effective degrees of freedom.
+    ``D / n + 2 edf / n - 1`` of a family whose scale is known to be 1. ``D`` is
+    ``deviance(y, etas)``, twice the negative log-likelihood less its value when each row's
+    parameter fits that row alone, summed from each row's own difference so that large values do
+    not cancel, and ``edf`` the fit's effective degrees of freedom.
     """
 
     name: str
@@ -133,7 +134,7 @@ class Family:
     upper: Callable[[np.ndarray], float] | None = None
     floor: float | None = None
     criterion: str = "laml"
-    saturated: Callable[[np.ndarray], float] | None = None
+    deviance: Callable[[np.ndarray, list[np.ndarray]], float] | None = None
 
     @property
     def reads_units(self) -> bool:
@@ -193,16 +194,18 @@ def _pareto_derivs(y: np.ndarray, etas: list[np.ndarray]) -> Derivs:
     return nll + float(np.sum(np.log(y))), grad, hess
 
 
-def _exponential_saturated(y: np.ndarray) -> float:
-    return float(np.sum(np.log(y) + 1.0))  # each row's own mean, exp(eta) = y
+def _exponential_deviance(y: np.ndarray, etas: list[np.ndarray]) -> float:
+    log_u = np.log(y) - etas[0]  # u = y / mean; a row's own mean, u = 1, adds 0
+    return 2.0 * float(np.sum(np.expm1(log_u) - log_u))
 
 
-def _pareto_saturated(y: np.ndarray) -> float:
-    return _exponential_saturated(np.log(y)) + float(np.sum(np.log(y)))
+def _pareto_deviance(y: np.ndarray, etas: list[np.ndarray]) -> float:
+    return _exponential_deviance(np.log(y), etas)
 
 
-def _poisson_saturated(y: np.ndarray) -> float:
-    return float(np.sum(y - special.xlogy(y, y) + special.gammaln(y + 1.0)))
+def _poisson_deviance(y: np.ndarray, etas: list[np.ndarray]) -> float:
+    mean = np.exp(etas[0])
+    return 2.0 * float(np.sum(special.xlogy(y, y / mean) - (y - mean)))
 
 
 def _poisson_derivs(y: np.ndarray, etas: list[np.ndarray]) -> Derivs:
@@ -360,13 +363,13 @@ def _families() -> dict[str, Family]:
                gaussian_cdf, _not_finite, rescale=_standardized),
         Family("exponential", "positive numbers", 1, "", lambda y: [math.log(np.mean(y))],
                _exponential_derivs, exponential_cdf, positive, rescale=_over_mean,
-               criterion="gcv", saturated=_exponential_saturated),
+               criterion="gcv", deviance=_exponential_deviance),
         Family("pareto", "numbers greater than 1 (a Pareto law of scale 1)", 1, "",
                lambda y: [math.log(max(float(np.mean(np.log(y))), 1e-8))], _pareto_derivs,
-               pareto_cdf, above_one, criterion="gcv", saturated=_pareto_saturated),
+               pareto_cdf, above_one, criterion="gcv", deviance=_pareto_deviance),
         Family("poisson", "counts (whole numbers of at least 0)", 1, "",
                lambda y: _count_start(y)[:1], _poisson_derivs, _poisson_cdf, _not_whole,
-               counts=True, criterion="ubre", saturated=_poisson_saturated),
+               counts=True, criterion="ubre", deviance=_poisson_deviance),
         Family("gamma", "positive numbers", 2, "smooth",
                *floored("gamma", _gamma_start, _gamma_derivs, gamma_cdf),
                positive, rescale=_over_mean, floor=LOG_SCALE_FLOOR["gamma"]),
@@ -769,12 +772,11 @@ class _Model:
         if self.family.criterion == "laml":
             ranks = np.array([rank for _, _, rank in self.penalties], dtype=np.float64)
             return value - 0.5 * float(ranks @ rho) + 0.5 * logdet, etas
-        assert self.family.saturated is not None
+        assert self.family.deviance is not None
         n = self.y.size
         if not n - edf > 0:
             return math.inf, etas
-        nll = self.family.derivs(self.y, etas)[0]
-        deviance = 2.0 * (nll - self.family.saturated(self.y))
+        deviance = self.family.deviance(self.y, etas)
         if self.family.criterion == "gcv":
             return n * deviance / (n - edf) ** 2, etas
         return deviance / n + 2.0 * edf / n - 1.0, etas
