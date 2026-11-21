@@ -50,7 +50,7 @@ eaau4996. https://doi.org/10.1126/sciadv.aau4996
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, cast
 
@@ -65,7 +65,13 @@ from andrey.core.ci import (
     StudentT,
     make_indep_test,
 )
-from andrey.core.ci_missing import PartialCorrelationDeletion, not_tested, testwise_deletion
+from andrey.core.ci_missing import (
+    NOT_TESTED,
+    PartialCorrelationDeletion,
+    TestwiseDeletion,
+    not_tested,
+    testwise_deletion,
+)
 from andrey.core.fdr import check_fdr_method, corrected_pvalues
 from andrey.core.score import CopiedColumnsError, copies_error
 from andrey.core.ties import KEY_DP, tie_ranks
@@ -157,6 +163,10 @@ class DesignTest:
             statistics[k], p_values[k] = statistic[0], p_value[0]
         return statistics, p_values
 
+    def conditionable(self, x: int, y: int, ordered: Iterable[int]) -> list[int]:
+        """:func:`conditionable` of ``test``."""
+        return conditionable(self.test, x, y, ordered)
+
 
 def design_test(
     indep_test: str,
@@ -230,6 +240,13 @@ class RankedDesignTest:
         """Test ``x[i]`` against ``y[i]`` given the columns ``conditions[i]``, for every row."""
         moved = np.sort(self._moved(conditions), axis=1)
         return self.test.statistic_pvalues(self._moved(x), self._moved(y), moved)
+
+    def conditionable(self, x: int, y: int, ordered: Iterable[int]) -> list[int]:
+        """:func:`conditionable` of ``test``, asked and answered in data columns."""
+        ordered = list(ordered)
+        moved = self._moved(np.array([x, y, *ordered], dtype=np.intp)).tolist()
+        back = dict(zip(moved[2:], ordered))
+        return [back[c] for c in conditionable(self.test, moved[0], moved[1], moved[2:])]
 
 
 def ranked_design_test(
@@ -355,6 +372,44 @@ def _strongest_others(columns: np.ndarray, p: int) -> np.ndarray:
     return others
 
 
+def deletes_rows(test: object) -> bool:
+    """Whether ``test`` is or wraps, through the ``test`` attributes of its wrappers, a test that
+    deletes rows per test (:class:`~andrey.core.ci_missing.TestwiseDeletion`)."""
+    while not isinstance(test, TestwiseDeletion):
+        test = getattr(test, "test", None)
+        if test is None:
+            return False
+    return True
+
+
+def conditionable(test: object, x: int, y: int, ordered: Iterable[int]) -> list[int]:
+    """The columns of ``ordered``, strongest first, that a test of ``x`` and ``y`` conditions on:
+    on data with missing values, those that keep the test's block testable, taken in order
+    (:meth:`~andrey.core.ci_missing.TestwiseDeletion.conditionable`), so the block does not mix
+    columns no row observes together; all of them on complete data. A wrapper of the test answers
+    through its own ``conditionable``, in its columns."""
+    method = getattr(test, "conditionable", None)
+    return list(ordered) if method is None else method(x, y, ordered)
+
+
+def _conditionable_others(
+    test: LinkTest, columns: np.ndarray, p: int, target: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Row ``k`` holds the first ``p`` entries of ``columns`` without ``columns[k]`` that a test of
+    ``columns[k]`` and ``target`` conditions on (:func:`conditionable`), and the mask of the rows
+    that have ``p`` of them; a row without them holds zeros."""
+    others = np.zeros((len(columns), p), dtype=np.intp)
+    has = np.ones(len(columns), dtype=bool)
+    listed = columns.tolist()
+    for k, column in enumerate(listed):
+        kept = conditionable(test, column, target, [c for c in listed if c != column])[:p]
+        if len(kept) < p:
+            has[k] = False
+        else:
+            others[k] = kept
+    return others, has
+
+
 def pc1(
     test: LinkTest,
     n_vars: int,
@@ -377,7 +432,10 @@ def pc1(
     strength. A candidate whose first test, given no condition, was not tested has no tested
     result, as no later test, given more, can run on more rows: it leaves the candidates after
     that round, so no test conditions on it, and is no parent; with ``undecided``, it is appended
-    there. With
+    there. On data with missing values, the ``p`` others of a candidate are the strongest that
+    that keep the test's block testable (:func:`conditionable`), so the block does not mix
+    columns no row observes together; a candidate with fewer than ``p`` such others has no test in
+    that round. With
     ``constraints``, a forbidden link is no candidate, and a required one is never tested: it
     stays, with the strength of a partial correlation of ``1``. With ``max_depth``, the rounds
     stop after ``p = max_depth``, so no test conditions on more.
@@ -390,19 +448,30 @@ def pc1(
         columns = columns[~constraints.forbidden[columns // n_vars, columns % n_vars, target]]
     tie = np.asarray(ranks, dtype=np.intp)[columns % n_vars] * (tau_max + 1) + columns // n_vars
     strength = np.full(len(columns), math.inf)
+    deleting = deletes_rows(test)
     p = 0
     while len(columns) - 1 >= p and (max_depth is None or p <= max_depth):
         y = np.full_like(columns, target)
-        conditions = _strongest_others(columns, p)
-        if constraints is None:
-            statistics, p_values = test.statistic_pvalues(columns, y, conditions)
+        if deleting:
+            conditions, has = _conditionable_others(test, columns, p, target)
         else:
-            statistics, p_values = _known_links_pvalues(
+            conditions, has = _strongest_others(columns, p), None
+        asked = slice(None) if has is None or has.all() else has
+        statistics = np.full(len(columns), NOT_TESTED)
+        p_values = np.full(len(columns), NOT_TESTED)
+        if has is not None and not has.any():
+            pass  # no candidate has p others to condition on: no test this round
+        elif constraints is None:
+            statistics[asked], p_values[asked] = test.statistic_pvalues(
+                columns[asked], y[asked], conditions[asked]
+            )
+        else:
+            statistics[asked], p_values[asked] = _known_links_pvalues(
                 test,
-                constraints.required[columns // n_vars, columns % n_vars, target],
-                columns,
-                y,
-                conditions,
+                constraints.required[columns // n_vars, columns % n_vars, target][asked],
+                columns[asked],
+                y[asked],
+                conditions[asked],
             )
         strength = np.fmin(strength, np.abs(statistics))
         kept = np.flatnonzero(~(p_values > pc_alpha))
@@ -443,7 +512,9 @@ def mci(
     """Run the MCI test on every link; return ``(statistics, p_values)``, each ``(tau_max, n, n)``.
 
     The link ``X^i_{t-lag} -> X^j_t`` is tested given ``parents[j]`` without ``(i, lag)`` and
-    ``parents[i]`` shifted ``lag`` steps back. The links into each ``X^j_t`` are tested together,
+    ``parents[i]`` shifted ``lag`` steps back; on data with missing values, only those, strongest
+    first, that keep the test's block testable (:func:`conditionable`). The links into each
+    ``X^j_t`` are tested together,
     one ``test`` call per conditioning-set size. With ``constraints``, no test runs on a forbidden
     link, which reads statistic 0 and p-value 1, or on a required one, which reads 1 and 0.
     """
@@ -460,9 +531,13 @@ def mci(
                     constraints.forbidden[lag, i, j] or constraints.required[lag, i, j]
                 ):
                     continue
-                conditions = {c for c in parents[j] if c != (i, lag)}
-                conditions.update((k, s + lag) for k, s in parents[i])
-                columns = sorted(_column(c, n_vars) for c in conditions)
+                ordered = [c for c in parents[j] if c != (i, lag)]
+                ordered += [(k, s + lag) for k, s in parents[i] if (k, s + lag) not in ordered]
+                columns = sorted(
+                    conditionable(
+                        test, _column((i, lag), n_vars), j, [_column(c, n_vars) for c in ordered]
+                    )
+                )
                 groups.setdefault(len(columns), []).append((i, lag, columns))
         for size, group in groups.items():
             causes = np.array([i for i, _, _ in group], dtype=np.intp)

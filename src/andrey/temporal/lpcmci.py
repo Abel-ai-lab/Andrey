@@ -1065,12 +1065,15 @@ class LPCMCISearch:
         return middle == "!" or (middle == "R" and b_first) or (middle == "L" and not b_first)
 
     def _unshielded(self) -> Iterable[tuple[Node, Node, Node]]:
-        """Every unshielded triple ``(a, b, c)``, both orders of ``a`` and ``c``.
+        """Every unshielded triple ``(a, b, c)``, both orders of ``a`` and ``c``, but those with a
+        side no test with rows decided (:meth:`untested`): such a link may be there or not, so no
+        rule reads the triple.
 
         Each triple appears once, moved so its latest node is at time ``t``.
         """
+        untested = self.untested()
         for b in self.window:
-            around = self.neighbors(b)
+            around = [a for a in self.neighbors(b) if _key(a, b)[0] not in untested]
             for a in around:
                 near_a = self.linked(a)
                 for c in around:
@@ -1520,7 +1523,10 @@ def _result(search: LPCMCISearch, kept: list[tuple[Key, bool]]) -> LPCMCIResult:
     shape = (tau_max + 1, n, n)
     start_marks = np.zeros(shape, dtype=np.int8)
     end_marks = np.zeros(shape, dtype=np.int8)
+    undecided = tuple(sorted(key for key in search.untested() if key in search.edges))
     for (i, j, lag), (start, _, end) in search.edges.items():
+        if (i, j, lag) in undecided and (i, j, lag) not in search.required:
+            continue  # no test with rows decided the link: it is not drawn
         start_marks[lag, i, j], end_marks[lag, i, j] = start, end
         if lag == 0:
             start_marks[0, j, i], end_marks[0, j, i] = end, start
@@ -1530,7 +1536,6 @@ def _result(search: LPCMCISearch, kept: list[tuple[Key, bool]]) -> LPCMCIResult:
         statistics[lag, i, j], p_values[lag, i, j] = statistic, p_value
         if lag == 0:
             statistics[0, j, i], p_values[0, j, i] = statistic, p_value
-    undecided = tuple(sorted(key for key in search.untested() if key in search.edges))
     for i, j, lag in undecided:  # a link no test with rows decided: its largest p-value is unknown
         statistics[lag, i, j], p_values[lag, i, j] = NOT_TESTED, NOT_TESTED
         if lag == 0:

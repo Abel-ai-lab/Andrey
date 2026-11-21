@@ -63,7 +63,14 @@ from andrey.core.fdr import check_fdr_method, corrected_pvalues
 from andrey.core.knowledge import orient as orient_known
 from andrey.core.structure import ARROW, NULL, TAIL
 from andrey.core.ties import KEY_DP, tie_ranks
-from andrey.temporal.pcmci import Link, LinkTest, pc1, ranked_design_test
+from andrey.temporal.pcmci import (
+    Link,
+    LinkTest,
+    conditionable,
+    deletes_rows,
+    pc1,
+    ranked_design_test,
+)
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import LaggedConstraints
@@ -117,6 +124,10 @@ class Recorder:
         self.test = test
         self.largest: dict[tuple[int, int], tuple[float, float]] = {}
 
+    def conditionable(self, x: int, y: int, ordered: Iterable[int]) -> list[int]:
+        """:func:`~andrey.temporal.pcmci.conditionable` of ``test``."""
+        return conditionable(self.test, x, y, ordered)
+
     def statistic_pvalues(
         self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
     ) -> tuple[np.ndarray, np.ndarray]:
@@ -141,13 +152,14 @@ def mark_undecided(
     undecided: np.ndarray,
     untested: list[list[Link]],
 ) -> None:
-    """Mark, in place, the links phase 2's ``undecided`` misses: each lagged link of
-    ``untested[j]``, which has no tested result, stays adjacent and undecided. An undecided link
-    gets :data:`~andrey.core.ci_missing.NOT_TESTED` as its p-value and statistic."""
+    """Mark, in place, the links phase 2's ``undecided`` misses, each lagged link of
+    ``untested[j]``, which has no tested result, and leave every undecided link out of
+    ``adjacency``: no test with rows decided it, so it is not drawn. An undecided link gets
+    :data:`~andrey.core.ci_missing.NOT_TESTED` as its p-value and statistic."""
     for j, links in enumerate(untested):
         for i, lag in links:
-            adjacency[lag, i, j] = undecided[lag, i, j] = True
-            p_values[lag, i, j] = NOT_TESTED
+            undecided[lag, i, j] = True
+    adjacency[undecided] = False
     p_values[undecided] = NOT_TESTED
     statistics[np.isnan(p_values)] = NOT_TESTED
 
@@ -190,6 +202,30 @@ def _conditions(
     return sorted(columns)
 
 
+def _testable(
+    test: LinkTest, n_vars: int, i: int, lag: int, j: int, pool: Iterable[int]
+) -> list[int]:
+    """The lag-0 variables of ``pool`` a test of ``X^i_{t-lag}`` and ``X^j_t`` can condition on
+    alone (:func:`~andrey.temporal.pcmci.conditionable`): on data with missing values, a variable
+    the rows that observe both ends leave too few rows for is left out; all of them on complete
+    data."""
+    pool = list(pool)
+    if not deletes_rows(test):
+        return pool
+    x = lag * n_vars + i
+    return [k for k in pool if conditionable(test, x, j, [k])]
+
+
+def _parent_columns(
+    parents: tuple[tuple[Link, ...], ...], n_vars: int, i: int, lag: int, j: int
+) -> list[int]:
+    """Design columns of ``B(j)`` without ``X^i_{t-lag}``, then of ``B(i)`` shifted ``lag``, each
+    strongest first, once each."""
+    columns = [s * n_vars + k for k, s in parents[j] if (k, s) != (i, lag)]
+    shifted = ((s + lag) * n_vars + k for k, s in parents[i])
+    return columns + [c for c in shifted if c not in columns]
+
+
 def _test_subsets(
     test: LinkTest,
     n_vars: int,
@@ -199,11 +235,35 @@ def _test_subsets(
     j: int,
     subsets: list[tuple[int, ...]],
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Test ``X^i_{t-lag}`` against ``X^j_t`` given each subset, all one size, in one call."""
-    rows = [_conditions(parents, n_vars, i, lag, j, subset) for subset in subsets]
-    conditions = np.array(rows, dtype=np.intp).reshape(len(rows), len(rows[0]))
-    x = np.full(len(rows), lag * n_vars + i, dtype=np.intp)
-    return test.statistic_pvalues(x, np.full_like(x, j), conditions)
+    """Test ``X^i_{t-lag}`` against ``X^j_t`` given each subset, all one size, in one call.
+
+    On data with missing values, each test conditions on its subset and on the parents, strongest
+    first, that keep its block testable
+    (:meth:`~andrey.core.ci_missing.TestwiseDeletion.conditionable`), so the block does not mix
+    columns no row observes together; the tests are then asked in one call per number of
+    conditions.
+    """
+    x_column = lag * n_vars + i
+    if not deletes_rows(test):
+        rows = [_conditions(parents, n_vars, i, lag, j, subset) for subset in subsets]
+    else:
+        defaults = _parent_columns(parents, n_vars, i, lag, j)
+        rows = []
+        for subset in subsets:
+            kept = conditionable(test, x_column, j, [*subset, *defaults])
+            whole = kept[: len(subset)] == list(subset)
+            rows.append(sorted(kept) if whole else _conditions(parents, n_vars, i, lag, j, subset))
+    statistics = np.empty(len(rows))
+    p_values = np.empty(len(rows))
+    for size in sorted({len(row) for row in rows}):
+        at = [k for k, row in enumerate(rows) if len(row) == size]
+        conditions = np.array([rows[k] for k in at], dtype=np.intp).reshape(len(at), size)
+        x = np.full(len(at), x_column, dtype=np.intp)
+        found = test.statistic_pvalues(x, np.full_like(x, j), conditions)
+        if len(at) == len(rows):
+            return found
+        statistics[at], p_values[at] = found
+    return statistics, p_values
 
 
 def skeleton(
@@ -272,7 +332,10 @@ def skeleton(
         for i, lag, j in pairs:
             if not adjacency[lag, i, j]:
                 continue  # removed from its other end in this round
-            subsets = list(combinations([k for k in neighbors[j] if lag or k != i], p))
+            pool_j = _testable(test, n_vars, i, lag, j, (k for k in neighbors[j] if lag or k != i))
+            subsets = list(combinations(pool_j, p))
+            if not subsets:
+                continue  # fewer than p neighbors observed with both ends: no test
             tested_statistics, tested_p_values = _test_subsets(
                 test, n_vars, parents, i, lag, j, subsets
             )
@@ -336,7 +399,10 @@ def _separating_subsets(
     added, gives a p-value above ``pc_alpha``. ``max_p_global`` caps the subsets' size, and a
     subset draws only from ``middles`` when it is given.
     """
-    families = [_neighbors(adjacency, j)] + ([_neighbors(adjacency, i)] if lag == 0 else [])
+    families = [
+        _testable(test, n_vars, i, lag, j, family)
+        for family in [_neighbors(adjacency, j)] + ([_neighbors(adjacency, i)] if lag == 0 else [])
+    ]
     if middles is not None:
         families = [[k for k in family if k in middles] for family in families]
     largest = max(len(family) for family in families)
@@ -385,8 +451,12 @@ def colliders(
     constraints: LaggedConstraints | None = None,
     max_p_global: int | None = None,
     middles: Sequence[int] | None = None,
+    undecided: np.ndarray | None = None,
 ) -> tuple[np.ndarray, frozenset[Triple]]:
     """Phase 3: return the lag-0 marks with the colliders oriented, and the ambiguous triples.
+
+    A triple over an ``undecided`` link, shaped as ``adjacency``, which phase 2 left out of it
+    (:func:`mark_undecided`), is ambiguous under every rule: the link may be there or not.
 
     With ``constraints``, the lag-0 links they decide are directed first, and no collider reverses
     one. With ``collider_rule="sepsets"``, a triple over a pair they keep apart has no separating
@@ -421,7 +491,9 @@ def colliders(
                 if adjacency[lag, i, k] and not adjacency[lag, i, j]
             ]
             for i, lag in far:
-                if collider_rule == "sepsets" and apart[lag, i, j]:
+                if undecided is not None and undecided[lag, i, j]:
+                    verdict = "ambiguous"
+                elif collider_rule == "sepsets" and apart[lag, i, j]:
                     verdict = "ambiguous"
                 elif collider_rule == "sepsets":
                     verdict = "non-collider" if k in sepsets.get((i, lag, j), ()) else "collider"
@@ -635,6 +707,7 @@ def run_phases(
         collider_rule,
         constraints,
         max_p_global,
+        undecided=undecided,
     )
     orient(marks, adjacency, ambiguous)
     return PCMCIPlusResult(

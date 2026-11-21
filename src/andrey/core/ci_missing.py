@@ -590,6 +590,20 @@ class TestwiseDeletion:
             self._together = counts > 0
         return self._together
 
+    def conditionable(self, x: int, y: int, ordered: Iterable[int]) -> list[int]:
+        """The members of ``ordered`` that a query of ``x`` and ``y`` keeps as conditions, taken
+        in order: each joins when the rows that observe ``x``, ``y``, the members taken before it,
+        and it hold at least :meth:`least_rows` for one more condition, so the query over all of
+        them is tested and its block does not mix columns that no row observes together."""
+        rows = self._observed[:, x] & self._observed[:, y]
+        kept: list[int] = []
+        for column in ordered:
+            joined = rows & self._observed[:, column]
+            if np.count_nonzero(joined) >= self.least_rows(len(kept) + 1):
+                kept.append(column)
+                rows = joined
+        return kept
+
     def count_not_tested(self, x: int, y: int, queries: int) -> None:
         """Count ``queries`` queries of ``x`` and ``y`` as not tested in the running
         :func:`rows_tested` counter without asking them, as a search counts the conditioning sets
