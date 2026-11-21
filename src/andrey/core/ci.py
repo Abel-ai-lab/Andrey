@@ -987,10 +987,10 @@ class ChiSquare:
     With ``degrees_of_freedom="nonempty"``, ``dof`` is instead ``(r_x - 1) * (r_y - 1)`` summed over
     the configurations, each table's empty rows and columns struck: the degrees of freedom of
     Spirtes et al. [1]_, less one for each cell with no expected count, in the exact form for cells
-    of an empty row or column [6]_. The two rules differ only on sparse tables, and the statistic
-    is the same under both. With zero degrees of freedom the p-value is :attr:`zero_dof_pvalue`,
-    ``1`` by default: the rows hold no evidence for or against independence, and the answer reads
-    as independence.
+    of an empty row or column [6]_. The two rules differ only on sparse tables, where what each
+    favors and gives up was not measured, and the statistic is the same under both. With zero
+    degrees of freedom the p-value is :attr:`zero_dof_pvalue`, ``1`` by default: the rows hold no
+    evidence for or against independence, and the answer reads as independence.
 
     **Limitations.** Referring the statistic to ``(r_x - 1) * (r_y - 1)`` degrees of freedom
     over-rejects a true independence once the table is sparse, G-square more than Pearson [5]_.

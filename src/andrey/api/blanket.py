@@ -215,14 +215,15 @@ def iamb(
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
         lies within the parents of one end, so that set might be the separating set the search
         missed.
-        ``"orient"`` favors arrowheads and accuracy; it gives up protection from false colliders.
-        ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them, and
-        accuracy. On merged cohorts of three graph sizes, with about 29 to 76 true edges, that no
-        row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's false
-        colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found
-        from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty graph in
-        6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs. Not
-        measured with IAMB. Read under ``structure="cpdag"`` only.
+        ``"orient"`` favors arrowheads; it gives up protection from false colliders. ``"ambiguous"``
+        favors no false collider; it gives up the true arrowheads beside them. With
+        :func:`~andrey.pc`, on merged cohorts of three graph sizes, with about 29 to 76 true edges,
+        that no row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's
+        false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it
+        found from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty
+        graph in 6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs.
+        With IAMB, what the option does to accuracy was not measured. Read under
+        ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
@@ -526,14 +527,15 @@ def inter_iamb(
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
         lies within the parents of one end, so that set might be the separating set the search
         missed.
-        ``"orient"`` favors arrowheads and accuracy; it gives up protection from false colliders.
-        ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them, and
-        accuracy. On merged cohorts of three graph sizes, with about 29 to 76 true edges, that no
-        row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's false
-        colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found
-        from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty graph in
-        6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs. Not
-        measured with Inter-IAMB. Read under ``structure="cpdag"`` only.
+        ``"orient"`` favors arrowheads; it gives up protection from false colliders. ``"ambiguous"``
+        favors no false collider; it gives up the true arrowheads beside them. With
+        :func:`~andrey.pc`, on merged cohorts of three graph sizes, with about 29 to 76 true edges,
+        that no row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's
+        false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it
+        found from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty
+        graph in 6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs.
+        With Inter-IAMB, what the option does to accuracy was not measured. Read under
+        ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
@@ -834,14 +836,15 @@ def mmpc(
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
         lies within the parents of one end, so that set might be the separating set the search
         missed.
-        ``"orient"`` favors arrowheads and accuracy; it gives up protection from false colliders.
-        ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them, and
-        accuracy. On merged cohorts of three graph sizes, with about 29 to 76 true edges, that no
-        row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's false
-        colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found
-        from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty graph in
-        6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs. Not
-        measured with MMPC. Read under ``structure="cpdag"`` only.
+        ``"orient"`` favors arrowheads; it gives up protection from false colliders. ``"ambiguous"``
+        favors no false collider; it gives up the true arrowheads beside them. With
+        :func:`~andrey.pc`, on merged cohorts of three graph sizes, with about 29 to 76 true edges,
+        that no row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's
+        false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it
+        found from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty
+        graph in 6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs.
+        With MMPC, what the option does to accuracy was not measured. Read under
+        ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's

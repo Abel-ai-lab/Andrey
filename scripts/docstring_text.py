@@ -242,9 +242,8 @@ SHARED = {
         "value and the fewest rows two columns share; two columns that share no observed row raise "
         "``ValueError``. "
         '``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it '
-        "gives up time: each round runs the search again, and a fit took 2 to 72 times as long as "
-        "the same search on complete data in the release benchmarks. See **Missing values.** in "
-        "Notes.",
+        "gives up time: each round runs the search again, so the default 10 rounds run it 10 "
+        "times. See **Missing values.** in Notes.",
         lambda m: m in EM_METHODS and m not in EM_SUPPORTED,
     ),
     # One sentence for every method that deletes rows per test, the pair methods included.

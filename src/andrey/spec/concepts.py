@@ -447,7 +447,8 @@ _CONCEPTS = (
         "of the statistic when y is shuffled within each configuration of the conditioning set; "
         "nonempty = (r_x - 1)(r_y - 1) per configuration over the values present, its table's "
         "empty rows and columns struck (Spirtes, Glymour and Scheines 1993, Section 5.5). The two "
-        "differ only on sparse tables. A call that passes it with another test raises ValueError.",
+        "differ only on sparse tables, where what each favors and gives up was not measured. A "
+        "call that passes it with another test raises ValueError.",
         param=_template(
             "degrees_of_freedom",
             "str",
@@ -455,7 +456,8 @@ _CONCEPTS = (
             "Degrees of freedom of the categorical tests, chisq and gsq: mean = the mean of the "
             "statistic when y is shuffled within each configuration of the conditioning set; "
             "nonempty = (r_x - 1) * (r_y - 1) per configuration over the values of x and y present "
-            "in it, the table's empty rows and columns struck. They differ only on sparse tables. "
+            "in it, the table's empty rows and columns struck. They differ only on sparse tables, "
+            "where what each favors and gives up was not measured. "
             "Only chisq and gsq read it: passing it with another test raises ValueError.",
             choices=DEGREES_OF_FREEDOM,
         ),

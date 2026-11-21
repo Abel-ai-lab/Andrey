@@ -196,8 +196,9 @@ the degrees of freedom of the categorical tests, `"chisq"` and `"gsq"`: `"mean"`
 the mean of the statistic when `y` is shuffled within each configuration of the conditioning set,
 and `"nonempty"` is `(r_x - 1) * (r_y - 1)` per configuration over the values of `x` and `y`
 present in it, the table's empty rows and columns struck (Spirtes, Glymour and Scheines 1993). The
-two differ only on sparse tables. Only `"chisq"` and `"gsq"` read it, so passing
-`degrees_of_freedom` with another test raises a `ValueError`.
+two differ only on sparse tables, where what each favors and gives up was not measured. Only
+`"chisq"` and `"gsq"` read it, so passing `degrees_of_freedom` with another test raises a
+`ValueError`.
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
