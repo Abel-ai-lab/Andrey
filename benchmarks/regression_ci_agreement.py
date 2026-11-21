@@ -14,8 +14,9 @@ so both sides test the same numbers. PCM is compared in its paper's direction, t
     ANDREY_BENCH_RSCRIPT=Rscript PCM_CODE=<clone of the PCM authors' code> \\
         uv run python benchmarks/regression_ci_agreement.py <empty folder>
 
-`benchmarks/start_regression_ci_r.sh` builds the R library the reference needs; put it first on
-`R_LIBS`. The script prints one Markdown table per test.
+`benchmarks/start_regression_ci_r.sh` builds the two R libraries the reference needs, read from
+`ANDREY_BENCH_R_LIBS` (GCM and PCM) and `ANDREY_BENCH_R_LIBS_WGCM` (wGCM) when they are set. The
+script prints one Markdown table per test.
 """
 
 from __future__ import annotations
@@ -89,8 +90,12 @@ def run_reference(folder: Path, mode: str, names: list[str], seeds: list[int]) -
     with open(folder / "cases.csv", "w") as f:
         f.write("case,seed\n" + "".join(f"{c},{s}\n" for c, s in zip(names, seeds)))
     rscript = os.environ.get("ANDREY_BENCH_RSCRIPT", "Rscript")
+    lib = os.environ.get(
+        "ANDREY_BENCH_R_LIBS_WGCM" if mode.startswith("wgcm") else "ANDREY_BENCH_R_LIBS"
+    )
+    env = {**os.environ, "R_LIBS": lib} if lib else None
     if not (folder / f"reference_{mode}.csv").exists():  # a rerun reuses the reference's output
-        subprocess.run([rscript, "--vanilla", str(SCRIPT), str(folder), mode], check=True)
+        subprocess.run([rscript, "--vanilla", str(SCRIPT), str(folder), mode], check=True, env=env)
     rows = np.genfromtxt(folder / f"reference_{mode}.csv", delimiter=",", names=True, dtype=None)
     return [dict(zip(rows.dtype.names, r)) for r in np.atleast_1d(rows)]
 
