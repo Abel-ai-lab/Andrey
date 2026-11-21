@@ -122,11 +122,13 @@ names its pull request.
   the pairs of their paper (its Tables 1 and 2 and model (16) with gamma > 0) and its graphs of 4
   to 8 variables, they made as many errors as the code published with the paper, except the
   conservative estimate at gamma 0 under `"pareto"` (see the Pareto gap), and fewer than a coin
-  flip, the majority direction, or the empty graph, and on the first seeds no other method measured
-  beside them was both more accurate and faster by the paired interval where their times pair; the
-  graph search ran about ten times faster. The conservative estimate under `"pareto"` is not
-  supported. Their Limitations state the gaps: the support rule's family on location-scale pairs,
-  and under `"pareto"` a test that can reject on causes with extreme values. The [0.19.0 release
+  flip, the majority direction, or the empty graph, except on Table 2's Pareto pairs drawn by the
+  authors' generator, where neither implementation did (see the PARg gap); on the first seeds no
+  other method measured beside them was both more accurate and faster by the paired interval where
+  their times pair, and the graph search ran about ten times faster. The conservative estimate
+  under `"pareto"` and Table 2's Pareto setup are not supported. Their Limitations state the gaps:
+  the support rule's family on location-scale pairs and on Table 2's Pareto pairs, and under
+  `"pareto"` a test that can reject on causes with extreme values. The [0.19.0 release
   card][card-0190-cpcm] has the numbers. ([#1169])
 - With `fisherz` and `student_t` on data with missing values, test-wise deletion groups the rows by
   their missingness patterns once and computes a test's sums from the groups' tables, removing the

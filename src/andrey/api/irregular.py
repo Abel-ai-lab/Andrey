@@ -742,8 +742,9 @@ def cpcm(
     for mixed pairs where each column gets its own family. On the paper's pairs the forced
     direction (``alpha=None``) is right as often as the code published with the paper, with the
     family the paper's rule picks from each column's support, or the Gaussian location-scale
-    family given where the noise's scale changes with the cause; the conservative estimate (a
-    level for ``alpha``) under ``"pareto"`` is not supported (see Limitations). For an effect
+    family given where the noise's scale changes with the cause. The paper's Pareto pairs (its
+    Table 2's PARg) and the conservative estimate (a level for ``alpha``) under ``"pareto"`` are
+    not supported (see Limitations). For an effect
     with additive noise use :func:`~andrey.anm`; for more than two variables,
     :func:`~andrey.cpcm_graph`.
 
@@ -810,11 +811,15 @@ def cpcm(
 
     **Limitations.** On the paper's pairs of 1,000 and 2,000 rows, CPCM's forced direction was right
     as often as the code published with the paper and more often than a coin flip or the majority
-    direction; the `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm>`_
-    has the numbers. The family must be chosen: the paper's rule that picks one from each column's
-    support, and its sequential choice between one- and two-parameter families, are not offered, and
-    the benchmark passed the support rule's family. On location-scale and multiplicative pairs that
-    rule picks ``"gaussian_fixed_scale"``, an additive-noise family, which named the true direction
+    direction, except on Table 2's Pareto pairs drawn by the authors' generator, whose effect is a
+    Pareto of scale theta and shape 1, which neither family the support rule picks (exponential,
+    or Pareto of scale 1) holds: there it was right on 38% and 47% of the pairs of two seed sets,
+    as often as the authors' code and no better than a coin flip. The `0.19.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm>`_ has the numbers. The family must be
+    chosen: the paper's rule that picks one from each column's support, and its sequential choice
+    between one- and two-parameter families, are not offered, and the benchmark passed the support
+    rule's family. On location-scale and multiplicative pairs that rule picks
+    ``"gaussian_fixed_scale"``, an additive-noise family, which named the true direction
     on 0% to 58% of them in both implementations, so pass ``"gaussian"`` there. On fresh
     multiplicative pairs, :func:`~andrey.loci` was right more often, 98% against 84%, and faster.
     Under ``"pareto"``, when the cause's largest value is thousands of times its median, the test of
