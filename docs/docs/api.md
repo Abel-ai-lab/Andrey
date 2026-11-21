@@ -125,8 +125,12 @@ query could decide, which the graph leaves out and no orientation reads, and
 `metadata["never_observed_together"]` the pairs of columns no row observes together. In PC, FCI,
 CD-NOD, FCI-JCI, the Markov-blanket searches, PCMCI, PCMCI+, and LPCMCI,
 `metadata["possibly_separable"]` lists the edges drawn although a conditioning set that could not
-be tested might have separated their pair. The
-notice gives the number of those pairs and edges, not of the sets. `pc` also takes
+be tested might have separated their pair. With `possibly_separable="ambiguous"`, FCI, FCI-JCI,
+and PCMCI+ read no triple with such a side as a collider or a non-collider; PC, CD-NOD, and the
+Markov-blanket searches' CPDAG so read a side when one of its untested conditioning sets lies within
+the other nodes adjacent to an end or undecided with it, and orient through the others as before.
+LPCMCI lists such links but does not read them. The notice gives the number of those pairs and
+edges, not of the sets. `pc` also takes
 `missing="mvpc"`: Missing-Value PC (Tu et al., 2019) finds the parents of each missingness indicator
 and tests again the edges they could have kept; `metadata["corrected_edges"]["rows_tested"]` gives
 the fewest and the median rows such a test read, and `metadata["corrected_edges"]["p_one_tests"]`,
@@ -513,6 +517,8 @@ variable.
    anm
    pnl
    loci
+   cpcm
+   cpcm_graph
    rcd
    bottom_up_parce_lingam
    gin
@@ -600,6 +606,19 @@ proposed cause, and decides either by an HSIC test of the scaled residual agains
 (`criterion="independence"`, the default) or by the larger likelihood (`criterion="likelihood"`),
 which suits Gaussian noise. The [0.16.0](benchmarks/0.16.0.md#loci) release card measures both
 against the authors' code.
+
+CPCM, conditionally parametric causal models (Bodik and Chavez-Demoulin 2025), models each
+variable given its parents by a parametric family whose parameters are smooth functions of the
+parents: Gaussian with mean and scale (the default), Gaussian with the mean alone, exponential,
+Pareto, Poisson, gamma, Gumbel, or negative binomial, one family for every column or one per
+column. Each variable's values mapped through its fitted distribution function are independent of
+its causes only in the causal direction. {py:func}`~andrey.cpcm` decides a pair by an HSIC test of
+that residual in each direction; {py:func}`~andrey.cpcm_graph` returns the DAG whose residuals a
+dHSIC test finds most jointly independent, with a penalty of 2 per edge, by exact search up to 4
+variables and RESIT's order with greedy edge removal above. A column outside its family's support
+raises `ValueError`: a non-integer under `"poisson"`, a value of 0 or less under `"exponential"`,
+or a value of 1 or less under `"pareto"`. The [0.19.0](benchmarks/0.19.0.md#cpcm) release card
+measures both against the authors' code on the paper's pairs and on graphs of 4 to 8 variables.
 
 IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
 `target`; without one, they join a pair when each is in the other's set and return the graph
@@ -741,24 +760,9 @@ in a process.
 
    skewd
    skewd_mv
-   cpcm
-   cpcm_graph
    lges
    rpcmci
 ```
-
-CPCM, conditionally parametric causal models (Bodik and Chavez-Demoulin 2025), models each
-variable given its parents by a parametric family whose parameters are smooth functions of the
-parents: Gaussian with mean and scale (the default), Gaussian with the mean alone, exponential,
-Pareto, Poisson, gamma, Gumbel, or negative binomial, one family for every column or one per
-column. Each variable's values mapped through its fitted distribution function are independent of
-its causes only in the causal direction. {py:func}`~andrey.cpcm` decides a pair by an HSIC test of
-that residual in each direction; {py:func}`~andrey.cpcm_graph` returns the DAG whose residuals a
-dHSIC test finds most jointly independent, with a penalty of 2 per edge, by exact search up to 4
-variables and RESIT's order with greedy edge removal above. A column outside its family's support
-raises `ValueError`: a non-integer under `"poisson"`, a value of 0 or less under `"exponential"`,
-or a value of 1 or less under `"pareto"`. Both are experimental until their comparison with the
-authors' code is published.
 
 SkewD (Klippert and Marx 2026), {py:func}`~andrey.skewd`, decides the direction of a variable pair
 whose noise is skewed, in the location-scale model of LOCI with a skew-normal noise. It fits the

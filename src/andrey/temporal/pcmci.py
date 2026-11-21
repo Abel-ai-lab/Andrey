@@ -68,6 +68,7 @@ from andrey.core.ci import (
 from andrey.core.ci_missing import (
     NOT_TESTED,
     PartialCorrelationDeletion,
+    RowCounts,
     TestwiseDeletion,
     not_tested,
     testwise_deletion,
@@ -394,6 +395,44 @@ def _deletion(test: object) -> TestwiseDeletion | None:
         if test is None:
             return None
     return test
+
+
+def flagged_links(
+    rows: RowCounts | None,
+    drawn: np.ndarray,
+    undecided: np.ndarray | None,
+    required: np.ndarray | None = None,
+) -> np.ndarray:
+    """The links of ``drawn[lag, i, j]`` a conditioning set not tested might have separated, as a
+    boolean array shaped as ``drawn``, a lag-0 link at both ``[0, i, j]`` and ``[0, j, i]``.
+
+    A drawn link is flagged when a query of its ends, the design columns ``lag * n + i`` and ``j``,
+    was not tested in ``rows`` and another was
+    (:meth:`~andrey.core.ci_missing.RowCounts.possibly_separable`), or when an end shares its
+    variable with an end of a link ``undecided[lag, i, j]`` marks: no test conditions on a node an
+    undecided link joins, and a test of the link can shift that node next to its end. A link
+    ``required`` marks is never tested, so no set could separate it, and it is not flagged. None is
+    flagged without ``rows`` or when every query was tested, as on complete data.
+    """
+    flagged = np.zeros(drawn.shape, dtype=bool)
+    if rows is None or not rows.total_not_tested():
+        return flagged
+    n = drawn.shape[1]
+    joined: set[int] = set()
+    if undecided is not None and undecided.any():
+        _, sources, targets = np.nonzero(undecided)
+        joined = set(sources.tolist()) | set(targets.tolist())
+    for lag, i, j in zip(*np.nonzero(drawn)):
+        lag, i, j = int(lag), int(i), int(j)
+        a, b = sorted((lag * n + i, j))
+        if (a, b) in rows.not_tested and (a, b) in rows.largest:
+            flagged[lag, i, j] = True
+        elif (i in joined or j in joined) and not (
+            required is not None and (required[lag, i, j] or (lag == 0 and required[0, j, i]))
+        ):
+            flagged[lag, i, j] = True
+    flagged[0] |= flagged[0].T
+    return flagged
 
 
 def deletes_rows(test: object) -> bool:

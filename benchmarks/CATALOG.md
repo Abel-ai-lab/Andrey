@@ -103,7 +103,11 @@ presents, with `cam` and the floors on the same datasets, the fresh seeds, and t
 check. The 0.19.0 summary draws DAS's rows from
 [`published/0.19.0/das.json`](published/0.19.0/das.json), DAS with dodiscover, which also holds its
 floors up to 1,000 variables, `cam`, SCORE, and NoGAM on the same datasets, the fresh seeds, the
-five paired fits at 500 variables, and the check of its order search on raw columns. The path and confounder claims are in no release
+five paired fits at 500 variables, and the check of its order search on raw columns. Its CPCM rows
+come from [`published/0.19.0/cpcm.json`](published/0.19.0/cpcm.json), the pair test and the graph
+search with the authors' R code on the paper's pairs and graphs, which also holds the conservative
+estimate's outcomes, the floors, the fresh seeds, and LOCI, ANM, PNL, and eight graph methods on the
+same data. The path and confounder claims are in no release
 summary: [`published/0.16.0/knowledge-paths.json`](published/0.16.0/knowledge-paths.json) holds the
 rows of the first eight methods and
 [`published/0.17.0/knowledge-paths.json`](published/0.17.0/knowledge-paths.json) those of the other

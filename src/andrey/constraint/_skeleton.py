@@ -185,7 +185,8 @@ def kept_apart(
     candidates less those lying inside ``skip_within`` (:func:`subset_rows`). A set holding a
     dropped candidate keeps no rows under a test that deletes rows per test, so each such set is
     counted as a query of the pair not tested, without being built, as asking it would count it
-    (:meth:`~andrey.core.ci_missing.TestwiseDeletion.count_not_tested`). When no row observes the
+    (:meth:`~andrey.core.ci_missing.TestwiseDeletion.count_not_tested`), and kept by the dropped
+    candidate with the other columns of ``fixed``, which it holds. When no row observes the
     columns of ``fixed`` together, every set is counted and ``None`` is returned in place of the
     sides. Another test gets ``sides`` unchanged and none left out.
     """
@@ -197,9 +198,14 @@ def kept_apart(
     whole = not met[columns].all()
     kept = [([c for c in side if met[c]], skip) for side, skip in sides]
     left = sum(_subset_count(side, size, skip) for side, skip in sides)
-    if not whole:
+    held = columns[2:]
+    if whole:
+        keeping = [held]
+    else:
         left -= sum(_subset_count(side, size, skip) for side, skip in kept)
-    test.count_not_tested(columns[0], columns[1], left)
+        dropped = {c for side, _ in sides for c in side if not met[c]}
+        keeping = [[c, *held] for c in sorted(dropped)]
+    test.count_not_tested(columns[0], columns[1], left, keeping)
     return None if whole else kept, left
 
 
@@ -857,6 +863,28 @@ def unseparated_triples(
         for a, c in combinations(np.flatnonzero(row).tolist(), 2):
             if apart[a, c] and (a, c) not in sepsets and (c, a) not in sepsets:
                 triples.add((a, b, c))
+    return frozenset(triples)
+
+
+def flagged_triples(
+    adjacency: np.ndarray, flagged: Collection[tuple[int, int]]
+) -> frozenset[tuple[int, int, int]]:
+    """The unshielded triples ``(a, b, c)``, ``a < c``, of the boolean ``adjacency`` with a side in
+    ``flagged``, pairs in either order.
+
+    A flagged side is an edge a conditioning set no row could test might have separated
+    (:func:`~andrey.core.ci_missing.running_flags`), so it may be absent and the triple with it:
+    whether ``b`` is a collider is unknown, and no rule reads the triple as a collider or a
+    non-collider. With no flagged pair, as on complete data, there are none.
+    """
+    if not flagged:
+        return frozenset()
+    triples = set()
+    for u, v in flagged:
+        for end, middle in ((u, v), (v, u)):
+            for c in np.flatnonzero(adjacency[middle]).tolist():
+                if c != end and not adjacency[end, c]:
+                    triples.add((min(end, c), middle, max(end, c)))
     return frozenset(triples)
 
 

@@ -6,7 +6,7 @@ regressions leave. The tests follow the :class:`~andrey.core.ci.CITest` protocol
 the data and called as ``test(x, y, condition_set)``, returning a p-value where a larger value means
 more independent.
 
-The three share one data layout and one set of regressions. Each column is standardized, rounded
+The three share one data layout and one regression layer. Each column is standardized, rounded
 to 9 decimal places, and given the sign its sorted values fix, so the values the fits read do not
 change with the units or the sign of a column. Each fit reads only the columns it uses: their
 :func:`~andrey.core.ties.tie_ranks` order within that block gives the order of the features, and
@@ -22,6 +22,7 @@ import math
 from collections.abc import Callable, Iterable
 
 import numpy as np
+import sklearn
 from scipy.optimize import brentq
 from scipy.special import ndtr
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
@@ -47,6 +48,15 @@ _BOOST_DEPTHS = (1, 3, 4, 5, 6)
 _BOOST_ROUNDS = 50
 _BOOST_FOLDS = 10
 _BOOST_PATIENCE = 10
+# Boosted trees as the wGCM authors' current code: 10-fold cross-validation over the learning rates
+# 0.1, 0.2, 0.3, 0.5 and the depths 1 to 7, up to 500 rounds, the folds' mean error stopped 10
+# rounds after its best. Three differences from that code: the trees' leaf values carry no
+# penalty, where the authors' boosting shrinks them; every grid point uses the same folds, where
+# the authors' code draws new folds for each; and the trees search every split point exactly,
+# where the authors' boosting grows them on histogram bins of each feature.
+_MEAN_CV_RATES = (0.1, 0.2, 0.3, 0.5)
+_MEAN_CV_DEPTHS = (1, 2, 3, 4, 5, 6, 7)
+_MEAN_CV_ROUNDS = 500
 # A random forest as the PCM authors': 500 trees, every predictor tried at each split, and nodes of
 # 5 rows or fewer left unsplit. A node's size counts the distinct rows in it, where the authors'
 # forest counts a row its bootstrap draws twice as two.
@@ -80,14 +90,17 @@ def _early_stopped(curve: np.ndarray) -> np.ndarray:
     return curve
 
 
-def _boosting(depth: int, rounds: int) -> GradientBoostingRegressor:
-    """Boosted regression trees of ``depth`` over ``rounds`` rounds."""
+def _boosting(
+    depth: int, rounds: int, rate: float = _BOOST_RATE, *, warm_start: bool = False
+) -> GradientBoostingRegressor:
+    """Boosted regression trees of ``depth`` over ``rounds`` rounds at learning rate ``rate``."""
     return GradientBoostingRegressor(
-        learning_rate=_BOOST_RATE,
+        learning_rate=rate,
         n_estimators=rounds,
         max_depth=depth,
         min_samples_leaf=1,
         random_state=0,  # orders the candidate features at each split; the columns are canonical
+        warm_start=warm_start,
     )
 
 
@@ -109,6 +122,60 @@ def _fit_boosting(features: np.ndarray, target: np.ndarray, folds: np.ndarray) -
     # The first minimum over the depths in turn, each over its rounds.
     j, rounds = divmod(int(np.argmin(error.T)), _BOOST_ROUNDS)
     return _boosting(_BOOST_DEPTHS[j], rounds + 1).fit(features, target).predict
+
+
+def _mean_cv_error(
+    features: np.ndarray, target: np.ndarray, folds: np.ndarray, rate: float, depth: int
+) -> tuple[float, int]:
+    """The least mean cross-validated error of boosted trees at ``rate`` and ``depth``, and the
+    number of rounds that first reaches it.
+
+    The folds' models grow together, and the rounds stop once ``_BOOST_PATIENCE`` rounds in a row
+    have not lowered the best mean error, or at ``_MEAN_CV_ROUNDS``.
+    """
+    n_folds = int(folds.max()) + 1
+    held = [folds == fold for fold in range(n_folds)]
+    # The trees read their features as float32, which staged prediction converts them to.
+    held_features = [np.ascontiguousarray(features[h], dtype=np.float32) for h in held]
+    models = [_boosting(depth, 1, rate, warm_start=True) for _ in held]
+    predictions = [np.empty(0)] * n_folds
+    best_error, best, grown = np.inf, 0, 0
+    # The inputs are checked once here, not at each of the many small fits.
+    with sklearn.config_context(assume_finite=True, skip_parameter_validation=True):
+        while grown < _MEAN_CV_ROUNDS:
+            stop = min(grown + _BOOST_PATIENCE, _MEAN_CV_ROUNDS)
+            errors = np.empty((n_folds, stop - grown))
+            for k, (model, h) in enumerate(zip(models, held, strict=True)):
+                model.set_params(n_estimators=stop).fit(features[~h], target[~h])
+                if grown == 0:
+                    predictions[k] = model.init_.predict(features[h])
+                for r in range(grown, stop):
+                    # A round adds its tree's prediction times the rate, as staged prediction does.
+                    tree = model.estimators_[r, 0]
+                    predictions[k] = predictions[k] + rate * tree.predict(
+                        held_features[k], check_input=False
+                    )
+                    errors[k, r - grown] = np.sqrt(np.mean((target[h] - predictions[k]) ** 2))
+            for r, error in enumerate(errors.mean(axis=0), start=grown):
+                if error < best_error:
+                    best_error, best = float(error), r
+                elif r - best >= _BOOST_PATIENCE:
+                    return best_error, best + 1
+            grown = stop
+    return best_error, best + 1
+
+
+def _fit_boosting_mean_cv(features: np.ndarray, target: np.ndarray, folds: np.ndarray) -> Predictor:
+    """Boosted trees whose learning rate, depth, and number of rounds minimize the folds' mean
+    cross-validated error; of equal errors, the first in the order of the depths, then the rates."""
+    best = (np.inf, _MEAN_CV_RATES[0], _MEAN_CV_DEPTHS[0], 1)
+    for depth in _MEAN_CV_DEPTHS:
+        for rate in _MEAN_CV_RATES:
+            error, rounds = _mean_cv_error(features, target, folds, rate, depth)
+            if error < best[0]:
+                best = (error, rate, depth, rounds)
+    _, rate, depth, rounds = best
+    return _boosting(depth, rounds, rate).fit(features, target).predict
 
 
 def _fit_forest(features: np.ndarray, target: np.ndarray, seed: int) -> Predictor:
@@ -146,12 +213,12 @@ class _Additive:
         return np.exp(eta) if self._log else eta
 
 
-def _additive_bases(features: np.ndarray) -> list[SmoothBasis] | None:
-    """One thin plate regression spline basis per predictor, of ``floor((N - 1) / d)`` functions
-    for ``N`` rows and ``d`` predictors, at most the predictor's distinct values and
+def _additive_bases(features: np.ndarray, share: int = 1) -> list[SmoothBasis] | None:
+    """One thin plate regression spline basis per predictor, of ``floor((N - 1) / (share d))``
+    functions for ``N`` rows and ``d`` predictors, at most the predictor's distinct values and
     :data:`~andrey.fcm.gam.MAX_KNOTS`; ``None`` where a predictor gets fewer than 3."""
     rows, d = features.shape
-    k = (rows - 1) // d
+    k = (rows - 1) // (share * d)
     bases = []
     for column in features.T:
         rank = min(k, np.unique(column).size, MAX_KNOTS)
@@ -161,11 +228,11 @@ def _additive_bases(features: np.ndarray) -> list[SmoothBasis] | None:
     return bases
 
 
-def _fit_additive(features: np.ndarray, target: np.ndarray) -> Predictor:
-    """An additive model of penalized thin plate regression splines, smoothed by GCV; the
-    least-squares line where a predictor has too few rows or values for a smooth, or the
-    smoothing search fails."""
-    bases = _additive_bases(features)
+def _fit_additive(features: np.ndarray, target: np.ndarray, share: int = 1) -> Predictor:
+    """An additive model of penalized thin plate regression splines, ``share`` as for
+    :func:`_additive_bases`, smoothed by GCV; the least-squares line where a predictor has too few
+    rows or values for a smooth, or the smoothing search fails."""
+    bases = _additive_bases(features, share)
     if bases is None:
         return _fit_linear(features, target)
     try:
@@ -176,19 +243,20 @@ def _fit_additive(features: np.ndarray, target: np.ndarray) -> Predictor:
 
 
 def _fit_additive_log(features: np.ndarray, target: np.ndarray) -> Predictor:
-    """An additive model of a positive ``target`` through the log link: the penalized gamma
-    deviance, smoothed by the GCV score of the deviance; :func:`_fit_additive` where a value is not
-    positive or the fit has no minimum."""
-    bases = _additive_bases(features)
+    """An additive model of a positive ``target`` through the log link, with half the basis
+    functions of a mean fit, ``floor((N - 1) / (2 d))``, as the PCM authors' code: the penalized
+    gamma deviance, smoothed by the GCV score of the deviance; :func:`_fit_additive` with the same
+    bases where a value is not positive or the fit has no minimum."""
+    bases = _additive_bases(features, 2)
     if bases is None or not np.all(target > 0):
-        return _fit_additive(features, target)
+        return _fit_additive(features, target, 2)
     # The exponential family's deviance is the gamma family's at unit shape, and the gamma shape
     # scales the deviance without moving its minimum or the GCV score's.
     terms = [cpcm._Term(b.X, b.S, b.root.shape[0]) for b in bases]
     try:
         (eta,) = cpcm.fit(target, terms, cpcm.FAMILIES["exponential"])
     except ValueError:
-        return _fit_additive(features, target)
+        return _fit_additive(features, target, 2)
     design = np.column_stack([np.ones(target.size), *(b.X for b in bases)])
     coef = np.linalg.lstsq(design, eta, rcond=None)[0]  # the design has full column rank
     return _Additive(coef, bases, log=True)
@@ -225,6 +293,8 @@ class _RegressionTest:
 
     pin_blas = True  # read by pins_blas: the skeleton scans run it on one BLAS thread
     regressions = REGRESSIONS
+    #: How ``"boosting"`` tunes its trees: the GCM authors' cross-validation.
+    _fit_boosting = staticmethod(_fit_boosting)
 
     @staticmethod
     def least_rows(size: int, **options: object) -> int:
@@ -316,7 +386,7 @@ class _RegressionTest:
             return _fit_forest(features, target, self._seed % 2**32)
         n_folds = min(_BOOST_FOLDS, m)
         perm = np.random.default_rng([self._seed, m]).permutation(m)
-        return _fit_boosting(features, target, (np.arange(m) % n_folds)[perm])
+        return self._fit_boosting(features, target, (np.arange(m) % n_folds)[perm])
 
     def _residual(self, target: np.ndarray, features: np.ndarray) -> np.ndarray:
         """``target`` minus its in-sample regression on ``features``."""
@@ -398,15 +468,18 @@ class GCM(_RegressionTest):
     one nonzero constant, a covariance without noise, give an infinite statistic and the p-value
     ``0``.
 
-    **Limitations.** Not benchmarked yet. The tests run it on up to 4 variables and 400 rows. A
-    ``"boosting"`` regression fits 51 boosted models, once per variable and conditioning set. Its
+    **Limitations.** No benchmark campaign yet; the tests run it on up to 4 variables and 400 rows.
+    A ``"boosting"`` regression fits 51 boosted models, once per variable and conditioning set. Its
     level depends on the regressions: a conditional mean the method cannot learn, such as a function
     of several variables of ``z`` jointly under ``"linear"``, leaves a covariance in the residuals
     and reads as dependence. At a few hundred rows, where the conditional means are hard to learn,
-    the test can reject a true independence more often than its level, as the weighted GCM's
-    paper reports for it at 100 and 200 rows [2]_. With an empty conditioning set the test is a
-    test of correlation: a dependence without one, such as ``y = x**2`` for a symmetric ``x``, goes
-    unseen.
+    the test rejects a true independence more often than its level, as the weighted GCM's paper
+    reports for it at 100 and 200 rows [2]_. With ``"boosting"``, pooled over draws of 12 null
+    designs at 200 and 400 rows (those of [1]_ and [2]_, and example 7 of [2]_ without its
+    dependence), it rejected about 6.3% at 0.05 (6.4% and 7.6% in two runs on the designs of
+    [2]_), from 4 to 11% by design, and about 9% on the one-dimensional null of [2]_ at 200 rows.
+    With an empty conditioning set the test is a test of correlation: a dependence without one,
+    such as ``y = x**2`` for a symmetric ``x``, goes unseen.
 
     References
     ----------
@@ -458,8 +531,14 @@ class WGCM(_RegressionTest):
         ``"fix"`` tests a fixed set of weight functions on every row and takes the largest
         statistic.
     regression : {"boosting", "forest", "linear"}, default="boosting"
-        The regression of each variable, and of the products of residuals, on the conditioning set,
-        as for :class:`~andrey.core.ci_regression.GCM`.
+        The regression of each variable, and of the products of residuals, on the conditioning set.
+        ``"boosting"`` is boosted regression trees whose learning rate (0.1, 0.2, 0.3, or 0.5),
+        depth (1 to 7), and number of rounds (up to 500) minimize the 10-fold cross-validated error
+        averaged over the folds, stopped 10 rounds after its best, the wGCM authors' current
+        default; the trees' leaf values carry no penalty, where the authors' boosting shrinks them,
+        and the trees search every split point exactly, where the authors' boosting grows them on
+        histogram bins of each feature.
+        ``"forest"`` and ``"linear"`` are as for :class:`~andrey.core.ci_regression.GCM`.
     seed : int or None, default=None
         Seed for the sample split of ``"est"``, the multiplier draws of ``"fix"``, the
         cross-validation folds of ``"boosting"``, and the trees of ``"forest"``. ``None`` uses
@@ -482,27 +561,34 @@ class WGCM(_RegressionTest):
     **How it works.** For a conditioning set ``z``, the residuals of ``x`` and ``y`` on ``z`` give
     the products ``R_i`` as for the GCM [2]_. ``"est"`` (Method 1 of [1]_) splits the rows at
     random, 30% to estimate and 70% to test. On the first part it regresses the products on ``z``
-    and takes the weight ``w(z)``, the sign of that fit; on the second part, with residuals from
-    regressions on that part, the statistic is the GCM statistic of ``R_i w(z_i)``, and the
-    p-value is the standard normal tail above it, one-sided because the weight points the
-    covariance up. ``"fix"`` takes the constant weight and the signs of each variable of ``z`` about
-    its empirical 1/8, ..., 7/8 quantiles, normalizes each weighted product by its standard
+    and takes that fit as the weight ``w(z)``; on the second part, with residuals from regressions
+    on that part, the statistic is the GCM statistic of ``R_i w(z_i)``, and the p-value is the
+    standard normal tail above it, one-sided because the weight points the covariance up.
+    ``"fix"`` takes the constant weight and the signs of each variable of ``z`` about its
+    empirical 1/8, ..., 7/8 quantiles, normalizes each weighted product by its standard
     deviation, and the statistic is ``sqrt(n)`` times the largest absolute mean; its p-value is
     ``(b + 1) / 500``, where ``b`` of 499 Gaussian multiplier draws of the same maximum over the
     centered columns, whose covariance is the products' sample correlation, are at least as large
     [1]_. An empty conditioning set has no weight to estimate, and both variants give the
     GCM's p-value of ``x`` and ``y`` minus their means. The statistic reported for ``"est"`` is the
     statistic or ``0``, whichever is larger, so a larger statistic always means a smaller p-value.
-    The split and the multiplier draws are drawn from ``seed`` over the rows in lexicographic order
-    of the query's own columns, so they do not depend on other columns.
+    The weight of ``"est"`` is the fitted value, as in the authors' code; the paper takes its sign.
+    The draws of ``"fix"`` use the centered columns, as in the paper; the authors' code leaves them
+    uncentered. The split and the multiplier draws are drawn from ``seed`` over the rows in
+    lexicographic order of the query's own columns, so they do not depend on other columns.
 
-    **Limitations.** Not benchmarked yet. The tests run it on up to 4 variables and 400 rows.
+    **Limitations.** No benchmark campaign yet; the tests run it on up to 4 variables and 400 rows.
     ``"est"`` tests on 70% of the rows, and its p-value changes with the seed. A ``"boosting"``
-    regression fits 51 boosted models; ``"est"`` fits five per query, its split being the query's
-    own. ``"fix"`` uses 7 weights per conditioning variable, so with many conditioning variables
-    the maximum spreads its power thin. At a few hundred rows, where the conditional means are hard
-    to learn, both variants can reject a true independence more often than their level, as the
-    paper's simulations show at 100 and 200 rows [1]_.
+    regression fits 281 boosted models of up to 500 rounds, 28 settings on 10 folds and the chosen
+    one on every row, so a query takes several times as long as the GCM's; ``"est"`` runs five such
+    regressions per query, its split being the query's own. ``"fix"`` uses 7 weights per
+    conditioning variable, so with many conditioning variables the maximum spreads its power thin.
+    At a few hundred rows, where the conditional means are hard to learn, neither variant holds its
+    level. With ``"boosting"``, pooled over draws of the paper's null designs at 200 and 400 rows
+    [1]_, ``"est"`` rejected a true independence at 0.05 in about 6.8% of draws and ``"fix"`` in
+    6.0%, up to 7.8% on one design for either; pooled over 12 null designs (those, further nulls
+    of [2]_, and example 7 of [1]_ without its dependence), 6.6% and 6.4%, from 4 to 13% by design
+    for ``"est"``, the most on the a = 4 null of [2]_, and from 4 to 8.6% for ``"fix"``.
 
     References
     ----------
@@ -519,6 +605,9 @@ class WGCM(_RegressionTest):
         """The fewest rows a query given ``size`` conditioning variables is tested on: ``17`` for
         ``variant="est"``, whose 30% part then holds the 6 rows a forest splits, else ``4``."""
         return 17 if variant == "est" else 4
+
+    #: How ``"boosting"`` tunes its trees: the wGCM authors' cross-validation.
+    _fit_boosting = staticmethod(_fit_boosting_mean_cv)
 
     def __init__(
         self,
@@ -554,7 +643,7 @@ class WGCM(_RegressionTest):
             z = rows[:, features]
             return self._residual(rows[:, x], z) * self._residual(rows[:, y], z)
 
-        weight = np.sign(self._fit(estimate[:, features], products(estimate))(test[:, features]))
+        weight = self._fit(estimate[:, features], products(estimate))(test[:, features])
         return _estimated_answer(products(test), weight)
 
     def _multiplier_draws(self) -> np.ndarray:
@@ -624,11 +713,15 @@ class PCM(_RegressionTest):
         The regressions of the test. ``"additive"`` fits an additive model, one penalized thin
         plate regression spline [2]_ per predictor with ``floor((N - 1) / d)`` basis functions for
         ``N`` rows and ``d`` predictors, its smoothing chosen by generalized cross-validation [3]_,
-        and fits the conditional variance through the log link, as the paper does for its
-        additive settings [1]_ (Section 6.1). ``"forest"`` is a random forest of 500 trees that
-        tries every predictor at each split and leaves nodes of 5 rows or fewer unsplit, as the
-        authors' code does for its random-forest experiments; ``"boosting"`` and ``"linear"`` are
-        as for :class:`~andrey.core.ci_regression.GCM`.
+        and fits the conditional variance through the log link with half as many basis functions,
+        the regressions of the paper's additive settings [1]_ (Section 6.1) as the authors' code
+        fits them; it holds the level where the conditional means are sums of smooth functions of
+        one variable each and fits only the additive part of an interaction. ``"forest"`` is a
+        random forest of 500 trees that tries every predictor at each split and leaves nodes of 5
+        rows or fewer unsplit, as the authors' code does for its random-forest experiments; it
+        learns interactions and loses the level where a conditional mean on ``z`` is hard to learn
+        from a few hundred rows (see Limitations). ``"boosting"`` and ``"linear"`` are as for
+        :class:`~andrey.core.ci_regression.GCM`.
     n_splits : int, default=6
         The number of random sample splits whose statistics are averaged, at least ``1``.
     seed : int or None, default=None
@@ -644,11 +737,14 @@ class PCM(_RegressionTest):
 
     Notes
     -----
-    **When to use.** For continuous data where the conditional mean of one variable may depend on
-    the other given the conditioning set in any form, interactions included, at hundreds to
-    thousands of rows [1]_. It tests conditional mean independence, which conditional independence
-    implies, and keeps its level whenever the regressions on the conditioning set are accurate
-    enough, whatever the regression that learns the dependence [1]_.
+    **When to use.** For continuous data at hundreds to thousands of rows where, with the default
+    additive regression, the conditional mean of each variable is a sum of smooth functions of one
+    variable each: of ``z`` for both variables, and of ``x`` and ``z`` for the response [1]_. It
+    tests conditional mean independence, which conditional independence implies, and keeps its
+    level whenever the regressions on the conditioning set are accurate enough, whatever the
+    regression that learns the dependence [1]_. An interaction, such as a product of two
+    variables, is outside the additive model: in the mean given ``z`` it can break the level, and
+    between ``x`` and ``z`` the test sees only its additive part.
 
     **How it works.** Of a query's two variables, the one with the larger
     :func:`~andrey.core.ties.tie_ranks` rank within the query's columns is the response ``y`` and
@@ -657,33 +753,56 @@ class PCM(_RegressionTest):
     Each split puts half of the rows, at random, in the first part [1]_ (Algorithm 1). On the first
     part, ``y`` is regressed on ``(x, z)`` to give ``g``; ``g~`` is the part of ``g`` that ``x``
     carries, the ``x`` term of an additive ``g`` and ``g`` itself under the other regressions;
-    ``g~`` is regressed on ``z`` to give ``m``, and ``h = g~ - m`` takes the sign of the mean of
+    ``g`` is regressed on ``z`` to give ``m``, and ``h = g~ - m`` takes the sign of the mean of
     ``(y - g + h) h``. The squared residuals of ``g`` are regressed on ``(x, z)``, through the log
     link under ``"additive"`` (the penalized gamma deviance, smoothed by the generalized
     cross-validation score of the deviance), and the fit's positive part, plus the smallest
     constant ``c`` that brings the mean of the squared residuals over it to at most 1, is the
     conditional variance ``v``, at least 0.01. On the second part, ``f = h / v`` and ``y`` are
-    each regressed on ``z``,
-    and the statistic is the GCM statistic of the products of their residuals. The ``n_splits``
-    statistics are averaged and the p-value is the standard normal tail above the average, the
-    one-sided test of Algorithm 1DR with its threshold at the normal quantile [1]_. The reported
-    statistic is the average or ``0``, whichever is larger. A split whose products are all zero adds
-    ``0``, and one whose products are one nonzero constant an infinity of its sign. The splits are
-    drawn from ``seed`` over the rows in lexicographic order of the query's own columns, so they
-    do not depend on other columns. An additive fit with fewer than 3 basis functions for some
-    predictor, too few rows or distinct values, is the least-squares line, as is one whose
-    smoothing search fails; a variance fit through the log link without a minimum, or with a
-    squared residual of 0, uses the identity link.
+    each regressed on ``z``, and the statistic is the GCM statistic of the products of their
+    residuals. The ``n_splits`` statistics are averaged and the p-value is the standard normal tail
+    above the average, the one-sided test of Algorithm 1DR with its threshold at the normal
+    quantile [1]_. The reported statistic is the average or ``0``, whichever is larger. A split
+    whose products are all zero adds ``0``, and one whose products are one nonzero constant an
+    infinity of its sign. The splits are drawn from ``seed`` over the rows in lexicographic order
+    of the query's own columns, so they do not depend on other columns. An additive fit with fewer
+    than 3 basis functions for some predictor, too few rows or distinct values, is the
+    least-squares line, as is one whose smoothing search fails; a variance fit through the log link
+    without a minimum, or with a squared residual of 0, uses the identity link with the same basis.
 
-    **Limitations.** Not benchmarked yet. The tests run it on up to 4 variables and 400 rows. Each
-    query fits 30 regressions with the default 6 splits, each of 500 trees under ``"forest"``. The
-    variance floor of 0.01, in units of the standardized response, is the authors' code's value;
-    the paper sets none. The test detects a dependence of the mean of ``y`` on ``x``; one that
-    changes only the spread of ``y`` goes unseen, as does a dependence of the mean of ``x`` on
-    ``y`` that leaves the mean of ``y`` unchanged. Which variable is the response follows a rule on
-    the data that has nothing to do with the causal question, so swapping the roles can change the
-    answer. At a few hundred rows, where the conditional means are hard to learn, the test can
-    reject a true independence more often than its level.
+    Where the paper and the authors' code differ, Andrey takes:
+
+    - ``m`` regresses ``g``, as in the authors' code; the paper regresses ``g~``, which in the
+      measurements had more power in the paper's first setting at 250 rows (71.6% against 54.8%)
+      and almost none in its third at 500 (1.0% against 13.4%), below the authors' code (7.6%).
+    - The variance fit has half the basis functions of the mean fits, as in the authors' code; the
+      paper's full basis changed 19 of 4,500 decisions and took about 2.5 times as long.
+    - The variance adds ``c`` to the fit's positive part, as in the paper; the authors' code adds
+      it first, the same for a forest, whose fit is never negative, and less powerful with least
+      squares.
+    - The standard deviation divides by the second part's row count ``m``, as in the paper; the
+      authors' code's ``m - 1`` shrinks each split's statistic by the factor ``sqrt((m - 1) / m)``,
+      which in the measurements turned a few rejections near the level into acceptances and
+      changed no other decision.
+
+    **Limitations.** On the null design of the paper's Section 6.1 (seven conditioning
+    variables, 500 draws per size), the default rejected a true independence at 0.05 in 0.4% of
+    draws at 250 rows and 0.2% at 500 (the authors' code with the same regressions: 0.6% and
+    0.2%), and in the paper's three alternative settings its power was at or above the authors'
+    code's on the same data, for example 54.8% against 48.8% in the first setting at 250 rows and
+    13.4% against 7.6% in the third at 500. On the null of Section 6.2, whose conditional means
+    hold an interaction, it rejected 97.6% at 500 rows (the authors' code 95.6%); the paper runs
+    that design from 10,000 rows, and no regression measured holds it at 500 (the forest rejected
+    34.4%). The tree regressions fail the Section 6.1 null, where ``x`` nearly copies the
+    conditional mean of ``y`` on ``z``: ``"forest"`` rejected 99.9% at 250 rows and 97.3% at 500,
+    ``"boosting"`` 97.7% at 250. A query on nine columns takes about 7 s at 250 rows and 29 s at
+    500 on one core, so a PC search, which runs a query for each pair and conditioning set it
+    tries, is slow. The variance floor of 0.01, in units of the standardized response, is the
+    authors' code's value; the paper sets none. The test detects a dependence of the mean of ``y``
+    on ``x``; one that changes only the spread of ``y`` goes unseen, as does a dependence of the
+    mean of ``x`` on ``y`` that leaves the mean of ``y`` unchanged. Which variable is the response
+    follows a rule on the data that has nothing to do with the causal question, so swapping the
+    roles can change the answer.
 
     References
     ----------
@@ -762,7 +881,7 @@ class PCM(_RegressionTest):
         g_learn = g(xz[learn])
         g_tilde = g.term if isinstance(g, _Additive) else None
         gt_learn = g_learn if g_tilde is None else g_tilde(0, xz[learn, 0])
-        m = self._fit(z[learn], gt_learn)
+        m = self._fit(z[learn], g_learn)
         m_learn = m(z[learn])
         h_learn = gt_learn - m_learn
         sign = -1.0 if np.mean((y[learn] - g_learn + h_learn) * h_learn) < 0 else 1.0
@@ -770,11 +889,17 @@ class PCM(_RegressionTest):
         fit_v = _fit_additive_log if self._regression == "additive" else self._fit
         v = fit_v(xz[learn], squares)
         shift = _variance_shift(squares, np.maximum(v(xz[learn]), 0.0))
-        variance = np.maximum(np.maximum(v(xz[test]), 0.0) + shift, _VARIANCE_FLOOR)
+        variance = _conditional_variance(v(xz[test]), shift)
         gt_test = g(xz[test]) if g_tilde is None else g_tilde(0, xz[test, 0])
         f = sign * (gt_test - m(z[test])) / variance
         statistic = _normalized_mean(self._residual(y[test], z[test]) * self._residual(f, z[test]))
         return 0.0 if np.isnan(statistic) else statistic
+
+
+def _conditional_variance(fitted: np.ndarray, shift: float) -> np.ndarray:
+    """The PCM's conditional variance: the positive part of ``fitted`` plus ``shift``, at least
+    ``_VARIANCE_FLOOR``."""
+    return np.maximum(np.maximum(fitted, 0.0) + shift, _VARIANCE_FLOOR)
 
 
 def _variance_shift(squares: np.ndarray, fitted: np.ndarray) -> float:

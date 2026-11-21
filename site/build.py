@@ -477,6 +477,33 @@ REGIMES |= {
         )
     },
 }
+# The 0.19.0 summary's CPCM cells: the pairs of the CPCM paper's Table 1 by the family fitted, its
+# Table 2 (the Tagasovska et al. sets and its Poisson and Pareto setups) by family arm, its model
+# (16), and its graphs of Section 6.4 and Appendix B.1.1.
+CPCM_PAPER = "the CPCM paper's"
+REGIMES |= {
+    **{
+        f"cpcm_table1_{family}": f"{CPCM_PAPER} Table 1 pairs with exponential effects, fitted "
+        f"with the {name} family"
+        for family, name in (
+            ("exponential", "exponential"),
+            ("gamma_fixed_shape", "gamma, fixed shape,"),
+            ("pareto", "Pareto"),
+            ("gamma", "gamma"),
+            ("gumbel", "Gumbel"),
+            ("gumbel_fixed_scale", "Gumbel, fixed scale,"),
+            ("gaussian", "Gaussian location-scale"),
+            ("gaussian_fixed_scale", "Gaussian, fixed scale,"),
+        )
+    },
+    "cpcm_table2": f"{CPCM_PAPER} Table 2 pairs: the Tagasovska et al. (2020) sets and its Poisson "
+    "and Pareto setups",
+    "cpcm_table2_other_arm": f"{CPCM_PAPER} Table 2 pairs, fitted with the other family",
+    "cpcm_pareto16": f"{CPCM_PAPER} Pareto pairs of model (16)",
+    "cpcm_graph_paper": f"{CPCM_PAPER} graphs of 5 variables",
+    "cpcm_graph_paper_lambda1": f"{CPCM_PAPER} graphs of 5 variables, edge penalty 1",
+    "cpcm_graph_greedy": f"{CPCM_PAPER} exponential graphs of 4 to 8 variables",
+}
 # The 0.17.0 summary's cells: SCORE and NoGAM on the simulation of their papers, with Gaussian,
 # Laplace, or Gumbel noise, every column z-scored, or each variable rescaled to unit variance
 # before its children read it.
@@ -557,6 +584,8 @@ NOT_SHOWN = {("nonlinear", "anm_er"), ("boss-grasp", "diabetes")}
 # paper's 0.05, and omits the default 0.01, its context-link errors, the draws that break the
 # paper's Assumption 3, and its nonlinear cells with GPDC, whose reference reads one column of the
 # dummies. LOCI shows its default criterion, independence, and omits the likelihood criterion.
+# CPCM shows its claimed family arms and omits Table 1's misspecified families, the other family
+# arm of Table 2, and the graphs' edge penalty 1.
 # SCORE, NoGAM, and DAS show their z-scored and rescaled cells and omit the cells in the
 # simulation's own units, where the references read those units and Andrey standardizes. NOTEARS
 # omits its cells in the simulation's own units and its rescaled cells, which its release card
@@ -576,6 +605,9 @@ NOT_SHOWN_LANES = {
     "jpcmciplus.assumption_3_broken",
     "jpcmciplus.gpdc",
     "loci.likelihood",
+    "cpcm.misspecified",
+    "cpcm.other_arm",
+    "cpcm_graph.lambda1",
     "score_matching.raw",
     "nogam.raw",
     "das.raw",
@@ -2735,6 +2767,7 @@ RESEARCH_CODE = {
     "SCORE authors' code",
     "NOTEARS authors' code",
     "authors' R RESIT",
+    "CPCM authors' R code",
 }
 # Families whose graphs beat the empty graph by link F1 (cross-variable links in the window graph,
 # or adjacencies for LPCMCI), not by errors: a lag window can hold far more errors than the empty

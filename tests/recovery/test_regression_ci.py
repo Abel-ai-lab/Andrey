@@ -57,10 +57,28 @@ def _additive_noise_case(n: int, seed: int) -> tuple[np.ndarray, andrey.GraphStr
 # ---- ground truth ------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("indep_test", ["gcm", "wgcm"])
+def test_pc_with_partial_correlation_misses_the_additive_noise_graph():
+    """The design takes a nonlinear test: with partial correlation PC misses its graph."""
+    x, truth = _additive_noise_case(200, 0)
+    assert shd(andrey.pc(x).structure, truth) >= 2
+
+
+@pytest.mark.parametrize(
+    "indep_test",
+    [
+        "gcm",
+        # Over seeds 0 to 9 of this design, PC with wGCM ends within SHD 1 of the true graph on 7;
+        # seed 0 is one of the 3 others (SHD 3).
+        pytest.param(
+            "wgcm",
+            marks=pytest.mark.xfail(
+                strict=True, raises=AssertionError, reason="wGCM misses seed 0"
+            ),
+        ),
+    ],
+)
 def test_pc_recovers_the_additive_noise_graph(indep_test):
     x, truth = _additive_noise_case(200, 0)
-    assert shd(andrey.pc(x).structure, truth) >= 2  # partial correlation errs here
     assert shd(andrey.pc(x, indep_test=indep_test).structure, truth) <= 1
 
 

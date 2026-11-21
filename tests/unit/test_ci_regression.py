@@ -59,7 +59,7 @@ def test_the_tests_are_registered_and_seeded():
 def test_gcm_statistic_on_fixed_residuals():
     rx = np.array([1.0, -1.0, 2.0, 0.5])
     ry = np.array([0.5, -2.0, 1.0, 1.0])
-    products = rx * ry  # 0.5, 2, 2, 0.5: mean 1.25, variance 0.5625
+    products = rx * ry  # 0.5, 2, 2, 0.5: mean 1.25, variance over n 0.5625
     statistic, p = cr._gcm_answer(rx, ry)
     assert statistic == pytest.approx(2.0 * 1.25 / 0.75)
     assert p == pytest.approx(2.0 * ndtr(-statistic))
@@ -222,6 +222,21 @@ def test_pcm_keeps_its_level_where_x_copies_the_conditional_mean():
     assert rejections <= 9  # the 0.999 quantile of the binomial count at 5%
 
 
+def test_pcm_detects_the_squared_effect_of_its_papers_first_setting():
+    # Section 6.1, setting 1: y depends on x through 0.2 x**2 beyond sin(2 pi z1), with z ~ N7.
+    rng = np.random.default_rng(0)
+    z = rng.standard_normal((500, 7))
+    mean = np.sin(2 * np.pi * z[:, 0])
+    x = mean + rng.standard_normal(500)
+    y = mean + 0.2 * x**2 + rng.standard_normal(500)
+    test = cr.PCM(np.column_stack([x, y, z]), seed=0)
+    rows, cols = test._layout(range(9))
+    block, features = test._data[rows], [c for c in cols if c > 1]
+    # The paper's direction, y the response, whichever variable the query's rule would pick.
+    statistics = [test._split_statistic(block, s, 1, 0, features) for s in test._splits]
+    assert ndtr(-np.mean(statistics)) < 0.05
+
+
 def test_default_regressions_on_the_chain():
     x = _chain(150)
     for test in (cr.GCM(x), cr.WGCM(x, variant="fix")):
@@ -235,6 +250,90 @@ def test_early_stopping_keeps_ten_rounds_past_the_best():
     assert np.isfinite(cut[:13]).all()
     assert np.isinf(cut[13:]).all()
     assert np.array_equal(cr._early_stopped(curve[:12]), curve[:12])
+
+
+def test_mean_cv_error_equals_the_staged_curves(monkeypatch):
+    """The folds grown together in steps give the error and rounds of each fold's full staged
+    curve, averaged over the folds and stopped 10 rounds after its best."""
+    monkeypatch.setattr(cr, "_MEAN_CV_ROUNDS", 60)
+    rng = np.random.default_rng(0)
+    z = rng.standard_normal((60, 2))
+    target = np.sin(2 * z[:, 0]) + 0.3 * rng.standard_normal(60)
+    folds = (np.arange(60) % 10)[rng.permutation(60)]
+    for rate, depth in [(0.5, 3), (0.1, 1)]:  # stops early; runs to the last round
+        curves = []
+        for fold in range(10):
+            held = folds == fold
+            model = cr._boosting(depth, 60, rate).fit(z[~held], target[~held])
+            curves.append(
+                [np.sqrt(np.mean((target[held] - p) ** 2)) for p in model.staged_predict(z[held])]
+            )
+        mean = cr._early_stopped(np.mean(curves, axis=0))
+        best = int(np.argmin(mean))
+        assert cr._mean_cv_error(z, target, folds, rate, depth) == (mean[best], best + 1)
+
+
+def _linear_null(n: int, seed: int) -> np.ndarray:
+    """The wGCM paper's one-dimensional null at its linear grid point: ``x`` and ``y`` are
+    ``0.3 z`` plus independent noise of scale 0.3."""
+    rng = np.random.default_rng(seed)
+    z = rng.standard_normal(n)
+    return np.column_stack(
+        [0.3 * z + 0.3 * rng.standard_normal(n), 0.3 * z + 0.3 * rng.standard_normal(n), z]
+    )
+
+
+@pytest.mark.parametrize("variant", ["est", "fix"])
+def test_wgcm_holds_its_level_on_a_null_design(variant):
+    """Of 1,000 draws of a true independence, the share rejected at 0.05 stays within three
+    binomial standard deviations of 5% (29 to 71), with regressions that fit the design."""
+    rejected = sum(
+        cr.WGCM(_linear_null(200, seed), variant=variant, regression="linear", seed=seed)(0, 1, [2])
+        <= 0.05
+        for seed in range(1000)
+    )
+    assert 29 <= rejected <= 71
+
+
+def test_wgcm_est_weights_by_the_fit(monkeypatch):
+    weights = []
+    answer = cr._estimated_answer
+
+    def record(products, weight):
+        weights.append(weight)
+        return answer(products, weight)
+
+    monkeypatch.setattr(cr, "_estimated_answer", record)
+    cr.WGCM(_sign_changing(), regression="linear")(0, 1, [2])
+    (weight,) = weights
+    assert np.unique(weight).size == weight.size  # the fitted values, not their signs
+    assert (weight < 0).any() and (weight > 0).any()
+
+
+def test_pcm_variance_adds_the_shift_to_the_positive_part():
+    fitted = np.array([-0.5, 0.2, -0.005, -1.0])
+    variance = cr._conditional_variance(fitted, 0.3)
+    assert np.array_equal(variance, [0.3, 0.5, 0.3, 0.3])
+    assert np.array_equal(cr._conditional_variance(fitted, 0.0), [0.01, 0.2, 0.01, 0.01])
+
+
+def test_pcm_split_statistic_divides_its_standard_deviation_by_the_test_rows(monkeypatch):
+    products = []
+    normalized_mean = cr._normalized_mean
+
+    def record(values):
+        products.append(values)
+        return normalized_mean(values)
+
+    monkeypatch.setattr(cr, "_normalized_mean", record)
+    test = cr.PCM(_chain(40), regression="linear", n_splits=1)
+    rows, _ = test._layout([0, 1, 2])
+    split = test._splits[0]
+    statistic = test._split_statistic(test._data[rows], split, 1, 0, [2])
+    (values,) = products
+    m = split[1].size
+    assert values.size == m
+    assert statistic == pytest.approx(np.sqrt(m) * values.mean() / values.std(ddof=0))
 
 
 def test_variance_shift_brings_the_mean_ratio_to_one():

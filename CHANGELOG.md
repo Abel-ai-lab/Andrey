@@ -10,6 +10,11 @@ names its pull request.
 
 ## [Unreleased]
 
+### Breaking
+
+- `cpcm` and `cpcm_graph` raise `ValueError` on a 0 under `"exponential"` and on a 1 under
+  `"pareto"`, since the deviance is infinite at the edge of the support. ([#1165])
+
 ### Added
 
 - A test-wise test with fewer rows than it needs, a pair never observed together included, or with
@@ -33,6 +38,17 @@ names its pull request.
   whose link to either end of the tested pair is undecided; PCMCI and PCMCI+ condition each test
   only on the candidates, strongest first, that keep its rows enough for the test, so its rows do
   not mix cohorts never observed together. ([#1151], [#1156], [#1167])
+
+- `possibly_separable="ambiguous"` in PC, FCI, CD-NOD, FCI-JCI, the Markov-blanket searches' CPDAG,
+  and PCMCI+ reads a triple with a side in `metadata["possibly_separable"]` as neither a collider
+  nor a non-collider, in FCI's discriminating-path rule too, when a conditioning set not tested of
+  that side lies within the other nodes adjacent to one of its ends or undecided with it; FCI,
+  FCI-JCI, and PCMCI+ so read every listed side. LPCMCI lists such links but does not read them.
+  The default, `"orient"`, reads it as any other triple, as before. On merged cohorts that no row
+  bridges it removes most false colliders and most true arrowheads with them: PC's graph is then
+  farther from the truth than the empty graph, and in FCI and FCI-JCI the skeleton and
+  `metadata["not_tested"]` change through the possible-d-separation step. It can change results on
+  data where every pair shares rows, when some conditioning set has none. ([#1171])
 
 - `metadata["p_one_tests"]` counts every test of a fit on data with missing values that returned
   `p = 1`, whichever test it is, as a test whose statistic is exactly zero answers. ([#1102])
@@ -80,18 +96,37 @@ names its pull request.
   every method that takes one: `"gcm"`, the generalized covariance measure (Shah and Peters 2020),
   which tests the covariance of the residuals of boosted-tree regressions; `"wgcm"`, the weighted
   generalized covariance measure (Scheidegger, Hörrmann, and Bühlmann 2022), which weights that
-  covariance by an estimated sign function of the conditioning set (`variant="fix"` takes fixed
+  covariance by its fitted value given the conditioning set (`variant="fix"` takes fixed
   weights); and `"pcm"`, the projected covariance measure (Lundborg, Kim, Shah, and Samworth
   2024), which tests whether one variable improves an additive-model prediction of the other, the
-  paper's regression for additive settings. Each takes `regression="boosting"`, `"forest"`, or
-  `"linear"`, and `"pcm"` also `"additive"`, its default. Each fit and each sample split reads
-  only the query's columns, standardized, rounded, and signed, with the rows in an order of their
-  values, so a p-value depends on neither the row nor the column order, nor on columns outside the
-  query, and changes with a column's units or sign only where the rounding moves a value or a
-  column is symmetric about its mean once sorted. On data with missing values, a query with fewer
+  paper's regression for its additive settings as the authors' code fits it. Each takes
+  `regression="boosting"`, `"forest"`, or `"linear"`, and `"pcm"` also `"additive"`, its default;
+  `"wgcm"`'s boosted trees are tuned as
+  in the wGCM authors' current code, over 28 pairs of learning rate and depth by the folds' mean
+  cross-validated error. With boosted trees at 200 and 400 rows, pooled over the wGCM paper's null
+  designs, `"gcm"` and `"wgcm"` reject a true independence at 0.05 in about 6 to 7.6% of draws, and
+  from 4 to 13% by design over those and further null designs; the authors' code also rejects more
+  often than 0.05 there. On the PCM paper's Section 6.1 designs at 250 and 500 rows, `"pcm"`
+  rejects a true independence in 0.2 to 0.4% of draws, and its power is at or above the authors'
+  code's on the same data; on the Section 6.2 null, whose conditional means hold an interaction,
+  it rejects 97.6% at 500 rows, as the authors' code does (95.6%), and its random forests reject
+  97 to 99.9% of the Section 6.1 null. Each fit and each sample split reads only the query's columns,
+  standardized, rounded, and signed, with the rows in an order of their values, so a p-value depends
+  on neither the row nor the column order, nor on columns outside the query, and changes with a
+  column's units or sign only where the rounding moves a value or a column is symmetric about its
+  mean once sorted. On data with missing values, a query with fewer
   rows than its test needs, 4 for `"gcm"` and for `"wgcm"` with `variant="fix"`, 17 for `"wgcm"`'s
-  default `variant="est"`, and 12 for `"pcm"`, is not tested. A contributor's script compares them
-  with the authors' code. ([#1147], [#1129], [#PRNUM])
+  default `variant="est"`, and 12 for `"pcm"`, is not tested. Where the papers and the authors'
+  code differ, each choice was measured against the other in reduced versions of the papers'
+  simulation designs: the wGCM weight is the fitted value, as in the authors' code, which gave
+  more power at the same level than the paper's sign of the fit; the fixed weights' multiplier
+  draws use the centered products, the PCM variance adds its shift to the fit's positive part, and
+  the PCM statistic's standard deviation divides by the row count, as in the papers, where the
+  code's choices gave no more power; the PCM's additive default regresses the fit of the response,
+  not its predictor's term, on the conditioning set, and fits the variance with half the mean
+  fits' basis functions, as in the authors' code, which kept its power at or above that code's
+  in every setting measured. A contributor's script compares the three, the additive PCM
+  included, with the authors' code. ([#1147], [#1129], [#1162], [#PRNUM])
 - `target` takes a list of columns on `iamb`, `inter_iamb`, `mmpc`, and `icp`: one call returns one
   result per target, in the list's order, each equal to a call for that target alone. The three set
   learners answer every target with one search, which sets up the test once, and MMPC learns the
@@ -114,6 +149,18 @@ names its pull request.
   columns in its order search; its Limitations state this, and the
   [0.19.0 release card][card-0190-das] has the numbers, with `cam`, SCORE, and NoGAM on the same
   datasets. ([#1161])
+- `cpcm` and `cpcm_graph` are supported: the pair test's forced direction and the graph search. On
+  the pairs of their paper (its Tables 1 and 2 and model (16) with gamma > 0) and its graphs of 4
+  to 8 variables, they made as many errors as the code published with the paper, except the
+  conservative estimate at gamma 0 under `"pareto"` (see the Pareto gap), and fewer than a coin
+  flip, the majority direction, or the empty graph, except on Table 2's Pareto pairs drawn by the
+  authors' generator, where neither implementation did (see the PARg gap); on the first seeds no
+  other method measured beside them was both more accurate and faster by the paired interval where
+  their times pair, and the graph search ran about ten times faster. The conservative estimate
+  under `"pareto"` and Table 2's Pareto setup are not supported. Their Limitations state the gaps:
+  the support rule's family on location-scale pairs and on Table 2's Pareto pairs, and under
+  `"pareto"` a test that can reject on causes with extreme values. The [0.19.0 release
+  card][card-0190-cpcm] has the numbers. ([#1169])
 - With `fisherz` and `student_t` on data with missing values, test-wise deletion groups the rows by
   their missingness patterns once and computes a test's sums from the groups' tables, removing the
   scattered missing cells exactly, when that costs less than summing every row; a query whose
@@ -204,8 +251,7 @@ names its pull request.
   by the unbiased risk estimate, the criteria of the authors' code; the two-parameter families keep
   the Laplace approximate marginal likelihood. On heavy-tailed Pareto pairs the marginal likelihood
   picked a stiffer spline, under which the test of the true direction rejected well above its
-  level. A value at the edge of the support has an infinite deviance, so `"exponential"` now
-  raises `ValueError` on a 0 and `"pareto"` on a 1. ([#1165])
+  level. ([#1165])
 
 ### Fixed
 
@@ -2908,7 +2954,9 @@ First alpha release.
 [#1122]: https://github.com/Abel-ai-lab/Andrey/pull/1122
 [#1127]: https://github.com/Abel-ai-lab/Andrey/pull/1127
 [#1147]: https://github.com/Abel-ai-lab/Andrey/pull/1147
+[#1162]: https://github.com/Abel-ai-lab/Andrey/pull/1162
 [#1161]: https://github.com/Abel-ai-lab/Andrey/pull/1161
+[#1169]: https://github.com/Abel-ai-lab/Andrey/pull/1169
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
 [#1146]: https://github.com/Abel-ai-lab/Andrey/pull/1146
 [#1149]: https://github.com/Abel-ai-lab/Andrey/pull/1149
@@ -2918,6 +2966,7 @@ First alpha release.
 [#1090]: https://github.com/Abel-ai-lab/Andrey/pull/1090
 [#1099]: https://github.com/Abel-ai-lab/Andrey/pull/1099
 [card-0190-das]: https://andrey.abel.ai/docs/benchmarks/0.19.0.html#das
+[card-0190-cpcm]: https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm
 [card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
 [#1142]: https://github.com/Abel-ai-lab/Andrey/pull/1142
 [#1102]: https://github.com/Abel-ai-lab/Andrey/pull/1102
@@ -2925,6 +2974,7 @@ First alpha release.
 [#1151]: https://github.com/Abel-ai-lab/Andrey/pull/1151
 [#1156]: https://github.com/Abel-ai-lab/Andrey/pull/1156
 [#1167]: https://github.com/Abel-ai-lab/Andrey/pull/1167
+[#1171]: https://github.com/Abel-ai-lab/Andrey/pull/1171
 [#1129]: https://github.com/Abel-ai-lab/Andrey/pull/1129
 [#1094]: https://github.com/Abel-ai-lab/Andrey/pull/1094
 [#1095]: https://github.com/Abel-ai-lab/Andrey/pull/1095
