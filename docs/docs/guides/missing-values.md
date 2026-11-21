@@ -141,24 +141,21 @@ list such edges in `metadata["possibly_separable"]`. In data merged from cohorts
 two variables whose true separating set is never observed together with them is one of these. In
 PCMCI, PCMCI+, and LPCMCI, a link is flagged too when a test left out a candidate for want of rows,
 or when an end of it is an end of an undecided link, whose other node no test conditions on; a
-Markov-blanket search flags every edge of its target when it leaves an undecided candidate out.
-The flag says what the data could not check, not that the edge is false: in the smallest merged
-cohorts, every drawn edge is flagged, since another cohort's variable could have separated it.
-A flagged edge may be absent, and the triple with it. With `possibly_separable="ambiguous"`, PC,
-FCI, CD-NOD, FCI-JCI, the Markov-blanket searches' CPDAG, PCMCI+, and J-PCMCI+ read a triple with a
-flagged side as neither a collider nor a non-collider, as for a triple whose ends are undecided,
-when a conditioning set not tested of that side lies within the other adjacencies of one of its
-ends; PCMCI+ and J-PCMCI+ so read every flagged link. The default, `"orient"`, reads it as any
-other triple.
+Markov-blanket search flags every edge of its target when it leaves an undecided candidate out. The
+flag says what the data could not check, not that the edge is false: in the smallest merged cohorts,
+every drawn edge is flagged, since another cohort's variable could have separated it. A flagged edge
+may be absent, and the triple with it. With `possibly_separable="ambiguous"`, PC, FCI, CD-NOD,
+FCI-JCI, the Markov-blanket searches' CPDAG, and PCMCI+ read a triple with a flagged side as neither
+a collider nor a non-collider, as for a triple whose ends are undecided, when a conditioning set not
+tested of that side lies within the other adjacencies of one of its ends; PCMCI+ so reads every
+flagged link. The default, `"orient"`, reads it as any other triple.
 
 The choice is a trade. In merged cohorts that no row bridges, nearly every drawn edge is flagged,
-and `"ambiguous"` removes most false colliders and most true arrowheads with them: on our simulated
-cohorts, PC keeps about one false collider per graph or fewer where it drew 13 to 90, but finds 3%
-to 11% of the true arrowheads instead of 54% to 72%, and its graph is then farther from the truth,
-counted by the structural Hamming distance, than the empty graph; FCI's skeleton changes through the
-possible-d-separation step, with a slightly larger distance. Where cohorts share rows, few edges are
-flagged and the results change little. Keep the default when you read arrowheads, and use
-`"ambiguous"` when a false collider costs you more than a missing one.
+and `"ambiguous"` removes most false colliders and most true arrowheads with them: the graph can
+then be farther from the truth, counted by the structural Hamming distance, than the empty graph,
+and FCI's skeleton changes through the possible-d-separation step. Where cohorts share rows, few
+edges are flagged and the results change little. Keep the default when you read arrowheads, and
+use `"ambiguous"` when a false collider costs you more than a missing one.
 
 `metadata["not_tested"]` counts the conditioning sets not tested, including those the search
 skipped because no row can test them; it measures the search more than the data, so the notice for

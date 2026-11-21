@@ -1641,14 +1641,16 @@ _CONCEPTS = (
             choices=("orient", "ambiguous"),
         ),
         fragment="possibly_separable",
-        suitable=(
-            *("pc", "fci", "cdnod", "fci_jci", "iamb", "inter_iamb", "mmpc"),
-            *("pcmciplus", "jpcmciplus"),
-        ),
-        exempt=_exempt(
-            "Its orientation rules are LPCMCI's own, not the separating-set rules this reading "
-            "changes.",
-            "lpcmci",
+        suitable=(*("pc", "fci", "cdnod", "fci_jci", "iamb", "inter_iamb", "mmpc", "pcmciplus"),),
+        exempt=(
+            *_exempt(
+                "Its orientation rules are LPCMCI's own, not the separating-set rules this "
+                "reading changes.",
+                "lpcmci",
+            ),
+            *_exempt(
+                "It refuses missing values, so it lists no possibly separable link.", "jpcmciplus"
+            ),
         ),
         others_exempt="No separating-set orientation reads a possibly separable edge.",
     ),

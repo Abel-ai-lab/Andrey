@@ -34,16 +34,15 @@ names its pull request.
   only on the candidates, strongest first, that keep its rows enough for the test, so its rows do
   not mix cohorts never observed together. ([#1151], [#1156], [#1167])
 
-- `possibly_separable="ambiguous"` in PC, FCI, CD-NOD, FCI-JCI, the Markov-blanket searches'
-  CPDAG, PCMCI+, and J-PCMCI+ reads a triple with a side in `metadata["possibly_separable"]` as
-  neither a collider nor a non-collider, in FCI's discriminating-path rule too, when a conditioning
-  set not tested of that side lies within the other adjacencies of one of its ends; PCMCI+ and
-  J-PCMCI+ so read every listed link. The default, `"orient"`, reads it as any other triple, as
-  before. On merged cohorts that no row bridges it removes most false colliders and most true
-  arrowheads with them: PC's graph is then farther from the truth than the empty graph, and in FCI
-  and FCI-JCI the skeleton and `metadata["not_tested"]` change through the possible-d-separation
-  step. It can change results on data where every pair shares rows, when some conditioning set has
-  none. ([#1171])
+- `possibly_separable="ambiguous"` in PC, FCI, CD-NOD, FCI-JCI, the Markov-blanket searches' CPDAG,
+  and PCMCI+ reads a triple with a side in `metadata["possibly_separable"]` as neither a collider
+  nor a non-collider, in FCI's discriminating-path rule too, when a conditioning set not tested of
+  that side lies within the other adjacencies of one of its ends; PCMCI+ so reads every listed link.
+  The default, `"orient"`, reads it as any other triple, as before. On merged cohorts that no row
+  bridges it removes most false colliders and most true arrowheads with them: PC's graph is then
+  farther from the truth than the empty graph, and in FCI and FCI-JCI the skeleton and
+  `metadata["not_tested"]` change through the possible-d-separation step. It can change results on
+  data where every pair shares rows, when some conditioning set has none. ([#1171])
 
 - `metadata["p_one_tests"]` counts every test of a fit on data with missing values that returned
   `p = 1`, whichever test it is, as a test whose statistic is exactly zero answers. ([#1102])

@@ -83,7 +83,7 @@ _LINKS_POSSIBLY_SEPARABLE = concept_param(
     doc="How a same-step triple with a link listed in metadata['possibly_separable'] is read, on "
     "data with missing values: orient = as any other triple; ambiguous = no collider vote reads "
     "it, so it is neither a collider nor a non-collider. On series that no row bridges, ambiguous "
-    "removes most same-step arrowheads.",
+    "can leave no same-step arrowhead.",
 )
 _POSSIBLE_DSEP = ParamSpec(
     name="possible_dsep",
@@ -2645,7 +2645,6 @@ _add(
                 doc="How a same-step collider between system variables is judged, as in "
                 "pcmciplus; a triple can open with a context or a dummy.",
             ),
-            _LINKS_POSSIBLY_SEPARABLE,
             concept_param(
                 "indep_test",
                 choices=tuple(t for t in CONTINUOUS_INDEP_TESTS if t in UNRANKED_TESTS),
