@@ -751,9 +751,10 @@ column. Each variable's values mapped through its fitted distribution function a
 its causes only in the causal direction. {py:func}`~andrey.cpcm` decides a pair by an HSIC test of
 that residual in each direction; {py:func}`~andrey.cpcm_graph` returns the DAG whose residuals a
 dHSIC test finds most jointly independent, with a penalty of 2 per edge, by exact search up to 4
-variables and RESIT's order with greedy edge removal above. A column outside its family's support,
-such as a non-integer under `"poisson"`, raises `ValueError`. Both are experimental until their
-comparison with the authors' code is published.
+variables and RESIT's order with greedy edge removal above. A column outside its family's support
+raises `ValueError`: a non-integer under `"poisson"`, a value of 0 or less under `"exponential"`,
+or a value of 1 or less under `"pareto"`. Both are experimental until their comparison with the
+authors' code is published.
 
 SkewD (Klippert and Marx 2026), {py:func}`~andrey.skewd`, decides the direction of a variable pair
 whose noise is skewed, in the location-scale model of LOCI with a skew-normal noise. It fits the

@@ -7,19 +7,21 @@ start ``a`` from seed ``a`` (tigramite's ``RPCMCI(seed=a)`` with ``max_anneal=1`
 ``n_starts=1, seed=a``), which gives both the same first regime weights. The settings are the
 paper's (Table 2): partial correlation with the Student-t p-value, ``pc_alpha=0.2``,
 ``alpha_level=0.01``, no FDR correction, ``max_iter=20``, and ``max_transitions`` set to the true
-number of switches.
+number of switches. ``--tau-max`` sets the largest lag of both fits and of the scored graphs
+(default ``3``, enough for the lag-2 link of "lag").
 
     ANDREY_BENCH_TIGRAMITE_PYTHON=<interpreter of benchmarks/start_tigramite.sh> \\
         uv run python benchmarks/rpcmci_agreement.py <empty folder> [--steps 1000] [--seeds 3] \\
-        [--starts 3] [--threshold 0.5] [--strict]
+        [--starts 3] [--threshold 0.5] [--tau-max 3]
 
 tigramite is GPL-licensed: its fits run in its own environment (``--reference``, below), which
-imports this module for nothing but numpy and the models. Andrey joins a step to a regime at
-``gamma >= threshold`` (the paper's Eq. 11), tigramite above it; ``--strict`` gives Andrey the
-threshold plus ``1e-10``, tigramite's rule. The script prints one row per model: the starts with
-the same regime path and graphs, those with also the same per-iteration changes, those that
-differ or fail, and each package's regime accuracy and lagged SHD (summed over the regimes)
-against the truth.
+imports this module for nothing but numpy and the models. Both join a step to a regime when its
+weight is above ``threshold``; Andrey rounds the weight to 9 decimals first. The script prints one row per model and one for all of them: the starts with the same regime path and graphs,
+those with also the same per-iteration changes and weights within ``1e-9``, those that differ or
+fail, and each package's mean regime accuracy and mean lagged SHD (summed over the regimes) against
+the truth over its fits that did not fail. A step's regime is its largest weight rounded to 9
+decimals, as ``andrey.RegimeOutput`` reads it, so weights that differ only in their last bits give
+the same path.
 """
 
 from __future__ import annotations
@@ -56,7 +58,7 @@ MODELS = {
         {(0, 1, 1): 0.8, (0, 0, 1): 0.2, (1, 1, 1): 0.2},
     ],
 }
-TAU_MAX = 3
+TAU_MAX = 3  #: the default largest lag
 SETTINGS = {"pc_alpha": 0.2, "alpha_level": 0.01, "max_iter": 20}
 
 
@@ -83,15 +85,17 @@ def simulate(model: str, n_steps: int, seed: int) -> tuple[np.ndarray, np.ndarra
     return x, regimes
 
 
-def truth(model: str, k: int) -> np.ndarray:
-    """Regime ``k``'s ``(TAU_MAX, 2, 2)`` lagged graph, ``[lag - 1, cause, effect]``."""
-    graph = np.zeros((TAU_MAX, 2, 2), dtype=bool)
+def truth(model: str, k: int, tau_max: int) -> np.ndarray:
+    """Regime ``k``'s ``(tau_max, 2, 2)`` lagged graph, ``[lag - 1, cause, effect]``; a link at a
+    larger lag is left out, so a fit that cannot test it is not scored on it."""
+    graph = np.zeros((tau_max, 2, 2), dtype=bool)
     for j, i, lag in MODELS[model][k]:
-        graph[lag - 1, i, j] = True
+        if lag <= tau_max:
+            graph[lag - 1, i, j] = True
     return graph
 
 
-def reference(folder: Path, starts: int, threshold: float) -> None:
+def reference(folder: Path, starts: int, threshold: float, tau_max: int) -> None:
     """Fit every case in ``folder`` with tigramite's RPCMCI; runs in tigramite's environment."""
     from tigramite import data_processing
     from tigramite.independence_tests.parcorr import ParCorr
@@ -111,7 +115,7 @@ def reference(folder: Path, starts: int, threshold: float) -> None:
                 num_iterations=SETTINGS["max_iter"],
                 max_anneal=1,
                 tau_min=1,
-                tau_max=TAU_MAX,
+                tau_max=tau_max,
                 pc_alpha=SETTINGS["pc_alpha"],
                 alpha_level=SETTINGS["alpha_level"],
                 n_jobs=1,
@@ -128,7 +132,9 @@ def reference(folder: Path, starts: int, threshold: float) -> None:
         case.with_suffix(".tigramite.json").write_text(json.dumps(rows))
 
 
-def andrey_fits(x: np.ndarray, n_regimes: int, switches: int, starts: int, threshold: float):
+def andrey_fits(
+    x: np.ndarray, n_regimes: int, switches: int, starts: int, threshold: float, tau_max: int
+):
     """Andrey's fits of one series, one start per seed; ``None`` for a failed start."""
     from andrey.temporal.rpcmci import RegimeFitError, rpcmci
 
@@ -141,7 +147,7 @@ def andrey_fits(x: np.ndarray, n_regimes: int, switches: int, starts: int, thres
                 max_transitions=switches,
                 switch_threshold=threshold,
                 n_starts=1,
-                tau_max=TAU_MAX,
+                tau_max=tau_max,
                 fdr_method="none",
                 indep_test="student_t",
                 seed=a,
@@ -155,14 +161,23 @@ def andrey_fits(x: np.ndarray, n_regimes: int, switches: int, starts: int, thres
     return rows
 
 
-def against_truth(row: dict, model: str, regimes: np.ndarray) -> tuple[float, int]:
-    """Regime accuracy after the first ``TAU_MAX`` steps under the best relabeling, and the lagged
+def regime_path(weights) -> np.ndarray:
+    """The regime of each step: its largest weight, rounded as ``andrey.RegimeOutput`` rounds it."""
+    from andrey.core.ties import KEY_DP
+
+    return np.round(np.asarray(weights), KEY_DP).argmax(axis=0)
+
+
+def against_truth(row: dict, model: str, regimes: np.ndarray, tau_max: int) -> tuple[float, int]:
+    """Regime accuracy after the first ``tau_max`` steps under the best relabeling, and the lagged
     SHD summed over the regimes so matched."""
-    path = np.asarray(row["weights"]).argmax(axis=0)
+    path = regime_path(row["weights"])
     perms = list(itertools.permutations(range(len(MODELS[model]))))
-    accuracy = [(np.array(p)[path] == regimes)[TAU_MAX:].mean() for p in perms]
+    accuracy = [(np.array(p)[path] == regimes)[tau_max:].mean() for p in perms]
     best = perms[int(np.argmax(accuracy))]
-    shd = sum(int((np.array(g) != truth(model, k)).sum()) for g, k in zip(row["graphs"], best))
+    shd = sum(
+        int((np.array(g) != truth(model, k, tau_max)).sum()) for g, k in zip(row["graphs"], best)
+    )
     return float(max(accuracy)), shd
 
 
@@ -173,11 +188,11 @@ def main() -> None:
     parser.add_argument("--seeds", type=int, default=3)
     parser.add_argument("--starts", type=int, default=3)
     parser.add_argument("--threshold", type=float, default=0.5)
-    parser.add_argument("--strict", action="store_true")
+    parser.add_argument("--tau-max", type=int, default=TAU_MAX)
     parser.add_argument("--reference", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.reference:
-        reference(args.folder, args.starts, args.threshold)
+        reference(args.folder, args.starts, args.threshold, args.tau_max)
         return
     args.folder.mkdir(parents=True, exist_ok=True)
     cases = {}
@@ -195,13 +210,14 @@ def main() -> None:
     python = os.environ["ANDREY_BENCH_TIGRAMITE_PYTHON"]
     command = [python, __file__, str(args.folder), "--reference"]
     command += ["--starts", str(args.starts), "--threshold", str(args.threshold)]
+    command += ["--tau-max", str(args.tau_max)]
     subprocess.run(command, check=True)
-    threshold = args.threshold + 1e-10 if args.strict else args.threshold
     tally: dict[str, dict] = {}
     for name, (model, x, regimes) in cases.items():
         t_rows = json.loads((args.folder / f"{name}.tigramite.json").read_text())
+        switches = int((np.diff(regimes) != 0).sum())
         a_rows = andrey_fits(
-            x, len(MODELS[model]), int((np.diff(regimes) != 0).sum()), args.starts, threshold
+            x, len(MODELS[model]), switches, args.starts, args.threshold, args.tau_max
         )
         row = tally.setdefault(
             model,
@@ -217,17 +233,20 @@ def main() -> None:
         )
         for a, t in zip(a_rows, t_rows, strict=True):
             for side, r in (("andrey", a), ("tigramite", t)):
-                row[side].append(None if r is None else against_truth(r, model, regimes))
+                row[side].append(
+                    None if r is None else against_truth(r, model, regimes, args.tau_max)
+                )
             if a is None or t is None:
                 row["both fail" if a is None and t is None else "one fails"] += 1
                 continue
-            wa, wt = np.asarray(a["weights"])[:, TAU_MAX:], np.asarray(t["weights"])[:, TAU_MAX:]
-            same = (wa.argmax(0) == wt.argmax(0)).all() and a["graphs"] == t["graphs"]
+            wa = np.asarray(a["weights"])[:, args.tau_max :]
+            wt = np.asarray(t["weights"])[:, args.tau_max :]
+            same = (regime_path(wa) == regime_path(wt)).all() and a["graphs"] == t["graphs"]
             changes = len(a["changes"]) == len(t["changes"]) and np.allclose(
                 a["changes"], t["changes"], rtol=0, atol=1e-6
             )
             row["same" if same else "differ"] += 1
-            row["identical"] += bool(same and changes and np.abs(wa - wt).max() <= 1e-15)
+            row["identical"] += bool(same and changes and np.abs(wa - wt).max() <= 1e-9)
 
     def summary(fits: list) -> str:
         ok = [f for f in fits if f is not None]
@@ -249,6 +268,10 @@ def main() -> None:
         "tigramite: accuracy, SHD, failed",
     ]
     print("| " + " | ".join(header) + " |\n|" + "---|" * len(header))
+    counts = ["same", "identical", "differ", "both fail", "one fails"]
+    tally["all"] = {c: sum(r[c] for r in tally.values()) for c in counts}
+    for side in ("andrey", "tigramite"):
+        tally["all"][side] = [f for model in MODELS for f in tally[model][side]]
     for model, r in tally.items():
         cells = [model, r["same"], r["identical"], r["differ"], r["both fail"], r["one fails"]]
         cells += [summary(r["andrey"]), summary(r["tigramite"])]

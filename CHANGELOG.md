@@ -64,7 +64,9 @@ names its pull request.
   causal links switch between a few persistent regimes. It returns an `andrey.RegimeOutput`: the
   regime of each time step, the regime weights, and one temporal result per regime, as `pcmci`
   returns it. The regime step solves the paper's linear program with SciPy, so it needs no new
-  dependency. A contributor's script compares it with the authors' code start by start. ([#1149])
+  dependency. A time step joins a regime only when its weight, rounded to 9 decimals, is above
+  `switch_threshold`: the paper's Eq. 11 reads `>=`, and Andrey follows the authors' code, which
+  uses `>`. A contributor's script compares it with the authors' code start by start. ([#1149], [#1159])
 - Three experimental regression-based conditional-independence tests, as `indep_test` options of
   every method that takes one: `"gcm"`, the generalized covariance measure (Shah and Peters 2020),
   which tests the covariance of the residuals of boosted-tree regressions; `"wgcm"`, the weighted
@@ -185,6 +187,13 @@ names its pull request.
   missing values, and the other tests keep the per-query path. A repeated variable in the
   conditioning set counts once, and a correlation matrix that is not exactly symmetric gives each
   pair one answer whichever variable is the target. ([#1047], [#1048])
+- `cpcm` and `cpcm_graph` choose the smoothing parameters of the `"exponential"` and `"pareto"`
+  fits by the generalized cross-validation score of the deviance and those of the `"poisson"` fit
+  by the unbiased risk estimate, the criteria of the authors' code; the two-parameter families keep
+  the Laplace approximate marginal likelihood. On heavy-tailed Pareto pairs the marginal likelihood
+  picked a stiffer spline, under which the test of the true direction rejected well above its
+  level. A value at the edge of the support has an infinite deviance, so `"exponential"` now
+  raises `ValueError` on a 0 and `"pareto"` on a 1. ([#1165])
 
 ### Fixed
 
@@ -2892,6 +2901,7 @@ First alpha release.
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
 [#1146]: https://github.com/Abel-ai-lab/Andrey/pull/1146
 [#1149]: https://github.com/Abel-ai-lab/Andrey/pull/1149
+[#1159]: https://github.com/Abel-ai-lab/Andrey/pull/1159
 [#1046]: https://github.com/Abel-ai-lab/Andrey/pull/1046
 [#1068]: https://github.com/Abel-ai-lab/Andrey/pull/1068
 [#1090]: https://github.com/Abel-ai-lab/Andrey/pull/1090
@@ -2918,3 +2928,4 @@ First alpha release.
 [#1048]: https://github.com/Abel-ai-lab/Andrey/pull/1048
 [#1058]: https://github.com/Abel-ai-lab/Andrey/pull/1058
 [#1153]: https://github.com/Abel-ai-lab/Andrey/pull/1153
+[#1165]: https://github.com/Abel-ai-lab/Andrey/pull/1165

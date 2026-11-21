@@ -8,9 +8,12 @@ gives a residual that is uniform and independent of the parents in the causal di
 Each parameter is a linear predictor ``eta = c + sum_k f_k(x_k)`` through the family's link, every
 ``f_k`` a rank-10 thin plate regression spline (:func:`~andrey.fcm.gam.tp_basis`) with its own
 smoothing parameter, or indicators for a parent of at most 9 distinct values. The coefficients
-maximize the penalized log-likelihood by Newton's method, and the smoothing parameters maximize
-its Laplace approximate marginal likelihood (Wood, Pya, and Safken 2016). A count family's
-distribution function is randomized between its steps, which needs the ``seed``.
+maximize the penalized log-likelihood by Newton's method. The smoothing parameters of a
+two-parameter family maximize its Laplace approximate marginal likelihood (Wood, Pya, and Safken
+2016); those of a one-parameter family minimize the generalized cross-validation score of its
+deviance, or, for the Poisson family, whose scale is known, the unbiased risk estimate (Wood
+2008). A count family's distribution function is randomized between its steps, which needs the
+``seed``.
 
 :func:`pair_tests` runs Algorithm 1's two independence tests; :func:`search` minimizes the score
 ``-log p + edge_penalty * edges`` over DAGs, ``p`` the gamma dHSIC test of the residuals' joint
@@ -24,6 +27,9 @@ parametric causal models. JMLR 26(264).
 
 Wood, Pya, and Safken (2016). Smoothing parameter and model selection for general smooth models.
 JASA 111(516), 1548-1563.
+
+Wood (2008). Fast stable direct fitting and smoothness selection for generalized additive models.
+JRSS-B 70(3), 495-518.
 """
 
 from __future__ import annotations
@@ -52,8 +58,9 @@ _LOG_SP_RANGE = 20.0
 #: The search over the log smoothing parameters moves by a step that halves from the first of
 #: these to the second, so every point it reads lies on one lattice around the start.
 _SP_STEPS = (4.0, 1.0 / 16.0)
-#: A point of that search replaces the best one only if its LAML is lower by more than this share.
-_LAML_GAIN = 1e-6
+#: A point of that search replaces the best one only if its criterion is lower by more than this
+#: share.
+_SCORE_GAIN = 1e-6
 _NEWTON_TOL = 1e-11
 _MAX_NEWTON = 100
 #: Lower bound of a fitted log scale that varies with the parents, on the column the fit reads:
@@ -79,8 +86,8 @@ NB_LOG_SIZE_MAX = (12.0, 20.0)
 NB_LOG_SIZE_OVER_MAX = 5.0
 #: A Hessian is singular to working precision if, with its diagonal brought to 1, an eigenvalue is
 #: below this. The coefficients and the log determinant at such a point follow the table's last
-#: digits (their rounding error is the machine's divided by that eigenvalue), so its LAML is not a
-#: number two runs agree on, and the point has no fit.
+#: digits (their rounding error is the machine's divided by that eigenvalue), so its criterion is
+#: not a number two runs agree on, and the point has no fit.
 _SINGULAR = 1e-8
 #: A residual, a probability, is the same on every row if its values lie within this of each other.
 _CONSTANT = 1e-9
@@ -104,6 +111,14 @@ class Family:
     the units and the fit does not depend on their size. ``upper(y)`` bounds a ``"constant"``
     second predictor from above, and ``floor`` is the lower bound of a ``"smooth"`` second
     predictor's log scale (:data:`LOG_SCALE_FLOOR`).
+
+    ``criterion`` is what the log smoothing parameters minimize (:meth:`_Model.score`): ``"laml"``,
+    the negative Laplace approximate marginal likelihood; ``"gcv"``, the generalized
+    cross-validation score ``n D / (n - edf)^2``; or ``"ubre"``, the unbiased risk estimate
+    ``D / n + 2 edf / n - 1`` of a family whose scale is known to be 1. ``D`` is
+    ``deviance(y, etas)``, twice the negative log-likelihood less its value when each row's
+    parameter fits that row alone, summed from each row's own difference so that large values do
+    not cancel, and ``edf`` the fit's effective degrees of freedom.
     """
 
     name: str
@@ -118,6 +133,8 @@ class Family:
     rescale: Callable[[np.ndarray], np.ndarray] | None = None
     upper: Callable[[np.ndarray], float] | None = None
     floor: float | None = None
+    criterion: str = "laml"
+    deviance: Callable[[np.ndarray, list[np.ndarray]], float] | None = None
 
     @property
     def reads_units(self) -> bool:
@@ -175,6 +192,20 @@ def _pareto_derivs(y: np.ndarray, etas: list[np.ndarray]) -> Derivs:
     # log(y) is exponential with rate exp(-eta); the Jacobian 1 / y does not depend on eta.
     nll, grad, hess = _exponential_derivs(np.log(y), etas)
     return nll + float(np.sum(np.log(y))), grad, hess
+
+
+def _exponential_deviance(y: np.ndarray, etas: list[np.ndarray]) -> float:
+    log_u = np.log(y) - etas[0]  # u = y / mean; a row's own mean, u = 1, adds 0
+    return 2.0 * float(np.sum(np.expm1(log_u) - log_u))
+
+
+def _pareto_deviance(y: np.ndarray, etas: list[np.ndarray]) -> float:
+    return _exponential_deviance(np.log(y), etas)
+
+
+def _poisson_deviance(y: np.ndarray, etas: list[np.ndarray]) -> float:
+    mean = np.exp(etas[0])
+    return 2.0 * float(np.sum(special.xlogy(y, y / mean) - (y - mean)))
 
 
 def _poisson_derivs(y: np.ndarray, etas: list[np.ndarray]) -> Derivs:
@@ -306,8 +337,7 @@ def _families() -> dict[str, Family]:
     )
     gaussian_start = lambda y: [float(np.mean(y)), _scale_start(y)]  # noqa: E731
     positive = lambda y: ~np.isfinite(y) | (y <= 0)  # noqa: E731
-    nonnegative = lambda y: ~np.isfinite(y) | (y < 0)  # noqa: E731
-    at_least_one = lambda y: ~np.isfinite(y) | (y < 1)  # noqa: E731
+    above_one = lambda y: ~np.isfinite(y) | (y <= 1)  # noqa: E731
     real = "real numbers"
 
     def floored(
@@ -331,14 +361,15 @@ def _families() -> dict[str, Family]:
                _not_finite, rescale=_standardized, floor=LOG_SCALE_FLOOR["gaussian"]),
         Family("gaussian_fixed_scale", real, 2, "constant", gaussian_start, _gaussian_derivs,
                gaussian_cdf, _not_finite, rescale=_standardized),
-        Family("exponential", "non-negative numbers", 1, "", lambda y: [math.log(np.mean(y))],
-               _exponential_derivs, exponential_cdf, nonnegative, rescale=_over_mean),
-        Family("pareto", "numbers of at least 1 (a Pareto law of scale 1)", 1, "",
+        Family("exponential", "positive numbers", 1, "", lambda y: [math.log(np.mean(y))],
+               _exponential_derivs, exponential_cdf, positive, rescale=_over_mean,
+               criterion="gcv", deviance=_exponential_deviance),
+        Family("pareto", "numbers greater than 1 (a Pareto law of scale 1)", 1, "",
                lambda y: [math.log(max(float(np.mean(np.log(y))), 1e-8))], _pareto_derivs,
-               pareto_cdf, at_least_one),
+               pareto_cdf, above_one, criterion="gcv", deviance=_pareto_deviance),
         Family("poisson", "counts (whole numbers of at least 0)", 1, "",
                lambda y: _count_start(y)[:1], _poisson_derivs, _poisson_cdf, _not_whole,
-               counts=True),
+               counts=True, criterion="ubre", deviance=_poisson_deviance),
         Family("gamma", "positive numbers", 2, "smooth",
                *floored("gamma", _gamma_start, _gamma_derivs, gamma_cdf),
                positive, rescale=_over_mean, floor=LOG_SCALE_FLOOR["gamma"]),
@@ -459,9 +490,9 @@ def fit(y: np.ndarray, terms: list[_Term], family: Family) -> list[np.ndarray]:
     Each smooth linear predictor has an intercept and every term's columns; a constant one has the
     intercept alone. Beside a smooth parent, a second predictor leaves out the indicator of a
     parent value on whose rows ``y`` holds one value (:func:`_varying`). The coefficients
-    minimize the penalized negative log-likelihood, and the log
-    smoothing parameters minimize its Laplace approximate marginal likelihood (Wood, Pya, and
-    Safken 2016) over a lattice around their start (:func:`_search`).
+    minimize the penalized negative log-likelihood, and the log smoothing parameters minimize the
+    family's criterion (:attr:`Family.criterion`) over a lattice around their start
+    (:func:`_search`).
 
     A parameter that runs to a limit is held there, outside the fit and its Laplace determinant,
     where it would otherwise stop wherever rounding leaves it. Under a count family, the mean of
@@ -510,7 +541,7 @@ def fit(y: np.ndarray, terms: list[_Term], family: Family) -> list[np.ndarray]:
     for j, value in enumerate(family.start(y)[: family.predictors]):
         beta[offsets[j]] = value
     model = _Model(y, designs, offsets, penalties, family, beta)
-    fitted = _search(model) if penalties else model.laml(np.zeros(0))[1]
+    fitted = _search(model) if penalties else model.score(np.zeros(0))[1]
     if fitted is None:
         fewer = ", or a family with fewer fitted parameters" if family.predictors == 2 else ""
         raise ValueError(
@@ -561,15 +592,16 @@ def _varying(indicators: np.ndarray, y: np.ndarray) -> np.ndarray:
 
 
 def _search(model: _Model) -> list[np.ndarray] | None:
-    """The linear predictors at the log smoothing parameters of lowest LAML, by a compass search.
+    """The linear predictors at the log smoothing parameters of lowest criterion
+    (:meth:`_Model.score`), by a compass search.
 
     The search starts where each penalty is on the scale of its Hessian block, which moves with
     the units, and tries one step up and down in each parameter in turn, taking a point that
-    lowers the LAML and halving the step once none does, from 4 down to 1/16 and within 20 of
-    the start. Every LAML is fitted from the same starting coefficients, so it depends on its
-    point alone, and the points lie on a fixed lattice around the start: a change of the table
-    within rounding (a column in other units) moves the result within rounding too, where a
-    gradient search on the LAML's narrow dips, which form where the Hessian is close to
+    lowers the criterion and halving the step once none does, from 4 down to 1/16 and within 20 of
+    the start. Every point is fitted from the same starting coefficients, so its criterion depends
+    on the point alone, and the points lie on a fixed lattice around the start: a change of the
+    table within rounding (a column in other units) moves the result within rounding too, where a
+    gradient search on the criterion's narrow dips, which form where the Hessian is close to
     singular, does not. ``None`` where no point has a fit.
     """
     start = model.start_rho(model.start)
@@ -577,22 +609,22 @@ def _search(model: _Model) -> list[np.ndarray] | None:
     reach = round(_LOG_SP_RANGE / unit)
     seen: dict[tuple[int, ...], tuple[float, list[np.ndarray] | None]] = {}
 
-    def laml(point: tuple[int, ...]) -> float:
+    def score(point: tuple[int, ...]) -> float:
         if point not in seen:
-            seen[point] = model.laml(start + unit * np.array(point))
+            seen[point] = model.score(start + unit * np.array(point))
         return seen[point][0]
 
     point = (0,) * start.size
-    best = laml(point)
+    best = score(point)
     step = round(_SP_STEPS[0] / unit)
     while step >= 1:
         moved = False
         for i in range(start.size):
             for move in (step, -step):
                 trial = (*point[:i], point[i] + move, *point[i + 1 :])
-                gain = _LAML_GAIN * (1.0 + abs(best)) if math.isfinite(best) else 0.0
-                if abs(trial[i]) <= reach and laml(trial) < best - gain:
-                    point, best, moved = trial, laml(trial), True
+                gain = _SCORE_GAIN * (1.0 + abs(best)) if math.isfinite(best) else 0.0
+                if abs(trial[i]) <= reach and score(trial) < best - gain:
+                    point, best, moved = trial, score(trial), True
         if not moved:
             step //= 2
     return seen[point][1]
@@ -728,17 +760,26 @@ class _Model:
             settled = done
         return beta
 
-    def laml(self, rho: np.ndarray) -> tuple[float, list[np.ndarray] | None]:
-        """The negative Laplace approximate marginal likelihood at ``rho``, up to a constant, and
-        the linear predictors fitted there from the starting coefficients; infinite where those
-        are no minimum.
+    def score(self, rho: np.ndarray) -> tuple[float, list[np.ndarray] | None]:
+        """The family's criterion at ``rho`` (:attr:`Family.criterion`), the LAML up to a
+        constant, and the linear predictors fitted there from the starting coefficients; infinite
+        where those are no minimum, or where the effective degrees of freedom reach the rows.
         """
         found = self.minimum(rho)
         if found is None:
             return math.inf, None
-        etas, value, logdet = found
-        ranks = np.array([rank for _, _, rank in self.penalties], dtype=np.float64)
-        return value - 0.5 * float(ranks @ rho) + 0.5 * logdet, etas
+        etas, value, logdet, edf = found
+        if self.family.criterion == "laml":
+            ranks = np.array([rank for _, _, rank in self.penalties], dtype=np.float64)
+            return value - 0.5 * float(ranks @ rho) + 0.5 * logdet, etas
+        assert self.family.deviance is not None
+        n = self.y.size
+        if not n - edf > 0:
+            return math.inf, etas
+        deviance = self.family.deviance(self.y, etas)
+        if self.family.criterion == "gcv":
+            return n * deviance / (n - edf) ** 2, etas
+        return deviance / n + 2.0 * edf / n - 1.0, etas
 
     def free(self, beta: np.ndarray, grad: np.ndarray) -> np.ndarray:
         """The coefficients that move: all but the fixed ones (:meth:`holding`) and one at its
@@ -746,8 +787,9 @@ class _Model:
         of the fit, outside its Laplace determinant."""
         return ~self.fixed & ~((beta >= self.upper) & (grad < 0))
 
-    def minimum(self, rho: np.ndarray) -> tuple[list[np.ndarray], float, float] | None:
-        """A minimum of the penalized objective: linear predictors, value, Hessian log determinant.
+    def minimum(self, rho: np.ndarray) -> tuple[list[np.ndarray], float, float, float] | None:
+        """A minimum of the penalized objective: linear predictors, value, Hessian log determinant,
+        and effective degrees of freedom.
 
         :meth:`newton` runs from the fit's starting coefficients; under a floored log scale it runs
         again, from where it ended, with the rows :meth:`at_floor` finds held there
@@ -759,7 +801,9 @@ class _Model:
         the objective is not finite. The log determinant is taken from the Hessian with its
         diagonal brought to 1, plus the diagonal's logarithms: the penalties of two smooths can
         differ by many orders of magnitude, and the small eigenvalues of the Hessian as it stands
-        would carry the rounding error of its largest entries.
+        would carry the rounding error of its largest entries. The effective degrees of freedom
+        are the trace of ``H^-1 (H - S)``, ``H`` the penalized Hessian and ``S`` the penalty, over
+        the coefficients that move.
         """
         model, fitted = self, self.newton(self.start, rho)
         if self.family.floor is not None:
@@ -768,19 +812,22 @@ class _Model:
                 model = self.holding(held)
                 fitted = model.newton(fitted, rho)
                 held = model.at_floor(fitted)
+        S = model.penalty(rho)
         with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
-            value, grad, H = model.evaluate(fitted, model.penalty(rho))
+            value, grad, H = model.evaluate(fitted, S)
         if not (np.isfinite(value) and np.isfinite(grad).all() and np.isfinite(H).all()):
             return None
         free = model.free(fitted, grad)
-        H, grad = H[np.ix_(free, free)], grad[free]
+        H, grad, S = H[np.ix_(free, free)], grad[free], S[np.ix_(free, free)]
         unit = 1.0 / np.sqrt(_diagonal(H))
         left = 0.5 * float(grad @ _newton_solve(H, grad))
-        eigenvalues = np.linalg.eigvalsh(H * unit[:, None] * unit)
+        scaled = H * unit[:, None] * unit
+        eigenvalues = np.linalg.eigvalsh(scaled)
         if eigenvalues[0] < _SINGULAR or left > _UNFINISHED * (1.0 + abs(value)):
             return None
         logdet = float(np.sum(np.log(eigenvalues)) - 2.0 * np.sum(np.log(unit)))
-        return model.etas(fitted), value, logdet
+        edf = free.sum() - float(np.trace(np.linalg.solve(scaled, S * unit[:, None] * unit)))
+        return model.etas(fitted), value, logdet, edf
 
     def start_rho(self, beta: np.ndarray) -> np.ndarray:
         """Log smoothing parameters that put each penalty on the scale of its Hessian block."""
