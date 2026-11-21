@@ -1207,19 +1207,29 @@ class LPCMCISearch:
         return marks, {}, {}
 
     def rule_r2(self) -> tuple[dict, dict, dict]:
-        """R2': ``A -> B *-> C`` or ``A *-> B -> C`` with ``A *-o C``: ``A *-> C``."""
+        """R2': ``A -> B *-> C`` or ``A *-> B -> C`` with ``A *-o C``: ``A *-> C``. No link of the
+        pattern is one no test with rows decided (:meth:`usable`)."""
         marks: dict = {}
+        untested = self.untested()
+
+        def usable(x: Node, y: Node) -> bool:
+            return _key(x, y)[0] not in untested
+
         for a in self.window:
             around = self.neighbors(a)
             sides: list[tuple[Node, bool, bool]] | None = None  # b, b <-* a, a -> b
             for c in around:
-                if self.mark(c, a) != CIRCLE or self.mark(a, c) == CONFLICT:
+                if self.mark(c, a) != CIRCLE or self.mark(a, c) == CONFLICT or not usable(a, c):
                     continue
                 if sides is None:
-                    sides = [(b, self.mark(b, a) == ARROW, self.directed(a, b)) for b in around]
+                    sides = [
+                        (b, self.mark(b, a) == ARROW, self.directed(a, b))
+                        for b in around
+                        if usable(a, b)
+                    ]
                 near_c = self.linked(c)
                 for b, into_b, a_to_b in sides:
-                    if b == c or b not in near_c:
+                    if b == c or b not in near_c or not usable(b, c):
                         continue
                     into_c = self.mark(c, b) == ARROW
                     if (a_to_b and into_c) or (into_b and self.directed(b, c)):
