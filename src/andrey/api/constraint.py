@@ -330,15 +330,16 @@ def pc(
     listed in ``metadata["undecided_pairs"]``, and a triple whose ends are undecided is neither a
     collider nor a non-collider to any rule. A drawn edge that a conditioning set not tested might
     have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
-    not check, not a finding that the edge is false. On merged cohorts, every pair of variables
-    measured only in different cohorts is therefore undecided, and an edge whose separating set is
-    never observed together with its pair is drawn and flagged. A few rows that observe every
-    column decide such pairs on those rows alone, with little power, so they can remove true edges
-    between variables observed together. A continuous column constant on a test's rows
-    raises ``ValueError``. With missing values, the skeleton search runs in one process. Test-wise
-    deletion is valid when values are missing completely at random, which means that whether a value
-    is missing depends on no value in the data; the rows a test reads are then a random sample of
-    all rows, and otherwise they are a selected sample that more rows do not correct.
+    not check, not a finding that the edge is false; a triple with a flagged side is neither a
+    collider nor a non-collider to any rule. On merged cohorts, every pair of variables measured
+    only in different cohorts is therefore undecided, and an edge whose separating set is never
+    observed together with its pair is drawn and flagged. A few rows that observe every column
+    decide such pairs on those rows alone, with little power, so they can remove true edges between
+    variables observed together. A continuous column constant on a test's rows raises
+    ``ValueError``. With missing values, the skeleton search runs in one process. Test-wise deletion
+    is valid when values are missing completely at random, which means that whether a value is
+    missing depends on no value in the data; the rows a test reads are then a random sample of all
+    rows, and otherwise they are a selected sample that more rows do not correct.
 
     **Missing-Value PC.** ``missing="mvpc"`` follows Algorithm 1 of Tu et al. [13]_. The test-wise
     skeleton keeps every true edge but can keep extra ones: an extra edge ``x - y`` needs the
@@ -885,15 +886,16 @@ def fci(
     listed in ``metadata["undecided_pairs"]``, and a triple whose ends are undecided is neither a
     collider nor a non-collider to any rule. A drawn edge that a conditioning set not tested might
     have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
-    not check, not a finding that the edge is false. On merged cohorts, every pair of variables
-    measured only in different cohorts is therefore undecided, and an edge whose separating set is
-    never observed together with its pair is drawn and flagged. A few rows that observe every
-    column decide such pairs on those rows alone, with little power, so they can remove true edges
-    between variables observed together. A continuous column constant on a test's rows
-    raises ``ValueError``. With missing values, the skeleton search runs in one process. Test-wise
-    deletion is valid when values are missing completely at random, which means that whether a value
-    is missing depends on no value in the data; the rows a test reads are then a random sample of
-    all rows, and otherwise they are a selected sample that more rows do not correct.
+    not check, not a finding that the edge is false; a triple with a flagged side is neither a
+    collider nor a non-collider to any rule. On merged cohorts, every pair of variables measured
+    only in different cohorts is therefore undecided, and an edge whose separating set is never
+    observed together with its pair is drawn and flagged. A few rows that observe every column
+    decide such pairs on those rows alone, with little power, so they can remove true edges between
+    variables observed together. A continuous column constant on a test's rows raises
+    ``ValueError``. With missing values, the skeleton search runs in one process. Test-wise deletion
+    is valid when values are missing completely at random, which means that whether a value is
+    missing depends on no value in the data; the rows a test reads are then a random sample of all
+    rows, and otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs with no
     hidden variable, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through which
@@ -1740,13 +1742,14 @@ def cdnod(
     collider nor a non-collider to any rule; a test whose ``env`` is constant on its rows, which
     come from one environment, is not tested. A drawn edge that a conditioning set not tested might
     have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
-    not check, not a finding that the edge is false. On merged cohorts, every pair of variables
-    measured only in different cohorts is therefore undecided. A continuous column constant on a
-    test's rows raises ``ValueError``. ``env`` must be complete, and ``dependence_threshold``, whose
-    kernel measures read every row, raises ``ValueError`` on data with missing values. With missing
-    values, the skeleton search runs in one process. Test-wise deletion is valid when values are
-    missing completely at random, which means that whether a value is missing depends on no value in
-    the data; the rows a test reads are then a random sample of all rows, and otherwise they are a
+    not check, not a finding that the edge is false; a triple with a flagged side is neither a
+    collider nor a non-collider to any rule. On merged cohorts, every pair of variables measured
+    only in different cohorts is therefore undecided. A continuous column constant on a test's rows
+    raises ``ValueError``. ``env`` must be complete, and ``dependence_threshold``, whose kernel
+    measures read every row, raises ``ValueError`` on data with missing values. With missing values,
+    the skeleton search runs in one process. Test-wise deletion is valid when values are missing
+    completely at random, which means that whether a value is missing depends on no value in the
+    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
     selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs whose means
@@ -2128,13 +2131,13 @@ def fci_jci(
     collider nor a non-collider to any rule; a test whose ``env`` is constant on its rows, which
     come from one environment, is not tested. A drawn edge that a conditioning set not tested might
     have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
-    not check, not a finding that the edge is false. On merged cohorts, every pair of variables
-    measured only in different cohorts is therefore undecided. A continuous column constant on a
-    test's rows raises ``ValueError``. With missing values, the skeleton search runs in one process.
-    Test-wise deletion is valid when values are missing completely at random, which means that
-    whether a value is missing depends on no value in the data; the rows a test reads are then a
-    random sample of all rows, and otherwise they are a selected sample that more rows do not
-    correct.
+    not check, not a finding that the edge is false; a triple with a flagged side is neither a
+    collider nor a non-collider to any rule. On merged cohorts, every pair of variables measured
+    only in different cohorts is therefore undecided. A continuous column constant on a test's rows
+    raises ``ValueError``. With missing values, the skeleton search runs in one process. Test-wise
+    deletion is valid when values are missing completely at random, which means that whether a value
+    is missing depends on no value in the data; the rows a test reads are then a random sample of
+    all rows, and otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on its authors' simulation [1]_, linear-Gaussian data with hidden
     common causes and one context variable that changes one variable: 4, 10, and 100 variables with

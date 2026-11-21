@@ -144,6 +144,11 @@ or when an end of it is an end of an undecided link, whose other node no test co
 Markov-blanket search flags every edge of its target when it leaves an undecided candidate out.
 The flag says what the data could not check, not that the edge is false: in the smallest merged
 cohorts, every drawn edge is flagged, since another cohort's variable could have separated it.
+A flagged edge may be absent, and the triple with it, so no rule reads a triple with a flagged side
+as a collider or a non-collider: PC, FCI, CD-NOD, FCI-JCI, the Markov-blanket searches' CPDAG, and
+PCMCI+ orient nothing from it, as for a triple whose ends are undecided. Where most edges are
+flagged, as in merged cohorts without rows that observe every column, the graph therefore holds few
+or no arrowheads.
 
 `metadata["not_tested"]` counts the conditioning sets not tested, including those the search
 skipped because no row can test them; it measures the search more than the data, so the notice for

@@ -26,13 +26,15 @@ names its pull request.
   with an undecided side, is neither a collider nor a non-collider. In PC, FCI, CD-NOD, FCI-JCI,
   the Markov-blanket searches, PCMCI, PCMCI+, and LPCMCI, `metadata["possibly_separable"]` lists
   the drawn edges that a conditioning set not tested might have separated, which the notice names
-  too, every edge of its target when a Markov-blanket search leaves an undecided candidate out;
+  too, every edge of its target when a Markov-blanket search leaves an undecided candidate out; in
+  PC, FCI, CD-NOD, FCI-JCI, the Markov-blanket searches' CPDAG, and PCMCI+, a triple with such a
+  side is neither a collider nor a non-collider either, in FCI's discriminating-path rule too;
   `bootstrap` lists the pairs of all three kinds over its fits in its metadata. MVPC's correction
   removes only the edges its own tests separate. PCMCI, PCMCI+, and
   J-PCMCI+ condition no test on a lagged parent without a tested result, and LPCMCI none on a node
   whose link to either end of the tested pair is undecided; PCMCI and PCMCI+ condition each test
   only on the candidates, strongest first, that keep its rows enough for the test, so its rows do
-  not mix cohorts never observed together. ([#1151], [#1156], [#1167])
+  not mix cohorts never observed together. ([#1151], [#1156], [#1167], [#1171])
 
 - `metadata["p_one_tests"]` counts every test of a fit on data with missing values that returned
   `p = 1`, whichever test it is, as a test whose statistic is exactly zero answers. ([#1102])
@@ -2924,6 +2926,7 @@ First alpha release.
 [#1151]: https://github.com/Abel-ai-lab/Andrey/pull/1151
 [#1156]: https://github.com/Abel-ai-lab/Andrey/pull/1156
 [#1167]: https://github.com/Abel-ai-lab/Andrey/pull/1167
+[#1171]: https://github.com/Abel-ai-lab/Andrey/pull/1171
 [#1129]: https://github.com/Abel-ai-lab/Andrey/pull/1129
 [#1094]: https://github.com/Abel-ai-lab/Andrey/pull/1094
 [#1095]: https://github.com/Abel-ai-lab/Andrey/pull/1095
