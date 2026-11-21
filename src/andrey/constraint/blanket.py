@@ -177,9 +177,7 @@ def markov_blanket(
     ``KEY_DP`` significant digits; then add, in rank order, each candidate whose test given the
     blanket was not tested and that no earlier test separated, since a test without rows separates
     no pair; a candidate with no test that had rows, as one never observed with ``target``, is
-    undecided and left out, and unless ``max_depth`` is 0, each member returned counts one
-    conditioning set not tested, the one holding it, which no test asked and which might separate
-    the member from ``target``.
+    undecided and left out (:func:`_count_beside_undecided`).
     Shrink: visit the members in the order they joined and drop each one
     the test finds independent of ``target`` (a p-value above ``alpha``) given the other current
     members. IAMB
@@ -249,10 +247,23 @@ def markov_blanket(
     if constraints is not None:
         support = constraints.support()[target]
         blanket = [x for x in blanket if support[x]]
-    if undecided and max_depth != 0 and isinstance(test, TestwiseDeletion):
-        for x in blanket:
-            test.count_not_tested(target, x, 1)
+    if undecided:
+        _count_beside_undecided(test, target, blanket, required, max_depth)
     return blanket
+
+
+def _count_beside_undecided(
+    test: CITest, target: int, members: list[int], required: Sequence[int], max_depth: int | None
+) -> None:
+    """Count, for each of ``members`` outside ``required``, one conditioning set of it and
+    ``target`` as not tested when a search leaves an undecided candidate out: the set holding that
+    candidate, which no test asked and which might separate the member from ``target``. A required
+    member is never tested, and with ``max_depth`` 0 no set is asked, so neither counts one."""
+    if max_depth == 0 or not isinstance(test, TestwiseDeletion):
+        return
+    for x in members:
+        if x not in required:
+            test.count_not_tested(target, x, 1)
 
 
 def _shrink(
@@ -422,9 +433,10 @@ def parents_children(
     adding members only weakens an association. A set that was not tested is left out of a
     candidate's association, and a candidate whose test with ``target`` alone was not tested, as
     one never observed with it, has no test with rows, since no test given more can run on more
-    rows: it is undecided and left out. Each addition tests every remaining candidate
-    against the conditioning sets that hold the new member, by increasing size, and stops testing
-    a candidate after the first size at which a set separates it. Backward: visit the members in the
+    rows: it is undecided and left out (:func:`_count_beside_undecided`). Each addition tests every
+    remaining candidate against the conditioning sets that hold the new member, by increasing size,
+    and stops testing a candidate after the first size at which a set separates it. Backward: visit
+    the members in the
     order they joined and drop each one some subset of the other current members separates; the
     subsets of the members that joined before it were tested in the forward phase. With
     ``max_depth``, both phases test only the conditioning sets of at most ``max_depth`` variables;
@@ -451,6 +463,7 @@ def parents_children(
         x for x in range(d) if x != target and x not in required and (allowed is None or allowed[x])
     ]
     weakest = dict(zip(others, _weakest(test, target, others, [()]), strict=True))
+    undecided = any(not_tested(p) for p, _ in weakest.values())
     if sepsets is not None:
         sepsets.update({x: () for x, (p, _) in weakest.items() if p > alpha})
     members: list[int] = []
@@ -503,6 +516,8 @@ def parents_children(
                 if sepsets is not None:
                     sepsets[x] = found
                 break
+    if undecided:
+        _count_beside_undecided(test, target, members, required, max_depth)
     return members
 
 

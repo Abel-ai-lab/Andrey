@@ -409,14 +409,14 @@ def _separating_subsets(
 
     A subset separates ``X^i_{t-lag}`` and ``X^j_t`` when its test, with the phase-2 conditions
     added, gives a p-value above ``pc_alpha``. ``max_p_global`` caps the subsets' size, and a
-    subset draws only from ``middles`` when it is given.
+    subset draws only from ``middles`` when it is given. A subset holding a neighbor that no test of
+    the pair can condition on alone (:func:`_testable`) is not tested, without being asked, and
+    counts as not tested.
     """
-    families = [
-        _testable(test, n_vars, i, lag, j, family)
-        for family in [_neighbors(adjacency, j)] + ([_neighbors(adjacency, i)] if lag == 0 else [])
-    ]
+    families = [_neighbors(adjacency, j)] + ([_neighbors(adjacency, i)] if lag == 0 else [])
     if middles is not None:
         families = [[k for k in family if k in middles] for family in families]
+    testable = set(_testable(test, n_vars, i, lag, j, {k for f in families for k in f}))
     largest = max(len(family) for family in families)
     separating = []
     skipped = []
@@ -428,10 +428,15 @@ def _separating_subsets(
                 for subset in combinations(family, size)
             )
         )
-        if subsets:
-            _, p_values = _test_subsets(test, n_vars, parents, i, lag, j, subsets)
-            separating += [frozenset(subsets[k]) for k in np.flatnonzero(p_values > pc_alpha)]
-            skipped += [frozenset(subsets[k]) for k in np.flatnonzero(np.isnan(p_values))]
+        asked = [subset for subset in subsets if testable.issuperset(subset)]
+        left = [frozenset(subset) for subset in subsets if not testable.issuperset(subset)]
+        if left:
+            count_not_tested(test, lag * n_vars + i, j, len(left))
+            skipped += left
+        if asked:
+            _, p_values = _test_subsets(test, n_vars, parents, i, lag, j, asked)
+            separating += [frozenset(asked[k]) for k in np.flatnonzero(p_values > pc_alpha)]
+            skipped += [frozenset(asked[k]) for k in np.flatnonzero(np.isnan(p_values))]
     return separating, skipped
 
 

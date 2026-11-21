@@ -325,7 +325,7 @@ def test_fci_asks_no_possible_dsep_set_no_row_can_test_and_keeps_its_answer(monk
     assert pruned.metadata == asked.metadata
 
 
-@pytest.mark.parametrize("method", ["iamb", "inter_iamb"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "mmpc"])
 def test_a_blanket_beside_an_undecided_candidate_is_flagged(method):
     # Y is never observed with X, and could separate X and Z.
     outs = getattr(andrey, method)(_hand("fork"), target=["X", "Y", "Z"])
@@ -336,6 +336,14 @@ def test_a_blanket_beside_an_undecided_candidate_is_flagged(method):
     assert _pairs(outs[2], "possibly_separable") == {("X", "Z"), ("Y", "Z")}
     # At depth 0 no conditioning set is asked, so none is missed.
     assert "possibly_separable" not in getattr(andrey, method)(_hand("fork"), max_depth=0).metadata
+
+
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "mmpc"])
+def test_a_required_member_beside_an_undecided_candidate_stays_decided(method):
+    knowledge = andrey.Knowledge(required=[("Z", "X")])
+    out = getattr(andrey, method)(_hand("fork"), target="X", knowledge=knowledge)
+    assert _skeleton(out) == {("X", "Z")}
+    assert _pairs(out, "undecided_pairs") == {("X", "Y")}
 
 
 def test_bootstrap_keeps_the_undecided_pairs_and_flags_of_its_fits():
