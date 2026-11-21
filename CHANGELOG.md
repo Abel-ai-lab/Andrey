@@ -106,10 +106,11 @@ names its pull request.
   pooled over the wGCM paper's null designs, `"gcm"` and `"wgcm"` reject a true independence at 0.05
   in about 6 to 7.6% of draws, and from 4 to 13% by design over those and further null designs; the
   authors' code also rejects more often than 0.05 there. On the PCM paper's Section 6.1 designs at
-  250 and 500 rows, `"pcm"` rejects a true independence in 0.2 to 0.4% of draws, and its power is at
-  or above the authors' code's on the same data; on the Section 6.2 null, whose conditional means
-  hold an interaction, it rejects 97.6% at 500 rows, as the authors' code does (95.6%), and its
-  random forests reject 97 to 99.9% of the Section 6.1 null. Each fit and each sample split reads
+  250 and 500 rows, in the paper's direction (y the response), `"pcm"` rejects a true independence
+  in 0.2 to 0.4% of draws, and its power is at or above the authors' code's on the same data; on the
+  Section 6.2 null, whose conditional means hold an interaction, it rejects 97.6% at 500 rows, as
+  the authors' code does (95.6%), and its random forests reject 97 to 99.9% of the Section 6.1 null.
+  Each fit and each sample split reads
   only the query's columns, standardized, rounded, and signed, with the rows in an order of their
   values, so a p-value depends on neither the row nor the column order, nor on columns outside the
   query, and changes with a column's units or sign only where the rounding moves a value or a column
