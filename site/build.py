@@ -2767,6 +2767,7 @@ RESEARCH_CODE = {
     "SCORE authors' code",
     "NOTEARS authors' code",
     "authors' R RESIT",
+    "CPCM authors' R code",
 }
 # Families whose graphs beat the empty graph by link F1 (cross-variable links in the window graph,
 # or adjacencies for LPCMCI), not by errors: a lag window can hold far more errors than the empty
