@@ -642,9 +642,10 @@ def cpcm_graph(
 
     **Limitations.** On the paper's graphs of 4, 5, 6, and 8 variables and 1,000 rows, CPCM's graph
     had as many errors (SHD and SID) as the code published with the paper and fewer than the empty
-    graph, and no other method measured beside it was both more accurate and faster; the `0.19.0
-    release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm-graph-search>`_ has the
-    numbers. Graphs of 10 variables, which the paper also claims, were not measured. On the measured
+    graph, and no other method measured beside it was both more accurate and faster by the paired
+    interval; the `0.19.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm-graph-search>`_ has the numbers.
+    Graphs of 10 variables, which the paper also claims, were not measured. On the measured
     graphs :func:`~andrey.pc` with ``indep_test="kci"`` was close in accuracy, and faster at 4, 6,
     and 8 variables. The exact search scores every DAG and runs up to 4 variables; above, the greedy
     search refits a variable for each parent set it tries. Each test builds matrices with one row

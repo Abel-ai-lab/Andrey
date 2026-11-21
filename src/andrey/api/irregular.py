@@ -816,10 +816,12 @@ def cpcm(
     direction on 0% to 58% of them in both implementations, so pass ``"gaussian"`` there. On fresh
     multiplicative pairs, :func:`~andrey.loci` was right more often, 98% against 84%, and faster.
     Under ``"pareto"``, when the cause's largest value is thousands of times its median, the test
-    of one direction can reject where the authors' code does not: on the paper's model (16) at
-    ``gamma = 0`` the conservative estimate found both directions plausible on 73% to 78% of pairs
-    against the reference's 82% to 85%, and at 2,000 rows the forced direction was wrong on 8 of
-    200 pairs against 1. Each HSIC test builds matrices with one row and one column per sample, so
+    of one direction can reject where the authors' code does not. On the paper's model (16) at
+    ``gamma = 0`` the conservative estimate found both directions plausible, the paper's claim
+    there, on 73% and 78% of the pairs of two seed sets against the reference's 82% and 85%, fewer
+    on both; counted as no orientation (empty, both, or neither), the measure of the card's verdict,
+    the gap repeats on one seed set only. At 2,000 rows the forced direction was wrong on 8 of 200
+    pairs against 1. Each HSIC test builds matrices with one row and one column per sample, so
     time and memory grow with the square of ``n_samples``. Under the count families the rank-10
     spline must follow the mean to within the counts' own noise, about ``1 / sqrt(mean)`` of it,
     which it does for means up to a few hundred: from means of a few thousand that vary strongly

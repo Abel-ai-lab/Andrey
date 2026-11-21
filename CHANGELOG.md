@@ -10,6 +10,11 @@ names its pull request.
 
 ## [Unreleased]
 
+### Breaking
+
+- `cpcm` and `cpcm_graph` raise `ValueError` on a 0 under `"exponential"` and on a 1 under
+  `"pareto"`, since the deviance is infinite at the edge of the support. ([#1165])
+
 ### Added
 
 - A test-wise test with fewer rows than it needs, a pair never observed together included, or with
@@ -107,10 +112,10 @@ names its pull request.
 - `cpcm` and `cpcm_graph` are supported. On the pairs of their paper (its Tables 1 and 2 and model
   (16)) and its graphs of 4 to 8 variables, they made as many errors as the code published with the
   paper and fewer than a coin flip, the majority direction, or the empty graph, and on the first
-  seeds no other method measured beside them was both more accurate and faster; the graph search ran
-  about ten times faster. Their Limitations state the gaps: the support rule's family on
-  location-scale pairs, and under `"pareto"` a test that can reject on causes with extreme values.
-  The [0.19.0 release card][card-0190-cpcm] has the numbers. ([#1169])
+  seeds no other method measured beside them was both more accurate and faster by the paired
+  interval; the graph search ran about ten times faster. Their Limitations state the gaps: the
+  support rule's family on location-scale pairs, and under `"pareto"` a test that can reject on
+  causes with extreme values. The [0.19.0 release card][card-0190-cpcm] has the numbers. ([#1169])
 - With `fisherz` and `student_t` on data with missing values, test-wise deletion groups the rows by
   their missingness patterns once and computes a test's sums from the groups' tables, removing the
   scattered missing cells exactly, when that costs less than summing every row; a query whose
@@ -193,8 +198,7 @@ names its pull request.
   by the unbiased risk estimate, the criteria of the authors' code; the two-parameter families keep
   the Laplace approximate marginal likelihood. On heavy-tailed Pareto pairs the marginal likelihood
   picked a stiffer spline, under which the test of the true direction rejected well above its
-  level. A value at the edge of the support has an infinite deviance, so `"exponential"` now
-  raises `ValueError` on a 0 and `"pareto"` on a 1. ([#1165])
+  level. ([#1165])
 
 ### Fixed
 

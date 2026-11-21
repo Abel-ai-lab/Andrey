@@ -32,7 +32,7 @@
   "blas_threads": 1
  },
  "verdict_rule": "per cell (setup, family arm, size): D = error(Andrey) - error(reference) per dataset, on the datasets both fitted (pairs: 1 for the reversed forced direction; graphs: SHD, and the authors' SID beside it, a graph worse on either being worse); worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise; 10,000 resamples, default_rng(0). Pairs: 100 per cell, graphs: 20. A row worse on its first seeds was rerun on fresh seeds, and holds that rerun as replication; every other pair row with fresh seeds holds them as fresh. Fresh graph rows have no reference arm: Andrey's errors and floors only. result is the published verdict, better or worse only where the fresh seeds agree, a tie otherwise. The floor field is Andrey's and the reference's error minus the empty answer's; the lane file also gives the floor of the better of the coin flip and the cell's majority direction (pairs) or the empty and the base-rate graph (graphs). Rows of Table 1's misspecified families, the other family arm on LS, LS-s and MN-U, and the edge penalty 1 are out of claim, reported",
- "seeds_note": "pairs: first seeds 0-99, fresh seeds 100-199; Table 2: the first seeds are the 100 pairs of each of the five Tagasovska et al. (2020) files the paper takes them from, the fresh seeds 100 pairs from their generator run unmodified under another seed, and POISg and PARg are drawn in the same style (the cause and a bandwidth-1 Gaussian-process parameter, shifted by 0.5) under the same two seeds; graphs: first seeds 0-19, fresh seeds 20-39",
+ "seeds_note": "pairs: first seeds 0-99, fresh seeds 100-199; Table 2: the first seeds are the 100 pairs of each of the five Tagasovska et al. (2020) files the paper takes them from, and the fresh seeds 100 pairs drawn by those files' generator, unmodified, under another seed. That generator at the published commit reproduces the MN-U file exactly and the AN file's causes and directions, but not the AN-s, LS and LS-s files, which match the fresh draws on summary statistics only (the cause's and the effect's spread, kurtosis). POISg and PARg have no published data and were drawn for this comparison: the cause sqrt(V) Z with V uniform on (1, 2) and Z standard normal, as in that generator, theta(x) = f(x) - min f + 0.5 with f a Gaussian-process draw with a Gaussian kernel of bandwidth 1, and the effect Poisson(theta) or Pareto of scale 1 and shape theta, the pair's order swapped on a coin; one seed for the first set and another for the fresh set; graphs: first seeds 0-19, fresh seeds 20-39",
  "fit_protocol": "each fit in a long-lived worker on one core with one BLAS thread, one timed fit, a cap of 1,800 s per fit (3,600 s for the reference at 8 variables); no fit timed out; the reference's errors are counted and never scored, and each cell is paired on the datasets both finished; times are wall seconds of the fit inside the worker",
  "regimes": {
   "cpcm_table1_exponential": "the CPCM paper's Table 1 pairs: X1 ~ N(2, 1) on x > 0, X2 given X1 exponential with rate theta(X1), 1,000 rows, fitted with the exponential family",
@@ -7415,7 +7415,7 @@
   }
  ],
  "conservative_estimate": {
-  "about": "model (16) at 500 rows, the conservative estimate at alpha 0.05 read from one forced fit's p-values: the share of pairs with X1 -> X2, X2 -> X1, no edge with the columns independent (empty), both directions plausible (both), and neither; the claimed outcome is X1 -> X2 for gamma > 0 and no orientation (empty, both, or neither) for gamma <= 0; parity pairs the misses of the claimed outcome, Andrey minus the reference, paired bootstrap 95% interval; Table 4 is the paper's row",
+  "about": "model (16) at 500 rows, the conservative estimate at alpha 0.05 read from one forced fit's p-values: the share of pairs with X1 -> X2, X2 -> X1, no edge with the columns independent (empty), both directions plausible (both), and neither; the claimed outcome is X1 -> X2 for gamma > 0 and no orientation (empty, both, or neither) for gamma <= 0, fixed before the results; parity pairs the misses of the claimed outcome, Andrey minus the reference, paired bootstrap 95% interval; at gamma 0, whose claim in the paper is both directions plausible, parity_both_only pairs the misses of that outcome alone, reported beside the verdict; Table 4 is the paper's row",
   "rows": [
    {
     "gamma": -2,
@@ -7591,6 +7591,15 @@
        0.13
       ],
       "verdict": "tie"
+     },
+     "parity_both_only": {
+      "paired": 100,
+      "misses_andrey_minus_reference": 0.09,
+      "bootstrap_95": [
+       0.04,
+       0.15
+      ],
+      "verdict": "worse"
      }
     },
     "fresh_seeds": {
@@ -7618,6 +7627,15 @@
       "bootstrap_95": [
        0.02,
        0.14
+      ],
+      "verdict": "worse"
+     },
+     "parity_both_only": {
+      "paired": 100,
+      "misses_andrey_minus_reference": 0.07,
+      "bootstrap_95": [
+       0.02,
+       0.13
       ],
       "verdict": "worse"
      }
@@ -11382,7 +11400,7 @@
   ]
  },
  "gaps": {
-  "pareto_basis": "On model (16), Andrey's p-value of one direction falls far below the reference's on some pairs (16 of 400 fits at gamma 0, 500 rows), 14 of them where the covariate's largest value is more than 844 times its median, the top tenth of the pairs, where it happens on 35% of fits against 0-2.5% elsewhere. At gamma 0 the conservative estimate misses the claimed outcome more often than the reference on both seed sets (+0.06 [-0.01, +0.13] first, +0.08 [+0.02, +0.14] fresh); at gamma 2 and 2,000 rows the forced direction is wrong on 8 of 200 pairs against 1. The located cause is the rank-10 thin plate spline basis on a covariate with extreme values; it is not yet traced to a difference from the authors' basis",
+  "pareto_basis": "On model (16), Andrey's p-value of one direction falls far below the reference's on some pairs (16 of 400 fits at gamma 0, 500 rows), 14 of them where the covariate's largest value is more than 844 times its median, the top tenth of the pairs, where it happens on 35% of fits against 0-2.5% elsewhere. At gamma 0 the conservative estimate misses the claimed outcome, which the verdict pools as no orientation (empty, both, or neither), more often than the reference on both seed sets (+0.06 [-0.01, +0.13] first, +0.08 [+0.02, +0.14] fresh), a tie by the rule; on both directions plausible alone, the paper's claim at gamma 0, Andrey is worse on both seed sets (parity_both_only: +0.09 [+0.04, +0.15] first, +0.07 [+0.02, +0.13] fresh). At gamma 2 and 2,000 rows the forced direction is wrong on 8 of 200 pairs against 1. The located cause is the rank-10 thin plate spline basis on a covariate with extreme values; it is not yet traced to a difference from the authors' basis",
   "mn_u_fresh": "On the fresh MN-U draws, loci named the true direction more often (0.98 against 0.84) and faster; on the shipped files it did not (0.98 against 0.96)",
   "support_rule_on_location_scale": "On LS, LS-s and MN-U the support rule picks the fixed-scale Gaussian family, an additive-noise model, in both implementations; there the forced direction is right on 0.58, 0.03 and 0.00 of the shipped pairs. The paper's sequential choice of the family is not implemented"
  },
