@@ -222,7 +222,7 @@ def test_early_stopping_keeps_ten_rounds_past_the_best():
     assert np.array_equal(cr._early_stopped(curve[:12]), curve[:12])
 
 
-def test_wgcm_est_weights_by_the_sign_of_the_fit(monkeypatch):
+def test_wgcm_est_weights_by_the_fit(monkeypatch):
     weights = []
     answer = cr._estimated_answer
 
@@ -232,7 +232,9 @@ def test_wgcm_est_weights_by_the_sign_of_the_fit(monkeypatch):
 
     monkeypatch.setattr(cr, "_estimated_answer", record)
     cr.WGCM(_sign_changing(), regression="linear")(0, 1, [2])
-    assert set(np.unique(weights[0])) == {-1.0, 1.0}
+    (weight,) = weights
+    assert np.unique(weight).size == weight.size  # the fitted values, not their signs
+    assert (weight < 0).any() and (weight > 0).any()
 
 
 def test_pcm_variance_adds_the_shift_to_the_positive_part():

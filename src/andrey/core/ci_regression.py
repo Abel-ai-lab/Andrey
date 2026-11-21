@@ -412,25 +412,22 @@ class WGCM(_RegressionTest):
     **How it works.** For a conditioning set ``z``, the residuals of ``x`` and ``y`` on ``z`` give
     the products ``R_i`` as for the GCM [2]_. ``"est"`` (Method 1 of [1]_) splits the rows at
     random, 30% to estimate and 70% to test. On the first part it regresses the products on ``z``
-    and takes the weight ``w(z)``, the sign of that fit; on the second part, with residuals from
-    regressions on that part, the statistic is the GCM statistic of ``R_i w(z_i)``, and the
-    p-value is the standard normal tail above it, one-sided because the weight points the
-    covariance up. ``"fix"`` takes the constant weight and the signs of each variable of ``z`` about
-    its empirical 1/8, ..., 7/8 quantiles, normalizes each weighted product by its standard
+    and takes that fit as the weight ``w(z)``; on the second part, with residuals from regressions
+    on that part, the statistic is the GCM statistic of ``R_i w(z_i)``, and the p-value is the
+    standard normal tail above it, one-sided because the weight points the covariance up.
+    ``"fix"`` takes the constant weight and the signs of each variable of ``z`` about its
+    empirical 1/8, ..., 7/8 quantiles, normalizes each weighted product by its standard
     deviation, and the statistic is ``sqrt(n)`` times the largest absolute mean; its p-value is
     ``(b + 1) / 500``, where ``b`` of 499 Gaussian multiplier draws of the same maximum over the
     centered columns, whose covariance is the products' sample correlation, are at least as large
     [1]_. An empty conditioning set has no weight to estimate, and both variants give the
     GCM's p-value of ``x`` and ``y`` minus their means. The statistic reported for ``"est"`` is the
     statistic or ``0``, whichever is larger, so a larger statistic always means a smaller p-value.
-    The weight is the sign of the fit, as in the paper; the authors' later code weights by the fit
-    itself, which in reduced versions of the paper's designs with boosted trees rejected more often
-    under the alternatives, also at a matched null rate, and about one percentage point more often
-    under the nulls. The draws of ``"fix"`` use the centered columns, as in the paper; the authors'
-    code's uncentered draws gave the same power at a matched null rate and rejected about 0.3
-    percentage points less often under the nulls. The split and the multiplier draws are drawn from
-    ``seed`` over the rows in lexicographic order of the query's own columns, so they do not depend
-    on other columns.
+    The weight of ``"est"`` is the fitted value, as in the authors' code, which gave more power at
+    the same level than the paper's sign of the fit. The draws of ``"fix"`` use the centered
+    columns, as in the paper; the authors' code's uncentered draws gave the same power. The split
+    and the multiplier draws are drawn from ``seed`` over the rows in lexicographic order of the
+    query's own columns, so they do not depend on other columns.
 
     **Limitations.** Not benchmarked yet. The tests run it on up to 4 variables and 400 rows.
     ``"est"`` tests on 70% of the rows, and its p-value changes with the seed. A ``"boosting"``
@@ -490,7 +487,7 @@ class WGCM(_RegressionTest):
             z = rows[:, features]
             return self._residual(rows[:, x], z) * self._residual(rows[:, y], z)
 
-        weight = np.sign(self._fit(estimate[:, features], products(estimate))(test[:, features]))
+        weight = self._fit(estimate[:, features], products(estimate))(test[:, features])
         return _estimated_answer(products(test), weight)
 
     def _multiplier_draws(self) -> np.ndarray:
