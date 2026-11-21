@@ -2,7 +2,8 @@
 
 A pair that no test with rows could decide, as a pair never observed together, is left out of the
 graph and listed in ``metadata["undecided_pairs"]``; no orientation reads it. A drawn edge that a
-conditioning set not tested might have separated is listed in ``metadata["possibly_separable"]``.
+conditioning set not tested might have separated is listed in ``metadata["possibly_separable"]``,
+and no rule reads a triple with such a side as a collider or a non-collider.
 The hand cases are three variables ``X``, ``Y`` and a third, with weights 0.8, root noise 1 and
 child noise 0.6, merged from cohorts that each observe some of them.
 """
@@ -17,7 +18,9 @@ import pytest
 
 import andrey
 from andrey.constraint.fci import _iter_dsep_choices, _left_out
-from andrey.core import ARROW, ci_missing
+from andrey.constraint.fci import fci as fci_core
+from andrey.constraint.pc import pc as pc_core
+from andrey.core import ARROW, NULL, ci_missing
 
 # case: (edges as (parent, child) over 0 = X, 1 = Y, 2 = third, cohort patterns, cohort shares)
 HAND = {
@@ -64,6 +67,30 @@ def _pairs(out, key: str) -> set[tuple[str, str]]:
     return {tuple(pair) for pair in out.metadata.get(key, [])}
 
 
+def _arrowheads(out) -> set[tuple[str, str]]:
+    """The ``(a, b)`` edges with an arrowhead at ``b``."""
+    heads = set()
+    for a, b, _ in out.structure.oriented_edges():
+        x, y = out.structure.endpoints(a, b)
+        heads |= {(a, b)} if y == ARROW else set()
+        heads |= {(b, a)} if x == ARROW else set()
+    return heads
+
+
+def _ambiguous(method: str, df: pd.DataFrame, **settings):
+    """The triples ``method``'s core search reads as neither a collider nor a non-collider, by name
+    with the ends in name order; the pairs it flags; its boolean adjacency; and the names."""
+    core = {"pc": pc_core, "fci": fci_core}[method]
+    sink: set[tuple[int, int, int]] = set()
+    with ci_missing.rows_tested() as rows:
+        graph = core(df.to_numpy(), _ambiguous=sink, **settings)
+    names = [str(c) for c in df.columns]
+    drawn = graph.to_numpy() != NULL
+    flagged = {tuple(sorted((names[a], names[b]))) for a, b in rows.possibly_separable(drawn)}
+    triples = {(min(names[a], names[c]), names[b], max(names[a], names[c])) for a, b, c in sink}
+    return triples, flagged, drawn, names
+
+
 FITS = {"pc": andrey.pc, "fci": andrey.fci}
 
 
@@ -105,16 +132,22 @@ def test_a_hand_case_gives_its_decided_graph_undecided_pairs_and_flags(
     assert _pairs(out, "undecided_pairs") == undecided
     assert _pairs(out, "possibly_separable") == flagged
     assert not _skeleton(out) & undecided
+    # No case has a triple with decided ends and unflagged sides, so no case has an arrowhead.
+    assert not _arrowheads(out)
 
 
 @pytest.mark.parametrize("method", list(FITS))
 def test_four_rows_observing_every_column_decide_the_pair_on_those_rows_alone(method):
-    """The bridging cost: the four rows test X and Y with no power, so they separate them and the
-    fork reads as a collider, while each edge stays flagged."""
-    out = FITS[method](_hand("fork", extra=4), max_depth=3)
+    """The bridging cost: the four rows test X and Y with no power, so they separate them; each edge
+    stays flagged, since no row tests it given the third column, so the fork is no collider."""
+    df = _hand("fork", extra=4)
+    out = FITS[method](df, max_depth=3)
     assert "undecided_pairs" not in out.metadata or not out.metadata["undecided_pairs"]
     assert _skeleton(out) == {("X", "Z"), ("Y", "Z")}
     assert _pairs(out, "possibly_separable") == {("X", "Z"), ("Y", "Z")}
+    assert not _arrowheads(out)
+    triples, *_ = _ambiguous(method, df, max_depth=3)
+    assert triples == {("X", "Z", "Y")}
 
 
 def _undecided_end() -> pd.DataFrame:
@@ -135,11 +168,32 @@ def test_no_rule_reads_an_undecided_pair_as_apart(method):
     out = FITS[method](_undecided_end())
     assert _pairs(out, "undecided_pairs") == {("A", "Z"), ("B", "Z")}
     assert _skeleton(out) == {("A", "X"), ("B", "X"), ("X", "Z")}
-    # The decided collider A -> X <- B stands; A - X - Z is no unshielded triple to Meek's or FCI's
+    # Z, never observed with A or B, could have separated A - X and B - X, so A - X - B, whose ends
+    # a test decided apart, is no collider; A - X - Z is no unshielded triple to Meek's or FCI's
     # first rule, which would otherwise orient X -> Z.
-    assert out.structure.endpoints("A", "X")[1] == ARROW
-    assert out.structure.endpoints("B", "X")[1] == ARROW
-    assert ARROW not in out.structure.endpoints("X", "Z")
+    assert _pairs(out, "possibly_separable") == {("A", "X"), ("B", "X"), ("X", "Z")}
+    triples, *_ = _ambiguous(method, _undecided_end())
+    assert ("A", "X", "B") in triples
+    assert not _arrowheads(out)
+
+
+@pytest.mark.parametrize("method", list(FITS))
+@pytest.mark.parametrize("seed", [0, 1])
+def test_no_rule_reads_a_triple_with_a_flagged_side(method, seed):
+    """On merged cohorts, every unshielded triple with a flagged side is ambiguous, whether its
+    ends are decided apart or undecided."""
+    df = _merged_cohorts(seed)
+    triples, flagged, drawn, names = _ambiguous(method, df, max_depth=2)
+    expected = set()
+    for b in range(len(names)):
+        around = np.flatnonzero(drawn[b]).tolist()
+        for a in around:
+            for c in around:
+                ends = (min(names[a], names[c]), max(names[a], names[c]))
+                sides = {tuple(sorted((names[a], names[b]))), tuple(sorted((names[c], names[b])))}
+                if a != c and not drawn[a, c] and sides & flagged:
+                    expected.add((ends[0], names[b], ends[1]))
+    assert expected and expected <= triples
 
 
 def _cohort_series(seed: int = 0, steps: int = 3000) -> pd.DataFrame:
@@ -412,3 +466,35 @@ def test_undecided_pairs_and_flags_do_not_depend_on_the_column_order(method):
     assert _skeleton(moved) == _skeleton(out)
     for key in ("undecided_pairs", "possibly_separable"):
         assert moved.metadata.get(key) == out.metadata.get(key), key
+
+
+def _collider_beside_cohorts(n: int = 4000) -> pd.DataFrame:
+    """``A -> C <- B``, observed in every row, with ``C -> D`` and ``C -> E``: one cohort observes
+    ``D``, the other ``E``, so ``D`` and ``E`` are never observed together."""
+    rng = np.random.default_rng(3)
+    a, b = rng.normal(size=(2, n))
+    c = 0.8 * a + 0.8 * b + 0.6 * rng.normal(size=n)
+    d = 0.8 * c + 0.6 * rng.normal(size=n)
+    e = 0.8 * c + 0.6 * rng.normal(size=n)
+    df = pd.DataFrame({"A": a, "B": b, "C": c, "D": d, "E": e})
+    df.loc[: n // 2 - 1, "E"] = np.nan
+    df.loc[n // 2 :, "D"] = np.nan
+    return df
+
+
+@pytest.mark.parametrize("method", list(FITS))
+def test_a_flagged_side_orients_nothing_and_a_decided_collider_stands(method):
+    df = _collider_beside_cohorts()
+    out = FITS[method](df, max_depth=1)
+    assert _skeleton(out) == {("A", "C"), ("B", "C"), ("C", "D"), ("C", "E")}
+    assert _pairs(out, "undecided_pairs") == {("D", "E")}
+    # E could have separated C and D, and D could have separated C and E.
+    assert _pairs(out, "possibly_separable") == {("C", "D"), ("C", "E")}
+    # A - C - B has decided ends and unflagged sides; A - C - D and the others with a flagged side
+    # read neither way, so no rule orients C - D or C - E.
+    assert _arrowheads(out) == {("A", "C"), ("B", "C")}
+    moved = FITS[method](df[["E", "D", "C", "B", "A"]], max_depth=1)
+    assert _skeleton(moved) == _skeleton(out)
+    assert _arrowheads(moved) == _arrowheads(out)
+    for key in ("undecided_pairs", "possibly_separable", "not_tested"):
+        assert moved.metadata[key] == out.metadata[key], key

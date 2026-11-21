@@ -23,6 +23,7 @@ from andrey.constraint._skeleton import (
     canonical_capable,
     check_collider_rule,
     first_separating_subset,
+    flagged_triples,
     unseparated_triples,
     vote_triples,
 )
@@ -35,7 +36,7 @@ from andrey.constraint.pc import (
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
 from andrey.core._bitset import row_masks, semidirected_reach_set
 from andrey.core.ci import CITest, make_indep_test, pins_blas
-from andrey.core.ci_missing import TestwiseDeletion
+from andrey.core.ci_missing import TestwiseDeletion, running_flags
 from andrey.core.orient import separating_set
 from andrey.core.ties import tie_mask, tie_ranks
 
@@ -85,9 +86,12 @@ def fci(
     (:func:`~andrey.constraint.pc.adjacency_search`), and :func:`knowledge_marks` sets their
     endpoints before the orientation rules, which change circles only. A triple over a
     non-adjacent pair with no separating set is neither a collider nor a non-collider to any rule
-    (:func:`~andrey.constraint._skeleton.unseparated_triples`). An
-    arrowhead the knowledge puts at ``x`` on an edge ``x - y`` while its required edges lead from
-    ``x`` to ``y`` raises ``ValueError`` (:func:`possible_dsep_step`). ``workers`` worker processes
+    (:func:`~andrey.constraint._skeleton.unseparated_triples`), and so is a triple with a side a
+    conditioning set no row could test might have separated
+    (:func:`~andrey.constraint._skeleton.flagged_triples`), in the collider pass before the
+    possible-d-sep step (:func:`flagged_sides`), after it, and in R4. An arrowhead the knowledge
+    puts at ``x`` on an edge ``x - y`` while its required edges lead from ``x`` to ``y`` raises
+    ``ValueError`` (:func:`possible_dsep_step`). ``workers`` worker processes
     share the adjacency search's larger conditioning-size passes
     (:func:`~andrey.constraint.pc.adjacency_search`) and the larger possible-d-sep searches
     (:func:`possible_dsep_step`); ``None`` reads ``andrey.config.n_jobs``. ``seed`` fixes the draws
@@ -122,7 +126,7 @@ def fci(
     shielded, kept = shield_undecided(skeleton, undecided)
     marks = circle_pag(shielded)
     knowledge_marks(marks, constraints)
-    orient_colliders(marks, sepsets, undecided_sides(marks, kept))
+    orient_colliders(marks, sepsets, undecided_sides(marks, kept) | flagged_sides(marks))
     marks = possible_dsep_step(
         marks,
         X,
@@ -141,16 +145,26 @@ def fci(
     )
     if kept is not None:
         marks[kept] = NULL
-    ambiguous = unseparated_triples(marks != NULL, sepsets, constraints, undecided)
+    adjacency = marks != NULL
+    flagged = running_flags(adjacency)
+    ambiguous = unseparated_triples(adjacency, sepsets, constraints, undecided)
     if collider_rule != "sepsets":
         ambiguous |= vote_triples(
             marks, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
         )
+    ambiguous |= flagged_triples(adjacency, flagged)
     if _ambiguous is not None:
         _ambiguous.update(ambiguous)
     orient_colliders(marks, sepsets, ambiguous)
     fci_orient(
-        marks, test, alpha, sepsets, ambiguous, max_depth=max_depth, in_column_order=in_column_order
+        marks,
+        test,
+        alpha,
+        sepsets,
+        ambiguous,
+        max_depth=max_depth,
+        in_column_order=in_column_order,
+        flagged=flagged,
     )
 
     return GraphStructure.from_numpy(marks, kind="pag")
@@ -190,6 +204,13 @@ def undecided_sides(marks: np.ndarray, kept: np.ndarray | None) -> frozenset[tup
             if c != a:
                 triples.add(_triple(int(a), int(b), c))
     return frozenset(triples)
+
+
+def flagged_sides(marks: np.ndarray) -> frozenset[tuple[int, int, int]]:
+    """The unshielded triples of ``marks`` with a side the tests so far flag as possibly separable
+    (:func:`~andrey.constraint._skeleton.flagged_triples`): no collider is read from them."""
+    adjacency = marks != NULL
+    return flagged_triples(adjacency, running_flags(adjacency))
 
 
 def circle_pag(support: np.ndarray) -> np.ndarray:
@@ -929,6 +950,7 @@ def fci_orient(
     max_depth: int | None = None,
     in_column_order: bool = False,
     selection_bias: bool = True,
+    flagged: Collection[tuple[int, int]] = (),
 ) -> None:
     """Apply the FCI orientation rules R1-R10 to a fixed point, in place over ``marks``.
 
@@ -953,14 +975,28 @@ def fci_orient(
 
     ``selection_bias=False`` skips R5-R7, the rules for selection bias, leaving R1-R4 and R8-R10,
     Zhang's complete set for PAGs without selection bias.
+
+    The rules skip the ``ambiguous`` triples, keyed ``(a, b, c)`` with ``a < c``, and R4 decides no
+    triple ``a, b, c`` with a side in ``flagged``, pairs in either order: an edge a conditioning set
+    no row could test might have separated may be absent.
     """
+    flagged = frozenset((min(a, b), max(a, b)) for a, b in flagged)
     if not in_column_order:
         test = _memoized(test)  # R4 repeats its tests in every round
         while True:
             implied = _Implied()
             _rule_r1r2_cycle(marks, False, ambiguous, out=implied)
             _rule_r3(marks, sepsets, False, ambiguous, out=implied)
-            _rule_r4(marks, test, alpha, sepsets, False, max_depth=max_depth, out=implied)
+            _rule_r4(
+                marks,
+                test,
+                alpha,
+                sepsets,
+                False,
+                max_depth=max_depth,
+                out=implied,
+                flagged=flagged,
+            )
             if selection_bias:
                 _rule_r5(marks, False, ambiguous, out=implied)
                 _rule_r6(marks, False, out=implied)
@@ -976,7 +1012,7 @@ def fci_orient(
         change = _rule_r1r2_cycle(marks, change, ambiguous)
         change = _rule_r3(marks, sepsets, change, ambiguous)
         # R4 runs every sweep because a discriminating path can orient an otherwise unchanged graph.
-        change = _rule_r4(marks, test, alpha, sepsets, change, max_depth=max_depth)
+        change = _rule_r4(marks, test, alpha, sepsets, change, max_depth=max_depth, flagged=flagged)
         if selection_bias:
             change = _rule_r5(marks, change, ambiguous)
             change = _rule_r6(marks, change)
@@ -1100,8 +1136,10 @@ def _rule_r4(
     *,
     max_depth: int | None = None,
     out: _Implied | None = None,
+    flagged: frozenset[tuple[int, int]] = frozenset(),
 ) -> bool:
-    """R4: orient the endpoints closing a definite discriminating path into ``b``.
+    """R4: orient the endpoints closing a definite discriminating path into ``b``, unless a side
+    of ``a, b, c`` is in ``flagged``, keyed ``(x, y)`` with ``x < y``.
 
     Without ``out``, the first discriminating path found that decides (:func:`_ddp_orient`) sets
     the marks in ``marks``. With ``out``, every shortest discriminating path that decides records
@@ -1117,6 +1155,10 @@ def _rule_r4(
                 if not _is_parent_of(marks, a, c):
                     continue
                 if marks[c, b] != ARROW:
+                    continue
+                if flagged and (
+                    (min(a, b), max(a, b)) in flagged or (min(b, c), max(b, c)) in flagged
+                ):
                     continue
                 if out is None:
                     change = _ddp_orient(

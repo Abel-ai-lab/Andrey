@@ -860,6 +860,28 @@ def unseparated_triples(
     return frozenset(triples)
 
 
+def flagged_triples(
+    adjacency: np.ndarray, flagged: Collection[tuple[int, int]]
+) -> frozenset[tuple[int, int, int]]:
+    """The unshielded triples ``(a, b, c)``, ``a < c``, of the boolean ``adjacency`` with a side in
+    ``flagged``, pairs in either order.
+
+    A flagged side is an edge a conditioning set no row could test might have separated
+    (:func:`~andrey.core.ci_missing.running_flags`), so it may be absent and the triple with it:
+    whether ``b`` is a collider is unknown, and no rule reads the triple as a collider or a
+    non-collider. With no flagged pair, as on complete data, there are none.
+    """
+    if not flagged:
+        return frozenset()
+    triples = set()
+    for u, v in flagged:
+        for end, middle in ((u, v), (v, u)):
+            for c in np.flatnonzero(adjacency[middle]).tolist():
+                if c != end and not adjacency[end, c]:
+                    triples.add((min(end, c), middle, max(end, c)))
+    return frozenset(triples)
+
+
 def check_collider_rule(collider_rule: str) -> None:
     """Raise ``ValueError`` unless ``collider_rule`` is one of :data:`COLLIDER_RULES`."""
     if collider_rule not in COLLIDER_RULES:

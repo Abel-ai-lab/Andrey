@@ -58,7 +58,7 @@ import numpy as np
 from andrey.constraint._skeleton import check_collider_rule, collider_verdict
 from andrey.constraint.pc import check_knowledge_cycle
 from andrey.core import backend
-from andrey.core.ci_missing import NOT_TESTED
+from andrey.core.ci_missing import NOT_TESTED, running_counter
 from andrey.core.fdr import check_fdr_method, corrected_pvalues
 from andrey.core.knowledge import orient as orient_known
 from andrey.core.structure import ARROW, NULL, TAIL
@@ -69,6 +69,7 @@ from andrey.temporal.pcmci import (
     conditionable,
     count_not_tested,
     deletes_rows,
+    flagged_links,
     pc1,
     ranked_design_test,
 )
@@ -469,11 +470,14 @@ def colliders(
     max_p_global: int | None = None,
     middles: Sequence[int] | None = None,
     undecided: np.ndarray | None = None,
+    flagged: np.ndarray | None = None,
 ) -> tuple[np.ndarray, frozenset[Triple]]:
     """Phase 3: return the lag-0 marks with the colliders oriented, and the ambiguous triples.
 
     A triple over an ``undecided`` link, shaped as ``adjacency``, which phase 2 left out of it
-    (:func:`mark_undecided`), is ambiguous under every rule: the link may be there or not.
+    (:func:`mark_undecided`), is ambiguous under every rule: the link may be there or not. So is a
+    triple with a side ``flagged`` marks, shaped as ``adjacency``: a conditioning set not tested
+    might have separated that link (:func:`~andrey.temporal.pcmci.flagged_links`).
 
     With ``constraints``, the lag-0 links they decide are directed first, and no collider reverses
     one. With ``collider_rule="sepsets"``, a triple over a pair they keep apart has no separating
@@ -522,6 +526,8 @@ def colliders(
                         )
                     separating, skipped = cache[key]
                     verdict = collider_verdict(separating, k, collider_rule, skipped)
+                if flagged is not None and (flagged[lag, i, k] or flagged[0, k, j]):
+                    verdict = "ambiguous"  # the votes ask the same tests either way
                 if verdict == "collider":
                     requests.append((j, k))
                     if lag == 0:
@@ -714,6 +720,7 @@ def run_phases(
         p_values[1:] = corrected_pvalues(
             p_values[1:], fdr_method, None if constraints is None else constraints.forbidden[1:]
         )
+    required = None if constraints is None else constraints.required
     marks, ambiguous = colliders(
         test,
         n_vars,
@@ -725,6 +732,7 @@ def run_phases(
         constraints,
         max_p_global,
         undecided=undecided,
+        flagged=flagged_links(running_counter(), adjacency, undecided, required),
     )
     orient(marks, adjacency, ambiguous)
     return PCMCIPlusResult(

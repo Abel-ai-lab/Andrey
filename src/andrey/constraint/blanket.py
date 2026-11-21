@@ -46,10 +46,16 @@ from typing import Literal
 
 import numpy as np
 
-from andrey.constraint._skeleton import CHUNK, adjacent_pairs, kept_apart, scan_conditioning_sets
+from andrey.constraint._skeleton import (
+    CHUNK,
+    adjacent_pairs,
+    flagged_triples,
+    kept_apart,
+    scan_conditioning_sets,
+)
 from andrey.core import ARROW, NULL, TAIL, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
-from andrey.core.ci_missing import NOT_TESTED, TestwiseDeletion, not_tested
+from andrey.core.ci_missing import NOT_TESTED, TestwiseDeletion, not_tested, running_flags
 from andrey.core.knowledge import Constraints, orient
 from andrey.core.orient import meek
 from andrey.core.ties import (
@@ -739,12 +745,15 @@ def blanket_cpdag(
     cycle), the colliders are oriented by
     :func:`~andrey.constraint.pc.orient_colliders` in the order ``andrey.config.tie_break``
     selects, Meek's rules complete the result, with R4 under ``constraints``, and an edge two
-    colliders of equal rank dispute is left undirected.
+    colliders of equal rank dispute is left undirected. A triple with a side a conditioning set no
+    row could test might have separated is neither a collider nor a non-collider
+    (:func:`~andrey.constraint._skeleton.flagged_triples`).
     """
     # pc imports this module through andrey.search, so its import waits for the call.
     from andrey.constraint.pc import check_knowledge_cycle, orient_colliders, undirect_conflicts
 
     sepsets, strengths, ambiguous = blanket_colliders(test, skeleton, blankets, alpha, max_depth)
+    ambiguous |= flagged_triples(skeleton, running_flags(skeleton))
     marks = np.where(skeleton, TAIL, NULL).astype(np.int8)
     if constraints is not None:
         marks = orient(marks, constraints)

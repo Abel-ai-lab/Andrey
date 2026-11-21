@@ -19,6 +19,7 @@ from andrey.constraint._skeleton import (
     adjacent_pairs,
     check_collider_rule,
     first_order_removals,
+    flagged_triples,
     marginal_removals,
     prescreen_capable,
     scan_pairs,
@@ -30,7 +31,7 @@ from andrey.constraint._skeleton import (
 from andrey.constraint.mvpc import IndicatorTest, PermutationCorrection, candidate_edges
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
-from andrey.core.ci_missing import rows_tested_elsewhere, search_outcomes
+from andrey.core.ci_missing import rows_tested_elsewhere, running_flags, search_outcomes
 from andrey.core.knowledge import KnowledgeError, orient
 from andrey.core.orient import meek, separating_set, to_structure
 from andrey.core.seeding import resolve_seed
@@ -79,7 +80,9 @@ def pc(
     colliders, and Meek's rules run with R4, so the result is the maximally oriented PDAG (MPDAG)
     of the class under the knowledge (Meek 1995; Perkovic, Kalisch, and Maathuis 2017). A triple
     over a non-adjacent pair with no separating set is neither a collider nor a non-collider to any
-    rule (:func:`~andrey.constraint._skeleton.unseparated_triples`). Edges they decide that close a
+    rule (:func:`~andrey.constraint._skeleton.unseparated_triples`), and so is a triple with a side
+    a conditioning set no row could test might have separated
+    (:func:`~andrey.constraint._skeleton.flagged_triples`). Edges they decide that close a
     directed cycle raise ``ValueError`` (:func:`check_knowledge_cycle`). ``in_column_order`` fires
     Meek's rules one at a time in column order instead of in order-free rounds
     (:func:`~andrey.core.orient.meek`). ``workers`` worker processes share the skeleton search's
@@ -142,7 +145,8 @@ def pc(
             sink=_mvpc,
         )
     rule4 = constraints is not None
-    ambiguous = unseparated_triples(skeleton != NULL, sepsets, constraints, undecided)
+    adjacency = skeleton != NULL
+    ambiguous = unseparated_triples(adjacency, sepsets, constraints, undecided)
     if collider_rule != "sepsets":
         # Under missing="mvpc" too, the votes read the test-wise tests, as the authors' code does.
         test = make_indep_test(
@@ -151,6 +155,8 @@ def pc(
         ambiguous |= vote_triples(
             skeleton, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
         )
+    # The votes ask the same tests as on data where nothing is flagged; a flag then overrides.
+    ambiguous |= flagged_triples(adjacency, running_flags(adjacency))
     if _ambiguous is not None:
         _ambiguous.update(ambiguous)
     if _conflicts is not None:

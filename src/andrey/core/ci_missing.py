@@ -268,6 +268,22 @@ def rows_tested() -> Generator[RowCounts]:
         _ROWS.reset(token)
 
 
+def running_counter() -> RowCounts | None:
+    """The counter of the running :func:`rows_tested` block, or ``None`` outside one."""
+    return _ROWS.get()
+
+
+def running_flags(adjacency: np.ndarray) -> list[tuple[int, int]]:
+    """The pairs adjacent in the boolean ``adjacency`` that the tests counted so far in the running
+    :func:`rows_tested` block flag as possibly separable
+    (:meth:`RowCounts.possibly_separable`); none outside a block or when every query was tested,
+    as on complete data."""
+    counter = _ROWS.get()
+    if counter is None or not counter.not_tested:
+        return []
+    return counter.possibly_separable(adjacency)
+
+
 def count_answer(rows: int, p: float, x: int, y: int) -> None:
     """Count, in the running :func:`rows_tested` counter if any, a query of ``x`` and ``y``
     answered ``p`` on ``rows`` rows by a test that is no :class:`TestwiseDeletion`, as MVPC's

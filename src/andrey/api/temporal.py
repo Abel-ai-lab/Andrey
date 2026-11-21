@@ -2643,28 +2643,16 @@ def possibly_separable_links(
 ) -> dict:
     """Return ``{"possibly_separable": ...}``, the drawn links a set not tested might separate.
 
-    ``drawn[lag, i, j]`` marks the links drawn. A drawn link is flagged when a query of its ends,
-    the design columns ``lag * n + i`` and ``j``, was not tested in ``rows`` and another was
-    (:meth:`~andrey.core.ci_missing.RowCounts.possibly_separable`), or when an end shares its
-    variable with an end of a link ``undecided[lag, i, j]`` marks: no test conditions on a node an
-    undecided link joins, and a test of the link can shift that node next to its end. A link the
-    ``constraints`` require is never tested, so no set could separate it, and it is not flagged.
-    The links are listed as :func:`undecided_links` lists them; ``{}`` when none is flagged.
+    ``drawn[lag, i, j]`` marks the links drawn, and the flagged ones are those of
+    :func:`~andrey.temporal.pcmci.flagged_links`, with the links ``constraints`` require never
+    flagged. The links are listed as :func:`undecided_links` lists them; ``{}`` when none is
+    flagged.
     """
-    if not rows.total_not_tested():
-        return {}
-    n = drawn.shape[1]
-    pairs = _link_pairs(drawn)
-    square = np.zeros((n * drawn.shape[0],) * 2, dtype=bool)
-    for a, b in pairs:
-        square[a, b] = square[b, a] = True
-    flagged = set(rows.possibly_separable(square))
-    if undecided is not None and undecided.any():
-        _, sources, targets = np.nonzero(undecided)
-        joined = set(targets.tolist()) | set(sources.tolist())
-        kept = set() if constraints is None else _link_pairs(constraints.required)
-        flagged |= {(a, b) for a, b in pairs - kept if a % n in joined or b % n in joined}
-    return {"possibly_separable": _named_links(flagged, n, labels)} if flagged else {}
+    from andrey.temporal.pcmci import flagged_links
+
+    required = None if constraints is None else constraints.required
+    flagged = _link_pairs(flagged_links(rows, drawn, undecided, required))
+    return {"possibly_separable": _named_links(flagged, drawn.shape[1], labels)} if flagged else {}
 
 
 def _link_pairs(links: np.ndarray) -> set[tuple[int, int]]:

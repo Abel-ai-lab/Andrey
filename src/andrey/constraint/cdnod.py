@@ -48,7 +48,12 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._skeleton import check_collider_rule, unseparated_triples, vote_triples
+from andrey.constraint._skeleton import (
+    check_collider_rule,
+    flagged_triples,
+    unseparated_triples,
+    vote_triples,
+)
 from andrey.constraint.pc import (
     adjacency_search,
     check_collider_order,
@@ -60,7 +65,7 @@ from andrey.constraint.pc import (
 )
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import make_indep_test
-from andrey.core.ci_missing import mark_environment
+from andrey.core.ci_missing import mark_environment, running_flags
 from andrey.core.independence import _center_kernel, _gaussian_kernel
 from andrey.core.knowledge import orient
 from andrey.core.orient import _is_directed, _reaches_directed, meek, to_structure
@@ -167,7 +172,8 @@ def cdnod(
             record_pvalues=ranked,
             undecided=undecided,
         )
-        ambiguous = unseparated_triples(skeleton != NULL, sepsets, constraints, undecided)
+        adjacency = skeleton != NULL
+        ambiguous = unseparated_triples(adjacency, sepsets, constraints, undecided)
         if collider_rule != "sepsets":
             test = make_indep_test(
                 indep_test,
@@ -179,6 +185,7 @@ def cdnod(
             ambiguous |= vote_triples(
                 skeleton, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
             )
+        ambiguous |= flagged_triples(adjacency, running_flags(adjacency))
         pdag = _orient_with_context(
             skeleton,
             sepsets,
@@ -214,7 +221,8 @@ def cdnod(
             record_pvalues=ranked,
             undecided=undecided,
         )
-        ambiguous = unseparated_triples(skeleton != NULL, sepsets, padded, undecided)
+        adjacency = skeleton != NULL
+        ambiguous = unseparated_triples(adjacency, sepsets, padded, undecided)
         if _index_edges is not None:
             _index_edges.extend(np.flatnonzero(skeleton[d] != NULL).tolist())
         if collider_rule != "sepsets":
@@ -239,6 +247,7 @@ def cdnod(
                 max_depth=max_depth,
                 skip=ambiguous | through_context,
             )
+        ambiguous |= flagged_triples(adjacency, running_flags(adjacency))
         pdag = _orient_with_context(
             skeleton,
             sepsets,
