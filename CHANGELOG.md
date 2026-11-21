@@ -129,7 +129,8 @@ names its pull request.
   already did, and FCI's possible-d-sep step does so with every test, both with the same output;
   the skeleton's warning of a costly pass counts only the sets it builds. On synthetic merged
   cohorts of 40 and 50 columns, `pc` with `max_depth=None` finishes in about a second, and `fci`
-  in under a minute. ([#1167])
+  in 12 to 58 s at 40 columns, where it ran past 10 minutes before, and 4 to 6 minutes at 50.
+  ([#1167])
 - The Markov-blanket searches count a conditioning set that holds a column no row observes with the
   tested pair, or with a collider's middle variable, as not tested without building its query. On
   synthetic merged cohorts of 50 columns with 134 pairs never observed together, `iamb` finished in

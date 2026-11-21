@@ -328,10 +328,14 @@ def test_fci_asks_no_possible_dsep_set_no_row_can_test_and_keeps_its_answer(monk
 @pytest.mark.parametrize("method", ["iamb", "inter_iamb"])
 def test_a_blanket_beside_an_undecided_candidate_is_flagged(method):
     # Y is never observed with X, and could separate X and Z.
-    out = getattr(andrey, method)(_hand("fork"), target="X")
-    assert _skeleton(out) == {("X", "Z")}
-    assert _pairs(out, "undecided_pairs") == {("X", "Y")}
-    assert _pairs(out, "possibly_separable") == {("X", "Z")}
+    outs = getattr(andrey, method)(_hand("fork"), target=["X", "Y", "Z"])
+    for out, edge in zip(outs, [("X", "Z"), ("Y", "Z")]):
+        assert _skeleton(out) == {edge}
+        assert _pairs(out, "undecided_pairs") == {("X", "Y")}
+        assert _pairs(out, "possibly_separable") == {edge}
+    assert _pairs(outs[2], "possibly_separable") == {("X", "Z"), ("Y", "Z")}
+    # At depth 0 no conditioning set is asked, so none is missed.
+    assert "possibly_separable" not in getattr(andrey, method)(_hand("fork"), max_depth=0).metadata
 
 
 def test_bootstrap_keeps_the_undecided_pairs_and_flags_of_its_fits():

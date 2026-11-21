@@ -162,8 +162,8 @@ the statistical minimum: a test on a few rows has little power, so it can separa
 rest of the data show dependent and remove a true edge. Such rows decide more pairs and cost some
 edges between variables observed together. Only rows that observe both columns of a pair decide
 it: capping the conditioning sets with `max_depth` (`max_p_global` in LPCMCI and the same-step
-phases of PCMCI+) decides none. With `max_depth=0`, no edge is flagged because no conditioning set
-is asked, not because one was checked.
+phases of PCMCI+) decides none. With `max_depth=0`, PC, FCI, and the Markov-blanket searches flag
+no edge because they ask no conditioning set, not because one was checked.
 
 With `fisherz` and `student_t`, each test computes its correlations directly from its rows, for many
 tests at once. When the rows fall into a few missingness patterns, as in data merged from cohorts

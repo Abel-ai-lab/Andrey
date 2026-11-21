@@ -177,8 +177,9 @@ def markov_blanket(
     ``KEY_DP`` significant digits; then add, in rank order, each candidate whose test given the
     blanket was not tested and that no earlier test separated, since a test without rows separates
     no pair; a candidate with no test that had rows, as one never observed with ``target``, is
-    undecided and left out, and each member returned counts one conditioning set not tested, the
-    one holding it, which no test asked and which might separate the member from ``target``.
+    undecided and left out, and unless ``max_depth`` is 0, each member returned counts one
+    conditioning set not tested, the one holding it, which no test asked and which might separate
+    the member from ``target``.
     Shrink: visit the members in the order they joined and drop each one
     the test finds independent of ``target`` (a p-value above ``alpha``) given the other current
     members. IAMB
@@ -248,7 +249,7 @@ def markov_blanket(
     if constraints is not None:
         support = constraints.support()[target]
         blanket = [x for x in blanket if support[x]]
-    if undecided and isinstance(test, TestwiseDeletion):
+    if undecided and max_depth != 0 and isinstance(test, TestwiseDeletion):
         for x in blanket:
             test.count_not_tested(target, x, 1)
     return blanket
