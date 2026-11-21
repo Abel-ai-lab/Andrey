@@ -48,8 +48,10 @@ _BOOST_FOLDS = 10
 _BOOST_PATIENCE = 10
 # Boosted trees as the wGCM authors' current code: 10-fold cross-validation over the learning rates
 # 0.1, 0.2, 0.3, 0.5 and the depths 1 to 7, up to 500 rounds, the folds' mean error stopped 10
-# rounds after its best. Every grid point uses the same folds, where the authors' code draws new
-# folds for each.
+# rounds after its best. Three differences from that code: the trees' leaf values carry no
+# penalty, where the authors' boosting shrinks them; every grid point uses the same folds, where
+# the authors' code draws new folds for each; and the trees search every split point exactly,
+# where the authors' boosting grows them on histogram bins of each feature.
 _MEAN_CV_RATES = (0.1, 0.2, 0.3, 0.5)
 _MEAN_CV_DEPTHS = (1, 2, 3, 4, 5, 6, 7)
 _MEAN_CV_ROUNDS = 500
@@ -401,8 +403,10 @@ class GCM(_RegressionTest):
     of several variables of ``z`` jointly under ``"linear"``, leaves a covariance in the residuals
     and reads as dependence. At a few hundred rows, where the conditional means are hard to learn,
     the test rejects a true independence more often than its level, as the weighted GCM's paper
-    reports for it at 100 and 200 rows [2]_: with ``"boosting"``, on draws of the null designs of
-    [1]_ and [2]_ at 200 and 400 rows, it rejected about 6 to 6.6% of them at 0.05. With an empty
+    reports for it at 100 and 200 rows [2]_. With ``"boosting"``, pooled over draws of 12 null
+    designs at 200 and 400 rows (those of [1]_ and [2]_, and example 7 of [2]_ without its
+    dependence), it rejected about 6.3% at 0.05 (6.4% on the designs of [2]_), from 4 to 11% by
+    design, and about 9% on the one-dimensional null of [2]_ at 200 rows. With an empty
     conditioning set the test is a test of correlation: a dependence without one, such as
     ``y = x**2`` for a symmetric ``x``, goes unseen.
 
@@ -460,7 +464,9 @@ class WGCM(_RegressionTest):
         ``"boosting"`` is boosted regression trees whose learning rate (0.1, 0.2, 0.3, or 0.5),
         depth (1 to 7), and number of rounds (up to 500) minimize the 10-fold cross-validated error
         averaged over the folds, stopped 10 rounds after its best, the wGCM authors' current
-        default; the trees' leaf values carry no penalty, where the authors' boosting shrinks them.
+        default; the trees' leaf values carry no penalty, where the authors' boosting shrinks them,
+        and the trees search every split point exactly, where the authors' boosting grows them on
+        histogram bins of each feature.
         ``"forest"`` and ``"linear"`` are as for :class:`~andrey.core.ci_regression.GCM`.
     seed : int or None, default=None
         Seed for the sample split of ``"est"``, the multiplier draws of ``"fix"``, the
@@ -507,9 +513,11 @@ class WGCM(_RegressionTest):
     regressions per query, its split being the query's own. ``"fix"`` uses 7 weights per
     conditioning variable, so with many conditioning variables the maximum spreads its power thin.
     At a few hundred rows, where the conditional means are hard to learn, neither variant holds its
-    level: with ``"boosting"``, ``"est"`` rejected a true independence at 0.05 in about 6.8% of
-    draws on the paper's null designs at 200 and 400 rows [1]_, and 6.6% over those and further null
-    designs of [1]_ and [2]_; ``"fix"`` in about 6 to 6.4%.
+    level. With ``"boosting"``, pooled over draws of the paper's null designs at 200 and 400 rows
+    [1]_, ``"est"`` rejected a true independence at 0.05 in about 6.8% of draws and ``"fix"`` in
+    6.0%, up to 7.8% on one design for either; pooled over 12 null designs (those, further nulls
+    of [2]_, and example 7 of [1]_ without its dependence), 6.6% and 6.4%, from 4 to 13% by design
+    for ``"est"``, the most on the a = 4 null of [2]_, and from 4 to 8.6% for ``"fix"``.
 
     References
     ----------
