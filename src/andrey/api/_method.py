@@ -767,9 +767,9 @@ def _not_tested_notice(metadata: dict) -> str:
     can change.
     """
 
-    def counted(pairs: list[list], of: str = "") -> str:
+    def counted(pairs: list[list], of: str = "", noun: str = "pair") -> str:
         n = len(pairs)
-        text = f"{n:,} {'pair' if n == 1 else 'pairs'}{of}"
+        text = f"{n:,} {noun if n == 1 else noun + 's'}{of}"
         if n <= _NOTICE_PAIRS:
             text += " (" + ", ".join(f"{a} and {b}" for a, b in pairs) + ")"
         return text
@@ -792,7 +792,7 @@ def _not_tested_notice(metadata: dict) -> str:
     if possibly := metadata.get("possibly_separable"):
         verb = "is" if len(possibly) == 1 else "are"
         text += (
-            f" {POSSIBLY_SEPARABLE_CLAIM} {counted(possibly, ' of drawn edges')} {verb} flagged."
+            f" {POSSIBLY_SEPARABLE_CLAIM} {counted(possibly, noun='drawn edge')} {verb} flagged."
         )
     return text
 

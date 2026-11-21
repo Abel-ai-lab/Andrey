@@ -128,10 +128,10 @@ class LPCMCIResult:
     separating sets of a removed link (``i < j`` at lag 0) as ``(variable, lag)`` nodes relative
     to ``X^j_t``. ``parents[j]`` holds the ``(i, lag)`` nodes the last preliminary iteration found
     to be parents of ``X^j_t``, kept as directed links for the final phase. ``undecided`` holds
-    the links ``(i, j, lag)`` left in the graph with a test without the rows it needs
-    (:data:`~andrey.core.ci_missing.NOT_TESTED`) and no test with rows; they read ``NaN`` in
-    ``statistics`` and ``p_values``, and no test conditions on an end of such a link given the
-    other end.
+    the links ``(i, j, lag)`` with a test without the rows it needs
+    (:data:`~andrey.core.ci_missing.NOT_TESTED`) and no test with rows; the marks leave them out,
+    they read ``NaN`` in ``statistics`` and ``p_values``, and no test conditions on an end of such
+    a link given the other end.
     """
 
     start_marks: np.ndarray

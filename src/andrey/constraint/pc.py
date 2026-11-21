@@ -20,10 +20,10 @@ from andrey.constraint._skeleton import (
     check_collider_rule,
     first_order_removals,
     marginal_removals,
-    pair_queries,
     prescreen_capable,
     scan_pairs,
     separate_apart,
+    testable_queries,
     unseparated_triples,
     vote_triples,
 )
@@ -588,7 +588,7 @@ def adjacency_search(
                 pairs = adjacent_pairs(testable)
                 # Each pair's test count, taken once: the warning and the pool's cutoff read it.
                 weights = (
-                    [pair_queries(neighbors, x, y, size) for x, y in pairs]
+                    [testable_queries(test, neighbors, x, y, size) for x, y in pairs]
                     if pool is not None or (warn_expensive and size >= 2)
                     else []
                 )

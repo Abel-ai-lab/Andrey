@@ -634,6 +634,20 @@ def _evaluated(
         yield [item], _canonical_chunk(pvalues, size, *item[1:])
 
 
+def testable_queries(test: CITest, neighbors: list[np.ndarray], x: int, y: int, size: int) -> int:
+    """:func:`pair_queries` less the sets a test that deletes rows per test leaves out because a
+    member keeps no rows with the pair (:func:`kept_apart`): the queries the scan builds."""
+    if not isinstance(test, TestwiseDeletion):
+        return pair_queries(neighbors, x, y, size)
+    together = test.together()
+    if not together[x, y]:
+        return 0
+    met = together[x] & together[y]
+    from_x = {c for c in neighbors[x].tolist() if c != y and met[c]}
+    from_y = {c for c in neighbors[y].tolist() if c != x and met[c]}
+    return comb(len(from_x), size) + comb(len(from_y), size) - comb(len(from_x & from_y), size)
+
+
 def pair_queries(neighbors: list[np.ndarray], x: int, y: int, size: int) -> int:
     """The tests :func:`scan_pairs` runs on the adjacent pair ``(x, y)`` at conditioning ``size``.
 

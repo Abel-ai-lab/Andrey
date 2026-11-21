@@ -192,6 +192,30 @@ def test_pcmci_and_pcmciplus_leave_undecided_links_out_alike():
     assert lagged["pcmci"] == lagged["pcmciplus"]
 
 
+def test_lpcmci_draws_no_undecided_link():
+    out = andrey.lpcmci(_cohort_series(), tau_max=1, indep_test="fisherz")
+    undecided = [tuple(pair) for pair in out.metadata["undecided_pairs"]]
+    assert undecided
+    labels = list(out.structure.labels)
+    for a, b in undecided:
+        (x, lag_x), (y, lag_y) = (
+            (name.split()[0], int(name.split()[-1]) if "lag" in name else 0) for name in (a, b)
+        )
+        marks = out.structure.lag(abs(lag_x - lag_y)).to_numpy()
+        i, j = labels.index(x), labels.index(y)
+        assert marks[i, j] == 0 and marks[j, i] == 0, (a, b)
+
+
+def test_the_notice_names_the_possibly_separable_edges(caplog):
+    df = _undecided_end()
+    with caplog.at_level(logging.WARNING, logger="andrey"):
+        logging.disable(logging.NOTSET)
+        andrey.pc(df)
+    (notice,) = [r.getMessage() for r in caplog.records if r.name == "andrey.api._method"]
+    assert 'metadata["possibly_separable"]' in notice
+    assert "3 drawn edges (A and X, B and X, X and Z) are flagged." in notice
+
+
 def _merged_cohorts(seed: int = 0) -> pd.DataFrame:
     """Eight cohorts of 1,000 to 4,000 rows over 40 columns: 12 that every cohort measures, four
     modules of 6 that three cohorts each measure, and 4 that one cohort measures; 10% of the cells

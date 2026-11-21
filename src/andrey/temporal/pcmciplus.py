@@ -94,9 +94,9 @@ class PCMCIPlusResult:
     ``i - j``, ``TAIL``/``ARROW`` for ``i -> j``, ``TAIL`` at both ends for an unoriented link, and
     ``ARROW`` at both ends for a conflict. ``sepsets[(i, lag, j)]`` is the lag-0 separating set
     phase 2 stored for a removed link, under both orders at lag 0. ``undecided``, shaped as
-    ``adjacency``, marks the links left adjacent after a test without the rows it needs
-    (:data:`~andrey.core.ci_missing.NOT_TESTED`), which could have removed them; one with no test
-    that had rows reads ``NaN`` in ``p_values``. ``ambiguous_triples`` lists the
+    ``adjacency``, marks the links no test with rows decided
+    (:data:`~andrey.core.ci_missing.NOT_TESTED`): ``adjacency`` leaves them out, and they read
+    ``NaN`` in ``p_values``. ``ambiguous_triples`` lists the
     ``(i, lag, k, j)`` triples phase 3 left ambiguous, a lag-0 triple in both orders.
     """
 
