@@ -490,6 +490,11 @@ class LPCMCISearch:
         tested: no test with rows decided them."""
         return frozenset(self.skipped - self.tested)
 
+    def usable(self, a: Node, b: Node) -> bool:
+        """Whether an orientation rule may read the link ``a - b``: not one no test with rows
+        decided (:meth:`untested`), which may be there or not."""
+        return _key(a, b)[0] not in self.untested()
+
     def unconditioned(self, a: Node, b: Node, untested: frozenset[Key]) -> set[Node]:
         """The nodes linked to ``a`` or ``b`` by a link in ``untested``: no test of the pair
         conditions on them, as the rows that observe both are likely too few."""
@@ -1250,10 +1255,12 @@ class LPCMCISearch:
         marks: dict = {}
         for b in self.window:
             for c in self.neighbors(b):
-                if self.mark(b, c) != CIRCLE:
+                if self.mark(b, c) != CIRCLE or not self.usable(b, c):
                     continue
                 for a in self.neighbors(b):
                     if a == c or not self.adjacent(a, c):
+                        continue
+                    if not (self.usable(a, b) and self.usable(a, c)):
                         continue
                     if self.mark(a, b) != ARROW or not self.directed(a, c):
                         continue
@@ -1281,10 +1288,15 @@ class LPCMCISearch:
             for d in self.neighbors(node):
                 if d in seen or self.mark(node, d) != ARROW or self.middle(node, d) != "":
                     continue
+                if not self.usable(node, d):
+                    continue
                 if not self.adjacent(d, c):
                     ends.add(d)
                 elif (
-                    self.directed(d, c) and self.middle(d, c) == "" and self.mark(d, node) == ARROW
+                    self.usable(d, c)
+                    and self.directed(d, c)
+                    and self.middle(d, c) == ""
+                    and self.mark(d, node) == ARROW
                 ):
                     seen.add(d)
                     frontier.append(d)
@@ -1295,10 +1307,21 @@ class LPCMCISearch:
         marks: dict = {}
         for a in self.window:
             for c in self.neighbors(a):
-                if self.mark(a, c) != CIRCLE or self.mark(c, a) == CONFLICT:
+                if (
+                    self.mark(a, c) != CIRCLE
+                    or self.mark(c, a) == CONFLICT
+                    or not self.usable(a, c)
+                ):
                     continue
                 near_c = self.linked(c)
-                if any(b != c and b in near_c and self.directed(b, c) for b in self._roles(a)[2]):
+                if any(
+                    b != c
+                    and b in near_c
+                    and self.usable(a, b)
+                    and self.usable(b, c)
+                    and self.directed(b, c)
+                    for b in self._roles(a)[2]
+                ):
                     self._propose(marks, a, c, TAIL, ARROW)
         return marks, {}, {}
 
@@ -1328,7 +1351,8 @@ class LPCMCISearch:
             found = []
             for b in self.neighbors(a):
                 at_a, middle, at_b = self.link(a, b)
-                if at_a in (CIRCLE, TAIL) and at_b in (CIRCLE, ARROW) and middle != "?":
+                usable = self.usable(a, b)
+                if at_a in (CIRCLE, TAIL) and at_b in (CIRCLE, ARROW) and middle != "?" and usable:
                     found.append(b)
             self.steps_of[a] = found
         return found
@@ -1339,6 +1363,8 @@ class LPCMCISearch:
         for a1 in self.window:
             for an in self.neighbors(a1):
                 if self.mark(a1, an) != CIRCLE or self.mark(an, a1) != ARROW:
+                    continue
+                if not self.usable(a1, an):
                     continue
 
                 def step_ok(path: list[Node], node: Node, an: Node = an) -> bool:
@@ -1365,9 +1391,9 @@ class LPCMCISearch:
         marks: dict = {}
         for a in self.window:
             for d in self.neighbors(a):
-                if self.mark(a, d) != CIRCLE or self.mark(d, a) != ARROW:
+                if self.mark(a, d) != CIRCLE or self.mark(d, a) != ARROW or not self.usable(a, d):
                     continue
-                into = [x for x in self._roles(d)[1] if x != a]
+                into = [x for x in self._roles(d)[1] if x != a and self.usable(x, d)]
                 if len(into) < 2:
                     continue
 

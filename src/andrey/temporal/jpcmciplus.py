@@ -538,6 +538,8 @@ def run_phases(
     directions[0] = np.outer(system, ~system)
     orientation = LaggedConstraints(directions | known.forbidden, known.required, known.tier)
     middles = range(a)
+    either_order = undecided.copy()  # a lag-0 link undecided from one end is undecided both ways
+    either_order[0] |= either_order[0].T
     marks, ambiguous = colliders(
         test,
         n_nodes,
@@ -549,6 +551,7 @@ def run_phases(
         orientation,
         max_p_global,
         middles,
+        undecided=either_order,
     )
     orient(marks, adjacency, ambiguous)
 

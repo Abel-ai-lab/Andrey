@@ -27,6 +27,7 @@ from andrey.constraint.fci import (
     knowledge_marks,
     orient_colliders,
     possible_dsep_step,
+    shield_undecided,
     validate_possible_dsep,
 )
 from andrey.constraint.pc import adjacency_search, knowledge_masks
@@ -135,7 +136,8 @@ def fci_jci(
         undecided=undecided,
     )
 
-    marks = circle_pag(skeleton)
+    shielded, kept = shield_undecided(skeleton, undecided)
+    marks = circle_pag(shielded)
     knowledge_marks(marks, padded)
     mark_index(marks, d, confounded_index)
     orient_colliders(marks, sepsets)
@@ -154,8 +156,11 @@ def fci_jci(
         seed=seed,
         max_depth=max_depth,
         constraints=padded,
+        keep=kept,
         workers=workers,
     )
+    if kept is not None:
+        marks[kept] = NULL
     mark_index(marks, d, confounded_index)
     ambiguous = unseparated_triples(marks != NULL, sepsets, padded, undecided)
     if collider_rule != "sepsets":

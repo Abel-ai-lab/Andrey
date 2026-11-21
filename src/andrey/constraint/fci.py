@@ -119,7 +119,8 @@ def fci(
         undecided=undecided,
     )
 
-    marks = circle_pag(skeleton)
+    shielded, kept = shield_undecided(skeleton, undecided)
+    marks = circle_pag(shielded)
     knowledge_marks(marks, constraints)
     orient_colliders(marks, sepsets)
     marks = possible_dsep_step(
@@ -135,8 +136,11 @@ def fci(
         seed=seed,
         max_depth=max_depth,
         constraints=constraints,
+        keep=kept,
         workers=workers,
     )
+    if kept is not None:
+        marks[kept] = NULL
     ambiguous = unseparated_triples(marks != NULL, sepsets, constraints, undecided)
     if collider_rule != "sepsets":
         ambiguous |= vote_triples(
@@ -154,6 +158,24 @@ def fci(
 
 # ---- mark-matrix helpers ------------------------------------------------------------------------
 # ``marks[i, j]`` is the mark at node ``i`` on edge ``i-j``, as in :mod:`andrey.core.structure`.
+
+
+def shield_undecided(
+    skeleton: np.ndarray, undecided: Collection[tuple[int, int]]
+) -> tuple[np.ndarray, np.ndarray | None]:
+    """``skeleton`` with the ``undecided`` pairs joined again, and their boolean mask, both ways;
+    ``None`` in place of the mask when there are none.
+
+    The possible-d-sep step runs on it with the mask kept (never tested): a pair no test with rows
+    decided may be adjacent, so its paths still reach the nodes beyond, and the caller leaves the
+    pairs out of the marks again after the step.
+    """
+    if not undecided:
+        return skeleton, None
+    mask = np.zeros(skeleton.shape, dtype=bool)
+    for a, c in undecided:
+        mask[a, c] = mask[c, a] = True
+    return np.where(mask, np.int8(TAIL), skeleton), mask
 
 
 def circle_pag(support: np.ndarray) -> np.ndarray:
