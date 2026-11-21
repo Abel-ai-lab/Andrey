@@ -58,7 +58,7 @@ import numpy as np
 from andrey.constraint._skeleton import check_collider_rule, collider_verdict
 from andrey.constraint.pc import check_knowledge_cycle
 from andrey.core import backend
-from andrey.core.ci_missing import NOT_TESTED, counts_its_tests, running_counter
+from andrey.core.ci_missing import NOT_TESTED, counts_its_tests, reads_flags, running_counter
 from andrey.core.fdr import check_fdr_method, corrected_pvalues
 from andrey.core.knowledge import orient as orient_known
 from andrey.core.structure import ARROW, NULL, TAIL
@@ -733,7 +733,9 @@ def run_phases(
         constraints,
         max_p_global,
         undecided=undecided,
-        flagged=flagged_links(running_counter(), adjacency, undecided, required),
+        flagged=flagged_links(running_counter(), adjacency, undecided, required)
+        if reads_flags()
+        else None,
     )
     orient(marks, adjacency, ambiguous)
     return PCMCIPlusResult(

@@ -79,14 +79,15 @@ def _arrowheads(out) -> set[tuple[str, str]]:
 
 def _ambiguous(method: str, df: pd.DataFrame, **settings):
     """The triples ``method``'s core search reads as neither a collider nor a non-collider, by name
-    with the ends in name order; the pairs it flags; its boolean adjacency; and the names."""
+    with the ends in name order; the flagged pairs whose rules it vetoes, those with a set not
+    tested within an end's adjacencies; its boolean adjacency; and the names."""
     core = {"pc": pc_core, "fci": fci_core}[method]
     sink: set[tuple[int, int, int]] = set()
     with ci_missing.rows_tested() as rows:
         graph = core(df.to_numpy(), _ambiguous=sink, **settings)
     names = [str(c) for c in df.columns]
     drawn = graph.to_numpy() != NULL
-    flagged = {tuple(sorted((names[a], names[b]))) for a, b in rows.possibly_separable(drawn)}
+    flagged = {tuple(sorted((names[a], names[b]))) for a, b in rows.separable_within(drawn)}
     triples = {(min(names[a], names[c]), names[b], max(names[a], names[c])) for a, b, c in sink}
     return triples, flagged, drawn, names
 
@@ -180,8 +181,8 @@ def test_no_rule_reads_an_undecided_pair_as_apart(method):
 @pytest.mark.parametrize("method", list(FITS))
 @pytest.mark.parametrize("seed", [0, 1])
 def test_no_rule_reads_a_triple_with_a_flagged_side(method, seed):
-    """On merged cohorts, every unshielded triple with a flagged side is ambiguous, whether its
-    ends are decided apart or undecided."""
+    """On merged cohorts, every unshielded triple with a flagged side whose set not tested lies
+    within an end's adjacencies is ambiguous, whether its ends are decided apart or undecided."""
     df = _merged_cohorts(seed)
     triples, flagged, drawn, names = _ambiguous(method, df, max_depth=2)
     expected = set()
@@ -544,3 +545,24 @@ def test_a_search_called_directly_reads_its_own_flags():
         sink: set[tuple[int, int, int]] = set()
         core(X, max_depth=3, _ambiguous=sink)
         assert (0, 2, 1) in sink
+
+
+def test_a_flagged_side_is_vetoed_only_by_a_set_within_an_ends_adjacencies():
+    """A set not tested that holds a column adjacent to neither end of its pair cannot be the
+    separating set the search missed; one within an end's other adjacencies, or one not known,
+    can."""
+    rows = ci_missing.RowCounts()
+    # Pairs (0, 1), (1, 2), (2, 3) are drawn; 4 and 5 are adjacent to 3 only.
+    drawn = np.zeros((6, 6), dtype=bool)
+    for a, b in ((0, 1), (1, 2), (2, 3), (3, 4), (3, 5)):
+        drawn[a, b] = drawn[b, a] = True
+    tested = [(0, 1), (1, 2), (2, 3)]
+    rows.add([50] * 3, [0.01] * 3, *zip(*tested))
+    rows.add([1], [ci_missing.NOT_TESTED], [0], [1], [[4]])  # 4 is beside neither 0 nor 1
+    rows.add([1], [ci_missing.NOT_TESTED], [1], [2], [[0]])  # 0 is beside 1
+    rows.add([1], [ci_missing.NOT_TESTED], [2], [3], [[4, 5]])  # 4 and 5 are beside 3
+    assert sorted(rows.possibly_separable(drawn)) == tested
+    assert sorted(rows.separable_within(drawn)) == [(1, 2), (2, 3)]
+    # A set not known is kept as the empty set, within every end's adjacencies.
+    rows.add([1], [ci_missing.NOT_TESTED], [0], [1])
+    assert sorted(rows.separable_within(drawn)) == tested

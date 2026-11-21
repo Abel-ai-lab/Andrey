@@ -482,7 +482,7 @@ def parents_children(
         x for x in range(d) if x != target and x not in required and (allowed is None or allowed[x])
     ]
     weakest = dict(zip(others, _weakest(test, target, others, [()]), strict=True))
-    undecided = any(not_tested(p) for p, _ in weakest.values())
+    undecided = [x for x, (p, _) in weakest.items() if not_tested(p)]
     if sepsets is not None:
         sepsets.update({x: () for x, (p, _) in weakest.items() if p > alpha})
     members: list[int] = []
@@ -536,7 +536,7 @@ def parents_children(
                     sepsets[x] = found
                 break
     if undecided:
-        _count_beside_undecided(test, target, members, required, max_depth)
+        _count_beside_undecided(test, target, members, required, max_depth, undecided)
     return members
 
 

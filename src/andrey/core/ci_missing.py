@@ -161,6 +161,8 @@ _DF_OFFSET: dict[type, int] = {FisherZ: 3, StudentT: 2}
 _TOGETHER_ROWS = 1 << 16
 #: The tests run inside :func:`rows_tested`, or ``None`` outside it.
 _ROWS: ContextVar[RowCounts | None] = ContextVar("andrey_rows_tested", default=None)
+#: Whether the searches read a triple with a flagged side as ambiguous (:func:`reading_flags`).
+_READ_FLAGS: ContextVar[bool] = ContextVar("andrey_read_flags", default=False)
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
 
@@ -324,6 +326,23 @@ def counts_its_tests(search: Callable[_P, _R]) -> Callable[_P, _R]:
     return counted
 
 
+@contextlib.contextmanager
+def reading_flags(on: bool = True) -> Generator[None]:
+    """Inside the block, with ``on``, the searches read a triple with a side that
+    :func:`running_flags` lists as neither a collider nor a non-collider; outside it they read no
+    flag, as ``possibly_separable="orient"`` does."""
+    token = _READ_FLAGS.set(on)
+    try:
+        yield
+    finally:
+        _READ_FLAGS.reset(token)
+
+
+def reads_flags() -> bool:
+    """Whether the running block reads flagged sides (:func:`reading_flags`)."""
+    return _READ_FLAGS.get()
+
+
 def running_counter() -> RowCounts | None:
     """The counter of the running :func:`rows_tested` block, or ``None`` outside one."""
     return _ROWS.get()
@@ -332,10 +351,11 @@ def running_counter() -> RowCounts | None:
 def running_flags(adjacency: np.ndarray) -> list[tuple[int, int]]:
     """The pairs adjacent in the boolean ``adjacency`` that the tests counted so far in the running
     :func:`rows_tested` block flag as possibly separable, with a conditioning set not tested within
-    an end's other adjacencies (:meth:`RowCounts.separable_within`); none outside a block or when
-    every query was tested, as on complete data."""
+    an end's other adjacencies (:meth:`RowCounts.separable_within`); none outside a
+    :func:`reading_flags` block or a counting block, or when every query was tested, as on
+    complete data."""
     counter = _ROWS.get()
-    if counter is None or not counter.not_tested:
+    if counter is None or not counter.not_tested or not _READ_FLAGS.get():
         return []
     return counter.separable_within(adjacency)
 
