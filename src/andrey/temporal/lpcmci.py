@@ -230,6 +230,8 @@ class LPCMCISearch:
         self.near: dict[Node, tuple[list[Node], frozenset[Node]]] = {}
         self.roles_of: dict[Node, tuple[set[Node], list[Node], list[Node], list[Node]]] = {}
         self.steps_of: dict[Node, list[Node]] = {}
+        #: The links :meth:`untested` gave when ``steps_of`` was filled.
+        self.steps_untested: frozenset[Key] = frozenset()
         self.shifted: dict[tuple[Key, int], list[frozenset[Node]]] = {}
         self.imin: dict[Key, float] = {}
         self.best: dict[Key, tuple[float, float]] = {}
@@ -1343,9 +1345,13 @@ class LPCMCISearch:
     def _steps(self, a: Node) -> list[Node]:
         """The neighbors ``b`` of ``a``, in order, whose link can be a path step ``a - b``.
 
-        The link is potentially directed, not into ``a`` and not out of ``b``, and its middle mark
-        is not ``"?"``.
+        The link is potentially directed, not into ``a`` and not out of ``b``, its middle mark is
+        not ``"?"``, and a test with rows decided it (:meth:`usable`); the steps are found again
+        once the links no such test decided change.
         """
+        untested = self.untested()
+        if untested != self.steps_untested:
+            self.steps_of, self.steps_untested = {}, untested
         found = self.steps_of.get(a)
         if found is None:
             found = []
