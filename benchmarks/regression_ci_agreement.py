@@ -96,7 +96,14 @@ def run_reference(folder: Path, mode: str, names: list[str], seeds: list[int]) -
     env = {**os.environ, "R_LIBS": lib} if lib else None
     if not (folder / f"reference_{mode}.csv").exists():  # a rerun reuses the reference's output
         subprocess.run([rscript, "--vanilla", str(SCRIPT), str(folder), mode], check=True, env=env)
-    rows = np.genfromtxt(folder / f"reference_{mode}.csv", delimiter=",", names=True, dtype=None)
+    rows = np.genfromtxt(
+        folder / f"reference_{mode}.csv",
+        delimiter=",",
+        names=True,
+        dtype=None,
+        missing_values="NA",  # a reference call that stopped with an error
+        filling_values=np.nan,
+    )
     return [dict(zip(rows.dtype.names, r)) for r in np.atleast_1d(rows)]
 
 
