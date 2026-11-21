@@ -39,6 +39,17 @@ names its pull request.
   only on the candidates, strongest first, that keep its rows enough for the test, so its rows do
   not mix cohorts never observed together. ([#1151], [#1156], [#1167])
 
+- `possibly_separable="ambiguous"` in PC, FCI, CD-NOD, FCI-JCI, the Markov-blanket searches' CPDAG,
+  and PCMCI+ reads a triple with a side in `metadata["possibly_separable"]` as neither a collider
+  nor a non-collider, in FCI's discriminating-path rule too, when a conditioning set not tested of
+  that side lies within the other nodes adjacent to one of its ends or undecided with it; FCI,
+  FCI-JCI, and PCMCI+ so read every listed side. LPCMCI lists such links but does not read them.
+  The default, `"orient"`, reads it as any other triple, as before. On merged cohorts that no row
+  bridges it removes most false colliders and most true arrowheads with them: PC's graph is then
+  farther from the truth than the empty graph, and in FCI and FCI-JCI the skeleton and
+  `metadata["not_tested"]` change through the possible-d-separation step. It can change results on
+  data where every pair shares rows, when some conditioning set has none. ([#1171])
+
 - `metadata["p_one_tests"]` counts every test of a fit on data with missing values that returned
   `p = 1`, whichever test it is, as a test whose statistic is exactly zero answers. ([#1102])
 - `metadata["em"]` records `rows_dropped`, the rows dropped for observing no value, and
@@ -2954,6 +2965,7 @@ First alpha release.
 [#1151]: https://github.com/Abel-ai-lab/Andrey/pull/1151
 [#1156]: https://github.com/Abel-ai-lab/Andrey/pull/1156
 [#1167]: https://github.com/Abel-ai-lab/Andrey/pull/1167
+[#1171]: https://github.com/Abel-ai-lab/Andrey/pull/1171
 [#1129]: https://github.com/Abel-ai-lab/Andrey/pull/1129
 [#1094]: https://github.com/Abel-ai-lab/Andrey/pull/1094
 [#1095]: https://github.com/Abel-ai-lab/Andrey/pull/1095

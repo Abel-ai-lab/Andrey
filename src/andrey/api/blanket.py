@@ -22,7 +22,7 @@ from andrey.api._adapt import (
 )
 from andrey.api._method import method_spec
 from andrey.core import NULL, TAIL, backend
-from andrey.core.ci_missing import rows_metadata, rows_tested
+from andrey.core.ci_missing import reading_flags, reads_flags, rows_metadata, rows_tested
 from andrey.core.knowledge import Knowledge, as_node, column_position
 from andrey.core.orient import to_structure
 
@@ -54,7 +54,10 @@ def fit_blanket(
 ) -> StructureOutput | list[StructureOutput]:
     """Check the settings, run the search, and wrap the graph ``structure`` names or the set.
 
-    A list of targets gives one result for each, in its order.
+    A list of targets gives one result for each, in its order. Only the CPDAG of every variable
+    reads flagged sides (``possibly_separable``); a target's set and the other structures orient
+    nothing, so their searches keep no untested sets
+    (:func:`~andrey.core.ci_missing.reading_flags`).
     """
     from andrey.constraint._parallel_targets import answers
     from andrey.constraint.blanket import local_search, local_set, local_structure
@@ -81,7 +84,7 @@ def fit_blanket(
         "constraints": constraints,
     }
     if targets is not None:
-        with copies_named(labels):
+        with copies_named(labels), reading_flags(False):
             found = answers(
                 partial(local_search, X, **settings),
                 partial(_target_set, method),
@@ -101,7 +104,8 @@ def fit_blanket(
         return outs
     metadata: dict[str, object] = {}
     kind = BLANKET_STRUCTURES[structure] if t is None else "undirected"
-    with copies_named(labels), rows_tested() as rows:
+    orients = reads_flags() and t is None and structure == "cpdag"
+    with copies_named(labels), rows_tested() as rows, reading_flags(orients):
         if t is None:
             marks = local_structure(X, method, structure, **settings)
         else:
@@ -150,6 +154,7 @@ def iamb(
     indep_test: str | None = None,
     degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
+    possibly_separable: str = "orient",
     missing: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -202,6 +207,17 @@ def iamb(
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
+    possibly_separable : {"orient", "ambiguous"}, default="orient"
+        How the orientation rules read a triple ``x - z - y`` with a side listed in
+        ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
+        any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
+        rule orients through it, when a conditioning set not tested of that side lies within the
+        other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
+        lies within the parents of one end, so that set might be the separating set the search
+        missed. On merged cohorts
+        that no row bridges, ``"ambiguous"`` removes most false colliders and most true
+        arrowheads with them, and the graph can then be farther from the truth than the empty
+        graph. Read under ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
@@ -337,12 +353,14 @@ def iamb(
     variable never observed with the target, is undecided: it is left out of the set and the graph
     and listed in ``metadata["undecided_pairs"]``. A drawn edge that a conditioning set not tested
     might have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data
-    could not check, not a finding that the edge is false. On merged cohorts, every pair of
-    variables measured only in different cohorts is therefore undecided. A continuous column
-    constant on a test's rows raises ``ValueError``. Test-wise deletion is valid when values are
-    missing completely at random, which means that whether a value is missing depends on no value in
-    the data; the rows a test reads are then a random sample of all rows, and otherwise they are a
-    selected sample that more rows do not correct.
+    could not check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``,
+    the CPDAG takes a triple with a side it reads (see ``possibly_separable``) as neither a collider
+    nor a non-collider. On merged cohorts, every pair of variables measured only in different
+    cohorts is therefore undecided. A continuous column constant on a test's rows raises
+    ``ValueError``. Test-wise deletion is valid
+    when values are missing completely at random, which means that whether a value is missing
+    depends on no value in the data; the rows a test reads are then a random sample of all rows, and
+    otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data with Fisher-z tests at alpha 0.05,
     on one core: 20, 50, and 100 variables with 1,000 and 5,000 rows and mean degree 2 and 4, with
@@ -441,6 +459,7 @@ def inter_iamb(
     indep_test: str | None = None,
     degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
+    possibly_separable: str = "orient",
     missing: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -492,6 +511,17 @@ def inter_iamb(
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
+    possibly_separable : {"orient", "ambiguous"}, default="orient"
+        How the orientation rules read a triple ``x - z - y`` with a side listed in
+        ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
+        any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
+        rule orients through it, when a conditioning set not tested of that side lies within the
+        other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
+        lies within the parents of one end, so that set might be the separating set the search
+        missed. On merged cohorts
+        that no row bridges, ``"ambiguous"`` removes most false colliders and most true
+        arrowheads with them, and the graph can then be farther from the truth than the empty
+        graph. Read under ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
@@ -630,12 +660,14 @@ def inter_iamb(
     variable never observed with the target, is undecided: it is left out of the set and the graph
     and listed in ``metadata["undecided_pairs"]``. A drawn edge that a conditioning set not tested
     might have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data
-    could not check, not a finding that the edge is false. On merged cohorts, every pair of
-    variables measured only in different cohorts is therefore undecided. A continuous column
-    constant on a test's rows raises ``ValueError``. Test-wise deletion is valid when values are
-    missing completely at random, which means that whether a value is missing depends on no value in
-    the data; the rows a test reads are then a random sample of all rows, and otherwise they are a
-    selected sample that more rows do not correct.
+    could not check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``,
+    the CPDAG takes a triple with a side it reads (see ``possibly_separable``) as neither a collider
+    nor a non-collider. On merged cohorts, every pair of variables measured only in different
+    cohorts is therefore undecided. A continuous column constant on a test's rows raises
+    ``ValueError``. Test-wise deletion is valid
+    when values are missing completely at random, which means that whether a value is missing
+    depends on no value in the data; the rows a test reads are then a random sample of all rows, and
+    otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data with 20, 50, and 100 variables,
     1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05, on one core.
@@ -727,6 +759,7 @@ def mmpc(
     indep_test: str | None = None,
     degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
+    possibly_separable: str = "orient",
     missing: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -779,6 +812,17 @@ def mmpc(
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
+    possibly_separable : {"orient", "ambiguous"}, default="orient"
+        How the orientation rules read a triple ``x - z - y`` with a side listed in
+        ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
+        any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
+        rule orients through it, when a conditioning set not tested of that side lies within the
+        other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
+        lies within the parents of one end, so that set might be the separating set the search
+        missed. On merged cohorts
+        that no row bridges, ``"ambiguous"`` removes most false colliders and most true
+        arrowheads with them, and the graph can then be farther from the truth than the empty
+        graph. Read under ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
@@ -915,12 +959,14 @@ def mmpc(
     variable never observed with the target, is undecided: it is left out of the set and the graph
     and listed in ``metadata["undecided_pairs"]``. A drawn edge that a conditioning set not tested
     might have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data
-    could not check, not a finding that the edge is false. On merged cohorts, every pair of
-    variables measured only in different cohorts is therefore undecided. A continuous column
-    constant on a test's rows raises ``ValueError``. Test-wise deletion is valid when values are
-    missing completely at random, which means that whether a value is missing depends on no value in
-    the data; the rows a test reads are then a random sample of all rows, and otherwise they are a
-    selected sample that more rows do not correct.
+    could not check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``,
+    the CPDAG takes a triple with a side it reads (see ``possibly_separable``) as neither a collider
+    nor a non-collider. On merged cohorts, every pair of variables measured only in different
+    cohorts is therefore undecided. A continuous column constant on a test's rows raises
+    ``ValueError``. Test-wise deletion is valid
+    when values are missing completely at random, which means that whether a value is missing
+    depends on no value in the data; the rows a test reads are then a random sample of all rows, and
+    otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data with Fisher-z tests at alpha 0.05,
     on one core: 20, 50, and 100 variables with 1,000 and 5,000 rows and mean degree 2 and 4, with

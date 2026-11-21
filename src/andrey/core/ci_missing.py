@@ -39,10 +39,10 @@ from __future__ import annotations
 import contextlib
 import functools
 from collections import Counter, OrderedDict
-from collections.abc import Callable, Generator, Iterable, Mapping
+from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
 from contextvars import ContextVar
 from functools import partial
-from typing import Any, cast
+from typing import Any, ParamSpec, TypeVar, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -161,6 +161,12 @@ _DF_OFFSET: dict[type, int] = {FisherZ: 3, StudentT: 2}
 _TOGETHER_ROWS = 1 << 16
 #: The tests run inside :func:`rows_tested`, or ``None`` outside it.
 _ROWS: ContextVar[RowCounts | None] = ContextVar("andrey_rows_tested", default=None)
+#: Whether the searches read a triple with a flagged side as ambiguous (:func:`reading_flags`).
+_READ_FLAGS: ContextVar[bool] = ContextVar("andrey_read_flags", default=False)
+#: Whether a search reading flags keeps its untested sets (:func:`keeps_no_untested_sets`).
+_KEEP_SETS: ContextVar[bool] = ContextVar("andrey_keep_sets", default=True)
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
 
 
 class RowCounts(Counter[int]):
@@ -173,6 +179,8 @@ class RowCounts(Counter[int]):
     answered :data:`NOT_TESTED`, which a query with zero degrees of freedom is, counts in
     ``not_tested``, by its pair of the test's columns, ``(x, y)`` with ``x < y``. ``largest`` keeps
     each tested pair's largest p-value, which tells whether a tested query separated it.
+    ``untested_sets`` keeps each pair's conditioning sets that were not tested
+    (:meth:`note_untested`).
     """
 
     def __init__(self) -> None:
@@ -180,6 +188,7 @@ class RowCounts(Counter[int]):
         self.p_one = 0
         self.not_tested: Counter[tuple[int, int]] = Counter()
         self.largest: dict[tuple[int, int], float] = {}
+        self.untested_sets: dict[tuple[int, int], set[frozenset[int]]] = {}
         #: The queries not tested whose pairs are not columns of the data, as a search over
         #: another matrix asks them.
         self.not_tested_elsewhere = 0
@@ -196,10 +205,18 @@ class RowCounts(Counter[int]):
         return sum(self.not_tested.values()) + self.not_tested_elsewhere
 
     def add(
-        self, rows: npt.ArrayLike, p: npt.ArrayLike, x: npt.ArrayLike, y: npt.ArrayLike
+        self,
+        rows: npt.ArrayLike,
+        p: npt.ArrayLike,
+        x: npt.ArrayLike,
+        y: npt.ArrayLike,
+        conditions: Sequence[Iterable[int]] | np.ndarray | None = None,
     ) -> None:
         """Count the queries of the pairs ``x < y`` answered with the row counts ``rows`` and the
-        p-values ``p``, a :data:`NOT_TESTED` one apart."""
+        p-values ``p``, a :data:`NOT_TESTED` one apart, with its conditioning set, entry ``i`` of
+        ``conditions``, kept inside a :func:`reading_flags` block only, the one place a rule reads
+        it, and not in a search that reads every flagged pair (:func:`keeps_no_untested_sets`;
+        :meth:`note_untested`)."""
         values = np.asarray(p, dtype=np.float64).reshape(-1)
         if not values.size:
             return
@@ -211,6 +228,10 @@ class RowCounts(Counter[int]):
         self.p_one += int(np.count_nonzero(values == 1.0))
         if skipped.any():
             self.not_tested.update(zip(lo[skipped].tolist(), hi[skipped].tolist()))
+            for k in np.flatnonzero(skipped).tolist() if _keeps_sets() else ():
+                self.note_untested(
+                    int(lo[k]), int(hi[k]), None if conditions is None else conditions[k]
+                )
         if tested.any():
             pairs, inverse = np.unique(
                 np.stack([lo[tested], hi[tested]], axis=1), axis=0, return_inverse=True
@@ -221,12 +242,23 @@ class RowCounts(Counter[int]):
                 pair = (a, b)
                 self.largest[pair] = max(self.largest.get(pair, -np.inf), value)
 
+    def note_untested(self, x: int, y: int, columns: Iterable[int] | None) -> None:
+        """Keep ``columns`` as a conditioning set of the pair ``x < y`` that was not tested.
+
+        A set a search left out without building it is kept by the columns that kept it from rows,
+        a subset of it. A set not known, ``None``, is kept as the empty set, which lies within
+        every set of columns (:meth:`separable_within`)."""
+        sets = self.untested_sets.setdefault((x, y), set())
+        sets.add(frozenset() if columns is None else frozenset(int(c) for c in columns))
+
     def merge(self, other: RowCounts) -> None:
         """Add the counts of ``other``, whose tests ran over the same columns, pairs included."""
         self.update(other)
         self.p_one += other.p_one
         self.not_tested.update(other.not_tested)
         self.not_tested_elsewhere += other.not_tested_elsewhere
+        for pair, sets in other.untested_sets.items():
+            self.untested_sets.setdefault(pair, set()).update(sets)
         for pair, value in other.largest.items():
             self.largest[pair] = max(self.largest.get(pair, -np.inf), value)
 
@@ -243,6 +275,29 @@ class RowCounts(Counter[int]):
         return [
             (a, b) for a, b in self.not_tested if b < d and (a, b) in self.largest and drawn[a, b]
         ]
+
+    def separable_within(self, drawn: np.ndarray) -> list[tuple[int, int]]:
+        """The pairs of :meth:`possibly_separable` with a conditioning set not tested that lies
+        within the possible adjacencies of one of its ends: the other columns adjacent to it in
+        ``drawn``, and those it forms an undecided pair with (:meth:`untested`).
+
+        A set that separates a pair, when every variable is measured, lies within the parents of
+        one of its ends. A search that removes no true edge keeps each parent adjacent, or leaves
+        it undecided when no test with rows could decide the pair, so a set not tested beyond both
+        ends' possible adjacencies is no separating set that the search missed. A pair whose sets
+        not tested are not known is kept."""
+        undecided: dict[int, set[int]] = {}
+        for a, b in self.untested():
+            undecided.setdefault(a, set()).add(b)
+            undecided.setdefault(b, set()).add(a)
+        kept = []
+        for a, b in self.possibly_separable(drawn):
+            sets = self.untested_sets.get((a, b), {frozenset()})
+            near_a = (set(np.flatnonzero(drawn[a]).tolist()) | undecided.get(a, set())) - {b}
+            near_b = (set(np.flatnonzero(drawn[b]).tolist()) | undecided.get(b, set())) - {a}
+            if any(s <= near_a or s <= near_b for s in sets):
+                kept.append((a, b))
+        return kept
 
 
 def not_tested(p: npt.ArrayLike) -> np.ndarray:
@@ -268,12 +323,91 @@ def rows_tested() -> Generator[RowCounts]:
         _ROWS.reset(token)
 
 
-def count_answer(rows: int, p: float, x: int, y: int) -> None:
-    """Count, in the running :func:`rows_tested` counter if any, a query of ``x`` and ``y``
-    answered ``p`` on ``rows`` rows by a test that is no :class:`TestwiseDeletion`, as MVPC's
-    indicator search answers :data:`NOT_TESTED` one whose indicator is constant on its rows."""
+def counts_its_tests(search: Callable[_P, _R]) -> Callable[_P, _R]:
+    """Run ``search`` inside :func:`search_outcomes`, so the flags it reads
+    (:func:`running_flags`) count its own tests even when no :func:`rows_tested` block runs, as
+    when a search is called directly; inside one, the block takes its counts as before."""
+
+    @functools.wraps(search)
+    def counted(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+        with search_outcomes():
+            return search(*args, **kwargs)
+
+    return counted
+
+
+@contextlib.contextmanager
+def reading_flags(on: bool = True) -> Generator[None]:
+    """Inside the block, with ``on``, the searches read a triple with a side that
+    :func:`running_flags` lists as neither a collider nor a non-collider; outside it they read no
+    flag, as ``possibly_separable="orient"`` does."""
+    token = _READ_FLAGS.set(on)
+    try:
+        yield
+    finally:
+        _READ_FLAGS.reset(token)
+
+
+def keeps_no_untested_sets(search: Callable[_P, _R]) -> Callable[_P, _R]:
+    """Run ``search`` keeping no untested conditioning set (:meth:`RowCounts.note_untested`), for a
+    search that reads every flagged pair (``running_flags(..., latent=True)``, as FCI does, or
+    :func:`~andrey.temporal.pcmci.flagged_links`) and so never reads the sets."""
+
+    @functools.wraps(search)
+    def run(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+        token = _KEEP_SETS.set(False)
+        try:
+            return search(*args, **kwargs)
+        finally:
+            _KEEP_SETS.reset(token)
+
+    return run
+
+
+def _keeps_sets() -> bool:
+    """Whether the running search keeps its untested sets: inside a :func:`reading_flags` block, in
+    a search that reads them."""
+    return _READ_FLAGS.get() and _KEEP_SETS.get()
+
+
+def reads_flags() -> bool:
+    """Whether the running block reads flagged sides (:func:`reading_flags`)."""
+    return _READ_FLAGS.get()
+
+
+def running_counter() -> RowCounts | None:
+    """The counter of the running :func:`rows_tested` block, or ``None`` outside one."""
+    return _ROWS.get()
+
+
+def running_flags(adjacency: np.ndarray, *, latent: bool = False) -> list[tuple[int, int]]:
+    """The pairs adjacent in the boolean ``adjacency`` that the tests counted so far in the running
+    :func:`rows_tested` block flag as possibly separable, with a conditioning set not tested within
+    an end's possible adjacencies (:meth:`RowCounts.separable_within`); none outside a
+    :func:`reading_flags` block or a counting block, or when every query was tested, as on
+    complete data.
+
+    With ``latent``, for a search that allows latent variables, every flagged pair is listed
+    (:meth:`RowCounts.possibly_separable`): a set that separates a pair then lies within the
+    possible-d-separating set of an end, not within its adjacencies."""
+    counter = _ROWS.get()
+    if counter is None or not counter.not_tested or not _READ_FLAGS.get():
+        return []
+    if latent:
+        return counter.possibly_separable(adjacency)
+    return counter.separable_within(adjacency)
+
+
+def count_answer(
+    rows: int, p: float, x: int, y: int, conditions: Iterable[int] | None = None
+) -> None:
+    """Count, in the running :func:`rows_tested` counter if any, a query of ``x`` and ``y`` given
+    ``conditions`` answered ``p`` on ``rows`` rows by a test that is no :class:`TestwiseDeletion`,
+    as MVPC's indicator search answers :data:`NOT_TESTED` one whose indicator is constant on its
+    rows."""
     if (counter := _ROWS.get()) is not None:
-        counter.add([rows], [p], [min(x, y)], [max(x, y)])
+        given = None if conditions is None else [conditions]
+        counter.add([rows], [p], [min(x, y)], [max(x, y)], given)
 
 
 @contextlib.contextmanager
@@ -462,13 +596,21 @@ class TestwiseDeletion:
         self._source = np.asarray(source, dtype=np.int64)
 
     def _count(
-        self, counter: RowCounts, rows: npt.ArrayLike, p: npt.ArrayLike, pairs: np.ndarray
+        self,
+        counter: RowCounts,
+        rows: npt.ArrayLike,
+        p: npt.ArrayLike,
+        pairs: np.ndarray,
+        conds: Sequence[Iterable[int]] | np.ndarray,
     ) -> None:
-        """Add the queries of ``pairs``, an ``(N, 2)`` array of this test's columns, to
-        ``counter`` as pairs of the source columns (:meth:`from_columns`)."""
+        """Add the queries of ``pairs``, an ``(N, 2)`` array of this test's columns, given the
+        conditioning sets ``conds``, to ``counter`` in the source's columns
+        (:meth:`from_columns`)."""
         if self._source is not None:
             pairs = np.sort(self._source[pairs], axis=1)
-        counter.add(rows, p, pairs[:, 0], pairs[:, 1])
+            if not_tested(p).any():
+                conds = [self._source[np.asarray(c, dtype=np.intp)].tolist() for c in conds]
+        counter.add(rows, p, pairs[:, 0], pairs[:, 1], conds)
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the p-value for ``x`` independent of ``y`` given ``condition_set``.
@@ -530,7 +672,7 @@ class TestwiseDeletion:
         counter = _ROWS.get()
         if test is None:
             if counter is not None:
-                self._count(counter, [rows], [NOT_TESTED], np.array([[x, y]]))
+                self._count(counter, [rows], [NOT_TESTED], np.array([[x, y]]), [cond])
             return untested
         at = {c: i for i, c in enumerate(columns)}
         try:
@@ -542,12 +684,12 @@ class TestwiseDeletion:
         p = np.asarray(out[-1] if isinstance(out, tuple) else out, dtype=np.float64)
         if not_tested(p).all() and hasattr(test, "zero_dof_pvalue"):  # zero degrees of freedom
             if counter is not None:
-                self._count(counter, [rows], [NOT_TESTED], np.array([[x, y]]))
+                self._count(counter, [rows], [NOT_TESTED], np.array([[x, y]]), [cond])
             return untested
         if not np.isfinite(p).all():
             raise self._failed(rows, " gives no p-value")
         if counter is not None:
-            self._count(counter, [rows], p.reshape(-1)[-1:], np.array([[x, y]]))
+            self._count(counter, [rows], p.reshape(-1)[-1:], np.array([[x, y]]), [cond])
         return out
 
     def _failed(self, rows: int, what: str) -> ValueError:
@@ -612,15 +754,28 @@ class TestwiseDeletion:
                 rows = joined
         return kept
 
-    def count_not_tested(self, x: int, y: int, queries: int) -> None:
+    def count_not_tested(
+        self, x: int, y: int, queries: int, held: Iterable[Iterable[int]] | None = None
+    ) -> None:
         """Count ``queries`` queries of ``x`` and ``y`` as not tested in the running
         :func:`rows_tested` counter without asking them, as a search counts the conditioning sets
-        that keep no rows (:meth:`together`); the pair is recorded as :meth:`_count` records it."""
+        that keep no rows (:meth:`together`); the pair is recorded as :meth:`_count` records it.
+
+        Each of ``held`` is the columns that keep some of those sets from rows, which the sets
+        hold, kept as :meth:`RowCounts.add` keeps them (:meth:`RowCounts.note_untested`); ``None``
+        when they are not known."""
         counter = _ROWS.get()
         if counter is None or not queries:
             return
         pair = (x, y) if self._source is None else self._source[[x, y]].tolist()
-        counter.not_tested[min(pair), max(pair)] += queries
+        a, b = min(pair), max(pair)
+        counter.not_tested[a, b] += queries
+        if not _keeps_sets():
+            return
+        for columns in [None] if held is None else held:
+            if columns is not None and self._source is not None:
+                columns = self._source[np.asarray(list(columns), dtype=np.intp)].tolist()
+            counter.note_untested(a, b, columns)
 
     def _block(self, columns: Iterable[int]) -> np.ndarray:
         """The rows of ``data`` observed in every one of ``columns``, those columns only."""
@@ -889,7 +1044,8 @@ class GaussianDeletion(PartialCorrelationDeletion):
             arrays = _arrays([queries[i] for i in at], size)
             r[at], p[at], rows[at], flagged[at] = self._fast(*arrays)
         pairs = np.array([query[:2] for query in queries], dtype=np.int64).reshape(-1, 2)
-        self._settle(queries.__getitem__, pairs, r, p, rows, flagged)
+        conds = [query[2] for query in queries]
+        self._settle(queries.__getitem__, pairs, conds, r, p, rows, flagged)
         return p.tolist()
 
     def _answer(
@@ -901,13 +1057,14 @@ class GaussianDeletion(PartialCorrelationDeletion):
         def query(k: int) -> tuple[int, int, list[int]]:
             return int(lo[k]), int(hi[k]), conds[k].tolist()
 
-        self._settle(query, np.stack([lo, hi], axis=1), r, p, rows, flagged)
+        self._settle(query, np.stack([lo, hi], axis=1), conds, r, p, rows, flagged)
         return r, p
 
     def _settle(
         self,
         query: Callable[[int], tuple[int, int, list[int]]],
         pairs: np.ndarray,
+        conds: Sequence[Iterable[int]] | np.ndarray,
         r: np.ndarray,
         p: np.ndarray,
         rows: np.ndarray,
@@ -915,17 +1072,17 @@ class GaussianDeletion(PartialCorrelationDeletion):
     ) -> None:
         """Answer the ``flagged`` queries by the exact path, in order, and count every query.
 
-        ``query(k)`` is query ``k`` as ``(x, y, conditioning set)`` and ``pairs[k]`` its ``(x,
-        y)``. ``r`` and ``p`` hold the fast answers, :data:`NOT_TESTED` for a query without the
-        rows it needs, and take the exact ones in place; ``rows`` holds each query's row count. The
-        queries are counted in order, so a query that raises does so after the queries before it,
-        as the exact path's loop does.
+        ``query(k)`` is query ``k`` as ``(x, y, conditioning set)``, ``pairs[k]`` its ``(x, y)``,
+        and ``conds[k]`` its conditioning set. ``r`` and ``p`` hold the fast answers,
+        :data:`NOT_TESTED` for a query without the rows it needs, and take the exact ones in place;
+        ``rows`` holds each query's row count. The queries are counted in order, so a query that
+        raises does so after the queries before it, as the exact path's loop does.
         """
         counter = _ROWS.get()
         start = 0
         for k in np.flatnonzero(flagged).tolist():
             if counter is not None:
-                self._count(counter, rows[start:k], p[start:k], pairs[start:k])
+                self._count(counter, rows[start:k], p[start:k], pairs[start:k], conds[start:k])
             x, y, cond = query(k)
             r[k], p[k] = self._query(
                 lambda test, a, b, s: test.statistic_pvalue(a, b, s),
@@ -936,7 +1093,7 @@ class GaussianDeletion(PartialCorrelationDeletion):
             )
             start = k + 1
         if counter is not None:
-            self._count(counter, rows[start:], p[start:], pairs[start:])
+            self._count(counter, rows[start:], p[start:], pairs[start:], conds[start:])
 
     def _fast(
         self, lo: np.ndarray, hi: np.ndarray, conds: np.ndarray

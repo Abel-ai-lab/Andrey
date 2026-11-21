@@ -37,6 +37,7 @@ from andrey.core.ci_missing import (
     TESTWISE,
     TESTWISE_CLAIM,
     named_pairs,
+    reading_flags,
 )
 from andrey.core.knowledge import PATH_PARTS, Knowledge, resolve
 from andrey.core.output import RegimeOutput
@@ -103,7 +104,9 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
     the fit used, for a method that takes them, with the penalties that score used
     (:func:`used_penalties`);
     ``metadata["tie_break"]`` is :data:`andrey.config`'s ``tie_break`` for a method whose result it
-    can change (``MethodSpec.tie_break``); when the fit draws random numbers
+    can change (``MethodSpec.tie_break``); the orientation rules read flagged sides under
+    ``possibly_separable="ambiguous"`` (:func:`~andrey.core.ci_missing.reading_flags`); when the
+    fit draws random numbers
     (:func:`draws_random_numbers`), ``metadata["seed"]`` is the seed used; and, when its tests met
     missing values, ``metadata["missing"]`` is how it handled them (:func:`missing_used`).
     """
@@ -138,7 +141,8 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
             chosen = chosen_settings(spec, bound.arguments)
             check_penalties(spec, bound.arguments, chosen.get("score_func"))
             check_degrees_of_freedom(spec, bound.arguments, chosen.get("indep_test"))
-            out = facade(*bound.args, **bound.kwargs)
+            with reading_flags(bound.arguments.get("possibly_separable") == "ambiguous"):
+                out = facade(*bound.args, **bound.kwargs)
             if paths is not None:
                 out = (restrict_paths if spec.restricts_paths else meet_paths)(out, paths, name)
             stamp.update(chosen)
