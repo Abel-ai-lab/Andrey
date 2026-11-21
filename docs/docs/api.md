@@ -509,6 +509,8 @@ variable.
    anm
    pnl
    loci
+   cpcm
+   cpcm_graph
    rcd
    bottom_up_parce_lingam
    gin
@@ -596,6 +598,19 @@ proposed cause, and decides either by an HSIC test of the scaled residual agains
 (`criterion="independence"`, the default) or by the larger likelihood (`criterion="likelihood"`),
 which suits Gaussian noise. The [0.16.0](benchmarks/0.16.0.md#loci) release card measures both
 against the authors' code.
+
+CPCM, conditionally parametric causal models (Bodik and Chavez-Demoulin 2025), models each
+variable given its parents by a parametric family whose parameters are smooth functions of the
+parents: Gaussian with mean and scale (the default), Gaussian with the mean alone, exponential,
+Pareto, Poisson, gamma, Gumbel, or negative binomial, one family for every column or one per
+column. Each variable's values mapped through its fitted distribution function are independent of
+its causes only in the causal direction. {py:func}`~andrey.cpcm` decides a pair by an HSIC test of
+that residual in each direction; {py:func}`~andrey.cpcm_graph` returns the DAG whose residuals a
+dHSIC test finds most jointly independent, with a penalty of 2 per edge, by exact search up to 4
+variables and RESIT's order with greedy edge removal above. A column outside its family's support
+raises `ValueError`: a non-integer under `"poisson"`, a value of 0 or less under `"exponential"`,
+or a value of 1 or less under `"pareto"`. The [0.19.0](benchmarks/0.19.0.md#cpcm) release card
+measures both against the authors' code on the paper's pairs and on graphs of 4 to 8 variables.
 
 IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
 `target`; without one, they join a pair when each is in the other's set and return the graph
@@ -737,24 +752,9 @@ in a process.
 
    skewd
    skewd_mv
-   cpcm
-   cpcm_graph
    lges
    rpcmci
 ```
-
-CPCM, conditionally parametric causal models (Bodik and Chavez-Demoulin 2025), models each
-variable given its parents by a parametric family whose parameters are smooth functions of the
-parents: Gaussian with mean and scale (the default), Gaussian with the mean alone, exponential,
-Pareto, Poisson, gamma, Gumbel, or negative binomial, one family for every column or one per
-column. Each variable's values mapped through its fitted distribution function are independent of
-its causes only in the causal direction. {py:func}`~andrey.cpcm` decides a pair by an HSIC test of
-that residual in each direction; {py:func}`~andrey.cpcm_graph` returns the DAG whose residuals a
-dHSIC test finds most jointly independent, with a penalty of 2 per edge, by exact search up to 4
-variables and RESIT's order with greedy edge removal above. A column outside its family's support
-raises `ValueError`: a non-integer under `"poisson"`, a value of 0 or less under `"exponential"`,
-or a value of 1 or less under `"pareto"`. Both are experimental until their comparison with the
-authors' code is published.
 
 SkewD (Klippert and Marx 2026), {py:func}`~andrey.skewd`, decides the direction of a variable pair
 whose noise is skewed, in the location-scale model of LOCI with a skew-normal noise. It fits the

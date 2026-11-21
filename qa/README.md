@@ -166,10 +166,10 @@ fails, or no such run, runs the gate.
 The gate checks PC, FCI, GFCI, CD-NOD, FCI-JCI, IAMB, Inter-IAMB, MMPC, GES, GIES, GnIES, IGSP, ICP,
 XGES, AGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, NOTEARS, DAGMA, BOSS, GRaSP, BOSS-FCI,
 GRaSP-FCI, UT-IGSP, DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM,
-SCORE, NoGAM, DAS, CAM-UV, GIN, ANM, PNL, LOCI, PCMCI, PCMCI+, LPCMCI, J-PCMCI+, VARMA-LiNGAM,
-LongitudinalLiNGAM, Granger, and DYNOTEARS on the datasets whose assumptions each method needs, PC
-with each supported nonlinear conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on
-nonlinear data, and the targets UT-IGSP learns:
+SCORE, NoGAM, DAS, CAM-UV, GIN, ANM, PNL, LOCI, CPCM, CPCM's graph search, PCMCI, PCMCI+, LPCMCI,
+J-PCMCI+, VARMA-LiNGAM, LongitudinalLiNGAM, Granger, and DYNOTEARS on the datasets whose assumptions
+each method needs, PC with each supported nonlinear conditional-independence test, KCI, RCoT,
+CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 
 | Dataset | Draws | Methods |
 |---|---|---|
@@ -195,7 +195,8 @@ nonlinear data, and the targets UT-IGSP learns:
 | `camuv_paper` at `d = 14`, `latent_anm_er_tenth` at `d = 22`, `n = 1000` | 10 seeds each | CAM-UV |
 | `anm_pair` at `n = 1000` | 10 seeds | ANM |
 | `pnl_pair` at `n = 1000` | 10 seeds | PNL |
-| `lsnm_pair` at `n = 1000` | 10 seeds | LOCI |
+| `lsnm_pair` at `n = 1000` | 10 seeds | LOCI, CPCM (`family="gaussian"`) |
+| `anm_er_n1000` at `d = 5` | 10 seeds | CPCM's graph search (`family="gaussian_fixed_scale"`) |
 | `pcmci_paper` at `d = 10`, `n = 500, 1000` | 10 seeds each | PCMCI |
 | `pcmciplus_paper` at `(d, n) = (10, 500), (20, 1000)` | 10 seeds each | PCMCI+ |
 | `lpcmci_paper` at `(d, n) = (5, 500), (10, 1000)` | 10 seeds each | LPCMCI |
@@ -307,7 +308,9 @@ nonlinear data, and the targets UT-IGSP learns:
 - **Pairs.** `anm_pair`, `pnl_pair`, and `lsnm_pair` are the published cause-effect pairs: two
   variables and one edge, in a direction the seed draws, at the benchmarks' 1,000-row size; a test
   keeps them in step with the benchmark drivers. The empty graph's SHD on a pair is 1, so ANM, PNL,
-  and LOCI pass only when they name the true direction on most draws.
+  LOCI, and CPCM pass only when they name the true direction on most draws. CPCM runs with the
+  Gaussian location-scale family, the family its benchmark gives it on location-scale pairs, and
+  its graph search with the fixed-scale Gaussian family, an additive-noise model.
 - **Time series.** The published time-series regimes, drawn by the benchmark harness
   (`benchmarks/andrey_bench`), which the gate imports; each method runs through its benchmark
   adapter with the published settings. The sizes are published sizes at which the method's median
@@ -337,9 +340,9 @@ nonlinear data, and the targets UT-IGSP learns:
 
 SHD follows the published summaries: PC, with any test, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu,
 MMHC, RSMAX2, exact search, CALM, BOSS, and GRaSP against the truth's CPDAG, the LiNGAM methods,
-NOTEARS, DAGMA, AGES, ANM, PNL, SCORE, NoGAM, and DAS against the DAG, MultiGroupDirectLiNGAM summed
-over its groups, and FCI, GFCI, BOSS-FCI, and GRaSP-FCI by endpoint SHD against the PAG of the
-observed variables.
+NOTEARS, DAGMA, AGES, ANM, PNL, CPCM and its graph search, SCORE, NoGAM, and DAS against the DAG,
+MultiGroupDirectLiNGAM summed over its groups, and FCI, GFCI, BOSS-FCI, and GRaSP-FCI by endpoint
+SHD against the PAG of the observed variables.
 GIES is scored against the interventional essential graph of the true DAG under the rows' targets,
 IGSP against the one under the settings' targets, GnIES and UT-IGSP against the one under the true
 targets, and CD-NOD against the CPDAG in which the domain index orients the edges it reaches.

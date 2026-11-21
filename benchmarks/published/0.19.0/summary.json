@@ -2,18 +2,32 @@
  "release": "0.19.0",
  "parity_rule": "paired bootstrap",
  "generated": "2026-11-20",
- "theme": "DAS against the code published with its paper on the papers' simulation, z-scored, rescaled, and raw",
- "build": "DAS: Andrey development build of 18 November 2026 (version string 0.17.1, the functional-models line with DAS as released in 0.18.0); the 0.19.0 release branch returns the same graph on 40 of 40 check datasets (50 variables, ER4, raw and z-scored)",
- "verdict_rule": "DAS: per cell (scale, graph density, variables; 20 datasets): D = SHD(Andrey) - SHD(reference) per dataset, on the datasets both fitted; worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise. 10,000 resamples of the datasets, default_rng(0). The decision cells are the z-scored and rescaled ones (claim in); the raw cells, where the reference reads the simulation's units and Andrey standardizes inside its order search, are reported, not judged (claim out). A cell worse on its first seeds was rerun on fresh seeds (replication); no decision cell was worse, so none was rerun, and the raw ER1 cells at 20 and 50 variables, worse on their first seeds, were rerun. result is the published verdict, better or worse only where the fresh seeds agree and a tie otherwise; replicated says which. The floor, each row's floor field, per dataset: SHD(Andrey) minus SHD(empty graph), with the same bootstrap; it applies where the reference's interval lies wholly below 0, and a row then passes when Andrey's does too. The lane file's floor section takes the better of the empty graph and the complete DAG in column order",
+ "theme": "DAS and CPCM against the code published with their papers, on their papers' simulations and data",
+ "build": "DAS: Andrey development build of 18 November 2026 (version string 0.17.1, the functional-models line with DAS as released in 0.18.0); the 0.19.0 release branch returns the same graph on 40 of 40 check datasets (50 variables, ER4, raw and z-scored) CPCM: Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+ "verdict_rule": "DAS: per cell (scale, graph density, variables; 20 datasets): D = SHD(Andrey) - SHD(reference) per dataset, on the datasets both fitted; worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise. 10,000 resamples of the datasets, default_rng(0). The decision cells are the z-scored and rescaled ones (claim in); the raw cells, where the reference reads the simulation's units and Andrey standardizes inside its order search, are reported, not judged (claim out). A cell worse on its first seeds was rerun on fresh seeds (replication); no decision cell was worse, so none was rerun, and the raw ER1 cells at 20 and 50 variables, worse on their first seeds, were rerun. result is the published verdict, better or worse only where the fresh seeds agree and a tie otherwise; replicated says which. The floor, each row's floor field, per dataset: SHD(Andrey) minus SHD(empty graph), with the same bootstrap; it applies where the reference's interval lies wholly below 0, and a row then passes when Andrey's does too. The lane file's floor section takes the better of the empty graph and the complete DAG in column order CPCM: per cell (setup, family arm, size): D = error(Andrey) - error(reference) per dataset, on the datasets both fitted (pairs: 1 for the reversed forced direction; graphs: SHD, and the authors' SID beside it, a graph worse on either being worse); worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise; 10,000 resamples, default_rng(0). Pairs: 100 per cell, graphs: 20. A row worse on its first seeds was rerun on fresh seeds, and holds that rerun as replication; every other pair row with fresh seeds holds them as fresh. Fresh graph rows have no reference arm: Andrey's errors and floors only. result is the published verdict, better or worse only where the fresh seeds agree, a tie otherwise. The floor field is Andrey's and the reference's error minus the empty answer's; the lane file also gives the floor of the better of the coin flip and the cell's majority direction (pairs) or the empty and the base-rate graph (graphs). Rows of Table 1's misspecified families, the other family arm on LS, LS-s and MN-U, and the edge penalty 1 are out of claim, reported",
  "card_verdict_rule": "card_verdict, on every row: the release card's verdict on the row's comparison, 'better', 'tie', or 'worse', and null where the card judges none (rows out of claim). Better or worse counts only where a rerun on fresh seeds agreed; one on the first seeds alone is a tie",
- "fit_protocol": "DAS: each fit in a fresh process on one core with one BLAS thread, one timed fit without warm-up, a cap of 1,800 s per fit up to 100 variables and 3,600 s at 200, past which a fit is a timeout and never scored as a graph; no fit of these rows failed or timed out. Times are process CPU seconds; ratio is the median over the paired datasets of the reference's time over Andrey's",
- "error_metric": "DAS: SHD of the DAG against the true DAG (a reversed edge counts 1): andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means",
- "complete_definition": "DAS: true when every row has at least 10 paired datasets (both fitted)",
- "seeds_note": "DAS: every cell holds 20 datasets: seeds 0-19 for ER1 and for ER4 at 10 variables; seeds 20-39 for ER4 from 20 to 200 variables, kept apart from the ER4 seeds 0-19 used while the method was built; the raw ER4 cell at 50 variables is the one on seeds 0-19, reported as context, with the reference's fits from a separate run on the same datasets. A replication holds 20 fresh datasets, seeds 20-39. The lane file's rows at 500 and 1,000 variables use seeds 0-19, and its paired check at 500 seeds 0-4",
+ "fit_protocol": "DAS: each fit in a fresh process on one core with one BLAS thread, one timed fit without warm-up, a cap of 1,800 s per fit up to 100 variables and 3,600 s at 200, past which a fit is a timeout and never scored as a graph; no fit of these rows failed or timed out. Times are process CPU seconds; ratio is the median over the paired datasets of the reference's time over Andrey's CPCM: each fit in a long-lived worker on one core with one BLAS thread, one timed fit, a cap of 1,800 s per fit (3,600 s for the reference at 8 variables); no fit timed out; the reference's errors are counted and never scored, and each cell is paired on the datasets both finished; times are wall seconds of the fit inside the worker",
+ "error_metric": "DAS: SHD of the DAG against the true DAG (a reversed edge counts 1): andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means CPCM: pairs: SHD of the two-node DAG of the forced direction; graphs: SHD of the DAG, with the authors' SID under sid",
+ "complete_definition": "DAS: true when every row has at least 10 paired datasets (both fitted) CPCM: true when every row has at least 10 paired datasets",
+ "seeds_note": "DAS: every cell holds 20 datasets: seeds 0-19 for ER1 and for ER4 at 10 variables; seeds 20-39 for ER4 from 20 to 200 variables, kept apart from the ER4 seeds 0-19 used while the method was built; the raw ER4 cell at 50 variables is the one on seeds 0-19, reported as context, with the reference's fits from a separate run on the same datasets. A replication holds 20 fresh datasets, seeds 20-39. The lane file's rows at 500 and 1,000 variables use seeds 0-19, and its paired check at 500 seeds 0-4 CPCM: pairs: first seeds 0-99, fresh seeds 100-199; Table 2: the first seeds are the 100 pairs of each of the five Tagasovska et al. (2020) files the paper takes them from, the fresh seeds 100 pairs from their generator run unmodified under another seed, and POISg and PARg are drawn in the same style (the cause and a bandwidth-1 Gaussian-process parameter, shifted by 0.5) under the same two seeds; graphs: first seeds 0-19, fresh seeds 20-39",
  "regimes": {
   "score_paper_standardized": "the papers' simulation: Erdos-Renyi graphs with d edges (ER1) or 4 d (ER4), each link one draw of a Gaussian process over the node's parents, Gaussian noise of variance uniform on [0.4, 0.8], 1,000 rows, every column z-scored",
   "score_paper_rescaled": "the papers' simulation: Erdos-Renyi graphs with d edges (ER1) or 4 d (ER4), each link one draw of a Gaussian process over the node's parents, Gaussian noise of variance uniform on [0.4, 0.8], 1,000 rows, each variable divided by its standard deviation before its children read it",
-  "score_paper": "the papers' simulation: Erdos-Renyi graphs with d edges (ER1) or 4 d (ER4), each link one draw of a Gaussian process over the node's parents, Gaussian noise of variance uniform on [0.4, 0.8], 1,000 rows, in the simulation's own units"
+  "score_paper": "the papers' simulation: Erdos-Renyi graphs with d edges (ER1) or 4 d (ER4), each link one draw of a Gaussian process over the node's parents, Gaussian noise of variance uniform on [0.4, 0.8], 1,000 rows, in the simulation's own units",
+  "cpcm_table1_exponential": "the CPCM paper's Table 1 pairs: X1 ~ N(2, 1) on x > 0, X2 given X1 exponential with rate theta(X1), 1,000 rows, fitted with the exponential family",
+  "cpcm_table1_gamma_fixed_shape": "the CPCM paper's Table 1 pairs: X1 ~ N(2, 1) on x > 0, X2 given X1 exponential with rate theta(X1), 1,000 rows, fitted with the gamma_fixed_shape family",
+  "cpcm_table1_pareto": "the CPCM paper's Table 1 pairs: X1 ~ N(2, 1) on x > 0, X2 given X1 exponential with rate theta(X1), 1,000 rows, fitted with the pareto family",
+  "cpcm_table1_gamma": "the CPCM paper's Table 1 pairs: X1 ~ N(2, 1) on x > 0, X2 given X1 exponential with rate theta(X1), 1,000 rows, fitted with the gamma family",
+  "cpcm_table1_gumbel": "the CPCM paper's Table 1 pairs: X1 ~ N(2, 1) on x > 0, X2 given X1 exponential with rate theta(X1), 1,000 rows, fitted with the gumbel family",
+  "cpcm_table1_gumbel_fixed_scale": "the CPCM paper's Table 1 pairs: X1 ~ N(2, 1) on x > 0, X2 given X1 exponential with rate theta(X1), 1,000 rows, fitted with the gumbel_fixed_scale family",
+  "cpcm_table1_gaussian": "the CPCM paper's Table 1 pairs: X1 ~ N(2, 1) on x > 0, X2 given X1 exponential with rate theta(X1), 1,000 rows, fitted with the gaussian family",
+  "cpcm_table1_gaussian_fixed_scale": "the CPCM paper's Table 1 pairs: X1 ~ N(2, 1) on x > 0, X2 given X1 exponential with rate theta(X1), 1,000 rows, fitted with the gaussian_fixed_scale family",
+  "cpcm_table2": "the CPCM paper's Table 2 pairs, 1,000 rows: the five synthetic sets of Tagasovska et al. (2020) and the paper's Poisson and Pareto setups, with the family the paper's rule picks from each column's support, or the Gaussian location-scale family on the location-scale and multiplicative sets",
+  "cpcm_table2_other_arm": "the CPCM paper's Table 2 pairs, each fitted with the other family arm: the fixed-scale Gaussian family given on AN and AN-s, the support rule's family on LS, LS-s and MN-U",
+  "cpcm_pareto16": "the CPCM paper's model (16): X2 given X1 Pareto with theta(x) = x^gamma log x + 1, gamma 1 or 2, 500 to 2,000 rows",
+  "cpcm_graph_paper": "the CPCM paper's Section 6.4 graphs: random DAGs of 5 variables, 1,000 rows, linear, additive-noise, exponential CPCM, and mixed exponential and Gaussian CPCM variables, with the families the paper's rule picks from each column's support",
+  "cpcm_graph_paper_lambda1": "as cpcm_graph_paper, with an edge penalty of 1, the default of the authors' scripts",
+  "cpcm_graph_greedy": "the CPCM paper's Appendix B.1.1 graphs: exponential CPCM variables on random DAGs of 4, 6 and 8 variables, 1,000 rows, the families from the support rule"
  },
  "coverage": {},
  "packages": {
@@ -22,6 +36,14 @@
    "torch (dodiscover)": "2.13.0+cpu",
    "CausalDisco": "0.3.0",
    "NumPy (Andrey)": "2.5.4"
+  },
+  "CPCM": {
+   "CPCM (authors' code)": "commit 2ada90e",
+   "R": "4.6.1",
+   "mgcv": "1.9.5",
+   "dHSIC": "2.2",
+   "gamlss": "5.5.5",
+   "bnlearn": "5.2.1"
   }
  },
  "hardware": {
@@ -31,6 +53,15 @@
      "AMD EPYC 9534 64-Core Processor",
      "AMD EPYC 9555 64-Core Processor",
      "Intel(R) Xeon(R) Gold 5418Y"
+    ],
+    "cores_per_fit": 1,
+    "blas_threads": 1
+   },
+   "CPCM": {
+    "cpu_models": [
+     "AMD EPYC 7713 64-Core Processor",
+     "AMD EPYC 9534 64-Core Processor",
+     "INTEL(R) XEON(R) GOLD 6542Y"
     ],
     "cores_per_fit": 1,
     "blas_threads": 1
@@ -1806,6 +1837,7143 @@
      "result": "tie",
      "cell": "DAS|score_paper|ER4|d=50",
      "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "CPCM",
+   "family": "pairwise",
+   "solution": "andrey.cpcm.numpy",
+   "setting": "family=\"exponential\", alpha=None (forced)",
+   "comparator": "CPCM authors' R code",
+   "comparator_solution": "bodik.cpcm.r",
+   "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
+   "lane": "cpcm",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "cores": 1,
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "same_graph_test": "the same forced direction",
+   "regime": "cpcm_table1_exponential",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "forced direction: SHD of the two-node DAG, 1 for the reversed direction and 0 for the true one; the _mean fields are the error rates",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "CPCM|table1|exponential|theta=GP",
+     "effect": "theta = GP",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.98,
+     "base_rate_floor": {
+      "majority_share": 0.5,
+      "coin_flip_ub": -0.45,
+      "base_rate_ub": -0.38,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.1036,
+     "comparator_s": 0.403,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "timed_on_one_cpu": 0,
+     "andrey_correct": 98,
+     "andrey_reversed": 2,
+     "andrey_no_edge": 0,
+     "comparator_correct": 99,
+     "comparator_reversed": 1,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 1,
+     "comparator_direction_correct": 0.99,
+     "andrey_shd_mean": 0.02,
+     "comparator_shd_mean": 0.01,
+     "mean_D": 0.01,
+     "bootstrap_95": [
+      0.0,
+      0.03
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.98,
+       "bootstrap_95": [
+        -1.0,
+        -0.95
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.99,
+       "bootstrap_95": [
+        -1.0,
+        -0.97
+       ]
+      }
+     },
+     "paper_accuracy": 0.99,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.97,
+      "base_rate_floor": {
+       "majority_share": 0.6,
+       "coin_flip_ub": -0.43,
+       "base_rate_ub": -0.27,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.1025,
+      "comparator_s": 0.3075,
+      "ratio": null,
+      "ratio_quartiles": null,
+      "timed_on_one_cpu": 0,
+      "andrey_correct": 97,
+      "andrey_reversed": 3,
+      "andrey_no_edge": 0,
+      "comparator_correct": 99,
+      "comparator_reversed": 1,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 2,
+      "comparator_direction_correct": 0.99,
+      "andrey_shd_mean": 0.03,
+      "comparator_shd_mean": 0.01,
+      "mean_D": 0.02,
+      "bootstrap_95": [
+       0.0,
+       0.05
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.97,
+        "bootstrap_95": [
+         -1.0,
+         -0.93
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.99,
+        "bootstrap_95": [
+         -1.0,
+         -0.97
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|table1|exponential|theta=x",
+     "effect": "theta = x",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.99,
+     "base_rate_floor": {
+      "majority_share": 0.54,
+      "coin_flip_ub": -0.47,
+      "base_rate_ub": -0.35,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.1186,
+     "comparator_s": 0.3705,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "timed_on_one_cpu": 0,
+     "andrey_correct": 99,
+     "andrey_reversed": 1,
+     "andrey_no_edge": 0,
+     "comparator_correct": 99,
+     "comparator_reversed": 1,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.99,
+     "andrey_shd_mean": 0.01,
+     "comparator_shd_mean": 0.01,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.99,
+       "bootstrap_95": [
+        -1.0,
+        -0.97
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.99,
+       "bootstrap_95": [
+        -1.0,
+        -0.97
+       ]
+      }
+     },
+     "paper_accuracy": 0.98,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.99,
+      "base_rate_floor": {
+       "majority_share": 0.51,
+       "coin_flip_ub": -0.47,
+       "base_rate_ub": -0.38,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.1307,
+      "comparator_s": 0.251,
+      "ratio": 1.97,
+      "ratio_quartiles": [
+       1.83,
+       2.2
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 99,
+      "andrey_reversed": 1,
+      "andrey_no_edge": 0,
+      "comparator_correct": 98,
+      "comparator_reversed": 2,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 1,
+      "comparator_right_andrey_wrong_count": 0,
+      "comparator_direction_correct": 0.98,
+      "andrey_shd_mean": 0.01,
+      "comparator_shd_mean": 0.02,
+      "mean_D": -0.01,
+      "bootstrap_95": [
+       -0.03,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.99,
+        "bootstrap_95": [
+         -1.0,
+         -0.97
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.98,
+        "bootstrap_95": [
+         -1.0,
+         -0.95
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|table1|exponential|theta=x^2 + 1",
+     "effect": "theta = x^2 + 1",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "base_rate_floor": {
+      "majority_share": 0.53,
+      "coin_flip_ub": -0.5,
+      "base_rate_ub": -0.37,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.1064,
+     "comparator_s": 0.3355,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "timed_on_one_cpu": 0,
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 100,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "paper_accuracy": 0.99,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.96,
+      "base_rate_floor": {
+       "majority_share": 0.51,
+       "coin_flip_ub": -0.42,
+       "base_rate_ub": -0.35,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.126,
+      "comparator_s": 0.2515,
+      "ratio": 2.04,
+      "ratio_quartiles": [
+       1.84,
+       2.26
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 96,
+      "andrey_reversed": 4,
+      "andrey_no_edge": 0,
+      "comparator_correct": 96,
+      "comparator_reversed": 4,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 0,
+      "comparator_direction_correct": 0.96,
+      "andrey_shd_mean": 0.04,
+      "comparator_shd_mean": 0.04,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.96,
+        "bootstrap_95": [
+         -0.99,
+         -0.92
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.96,
+        "bootstrap_95": [
+         -0.99,
+         -0.92
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|table1|exponential|theta=exp(x / 2)",
+     "effect": "theta = exp(x / 2)",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.92,
+     "base_rate_floor": {
+      "majority_share": 0.53,
+      "coin_flip_ub": -0.36,
+      "base_rate_ub": -0.28,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.1049,
+     "comparator_s": 0.343,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "timed_on_one_cpu": 0,
+     "andrey_correct": 92,
+     "andrey_reversed": 8,
+     "andrey_no_edge": 0,
+     "comparator_correct": 92,
+     "comparator_reversed": 8,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.92,
+     "andrey_shd_mean": 0.08,
+     "comparator_shd_mean": 0.08,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.92,
+       "bootstrap_95": [
+        -0.97,
+        -0.86
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.92,
+       "bootstrap_95": [
+        -0.97,
+        -0.86
+       ]
+      }
+     },
+     "paper_accuracy": 1.0,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.93,
+      "base_rate_floor": {
+       "majority_share": 0.56,
+       "coin_flip_ub": -0.3798,
+       "base_rate_ub": -0.26,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.1226,
+      "comparator_s": 0.2595,
+      "ratio": 2.26,
+      "ratio_quartiles": [
+       1.97,
+       2.44
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 93,
+      "andrey_reversed": 7,
+      "andrey_no_edge": 0,
+      "comparator_correct": 94,
+      "comparator_reversed": 6,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 1,
+      "comparator_right_andrey_wrong_count": 2,
+      "comparator_direction_correct": 0.94,
+      "andrey_shd_mean": 0.07,
+      "comparator_shd_mean": 0.06,
+      "mean_D": 0.01,
+      "bootstrap_95": [
+       -0.02,
+       0.05
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.93,
+        "bootstrap_95": [
+         -0.97,
+         -0.8798
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.94,
+        "bootstrap_95": [
+         -0.98,
+         -0.89
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "CPCM",
+   "family": "pairwise",
+   "solution": "andrey.cpcm.numpy",
+   "setting": "family=\"gamma_fixed_shape\", alpha=None (forced)",
+   "comparator": "CPCM authors' R code",
+   "comparator_solution": "bodik.cpcm.r",
+   "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
+   "lane": "cpcm",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "cores": 1,
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "same_graph_test": "the same forced direction",
+   "regime": "cpcm_table1_gamma_fixed_shape",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "forced direction: SHD of the two-node DAG, 1 for the reversed direction and 0 for the true one; the _mean fields are the error rates",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "CPCM|table1|gamma_fixed_shape|theta=GP",
+     "effect": "theta = GP",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.98,
+     "base_rate_floor": {
+      "majority_share": 0.5,
+      "coin_flip_ub": -0.45,
+      "base_rate_ub": -0.38,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.3407,
+     "comparator_s": 0.5745,
+     "ratio": 1.69,
+     "ratio_quartiles": [
+      1.53,
+      1.91
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 98,
+     "andrey_reversed": 2,
+     "andrey_no_edge": 0,
+     "comparator_correct": 98,
+     "comparator_reversed": 2,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.98,
+     "andrey_shd_mean": 0.02,
+     "comparator_shd_mean": 0.02,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.98,
+       "bootstrap_95": [
+        -1.0,
+        -0.95
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.98,
+       "bootstrap_95": [
+        -1.0,
+        -0.95
+       ]
+      }
+     },
+     "paper_accuracy": 0.96,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.97,
+      "base_rate_floor": {
+       "majority_share": 0.6,
+       "coin_flip_ub": -0.43,
+       "base_rate_ub": -0.27,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.2247,
+      "comparator_s": 0.445,
+      "ratio": 2.0,
+      "ratio_quartiles": [
+       1.82,
+       2.3
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 97,
+      "andrey_reversed": 3,
+      "andrey_no_edge": 0,
+      "comparator_correct": 98,
+      "comparator_reversed": 2,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 1,
+      "comparator_direction_correct": 0.98,
+      "andrey_shd_mean": 0.03,
+      "comparator_shd_mean": 0.02,
+      "mean_D": 0.01,
+      "bootstrap_95": [
+       0.0,
+       0.03
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.97,
+        "bootstrap_95": [
+         -1.0,
+         -0.93
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.98,
+        "bootstrap_95": [
+         -1.0,
+         -0.95
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|table1|gamma_fixed_shape|theta=x",
+     "effect": "theta = x",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.99,
+     "base_rate_floor": {
+      "majority_share": 0.54,
+      "coin_flip_ub": -0.47,
+      "base_rate_ub": -0.35,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.5159,
+     "comparator_s": 0.523,
+     "ratio": 1.03,
+     "ratio_quartiles": [
+      0.9,
+      1.18
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 99,
+     "andrey_reversed": 1,
+     "andrey_no_edge": 0,
+     "comparator_correct": 99,
+     "comparator_reversed": 1,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.99,
+     "andrey_shd_mean": 0.01,
+     "comparator_shd_mean": 0.01,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.99,
+       "bootstrap_95": [
+        -1.0,
+        -0.97
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.99,
+       "bootstrap_95": [
+        -1.0,
+        -0.97
+       ]
+      }
+     },
+     "paper_accuracy": 0.96,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|table1|gamma_fixed_shape|theta=x^2 + 1",
+     "effect": "theta = x^2 + 1",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.99,
+     "base_rate_floor": {
+      "majority_share": 0.53,
+      "coin_flip_ub": -0.47,
+      "base_rate_ub": -0.36,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.4228,
+     "comparator_s": 0.5255,
+     "ratio": 1.25,
+     "ratio_quartiles": [
+      1.16,
+      1.45
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 99,
+     "andrey_reversed": 1,
+     "andrey_no_edge": 0,
+     "comparator_correct": 99,
+     "comparator_reversed": 1,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.99,
+     "andrey_shd_mean": 0.01,
+     "comparator_shd_mean": 0.01,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.99,
+       "bootstrap_95": [
+        -1.0,
+        -0.97
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.99,
+       "bootstrap_95": [
+        -1.0,
+        -0.97
+       ]
+      }
+     },
+     "paper_accuracy": 1.0,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|table1|gamma_fixed_shape|theta=exp(x / 2)",
+     "effect": "theta = exp(x / 2)",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.94,
+     "base_rate_floor": {
+      "majority_share": 0.53,
+      "coin_flip_ub": -0.39,
+      "base_rate_ub": -0.3,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.3742,
+     "comparator_s": 0.6545,
+     "ratio": 1.76,
+     "ratio_quartiles": [
+      1.6,
+      1.97
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 94,
+     "andrey_reversed": 6,
+     "andrey_no_edge": 0,
+     "comparator_correct": 94,
+     "comparator_reversed": 6,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.94,
+     "andrey_shd_mean": 0.06,
+     "comparator_shd_mean": 0.06,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.94,
+       "bootstrap_95": [
+        -0.98,
+        -0.89
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.94,
+       "bootstrap_95": [
+        -0.98,
+        -0.89
+       ]
+      }
+     },
+     "paper_accuracy": 0.99,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "CPCM",
+   "family": "pairwise",
+   "solution": "andrey.cpcm.numpy",
+   "setting": "family=\"pareto\", alpha=None (forced)",
+   "comparator": "CPCM authors' R code",
+   "comparator_solution": "bodik.cpcm.r",
+   "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
+   "lane": "cpcm",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "cores": 1,
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "same_graph_test": "the same forced direction",
+   "regime": "cpcm_table1_pareto",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "forced direction: SHD of the two-node DAG, 1 for the reversed direction and 0 for the true one; the _mean fields are the error rates",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "CPCM|table1|pareto|theta=GP",
+     "effect": "theta = GP",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "base_rate_floor": {
+      "majority_share": 0.5,
+      "coin_flip_ub": -0.5,
+      "base_rate_ub": -0.4,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.1028,
+     "comparator_s": 0.3955,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "timed_on_one_cpu": 0,
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 100,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "paper_accuracy": 0.99,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.97,
+      "base_rate_floor": {
+       "majority_share": 0.6,
+       "coin_flip_ub": -0.43,
+       "base_rate_ub": -0.27,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.1024,
+      "comparator_s": 0.3075,
+      "ratio": null,
+      "ratio_quartiles": null,
+      "timed_on_one_cpu": 0,
+      "andrey_correct": 97,
+      "andrey_reversed": 3,
+      "andrey_no_edge": 0,
+      "comparator_correct": 99,
+      "comparator_reversed": 1,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 2,
+      "comparator_direction_correct": 0.99,
+      "andrey_shd_mean": 0.03,
+      "comparator_shd_mean": 0.01,
+      "mean_D": 0.02,
+      "bootstrap_95": [
+       0.0,
+       0.05
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.97,
+        "bootstrap_95": [
+         -1.0,
+         -0.93
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.99,
+        "bootstrap_95": [
+         -1.0,
+         -0.97
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|table1|pareto|theta=x",
+     "effect": "theta = x",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "base_rate_floor": {
+      "majority_share": 0.54,
+      "coin_flip_ub": -0.5,
+      "base_rate_ub": -0.36,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.115,
+     "comparator_s": 0.3645,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "timed_on_one_cpu": 0,
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 100,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "paper_accuracy": 0.99,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 1.0,
+      "base_rate_floor": {
+       "majority_share": 0.51,
+       "coin_flip_ub": -0.5,
+       "base_rate_ub": -0.39,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.1273,
+      "comparator_s": 0.251,
+      "ratio": 2.02,
+      "ratio_quartiles": [
+       1.83,
+       2.24
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 100,
+      "andrey_reversed": 0,
+      "andrey_no_edge": 0,
+      "comparator_correct": 100,
+      "comparator_reversed": 0,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 0,
+      "comparator_direction_correct": 1.0,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.0,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|table1|pareto|theta=x^2 + 1",
+     "effect": "theta = x^2 + 1",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "base_rate_floor": {
+      "majority_share": 0.53,
+      "coin_flip_ub": -0.5,
+      "base_rate_ub": -0.37,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.1057,
+     "comparator_s": 0.342,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "timed_on_one_cpu": 0,
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 100,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "paper_accuracy": 1.0,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 1.0,
+      "base_rate_floor": {
+       "majority_share": 0.51,
+       "coin_flip_ub": -0.5,
+       "base_rate_ub": -0.39,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.1266,
+      "comparator_s": 0.2535,
+      "ratio": 2.08,
+      "ratio_quartiles": [
+       1.88,
+       2.25
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 100,
+      "andrey_reversed": 0,
+      "andrey_no_edge": 0,
+      "comparator_correct": 100,
+      "comparator_reversed": 0,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 0,
+      "comparator_direction_correct": 1.0,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.0,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|table1|pareto|theta=exp(x / 2)",
+     "effect": "theta = exp(x / 2)",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "base_rate_floor": {
+      "majority_share": 0.53,
+      "coin_flip_ub": -0.5,
+      "base_rate_ub": -0.37,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.1053,
+     "comparator_s": 0.345,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "timed_on_one_cpu": 0,
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 100,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "paper_accuracy": 1.0,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 1.0,
+      "base_rate_floor": {
+       "majority_share": 0.56,
+       "coin_flip_ub": -0.5,
+       "base_rate_ub": -0.34,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.1222,
+      "comparator_s": 0.2545,
+      "ratio": 2.18,
+      "ratio_quartiles": [
+       1.93,
+       2.44
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 100,
+      "andrey_reversed": 0,
+      "andrey_no_edge": 0,
+      "comparator_correct": 100,
+      "comparator_reversed": 0,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 0,
+      "comparator_direction_correct": 1.0,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.0,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "CPCM",
+   "family": "pairwise",
+   "solution": "andrey.cpcm.numpy",
+   "setting": "family=\"gamma\", alpha=None (forced)",
+   "comparator": "CPCM authors' R code",
+   "comparator_solution": "bodik.cpcm.r",
+   "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
+   "lane": "cpcm.misspecified",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "cores": 1,
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "same_graph_test": "the same forced direction",
+   "regime": "cpcm_table1_gamma",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "forced direction: SHD of the two-node DAG, 1 for the reversed direction and 0 for the true one; the _mean fields are the error rates",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "CPCM|table1|gamma|theta=GP",
+     "effect": "theta = GP",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.976,
+     "base_rate_floor": {
+      "majority_share": 0.5,
+      "coin_flip_ub": -0.47,
+      "base_rate_ub": -0.39,
+      "pass": true
+     },
+     "comparator_ok": 41,
+     "paired": 41,
+     "datasets": 100,
+     "andrey_s": 0.8204,
+     "comparator_s": 1.004,
+     "ratio": 1.26,
+     "ratio_quartiles": [
+      0.96,
+      1.37
+     ],
+     "timed_on_one_cpu": 41,
+     "andrey_correct": 40,
+     "andrey_reversed": 1,
+     "andrey_no_edge": 0,
+     "comparator_correct": 40,
+     "comparator_reversed": 1,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.976,
+     "andrey_shd_mean": 0.0244,
+     "comparator_shd_mean": 0.0244,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 59
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 41,
+       "mean": -0.9756,
+       "bootstrap_95": [
+        -1.0,
+        -0.9268
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 41,
+       "mean": -0.9756,
+       "bootstrap_95": [
+        -1.0,
+        -0.9268
+       ]
+      }
+     },
+     "comparator_errors": 59,
+     "paper_accuracy": 0.96,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.96,
+      "base_rate_floor": {
+       "majority_share": 0.6,
+       "coin_flip_ub": -0.42,
+       "base_rate_ub": -0.25,
+       "pass": true
+      },
+      "comparator_ok": 50,
+      "paired": 50,
+      "datasets": 100,
+      "andrey_s": 0.5752,
+      "comparator_s": 0.7725,
+      "ratio": 1.37,
+      "ratio_quartiles": [
+       1.07,
+       1.65
+      ],
+      "timed_on_one_cpu": 50,
+      "andrey_correct": 48,
+      "andrey_reversed": 2,
+      "andrey_no_edge": 0,
+      "comparator_correct": 49,
+      "comparator_reversed": 1,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 1,
+      "comparator_direction_correct": 0.98,
+      "andrey_shd_mean": 0.04,
+      "comparator_shd_mean": 0.02,
+      "mean_D": 0.02,
+      "bootstrap_95": [
+       0.0,
+       0.06
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 50
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 50,
+        "mean": -0.96,
+        "bootstrap_95": [
+         -1.0,
+         -0.9
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 50,
+        "mean": -0.98,
+        "bootstrap_95": [
+         -1.0,
+         -0.94
+        ]
+       }
+      },
+      "comparator_errors": 50
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": null
+    },
+    {
+     "cell": "CPCM|table1|gamma|theta=x",
+     "effect": "theta = x",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.867,
+     "base_rate_floor": {
+      "majority_share": 0.54,
+      "coin_flip_ub": -0.24,
+      "base_rate_ub": -0.15,
+      "pass": true
+     },
+     "comparator_ok": 15,
+     "paired": 15,
+     "datasets": 100,
+     "andrey_s": 1.6045,
+     "comparator_s": 0.999,
+     "ratio": 0.58,
+     "ratio_quartiles": [
+      0.48,
+      0.85
+     ],
+     "timed_on_one_cpu": 15,
+     "andrey_correct": 13,
+     "andrey_reversed": 2,
+     "andrey_no_edge": 0,
+     "comparator_correct": 13,
+     "comparator_reversed": 2,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.867,
+     "andrey_shd_mean": 0.1333,
+     "comparator_shd_mean": 0.1333,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 85
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 15,
+       "mean": -0.8667,
+       "bootstrap_95": [
+        -1.0,
+        -0.6667
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 15,
+       "mean": -0.8667,
+       "bootstrap_95": [
+        -1.0,
+        -0.6667
+       ]
+      }
+     },
+     "comparator_errors": 85,
+     "paper_accuracy": 0.73,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": null
+    },
+    {
+     "cell": "CPCM|table1|gamma|theta=x^2 + 1",
+     "effect": "theta = x^2 + 1",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.653,
+     "base_rate_floor": {
+      "majority_share": 0.53,
+      "coin_flip_ub": -0.06,
+      "base_rate_ub": 0.01,
+      "pass": false
+     },
+     "comparator_ok": 75,
+     "paired": 75,
+     "datasets": 100,
+     "andrey_s": 1.3341,
+     "comparator_s": 0.912,
+     "ratio": 0.72,
+     "ratio_quartiles": [
+      0.6,
+      0.83
+     ],
+     "timed_on_one_cpu": 75,
+     "andrey_correct": 49,
+     "andrey_reversed": 26,
+     "andrey_no_edge": 0,
+     "comparator_correct": 49,
+     "comparator_reversed": 26,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.653,
+     "andrey_shd_mean": 0.3467,
+     "comparator_shd_mean": 0.3467,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 25
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 75,
+       "mean": -0.6533,
+       "bootstrap_95": [
+        -0.76,
+        -0.5467
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 75,
+       "mean": -0.6533,
+       "bootstrap_95": [
+        -0.76,
+        -0.5467
+       ]
+      }
+     },
+     "comparator_errors": 25,
+     "paper_accuracy": 0.64,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": null
+    },
+    {
+     "cell": "CPCM|table1|gamma|theta=exp(x / 2)",
+     "effect": "theta = exp(x / 2)",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.605,
+     "base_rate_floor": {
+      "majority_share": 0.53,
+      "coin_flip_ub": -0.02,
+      "base_rate_ub": 0.05,
+      "pass": false
+     },
+     "comparator_ok": 76,
+     "paired": 76,
+     "datasets": 100,
+     "andrey_s": 0.9486,
+     "comparator_s": 1.0425,
+     "ratio": 1.1,
+     "ratio_quartiles": [
+      0.94,
+      1.27
+     ],
+     "timed_on_one_cpu": 76,
+     "andrey_correct": 46,
+     "andrey_reversed": 30,
+     "andrey_no_edge": 0,
+     "comparator_correct": 47,
+     "comparator_reversed": 29,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 1,
+     "comparator_direction_correct": 0.618,
+     "andrey_shd_mean": 0.3947,
+     "comparator_shd_mean": 0.3816,
+     "mean_D": 0.0132,
+     "bootstrap_95": [
+      0.0,
+      0.0395
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 24
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 76,
+       "mean": -0.6053,
+       "bootstrap_95": [
+        -0.7105,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 76,
+       "mean": -0.6184,
+       "bootstrap_95": [
+        -0.7237,
+        -0.5132
+       ]
+      }
+     },
+     "comparator_errors": 24,
+     "paper_accuracy": 0.79,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "CPCM",
+   "family": "pairwise",
+   "solution": "andrey.cpcm.numpy",
+   "setting": "family=\"gumbel\", alpha=None (forced)",
+   "comparator": "CPCM authors' R code",
+   "comparator_solution": "bodik.cpcm.r",
+   "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
+   "lane": "cpcm.misspecified",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "cores": 1,
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "same_graph_test": "the same forced direction",
+   "regime": "cpcm_table1_gumbel",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "forced direction: SHD of the two-node DAG, 1 for the reversed direction and 0 for the true one; the _mean fields are the error rates",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "CPCM|table1|gumbel|theta=GP",
+     "effect": "theta = GP",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.977,
+     "base_rate_floor": {
+      "majority_share": 0.5,
+      "coin_flip_ub": -0.43,
+      "base_rate_ub": -0.36,
+      "pass": true
+     },
+     "comparator_ok": 88,
+     "paired": 88,
+     "datasets": 100,
+     "andrey_s": 0.5247,
+     "comparator_s": 0.78,
+     "ratio": 1.57,
+     "ratio_quartiles": [
+      1.18,
+      1.86
+     ],
+     "timed_on_one_cpu": 88,
+     "andrey_correct": 86,
+     "andrey_reversed": 2,
+     "andrey_no_edge": 0,
+     "comparator_correct": 88,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 2,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0227,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0227,
+     "bootstrap_95": [
+      0.0,
+      0.0568
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 12
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 88,
+       "mean": -0.9773,
+       "bootstrap_95": [
+        -1.0,
+        -0.9432
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 88,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "comparator_errors": 12,
+     "paper_accuracy": 0.68,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.946,
+      "base_rate_floor": {
+       "majority_share": 0.6,
+       "coin_flip_ub": -0.4,
+       "base_rate_ub": -0.24,
+       "pass": true
+      },
+      "comparator_ok": 93,
+      "paired": 93,
+      "datasets": 100,
+      "andrey_s": 0.2946,
+      "comparator_s": 0.6,
+      "ratio": 2.09,
+      "ratio_quartiles": [
+       1.58,
+       2.54
+      ],
+      "timed_on_one_cpu": 93,
+      "andrey_correct": 88,
+      "andrey_reversed": 5,
+      "andrey_no_edge": 0,
+      "comparator_correct": 92,
+      "comparator_reversed": 1,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 1,
+      "comparator_right_andrey_wrong_count": 5,
+      "comparator_direction_correct": 0.989,
+      "andrey_shd_mean": 0.0538,
+      "comparator_shd_mean": 0.0108,
+      "mean_D": 0.043,
+      "bootstrap_95": [
+       0.0,
+       0.0968
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 7
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 93,
+        "mean": -0.9462,
+        "bootstrap_95": [
+         -0.9892,
+         -0.8925
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 93,
+        "mean": -0.9892,
+        "bootstrap_95": [
+         -1.0,
+         -0.9677
+        ]
+       }
+      },
+      "comparator_errors": 7
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": null
+    },
+    {
+     "cell": "CPCM|table1|gumbel|theta=x",
+     "effect": "theta = x",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.7,
+     "base_rate_floor": {
+      "majority_share": 0.54,
+      "coin_flip_ub": -0.33,
+      "base_rate_ub": -0.2398,
+      "pass": true
+     },
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 100,
+     "andrey_s": 0.8171,
+     "comparator_s": 0.8595,
+     "ratio": 1.04,
+     "ratio_quartiles": [
+      0.9,
+      1.24
+     ],
+     "timed_on_one_cpu": 20,
+     "andrey_correct": 14,
+     "andrey_reversed": 6,
+     "andrey_no_edge": 0,
+     "comparator_correct": 15,
+     "comparator_reversed": 5,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 1,
+     "comparator_direction_correct": 0.75,
+     "andrey_shd_mean": 0.3,
+     "comparator_shd_mean": 0.25,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      0.0,
+      0.15
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 80
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.7,
+       "bootstrap_95": [
+        -0.9,
+        -0.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.75,
+       "bootstrap_95": [
+        -0.9,
+        -0.55
+       ]
+      }
+     },
+     "comparator_errors": 80,
+     "paper_accuracy": 0.87,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": null
+    },
+    {
+     "cell": "CPCM|table1|gumbel|theta=x^2 + 1",
+     "effect": "theta = x^2 + 1",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.773,
+     "base_rate_floor": {
+      "majority_share": 0.53,
+      "coin_flip_ub": -0.2,
+      "base_rate_ub": -0.12,
+      "pass": true
+     },
+     "comparator_ok": 97,
+     "paired": 97,
+     "datasets": 100,
+     "andrey_s": 0.6926,
+     "comparator_s": 0.687,
+     "ratio": 1.02,
+     "ratio_quartiles": [
+      0.88,
+      1.26
+     ],
+     "timed_on_one_cpu": 97,
+     "andrey_correct": 75,
+     "andrey_reversed": 22,
+     "andrey_no_edge": 0,
+     "comparator_correct": 76,
+     "comparator_reversed": 21,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 2,
+     "comparator_right_andrey_wrong_count": 3,
+     "comparator_direction_correct": 0.784,
+     "andrey_shd_mean": 0.2268,
+     "comparator_shd_mean": 0.2165,
+     "mean_D": 0.0103,
+     "bootstrap_95": [
+      -0.0309,
+      0.0515
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 3
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 97,
+       "mean": -0.7732,
+       "bootstrap_95": [
+        -0.8557,
+        -0.6907
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 97,
+       "mean": -0.7835,
+       "bootstrap_95": [
+        -0.866,
+        -0.701
+       ]
+      }
+     },
+     "comparator_errors": 3,
+     "paper_accuracy": 0.91,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": null
+    },
+    {
+     "cell": "CPCM|table1|gumbel|theta=exp(x / 2)",
+     "effect": "theta = exp(x / 2)",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.737,
+     "base_rate_floor": {
+      "majority_share": 0.53,
+      "coin_flip_ub": -0.14,
+      "base_rate_ub": -0.06,
+      "pass": true
+     },
+     "comparator_ok": 99,
+     "paired": 99,
+     "datasets": 100,
+     "andrey_s": 0.4981,
+     "comparator_s": 0.736,
+     "ratio": 1.55,
+     "ratio_quartiles": [
+      1.33,
+      1.75
+     ],
+     "timed_on_one_cpu": 99,
+     "andrey_correct": 73,
+     "andrey_reversed": 26,
+     "andrey_no_edge": 0,
+     "comparator_correct": 76,
+     "comparator_reversed": 23,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 2,
+     "comparator_right_andrey_wrong_count": 5,
+     "comparator_direction_correct": 0.768,
+     "andrey_shd_mean": 0.2626,
+     "comparator_shd_mean": 0.2323,
+     "mean_D": 0.0303,
+     "bootstrap_95": [
+      -0.0202,
+      0.0808
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 1
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 99,
+       "mean": -0.7374,
+       "bootstrap_95": [
+        -0.8182,
+        -0.6465
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 99,
+       "mean": -0.7677,
+       "bootstrap_95": [
+        -0.8485,
+        -0.6869
+       ]
+      }
+     },
+     "comparator_errors": 1,
+     "paper_accuracy": 0.97,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "CPCM",
+   "family": "pairwise",
+   "solution": "andrey.cpcm.numpy",
+   "setting": "family=\"gumbel_fixed_scale\", alpha=None (forced)",
+   "comparator": "CPCM authors' R code",
+   "comparator_solution": "bodik.cpcm.r",
+   "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
+   "lane": "cpcm.misspecified",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "cores": 1,
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "same_graph_test": "the same forced direction",
+   "regime": "cpcm_table1_gumbel_fixed_scale",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "forced direction: SHD of the two-node DAG, 1 for the reversed direction and 0 for the true one; the _mean fields are the error rates",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "CPCM|table1|gumbel_fixed_scale|theta=GP",
+     "effect": "theta = GP",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.3,
+     "base_rate_floor": {
+      "majority_share": 0.5,
+      "coin_flip_ub": 0.29,
+      "base_rate_ub": 0.33,
+      "pass": false
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.1803,
+     "comparator_s": 0.53,
+     "ratio": 2.82,
+     "ratio_quartiles": [
+      2.56,
+      3.23
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 30,
+     "andrey_reversed": 70,
+     "andrey_no_edge": 0,
+     "comparator_correct": 42,
+     "comparator_reversed": 58,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 3,
+     "comparator_right_andrey_wrong_count": 15,
+     "comparator_direction_correct": 0.42,
+     "andrey_shd_mean": 0.7,
+     "comparator_shd_mean": 0.58,
+     "mean_D": 0.12,
+     "bootstrap_95": [
+      0.04,
+      0.2
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.3,
+       "bootstrap_95": [
+        -0.39,
+        -0.21
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.42,
+       "bootstrap_95": [
+        -0.52,
+        -0.32
+       ]
+      }
+     },
+     "paper_accuracy": 0.36,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "replication": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.35,
+      "base_rate_floor": {
+       "majority_share": 0.6,
+       "coin_flip_ub": 0.24,
+       "base_rate_ub": 0.39,
+       "pass": false
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.1118,
+      "comparator_s": 0.3995,
+      "ratio": 3.47,
+      "ratio_quartiles": [
+       3.18,
+       4.01
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 35,
+      "andrey_reversed": 65,
+      "andrey_no_edge": 0,
+      "comparator_correct": 41,
+      "comparator_reversed": 59,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 4,
+      "comparator_right_andrey_wrong_count": 10,
+      "comparator_direction_correct": 0.41,
+      "andrey_shd_mean": 0.65,
+      "comparator_shd_mean": 0.59,
+      "mean_D": 0.06,
+      "bootstrap_95": [
+       -0.01,
+       0.13
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.35,
+        "bootstrap_95": [
+         -0.45,
+         -0.26
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.41,
+        "bootstrap_95": [
+         -0.51,
+         -0.31
+        ]
+       }
+      }
+     },
+     "replicated": "worse, not repeated on fresh seeds",
+     "result": "tie",
+     "card_verdict": null
+    },
+    {
+     "cell": "CPCM|table1|gumbel_fixed_scale|theta=x",
+     "effect": "theta = x",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.0,
+     "base_rate_floor": {
+      "majority_share": 0.54,
+      "coin_flip_ub": 0.5,
+      "base_rate_ub": 0.64,
+      "pass": false
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.1969,
+     "comparator_s": 0.6295,
+     "ratio": 3.21,
+     "ratio_quartiles": [
+      2.7,
+      3.64
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 0,
+     "andrey_reversed": 100,
+     "andrey_no_edge": 0,
+     "comparator_correct": 0,
+     "comparator_reversed": 100,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.0,
+     "andrey_shd_mean": 1.0,
+     "comparator_shd_mean": 1.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "paper_accuracy": 0.0,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": null
+    },
+    {
+     "cell": "CPCM|table1|gumbel_fixed_scale|theta=x^2 + 1",
+     "effect": "theta = x^2 + 1",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.0,
+     "base_rate_floor": {
+      "majority_share": 0.53,
+      "coin_flip_ub": 0.5,
+      "base_rate_ub": 0.63,
+      "pass": false
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.1956,
+     "comparator_s": 0.427,
+     "ratio": 2.21,
+     "ratio_quartiles": [
+      2.07,
+      3.04
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 0,
+     "andrey_reversed": 100,
+     "andrey_no_edge": 0,
+     "comparator_correct": 0,
+     "comparator_reversed": 100,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.0,
+     "andrey_shd_mean": 1.0,
+     "comparator_shd_mean": 1.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "paper_accuracy": 0.01,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": null
+    },
+    {
+     "cell": "CPCM|table1|gumbel_fixed_scale|theta=exp(x / 2)",
+     "effect": "theta = exp(x / 2)",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.0,
+     "base_rate_floor": {
+      "majority_share": 0.53,
+      "coin_flip_ub": 0.5,
+      "base_rate_ub": 0.63,
+      "pass": false
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.1975,
+     "comparator_s": 0.464,
+     "ratio": 2.34,
+     "ratio_quartiles": [
+      2.15,
+      2.58
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 0,
+     "andrey_reversed": 100,
+     "andrey_no_edge": 0,
+     "comparator_correct": 0,
+     "comparator_reversed": 100,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.0,
+     "andrey_shd_mean": 1.0,
+     "comparator_shd_mean": 1.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "paper_accuracy": 0.0,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "CPCM",
+   "family": "pairwise",
+   "solution": "andrey.cpcm.numpy",
+   "setting": "family=\"gaussian\", alpha=None (forced)",
+   "comparator": "CPCM authors' R code",
+   "comparator_solution": "bodik.cpcm.r",
+   "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
+   "lane": "cpcm.misspecified",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "cores": 1,
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "same_graph_test": "the same forced direction",
+   "regime": "cpcm_table1_gaussian",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "forced direction: SHD of the two-node DAG, 1 for the reversed direction and 0 for the true one; the _mean fields are the error rates",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "CPCM|table1|gaussian|theta=GP",
+     "effect": "theta = GP",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.62,
+     "base_rate_floor": {
+      "majority_share": 0.5,
+      "coin_flip_ub": -0.03,
+      "base_rate_ub": 0.02,
+      "pass": false
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.5163,
+     "comparator_s": 0.819,
+     "ratio": 1.58,
+     "ratio_quartiles": [
+      1.28,
+      1.99
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 62,
+     "andrey_reversed": 38,
+     "andrey_no_edge": 0,
+     "comparator_correct": 59,
+     "comparator_reversed": 41,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 3,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.59,
+     "andrey_shd_mean": 0.38,
+     "comparator_shd_mean": 0.41,
+     "mean_D": -0.03,
+     "bootstrap_95": [
+      -0.07,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.62,
+       "bootstrap_95": [
+        -0.71,
+        -0.53
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.59,
+       "bootstrap_95": [
+        -0.68,
+        -0.5
+       ]
+      }
+     },
+     "paper_accuracy": 0.69,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.64,
+      "base_rate_floor": {
+       "majority_share": 0.6,
+       "coin_flip_ub": -0.05,
+       "base_rate_ub": 0.1,
+       "pass": false
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.2898,
+      "comparator_s": 0.5725,
+      "ratio": 1.98,
+      "ratio_quartiles": [
+       1.59,
+       2.49
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 64,
+      "andrey_reversed": 36,
+      "andrey_no_edge": 0,
+      "comparator_correct": 62,
+      "comparator_reversed": 38,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 2,
+      "comparator_right_andrey_wrong_count": 0,
+      "comparator_direction_correct": 0.62,
+      "andrey_shd_mean": 0.36,
+      "comparator_shd_mean": 0.38,
+      "mean_D": -0.02,
+      "bootstrap_95": [
+       -0.05,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.64,
+        "bootstrap_95": [
+         -0.73,
+         -0.55
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.62,
+        "bootstrap_95": [
+         -0.72,
+         -0.53
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": null
+    },
+    {
+     "cell": "CPCM|table1|gaussian|theta=x",
+     "effect": "theta = x",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.29,
+     "base_rate_floor": {
+      "majority_share": 0.54,
+      "coin_flip_ub": 0.3,
+      "base_rate_ub": 0.38,
+      "pass": false
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.8865,
+     "comparator_s": 0.884,
+     "ratio": 1.0,
+     "ratio_quartiles": [
+      0.79,
+      1.28
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 29,
+     "andrey_reversed": 71,
+     "andrey_no_edge": 0,
+     "comparator_correct": 8,
+     "comparator_reversed": 92,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 21,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.08,
+     "andrey_shd_mean": 0.71,
+     "comparator_shd_mean": 0.92,
+     "mean_D": -0.21,
+     "bootstrap_95": [
+      -0.29,
+      -0.13
+     ],
+     "above_zero": false,
+     "verdict": "better",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.29,
+       "bootstrap_95": [
+        -0.38,
+        -0.2
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.08,
+       "bootstrap_95": [
+        -0.14,
+        -0.03
+       ]
+      }
+     },
+     "paper_accuracy": 0.07,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "replicated": "better, not rerun",
+     "result": "tie",
+     "card_verdict": null
+    },
+    {
+     "cell": "CPCM|table1|gaussian|theta=x^2 + 1",
+     "effect": "theta = x^2 + 1",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.36,
+     "base_rate_floor": {
+      "majority_share": 0.53,
+      "coin_flip_ub": 0.23,
+      "base_rate_ub": 0.31,
+      "pass": false
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.7248,
+     "comparator_s": 0.606,
+     "ratio": 0.87,
+     "ratio_quartiles": [
+      0.74,
+      1.03
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 36,
+     "andrey_reversed": 64,
+     "andrey_no_edge": 0,
+     "comparator_correct": 36,
+     "comparator_reversed": 64,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.36,
+     "andrey_shd_mean": 0.64,
+     "comparator_shd_mean": 0.64,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.36,
+       "bootstrap_95": [
+        -0.45,
+        -0.27
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.36,
+       "bootstrap_95": [
+        -0.45,
+        -0.27
+       ]
+      }
+     },
+     "paper_accuracy": 0.32,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": null
+    },
+    {
+     "cell": "CPCM|table1|gaussian|theta=exp(x / 2)",
+     "effect": "theta = exp(x / 2)",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.31,
+     "base_rate_floor": {
+      "majority_share": 0.53,
+      "coin_flip_ub": 0.28,
+      "base_rate_ub": 0.36,
+      "pass": false
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.5001,
+     "comparator_s": 0.647,
+     "ratio": 1.31,
+     "ratio_quartiles": [
+      1.14,
+      1.54
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 31,
+     "andrey_reversed": 69,
+     "andrey_no_edge": 0,
+     "comparator_correct": 32,
+     "comparator_reversed": 68,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 2,
+     "comparator_right_andrey_wrong_count": 3,
+     "comparator_direction_correct": 0.32,
+     "andrey_shd_mean": 0.69,
+     "comparator_shd_mean": 0.68,
+     "mean_D": 0.01,
+     "bootstrap_95": [
+      -0.03,
+      0.05
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.31,
+       "bootstrap_95": [
+        -0.4,
+        -0.22
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.32,
+       "bootstrap_95": [
+        -0.41,
+        -0.23
+       ]
+      }
+     },
+     "paper_accuracy": 0.29,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "CPCM",
+   "family": "pairwise",
+   "solution": "andrey.cpcm.numpy",
+   "setting": "family=\"gaussian_fixed_scale\", alpha=None (forced)",
+   "comparator": "CPCM authors' R code",
+   "comparator_solution": "bodik.cpcm.r",
+   "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
+   "lane": "cpcm.misspecified",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "cores": 1,
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "same_graph_test": "the same forced direction",
+   "regime": "cpcm_table1_gaussian_fixed_scale",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "forced direction: SHD of the two-node DAG, 1 for the reversed direction and 0 for the true one; the _mean fields are the error rates",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "CPCM|table1|gaussian_fixed_scale|theta=GP",
+     "effect": "theta = GP",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.01,
+     "base_rate_floor": {
+      "majority_share": 0.5,
+      "coin_flip_ub": 0.5,
+      "base_rate_ub": 0.59,
+      "pass": false
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.1665,
+     "comparator_s": 0.476,
+     "ratio": 2.89,
+     "ratio_quartiles": [
+      2.62,
+      3.24
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 1,
+     "andrey_reversed": 99,
+     "andrey_no_edge": 0,
+     "comparator_correct": 1,
+     "comparator_reversed": 99,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.01,
+     "andrey_shd_mean": 0.99,
+     "comparator_shd_mean": 0.99,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.01,
+       "bootstrap_95": [
+        -0.03,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.01,
+       "bootstrap_95": [
+        -0.03,
+        0.0
+       ]
+      }
+     },
+     "paper_accuracy": 0.01,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.01,
+      "base_rate_floor": {
+       "majority_share": 0.6,
+       "coin_flip_ub": 0.5,
+       "base_rate_ub": 0.69,
+       "pass": false
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.1071,
+      "comparator_s": 0.371,
+      "ratio": 3.51,
+      "ratio_quartiles": [
+       3.23,
+       3.89
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 1,
+      "andrey_reversed": 99,
+      "andrey_no_edge": 0,
+      "comparator_correct": 1,
+      "comparator_reversed": 99,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 0,
+      "comparator_direction_correct": 0.01,
+      "andrey_shd_mean": 0.99,
+      "comparator_shd_mean": 0.99,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": false,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.01,
+        "bootstrap_95": [
+         -0.03,
+         0.0
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.01,
+        "bootstrap_95": [
+         -0.03,
+         0.0
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": null
+    },
+    {
+     "cell": "CPCM|table1|gaussian_fixed_scale|theta=x",
+     "effect": "theta = x",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.0,
+     "base_rate_floor": {
+      "majority_share": 0.54,
+      "coin_flip_ub": 0.5,
+      "base_rate_ub": 0.64,
+      "pass": false
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.1716,
+     "comparator_s": 0.4855,
+     "ratio": 2.73,
+     "ratio_quartiles": [
+      2.47,
+      3.24
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 0,
+     "andrey_reversed": 100,
+     "andrey_no_edge": 0,
+     "comparator_correct": 0,
+     "comparator_reversed": 100,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.0,
+     "andrey_shd_mean": 1.0,
+     "comparator_shd_mean": 1.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "paper_accuracy": 0.0,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": null
+    },
+    {
+     "cell": "CPCM|table1|gaussian_fixed_scale|theta=x^2 + 1",
+     "effect": "theta = x^2 + 1",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.0,
+     "base_rate_floor": {
+      "majority_share": 0.53,
+      "coin_flip_ub": 0.5,
+      "base_rate_ub": 0.63,
+      "pass": false
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.1923,
+     "comparator_s": 0.3945,
+     "ratio": 2.08,
+     "ratio_quartiles": [
+      1.93,
+      2.25
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 0,
+     "andrey_reversed": 100,
+     "andrey_no_edge": 0,
+     "comparator_correct": 0,
+     "comparator_reversed": 100,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.0,
+     "andrey_shd_mean": 1.0,
+     "comparator_shd_mean": 1.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "paper_accuracy": 0.01,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": null
+    },
+    {
+     "cell": "CPCM|table1|gaussian_fixed_scale|theta=exp(x / 2)",
+     "effect": "theta = exp(x / 2)",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.0,
+     "base_rate_floor": {
+      "majority_share": 0.53,
+      "coin_flip_ub": 0.5,
+      "base_rate_ub": 0.63,
+      "pass": false
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.194,
+     "comparator_s": 0.401,
+     "ratio": 2.09,
+     "ratio_quartiles": [
+      1.98,
+      2.38
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 0,
+     "andrey_reversed": 100,
+     "andrey_no_edge": 0,
+     "comparator_correct": 0,
+     "comparator_reversed": 100,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.0,
+     "andrey_shd_mean": 1.0,
+     "comparator_shd_mean": 1.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "paper_accuracy": 0.0,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "CPCM",
+   "family": "pairwise",
+   "solution": "andrey.cpcm.numpy",
+   "setting": "alpha=None (forced); family: the support rule's family per column on AN, AN-s, POISg and PARg, family=\"gaussian\" on LS, LS-s and MN-U",
+   "comparator": "CPCM authors' R code",
+   "comparator_solution": "bodik.cpcm.r",
+   "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
+   "lane": "cpcm",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "cores": 1,
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "same_graph_test": "the same forced direction",
+   "regime": "cpcm_table2",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "forced direction: SHD of the two-node DAG, 1 for the reversed direction and 0 for the true one; the _mean fields are the error rates",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "CPCM|table2|AN|collection1",
+     "network": "AN",
+     "d": 2,
+     "n": 1000,
+     "arm": "collection1",
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "base_rate_floor": {
+      "majority_share": 0.55,
+      "coin_flip_ub": -0.5,
+      "base_rate_ub": -0.35,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.2213,
+     "comparator_s": 0.4965,
+     "ratio": 2.22,
+     "ratio_quartiles": [
+      1.7,
+      2.94
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 100,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "paper_accuracy_sequential_choice": 1.0,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 1.0,
+      "base_rate_floor": {
+       "majority_share": 0.51,
+       "coin_flip_ub": -0.5,
+       "base_rate_ub": -0.39,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.2282,
+      "comparator_s": 0.3615,
+      "ratio": 1.88,
+      "ratio_quartiles": [
+       1.41,
+       2.29
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 100,
+      "andrey_reversed": 0,
+      "andrey_no_edge": 0,
+      "comparator_correct": 100,
+      "comparator_reversed": 0,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 0,
+      "comparator_direction_correct": 1.0,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.0,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|table2|AN-s|collection1",
+     "network": "AN-s",
+     "d": 2,
+     "n": 1000,
+     "arm": "collection1",
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "base_rate_floor": {
+      "majority_share": 0.52,
+      "coin_flip_ub": -0.5,
+      "base_rate_ub": -0.38,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.2146,
+     "comparator_s": 0.402,
+     "ratio": 2.02,
+     "ratio_quartiles": [
+      1.61,
+      2.5
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 100,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "paper_accuracy_sequential_choice": 0.99,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 1.0,
+      "base_rate_floor": {
+       "majority_share": 0.58,
+       "coin_flip_ub": -0.5,
+       "base_rate_ub": -0.33,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.2067,
+      "comparator_s": 0.425,
+      "ratio": 2.13,
+      "ratio_quartiles": [
+       1.65,
+       2.81
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 100,
+      "andrey_reversed": 0,
+      "andrey_no_edge": 0,
+      "comparator_correct": 100,
+      "comparator_reversed": 0,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 0,
+      "comparator_direction_correct": 1.0,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.0,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|table2|LS|given_gaussian",
+     "network": "LS",
+     "d": 2,
+     "n": 1000,
+     "arm": "given_gaussian",
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.99,
+     "base_rate_floor": {
+      "majority_share": 0.51,
+      "coin_flip_ub": -0.47,
+      "base_rate_ub": -0.38,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.5651,
+     "comparator_s": 0.5555,
+     "ratio": 1.01,
+     "ratio_quartiles": [
+      0.85,
+      1.19
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 99,
+     "andrey_reversed": 1,
+     "andrey_no_edge": 0,
+     "comparator_correct": 99,
+     "comparator_reversed": 1,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.99,
+     "andrey_shd_mean": 0.01,
+     "comparator_shd_mean": 0.01,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.99,
+       "bootstrap_95": [
+        -1.0,
+        -0.97
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.99,
+       "bootstrap_95": [
+        -1.0,
+        -0.97
+       ]
+      }
+     },
+     "paper_accuracy_sequential_choice": 0.98,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.99,
+      "base_rate_floor": {
+       "majority_share": 0.55,
+       "coin_flip_ub": -0.47,
+       "base_rate_ub": -0.34,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.576,
+      "comparator_s": 0.608,
+      "ratio": 1.09,
+      "ratio_quartiles": [
+       0.86,
+       1.31
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 99,
+      "andrey_reversed": 1,
+      "andrey_no_edge": 0,
+      "comparator_correct": 99,
+      "comparator_reversed": 1,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 0,
+      "comparator_direction_correct": 0.99,
+      "andrey_shd_mean": 0.01,
+      "comparator_shd_mean": 0.01,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.99,
+        "bootstrap_95": [
+         -1.0,
+         -0.97
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.99,
+        "bootstrap_95": [
+         -1.0,
+         -0.97
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|table2|LS-s|given_gaussian",
+     "network": "LS-s",
+     "d": 2,
+     "n": 1000,
+     "arm": "given_gaussian",
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.99,
+     "base_rate_floor": {
+      "majority_share": 0.53,
+      "coin_flip_ub": -0.47,
+      "base_rate_ub": -0.36,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.5927,
+     "comparator_s": 0.566,
+     "ratio": 1.0,
+     "ratio_quartiles": [
+      0.77,
+      1.16
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 99,
+     "andrey_reversed": 1,
+     "andrey_no_edge": 0,
+     "comparator_correct": 98,
+     "comparator_reversed": 2,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 1,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.98,
+     "andrey_shd_mean": 0.01,
+     "comparator_shd_mean": 0.02,
+     "mean_D": -0.01,
+     "bootstrap_95": [
+      -0.03,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.99,
+       "bootstrap_95": [
+        -1.0,
+        -0.97
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.98,
+       "bootstrap_95": [
+        -1.0,
+        -0.95
+       ]
+      }
+     },
+     "paper_accuracy_sequential_choice": 0.92,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.98,
+      "base_rate_floor": {
+       "majority_share": 0.53,
+       "coin_flip_ub": -0.45,
+       "base_rate_ub": -0.35,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.6177,
+      "comparator_s": 0.4965,
+      "ratio": 0.86,
+      "ratio_quartiles": [
+       0.71,
+       0.98
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 98,
+      "andrey_reversed": 2,
+      "andrey_no_edge": 0,
+      "comparator_correct": 99,
+      "comparator_reversed": 1,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 1,
+      "comparator_direction_correct": 0.99,
+      "andrey_shd_mean": 0.02,
+      "comparator_shd_mean": 0.01,
+      "mean_D": 0.01,
+      "bootstrap_95": [
+       0.0,
+       0.03
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.98,
+        "bootstrap_95": [
+         -1.0,
+         -0.95
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.99,
+        "bootstrap_95": [
+         -1.0,
+         -0.97
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|table2|MN-U|given_gaussian",
+     "network": "MN-U",
+     "d": 2,
+     "n": 1000,
+     "arm": "given_gaussian",
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.96,
+     "base_rate_floor": {
+      "majority_share": 0.61,
+      "coin_flip_ub": -0.42,
+      "base_rate_ub": -0.25,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.5315,
+     "comparator_s": 0.4115,
+     "ratio": 0.81,
+     "ratio_quartiles": [
+      0.72,
+      1.04
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 96,
+     "andrey_reversed": 4,
+     "andrey_no_edge": 0,
+     "comparator_correct": 95,
+     "comparator_reversed": 5,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 1,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.95,
+     "andrey_shd_mean": 0.04,
+     "comparator_shd_mean": 0.05,
+     "mean_D": -0.01,
+     "bootstrap_95": [
+      -0.03,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.96,
+       "bootstrap_95": [
+        -0.99,
+        -0.92
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -0.99,
+        -0.9
+       ]
+      }
+     },
+     "paper_accuracy_sequential_choice": 0.88,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.84,
+      "base_rate_floor": {
+       "majority_share": 0.52,
+       "coin_flip_ub": -0.27,
+       "base_rate_ub": -0.2,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.5012,
+      "comparator_s": 0.4275,
+      "ratio": 0.86,
+      "ratio_quartiles": [
+       0.75,
+       1.16
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 84,
+      "andrey_reversed": 16,
+      "andrey_no_edge": 0,
+      "comparator_correct": 82,
+      "comparator_reversed": 18,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 2,
+      "comparator_right_andrey_wrong_count": 0,
+      "comparator_direction_correct": 0.82,
+      "andrey_shd_mean": 0.16,
+      "comparator_shd_mean": 0.18,
+      "mean_D": -0.02,
+      "bootstrap_95": [
+       -0.05,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.84,
+        "bootstrap_95": [
+         -0.91,
+         -0.77
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.82,
+        "bootstrap_95": [
+         -0.89,
+         -0.74
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|table2|POISg|collection1",
+     "network": "POISg",
+     "d": 2,
+     "n": 1000,
+     "arm": "collection1",
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.99,
+     "base_rate_floor": {
+      "majority_share": 0.56,
+      "coin_flip_ub": -0.47,
+      "base_rate_ub": -0.33,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.2189,
+     "comparator_s": 0.301,
+     "ratio": 1.56,
+     "ratio_quartiles": [
+      1.26,
+      2.07
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 99,
+     "andrey_reversed": 1,
+     "andrey_no_edge": 0,
+     "comparator_correct": 99,
+     "comparator_reversed": 1,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 1,
+     "comparator_right_andrey_wrong_count": 1,
+     "comparator_direction_correct": 0.99,
+     "andrey_shd_mean": 0.01,
+     "comparator_shd_mean": 0.01,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.03,
+      0.03
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.99,
+       "bootstrap_95": [
+        -1.0,
+        -0.97
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.99,
+       "bootstrap_95": [
+        -1.0,
+        -0.97
+       ]
+      }
+     },
+     "paper_accuracy_sequential_choice": 0.94,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.99,
+      "base_rate_floor": {
+       "majority_share": 0.52,
+       "coin_flip_ub": -0.47,
+       "base_rate_ub": -0.37,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.2146,
+      "comparator_s": 0.4095,
+      "ratio": 2.05,
+      "ratio_quartiles": [
+       1.22,
+       3.22
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 99,
+      "andrey_reversed": 1,
+      "andrey_no_edge": 0,
+      "comparator_correct": 100,
+      "comparator_reversed": 0,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 1,
+      "comparator_direction_correct": 1.0,
+      "andrey_shd_mean": 0.01,
+      "comparator_shd_mean": 0.0,
+      "mean_D": 0.01,
+      "bootstrap_95": [
+       0.0,
+       0.03
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.99,
+        "bootstrap_95": [
+         -1.0,
+         -0.97
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|table2|PARg|collection1",
+     "network": "PARg",
+     "d": 2,
+     "n": 1000,
+     "arm": "collection1",
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.959,
+     "base_rate_floor": {
+      "majority_share": 0.56,
+      "coin_flip_ub": -0.42,
+      "base_rate_ub": -0.31,
+      "pass": true
+     },
+     "comparator_ok": 98,
+     "paired": 98,
+     "datasets": 100,
+     "andrey_s": 0.1952,
+     "comparator_s": 0.415,
+     "ratio": 2.18,
+     "ratio_quartiles": [
+      1.8,
+      2.84
+     ],
+     "timed_on_one_cpu": 98,
+     "andrey_correct": 94,
+     "andrey_reversed": 4,
+     "andrey_no_edge": 0,
+     "comparator_correct": 94,
+     "comparator_reversed": 4,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 1,
+     "comparator_right_andrey_wrong_count": 1,
+     "comparator_direction_correct": 0.959,
+     "andrey_shd_mean": 0.0408,
+     "comparator_shd_mean": 0.0408,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.0306,
+      0.0306
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 2
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 98,
+       "mean": -0.9592,
+       "bootstrap_95": [
+        -0.9898,
+        -0.9184
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 98,
+       "mean": -0.9592,
+       "bootstrap_95": [
+        -0.9898,
+        -0.9184
+       ]
+      }
+     },
+     "comparator_errors": 2,
+     "paper_accuracy_sequential_choice": 0.9,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.98,
+      "base_rate_floor": {
+       "majority_share": 0.52,
+       "coin_flip_ub": -0.45,
+       "base_rate_ub": -0.36,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.2175,
+      "comparator_s": 0.3835,
+      "ratio": 2.02,
+      "ratio_quartiles": [
+       1.49,
+       2.45
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 98,
+      "andrey_reversed": 2,
+      "andrey_no_edge": 0,
+      "comparator_correct": 98,
+      "comparator_reversed": 2,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 1,
+      "comparator_right_andrey_wrong_count": 1,
+      "comparator_direction_correct": 0.98,
+      "andrey_shd_mean": 0.02,
+      "comparator_shd_mean": 0.02,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       -0.03,
+       0.03
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.98,
+        "bootstrap_95": [
+         -1.0,
+         -0.95
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.98,
+        "bootstrap_95": [
+         -1.0,
+         -0.95
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "CPCM",
+   "family": "pairwise",
+   "solution": "andrey.cpcm.numpy",
+   "setting": "alpha=None (forced); family=\"gaussian_fixed_scale\" on AN and AN-s, the support rule's family on LS, LS-s and MN-U",
+   "comparator": "CPCM authors' R code",
+   "comparator_solution": "bodik.cpcm.r",
+   "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
+   "lane": "cpcm.other_arm",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "cores": 1,
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "same_graph_test": "the same forced direction",
+   "regime": "cpcm_table2_other_arm",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "forced direction: SHD of the two-node DAG, 1 for the reversed direction and 0 for the true one; the _mean fields are the error rates",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "CPCM|table2|AN|given_gaussian_fixed_scale",
+     "network": "AN",
+     "d": 2,
+     "n": 1000,
+     "arm": "given_gaussian_fixed_scale",
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "base_rate_floor": {
+      "majority_share": 0.55,
+      "coin_flip_ub": -0.5,
+      "base_rate_ub": -0.35,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.2165,
+     "comparator_s": 0.5025,
+     "ratio": 2.33,
+     "ratio_quartiles": [
+      1.71,
+      3.16
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 100,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "paper_accuracy_sequential_choice": 1.0,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 1.0,
+      "base_rate_floor": {
+       "majority_share": 0.51,
+       "coin_flip_ub": -0.5,
+       "base_rate_ub": -0.39,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.2291,
+      "comparator_s": 0.359,
+      "ratio": 1.69,
+      "ratio_quartiles": [
+       1.4,
+       2.2
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 100,
+      "andrey_reversed": 0,
+      "andrey_no_edge": 0,
+      "comparator_correct": 100,
+      "comparator_reversed": 0,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 0,
+      "comparator_direction_correct": 1.0,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.0,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|table2|AN-s|given_gaussian_fixed_scale",
+     "network": "AN-s",
+     "d": 2,
+     "n": 1000,
+     "arm": "given_gaussian_fixed_scale",
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 1.0,
+     "base_rate_floor": {
+      "majority_share": 0.52,
+      "coin_flip_ub": -0.5,
+      "base_rate_ub": -0.38,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.2134,
+     "comparator_s": 0.441,
+     "ratio": 2.23,
+     "ratio_quartiles": [
+      1.72,
+      2.78
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 100,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 100,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "paper_accuracy_sequential_choice": 0.99,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 1.0,
+      "base_rate_floor": {
+       "majority_share": 0.58,
+       "coin_flip_ub": -0.5,
+       "base_rate_ub": -0.33,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.198,
+      "comparator_s": 0.4615,
+      "ratio": 2.5,
+      "ratio_quartiles": [
+       1.83,
+       3.19
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 100,
+      "andrey_reversed": 0,
+      "andrey_no_edge": 0,
+      "comparator_correct": 100,
+      "comparator_reversed": 0,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 0,
+      "comparator_direction_correct": 1.0,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.0,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|table2|LS|collection1",
+     "network": "LS",
+     "d": 2,
+     "n": 1000,
+     "arm": "collection1",
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.58,
+     "base_rate_floor": {
+      "majority_share": 0.51,
+      "coin_flip_ub": 0.02,
+      "base_rate_ub": 0.07,
+      "pass": false
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.1614,
+     "comparator_s": 0.4395,
+     "ratio": 2.59,
+     "ratio_quartiles": [
+      2.08,
+      3.48
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 58,
+     "andrey_reversed": 42,
+     "andrey_no_edge": 0,
+     "comparator_correct": 58,
+     "comparator_reversed": 42,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.58,
+     "andrey_shd_mean": 0.42,
+     "comparator_shd_mean": 0.42,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.58,
+       "bootstrap_95": [
+        -0.68,
+        -0.48
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.58,
+       "bootstrap_95": [
+        -0.68,
+        -0.48
+       ]
+      }
+     },
+     "paper_accuracy_sequential_choice": 0.98,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.54,
+      "base_rate_floor": {
+       "majority_share": 0.55,
+       "coin_flip_ub": 0.06,
+       "base_rate_ub": 0.15,
+       "pass": false
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.1637,
+      "comparator_s": 0.3895,
+      "ratio": 2.47,
+      "ratio_quartiles": [
+       2.05,
+       2.99
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 54,
+      "andrey_reversed": 46,
+      "andrey_no_edge": 0,
+      "comparator_correct": 54,
+      "comparator_reversed": 46,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 0,
+      "comparator_direction_correct": 0.54,
+      "andrey_shd_mean": 0.46,
+      "comparator_shd_mean": 0.46,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.54,
+        "bootstrap_95": [
+         -0.64,
+         -0.44
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.54,
+        "bootstrap_95": [
+         -0.64,
+         -0.44
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": null
+    },
+    {
+     "cell": "CPCM|table2|LS-s|collection1",
+     "network": "LS-s",
+     "d": 2,
+     "n": 1000,
+     "arm": "collection1",
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.03,
+     "base_rate_floor": {
+      "majority_share": 0.53,
+      "coin_flip_ub": 0.5,
+      "base_rate_ub": 0.6,
+      "pass": false
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.1587,
+     "comparator_s": 0.4525,
+     "ratio": 2.72,
+     "ratio_quartiles": [
+      2.18,
+      3.58
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 3,
+     "andrey_reversed": 97,
+     "andrey_no_edge": 0,
+     "comparator_correct": 3,
+     "comparator_reversed": 97,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.03,
+     "andrey_shd_mean": 0.97,
+     "comparator_shd_mean": 0.97,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.03,
+       "bootstrap_95": [
+        -0.07,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.03,
+       "bootstrap_95": [
+        -0.07,
+        0.0
+       ]
+      }
+     },
+     "paper_accuracy_sequential_choice": 0.92,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.0,
+      "base_rate_floor": {
+       "majority_share": 0.53,
+       "coin_flip_ub": 0.5,
+       "base_rate_ub": 0.63,
+       "pass": false
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.166,
+      "comparator_s": 0.3505,
+      "ratio": 2.12,
+      "ratio_quartiles": [
+       1.93,
+       2.91
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 0,
+      "andrey_reversed": 100,
+      "andrey_no_edge": 0,
+      "comparator_correct": 1,
+      "comparator_reversed": 99,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 1,
+      "comparator_direction_correct": 0.01,
+      "andrey_shd_mean": 1.0,
+      "comparator_shd_mean": 0.99,
+      "mean_D": 0.01,
+      "bootstrap_95": [
+       0.0,
+       0.03
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": false,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": 0.0,
+        "bootstrap_95": [
+         0.0,
+         0.0
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.01,
+        "bootstrap_95": [
+         -0.03,
+         0.0
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": null
+    },
+    {
+     "cell": "CPCM|table2|MN-U|collection1",
+     "network": "MN-U",
+     "d": 2,
+     "n": 1000,
+     "arm": "collection1",
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.0,
+     "base_rate_floor": {
+      "majority_share": 0.61,
+      "coin_flip_ub": 0.5,
+      "base_rate_ub": 0.7,
+      "pass": false
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.1634,
+     "comparator_s": 0.34,
+     "ratio": 2.16,
+     "ratio_quartiles": [
+      1.89,
+      3.01
+     ],
+     "timed_on_one_cpu": 100,
+     "andrey_correct": 0,
+     "andrey_reversed": 100,
+     "andrey_no_edge": 0,
+     "comparator_correct": 0,
+     "comparator_reversed": 100,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.0,
+     "andrey_shd_mean": 1.0,
+     "comparator_shd_mean": 1.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": false,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      }
+     },
+     "paper_accuracy_sequential_choice": 0.88,
+     "claim": "out",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.03,
+      "base_rate_floor": {
+       "majority_share": 0.52,
+       "coin_flip_ub": 0.5,
+       "base_rate_ub": 0.59,
+       "pass": false
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.1575,
+      "comparator_s": 0.346,
+      "ratio": 2.2,
+      "ratio_quartiles": [
+       1.96,
+       3.2
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 3,
+      "andrey_reversed": 97,
+      "andrey_no_edge": 0,
+      "comparator_correct": 3,
+      "comparator_reversed": 97,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 0,
+      "comparator_direction_correct": 0.03,
+      "andrey_shd_mean": 0.97,
+      "comparator_shd_mean": 0.97,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": false,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.03,
+        "bootstrap_95": [
+         -0.07,
+         0.0
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.03,
+        "bootstrap_95": [
+         -0.07,
+         0.0
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "CPCM",
+   "family": "pairwise",
+   "solution": "andrey.cpcm.numpy",
+   "setting": "family=\"pareto\", alpha=None (forced)",
+   "comparator": "CPCM authors' R code",
+   "comparator_solution": "bodik.cpcm.r",
+   "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
+   "lane": "cpcm",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "cores": 1,
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "same_graph_test": "the same forced direction",
+   "regime": "cpcm_pareto16",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "forced direction: SHD of the two-node DAG, 1 for the reversed direction and 0 for the true one; the _mean fields are the error rates",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "CPCM|pareto16|gamma=1|n=500",
+     "effect": "gamma = 1",
+     "d": 2,
+     "n": 500,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.9,
+     "base_rate_floor": {
+      "majority_share": 0.54,
+      "coin_flip_ub": -0.34,
+      "base_rate_ub": -0.24,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.0567,
+     "comparator_s": 0.114,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "timed_on_one_cpu": 0,
+     "andrey_correct": 90,
+     "andrey_reversed": 10,
+     "andrey_no_edge": 0,
+     "comparator_correct": 90,
+     "comparator_reversed": 10,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 1,
+     "comparator_right_andrey_wrong_count": 1,
+     "comparator_direction_correct": 0.9,
+     "andrey_shd_mean": 0.1,
+     "comparator_shd_mean": 0.1,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.03,
+      0.03
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -0.96,
+        -0.84
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -0.95,
+        -0.84
+       ]
+      }
+     },
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.92,
+      "base_rate_floor": {
+       "majority_share": 0.51,
+       "coin_flip_ub": -0.36,
+       "base_rate_ub": -0.3,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.0563,
+      "comparator_s": 0.0945,
+      "ratio": 1.66,
+      "ratio_quartiles": [
+       1.52,
+       1.83
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 92,
+      "andrey_reversed": 8,
+      "andrey_no_edge": 0,
+      "comparator_correct": 94,
+      "comparator_reversed": 6,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 2,
+      "comparator_direction_correct": 0.94,
+      "andrey_shd_mean": 0.08,
+      "comparator_shd_mean": 0.06,
+      "mean_D": 0.02,
+      "bootstrap_95": [
+       0.0,
+       0.05
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.92,
+        "bootstrap_95": [
+         -0.97,
+         -0.86
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.94,
+        "bootstrap_95": [
+         -0.98,
+         -0.89
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|pareto16|gamma=1|n=1000",
+     "effect": "gamma = 1",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.98,
+     "base_rate_floor": {
+      "majority_share": 0.52,
+      "coin_flip_ub": -0.45,
+      "base_rate_ub": -0.36,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.1604,
+     "comparator_s": 0.5465,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "timed_on_one_cpu": 0,
+     "andrey_correct": 98,
+     "andrey_reversed": 2,
+     "andrey_no_edge": 0,
+     "comparator_correct": 100,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 2,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.02,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.02,
+     "bootstrap_95": [
+      0.0,
+      0.05
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.98,
+       "bootstrap_95": [
+        -1.0,
+        -0.95
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.98,
+      "base_rate_floor": {
+       "majority_share": 0.52,
+       "coin_flip_ub": -0.45,
+       "base_rate_ub": -0.36,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.1695,
+      "comparator_s": 0.431,
+      "ratio": 2.53,
+      "ratio_quartiles": [
+       1.96,
+       2.77
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 98,
+      "andrey_reversed": 2,
+      "andrey_no_edge": 0,
+      "comparator_correct": 100,
+      "comparator_reversed": 0,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 2,
+      "comparator_direction_correct": 1.0,
+      "andrey_shd_mean": 0.02,
+      "comparator_shd_mean": 0.0,
+      "mean_D": 0.02,
+      "bootstrap_95": [
+       0.0,
+       0.05
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.98,
+        "bootstrap_95": [
+         -1.0,
+         -0.95
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|pareto16|gamma=1|n=2000",
+     "effect": "gamma = 1",
+     "d": 2,
+     "n": 2000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.99,
+     "base_rate_floor": {
+      "majority_share": 0.59,
+      "coin_flip_ub": -0.47,
+      "base_rate_ub": -0.31,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.5901,
+     "comparator_s": 1.5105,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "timed_on_one_cpu": 0,
+     "andrey_correct": 99,
+     "andrey_reversed": 1,
+     "andrey_no_edge": 0,
+     "comparator_correct": 99,
+     "comparator_reversed": 1,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.99,
+     "andrey_shd_mean": 0.01,
+     "comparator_shd_mean": 0.01,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.99,
+       "bootstrap_95": [
+        -1.0,
+        -0.97
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.99,
+       "bootstrap_95": [
+        -1.0,
+        -0.97
+       ]
+      }
+     },
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.98,
+      "base_rate_floor": {
+       "majority_share": 0.5,
+       "coin_flip_ub": -0.45,
+       "base_rate_ub": -0.38,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.6153,
+      "comparator_s": 1.2065,
+      "ratio": 1.95,
+      "ratio_quartiles": [
+       1.68,
+       2.15
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 98,
+      "andrey_reversed": 2,
+      "andrey_no_edge": 0,
+      "comparator_correct": 99,
+      "comparator_reversed": 1,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 1,
+      "comparator_direction_correct": 0.99,
+      "andrey_shd_mean": 0.02,
+      "comparator_shd_mean": 0.01,
+      "mean_D": 0.01,
+      "bootstrap_95": [
+       0.0,
+       0.03
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.98,
+        "bootstrap_95": [
+         -1.0,
+         -0.95
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.99,
+        "bootstrap_95": [
+         -1.0,
+         -0.97
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|pareto16|gamma=2|n=500",
+     "effect": "gamma = 2",
+     "d": 2,
+     "n": 500,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.96,
+     "base_rate_floor": {
+      "majority_share": 0.54,
+      "coin_flip_ub": -0.42,
+      "base_rate_ub": -0.31,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.0666,
+     "comparator_s": 0.119,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "timed_on_one_cpu": 0,
+     "andrey_correct": 96,
+     "andrey_reversed": 4,
+     "andrey_no_edge": 0,
+     "comparator_correct": 99,
+     "comparator_reversed": 1,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 3,
+     "comparator_direction_correct": 0.99,
+     "andrey_shd_mean": 0.04,
+     "comparator_shd_mean": 0.01,
+     "mean_D": 0.03,
+     "bootstrap_95": [
+      0.0,
+      0.07
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.96,
+       "bootstrap_95": [
+        -0.99,
+        -0.92
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -0.99,
+       "bootstrap_95": [
+        -1.0,
+        -0.97
+       ]
+      }
+     },
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 1.0,
+      "base_rate_floor": {
+       "majority_share": 0.51,
+       "coin_flip_ub": -0.5,
+       "base_rate_ub": -0.39,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.065,
+      "comparator_s": 0.099,
+      "ratio": 1.49,
+      "ratio_quartiles": [
+       1.39,
+       1.66
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 100,
+      "andrey_reversed": 0,
+      "andrey_no_edge": 0,
+      "comparator_correct": 100,
+      "comparator_reversed": 0,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 0,
+      "comparator_direction_correct": 1.0,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.0,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|pareto16|gamma=2|n=1000",
+     "effect": "gamma = 2",
+     "d": 2,
+     "n": 1000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.98,
+     "base_rate_floor": {
+      "majority_share": 0.52,
+      "coin_flip_ub": -0.45,
+      "base_rate_ub": -0.35,
+      "pass": true
+     },
+     "comparator_ok": 100,
+     "paired": 100,
+     "datasets": 100,
+     "andrey_s": 0.134,
+     "comparator_s": 0.3545,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "timed_on_one_cpu": 0,
+     "andrey_correct": 98,
+     "andrey_reversed": 2,
+     "andrey_no_edge": 0,
+     "comparator_correct": 100,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 2,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.02,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.02,
+     "bootstrap_95": [
+      0.0,
+      0.05
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 100,
+       "mean": -0.98,
+       "bootstrap_95": [
+        -1.0,
+        -0.95
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 100,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "fresh": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 1.0,
+      "base_rate_floor": {
+       "majority_share": 0.52,
+       "coin_flip_ub": -0.5,
+       "base_rate_ub": -0.38,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.1428,
+      "comparator_s": 0.268,
+      "ratio": 1.89,
+      "ratio_quartiles": [
+       1.68,
+       2.05
+      ],
+      "timed_on_one_cpu": 100,
+      "andrey_correct": 100,
+      "andrey_reversed": 0,
+      "andrey_no_edge": 0,
+      "comparator_correct": 100,
+      "comparator_reversed": 0,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 0,
+      "comparator_direction_correct": 1.0,
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.0,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -1.0,
+        "bootstrap_95": [
+         -1.0,
+         -1.0
+        ]
+       }
+      }
+     },
+     "replicated": "tie, fresh seeds tie",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM|pareto16|gamma=2|n=2000",
+     "effect": "gamma = 2",
+     "d": 2,
+     "n": 2000,
+     "fits": 100,
+     "andrey_ok": 100,
+     "andrey_direction_correct": 0.96,
+     "base_rate_floor": {
+      "majority_share": 0.52,
+      "coin_flip_ub": -0.42,
+      "base_rate_ub": -0.33,
+      "pass": true
+     },
+     "comparator_ok": 99,
+     "paired": 99,
+     "datasets": 100,
+     "andrey_s": 0.6092,
+     "comparator_s": 1.589,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "timed_on_one_cpu": 0,
+     "andrey_correct": 95,
+     "andrey_reversed": 4,
+     "andrey_no_edge": 0,
+     "comparator_correct": 99,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 4,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0404,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0404,
+     "bootstrap_95": [
+      0.0101,
+      0.0808
+     ],
+     "above_zero": true,
+     "verdict": "worse",
+     "coverage": {
+      "datasets": 100,
+      "andrey_short": 0,
+      "reference_short": 1
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 99,
+       "mean": -0.9596,
+       "bootstrap_95": [
+        -0.9899,
+        -0.9192
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 99,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "comparator_errors": 1,
+     "claim": "in",
+     "first_seeds": "0-99",
+     "seeds": 100,
+     "replication": {
+      "seeds": "100-199",
+      "fits": 100,
+      "andrey_ok": 100,
+      "andrey_direction_correct": 0.96,
+      "base_rate_floor": {
+       "majority_share": 0.56,
+       "coin_flip_ub": -0.42,
+       "base_rate_ub": -0.3,
+       "pass": true
+      },
+      "comparator_ok": 100,
+      "paired": 100,
+      "datasets": 100,
+      "andrey_s": 0.617,
+      "comparator_s": 1.4575,
+      "ratio": null,
+      "ratio_quartiles": null,
+      "timed_on_one_cpu": 0,
+      "andrey_correct": 96,
+      "andrey_reversed": 4,
+      "andrey_no_edge": 0,
+      "comparator_correct": 99,
+      "comparator_reversed": 1,
+      "comparator_no_edge": 0,
+      "andrey_right_comparator_wrong_count": 0,
+      "comparator_right_andrey_wrong_count": 3,
+      "comparator_direction_correct": 0.99,
+      "andrey_shd_mean": 0.04,
+      "comparator_shd_mean": 0.01,
+      "mean_D": 0.03,
+      "bootstrap_95": [
+       0.0,
+       0.07
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 100,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 100,
+        "mean": -0.96,
+        "bootstrap_95": [
+         -0.99,
+         -0.92
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 100,
+        "mean": -0.99,
+        "bootstrap_95": [
+         -1.0,
+         -0.97
+        ]
+       }
+      }
+     },
+     "replicated": "worse, not repeated on fresh seeds",
+     "result": "tie",
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "CPCM graph search",
+   "family": "functional",
+   "solution": "andrey.cpcm_graph.numpy",
+   "setting": "edge_penalty=2; family: the support rule's family per column; exact search at 4 variables, RESIT-greedy above",
+   "comparator": "CPCM authors' R code",
+   "comparator_solution": "bodik.cpcm.r",
+   "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
+   "lane": "cpcm_graph",
+   "output": "DAG",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "cores": 1,
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "same_graph_test": "equal SHD to the true DAG",
+   "regime": "cpcm_graph_paper",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "SHD of the DAG against the true DAG (a reversed edge counts 1), with the authors' SID beside it under sid; andrey_shd, comparator_shd and empty_shd are medians over the paired graphs, the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "CPCM graph search|G1|collection1",
+     "d": 5,
+     "n": 1000,
+     "network": "linear",
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_shd_mean": 0.0,
+     "andrey_sid_mean": 0.0,
+     "empty_shd_mean": 5.35,
+     "empty_floor": {
+      "shd_ub": -4.85,
+      "sid_ub": -4.85,
+      "pass": true
+     },
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 4.4944,
+     "comparator_s": 60.7105,
+     "ratio": 12.69,
+     "ratio_quartiles": [
+      10.5,
+      14.85
+     ],
+     "timed_on_one_cpu": 20,
+     "andrey_shd": 0.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 5.0,
+     "comparator_shd_mean": 0.35,
+     "same_graph": 18,
+     "mean_D": -0.35,
+     "bootstrap_95": [
+      -0.9,
+      0.0
+     ],
+     "above_zero": false,
+     "sid": {
+      "andrey_mean": 0.0,
+      "comparator_mean": 0.45,
+      "mean_D": -0.45,
+      "bootstrap_95": [
+       -1.15,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -5.35,
+       "bootstrap_95": [
+        -5.85,
+        -4.85
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -5.0,
+       "bootstrap_95": [
+        -5.55,
+        -4.4
+       ]
+      }
+     },
+     "paper_sid_sequential_choice_lambda1": 0.22,
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM graph search|G2|collection1",
+     "d": 5,
+     "n": 1000,
+     "network": "ANM",
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_shd_mean": 0.25,
+     "andrey_sid_mean": 0.35,
+     "empty_shd_mean": 4.85,
+     "empty_floor": {
+      "shd_ub": -4.0,
+      "sid_ub": -3.85,
+      "pass": true
+     },
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 5.1932,
+     "comparator_s": 54.8515,
+     "ratio": 10.54,
+     "ratio_quartiles": [
+      8.31,
+      11.91
+     ],
+     "timed_on_one_cpu": 20,
+     "andrey_shd": 0.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 5.0,
+     "comparator_shd_mean": 0.3,
+     "same_graph": 18,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.45,
+      0.3
+     ],
+     "above_zero": false,
+     "sid": {
+      "andrey_mean": 0.35,
+      "comparator_mean": 0.45,
+      "mean_D": -0.1,
+      "bootstrap_95": [
+       -0.75,
+       0.45
+      ],
+      "verdict": "tie"
+     },
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -4.6,
+       "bootstrap_95": [
+        -5.15,
+        -4.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -4.55,
+       "bootstrap_95": [
+        -5.2,
+        -3.85
+       ]
+      }
+     },
+     "paper_sid_sequential_choice_lambda1": 0.72,
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM graph search|G3|collection1",
+     "d": 5,
+     "n": 1000,
+     "network": "CPCM(Exp)",
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_shd_mean": 1.0,
+     "andrey_sid_mean": 1.35,
+     "empty_shd_mean": 5.25,
+     "empty_floor": {
+      "shd_ub": -3.5,
+      "sid_ub": -2.85,
+      "pass": true
+     },
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 4.2246,
+     "comparator_s": 37.579,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "timed_on_one_cpu": 0,
+     "andrey_shd": 0.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 5.0,
+     "comparator_shd_mean": 1.2,
+     "same_graph": 14,
+     "mean_D": -0.2,
+     "bootstrap_95": [
+      -0.75,
+      0.4
+     ],
+     "above_zero": false,
+     "sid": {
+      "andrey_mean": 1.35,
+      "comparator_mean": 1.75,
+      "mean_D": -0.4,
+      "bootstrap_95": [
+       -1.4,
+       0.6
+      ],
+      "verdict": "tie"
+     },
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -4.25,
+       "bootstrap_95": [
+        -5.0,
+        -3.5
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -4.05,
+       "bootstrap_95": [
+        -4.75,
+        -3.35
+       ]
+      }
+     },
+     "paper_sid_sequential_choice_lambda1": 2.16,
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "fresh": {
+      "seeds": "20-39",
+      "fits": 20,
+      "andrey_ok": 20,
+      "andrey_shd_mean": 0.65,
+      "andrey_sid_mean": 1.0,
+      "empty_shd_mean": 5.0,
+      "empty_floor": {
+       "shd_ub": -3.8,
+       "sid_ub": -3.3,
+       "pass": true
+      },
+      "reference": "none"
+     },
+     "replicated": "tie, fresh seeds without a reference arm",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM graph search|G4|collection1",
+     "d": 5,
+     "n": 1000,
+     "network": "CPCM(Exp, Gauss)",
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_shd_mean": 0.3,
+     "andrey_sid_mean": 0.3,
+     "empty_shd_mean": 4.6,
+     "empty_floor": {
+      "shd_ub": -3.75,
+      "sid_ub": -3.75,
+      "pass": true
+     },
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 5.2048,
+     "comparator_s": 43.42,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "timed_on_one_cpu": 0,
+     "andrey_shd": 0.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 5.0,
+     "comparator_shd_mean": 0.7,
+     "same_graph": 16,
+     "mean_D": -0.4,
+     "bootstrap_95": [
+      -1.0,
+      0.05
+     ],
+     "above_zero": false,
+     "sid": {
+      "andrey_mean": 0.3,
+      "comparator_mean": 0.75,
+      "mean_D": -0.45,
+      "bootstrap_95": [
+       -1.1,
+       0.05
+      ],
+      "verdict": "tie"
+     },
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -4.3,
+       "bootstrap_95": [
+        -4.85,
+        -3.75
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -3.9,
+       "bootstrap_95": [
+        -4.55,
+        -3.25
+       ]
+      }
+     },
+     "paper_sid_sequential_choice_lambda1": 0.92,
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "fresh": {
+      "seeds": "20-39",
+      "fits": 20,
+      "andrey_ok": 20,
+      "andrey_shd_mean": 0.25,
+      "andrey_sid_mean": 0.35,
+      "empty_shd_mean": 4.7,
+      "empty_floor": {
+       "shd_ub": -3.8,
+       "sid_ub": -3.7,
+       "pass": true
+      },
+      "reference": "none"
+     },
+     "replicated": "tie, fresh seeds without a reference arm",
+     "result": "tie",
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "CPCM graph search",
+   "family": "functional",
+   "solution": "andrey.cpcm_graph.numpy",
+   "setting": "edge_penalty=1; family: the support rule's family per column; exact search at 4 variables, RESIT-greedy above",
+   "comparator": "CPCM authors' R code",
+   "comparator_solution": "bodik.cpcm.r",
+   "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
+   "lane": "cpcm_graph.lambda1",
+   "output": "DAG",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "cores": 1,
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "same_graph_test": "equal SHD to the true DAG",
+   "regime": "cpcm_graph_paper_lambda1",
+   "claim": "out",
+   "metric": "shd",
+   "error_metric": "SHD of the DAG against the true DAG (a reversed edge counts 1), with the authors' SID beside it under sid; andrey_shd, comparator_shd and empty_shd are medians over the paired graphs, the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "CPCM graph search|G1|collection1_lambda1",
+     "d": 5,
+     "n": 1000,
+     "network": "linear",
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_shd_mean": 0.0,
+     "andrey_sid_mean": 0.0,
+     "empty_shd_mean": 5.35,
+     "empty_floor": {
+      "shd_ub": -4.85,
+      "sid_ub": -4.85,
+      "pass": true
+     },
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 4.4639,
+     "comparator_s": 56.6895,
+     "ratio": 12.91,
+     "ratio_quartiles": [
+      8.42,
+      14.2
+     ],
+     "timed_on_one_cpu": 20,
+     "andrey_shd": 0.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 5.0,
+     "comparator_shd_mean": 0.4,
+     "same_graph": 18,
+     "mean_D": -0.4,
+     "bootstrap_95": [
+      -1.0,
+      0.0
+     ],
+     "above_zero": false,
+     "sid": {
+      "andrey_mean": 0.0,
+      "comparator_mean": 0.5,
+      "mean_D": -0.5,
+      "bootstrap_95": [
+       -1.25,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -5.35,
+       "bootstrap_95": [
+        -5.85,
+        -4.85
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -4.95,
+       "bootstrap_95": [
+        -5.55,
+        -4.25
+       ]
+      }
+     },
+     "paper_sid_sequential_choice_lambda1": 0.22,
+     "claim": "out",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": null
+    },
+    {
+     "cell": "CPCM graph search|G2|collection1_lambda1",
+     "d": 5,
+     "n": 1000,
+     "network": "ANM",
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_shd_mean": 0.3,
+     "andrey_sid_mean": 0.4,
+     "empty_shd_mean": 4.85,
+     "empty_floor": {
+      "shd_ub": -3.9,
+      "sid_ub": -3.75,
+      "pass": true
+     },
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 5.1604,
+     "comparator_s": 51.447,
+     "ratio": 9.73,
+     "ratio_quartiles": [
+      8.4,
+      11.58
+     ],
+     "timed_on_one_cpu": 20,
+     "andrey_shd": 0.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 5.0,
+     "comparator_shd_mean": 0.3,
+     "same_graph": 18,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.45,
+      0.45
+     ],
+     "above_zero": false,
+     "sid": {
+      "andrey_mean": 0.4,
+      "comparator_mean": 0.45,
+      "mean_D": -0.05,
+      "bootstrap_95": [
+       -0.75,
+       0.6
+      ],
+      "verdict": "tie"
+     },
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -4.55,
+       "bootstrap_95": [
+        -5.15,
+        -3.9
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -4.55,
+       "bootstrap_95": [
+        -5.2,
+        -3.85
+       ]
+      }
+     },
+     "paper_sid_sequential_choice_lambda1": 0.72,
+     "claim": "out",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": null
+    },
+    {
+     "cell": "CPCM graph search|G3|collection1_lambda1",
+     "d": 5,
+     "n": 1000,
+     "network": "CPCM(Exp)",
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_shd_mean": 1.4,
+     "andrey_sid_mean": 1.75,
+     "empty_shd_mean": 5.25,
+     "empty_floor": {
+      "shd_ub": -3.1,
+      "sid_ub": -2.4988,
+      "pass": true
+     },
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 4.1493,
+     "comparator_s": 38.0085,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "timed_on_one_cpu": 0,
+     "andrey_shd": 1.0,
+     "comparator_shd": 1.0,
+     "empty_shd": 5.0,
+     "comparator_shd_mean": 1.75,
+     "same_graph": 12,
+     "mean_D": -0.35,
+     "bootstrap_95": [
+      -1.1,
+      0.4
+     ],
+     "above_zero": false,
+     "sid": {
+      "andrey_mean": 1.75,
+      "comparator_mean": 2.3,
+      "mean_D": -0.55,
+      "bootstrap_95": [
+       -1.7,
+       0.55
+      ],
+      "verdict": "tie"
+     },
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -3.85,
+       "bootstrap_95": [
+        -4.55,
+        -3.1
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -3.5,
+       "bootstrap_95": [
+        -4.35,
+        -2.65
+       ]
+      }
+     },
+     "paper_sid_sequential_choice_lambda1": 2.16,
+     "claim": "out",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "fresh": {
+      "seeds": "20-39",
+      "fits": 20,
+      "andrey_ok": 20,
+      "andrey_shd_mean": 1.3,
+      "andrey_sid_mean": 1.65,
+      "empty_shd_mean": 5.0,
+      "empty_floor": {
+       "shd_ub": -3.15,
+       "sid_ub": -2.7,
+       "pass": true
+      },
+      "reference": "none"
+     },
+     "replicated": "tie, fresh seeds without a reference arm",
+     "result": "tie",
+     "card_verdict": null
+    },
+    {
+     "cell": "CPCM graph search|G4|collection1_lambda1",
+     "d": 5,
+     "n": 1000,
+     "network": "CPCM(Exp, Gauss)",
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_shd_mean": 0.45,
+     "andrey_sid_mean": 0.45,
+     "empty_shd_mean": 4.6,
+     "empty_floor": {
+      "shd_ub": -3.4,
+      "sid_ub": -3.4,
+      "pass": true
+     },
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 5.366,
+     "comparator_s": 42.766,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "timed_on_one_cpu": 0,
+     "andrey_shd": 0.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 5.0,
+     "comparator_shd_mean": 0.9,
+     "same_graph": 15,
+     "mean_D": -0.45,
+     "bootstrap_95": [
+      -1.0,
+      0.0
+     ],
+     "above_zero": false,
+     "sid": {
+      "andrey_mean": 0.45,
+      "comparator_mean": 1.05,
+      "mean_D": -0.6,
+      "bootstrap_95": [
+       -1.4,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -4.15,
+       "bootstrap_95": [
+        -4.8,
+        -3.4
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -3.7,
+       "bootstrap_95": [
+        -4.4,
+        -2.95
+       ]
+      }
+     },
+     "paper_sid_sequential_choice_lambda1": 0.92,
+     "claim": "out",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "fresh": {
+      "seeds": "20-39",
+      "fits": 20,
+      "andrey_ok": 20,
+      "andrey_shd_mean": 0.45,
+      "andrey_sid_mean": 0.55,
+      "empty_shd_mean": 4.7,
+      "empty_floor": {
+       "shd_ub": -3.5,
+       "sid_ub": -3.45,
+       "pass": true
+      },
+      "reference": "none"
+     },
+     "replicated": "tie, fresh seeds without a reference arm",
+     "result": "tie",
+     "card_verdict": null
+    }
+   ]
+  },
+  {
+   "method": "CPCM graph search",
+   "family": "functional",
+   "solution": "andrey.cpcm_graph.numpy",
+   "setting": "edge_penalty=2; family: the support rule's family per column; exact search at 4 variables, RESIT-greedy above",
+   "comparator": "CPCM authors' R code",
+   "comparator_solution": "bodik.cpcm.r",
+   "comparator_setting": "CPCM_graph_estimate from the code published with the paper (commit 2ada90e), sourced unmodified, with R 4.6.1, mgcv 1.9.5, dHSIC 2.2, gamlss 5.5.5 and bnlearn 5.2.1; the same family or family collection as Andrey's arm, lambda as Andrey's, quiet = TRUE, set.seed(seed) before each call",
+   "lane": "cpcm_graph",
+   "output": "DAG",
+   "hardware": "AMD EPYC 9534 64-Core Processor for the measured build's fits (Andrey's arm on the earlier build and the reference's first-seed fits also on AMD EPYC 7713 and Intel Xeon Gold 6542Y), 1 core per fit, 1 BLAS thread; a time ratio pairs only fits on the same node",
+   "cores": 1,
+   "build": "Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's",
+   "same_graph_test": "equal SHD to the true DAG",
+   "regime": "cpcm_graph_greedy",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "SHD of the DAG against the true DAG (a reversed edge counts 1), with the authors' SID beside it under sid; andrey_shd, comparator_shd and empty_shd are medians over the paired graphs, the _mean fields their means",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "CPCM graph search|G5|collection1",
+     "d": 4,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_shd_mean": 0.25,
+     "andrey_sid_mean": 0.3,
+     "empty_shd_mean": 3.35,
+     "empty_floor": {
+      "shd_ub": -2.45,
+      "sid_ub": -2.4,
+      "pass": true
+     },
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 15.6249,
+     "comparator_s": 216.326,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "timed_on_one_cpu": 0,
+     "andrey_shd": 0.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 3.5,
+     "comparator_shd_mean": 0.25,
+     "same_graph": 20,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "sid": {
+      "andrey_mean": 0.3,
+      "comparator_mean": 0.3,
+      "mean_D": 0.0,
+      "bootstrap_95": [
+       0.0,
+       0.0
+      ],
+      "verdict": "tie"
+     },
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -3.1,
+       "bootstrap_95": [
+        -3.75,
+        -2.45
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -3.1,
+       "bootstrap_95": [
+        -3.75,
+        -2.45
+       ]
+      }
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "fresh": {
+      "seeds": "20-39",
+      "fits": 20,
+      "andrey_ok": 20,
+      "andrey_shd_mean": 0.3,
+      "andrey_sid_mean": 0.35,
+      "empty_shd_mean": 3.3,
+      "empty_floor": {
+       "shd_ub": -2.3,
+       "sid_ub": -2.2,
+       "pass": true
+      },
+      "reference": "none"
+     },
+     "replicated": "tie, fresh seeds without a reference arm",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM graph search|G6|collection1",
+     "d": 6,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_shd_mean": 0.65,
+     "andrey_sid_mean": 0.9,
+     "empty_shd_mean": 4.9,
+     "empty_floor": {
+      "shd_ub": -2.9,
+      "sid_ub": -2.4,
+      "pass": true
+     },
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 9.9547,
+     "comparator_s": 146.59,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "timed_on_one_cpu": 0,
+     "andrey_shd": 0.0,
+     "comparator_shd": 0.0,
+     "empty_shd": 4.0,
+     "comparator_shd_mean": 0.6,
+     "same_graph": 16,
+     "mean_D": 0.05,
+     "bootstrap_95": [
+      -0.2,
+      0.35
+     ],
+     "above_zero": false,
+     "sid": {
+      "andrey_mean": 0.9,
+      "comparator_mean": 0.85,
+      "mean_D": 0.05,
+      "bootstrap_95": [
+       -0.3,
+       0.4
+      ],
+      "verdict": "tie"
+     },
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -4.25,
+       "bootstrap_95": [
+        -5.8,
+        -2.9
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -4.3,
+       "bootstrap_95": [
+        -5.9,
+        -2.9
+       ]
+      }
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "fresh": {
+      "seeds": "20-39",
+      "fits": 20,
+      "andrey_ok": 20,
+      "andrey_shd_mean": 1.1,
+      "andrey_sid_mean": 1.75,
+      "empty_shd_mean": 6.0,
+      "empty_floor": {
+       "shd_ub": -3.55,
+       "sid_ub": -2.9,
+       "pass": true
+      },
+      "reference": "none"
+     },
+     "replicated": "tie, fresh seeds without a reference arm",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "CPCM graph search|G7|collection1",
+     "d": 8,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_shd_mean": 3.25,
+     "andrey_sid_mean": 4.35,
+     "empty_shd_mean": 9.15,
+     "empty_floor": {
+      "shd_ub": -4.35,
+      "sid_ub": -3.2,
+      "pass": true
+     },
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 43.2372,
+     "comparator_s": 818.9145,
+     "ratio": null,
+     "ratio_quartiles": null,
+     "timed_on_one_cpu": 0,
+     "andrey_shd": 1.5,
+     "comparator_shd": 1.0,
+     "empty_shd": 8.5,
+     "comparator_shd_mean": 3.4,
+     "same_graph": 15,
+     "mean_D": -0.15,
+     "bootstrap_95": [
+      -0.75,
+      0.25
+     ],
+     "above_zero": false,
+     "sid": {
+      "andrey_mean": 4.35,
+      "comparator_mean": 4.75,
+      "mean_D": -0.4,
+      "bootstrap_95": [
+       -1.75,
+       0.5
+      ],
+      "verdict": "tie"
+     },
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -5.9,
+       "bootstrap_95": [
+        -7.6,
+        -4.35
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -5.75,
+       "bootstrap_95": [
+        -7.25,
+        -4.3
+       ]
+      }
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "fresh": {
+      "seeds": "20-39",
+      "fits": 20,
+      "andrey_ok": 20,
+      "andrey_shd_mean": 2.0,
+      "andrey_sid_mean": 2.7,
+      "empty_shd_mean": 7.2,
+      "empty_floor": {
+       "shd_ub": -3.45,
+       "sid_ub": -2.8,
+       "pass": true
+      },
+      "reference": "none"
+     },
+     "replicated": "tie, fresh seeds without a reference arm",
+     "result": "tie",
+     "card_verdict": "tie"
     }
    ]
   }

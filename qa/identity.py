@@ -261,6 +261,8 @@ FITS: dict[str, Fit] = {
     "ANM": Fit(andrey.anm),
     "PNL": Fit(andrey.pnl),
     "LOCI": Fit(andrey.loci),
+    "CPCM": Fit(functools.partial(andrey.cpcm, family="gaussian")),
+    "CPCMGraph": Fit(functools.partial(andrey.cpcm_graph, family="gaussian_fixed_scale")),
     "PCMCI": Fit(_pcmci),
     "PCMCIplus": Fit(lambda x: andrey.pcmciplus(x, **qg.andrey_pcmciplus_adapter(5).params())),
     "LPCMCI": Fit(lambda x: andrey.lpcmci(x, **qg.andrey_lpcmci_adapter(3).params())),
@@ -320,6 +322,7 @@ LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
     "linear_gauss_er_d16": functools.partial(qg.regime_draws, "linear_gauss_er", 16, 800),
     "anm_er_n1000_d30": functools.partial(qg.regime_draws, "anm_er_n1000", 30, 1000),
     "anm_er_n1000_d12": functools.partial(qg.regime_draws, "anm_er_n1000", 12, 1000),
+    "anm_er_n1000_d6": functools.partial(qg.regime_draws, "anm_er_n1000", 6, 1000),
     "score_paper_standardized_d15_er1": functools.partial(
         qg.order_draws, "score_paper_standardized", 15, "er1"
     ),
@@ -394,6 +397,8 @@ LARGER: dict[str, str] = {
     "ANM": "anm_pair_n1500",
     "PNL": "pnl_pair_n1500",
     "LOCI": "lsnm_pair_n1500",
+    "CPCM": "lsnm_pair_n1500",
+    "CPCMGraph": "anm_er_n1000_d6",
     "PCMCI": "pcmci_paper_d20_n1000",
     "PCMCIplus": "pcmciplus_paper_d40_n1000",
     "LPCMCI": "lpcmci_paper_d20_n1000",

@@ -603,9 +603,6 @@ def cpcm_graph(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not supported (see Limitations), and its
-        API may change without deprecation.
     DataTypeWarning
         When a column holds at most 10 distinct whole numbers and so may hold category codes, which
         the fit reads as numbers. Each message warns once per process.
@@ -616,8 +613,11 @@ def cpcm_graph(
     parents follows a known parametric family, with no hidden common cause [1]_. It is designed for
     effects whose whole distribution changes with their causes, such as counts, positive or
     heavy-tailed variables, or a mix where each column gets its own family; the paper claims it for
-    graphs of 5 variables [1]_. For a pair, :func:`~andrey.cpcm` runs the paper's pair test; for
-    nonlinear effects with additive noise, use :func:`~andrey.resit` or :func:`~andrey.cam`.
+    graphs of 5 to 10 variables [1]_. On its graphs of 4 to 8 variables, with the families its rule
+    picks from each column's support, it makes as few errors as the code published with the paper
+    and runs about ten times faster. For a pair, :func:`~andrey.cpcm` runs the paper's pair
+    test; for nonlinear effects with additive noise, use :func:`~andrey.resit` or
+    :func:`~andrey.cam`.
 
     Each variable with parents is fitted by its family on them and mapped through the fitted
     distribution function, as in :func:`~andrey.cpcm`; a variable without parents is its own
@@ -640,17 +640,22 @@ def cpcm_graph(
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked yet. The paper claims graphs of 5 variables and measures the
-    exact search as feasible to 4 variables; the residual fits grow with the number of parents and
-    the greedy search refits a variable for each parent set it tries. Each test builds matrices with
-    one row and one column per sample, and every distinct residual's matrix is kept for the fit, so
-    memory grows with the square of ``n_samples``. Under the count families the rank-10 spline
-    must follow the mean to within the counts' own noise, which it does for means up to a few
-    hundred: from means of a few thousand that vary strongly with the parents, the true graph's
-    test rejects too. The family must be chosen: the paper's choice of a family from each
-    column's support, and its sequential choice between one- and two-parameter families, are not
-    offered. The numbers are a reference, not a hard limit: they change with the
-    data generator, the density, the method's settings, and the machine.
+    **Limitations.** On the paper's graphs of 4, 5, 6, and 8 variables and 1,000 rows, CPCM's graph
+    had as many errors (SHD and SID) as the code published with the paper and fewer than the empty
+    graph, and no other method measured beside it was both more accurate and faster; the `0.19.0
+    release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm-graph-search>`_ has the
+    numbers. Graphs of 10 variables, which the paper also claims, were not measured. On the measured
+    graphs :func:`~andrey.pc` with ``indep_test="kci"`` was close in accuracy and faster. The exact
+    search scores every DAG and runs up to 4 variables; above, the greedy search refits a variable
+    for each parent set it tries. Each test builds matrices with one row and one column per sample,
+    and every distinct residual's matrix is kept for the fit, so memory grows with the square of
+    ``n_samples``. Under the count families the rank-10 spline must follow the mean to within the
+    counts' own noise, which it does for means up to a few hundred: from means of a few thousand
+    that vary strongly with the parents, the true graph's test rejects too. The family must be
+    chosen: the paper's choice of a family from each column's support, and its sequential choice
+    between one- and two-parameter families, are not offered. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------

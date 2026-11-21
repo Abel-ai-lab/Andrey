@@ -104,6 +104,13 @@ names its pull request.
   columns in its order search; its Limitations state this, and the
   [0.19.0 release card][card-0190-das] has the numbers, with `cam`, SCORE, and NoGAM on the same
   datasets. ([#1161])
+- `cpcm` and `cpcm_graph` are supported. On the pairs of their paper (its Tables 1 and 2 and model
+  (16)) and its graphs of 4 to 8 variables, they made as many errors as the code published with the
+  paper and fewer than a coin flip, the majority direction, or the empty graph, and no other method
+  measured beside them was both more accurate and faster; the graph search ran about ten times
+  faster. Their Limitations state the gaps: the support rule's family on location-scale pairs, and
+  under `"pareto"` a test that can reject on causes with extreme values. The
+  [0.19.0 release card][card-0190-cpcm] has the numbers. ([#PRNUM])
 - With `fisherz` and `student_t` on data with missing values, test-wise deletion groups the rows by
   their missingness patterns once and computes a test's sums from the groups' tables, removing the
   scattered missing cells exactly, when that costs less than summing every row; a query whose
@@ -2891,6 +2898,7 @@ First alpha release.
 [#1127]: https://github.com/Abel-ai-lab/Andrey/pull/1127
 [#1147]: https://github.com/Abel-ai-lab/Andrey/pull/1147
 [#1161]: https://github.com/Abel-ai-lab/Andrey/pull/1161
+[#PRNUM]: https://github.com/Abel-ai-lab/Andrey/pull/PRNUM
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
 [#1146]: https://github.com/Abel-ai-lab/Andrey/pull/1146
 [#1149]: https://github.com/Abel-ai-lab/Andrey/pull/1149
@@ -2900,6 +2908,7 @@ First alpha release.
 [#1090]: https://github.com/Abel-ai-lab/Andrey/pull/1090
 [#1099]: https://github.com/Abel-ai-lab/Andrey/pull/1099
 [card-0190-das]: https://andrey.abel.ai/docs/benchmarks/0.19.0.html#das
+[card-0190-cpcm]: https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm
 [card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
 [#1142]: https://github.com/Abel-ai-lab/Andrey/pull/1142
 [#1102]: https://github.com/Abel-ai-lab/Andrey/pull/1102
