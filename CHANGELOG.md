@@ -82,15 +82,16 @@ names its pull request.
   generalized covariance measure (Scheidegger, Hörrmann, and Bühlmann 2022), which weights that
   covariance by an estimated sign function of the conditioning set (`variant="fix"` takes fixed
   weights); and `"pcm"`, the projected covariance measure (Lundborg, Kim, Shah, and Samworth
-  2024), which tests whether one variable improves a random-forest prediction of the other. Each
-  takes `regression="boosting"`, `"forest"`, or `"linear"`. Each fit and each sample split reads
+  2024), which tests whether one variable improves an additive-model prediction of the other, the
+  paper's regression for additive settings. Each takes `regression="boosting"`, `"forest"`, or
+  `"linear"`, and `"pcm"` also `"additive"`, its default. Each fit and each sample split reads
   only the query's columns, standardized, rounded, and signed, with the rows in an order of their
   values, so a p-value depends on neither the row nor the column order, nor on columns outside the
   query, and changes with a column's units or sign only where the rounding moves a value or a
   column is symmetric about its mean once sorted. On data with missing values, a query with fewer
   rows than its test needs, 4 for `"gcm"` and for `"wgcm"` with `variant="fix"`, 17 for `"wgcm"`'s
   default `variant="est"`, and 12 for `"pcm"`, is not tested. A contributor's script compares them
-  with the authors' code. ([#1147], [#1129])
+  with the authors' code. ([#1147], [#1129], [#PRNUM])
 - `target` takes a list of columns on `iamb`, `inter_iamb`, `mmpc`, and `icp`: one call returns one
   result per target, in the list's order, each equal to a call for that target alone. The three set
   learners answer every target with one search, which sets up the test once, and MMPC learns the

@@ -47,6 +47,16 @@ def test_the_basis_is_centered_and_leaves_the_linear_function_unpenalized(n, max
     assert abs(beta @ b.S @ beta) < 1e-8 * np.abs(b.S).max()
 
 
+@pytest.mark.parametrize(("n", "max_knots"), [(200, 2000), (80, 50)])
+def test_the_basis_at_new_values_extends_its_design(n, max_knots):
+    x = np.random.default_rng(1).uniform(-2.0, 2.0, n)
+    b = gam.tp_basis(x, 10, max_knots=max_knots)
+    np.testing.assert_allclose(b.design(x), b.X, atol=1e-9 * np.abs(b.X).max())
+    beta = np.linalg.lstsq(b.X, x - x.mean(), rcond=None)[0]  # the linear function
+    new = np.array([-3.0, 0.5, 3.0])
+    np.testing.assert_allclose(b.design(new) @ beta, new - x.mean(), atol=1e-8)
+
+
 def test_a_basis_has_at_most_one_function_per_distinct_value():
     rng = np.random.default_rng(4)
     data = np.column_stack([rng.integers(0, 5, 200).astype(float), rng.standard_normal(200)])

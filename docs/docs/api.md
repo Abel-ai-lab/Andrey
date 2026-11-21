@@ -827,7 +827,7 @@ A method becomes supported once it has:
 | `"gpdc"` | Gaussian-process regression, then a distance-correlation test of the residuals | Supported |
 | `"gcm"` | Generalized covariance measure: the normalized covariance of the residuals of boosted-tree regressions | Experimental |
 | `"wgcm"` | Weighted generalized covariance measure: the GCM with weights on the conditioning set, for a covariance that changes sign | Experimental |
-| `"pcm"` | Projected covariance measure: whether one variable improves a random-forest prediction of the other | Experimental |
+| `"pcm"` | Projected covariance measure: whether one variable improves an additive-model prediction of the other | Experimental |
 
 `normal_scores` ranks each column over every row its test reads, and its model is one distribution.
 Ranked over the rows of several environments, a column mixes their distributions, and its scores
