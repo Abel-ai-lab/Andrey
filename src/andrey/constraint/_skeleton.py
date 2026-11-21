@@ -413,7 +413,7 @@ def first_order_removals(
     one stack however many pairs and conditioners it tests. With ``trace`` given, every test is
     recorded, pair by pair.
     """
-    queries = _first_order_queries(pairs, neighbors)
+    queries = _first_order_queries(pairs, neighbors, test if trace is None else None)
     canonical = _canonical_route(test)
     tested = (
         _stacked_first_order(canonical, queries)
@@ -436,12 +436,17 @@ def first_order_removals(
 
 
 def _first_order_queries(
-    pairs: list[tuple[int, int]], neighbors: list[np.ndarray]
+    pairs: list[tuple[int, int]], neighbors: list[np.ndarray], test: CITest | None = None
 ) -> Iterator[tuple[int, int, list[int]]]:
     """Yield ``(x, y, candidates)`` for each of ``pairs`` with a candidate, in order: the
-    ascending conditioners of :func:`first_order_removals`."""
+    ascending conditioners of :func:`first_order_removals`. With ``test``, a candidate no row
+    observes together with ``x`` or ``y`` is left out and counted as not tested
+    (:func:`kept_apart`)."""
     for x, y in pairs:
         candidates = sorted((set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y})
+        if test is not None and candidates:
+            kept, _ = kept_apart(test, (x, y), [(candidates, None)], 1)
+            candidates = [] if kept is None else kept[0][0]
         if candidates:
             yield x, y, candidates
 
@@ -492,7 +497,8 @@ def scan_pairs(
     """
     stacked = _stacked_route(test)
     if stacked is not None:
-        return stacked_scan(stacked, pairs, neighbors, size, alpha, trace, record_pvalues)
+        apart = test if trace is None else None
+        return stacked_scan(stacked, pairs, neighbors, size, alpha, trace, record_pvalues, apart)
     removals: list[Removal] = []
     for x, y in pairs:
         separating: set[int] = set()
@@ -531,16 +537,20 @@ def stacked_scan(
     alpha: float,
     trace: list[dict] | None,
     record_pvalues: bool,
+    test: CITest | None = None,
 ) -> list[Removal]:
     """:func:`scan_pairs` for a test whose ``pvalues`` take canonical query arrays.
 
     Each chunk is the one :func:`scan_conditioning_sets` evaluates in one call, in the per-pair
     order (:func:`_pair_chunks`); :func:`_stacks` evaluates consecutive chunks together. Every
     p-value is the one its chunk gets alone, and the chunks are read back in order, so the
-    separating sets, the largest p-values, and the trace are those of the per-pair scan.
+    separating sets, the largest p-values, and the trace are those of the per-pair scan. With
+    ``test``, the one ``pvalues`` belongs to, a set holding a candidate no row observes together
+    with the pair is counted as not tested without being asked (:func:`kept_apart`), as
+    :func:`scan_conditioning_sets` counts it.
     """
     separated: dict[int, tuple[set[int], list[float]]] = {}
-    for stack, values in _stacks(pvalues, size, _pair_chunks(pairs, neighbors, size)):
+    for stack, values in _stacks(pvalues, size, _pair_chunks(pairs, neighbors, size, test)):
         bounds = np.cumsum([0, *(len(chunk) for _, _, _, chunk in stack)]).tolist()
         passing = values > alpha
         if trace is not None:
@@ -561,13 +571,22 @@ def stacked_scan(
 
 
 def _pair_chunks(
-    pairs: list[tuple[int, int]], neighbors: list[np.ndarray], size: int
+    pairs: list[tuple[int, int]],
+    neighbors: list[np.ndarray],
+    size: int,
+    test: CITest | None = None,
 ) -> Iterator[_Chunk]:
     """Yield ``(i, x, y, chunk)``, ``x < y``, for each chunk of subsets the per-pair scan of
-    :func:`scan_pairs` evaluates in one call, in its order; ``i`` is the pair's position."""
+    :func:`scan_pairs` evaluates in one call, in its order; ``i`` is the pair's position. With
+    ``test``, each side leaves out the candidates :func:`kept_apart` drops."""
     for i, (a, b) in enumerate(pairs):
         x, y = min(a, b), max(a, b)
-        for _, _, candidates, seen in _sides(neighbors, a, b, size):
+        for side_a, side_b, candidates, seen in _sides(neighbors, a, b, size):
+            if test is not None:
+                kept, _ = kept_apart(test, (side_a, side_b), [(candidates, seen)], size)
+                if kept is None:
+                    continue
+                [(candidates, seen)] = kept
             for chunk in subset_rows(candidates, size, seen):
                 yield i, x, y, chunk
 
@@ -613,6 +632,20 @@ def _evaluated(
         return
     for item in stack:
         yield [item], _canonical_chunk(pvalues, size, *item[1:])
+
+
+def testable_queries(test: CITest, neighbors: list[np.ndarray], x: int, y: int, size: int) -> int:
+    """:func:`pair_queries` less the sets a test that deletes rows per test leaves out because a
+    member keeps no rows with the pair (:func:`kept_apart`): the queries the scan builds."""
+    if not isinstance(test, TestwiseDeletion):
+        return pair_queries(neighbors, x, y, size)
+    together = test.together()
+    if not together[x, y]:
+        return 0
+    met = together[x] & together[y]
+    from_x = {c for c in neighbors[x].tolist() if c != y and met[c]}
+    from_y = {c for c in neighbors[y].tolist() if c != x and met[c]}
+    return comb(len(from_x), size) + comb(len(from_y), size) - comb(len(from_x & from_y), size)
 
 
 def pair_queries(neighbors: list[np.ndarray], x: int, y: int, size: int) -> int:
@@ -799,19 +832,26 @@ def unseparated_triples(
     adjacency: np.ndarray,
     sepsets: Mapping[tuple[int, int], object],
     constraints: Constraints | None,
+    undecided: Collection[tuple[int, int]] = (),
 ) -> frozenset[tuple[int, int, int]]:
     """The unshielded triples ``(a, b, c)``, ``a < c``, over a non-adjacent pair with no
     separating set.
 
     ``adjacency`` is the boolean skeleton and ``sepsets`` the separating sets, keyed in either
     order. A pair ``constraints`` make non-adjacent that ``sepsets`` leaves out has no separating
-    set the search found, so whether ``b`` is a collider is unknown: no rule reads the triple as a
-    collider or a non-collider. Without constraints the search tested every pair it left
-    non-adjacent, and there are none.
+    set the search found, and an ``undecided`` pair, keyed ``(a, c)`` with ``a < c``, which the
+    search left out of the skeleton because no test with rows could decide it
+    (:func:`~andrey.constraint.pc.adjacency_search`), may be adjacent or not; so whether ``b`` is a
+    collider is unknown: no rule reads the triple as a collider or a non-collider, and no rule
+    reads its ends as non-adjacent. Without constraints and undecided pairs the search tested
+    every pair it left non-adjacent, and there are none.
     """
-    if constraints is None:
+    if constraints is None and not undecided:
         return frozenset()
-    apart = ~constraints.support()
+    d = len(adjacency)
+    apart = np.zeros((d, d), dtype=bool) if constraints is None else ~constraints.support()
+    for a, c in undecided:
+        apart[a, c] = apart[c, a] = True
     triples = set()
     for b, row in enumerate(adjacency):
         for a, c in combinations(np.flatnonzero(row).tolist(), 2):

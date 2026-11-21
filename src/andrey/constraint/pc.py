@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Collection, Iterable, Mapping
-from contextlib import nullcontext
+from contextlib import closing, nullcontext
 from itertools import combinations, groupby
 from typing import TYPE_CHECKING
 
@@ -20,17 +20,17 @@ from andrey.constraint._skeleton import (
     check_collider_rule,
     first_order_removals,
     marginal_removals,
-    pair_queries,
     prescreen_capable,
     scan_pairs,
     separate_apart,
+    testable_queries,
     unseparated_triples,
     vote_triples,
 )
 from andrey.constraint.mvpc import IndicatorTest, PermutationCorrection, candidate_edges
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
-from andrey.core.ci_missing import rows_tested_elsewhere
+from andrey.core.ci_missing import rows_tested_elsewhere, search_outcomes
 from andrey.core.knowledge import KnowledgeError, orient
 from andrey.core.orient import meek, separating_set, to_structure
 from andrey.core.seeding import resolve_seed
@@ -107,6 +107,7 @@ def pc(
     check_collider_rule(collider_rule)
     X = np.asarray(data, dtype=np.float64)
     allowed, keep, apart = knowledge_masks(constraints)
+    undecided: set[tuple[int, int]] = set()
     deletion = make_indep_test(
         indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
     )
@@ -122,6 +123,7 @@ def pc(
         record_pvalues=collider_order == "p_value",
         warn_expensive=True,
         trace=_trace,
+        undecided=undecided,
     )
     if missing == "mvpc" and np.isnan(X).any():
         skeleton, sepsets, pvalues = correct_skeleton(
@@ -140,7 +142,7 @@ def pc(
             sink=_mvpc,
         )
     rule4 = constraints is not None
-    ambiguous = unseparated_triples(skeleton != NULL, sepsets, constraints)
+    ambiguous = unseparated_triples(skeleton != NULL, sepsets, constraints, undecided)
     if collider_rule != "sepsets":
         # Under missing="mvpc" too, the votes read the test-wise tests, as the authors' code does.
         test = make_indep_test(
@@ -494,6 +496,7 @@ def adjacency_search(
     record_pvalues: bool = False,
     warn_expensive: bool = False,
     trace: list[dict] | None = None,
+    undecided: set[tuple[int, int]] | None = None,
 ) -> tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]], dict[tuple[int, int], float]]:
     """The stable adjacency search of PC, CD-NOD, RSMAX2's PC restrict, FCI, FCI-JCI, and GFCI:
     the skeleton, and for every removed pair its separating set and p-value.
@@ -535,6 +538,15 @@ def adjacency_search(
     ``warn_expensive`` emits a :class:`~andrey.PerformanceWarning` before each conditioning-size
     pass requiring at least ten million CI tests. The search still evaluates every conditioning set.
 
+    With the ``undecided`` sink, a pair still adjacent after the last size with no query tested,
+    only queries without the rows their test needs
+    (:meth:`~andrey.core.ci_missing.RowCounts.untested`), as a pair never observed together, is
+    undecided: it leaves the skeleton without a separating set, before the pairs of ``apart`` are
+    searched, and the sink receives it as ``(x, y)``, ``x < y``. A triple over it is neither a
+    collider nor a non-collider (:func:`~andrey.constraint._skeleton.unseparated_triples`). Without
+    the sink, as in a search that refines a skeleton an earlier search decided, every pair no test
+    removed stays. Data without missing values have no undecided pair.
+
     The ``trace`` sink records every test in the order it runs: ``step="test"``, ``depth``, the
     pair ``x < y``, the conditioning set ``S``, the p-value ``p`` (for CMIknn, which stops its
     shuffles once the side of ``alpha`` is certain, a bound on that side), and ``removed``
@@ -553,7 +565,8 @@ def adjacency_search(
 
     can_prescreen = prescreen_capable(test)
     pool = skeleton_pool(test, workers) if trace is None else None
-    try:
+    closed = nullcontext() if pool is None else closing(pool)
+    with search_outcomes() as counted, closed:
         size = 0
         while True:
             neighbors = [np.flatnonzero(row) for row in support]
@@ -576,7 +589,7 @@ def adjacency_search(
                 pairs = adjacent_pairs(testable)
                 # Each pair's test count, taken once: the warning and the pool's cutoff read it.
                 weights = (
-                    [pair_queries(neighbors, x, y, size) for x, y in pairs]
+                    [testable_queries(test, neighbors, x, y, size) for x, y in pairs]
                     if pool is not None or (warn_expensive and size >= 2)
                     else []
                 )
@@ -610,10 +623,12 @@ def adjacency_search(
                 if p is not None:
                     pvalues[(x, y)] = p
             size += 1
-    finally:
-        if pool is not None:
-            pool.close()
 
+    if undecided is not None:
+        for x, y in counted.untested():
+            if x < n_vars and y < n_vars and support[x, y]:
+                support[x, y] = support[y, x] = False
+                undecided.add((x, y))
     if apart is not None:
         for x, y, separating, p in separate_apart(
             test,
