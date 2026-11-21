@@ -208,7 +208,7 @@ class RowCounts(Counter[int]):
         p: npt.ArrayLike,
         x: npt.ArrayLike,
         y: npt.ArrayLike,
-        conditions: Sequence[Iterable[int]] | None = None,
+        conditions: Sequence[Iterable[int]] | np.ndarray | None = None,
     ) -> None:
         """Count the queries of the pairs ``x < y`` answered with the row counts ``rows`` and the
         p-values ``p``, a :data:`NOT_TESTED` one apart, with its conditioning set, entry ``i`` of
@@ -563,7 +563,7 @@ class TestwiseDeletion:
         rows: npt.ArrayLike,
         p: npt.ArrayLike,
         pairs: np.ndarray,
-        conds: Sequence[Iterable[int]],
+        conds: Sequence[Iterable[int]] | np.ndarray,
     ) -> None:
         """Add the queries of ``pairs``, an ``(N, 2)`` array of this test's columns, given the
         conditioning sets ``conds``, to ``counter`` in the source's columns
@@ -1023,7 +1023,7 @@ class GaussianDeletion(PartialCorrelationDeletion):
         self,
         query: Callable[[int], tuple[int, int, list[int]]],
         pairs: np.ndarray,
-        conds: Sequence[Iterable[int]],
+        conds: Sequence[Iterable[int]] | np.ndarray,
         r: np.ndarray,
         p: np.ndarray,
         rows: np.ndarray,

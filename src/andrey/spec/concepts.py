@@ -1624,6 +1624,35 @@ _CONCEPTS = (
         ),
     ),
     Concept(
+        key="possibly_separable",
+        summary="How the orientation rules read a triple with a side in "
+        "metadata['possibly_separable'], on data with missing values.",
+        param=_template(
+            "possibly_separable",
+            "str",
+            "orient",
+            "How a triple x - z - y with a side listed in metadata['possibly_separable'] is read, "
+            "on data with missing values: orient = as any other triple; ambiguous = neither a "
+            "collider nor a non-collider, never oriented through, when a conditioning set not "
+            "tested of that side lies within the other adjacencies of one of its ends, so it "
+            "might be the separating set the search missed. On merged cohorts that no row "
+            "bridges, ambiguous removes most false colliders and most true arrowheads with them, "
+            "and the graph can then be farther from the truth than the empty graph.",
+            choices=("orient", "ambiguous"),
+        ),
+        fragment="possibly_separable",
+        suitable=(
+            *("pc", "fci", "cdnod", "fci_jci", "iamb", "inter_iamb", "mmpc"),
+            *("pcmciplus", "jpcmciplus"),
+        ),
+        exempt=_exempt(
+            "Its orientation rules are LPCMCI's own, not the separating-set rules this reading "
+            "changes.",
+            "lpcmci",
+        ),
+        others_exempt="No separating-set orientation reads a possibly separable edge.",
+    ),
+    Concept(
         key="edge_removal",
         summary="Which edges of a score search's CPDAG the tests of an FCI hybrid may remove: "
         "every edge (all), or only those in a triangle of the CPDAG (triangles), as Section 5 of "

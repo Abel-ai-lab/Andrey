@@ -778,6 +778,7 @@ def pcmciplus(
     alpha: float = 0.01,
     fdr_method: str = "fdr_bh",
     collider_rule: str = "majority",
+    possibly_separable: str = "orient",
     indep_test: str | None = None,
     degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
@@ -827,6 +828,12 @@ def pcmciplus(
         when fewer than half hold ``b``, and ``"conservative"`` when none does; a triple neither
         rule can decide is ambiguous and orients nothing. The default, ``"majority"``, gives
         orientations that do not depend on the order of the variables [1]_.
+    possibly_separable : {"orient", "ambiguous"}, default="orient"
+        How the collider phase reads a same-step triple with a link listed in
+        ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
+        any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider: no
+        collider vote reads it, and no rule orients through it. On series that no row bridges,
+        ``"ambiguous"`` removes most same-step arrowheads.
     indep_test : str or None, default=None
         The conditional-independence test behind every p-value. ``"fisherz"`` and ``"student_t"``
         test partial correlation, for linear effects in continuous data: ``"fisherz"`` applies
@@ -1132,6 +1139,7 @@ def jpcmciplus(
     alpha: float = 0.01,
     fdr_method: str = "fdr_bh",
     collider_rule: str = "majority",
+    possibly_separable: str = "orient",
     indep_test: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -1186,6 +1194,12 @@ def jpcmciplus(
         system variables is judged, as in :func:`~andrey.pcmciplus`; ``a`` can be a context or a
         dummy. The default, ``"majority"``, gives orientations that do not depend on the order of
         the variables.
+    possibly_separable : {"orient", "ambiguous"}, default="orient"
+        How the collider phase reads a same-step triple with a link listed in
+        ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
+        any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider: no
+        collider vote reads it, and no rule orients through it. On series that no row bridges,
+        ``"ambiguous"`` removes most same-step arrowheads.
     indep_test : str or None, default=None
         The conditional-independence test behind every p-value, a test of continuous data, as in
         :func:`~andrey.pcmciplus`: ``"fisherz"`` and ``"student_t"`` test partial correlation, and

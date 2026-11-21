@@ -54,6 +54,7 @@ def pc(
     degrees_of_freedom: str = "mean",
     collider_order: str | None = None,
     collider_rule: str = "sepsets",
+    possibly_separable: str = "orient",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -120,6 +121,16 @@ def pc(
         of them contains it and a non-collider when all do; ``"majority"`` when fewer than half
         contain it and when more than half do. Any other triple is ambiguous, and no rule orients
         through it. Both run up to ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
+    possibly_separable : {"orient", "ambiguous"}, default="orient"
+        How the orientation rules read a triple ``x - z - y`` with a side listed in
+        ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
+        any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
+        rule orients through it, when a conditioning set not tested of that side lies within the
+        other adjacencies of one of its ends: a set that separates a pair lies within the parents
+        of one end, so that set might be the separating set the search missed. On merged cohorts
+        that no row bridges, ``"ambiguous"`` removes most false colliders and most true
+        arrowheads with them, and the graph can then be farther from the truth than the empty
+        graph.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -648,6 +659,7 @@ def fci(
     indep_test: str | None = None,
     degrees_of_freedom: str = "mean",
     collider_rule: str = "sepsets",
+    possibly_separable: str = "orient",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     possible_dsep: str | None = None,
@@ -707,6 +719,19 @@ def fci(
         non-collider when all do; ``"majority"`` when fewer than half contain it and when more
         than half do. Any other triple is ambiguous, and no rule orients through it. Both run up
         to ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
+    possibly_separable : {"orient", "ambiguous"}, default="orient"
+        How the orientation rules read a triple ``x - z - y`` with a side listed in
+        ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
+        any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
+        rule orients through it, when a conditioning set not tested of that side lies within the
+        other adjacencies of one of its ends: a set that separates a pair lies within the parents
+        of one end, so that set might be the separating set the search missed. On merged cohorts
+        that no row bridges, ``"ambiguous"`` removes most false colliders and most true
+        arrowheads with them, and the graph can then be farther from the truth than the empty
+        graph. Under ``"ambiguous"``, the collider pass before the possible-d-separation step
+        reads it too, so that step's sets, the skeleton, and ``metadata["not_tested"]`` can
+        change; the reason a set beyond both ends' adjacencies is no missed separating set is
+        PC's, and the possible-d-separation sets reach beyond the adjacencies.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1494,6 +1519,7 @@ def cdnod(
     degrees_of_freedom: str = "mean",
     collider_order: str | None = None,
     collider_rule: str = "sepsets",
+    possibly_separable: str = "orient",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     dependence_threshold: float | None = None,
@@ -1568,6 +1594,16 @@ def cdnod(
         fewer than half and when more than half do (``"majority"`` [4]_). Any other triple is
         ambiguous, and no rule orients through it. A triple whose middle node is the index is not
         voted: the index is never a collider.
+    possibly_separable : {"orient", "ambiguous"}, default="orient"
+        How the orientation rules read a triple ``x - z - y`` with a side listed in
+        ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
+        any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
+        rule orients through it, when a conditioning set not tested of that side lies within the
+        other adjacencies of one of its ends: a set that separates a pair lies within the parents
+        of one end, so that set might be the separating set the search missed. On merged cohorts
+        that no row bridges, ``"ambiguous"`` removes most false colliders and most true
+        arrowheads with them, and the graph can then be farther from the truth than the empty
+        graph.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1908,6 +1944,7 @@ def fci_jci(
     indep_test: str | None = None,
     degrees_of_freedom: str = "mean",
     collider_rule: str = "sepsets",
+    possibly_separable: str = "orient",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     possible_dsep: str | None = None,
@@ -1976,6 +2013,19 @@ def fci_jci(
         them, makes ``z`` a collider when none of them contains it and a non-collider when all do
         (``"conservative"`` [4]_ [5]_), or when fewer than half and when more than half do
         (``"majority"`` [4]_). Any other triple is ambiguous, and no rule orients through it.
+    possibly_separable : {"orient", "ambiguous"}, default="orient"
+        How the orientation rules read a triple ``x - z - y`` with a side listed in
+        ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
+        any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
+        rule orients through it, when a conditioning set not tested of that side lies within the
+        other adjacencies of one of its ends: a set that separates a pair lies within the parents
+        of one end, so that set might be the separating set the search missed. On merged cohorts
+        that no row bridges, ``"ambiguous"`` removes most false colliders and most true
+        arrowheads with them, and the graph can then be farther from the truth than the empty
+        graph. Under ``"ambiguous"``, the collider pass before the possible-d-separation step
+        reads it too, so that step's sets, the skeleton, and ``metadata["not_tested"]`` can
+        change; the reason a set beyond both ends' adjacencies is no missed separating set is
+        PC's, and the possible-d-separation sets reach beyond the adjacencies.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,

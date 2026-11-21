@@ -150,6 +150,7 @@ def iamb(
     indep_test: str | None = None,
     degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
+    possibly_separable: str = "orient",
     missing: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -202,6 +203,16 @@ def iamb(
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
+    possibly_separable : {"orient", "ambiguous"}, default="orient"
+        How the orientation rules read a triple ``x - z - y`` with a side listed in
+        ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
+        any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
+        rule orients through it, when a conditioning set not tested of that side lies within the
+        other adjacencies of one of its ends: a set that separates a pair lies within the parents
+        of one end, so that set might be the separating set the search missed. On merged cohorts
+        that no row bridges, ``"ambiguous"`` removes most false colliders and most true
+        arrowheads with them, and the graph can then be farther from the truth than the empty
+        graph. Read under ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
@@ -442,6 +453,7 @@ def inter_iamb(
     indep_test: str | None = None,
     degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
+    possibly_separable: str = "orient",
     missing: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -493,6 +505,16 @@ def inter_iamb(
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
+    possibly_separable : {"orient", "ambiguous"}, default="orient"
+        How the orientation rules read a triple ``x - z - y`` with a side listed in
+        ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
+        any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
+        rule orients through it, when a conditioning set not tested of that side lies within the
+        other adjacencies of one of its ends: a set that separates a pair lies within the parents
+        of one end, so that set might be the separating set the search missed. On merged cohorts
+        that no row bridges, ``"ambiguous"`` removes most false colliders and most true
+        arrowheads with them, and the graph can then be farther from the truth than the empty
+        graph. Read under ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
@@ -729,6 +751,7 @@ def mmpc(
     indep_test: str | None = None,
     degrees_of_freedom: str = "mean",
     categorical: Sequence[str | int] | None = None,
+    possibly_separable: str = "orient",
     missing: str | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -781,6 +804,16 @@ def mmpc(
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
+    possibly_separable : {"orient", "ambiguous"}, default="orient"
+        How the orientation rules read a triple ``x - z - y`` with a side listed in
+        ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
+        any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
+        rule orients through it, when a conditioning set not tested of that side lies within the
+        other adjacencies of one of its ends: a set that separates a pair lies within the parents
+        of one end, so that set might be the separating set the search missed. On merged cohorts
+        that no row bridges, ``"ambiguous"`` removes most false colliders and most true
+        arrowheads with them, and the graph can then be farther from the truth than the empty
+        graph. Read under ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
