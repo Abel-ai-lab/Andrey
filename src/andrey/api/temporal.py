@@ -2640,8 +2640,8 @@ def possibly_separable_links(
     ``drawn[lag, i, j]`` marks the links drawn. A drawn link is flagged when a query of its ends,
     the design columns ``lag * n + i`` and ``j``, was not tested in ``rows`` and another was
     (:meth:`~andrey.core.ci_missing.RowCounts.possibly_separable`), or when an end shares its
-    variable with the lag-0 end of a link ``undecided[lag, i, j]`` marks: no test conditions on a
-    node an undecided link joins, and a test of the link shifts that node next to its end. The
+    variable with an end of a link ``undecided[lag, i, j]`` marks: no test conditions on a node an
+    undecided link joins, and a test of the link can shift that node next to its end. The
     links are listed as :func:`undecided_links` lists them; ``{}`` when none is flagged.
     """
     if not rows.total_not_tested():
@@ -2653,8 +2653,8 @@ def possibly_separable_links(
         square[a, b] = square[b, a] = True
     flagged = set(rows.possibly_separable(square))
     if undecided is not None and undecided.any():
-        lags, sources, targets = np.nonzero(undecided)
-        joined = set(targets.tolist()) | set(sources[lags == 0].tolist())
+        _, sources, targets = np.nonzero(undecided)
+        joined = set(targets.tolist()) | set(sources.tolist())
         flagged |= {(a, b) for a, b in pairs if a % n in joined or b % n in joined}
     return {"possibly_separable": _named_links(flagged, n, labels)} if flagged else {}
 
