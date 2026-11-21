@@ -141,9 +141,24 @@ list such edges in `metadata["possibly_separable"]`. In data merged from cohorts
 two variables whose true separating set is never observed together with them is one of these. In
 PCMCI, PCMCI+, and LPCMCI, a link is flagged too when a test left out a candidate for want of rows,
 or when an end of it is an end of an undecided link, whose other node no test conditions on; a
-Markov-blanket search flags every edge of its target when it leaves an undecided candidate out.
-The flag says what the data could not check, not that the edge is false: in the smallest merged
-cohorts, every drawn edge is flagged, since another cohort's variable could have separated it.
+Markov-blanket search flags every edge of its target when it leaves an undecided candidate out. The
+flag says what the data could not check, not that the edge is false: in the smallest merged cohorts,
+every drawn edge is flagged, since another cohort's variable could have separated it. A flagged edge
+may be absent, and the triple with it. With `possibly_separable="ambiguous"`, PC, FCI, CD-NOD,
+FCI-JCI, the Markov-blanket searches' CPDAG, and PCMCI+ read a triple with a flagged side as neither
+a collider nor a non-collider, as for a triple whose ends are undecided, when a conditioning set not
+tested of that side lies within the other nodes adjacent to one of its ends or undecided with it,
+since a set that separates a pair lies within the parents of one end. FCI and FCI-JCI, which allow
+latent variables, so read every flagged side, since their separating sets can lie beyond the
+adjacencies, and PCMCI+ every flagged link. LPCMCI lists flagged links but does not read them. The
+default, `"orient"`, reads it as any other triple.
+
+The choice is a trade. In merged cohorts that no row bridges, nearly every drawn edge is flagged,
+and `"ambiguous"` removes most false colliders and most true arrowheads with them: the graph can
+then be farther from the truth, counted by the structural Hamming distance, than the empty graph,
+and FCI's skeleton changes through the possible-d-separation step. Where cohorts share rows, few
+edges are flagged and the results change little. Keep the default when you read arrowheads, and
+use `"ambiguous"` when a false collider costs you more than a missing one.
 
 `metadata["not_tested"]` counts the conditioning sets not tested, including those the search
 skipped because no row can test them; it measures the search more than the data, so the notice for

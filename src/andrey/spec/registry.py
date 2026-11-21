@@ -77,6 +77,14 @@ _POOLED_INDEP_TEST = concept_param(
 _DEGREES_OF_FREEDOM = concept_param("degrees_of_freedom")
 _CATEGORICAL = concept_param("categorical")
 _COLLIDER_RULE = concept_param("collider_rule")
+_POSSIBLY_SEPARABLE = concept_param("possibly_separable")
+_LINKS_POSSIBLY_SEPARABLE = concept_param(
+    "possibly_separable",
+    doc="How a same-step triple with a link listed in metadata['possibly_separable'] is read, on "
+    "data with missing values: orient = as any other triple; ambiguous = no collider vote reads "
+    "it, so it is neither a collider nor a non-collider. On series that no row bridges, ambiguous "
+    "can leave no same-step arrowhead.",
+)
 _POSSIBLE_DSEP = ParamSpec(
     name="possible_dsep",
     type="str",
@@ -214,6 +222,7 @@ _add(
             _DEGREES_OF_FREEDOM,
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
+            _POSSIBLY_SEPARABLE,
             _CATEGORICAL,
             concept_param(
                 "missing",
@@ -265,6 +274,7 @@ _add(
             _INDEP_TEST,
             _DEGREES_OF_FREEDOM,
             _COLLIDER_RULE,
+            _POSSIBLY_SEPARABLE,
             _CATEGORICAL,
             _POSSIBLE_DSEP,
             _TEST_SEED,
@@ -387,6 +397,7 @@ _add(
             _DEGREES_OF_FREEDOM,
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
+            _POSSIBLY_SEPARABLE,
             _CATEGORICAL,
             ParamSpec(
                 name="dependence_threshold",
@@ -453,6 +464,7 @@ _add(
             _POOLED_INDEP_TEST,
             _DEGREES_OF_FREEDOM,
             _COLLIDER_RULE,
+            _POSSIBLY_SEPARABLE,
             _CATEGORICAL,
             _POSSIBLE_DSEP,
             concept_param("confounded_index"),
@@ -568,6 +580,11 @@ _LOCAL_OUTPUT_DOC = (
     "they joined; with a list of targets, a list of those results, one per target in order"
 )
 _BLANKET_STRUCTURE = concept_param("structure")
+_BLANKET_POSSIBLY_SEPARABLE = concept_param(
+    "possibly_separable",
+    doc=_POSSIBLY_SEPARABLE.doc + " Read under structure=cpdag only; the skeleton and the moral "
+    "graph orient nothing.",
+)
 for _name, _summary, _key, _structure, _kind, _refs in (
     (
         "iamb",
@@ -632,6 +649,7 @@ for _name, _summary, _key, _structure, _kind, _refs in (
                 _INDEP_TEST,
                 _DEGREES_OF_FREEDOM,
                 _CATEGORICAL,
+                _BLANKET_POSSIBLY_SEPARABLE,
                 _TEST_SEED,
             ),
             references=_refs,
@@ -2525,6 +2543,7 @@ _add(
                 "the ends and fewer than half (majority) or none (conservative) of them hold the "
                 "middle. The default majority does not depend on the order of the variables.",
             ),
+            _LINKS_POSSIBLY_SEPARABLE,
             _INDEP_TEST,
             _DEGREES_OF_FREEDOM,
             _CATEGORICAL,

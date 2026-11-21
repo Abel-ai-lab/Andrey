@@ -1624,6 +1624,40 @@ _CONCEPTS = (
         ),
     ),
     Concept(
+        key="possibly_separable",
+        summary="How the orientation rules read a triple with a side in "
+        "metadata['possibly_separable'], on data with missing values.",
+        param=_template(
+            "possibly_separable",
+            "str",
+            "orient",
+            "How a triple x - z - y with a side listed in metadata['possibly_separable'] is read, "
+            "on data with missing values: orient = as any other triple; ambiguous = neither a "
+            "collider nor a non-collider, never oriented through, when a conditioning set not "
+            "tested of that side lies within the other nodes adjacent to one of its ends or "
+            "undecided with it, so it might be the separating set the search missed; in FCI and "
+            "FCI-JCI, which allow latent variables, for every listed side, since a separating "
+            "set can lie beyond the adjacencies. On merged cohorts that no row bridges, "
+            "ambiguous removes most false colliders and most true arrowheads with them, and the "
+            "graph can then be farther from the truth than the empty graph.",
+            choices=("orient", "ambiguous"),
+        ),
+        fragment="possibly_separable",
+        suitable=(*("pc", "fci", "cdnod", "fci_jci", "iamb", "inter_iamb", "mmpc", "pcmciplus"),),
+        exempt=(
+            *_exempt(
+                "It lists possibly separable links but does not read them: the flags are found "
+                "from its final links, after the search, and its collider votes run during the "
+                "search, while those links still change.",
+                "lpcmci",
+            ),
+            *_exempt(
+                "It refuses missing values, so it lists no possibly separable link.", "jpcmciplus"
+            ),
+        ),
+        others_exempt="No separating-set orientation reads a possibly separable edge.",
+    ),
+    Concept(
         key="edge_removal",
         summary="Which edges of a score search's CPDAG the tests of an FCI hybrid may remove: "
         "every edge (all), or only those in a triangle of the CPDAG (triangles), as Section 5 of "

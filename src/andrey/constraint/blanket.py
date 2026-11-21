@@ -46,10 +46,22 @@ from typing import Literal
 
 import numpy as np
 
-from andrey.constraint._skeleton import CHUNK, adjacent_pairs, kept_apart, scan_conditioning_sets
+from andrey.constraint._skeleton import (
+    CHUNK,
+    adjacent_pairs,
+    flagged_triples,
+    kept_apart,
+    scan_conditioning_sets,
+)
 from andrey.core import ARROW, NULL, TAIL, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
-from andrey.core.ci_missing import NOT_TESTED, TestwiseDeletion, not_tested
+from andrey.core.ci_missing import (
+    NOT_TESTED,
+    TestwiseDeletion,
+    counts_its_tests,
+    not_tested,
+    running_flags,
+)
 from andrey.core.knowledge import Constraints, orient
 from andrey.core.orient import meek
 from andrey.core.ties import (
@@ -243,27 +255,34 @@ def markov_blanket(
     if sepsets is not None:
         for x in blanket:
             sepsets.pop(x, None)
-    undecided = any(x != target and x not in decided and x not in blanket for x in range(d))
+    undecided = [x for x in range(d) if x != target and x not in decided and x not in blanket]
     if constraints is not None:
         support = constraints.support()[target]
         blanket = [x for x in blanket if support[x]]
     if undecided:
-        _count_beside_undecided(test, target, blanket, required, max_depth)
+        _count_beside_undecided(test, target, blanket, required, max_depth, undecided)
     return blanket
 
 
 def _count_beside_undecided(
-    test: CITest, target: int, members: list[int], required: Sequence[int], max_depth: int | None
+    test: CITest,
+    target: int,
+    members: list[int],
+    required: Sequence[int],
+    max_depth: int | None,
+    undecided: list[int],
 ) -> None:
     """Count, for each of ``members`` outside ``required``, one conditioning set of it and
-    ``target`` as not tested when a search leaves an undecided candidate out: the set holding that
-    candidate, which no test asked and which might separate the member from ``target``. A required
-    member is never tested, and with ``max_depth`` 0 no set is asked, so neither counts one."""
+    ``target`` as not tested when a search leaves the ``undecided`` candidates out: a set holding
+    one of them, which no test asked and which might separate the member from ``target``. A
+    required member is never tested, and with ``max_depth`` 0 no set is asked, so neither counts
+    one."""
     if max_depth == 0 or not isinstance(test, TestwiseDeletion):
         return
+    held = [[u] for u in undecided]
     for x in members:
         if x not in required:
-            test.count_not_tested(target, x, 1)
+            test.count_not_tested(target, x, 1, held)
 
 
 def _shrink(
@@ -463,7 +482,7 @@ def parents_children(
         x for x in range(d) if x != target and x not in required and (allowed is None or allowed[x])
     ]
     weakest = dict(zip(others, _weakest(test, target, others, [()]), strict=True))
-    undecided = any(not_tested(p) for p, _ in weakest.values())
+    undecided = [x for x, (p, _) in weakest.items() if not_tested(p)]
     if sepsets is not None:
         sepsets.update({x: () for x, (p, _) in weakest.items() if p > alpha})
     members: list[int] = []
@@ -517,7 +536,7 @@ def parents_children(
                     sepsets[x] = found
                 break
     if undecided:
-        _count_beside_undecided(test, target, members, required, max_depth)
+        _count_beside_undecided(test, target, members, required, max_depth, undecided)
     return members
 
 
@@ -739,12 +758,16 @@ def blanket_cpdag(
     cycle), the colliders are oriented by
     :func:`~andrey.constraint.pc.orient_colliders` in the order ``andrey.config.tie_break``
     selects, Meek's rules complete the result, with R4 under ``constraints``, and an edge two
-    colliders of equal rank dispute is left undirected.
+    colliders of equal rank dispute is left undirected. Inside a
+    :func:`~andrey.core.ci_missing.reading_flags` block, a triple with a side a conditioning set no
+    row could test might have separated is neither a collider nor a non-collider
+    (:func:`~andrey.constraint._skeleton.flagged_triples`).
     """
     # pc imports this module through andrey.search, so its import waits for the call.
     from andrey.constraint.pc import check_knowledge_cycle, orient_colliders, undirect_conflicts
 
     sepsets, strengths, ambiguous = blanket_colliders(test, skeleton, blankets, alpha, max_depth)
+    ambiguous |= flagged_triples(skeleton, running_flags(skeleton))
     marks = np.where(skeleton, TAIL, NULL).astype(np.int8)
     if constraints is not None:
         marks = orient(marks, constraints)
@@ -1049,6 +1072,7 @@ def local_search(
     )
 
 
+@counts_its_tests
 def local_structure(
     X: np.ndarray,
     method: str,

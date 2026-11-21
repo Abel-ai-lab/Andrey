@@ -54,6 +54,7 @@ def pc(
     degrees_of_freedom: str = "mean",
     collider_order: str | None = None,
     collider_rule: str = "sepsets",
+    possibly_separable: str = "orient",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     seed: int | None = None,
@@ -120,6 +121,17 @@ def pc(
         of them contains it and a non-collider when all do; ``"majority"`` when fewer than half
         contain it and when more than half do. Any other triple is ambiguous, and no rule orients
         through it. Both run up to ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
+    possibly_separable : {"orient", "ambiguous"}, default="orient"
+        How the orientation rules read a triple ``x - z - y`` with a side listed in
+        ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
+        any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
+        rule orients through it, when a conditioning set not tested of that side lies within the
+        other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
+        lies within the parents of one end, so that set might be the separating set the search
+        missed. On merged cohorts
+        that no row bridges, ``"ambiguous"`` removes most false colliders and most true
+        arrowheads with them, and the graph can then be farther from the truth than the empty
+        graph.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -330,15 +342,18 @@ def pc(
     listed in ``metadata["undecided_pairs"]``, and a triple whose ends are undecided is neither a
     collider nor a non-collider to any rule. A drawn edge that a conditioning set not tested might
     have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
-    not check, not a finding that the edge is false. On merged cohorts, every pair of variables
-    measured only in different cohorts is therefore undecided, and an edge whose separating set is
-    never observed together with its pair is drawn and flagged. A few rows that observe every
-    column decide such pairs on those rows alone, with little power, so they can remove true edges
-    between variables observed together. A continuous column constant on a test's rows
-    raises ``ValueError``. With missing values, the skeleton search runs in one process. Test-wise
-    deletion is valid when values are missing completely at random, which means that whether a value
-    is missing depends on no value in the data; the rows a test reads are then a random sample of
-    all rows, and otherwise they are a selected sample that more rows do not correct.
+    not check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``, a
+    triple with a side it reads (see ``possibly_separable``) is neither a collider nor a
+    non-collider to any rule. On merged cohorts, every pair of variables measured only in different
+    cohorts is therefore undecided, and
+    an edge whose separating set is never observed together with its pair is drawn and flagged. A
+    few rows that observe every column decide such pairs on those rows alone, with little power, so
+    they can remove true edges between variables observed together. A continuous column constant on
+    a test's rows raises ``ValueError``. With missing values, the skeleton search runs in one
+    process. Test-wise deletion is valid when values are missing completely at random, which means
+    that whether a value is missing depends on no value in the data; the rows a test reads are then
+    a random sample of all rows, and otherwise they are a selected sample that more rows do not
+    correct.
 
     **Missing-Value PC.** ``missing="mvpc"`` follows Algorithm 1 of Tu et al. [13]_. The test-wise
     skeleton keeps every true edge but can keep extra ones: an extra edge ``x - y`` needs the
@@ -647,6 +662,7 @@ def fci(
     indep_test: str | None = None,
     degrees_of_freedom: str = "mean",
     collider_rule: str = "sepsets",
+    possibly_separable: str = "orient",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     possible_dsep: str | None = None,
@@ -706,6 +722,16 @@ def fci(
         non-collider when all do; ``"majority"`` when fewer than half contain it and when more
         than half do. Any other triple is ambiguous, and no rule orients through it. Both run up
         to ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
+    possibly_separable : {"orient", "ambiguous"}, default="orient"
+        How the orientation rules read a triple ``x - z - y`` with a side listed in
+        ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
+        any other triple. ``"ambiguous"`` makes every such triple neither a collider nor a
+        non-collider, and no rule orients through it: with latent variables, a set that separates
+        a pair lies within the possible-d-separating set of one end, beyond its adjacencies, so
+        any conditioning set not tested might be the separating set the search missed. On merged
+        cohorts that no row bridges, ``"ambiguous"`` removes most false colliders and most true
+        arrowheads with them. The collider pass before the possible-d-separation step reads it
+        too, so that step's sets, the skeleton, and ``metadata["not_tested"]`` can change.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -885,15 +911,17 @@ def fci(
     listed in ``metadata["undecided_pairs"]``, and a triple whose ends are undecided is neither a
     collider nor a non-collider to any rule. A drawn edge that a conditioning set not tested might
     have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
-    not check, not a finding that the edge is false. On merged cohorts, every pair of variables
-    measured only in different cohorts is therefore undecided, and an edge whose separating set is
-    never observed together with its pair is drawn and flagged. A few rows that observe every
-    column decide such pairs on those rows alone, with little power, so they can remove true edges
-    between variables observed together. A continuous column constant on a test's rows
-    raises ``ValueError``. With missing values, the skeleton search runs in one process. Test-wise
-    deletion is valid when values are missing completely at random, which means that whether a value
-    is missing depends on no value in the data; the rows a test reads are then a random sample of
-    all rows, and otherwise they are a selected sample that more rows do not correct.
+    not check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``, a
+    triple with a flagged side is neither a collider nor a non-collider to any rule. On merged
+    cohorts, every pair of variables measured only in different cohorts is therefore undecided, and
+    an edge whose separating set is never observed together with its pair is drawn and flagged. A
+    few rows that observe every column decide such pairs on those rows alone, with little power, so
+    they can remove true edges between variables observed together. A continuous column constant on
+    a test's rows raises ``ValueError``. With missing values, the skeleton search runs in one
+    process. Test-wise deletion is valid when values are missing completely at random, which means
+    that whether a value is missing depends on no value in the data; the rows a test reads are then
+    a random sample of all rows, and otherwise they are a selected sample that more rows do not
+    correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs with no
     hidden variable, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through which
@@ -1492,6 +1520,7 @@ def cdnod(
     degrees_of_freedom: str = "mean",
     collider_order: str | None = None,
     collider_rule: str = "sepsets",
+    possibly_separable: str = "orient",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     dependence_threshold: float | None = None,
@@ -1566,6 +1595,17 @@ def cdnod(
         fewer than half and when more than half do (``"majority"`` [4]_). Any other triple is
         ambiguous, and no rule orients through it. A triple whose middle node is the index is not
         voted: the index is never a collider.
+    possibly_separable : {"orient", "ambiguous"}, default="orient"
+        How the orientation rules read a triple ``x - z - y`` with a side listed in
+        ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
+        any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
+        rule orients through it, when a conditioning set not tested of that side lies within the
+        other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
+        lies within the parents of one end, so that set might be the separating set the search
+        missed. On merged cohorts
+        that no row bridges, ``"ambiguous"`` removes most false colliders and most true
+        arrowheads with them, and the graph can then be farther from the truth than the empty
+        graph.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1740,14 +1780,16 @@ def cdnod(
     collider nor a non-collider to any rule; a test whose ``env`` is constant on its rows, which
     come from one environment, is not tested. A drawn edge that a conditioning set not tested might
     have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
-    not check, not a finding that the edge is false. On merged cohorts, every pair of variables
-    measured only in different cohorts is therefore undecided. A continuous column constant on a
-    test's rows raises ``ValueError``. ``env`` must be complete, and ``dependence_threshold``, whose
-    kernel measures read every row, raises ``ValueError`` on data with missing values. With missing
-    values, the skeleton search runs in one process. Test-wise deletion is valid when values are
-    missing completely at random, which means that whether a value is missing depends on no value in
-    the data; the rows a test reads are then a random sample of all rows, and otherwise they are a
-    selected sample that more rows do not correct.
+    not check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``, a
+    triple with a side it reads (see ``possibly_separable``) is neither a collider nor a
+    non-collider to any rule. On merged cohorts, every pair of variables measured only in different
+    cohorts is therefore undecided. A continuous column constant on a test's rows raises
+    ``ValueError``. ``env`` must be complete, and ``dependence_threshold``, whose kernel measures
+    read every row, raises ``ValueError`` on data with missing values. With missing values, the
+    skeleton search runs in one process. Test-wise
+    deletion is valid when values are missing completely at random, which means that whether a value
+    is missing depends on no value in the data; the rows a test reads are then a random sample of
+    all rows, and otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs whose means
     shift across 4 domains, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes
@@ -1905,6 +1947,7 @@ def fci_jci(
     indep_test: str | None = None,
     degrees_of_freedom: str = "mean",
     collider_rule: str = "sepsets",
+    possibly_separable: str = "orient",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
     possible_dsep: str | None = None,
@@ -1973,6 +2016,16 @@ def fci_jci(
         them, makes ``z`` a collider when none of them contains it and a non-collider when all do
         (``"conservative"`` [4]_ [5]_), or when fewer than half and when more than half do
         (``"majority"`` [4]_). Any other triple is ambiguous, and no rule orients through it.
+    possibly_separable : {"orient", "ambiguous"}, default="orient"
+        How the orientation rules read a triple ``x - z - y`` with a side listed in
+        ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
+        any other triple. ``"ambiguous"`` makes every such triple neither a collider nor a
+        non-collider, and no rule orients through it: with latent variables, a set that separates
+        a pair lies within the possible-d-separating set of one end, beyond its adjacencies, so
+        any conditioning set not tested might be the separating set the search missed. On merged
+        cohorts that no row bridges, ``"ambiguous"`` removes most false colliders and most true
+        arrowheads with them. The collider pass before the possible-d-separation step reads it
+        too, so that step's sets, the skeleton, and ``metadata["not_tested"]`` can change.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -2128,13 +2181,14 @@ def fci_jci(
     collider nor a non-collider to any rule; a test whose ``env`` is constant on its rows, which
     come from one environment, is not tested. A drawn edge that a conditioning set not tested might
     have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
-    not check, not a finding that the edge is false. On merged cohorts, every pair of variables
-    measured only in different cohorts is therefore undecided. A continuous column constant on a
-    test's rows raises ``ValueError``. With missing values, the skeleton search runs in one process.
-    Test-wise deletion is valid when values are missing completely at random, which means that
-    whether a value is missing depends on no value in the data; the rows a test reads are then a
-    random sample of all rows, and otherwise they are a selected sample that more rows do not
-    correct.
+    not check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``, a
+    triple with a flagged side is neither a collider nor a non-collider to any rule. On merged
+    cohorts, every pair of variables measured only in different cohorts is therefore undecided. A
+    continuous column constant on a test's rows raises ``ValueError``. With missing values, the
+    skeleton search runs in one process. Test-wise deletion is valid when values are missing
+    completely at random, which means that whether a value is missing depends on no value in the
+    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
+    selected sample that more rows do not correct.
 
     **Limitations.** Measured on its authors' simulation [1]_, linear-Gaussian data with hidden
     common causes and one context variable that changes one variable: 4, 10, and 100 variables with

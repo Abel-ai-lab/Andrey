@@ -19,11 +19,17 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._skeleton import check_collider_rule, unseparated_triples, vote_triples
+from andrey.constraint._skeleton import (
+    check_collider_rule,
+    flagged_triples,
+    unseparated_triples,
+    vote_triples,
+)
 from andrey.constraint.fci import (
     circle_pag,
     fci,
     fci_orient,
+    flagged_sides,
     knowledge_marks,
     orient_colliders,
     possible_dsep_step,
@@ -34,13 +40,14 @@ from andrey.constraint.fci import (
 from andrey.constraint.pc import adjacency_search, knowledge_masks
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import make_indep_test
-from andrey.core.ci_missing import mark_environment
+from andrey.core.ci_missing import counts_its_tests, mark_environment, running_flags
 from andrey.core.structure import EDGE_TYPES
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
 
 
+@counts_its_tests
 def fci_jci(
     data: np.ndarray,
     env: np.ndarray,
@@ -141,7 +148,7 @@ def fci_jci(
     marks = circle_pag(shielded)
     knowledge_marks(marks, padded)
     mark_index(marks, d, confounded_index)
-    orient_colliders(marks, sepsets, undecided_sides(marks, kept))
+    orient_colliders(marks, sepsets, undecided_sides(marks, kept) | flagged_sides(marks))
     # Its knowledge check runs before the index marks: no mark at the index is an arrowhead, so
     # the index cannot lie on a cycle the check reads.
     marks = possible_dsep_step(
@@ -163,11 +170,14 @@ def fci_jci(
     if kept is not None:
         marks[kept] = NULL
     mark_index(marks, d, confounded_index)
-    ambiguous = unseparated_triples(marks != NULL, sepsets, padded, undecided)
+    adjacency = marks != NULL
+    flagged = running_flags(adjacency, latent=True)
+    ambiguous = unseparated_triples(adjacency, sepsets, padded, undecided)
     if collider_rule != "sepsets":
         ambiguous |= vote_triples(
             marks, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
         )
+    ambiguous |= flagged_triples(adjacency, flagged)
     if _ambiguous is not None:
         _ambiguous.update(ambiguous)
     orient_colliders(marks, sepsets, ambiguous)
@@ -180,6 +190,7 @@ def fci_jci(
         max_depth=max_depth,
         in_column_order=in_column_order,
         selection_bias=False,
+        flagged=flagged,
     )
 
     index_edges = [

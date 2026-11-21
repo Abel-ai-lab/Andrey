@@ -53,7 +53,7 @@ class IndicatorTest:
         others = [int(v) for v in (x, y, *given) if int(v) != self._indicator]
         values = self._values[self._observed[:, others].all(axis=1)]
         if values.size and values.min() == values.max():
-            count_answer(values.size, NOT_TESTED, int(x), int(y))
+            count_answer(values.size, NOT_TESTED, int(x), int(y), given)
             return NOT_TESTED
         return self._test(x, y, given)
 
