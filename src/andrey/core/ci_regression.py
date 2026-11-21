@@ -401,9 +401,9 @@ class GCM(_RegressionTest):
     of several variables of ``z`` jointly under ``"linear"``, leaves a covariance in the residuals
     and reads as dependence. At a few hundred rows, where the conditional means are hard to learn,
     the test rejects a true independence more often than its level, as the weighted GCM's paper
-    reports for it at 100 and 200 rows [2]_: with ``"boosting"``, on the null designs of [1]_ and
-    [2]_ at 200 and 400 rows, it rejected about 6 to 6.6% of them at 0.05, and the authors' code
-    about 5.7%. With an empty conditioning set the test is a
+    reports for it at 100 and 200 rows [2]_: with ``"boosting"``, on draws of the null designs of
+    [1]_ and [2]_ at 200 and 400 rows, it rejected about 6 to 6.6% of them at 0.05, and the
+    authors' code about 5.7%. With an empty conditioning set the test is a
     test of correlation: a dependence without one, such as ``y = x**2`` for a symmetric ``x``, goes
     unseen.
 
@@ -505,17 +505,18 @@ class WGCM(_RegressionTest):
     **Limitations.** Not benchmarked yet. The tests run it on up to 4 variables and 400 rows.
     ``"est"`` tests on 70% of the rows, and its p-value changes with the seed. A ``"boosting"``
     regression fits 281 boosted models, 28 settings on 10 folds and the chosen one on every row;
-    ``"est"`` fits five per query, its split being the query's own. ``"fix"`` uses 7 weights per
-    conditioning variable, so with many conditioning variables the maximum spreads its power thin.
-    At a few hundred rows, where the conditional means are hard to learn, neither variant holds its
-    level: with ``"boosting"``, ``"est"`` rejected a true independence at 0.05 in about 6.8% of
-    draws on the paper's null designs at 200 and 400 rows [1]_, and 6.6% over those and further
-    null designs of [1]_ and [2]_; ``"fix"`` in about 6 to 6.4%. The authors' released code misses
-    the level too: its current release's ``"est"`` rejected 6.0% and 6.6% of such draws, and the
-    release the paper ran 6.8% and 7.8%. The GCM's tuning of the boosted trees, in place of the
-    authors' current one, makes queries three to four times faster and gives about 5 points more
-    power on the paper's alternatives, but ``"est"`` then rejects 8.3% of the null draws where this
-    tuning rejects 6.6%.
+    ``"est"`` runs five such regressions per query, its split being the query's own. ``"fix"`` uses
+    7 weights per conditioning variable, so with many conditioning variables the maximum spreads its
+    power thin. At a few hundred rows, where the conditional means are hard to learn, neither
+    variant holds its level: with ``"boosting"``, ``"est"`` rejected a true independence at 0.05 in
+    about 6.8% of draws on the paper's null designs at 200 and 400 rows [1]_, and 6.6% over those
+    and further null designs of [1]_ and [2]_; ``"fix"`` in about 6 to 6.4%. The authors' released
+    code misses the level too: its current release's ``"est"`` rejected 6.0% and 6.6% of such draws,
+    and the release the paper ran 6.8% and 7.8%. The authors' current tuning, which ``"boosting"``
+    follows, costs time and power: against the GCM's tuning of the boosted trees, a query takes
+    three to five times as long, and ``"est"`` has about 5 points less power on the paper's
+    alternatives, while the GCM's tuning rejects 8.3% of the null draws of which this one rejects
+    6.6%.
 
     References
     ----------
