@@ -7622,7 +7622,7 @@
        ]
       }
      },
-     "out_of_claim": "model (16) is judged at 1,000 and 2,000 rows, as fixed before the runs; 500 rows is reported, not judged",
+     "out_of_claim": "the docs and the release card claim model (16) at 1,000 and 2,000 rows, the sizes its floor is judged at as fixed before the runs; 500 rows is reported, not judged",
      "claim": "out",
      "first_seeds": "0-99",
      "seeds": 100,
@@ -8064,7 +8064,7 @@
        ]
       }
      },
-     "out_of_claim": "model (16) is judged at 1,000 and 2,000 rows, as fixed before the runs; 500 rows is reported, not judged",
+     "out_of_claim": "the docs and the release card claim model (16) at 1,000 and 2,000 rows, the sizes its floor is judged at as fixed before the runs; 500 rows is reported, not judged",
      "claim": "out",
      "first_seeds": "0-99",
      "seeds": 100,
