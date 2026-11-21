@@ -40,7 +40,12 @@ from andrey.constraint.fci import (
 from andrey.constraint.pc import adjacency_search, knowledge_masks
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import make_indep_test
-from andrey.core.ci_missing import counts_its_tests, mark_environment, running_flags
+from andrey.core.ci_missing import (
+    counts_its_tests,
+    keeps_no_untested_sets,
+    mark_environment,
+    running_flags,
+)
 from andrey.core.structure import EDGE_TYPES
 
 if TYPE_CHECKING:
@@ -48,6 +53,7 @@ if TYPE_CHECKING:
 
 
 @counts_its_tests
+@keeps_no_untested_sets
 def fci_jci(
     data: np.ndarray,
     env: np.ndarray,

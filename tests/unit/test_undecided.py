@@ -547,10 +547,20 @@ def test_the_other_orienting_searches_orient_nothing_from_a_flagged_side(fit):
 
 
 @pytest.mark.parametrize(
-    ("settings", "keeps"),
-    [({"structure": "cpdag"}, True), ({"structure": "skeleton"}, False), ({"target": "C"}, False)],
+    ("fit", "keeps"),
+    [
+        (lambda df: andrey.mmpc(df, structure="cpdag", max_depth=1, **AMBIGUOUS), True),
+        (lambda df: andrey.mmpc(df, structure="skeleton", max_depth=1, **AMBIGUOUS), False),
+        (lambda df: andrey.mmpc(df, target="C", max_depth=1, **AMBIGUOUS), False),
+        (lambda df: andrey.pc(df, max_depth=1, **AMBIGUOUS), True),
+        (lambda df: andrey.pc(df, max_depth=1), False),
+        (lambda df: andrey.fci(df, max_depth=1, **AMBIGUOUS), False),
+    ],
+    ids=["mmpc_cpdag", "mmpc_skeleton", "mmpc_target", "pc", "pc_orient", "fci"],
 )
-def test_a_blanket_output_that_orients_nothing_keeps_no_untested_set(monkeypatch, settings, keeps):
+def test_only_a_search_that_reads_untested_sets_keeps_them(monkeypatch, fit, keeps):
+    """PC and the blanket CPDAG read the untested sets under "ambiguous"; FCI reads every flagged
+    side, and a target set or skeleton orients nothing, so neither keeps them."""
     kept: list[tuple[int, int]] = []
     note = ci_missing.RowCounts.note_untested
 
@@ -559,7 +569,7 @@ def test_a_blanket_output_that_orients_nothing_keeps_no_untested_set(monkeypatch
         note(self, x, y, columns)
 
     monkeypatch.setattr(ci_missing.RowCounts, "note_untested", counted)
-    andrey.mmpc(_collider_beside_cohorts(), max_depth=1, **settings, **AMBIGUOUS)
+    fit(_collider_beside_cohorts())
     assert bool(kept) == keeps
 
 

@@ -58,7 +58,13 @@ import numpy as np
 from andrey.constraint._skeleton import check_collider_rule, collider_verdict
 from andrey.constraint.pc import check_knowledge_cycle
 from andrey.core import backend
-from andrey.core.ci_missing import NOT_TESTED, counts_its_tests, reads_flags, running_counter
+from andrey.core.ci_missing import (
+    NOT_TESTED,
+    counts_its_tests,
+    keeps_no_untested_sets,
+    reads_flags,
+    running_counter,
+)
 from andrey.core.fdr import check_fdr_method, corrected_pvalues
 from andrey.core.knowledge import orient as orient_known
 from andrey.core.structure import ARROW, NULL, TAIL
@@ -673,6 +679,7 @@ def pcmciplus(
 
 
 @counts_its_tests
+@keeps_no_untested_sets
 def run_phases(
     test: LinkTest,
     n_vars: int,

@@ -163,6 +163,8 @@ _TOGETHER_ROWS = 1 << 16
 _ROWS: ContextVar[RowCounts | None] = ContextVar("andrey_rows_tested", default=None)
 #: Whether the searches read a triple with a flagged side as ambiguous (:func:`reading_flags`).
 _READ_FLAGS: ContextVar[bool] = ContextVar("andrey_read_flags", default=False)
+#: Whether a search reading flags keeps its untested sets (:func:`keeps_no_untested_sets`).
+_KEEP_SETS: ContextVar[bool] = ContextVar("andrey_keep_sets", default=True)
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
 
@@ -213,7 +215,8 @@ class RowCounts(Counter[int]):
         """Count the queries of the pairs ``x < y`` answered with the row counts ``rows`` and the
         p-values ``p``, a :data:`NOT_TESTED` one apart, with its conditioning set, entry ``i`` of
         ``conditions``, kept inside a :func:`reading_flags` block only, the one place a rule reads
-        it (:meth:`note_untested`)."""
+        it, and not in a search that reads every flagged pair (:func:`keeps_no_untested_sets`;
+        :meth:`note_untested`)."""
         values = np.asarray(p, dtype=np.float64).reshape(-1)
         if not values.size:
             return
@@ -225,7 +228,7 @@ class RowCounts(Counter[int]):
         self.p_one += int(np.count_nonzero(values == 1.0))
         if skipped.any():
             self.not_tested.update(zip(lo[skipped].tolist(), hi[skipped].tolist()))
-            for k in np.flatnonzero(skipped).tolist() if _READ_FLAGS.get() else ():
+            for k in np.flatnonzero(skipped).tolist() if _keeps_sets() else ():
                 self.note_untested(
                     int(lo[k]), int(hi[k]), None if conditions is None else conditions[k]
                 )
@@ -343,6 +346,28 @@ def reading_flags(on: bool = True) -> Generator[None]:
         yield
     finally:
         _READ_FLAGS.reset(token)
+
+
+def keeps_no_untested_sets(search: Callable[_P, _R]) -> Callable[_P, _R]:
+    """Run ``search`` keeping no untested conditioning set (:meth:`RowCounts.note_untested`), for a
+    search that reads every flagged pair (``running_flags(..., latent=True)``, as FCI does, or
+    :func:`~andrey.temporal.pcmci.flagged_links`) and so never reads the sets."""
+
+    @functools.wraps(search)
+    def run(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+        token = _KEEP_SETS.set(False)
+        try:
+            return search(*args, **kwargs)
+        finally:
+            _KEEP_SETS.reset(token)
+
+    return run
+
+
+def _keeps_sets() -> bool:
+    """Whether the running search keeps its untested sets: inside a :func:`reading_flags` block, in
+    a search that reads them."""
+    return _READ_FLAGS.get() and _KEEP_SETS.get()
 
 
 def reads_flags() -> bool:
@@ -737,15 +762,15 @@ class TestwiseDeletion:
         that keep no rows (:meth:`together`); the pair is recorded as :meth:`_count` records it.
 
         Each of ``held`` is the columns that keep some of those sets from rows, which the sets
-        hold, kept inside a :func:`reading_flags` block only (:meth:`RowCounts.note_untested`);
-        ``None`` when they are not known."""
+        hold, kept as :meth:`RowCounts.add` keeps them (:meth:`RowCounts.note_untested`); ``None``
+        when they are not known."""
         counter = _ROWS.get()
         if counter is None or not queries:
             return
         pair = (x, y) if self._source is None else self._source[[x, y]].tolist()
         a, b = min(pair), max(pair)
         counter.not_tested[a, b] += queries
-        if not _READ_FLAGS.get():
+        if not _keeps_sets():
             return
         for columns in [None] if held is None else held:
             if columns is not None and self._source is not None:
