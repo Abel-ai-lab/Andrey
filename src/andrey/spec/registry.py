@@ -896,7 +896,10 @@ _add(
                 "graph of the current class scores better without the edge, and the paper proves "
                 "that it recovers the true class as the rows grow; conservative "
                 "(ConservativeInsert) also skips it when any valid addition of the edge worsens "
-                "the score, with fewer errors in the paper's simulations and no such proof.",
+                "the score, with fewer errors in the paper's simulations and no such proof. safe "
+                "favors the proof and gives up accuracy; conservative favors fewer errors (the "
+                "lower mean error in 31 of 38 settings of the paper's simulation) and gives up "
+                "the proof.",
             ),
             ParamSpec(
                 name="schedule",
@@ -907,9 +910,11 @@ _add(
                 "then reversing edges until neither improves the score before each single "
                 "addition; lges0_released is its LGES-0 (Algorithm 8) in the order of the "
                 "authors' code: additions, deletions, then reversals, once. lges is the "
-                "default as the paper's main method; on the paper's linear-Gaussian simulation "
-                "the two made about as many errors on the sparsest graphs and lges fewer on "
-                "denser ones.",
+                "default as the paper's main method. lges favors denser graphs and gives up "
+                "time (0.9 to 1.8 times as long) and some of the sparsest graphs; lges0_released "
+                "favors the sparsest graphs and time and gives up denser graphs (on the paper's "
+                "linear-Gaussian simulation, lges was better in 15 of 16 settings at mean degree "
+                "3, lges0_released in 12 of 32 at mean degree 1 and 2 against 5).",
             ),
             _CATEGORICAL,
         ),

@@ -202,8 +202,8 @@ def iamb(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
+        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -214,10 +214,15 @@ def iamb(
         rule orients through it, when a conditioning set not tested of that side lies within the
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
         lies within the parents of one end, so that set might be the separating set the search
-        missed. On merged cohorts
-        that no row bridges, ``"ambiguous"`` removes most false colliders and most true
-        arrowheads with them, and the graph can then be farther from the truth than the empty
-        graph. Read under ``structure="cpdag"`` only.
+        missed.
+        ``"orient"`` favors arrowheads and accuracy; it gives up protection from false colliders.
+        ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them, and
+        with them accuracy. On merged cohorts of 20, 40, and 50 variables that no row bridges (20
+        seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's false colliders per fit
+        from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found from 0.54-0.72 to 0,
+        and PC's graph was then farther from the truth than the empty graph in 6 of 6 settings; on
+        bridged cohorts and complete data the two gave the same graphs. Not measured with IAMB. Read
+        under ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
@@ -506,8 +511,8 @@ def inter_iamb(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
+        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -518,10 +523,15 @@ def inter_iamb(
         rule orients through it, when a conditioning set not tested of that side lies within the
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
         lies within the parents of one end, so that set might be the separating set the search
-        missed. On merged cohorts
-        that no row bridges, ``"ambiguous"`` removes most false colliders and most true
-        arrowheads with them, and the graph can then be farther from the truth than the empty
-        graph. Read under ``structure="cpdag"`` only.
+        missed.
+        ``"orient"`` favors arrowheads and accuracy; it gives up protection from false colliders.
+        ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them, and
+        with them accuracy. On merged cohorts of 20, 40, and 50 variables that no row bridges (20
+        seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's false colliders per fit
+        from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found from 0.54-0.72 to 0,
+        and PC's graph was then farther from the truth than the empty graph in 6 of 6 settings; on
+        bridged cohorts and complete data the two gave the same graphs. Not measured with
+        Inter-IAMB. Read under ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
@@ -807,8 +817,8 @@ def mmpc(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
+        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -819,10 +829,15 @@ def mmpc(
         rule orients through it, when a conditioning set not tested of that side lies within the
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
         lies within the parents of one end, so that set might be the separating set the search
-        missed. On merged cohorts
-        that no row bridges, ``"ambiguous"`` removes most false colliders and most true
-        arrowheads with them, and the graph can then be farther from the truth than the empty
-        graph. Read under ``structure="cpdag"`` only.
+        missed.
+        ``"orient"`` favors arrowheads and accuracy; it gives up protection from false colliders.
+        ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them, and
+        with them accuracy. On merged cohorts of 20, 40, and 50 variables that no row bridges (20
+        seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's false colliders per fit
+        from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found from 0.54-0.72 to 0,
+        and PC's graph was then farther from the truth than the empty graph in 6 of 6 settings; on
+        bridged cohorts and complete data the two gave the same graphs. Not measured with MMPC. Read
+        under ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's

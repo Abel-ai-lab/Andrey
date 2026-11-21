@@ -510,8 +510,8 @@ def pcmci(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
+        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -832,8 +832,11 @@ def pcmciplus(
         How the collider phase reads a same-step triple with a link listed in
         ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
         any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider: no
-        collider vote reads it, and no rule orients through it. On series that no row bridges,
-        ``"ambiguous"`` can leave no same-step arrowhead.
+        collider vote reads it, and no rule orients through it. ``"orient"`` favors same-step
+        arrowheads; it gives up protection from false colliders. ``"ambiguous"`` favors no false
+        collider; it gives up the same-step arrowheads. On lagged series whose modules are observed
+        in different periods, so that no row bridges them, ``"ambiguous"`` took the same-step
+        arrowheads per fit from 1.5-1.9 to 0; what that does to accuracy was not measured.
     indep_test : str or None, default=None
         The conditional-independence test behind every p-value. ``"fisherz"`` and ``"student_t"``
         test partial correlation, for linear effects in continuous data: ``"fisherz"`` applies
@@ -858,8 +861,8 @@ def pcmciplus(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
+        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1485,8 +1488,8 @@ def lpcmci(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
+        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -2265,12 +2268,18 @@ def rpcmci(
         How each regime's MCI p-values are corrected for the number of links tested. ``"none"``
         keeps each p-value as tested; ``"fdr_bh"`` replaces them with their Benjamini-Hochberg
         adjusted values [3]_ over all of the regime's links together, and a link is then in the
-        graph when its adjusted p-value is at most ``alpha``.
+        graph when its adjusted p-value is at most ``alpha``. ``"none"`` favors true links; it
+        gives up control of the extra ones. ``"fdr_bh"`` favors fewer extra links; it gives up
+        some true ones. Not measured with Regime-PCMCI; :func:`~andrey.pcmci` states the trade as
+        measured there.
     indep_test : {"student_t", "fisherz"}, default="student_t"
         The conditional-independence test behind every p-value, a partial-correlation test for
-        linear effects: ``"student_t"``
-        takes the p-value from the Student-t distribution, ``"fisherz"`` from Fisher's
-        z-transform and the normal distribution. ``metadata["indep_test"]`` names it.
+        linear effects: ``"student_t"`` takes the p-value from the Student-t distribution,
+        ``"fisherz"`` from Fisher's z-transform and the normal distribution.
+        ``metadata["indep_test"]`` names it. ``"student_t"`` favors an exact p-value for Gaussian
+        data at any number of steps. ``"fisherz"`` favors the p-values of the other temporal
+        methods' default test; it gives up that exactness on a regime with few steps. The two
+        differ less as the steps grow; the trade was not measured.
     n_starts : int, default=50
         The number of starts, at least ``1``, each from its own random regime assignment; the
         start with the lowest objective is returned.

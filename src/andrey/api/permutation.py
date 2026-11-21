@@ -145,7 +145,9 @@ def boss(
         values. On data with missing values, ``metadata["missing"]`` records the handling used and
         ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
         fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
-        See **Missing values.** in Notes.
+        ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
+        up time: each round runs the search again, and a fit took 2 to 72 times as long as the same
+        search on complete data in the release benchmarks. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
         1. Each round runs the search once, so the time grows with them. A fit whose last round
@@ -566,7 +568,9 @@ def grasp(
         values. On data with missing values, ``metadata["missing"]`` records the handling used and
         ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
         fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
-        See **Missing values.** in Notes.
+        ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
+        up time: each round runs the search again, and a fit took 2 to 72 times as long as the same
+        search on complete data in the release benchmarks. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
         1. Each round runs the search once, so the time grows with them. A fit whose last round
@@ -972,8 +976,8 @@ def igsp(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
+        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     invariance_test : {"gaussian", "indicator"} or None, default=None
         The invariance test, which asks whether a variable's distribution given a set of others is
         the same in a setting as in the observational rows. ``"gaussian"`` compares the linear
@@ -1319,8 +1323,8 @@ def ut_igsp(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
+        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     invariance_test : {"gaussian", "indicator"} or None, default=None
         The invariance test, which asks whether a variable's distribution given a set of others is
         the same in a setting as in the observational rows. ``"gaussian"`` compares the linear
@@ -1694,8 +1698,8 @@ def boss_fci(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
+        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
@@ -2042,8 +2046,8 @@ def grasp_fci(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
+        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"

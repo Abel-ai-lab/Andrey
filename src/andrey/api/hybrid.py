@@ -135,8 +135,8 @@ def mmhc(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
+        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     score_func : str or None, default=None
         Local score of the hill-climbing phase, any of :func:`~andrey.hc`'s: ``"bic"`` (Gaussian
         BIC) for continuous data, ``"bdeu"`` or ``"discrete_bic"`` for categorical data,
@@ -375,7 +375,13 @@ def rsmax2(
         ``iamb(structure="skeleton")``, which drops the pairs of parents of a common child.
         ``"pc"`` keeps the skeleton of :func:`~andrey.pc`'s adjacency search [4]_. With
         ``knowledge``, ``"mmpc"`` and ``"pc"`` read it in the restrict phase, and ``"iamb"`` and
-        ``"inter_iamb"`` read the data alone; ``knowledge`` below says why. See Notes.
+        ``"inter_iamb"`` read the data alone; ``knowledge`` below says why. ``"mmpc"`` favors
+        time; it gives up some accuracy. ``"iamb"`` favors accuracy; it gives up time. On
+        linear-Gaussian graphs of 20 to 100 variables (see Limitations), in the setting closest to
+        the empty graph, 20 variables at mean degree 4, ``"mmpc"`` had 29 to 31 pairs wrong and
+        ``"iamb"`` 21 to 24; over all settings a fit took 0.04 to 3.5 s with ``"mmpc"`` and 0.07 to
+        8.8 s with ``"iamb"``. ``"inter_iamb"`` and
+        ``"pc"`` were not measured against them. See Notes.
     maximize : {"hc", "tabu"}, default="hc"
         The maximize phase: :func:`~andrey.hc` or :func:`~andrey.tabu`.
     alpha : float, default=0.05
@@ -392,8 +398,8 @@ def rsmax2(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
+        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     score_func : str or None, default=None
         Local score of the maximize phase, any of :func:`~andrey.hc`'s. ``"normal_scores"``,
         experimental, is ``"bic"`` on each column's normal scores, for continuous data that are

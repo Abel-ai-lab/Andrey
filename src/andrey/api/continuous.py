@@ -117,7 +117,9 @@ def notears(
         values. On data with missing values, ``metadata["missing"]`` records the handling used and
         ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
         fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
-        See **Missing values.** in Notes.
+        ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
+        up time: each round runs the search again, and a fit took 2 to 72 times as long as the same
+        search on complete data in the release benchmarks. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
         1. Each round runs the search once, so the time grows with them. A fit whose last round
@@ -412,7 +414,10 @@ def dagma(
         refuses missing values. On data with missing values, ``metadata["missing"]`` records the
         handling used and ``metadata["em"]`` the EM record, with the rows dropped for observing no
         value and the fewest rows two columns share; two columns that share no observed row raise
-        ``ValueError``. See **Missing values.** in Notes.
+        ``ValueError``. ``"em"`` favors the partly observed rows, which dropping the incomplete rows
+        loses; it gives up time: each round runs the search again, and a fit took 2 to 72 times as
+        long as the same search on complete data in the release benchmarks. See **Missing values.**
+        in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
         1. Each round runs the search once, so the time grows with them. A fit whose last round

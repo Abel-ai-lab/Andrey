@@ -1637,9 +1637,12 @@ _CONCEPTS = (
             "tested of that side lies within the other nodes adjacent to one of its ends or "
             "undecided with it, so it might be the separating set the search missed; in FCI and "
             "FCI-JCI, which allow latent variables, for every listed side, since a separating "
-            "set can lie beyond the adjacencies. On merged cohorts that no row bridges, "
-            "ambiguous removes most false colliders and most true arrowheads with them, and the "
-            "graph can then be farther from the truth than the empty graph.",
+            "set can lie beyond the adjacencies. orient favors arrowheads and accuracy and gives "
+            "up protection from false colliders; ambiguous favors no false collider and gives up "
+            "the true arrowheads beside them: on merged cohorts of 20 to 50 variables that no row "
+            "bridges, it took PC's false colliders per fit from 12.8-90.0 to at most 0.2 and its "
+            "true arrowheads found from 0.54-0.72 to 0, leaving PC farther from the truth than "
+            "the empty graph in 6 of 6 settings and FCI 0.5 to 4.4 errors worse.",
             choices=("orient", "ambiguous"),
         ),
         fragment="possibly_separable",

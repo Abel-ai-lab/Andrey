@@ -360,7 +360,12 @@ class GCM(_RegressionTest):
         rate 0.3) minimize the 10-fold cross-validated error, the authors' default grid; the trees'
         leaf values carry no penalty, where the authors' boosting shrinks them, so the fits can
         leave smaller residuals. ``"forest"`` is a random forest of 500 trees; ``"linear"``
-        ordinary least squares.
+        ordinary least squares. ``"boosting"`` favors conditional means it can learn from the
+        data, nonlinear and of several variables; it gives up time, 51 boosted fits per
+        regression. ``"linear"`` favors time, one fit; it gives up the level wherever a conditional
+        mean is not linear, which then reads as dependence. ``"forest"`` favors nonlinear means
+        without tuning; it gives up time, 500 trees per regression. The three were not measured
+        against each other.
     seed : int or None, default=None
         Seed for the cross-validation folds of ``"boosting"`` and the trees of ``"forest"``.
         ``None`` uses ``ANDREY_SEED``, or ``0`` when it is unset.
@@ -458,7 +463,14 @@ class WGCM(_RegressionTest):
     variant : {"est", "fix"}, default="est"
         ``"est"`` estimates one weight function on 30% of the rows and tests on the rest;
         ``"fix"`` tests a fixed set of weight functions on every row and takes the largest
-        statistic.
+        statistic. ``"est"`` favors one weight learned from the data, whose power does not spread
+        over the conditioning variables; it gives up time, 30% of the rows, and a p-value that
+        changes little with the seed. ``"fix"`` favors every row, half the time, and a steadier
+        level; it gives up power as the conditioning set grows, 7 weights per variable. With
+        ``"boosting"``, on the null designs of [1]_ at 200 and 400 rows, ``"est"`` rejected a true
+        independence at 0.05 in 6.8% of draws against 6.0% (over 12 designs, those of [2]_
+        included: 6.6% against 6.4%, by design from 4 to 13% against 4 to 8.6%), and a query took
+        21 to 26 s against 11 to 15 s. Their power was not measured against each other.
     regression : {"boosting", "forest", "linear"}, default="boosting"
         The regression of each variable, and of the products of residuals, on the conditioning set.
         ``"boosting"`` is boosted regression trees whose learning rate (0.1, 0.2, 0.3, or 0.5),
@@ -467,7 +479,9 @@ class WGCM(_RegressionTest):
         default; the trees' leaf values carry no penalty, where the authors' boosting shrinks them,
         and the trees search every split point exactly, where the authors' boosting grows them on
         histogram bins of each feature.
-        ``"forest"`` and ``"linear"`` are as for :class:`~andrey.core.ci_regression.GCM`.
+        ``"forest"`` and ``"linear"`` are as for :class:`~andrey.core.ci_regression.GCM`, with
+        the same character, except that ``"boosting"`` fits 281 boosted models per regression.
+        The three were not measured against each other.
     seed : int or None, default=None
         Seed for the sample split of ``"est"``, the multiplier draws of ``"fix"``, the
         cross-validation folds of ``"boosting"``, and the trees of ``"forest"``. ``None`` uses

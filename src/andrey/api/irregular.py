@@ -682,7 +682,16 @@ def cpcm(
         when the p-values are equal (the paper's forced estimate). A significance level such as
         ``0.05`` gives no edge when the two columns test independent at that level, and otherwise
         draws an edge only when exactly one direction's p-value exceeds it (the paper's
-        conservative estimate). See Notes.
+        conservative estimate). ``None`` favors a direction for every pair; it gives up the sign
+        that a pair fits both ways or neither. A level favors that sign; it gives up the pairs it
+        leaves undecided. On the paper's pairs at 1,000 and 2,000 rows the forced direction was
+        right as often as the code published with the paper in every setting. On the paper's
+        model (16) at 500 rows under ``"pareto"``, the conservative estimate found both directions
+        plausible, the paper's outcome at ``gamma = 0``, on 73% and 78% of the pairs of two seed
+        sets against that code's 82% and 85%, so it is not supported there; at ``gamma = 1`` it
+        named the true direction on 55% of the pairs and both on 39%. The `0.19.0 release card
+        <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#the-conservative-estimate>`_ has the
+        numbers. See Notes.
     family : str or list of str, default="gaussian"
         The family of each variable given the other, one name for both columns or a list of two
         names, one per column: ``"gaussian"`` (mean and scale change with the cause),

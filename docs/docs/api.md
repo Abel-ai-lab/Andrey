@@ -788,12 +788,22 @@ edges as GES and GIES do, and returns a CPDAG. `schedule` picks the order of the
 `"lges"`, the default, is the paper's main method, LGES (its Algorithm 1), which deletes and
 reverses edges before each single addition; `"lges0_released"` is its LGES-0 variant (Algorithm 8)
 with the phases in the order of the authors' code: additions, deletions, then reversals, once. LGES
-is the default as the paper's main method. On the paper's linear-Gaussian simulation the two made
-about as many errors on the sparsest graphs (mean degree 1 and 2), with LGES-0 slightly ahead more
-often, and LGES made fewer on denser ones (mean degree 3 and up). With the standard BIC, its
-default, each schedule returns the CPDAGs of the authors' code run in its order on that simulation
+is the default as the paper's main method. With the standard BIC, its default, each schedule
+returns the CPDAGs of the authors' code run in its order on the paper's linear-Gaussian simulation
 when both read the same graph of each class; it is experimental until it is benchmarked in that
 setting.
+
+Choosing an option, on that simulation (the authors' generator; 10 to 100 variables at mean degree
+1, 2, 3, 4, and 6; 1,000 and 10,000 rows; 20 graphs per setting). A schedule is better in a setting
+when its mean error is lower and it is lower on more graphs than higher; for the schedules, each
+insertion rule counts as a setting of its own.
+
+| Option | Favors | Gives up | Measured |
+|---|---|---|---|
+| `schedule="lges"` (default) | Denser graphs | Time, and some of the sparsest graphs | Better in 15 of 16 settings at mean degree 3 and 12 of 16 at degree 4; fits took 0.9 to 1.8 times as long as LGES-0's |
+| `schedule="lges0_released"` | The sparsest graphs, and time | Denser graphs | Better in 12 of 32 settings at mean degree 1 and 2, LGES in 5, with 15 ties; better in 1 of 16 at degree 3 |
+| `insertion="safe"` (default) | The paper's proof that the search recovers the true class as the rows grow | Accuracy | 9,029 errors over the 480 graphs of mean degree 1 to 3, under `schedule="lges"` |
+| `insertion="conservative"` | Fewer errors | That proof | 6,789 errors on those graphs; the lower mean error in 31 of 38 settings, the higher in 3 |
 
 Regime-PCMCI (Saggioro et al. 2020), {py:func}`~andrey.rpcmci`, takes one time series whose lagged
 links switch between a few persistent regimes. Each start draws random regime weights, then
@@ -863,6 +873,17 @@ cmi = test.statistic(0, 1, [2])  # the estimate itself, in nats
 register_indep_test("cmiknn_k5", partial(make_indep_test, "cmiknn", k_cmi=5))
 andrey.pc(data, indep_test="cmiknn_k5")
 ```
+
+Choosing a setting of `"gcm"` and `"wgcm"`, passed through `make_indep_test` (measured with
+boosted trees on the wGCM paper's null designs at 200 and 400 rows):
+
+| Setting | Favors | Gives up | Measured |
+|---|---|---|---|
+| `"wgcm"`, `variant="est"` (default) | One weight learned from the data | Time, 30% of the rows, and a p-value that changes little with the seed | Rejected a true independence at 0.05 in 6.8% of draws; 21 to 26 s per query |
+| `"wgcm"`, `variant="fix"` | Every row, half the time, and a steadier level | Power as the conditioning set grows: 7 weights per variable | 6.0% of draws; 11 to 15 s per query; power not measured against `"est"` |
+| `regression="boosting"` (default) | Nonlinear conditional means of several variables | Time: 51 boosted fits per regression in `"gcm"`, 281 in `"wgcm"` | Not measured against the other two |
+| `regression="linear"` | Time: one fit | The level, wherever a conditional mean is not linear | Not measured against the other two |
+| `regression="forest"` | Nonlinear conditional means without tuning | Time: 500 trees per regression | Not measured against the other two |
 
 {py:meth}`CMIknn.statistic <andrey.core.ci_cmiknn.CMIknn.statistic>` returns the conditional
 mutual information estimate the test's p-value is built on, a dependence measure of its own.

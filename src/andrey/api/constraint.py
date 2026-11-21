@@ -102,8 +102,8 @@ def pc(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
+        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, which decides between two colliders that would
         orient one edge in opposite directions. ``"p_value"`` orients first the collider whose
@@ -128,10 +128,14 @@ def pc(
         rule orients through it, when a conditioning set not tested of that side lies within the
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
         lies within the parents of one end, so that set might be the separating set the search
-        missed. On merged cohorts
-        that no row bridges, ``"ambiguous"`` removes most false colliders and most true
-        arrowheads with them, and the graph can then be farther from the truth than the empty
-        graph.
+        missed.
+        ``"orient"`` favors arrowheads and accuracy; it gives up protection from false colliders.
+        ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them, and
+        with them accuracy. On merged cohorts of 20, 40, and 50 variables that no row bridges (20
+        seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's false colliders per fit
+        from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found from 0.54-0.72 to 0,
+        and PC's graph was then farther from the truth than the empty graph in 6 of 6 settings; on
+        bridged cohorts and complete data the two gave the same graphs.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -146,7 +150,14 @@ def pc(
         variable's missingness indicator and tests again, on virtual data that correct for them,
         the edges such an indicator could have kept; it takes ``"fisherz"`` or ``"student_t"``.
         ``None`` picks the method's default, ``"testwise"``. On data with missing values,
-        ``metadata["missing"]`` records the handling used. See **Missing values.** in Notes.
+        ``metadata["missing"]`` records the handling used. ``"testwise"`` favors any test and no
+        model of why values are missing; it gives up validity outside values missing completely at
+        random. ``"mvpc"`` favors values missing for a reason that other variables carry; it gives
+        up every test but those two and, where each indicator has many weak parents, accuracy. On
+        Erdos-Renyi graphs of 10 to 100 variables with one observed parent per indicator, ``"mvpc"``
+        had fewer errors in 14 of 72 settings and more in none; with values missing completely at
+        random it tied in 136 of 144; with many weak parents per indicator it was behind in 12 of
+        141 (see Limitations). See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -710,8 +721,8 @@ def fci(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
+        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
         How FCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
@@ -728,10 +739,16 @@ def fci(
         any other triple. ``"ambiguous"`` makes every such triple neither a collider nor a
         non-collider, and no rule orients through it: with latent variables, a set that separates
         a pair lies within the possible-d-separating set of one end, beyond its adjacencies, so
-        any conditioning set not tested might be the separating set the search missed. On merged
-        cohorts that no row bridges, ``"ambiguous"`` removes most false colliders and most true
-        arrowheads with them. The collider pass before the possible-d-separation step reads it
-        too, so that step's sets, the skeleton, and ``metadata["not_tested"]`` can change.
+        any conditioning set not tested might be the separating set the search missed. The
+        collider pass before the possible-d-separation step reads it too, so that step's sets, the
+        skeleton, and ``metadata["not_tested"]`` can change.
+        ``"orient"`` favors arrowheads and accuracy; it gives up protection from false colliders.
+        ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them. On
+        merged cohorts of 20, 40, and 50 variables that no row bridges (20 seeds each, conditioning
+        sets of up to 3), ``"ambiguous"`` took FCI's false colliders per fit from 21.5-165.4 to at
+        most 0.1 and the share of true arrowheads it found from 0.61-0.81 to 0, and raised its
+        errors by 0.5 to 4.4, still fewer than the empty graph's in 6 of 6 settings; on bridged
+        cohorts and complete data the two gave the same graphs.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1190,8 +1207,8 @@ def gfci(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
+        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test, in ``(0, 1)``. Smaller values give
         sparser graphs.
@@ -1577,8 +1594,8 @@ def cdnod(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
+        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, as for :func:`~andrey.pc`: ``"p_value"`` by the
         largest p-value that separated each collider's endpoints, so the colliders do not depend on
@@ -1602,10 +1619,14 @@ def cdnod(
         rule orients through it, when a conditioning set not tested of that side lies within the
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
         lies within the parents of one end, so that set might be the separating set the search
-        missed. On merged cohorts
-        that no row bridges, ``"ambiguous"`` removes most false colliders and most true
-        arrowheads with them, and the graph can then be farther from the truth than the empty
-        graph.
+        missed.
+        ``"orient"`` favors arrowheads and accuracy; it gives up protection from false colliders.
+        ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them, and
+        with them accuracy. On merged cohorts of 20, 40, and 50 variables that no row bridges (20
+        seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's false colliders per fit
+        from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found from 0.54-0.72 to 0,
+        and PC's graph was then farther from the truth than the empty graph in 6 of 6 settings; on
+        bridged cohorts and complete data the two gave the same graphs. Not measured with CD-NOD.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -2006,8 +2027,8 @@ def fci_jci(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables, where what each favors and gives up was not measured. Only ``"chisq"`` and
+        ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
         How a collider is decided on a triple ``x - z - y`` where ``x`` and ``y`` are not adjacent,
         as for :func:`~andrey.fci`: by the separating set that removed the edge ``x - y``
@@ -2022,10 +2043,16 @@ def fci_jci(
         any other triple. ``"ambiguous"`` makes every such triple neither a collider nor a
         non-collider, and no rule orients through it: with latent variables, a set that separates
         a pair lies within the possible-d-separating set of one end, beyond its adjacencies, so
-        any conditioning set not tested might be the separating set the search missed. On merged
-        cohorts that no row bridges, ``"ambiguous"`` removes most false colliders and most true
-        arrowheads with them. The collider pass before the possible-d-separation step reads it
-        too, so that step's sets, the skeleton, and ``metadata["not_tested"]`` can change.
+        any conditioning set not tested might be the separating set the search missed. The
+        collider pass before the possible-d-separation step reads it too, so that step's sets, the
+        skeleton, and ``metadata["not_tested"]`` can change.
+        ``"orient"`` favors arrowheads and accuracy; it gives up protection from false colliders.
+        ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them. On
+        merged cohorts of 20, 40, and 50 variables that no row bridges (20 seeds each, conditioning
+        sets of up to 3), ``"ambiguous"`` took FCI's false colliders per fit from 21.5-165.4 to at
+        most 0.1 and the share of true arrowheads it found from 0.61-0.81 to 0, and raised its
+        errors by 0.5 to 4.4, still fewer than the empty graph's in 6 of 6 settings; on bridged
+        cohorts and complete data the two gave the same graphs. Not measured with FCI-JCI.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
