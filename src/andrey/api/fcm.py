@@ -564,7 +564,7 @@ def cpcm_graph(
         The family of each variable given its parents, one name for every column or a list of one
         name per column: ``"gaussian"`` (mean and scale change with the parents),
         ``"gaussian_fixed_scale"`` (the mean alone), ``"exponential"``, ``"pareto"`` (scale 1,
-        values of at least 1), ``"poisson"``, ``"gamma"`` (mean and shape), ``"gamma_fixed_shape"``
+        values greater than 1), ``"poisson"``, ``"gamma"`` (mean and shape), ``"gamma_fixed_shape"``
         (the mean alone), ``"gumbel"`` (location and scale), ``"gumbel_fixed_scale"`` (the
         location alone), or ``"negative_binomial"`` (the mean, one size for all rows). A
         variable without parents is not modeled. See **Families.** in :func:`~andrey.cpcm`.
@@ -597,7 +597,7 @@ def cpcm_graph(
         columns, holds ``NaN`` or ``inf``, or has fewer than ``4 d + 12`` rows for ``d`` columns,
         if ``family`` names an unknown family or does not give one name per column, or if a column
         holds a value outside its family's support, such as a non-integer under ``"poisson"`` or
-        a value below 1 under ``"pareto"``. Also if a column's residual on a set of parents the
+        a value of at most 1 under ``"pareto"``. Also if a column's residual on a set of parents the
         search reads is the same on every row, as when the column is an exact function of them,
         or if a fit ends away from a maximum; the message names the columns.
 
