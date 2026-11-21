@@ -577,19 +577,22 @@ def test_a_search_called_directly_reads_its_own_flags():
 def test_a_flagged_side_is_vetoed_only_by_a_set_within_an_ends_adjacencies():
     """A set not tested that holds a column adjacent to neither end of its pair cannot be the
     separating set the search missed; one within an end's other adjacencies, or one not known,
-    can."""
-    rows = ci_missing.RowCounts()
+    can. The sets are kept only while flags are read."""
     # Pairs (0, 1), (1, 2), (2, 3) are drawn; 4 and 5 are adjacent to 3 only.
     drawn = np.zeros((6, 6), dtype=bool)
     for a, b in ((0, 1), (1, 2), (2, 3), (3, 4), (3, 5)):
         drawn[a, b] = drawn[b, a] = True
     tested = [(0, 1), (1, 2), (2, 3)]
+    rows = ci_missing.RowCounts()
     rows.add([50] * 3, [0.01] * 3, *zip(*tested))
-    rows.add([1], [ci_missing.NOT_TESTED], [0], [1], [[4]])  # 4 is beside neither 0 nor 1
-    rows.add([1], [ci_missing.NOT_TESTED], [1], [2], [[0]])  # 0 is beside 1
-    rows.add([1], [ci_missing.NOT_TESTED], [2], [3], [[4, 5]])  # 4 and 5 are beside 3
-    assert sorted(rows.possibly_separable(drawn)) == tested
-    assert sorted(rows.separable_within(drawn)) == [(1, 2), (2, 3)]
-    # A set not known is kept as the empty set, within every end's adjacencies.
-    rows.add([1], [ci_missing.NOT_TESTED], [0], [1])
-    assert sorted(rows.separable_within(drawn)) == tested
+    rows.add([1], [ci_missing.NOT_TESTED], [0], [1], [[4]])
+    assert not rows.untested_sets
+    with ci_missing.reading_flags():
+        rows.add([1], [ci_missing.NOT_TESTED], [0], [1], [[4]])  # 4 is beside neither 0 nor 1
+        rows.add([1], [ci_missing.NOT_TESTED], [1], [2], [[0]])  # 0 is beside 1
+        rows.add([1], [ci_missing.NOT_TESTED], [2], [3], [[4, 5]])  # 4 and 5 are beside 3
+        assert sorted(rows.possibly_separable(drawn)) == tested
+        assert sorted(rows.separable_within(drawn)) == [(1, 2), (2, 3)]
+        # A set not known is kept as the empty set, within every end's adjacencies.
+        rows.add([1], [ci_missing.NOT_TESTED], [0], [1])
+        assert sorted(rows.separable_within(drawn)) == tested

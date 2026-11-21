@@ -348,13 +348,13 @@ def iamb(
     variable never observed with the target, is undecided: it is left out of the set and the graph
     and listed in ``metadata["undecided_pairs"]``. A drawn edge that a conditioning set not tested
     might have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data
-    could not check, not a finding that the edge is false; the CPDAG reads a triple with a flagged
-    side as neither a collider nor a non-collider. On merged cohorts, every pair of variables
-    measured only in different cohorts is therefore undecided. A continuous column constant on a
-    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
-    completely at random, which means that whether a value is missing depends on no value in the
-    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
-    selected sample that more rows do not correct.
+    could not check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``,
+    the CPDAG reads a triple with a flagged side as neither a collider nor a non-collider. On merged
+    cohorts, every pair of variables measured only in different cohorts is therefore undecided. A
+    continuous column constant on a test's rows raises ``ValueError``. Test-wise deletion is valid
+    when values are missing completely at random, which means that whether a value is missing
+    depends on no value in the data; the rows a test reads are then a random sample of all rows, and
+    otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data with Fisher-z tests at alpha 0.05,
     on one core: 20, 50, and 100 variables with 1,000 and 5,000 rows and mean degree 2 and 4, with
@@ -653,13 +653,13 @@ def inter_iamb(
     variable never observed with the target, is undecided: it is left out of the set and the graph
     and listed in ``metadata["undecided_pairs"]``. A drawn edge that a conditioning set not tested
     might have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data
-    could not check, not a finding that the edge is false; the CPDAG reads a triple with a flagged
-    side as neither a collider nor a non-collider. On merged cohorts, every pair of variables
-    measured only in different cohorts is therefore undecided. A continuous column constant on a
-    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
-    completely at random, which means that whether a value is missing depends on no value in the
-    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
-    selected sample that more rows do not correct.
+    could not check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``,
+    the CPDAG reads a triple with a flagged side as neither a collider nor a non-collider. On merged
+    cohorts, every pair of variables measured only in different cohorts is therefore undecided. A
+    continuous column constant on a test's rows raises ``ValueError``. Test-wise deletion is valid
+    when values are missing completely at random, which means that whether a value is missing
+    depends on no value in the data; the rows a test reads are then a random sample of all rows, and
+    otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data with 20, 50, and 100 variables,
     1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05, on one core.
@@ -950,13 +950,13 @@ def mmpc(
     variable never observed with the target, is undecided: it is left out of the set and the graph
     and listed in ``metadata["undecided_pairs"]``. A drawn edge that a conditioning set not tested
     might have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data
-    could not check, not a finding that the edge is false; the CPDAG reads a triple with a flagged
-    side as neither a collider nor a non-collider. On merged cohorts, every pair of variables
-    measured only in different cohorts is therefore undecided. A continuous column constant on a
-    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
-    completely at random, which means that whether a value is missing depends on no value in the
-    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
-    selected sample that more rows do not correct.
+    could not check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``,
+    the CPDAG reads a triple with a flagged side as neither a collider nor a non-collider. On merged
+    cohorts, every pair of variables measured only in different cohorts is therefore undecided. A
+    continuous column constant on a test's rows raises ``ValueError``. Test-wise deletion is valid
+    when values are missing completely at random, which means that whether a value is missing
+    depends on no value in the data; the rows a test reads are then a random sample of all rows, and
+    otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data with Fisher-z tests at alpha 0.05,
     on one core: 20, 50, and 100 variables with 1,000 and 5,000 rows and mean degree 2 and 4, with

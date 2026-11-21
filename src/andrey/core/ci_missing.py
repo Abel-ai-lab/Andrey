@@ -212,7 +212,8 @@ class RowCounts(Counter[int]):
     ) -> None:
         """Count the queries of the pairs ``x < y`` answered with the row counts ``rows`` and the
         p-values ``p``, a :data:`NOT_TESTED` one apart, with its conditioning set, entry ``i`` of
-        ``conditions`` (:meth:`note_untested`)."""
+        ``conditions``, kept inside a :func:`reading_flags` block only, the one place a rule reads
+        it (:meth:`note_untested`)."""
         values = np.asarray(p, dtype=np.float64).reshape(-1)
         if not values.size:
             return
@@ -224,7 +225,7 @@ class RowCounts(Counter[int]):
         self.p_one += int(np.count_nonzero(values == 1.0))
         if skipped.any():
             self.not_tested.update(zip(lo[skipped].tolist(), hi[skipped].tolist()))
-            for k in np.flatnonzero(skipped).tolist():
+            for k in np.flatnonzero(skipped).tolist() if _READ_FLAGS.get() else ():
                 self.note_untested(
                     int(lo[k]), int(hi[k]), None if conditions is None else conditions[k]
                 )
@@ -724,13 +725,16 @@ class TestwiseDeletion:
         that keep no rows (:meth:`together`); the pair is recorded as :meth:`_count` records it.
 
         Each of ``held`` is the columns that keep some of those sets from rows, which the sets
-        hold (:meth:`RowCounts.note_untested`); ``None`` when they are not known."""
+        hold, kept inside a :func:`reading_flags` block only (:meth:`RowCounts.note_untested`);
+        ``None`` when they are not known."""
         counter = _ROWS.get()
         if counter is None or not queries:
             return
         pair = (x, y) if self._source is None else self._source[[x, y]].tolist()
         a, b = min(pair), max(pair)
         counter.not_tested[a, b] += queries
+        if not _READ_FLAGS.get():
+            return
         for columns in [None] if held is None else held:
             if columns is not None and self._source is not None:
                 columns = self._source[np.asarray(list(columns), dtype=np.intp)].tolist()

@@ -1031,14 +1031,15 @@ def pcmciplus(
     ``metadata["undecided_pairs"]``, and no test conditions on a lagged parent without a tested
     result. A test conditions only on the candidates, strongest first, that keep its rows enough for
     the test, so its rows do not mix variables no row observes together. A drawn link that a
-    conditioning set not tested might have separated, one a test left a candidate out of or one
-    with an end an undecided link joins, is listed in ``metadata["possibly_separable"]``: a flag of
-    what the data could not check, not a finding that the link is false; no collider vote reads a
-    triple with a flagged side. A continuous column constant on a test's rows raises ``ValueError``.
-    The categorical, mixed-data, and nonlinear tests delete rows the same way. Test-wise deletion is
-    valid when values are missing completely at random, which means that whether a value is missing
-    depends on no value in the data; the rows a test reads are then a random sample of all rows, and
-    otherwise they are a selected sample that more rows do not correct.
+    conditioning set not tested might have separated, one a test left a candidate out of or one with
+    an end an undecided link joins, is listed in ``metadata["possibly_separable"]``: a flag of what
+    the data could not check, not a finding that the link is false; under
+    ``possibly_separable="ambiguous"``, no collider vote reads a triple with a flagged side. A
+    continuous column constant on a test's rows raises ``ValueError``. The categorical, mixed-data,
+    and nonlinear tests delete rows the same way. Test-wise deletion is valid when values are
+    missing completely at random, which means that whether a value is missing depends on no value in
+    the data; the rows a test reads are then a random sample of all rows, and otherwise they are a
+    selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian time series with lagged and same-step
     links, of ``max(1000, 20 * (d + 1))`` time steps for ``d`` variables and of five times as many,
