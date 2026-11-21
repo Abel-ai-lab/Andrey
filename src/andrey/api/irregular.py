@@ -828,13 +828,13 @@ def cpcm(
     there, on 73% and 78% of the pairs of two seed sets against the reference's 82% and 85%, fewer
     on both, so the conservative estimate under ``"pareto"`` is not supported until the cause, the
     rank-10 thin plate spline of the cause on such values, is fixed. At 2,000 rows the forced
-    direction was wrong on 8 of 200 pairs against 1. Each HSIC test builds matrices with one row and
-    one column per sample, so time and memory grow with the square of ``n_samples``. Under the count
-    families the rank-10 spline must follow the mean to within the counts' own noise, about
-    ``1 / sqrt(mean)`` of it, which it does for means up to a few hundred: from means of a few
-    thousand that vary strongly with the cause, the true direction's test rejects too. The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    direction was wrong on 8 of the 199 pairs both fitted against 1 (the authors' code stopped with
+    an error on one). Each HSIC test builds matrices with one row and one column per sample, so time
+    and memory grow with the square of ``n_samples``. Under the count families the rank-10 spline
+    must follow the mean to within the counts' own noise, about ``1 / sqrt(mean)`` of it, which it
+    does for means up to a few hundred: from means of a few thousand that vary strongly with the
+    cause, the true direction's test rejects too. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
