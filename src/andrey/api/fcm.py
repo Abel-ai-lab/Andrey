@@ -1289,7 +1289,8 @@ def das(
     published with the paper made fewer errors on sparse graphs (19 against 28 at 50 variables).
     This is the likely reason that, on sparse graphs, DAS's errors are above the paper's where they
     are, since the paper used raw columns; on dense graphs of 500 variables they are above the
-    paper's too, a gap the units do not explain. The `0.19.0 release card
+    paper's too, a gap not traced, where the units are not ruled out: on z-scored columns the code
+    published with the paper is above the paper's limit there as well. The `0.19.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#das>`_ has the numbers. Its causal order is
     SCORE's, so the limits :func:`~andrey.score_matching` states for the order are its own: where
     links have a strong linear part, it did no better than a random order. The leaf rule is exact
