@@ -796,9 +796,12 @@ def _sizes(regime: str) -> tuple[str, ...]:
 # approximately. RCD and BottomUpParceLiNGAM run on their benchmark regime only: on ASIA's 1,000
 # rows RCD marks most pairs <-> and scores worse than the empty graph, and on Sachs
 # BottomUpParceLiNGAM does. ANM and PNL take one pair of variables, so each runs on its benchmark's
-# pairs only. GIES, GnIES, CD-NOD, MultiGroupDirectLiNGAM, and GIN need what only their regimes
-# have: interventions, environments that change noise variances, domains, groups, or latents
-# measured by indicators. CAM-UV runs on its benchmark's nonlinear regimes with hidden variables.
+# pairs only. CPCM's pair test runs with the Gaussian location-scale family on the location-scale
+# pairs, and its graph search with the fixed-scale Gaussian family, an additive-noise model, on
+# CAM's and RESIT's additive-noise regime at 5 variables, the size of its benchmark's additive-noise
+# graphs. GIES, GnIES, CD-NOD, MultiGroupDirectLiNGAM, and GIN need what only their regimes have:
+# interventions, environments that change noise variances, domains, groups, or latents measured by
+# indicators. CAM-UV runs on its benchmark's nonlinear regimes with hidden variables.
 # SCORE, NoGAM, and DAS run on their papers' simulation: Gaussian-process links with additive noise.
 # NOTEARS runs on its benchmark's cells, the simulation its claim is measured in: its least-squares
 # fit reads the columns' units, so one cell has standardized columns and one raw. DAGMA runs on the
@@ -977,6 +980,10 @@ SUPPORTED: dict[str, Method] = {
     "ANM": Method(lambda x: andrey.anm(x), "dag", (f"anm_pair_n{PAIR_N}",)),
     "PNL": Method(lambda x: andrey.pnl(x), "dag", (f"pnl_pair_n{PAIR_N}",)),
     "LOCI": Method(lambda x: andrey.loci(x), "dag", (f"lsnm_pair_n{PAIR_N}",)),
+    "CPCM": Method(lambda x: andrey.cpcm(x, family="gaussian"), "dag", (f"lsnm_pair_n{PAIR_N}",)),
+    "CPCMGraph": Method(
+        lambda x: andrey.cpcm_graph(x, family="gaussian_fixed_scale"), "dag", ("anm_er_n1000_d5",)
+    ),
     # Time series: the published settings (lags, levels, and order), on the published regimes.
     "PCMCI": Method(
         _adapted(AndreyPCMCI(name="pcmci", indep_test="student_t", tau_max=2)),
@@ -1305,6 +1312,7 @@ def cells(methods: list[str] | None = None) -> list[tuple[str, str]]:
 SLOWEST_FIRST: tuple[tuple[str, str], ...] = (
     ("NOTEARS", "notears_paper_standardized_d50"),
     ("CMIknn", "anm_er_d5"),
+    ("CPCMGraph", "anm_er_n1000_d5"),
     ("CALM", "linear_gauss_er_d10"),
     ("BottomUpParceLiNGAM", "latent_lingam_er_d15"),
     ("CAM-UV", "latent_anm_er_tenth_d22_n1000"),

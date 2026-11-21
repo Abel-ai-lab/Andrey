@@ -2054,7 +2054,7 @@ _add(
             "residuals, score its score, search exact or greedy, families each column's family.",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         params=(
@@ -2065,8 +2065,9 @@ _add(
                 choices=_CPCM_FAMILIES,
                 doc="The family of each variable given its parents: one name for every column or a "
                 "list of one name per column. gaussian = mean and scale change with the parents; "
-                "gaussian_fixed_scale = the mean alone; exponential; pareto = scale 1, values of "
-                "at least 1; poisson; gamma = mean and shape; gamma_fixed_shape = the mean alone; "
+                "gaussian_fixed_scale = the mean alone; exponential; pareto = scale 1, values "
+                "greater than 1; poisson; gamma = mean and shape; gamma_fixed_shape = the mean "
+                "alone; "
                 "gumbel = location and scale; gumbel_fixed_scale = the location alone; "
                 "negative_binomial = the mean, one size for all rows. A column outside its "
                 "family's support raises ValueError.",
@@ -3154,8 +3155,9 @@ _add(
                 choices=_CPCM_FAMILIES,
                 doc="The family of each variable given its parents: one name for every column or a "
                 "list of one name per column. gaussian = mean and scale change with the parents; "
-                "gaussian_fixed_scale = the mean alone; exponential; pareto = scale 1, values of "
-                "at least 1; poisson; gamma = mean and shape; gamma_fixed_shape = the mean alone; "
+                "gaussian_fixed_scale = the mean alone; exponential; pareto = scale 1, values "
+                "greater than 1; poisson; gamma = mean and shape; gamma_fixed_shape = the mean "
+                "alone; "
                 "gumbel = location and scale; gumbel_fixed_scale = the location alone; "
                 "negative_binomial = the mean, one size for all rows. A column outside its "
                 "family's support raises ValueError.",
@@ -3176,7 +3178,7 @@ _add(
             "p-value of the test that x and y are independent; families is each column's family.",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         references=("Bodik & Chavez-Demoulin 2025", "Gretton et al. 2008", "Pfister et al. 2018"),
     )
