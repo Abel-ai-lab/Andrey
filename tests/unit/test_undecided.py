@@ -546,6 +546,23 @@ def test_the_other_orienting_searches_orient_nothing_from_a_flagged_side(fit):
     assert _arrowheads(on) == {("A", "C"), ("B", "C")}
 
 
+@pytest.mark.parametrize(
+    ("settings", "keeps"),
+    [({"structure": "cpdag"}, True), ({"structure": "skeleton"}, False), ({"target": "C"}, False)],
+)
+def test_a_blanket_output_that_orients_nothing_keeps_no_untested_set(monkeypatch, settings, keeps):
+    kept: list[tuple[int, int]] = []
+    note = ci_missing.RowCounts.note_untested
+
+    def counted(self, x, y, columns):
+        kept.append((x, y))
+        note(self, x, y, columns)
+
+    monkeypatch.setattr(ci_missing.RowCounts, "note_untested", counted)
+    andrey.mmpc(_collider_beside_cohorts(), max_depth=1, **settings, **AMBIGUOUS)
+    assert bool(kept) == keeps
+
+
 def test_pcmciplus_reads_no_collider_from_a_flagged_side():
     from andrey.temporal.pcmciplus import colliders
 

@@ -22,7 +22,7 @@ from andrey.api._adapt import (
 )
 from andrey.api._method import method_spec
 from andrey.core import NULL, TAIL, backend
-from andrey.core.ci_missing import rows_metadata, rows_tested
+from andrey.core.ci_missing import reading_flags, reads_flags, rows_metadata, rows_tested
 from andrey.core.knowledge import Knowledge, as_node, column_position
 from andrey.core.orient import to_structure
 
@@ -54,7 +54,10 @@ def fit_blanket(
 ) -> StructureOutput | list[StructureOutput]:
     """Check the settings, run the search, and wrap the graph ``structure`` names or the set.
 
-    A list of targets gives one result for each, in its order.
+    A list of targets gives one result for each, in its order. Only the CPDAG of every variable
+    reads flagged sides (``possibly_separable``); a target's set and the other structures orient
+    nothing, so their searches keep no untested sets
+    (:func:`~andrey.core.ci_missing.reading_flags`).
     """
     from andrey.constraint._parallel_targets import answers
     from andrey.constraint.blanket import local_search, local_set, local_structure
@@ -81,7 +84,7 @@ def fit_blanket(
         "constraints": constraints,
     }
     if targets is not None:
-        with copies_named(labels):
+        with copies_named(labels), reading_flags(False):
             found = answers(
                 partial(local_search, X, **settings),
                 partial(_target_set, method),
@@ -101,7 +104,8 @@ def fit_blanket(
         return outs
     metadata: dict[str, object] = {}
     kind = BLANKET_STRUCTURES[structure] if t is None else "undirected"
-    with copies_named(labels), rows_tested() as rows:
+    orients = reads_flags() and t is None and structure == "cpdag"
+    with copies_named(labels), rows_tested() as rows, reading_flags(orients):
         if t is None:
             marks = local_structure(X, method, structure, **settings)
         else:
