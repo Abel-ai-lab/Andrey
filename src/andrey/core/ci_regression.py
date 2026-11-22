@@ -28,6 +28,8 @@ from scipy.special import ndtr
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 
 from andrey.core.ties import tie_ranks
+from andrey.fcm import cpcm
+from andrey.fcm.gam import MAX_KNOTS, SmoothBasis, fit_additive, tp_basis
 
 from . import stats
 from .ci import _canonical, per_query
@@ -194,6 +196,72 @@ def _fit_linear(features: np.ndarray, target: np.ndarray) -> Predictor:
     return lambda new: coef[0] + new @ coef[1:]
 
 
+class _Additive:
+    """A fitted additive model ``c + sum_j f_j(x_j)``, through the identity or the log link."""
+
+    def __init__(self, coef: np.ndarray, bases: list[SmoothBasis], *, log: bool) -> None:
+        self._coef, self._bases, self._log = coef, bases, log
+        self._starts = np.cumsum([1] + [b.X.shape[1] for b in bases])
+
+    def term(self, j: int, column: np.ndarray) -> np.ndarray:
+        """Term ``j`` of the linear predictor at the values ``column`` of its predictor."""
+        coef = self._coef[self._starts[j] : self._starts[j + 1]]
+        return self._bases[j].design(column) @ coef
+
+    def __call__(self, features: np.ndarray) -> np.ndarray:
+        eta = self._coef[0] + sum(self.term(j, features[:, j]) for j in range(len(self._bases)))
+        return np.exp(eta) if self._log else eta
+
+
+def _additive_bases(features: np.ndarray, share: int = 1) -> list[SmoothBasis] | None:
+    """One thin plate regression spline basis per predictor, of ``floor((N - 1) / (share d))``
+    functions for ``N`` rows and ``d`` predictors, at most the predictor's distinct values and
+    :data:`~andrey.fcm.gam.MAX_KNOTS`; ``None`` where a predictor gets fewer than 3."""
+    rows, d = features.shape
+    k = (rows - 1) // (share * d)
+    bases = []
+    for column in features.T:
+        rank = min(k, np.unique(column).size, MAX_KNOTS)
+        if rank < 3:
+            return None
+        bases.append(tp_basis(column, rank))
+    return bases
+
+
+def _fit_additive(features: np.ndarray, target: np.ndarray, share: int = 1) -> Predictor:
+    """An additive model of penalized thin plate regression splines, ``share`` as for
+    :func:`_additive_bases`, smoothed by GCV; the least-squares line where a predictor has too few
+    rows or values for a smooth, or the smoothing search fails."""
+    bases = _additive_bases(features, share)
+    if bases is None:
+        return _fit_linear(features, target)
+    try:
+        fit = fit_additive(target, bases)
+    except (np.linalg.LinAlgError, FloatingPointError):
+        return _fit_linear(features, target)
+    return _Additive(fit.coef, bases, log=False)
+
+
+def _fit_additive_log(features: np.ndarray, target: np.ndarray) -> Predictor:
+    """An additive model of a positive ``target`` through the log link, with half the basis
+    functions of a mean fit, ``floor((N - 1) / (2 d))``, as the PCM authors' code: the penalized
+    gamma deviance, smoothed by the GCV score of the deviance; :func:`_fit_additive` with the same
+    bases where a value is not positive or the fit has no minimum."""
+    bases = _additive_bases(features, 2)
+    if bases is None or not np.all(target > 0):
+        return _fit_additive(features, target, 2)
+    # The exponential family's deviance is the gamma family's at unit shape, and the gamma shape
+    # scales the deviance without moving its minimum or the GCV score's.
+    terms = [cpcm._Term(b.X, b.S, b.root.shape[0]) for b in bases]
+    try:
+        (eta,) = cpcm.fit(target, terms, cpcm.FAMILIES["exponential"])
+    except ValueError:
+        return _fit_additive(features, target, 2)
+    design = np.column_stack([np.ones(target.size), *(b.X for b in bases)])
+    coef = np.linalg.lstsq(design, eta, rcond=None)[0]  # the design has full column rank
+    return _Additive(coef, bases, log=True)
+
+
 def _canonical_columns(arr: np.ndarray) -> np.ndarray:
     """Each column of ``arr`` standardized, rounded to ``_DECIMALS`` places, and signed.
 
@@ -224,6 +292,7 @@ class _RegressionTest:
     """The data layout and the regressions the three tests share."""
 
     pin_blas = True  # read by pins_blas: the skeleton scans run it on one BLAS thread
+    regressions = REGRESSIONS
     #: How ``"boosting"`` tunes its trees: the GCM authors' cross-validation.
     _fit_boosting = staticmethod(_fit_boosting)
 
@@ -236,8 +305,8 @@ class _RegressionTest:
     def __init__(
         self, data: np.ndarray, *, regression: str, seed: int | None, name: str, min_rows: int = 4
     ) -> None:
-        if regression not in REGRESSIONS:
-            raise ValueError(f"regression must be one of {REGRESSIONS}, got {regression!r}")
+        if regression not in self.regressions:
+            raise ValueError(f"regression must be one of {self.regressions}, got {regression!r}")
         arr = stats.checked_matrix(data, f"run a {name} test", min_rows=min_rows)
         self._data = _canonical_columns(arr)
         self._n = arr.shape[0]
@@ -311,6 +380,8 @@ class _RegressionTest:
             return _constant(float(np.mean(target)))
         if self._regression == "linear":
             return _fit_linear(features, target)
+        if self._regression == "additive":
+            return _fit_additive(features, target)
         if self._regression == "forest":
             return _fit_forest(features, target, self._seed % 2**32)
         n_folds = min(_BOOST_FOLDS, m)
@@ -652,10 +723,18 @@ class PCM(_RegressionTest):
     ----------
     data : ndarray of shape (n_samples, n_variables)
         Observed data, one row per sample. Each column is standardized to unit variance.
-    regression : {"forest", "boosting", "linear"}, default="forest"
-        The regressions of the test. ``"forest"`` is a random forest of 500 trees that tries every
-        predictor at each split and leaves nodes of 5 rows or fewer unsplit, as the authors' code
-        does for its random-forest experiments; ``"boosting"`` and ``"linear"`` are as for
+    regression : {"additive", "forest", "boosting", "linear"}, default="additive"
+        The regressions of the test. ``"additive"`` fits an additive model, one penalized thin
+        plate regression spline [2]_ per predictor with ``floor((N - 1) / d)`` basis functions for
+        ``N`` rows and ``d`` predictors, its smoothing chosen by generalized cross-validation [3]_,
+        and fits the conditional variance through the log link with half as many basis functions,
+        the regressions of the paper's additive settings [1]_ (Section 6.1) as the authors' code
+        fits them; it holds the level where the conditional means are sums of smooth functions of
+        one variable each and fits only the additive part of an interaction. ``"forest"`` is a
+        random forest of 500 trees that tries every predictor at each split and leaves nodes of 5
+        rows or fewer unsplit, as the authors' code does for its random-forest experiments; it
+        learns interactions and loses the level where a conditional mean on ``z`` is hard to learn
+        from a few hundred rows (see Limitations). ``"boosting"`` and ``"linear"`` are as for
         :class:`~andrey.core.ci_regression.GCM`.
     n_splits : int, default=6
         The number of random sample splits whose statistics are averaged, at least ``1``.
@@ -672,51 +751,89 @@ class PCM(_RegressionTest):
 
     Notes
     -----
-    **When to use.** For continuous data where the conditional mean of one variable may depend on
-    the other given the conditioning set in any form, interactions included, at hundreds to
-    thousands of rows [1]_. It tests conditional mean independence, which conditional independence
-    implies, and keeps its level whenever the regressions on the conditioning set are accurate
-    enough, whatever the regression that learns the dependence [1]_.
+    **When to use.** For continuous data at a few hundred rows where, with the default additive
+    regression, the conditional mean of each variable is a sum of smooth functions of one
+    variable each: of ``z`` for both variables, and of ``x`` and ``z`` for the response [1]_. It
+    tests conditional mean independence, which conditional independence implies, and keeps its
+    level whenever the regressions on the conditioning set are accurate enough, whatever the
+    regression that learns the dependence [1]_. An interaction, such as a product of two
+    variables, is outside the additive model: in the mean given ``z`` it can break the level, and
+    between ``x`` and ``z`` the test sees only its additive part.
 
     **How it works.** Of a query's two variables, the one with the larger
     :func:`~andrey.core.ties.tie_ranks` rank within the query's columns is the response ``y`` and
     the other the predictor ``x``, so the direction depends on the values of those columns and not
     on the column order, the argument order, or the other columns.
     Each split puts half of the rows, at random, in the first part [1]_ (Algorithm 1). On the first
-    part, ``y`` is regressed on ``(x, z)`` to give ``g``, ``g`` on ``z`` to give ``m``, and
-    ``h = g - m`` takes the sign of the mean of ``(y - m) h``; the squared residuals of ``g`` are
-    regressed on ``(x, z)`` and the fit's positive part, plus the smallest constant ``c`` that
-    brings the mean of the squared residuals over it to at most 1, is the conditional variance
-    ``v``, at least 0.01. On the second part, ``f = h / v`` and ``y`` are each regressed on ``z``,
-    and the statistic is the GCM statistic of the products of their residuals. The ``n_splits``
-    statistics are averaged and the p-value is the standard normal tail above the average, the
-    one-sided test of Algorithm 1DR with its threshold at the normal quantile [1]_. The reported
-    statistic is the average or ``0``, whichever is larger. A split whose products are all zero adds
-    ``0``, and one whose products are one nonzero constant an infinity of its sign. The splits are
-    drawn from ``seed`` over the rows in lexicographic order of the query's own columns, so they
-    do not depend on other columns. The variance adds ``c`` to the fit's positive part, as in the
-    paper; the authors' code adds it first, the same for a forest, whose fit is never negative, and
-    less powerful with least squares. The standard deviation divides by the second part's row count
-    ``m``, as in the paper; the authors' code's ``m - 1`` shrinks each split's statistic by the
-    factor ``sqrt((m - 1) / m)``, which in the measurements turned a few rejections near the level
-    into acceptances and changed no other decision.
+    part, ``y`` is regressed on ``(x, z)`` to give ``g``; ``g~`` is the part of ``g`` that ``x``
+    carries, the ``x`` term of an additive ``g`` and ``g`` itself under the other regressions;
+    ``g`` is regressed on ``z`` to give ``m``, and ``h = g~ - m`` takes the sign of the mean of
+    ``(y - g + h) h``. The squared residuals of ``g`` are regressed on ``(x, z)``, through the log
+    link under ``"additive"`` (the penalized gamma deviance, smoothed by the generalized
+    cross-validation score of the deviance), and the fit's positive part, plus the smallest
+    constant ``c`` that brings the mean of the squared residuals over it to at most 1, is the
+    conditional variance ``v``, at least 0.01. On the second part, ``f = h / v`` and ``y`` are
+    each regressed on ``z``, and the statistic is the GCM statistic of the products of their
+    residuals. The ``n_splits`` statistics are averaged and the p-value is the standard normal tail
+    above the average, the one-sided test of Algorithm 1DR with its threshold at the normal
+    quantile [1]_. The reported statistic is the average or ``0``, whichever is larger. A split
+    whose products are all zero adds ``0``, and one whose products are one nonzero constant an
+    infinity of its sign. The splits are drawn from ``seed`` over the rows in lexicographic order
+    of the query's own columns, so they do not depend on other columns. An additive fit with fewer
+    than 3 basis functions for some predictor, too few rows or distinct values, is the
+    least-squares line, as is one whose smoothing search fails; a variance fit through the log link
+    without a minimum, or with a squared residual of 0, uses the identity link with the same basis.
 
-    **Limitations.** Not benchmarked yet. The tests run it on up to 4 variables and 400 rows. Each
-    query fits 30 regressions with the default 6 splits, each of 500 trees under ``"forest"``. The
-    variance floor of 0.01, in units of the standardized response, is the authors' code's value;
-    the paper sets none. The test detects a dependence of the mean of ``y`` on ``x``; one that
-    changes only the spread of ``y`` goes unseen, as does a dependence of the mean of ``x`` on
-    ``y`` that leaves the mean of ``y`` unchanged. Which variable is the response follows a rule on
-    the data that has nothing to do with the causal question, so swapping the roles can change the
-    answer. At a few hundred rows, where the conditional means are hard to learn, the test can
-    reject a true independence more often than its level.
+    The measurements in these notes take the paper's ``y`` as the response, as the paper does; on
+    the paper's designs, the rank rule above makes the paper's ``y`` the response in about half of
+    the draws, and the other direction was not measured. Where the paper and the authors' code
+    differ, Andrey takes:
+
+    - ``m`` regresses ``g``, as in the authors' code; the paper regresses ``g~``, which in the
+      measurements had more power in the paper's first setting at 250 rows (71.6% against 54.8%)
+      and almost none in its third at 500 (1.0% against 13.4%), below the authors' code (7.6%).
+    - The variance fit has half the basis functions of the mean fits, as in the authors' code; the
+      paper's full basis changed 28 of 4,500 decisions and took about 2.5 times as long.
+    - The variance adds ``c`` to the fit's positive part, as in the paper; the authors' code adds
+      it first, the same for a forest, whose fit is never negative, and less powerful with least
+      squares.
+    - The standard deviation divides by the second part's row count ``m``, as in the paper; the
+      authors' code's ``m - 1`` shrinks each split's statistic by the factor ``sqrt((m - 1) / m)``,
+      which in the measurements turned a few rejections near the level into acceptances and
+      changed no other decision.
+
+    **Limitations.** On the null design of the paper's Section 6.1 (seven conditioning variables,
+    500 draws per size), the default rejected a true independence at 0.05 in 0.4% of draws at 250
+    rows and 0.2% at 500 (the authors' code with the same regressions: 0.6% and 0.2%), and in the
+    paper's three alternative settings its power was at or above the authors' code's on the same
+    data, for example 54.8% against 48.8% in the first setting at 250 rows and 13.4% against 7.6% in
+    the third at 500. On the null of Section 6.2, whose conditional means hold an interaction, it
+    rejected 97.6% at 500 rows (the authors' code 95.6%); the paper runs that design from 10,000
+    rows, where ``"forest"`` rejected 4.0% of 50 draws, and no regression measured holds it at 500
+    (the forest rejected 34.4%). The tree regressions fail the Section 6.1 null, where ``x`` nearly
+    copies the conditional mean of ``y`` on ``z``: ``"forest"`` rejected 99.9% at 250 rows and 97.3%
+    at 500, ``"boosting"`` 97.7% at 250. A query on nine columns takes about 7 s at 250 rows, 29 s
+    at 500, and 6 minutes at 1,000 on one core, so a PC search, which runs a query for each pair and
+    conditioning set it tries, is slow. The variance floor of 0.01, in units of the standardized
+    response, is the authors' code's value; the paper sets none. The test detects a dependence of
+    the mean of ``y`` on ``x``; one that changes only the spread of ``y`` goes unseen, as does a
+    dependence of the mean of ``x`` on ``y`` that leaves the mean of ``y`` unchanged. Which variable
+    is the response follows a rule on the data that has nothing to do with the causal question, so
+    swapping the roles can change the answer.
 
     References
     ----------
     .. [1] Lundborg, A. R., Kim, I., Shah, R. D., and Samworth, R. J. (2024). The projected
        covariance measure for assumption-lean variable significance testing. Annals of Statistics
        52(6), 2851-2878. https://doi.org/10.1214/24-AOS2447
+    .. [2] Wood, S. N. (2003). Thin plate regression splines. Journal of the Royal Statistical
+       Society: Series B 65(1), 95-114. https://doi.org/10.1111/1467-9868.00374
+    .. [3] Wood, S. N. (2004). Stable and efficient multiple smoothing parameter estimation for
+       generalized additive models. Journal of the American Statistical Association 99(467),
+       673-686. https://doi.org/10.1198/016214504000000980
     """
+
+    regressions = ("additive", *REGRESSIONS)
 
     @staticmethod
     def least_rows(size: int, **options: object) -> int:
@@ -729,7 +846,7 @@ class PCM(_RegressionTest):
         self,
         data: np.ndarray,
         *,
-        regression: str = "forest",
+        regression: str = "additive",
         n_splits: int = _PCM_SPLITS,
         seed: int | None = None,
     ) -> None:
@@ -779,15 +896,19 @@ class PCM(_RegressionTest):
         z = block[:, features]
         g = self._fit(xz[learn], y[learn])
         g_learn = g(xz[learn])
+        g_tilde = g.term if isinstance(g, _Additive) else None
+        gt_learn = g_learn if g_tilde is None else g_tilde(0, xz[learn, 0])
         m = self._fit(z[learn], g_learn)
         m_learn = m(z[learn])
-        h_learn = g_learn - m_learn
-        sign = -1.0 if np.mean((y[learn] - m_learn) * h_learn) < 0 else 1.0
+        h_learn = gt_learn - m_learn
+        sign = -1.0 if np.mean((y[learn] - g_learn + h_learn) * h_learn) < 0 else 1.0
         squares = (y[learn] - g_learn) ** 2
-        v = self._fit(xz[learn], squares)
+        fit_v = _fit_additive_log if self._regression == "additive" else self._fit
+        v = fit_v(xz[learn], squares)
         shift = _variance_shift(squares, np.maximum(v(xz[learn]), 0.0))
         variance = _conditional_variance(v(xz[test]), shift)
-        f = sign * (g(xz[test]) - m(z[test])) / variance
+        gt_test = g(xz[test]) if g_tilde is None else g_tilde(0, xz[test, 0])
+        f = sign * (gt_test - m(z[test])) / variance
         statistic = _normalized_mean(self._residual(y[test], z[test]) * self._residual(f, z[test]))
         return 0.0 if np.isnan(statistic) else statistic
 
