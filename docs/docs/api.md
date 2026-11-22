@@ -198,11 +198,11 @@ and `"nonempty"` is `(r_x - 1) * (r_y - 1)` per configuration over the values of
 present in it, the table's empty rows and columns struck (Spirtes, Glymour and Scheines 1993). The
 two differ only on sparse tables. There `"mean"` favors a level near the nominal one: over 35,808
 true independences of random discrete networks, a test at 0.05 rejected 4.9% (`"chisq"`) and 3.8%
-(`"gsq"`). It gives up some of G-square's power in the sparsest tables, where its p-values come out
-too large, and, with `"gsq"`, time: a sum of hypergeometric terms per cell, not timed against
-`"nonempty"`. `"nonempty"` favors detection on sparse tables, keeping G-square's power where
-`"mean"` loses it; it gives up the level: 11.1% and 21.7% of the same true independences were
-rejected. Their power was not measured as a pair. Only `"chisq"` and `"gsq"` read it, so passing
+(`"gsq"`). With `"gsq"` it gives up time, a sum of hypergeometric terms per cell, and rejects
+below the nominal rate in the sparsest tables (0.8% at 3,125 cells). `"nonempty"` favors the
+degrees of freedom of Spirtes, Glymour and Scheines, read from the table alone; it gives up the
+level: 11.1% and 21.7% of the same true independences were rejected. Their time and their power
+were not measured against each other. Only `"chisq"` and `"gsq"` read it, so passing
 `degrees_of_freedom` with another test raises a `ValueError`.
 
 % concept: knowledge
@@ -880,13 +880,15 @@ register_indep_test("cmiknn_k5", partial(make_indep_test, "cmiknn", k_cmi=5))
 andrey.pc(data, indep_test="cmiknn_k5")
 ```
 
-Choosing a setting of `"gcm"` and `"wgcm"`, passed through `make_indep_test` (measured with
-boosted trees on the wGCM paper's null designs at 200 and 400 rows):
+Choosing a setting of `"gcm"` and `"wgcm"`, passed through `make_indep_test`, measured with boosted
+trees at 200 and 400 rows: the level over 12 null designs of the wGCM paper and of Shah and Peters,
+and power on the same 200 draws of each of the wGCM paper's 7 alternative cells, under the GCM's
+tuning:
 
 | Setting | Favors | Gives up | Measured |
 |---|---|---|---|
-| `"wgcm"`, `variant="est"` (default) | One weight learned from the data | Time, 30% of the rows, and a p-value that changes little with the seed | Rejected a true independence at 0.05 in 6.8% of draws; 21 to 26 s per query |
-| `"wgcm"`, `variant="fix"` | Every row, half the time, and a steadier level | Power as the conditioning set grows: 7 weights per variable | 6.0% of draws; 11 to 15 s per query; power not measured against `"est"` |
+| `"wgcm"`, `variant="est"` (default) | One weight learned from the data, however many conditioning variables | 30% of the rows, time, and, where measured, power | Rejected a true independence at 0.05 in 4 to 13% of draws by design; 21 to 26 s per query; rejected 10.5 to 60.5% of the alternatives' draws |
+| `"wgcm"`, `variant="fix"` | Every row, half the time, power, and a steadier level | A learned weight: 7 fixed weights per conditioning variable | 4 to 8.6% by design; 11 to 15 s per query; rejected 21 to 96.5% of the alternatives' draws, more than `"est"` in all 7 cells, 10 conditioning variables included, and in all 7 at critical values from each variant's own null draws; power not measured as a pair under the shipped tuning |
 | `regression="boosting"` (default) | Nonlinear conditional means of several variables | Time: 51 boosted fits per regression in `"gcm"`, 281 in `"wgcm"` | Not measured against the other two |
 | `regression="linear"` | Time: one fit | The level, wherever a conditional mean is not linear | Not measured against the other two |
 | `regression="forest"` | Nonlinear conditional means without tuning | Time: 500 trees per regression | Not measured against the other two |

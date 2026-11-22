@@ -194,14 +194,34 @@ SHARED = {
         'How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test '
         "reads only the rows where all of its variables are observed. ``None`` picks the method's "
         'default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the '
-        'handling used. ``"testwise"`` favors every row each test can read: with 20 variables and '
-        "1,000 rows, PC's median errors were 6.5 to 7.5 against 4.0 on the complete data with 10 to "
-        "30% of the values missing, where dropping the incomplete rows kept a median of 124.5 to "
-        "0.5 rows (0.11.0 release card). It gives up its guarantee outside values missing "
-        "completely at random: where values are missing for a reason that other variables carry, "
-        '``pc``\'s ``"mvpc"`` made fewer errors in 14 of 72 settings at ``alpha=0.01`` and 28 at '
-        "0.05. See **Missing values.** in Notes.",
-        lambda m: m in CONCEPTS["missing"].conforming,
+        'handling used. ``"testwise"`` favors every row each test can read; it gives up its '
+        "guarantee outside values missing completely at random. With PC at 20 variables and 1,000 "
+        "rows, 10 to 30% of the values missing completely at random, test-wise deletion made median "
+        "errors of 6.5 to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 "
+        "complete rows and had no complete row at 30% (complete data: 4.0; 0.11.0 release card). "
+        "Where values are missing for a reason that other variables carry, on Erdos-Renyi graphs of "
+        '10 to 100 variables with one observed parent per indicator, ``pc``\'s ``"mvpc"`` made fewer '
+        "errors in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none. Not "
+        "measured with this method. See **Missing values.** in Notes.",
+        lambda m: m in CONCEPTS["missing"].conforming and m != "fci",
+    ),
+    "missing_fci": Shared(
+        "Parameters",
+        "missing",
+        "entry",
+        'How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test '
+        "reads only the rows where all of its variables are observed. ``None`` picks the method's "
+        'default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the '
+        'handling used. ``"testwise"`` favors every row each test can read; it gives up its '
+        "guarantee outside values missing completely at random. With 20 variables and 1,000 rows, "
+        "10 to 30% of the values missing completely at random, FCI made median errors of 28.5 to "
+        "30.5 where dropping the incomplete rows made 32.5 and 42.0 on 124 and 10 complete rows and "
+        "had no complete row at 30% (complete data: 28.0; 0.11.0 release card). Where values are "
+        "missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100 "
+        'variables with one observed parent per indicator, ``pc``\'s ``"mvpc"`` made fewer errors '
+        "in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none; not measured with "
+        "FCI. See **Missing values.** in Notes.",
+        lambda m: m == "fci" and m in CONCEPTS["missing"].conforming,
     ),
     # A method whose default follows its paper words its own entry.
     "degrees_of_freedom": Shared(
@@ -215,12 +235,12 @@ SHARED = {
         'sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true '
         "independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning "
         'variables, 500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% '
-        '(``"gsq"``). It gives up some of ``"gsq"``\'s power in the sparsest tables, where its '
-        'p-values come out too large, and, with ``"gsq"``, time: a sum of hypergeometric terms per '
-        'cell, not timed against ``"nonempty"``. ``"nonempty"`` favors detection on sparse tables: '
-        'it rejects more often there, keeping ``"gsq"``\'s power where ``"mean"`` loses it. It gives '
-        "up the level: 11.1% and 21.7% of the same true independences were rejected. Their power "
-        "was not measured as a pair. "
+        '(``"gsq"``). With ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and '
+        "rejects below the nominal rate in the sparsest tables (0.8% at 3,125 cells). "
+        '``"nonempty"`` favors the degrees of freedom of Spirtes, Glymour and Scheines (1993), read '
+        "from the table alone, with no hypergeometric sum; it gives up the level: 11.1% and 21.7% "
+        "of the same true independences were rejected. Their time and their power were not "
+        "measured against each other. "
         'Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.',
         lambda m: m in CONCEPTS["degrees_of_freedom"].conforming,
     ),
@@ -237,10 +257,14 @@ SHARED = {
         "the fewest rows two columns share; two columns that share no observed row raise "
         "``ValueError``. "
         '``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it '
-        "gives up time: each round runs the search again. With the default 10 rounds, over the six "
-        "searches in which it is supported, from 10 to 50 variables and 100 to 2,000 rows, a "
-        "setting's median fit took 2 to 72 times as long as the same search on the complete data "
-        "(0.17.0 missing-data benchmark). See **Missing values.** in Notes.",
+        "gives up time: each round runs the search again. In the 0.17.0 missing-data benchmark "
+        "(linear-Gaussian data, 10 to 50 variables, 100 to 2,000 rows, 10 to 50% missing; the "
+        'searches at ``ebic_gamma=0``), against dropping the incomplete rows, ``"em"`` made fewer '
+        "errors in 186 of the 225 settings judged with GES, BOSS, GRaSP, and NOTEARS, as many in "
+        "39, and more in none, and in 204 more dropping the rows left too few to fit most "
+        "datasets; HC and Tabu were not compared with it. With the default 10 rounds, a setting's "
+        "median fit in the six searches took 2 to 72 times as long as the same search on the "
+        "complete data. See **Missing values.** in Notes.",
         lambda m: m in EM_SUPPORTED,
     ),
     "missing_em_experimental": Shared(

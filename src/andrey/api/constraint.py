@@ -104,13 +104,13 @@ def pc(
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
         sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
         independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). It
-        gives up some of ``"gsq"``'s power in the sparsest tables, where its p-values come out too
-        large, and, with ``"gsq"``, time: a sum of hypergeometric terms per cell, not timed against
-        ``"nonempty"``. ``"nonempty"`` favors detection on sparse tables: it rejects more often
-        there, keeping ``"gsq"``'s power where ``"mean"`` loses it. It gives up the level: 11.1% and
-        21.7% of the same true independences were rejected. Their power was not measured as a pair.
-        Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, which decides between two colliders that would
         orient one edge in opposite directions. ``"p_value"`` orients first the collider whose
@@ -157,21 +157,24 @@ def pc(
         indicator and tests again, on virtual data that correct for them, the edges such an
         indicator could have kept; it takes ``"fisherz"`` or ``"student_t"``. ``None`` picks the
         method's default, ``"testwise"``. On data with missing values, ``metadata["missing"]``
-        records the handling used. ``"testwise"`` favors every row each test can read: with 20
-        variables and 1,000 rows, PC's median errors were 6.5 to 7.5 against 4.0 on the complete
-        data with 10 to 30% of the values missing, where dropping the incomplete rows kept a median
-        of 124.5 to 0.5 rows (0.11.0 release card); it gives up its guarantee outside values missing
-        completely at random. ``"mvpc"`` favors values missing for a reason that other variables
-        carry; it gives up every test but those two and, where an indicator has many weak parents or
-        parents with missing values, accuracy on large graphs. On Erdos-Renyi graphs of 10 to 100
-        variables (mean degree 2 or 4; 500 to 10,000 rows; 10 to 30% missing), with one observed
-        parent per indicator, ``"mvpc"`` had fewer errors in 14 of 72 settings at ``alpha=0.01`` and
-        28 at the default 0.05, and more in none. Over both levels together (144 settings), it tied
-        in 136 with values missing completely at random; it was behind in 12 of the 141 judged with
-        many weak parents per indicator (3 again on fresh seeds) and, with one parent that has
-        missing values itself, ahead in 12 of 144 and behind in 24 (9 again); the repeated ones all
-        had 50 or 100 variables and 20 or 30% missing (see Limitations). See **Missing values.** in
-        Notes.
+        records the handling used. ``"testwise"`` favors every row each test can read and, on large
+        graphs where an indicator has many weak parents or parents with missing values, accuracy; it
+        gives up its guarantee outside values missing completely at random. With 20 variables and
+        1,000 rows, 10 to 30% of the values missing completely at random, it made median errors of
+        6.5 to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows
+        and had no complete row at 30% (complete data: 4.0; 0.11.0 release card); in the 12 settings
+        below where ``"mvpc"`` was behind again on fresh seeds (50 or 100 variables, 20 or 30%
+        missing), it made fewer errors. ``"mvpc"`` favors values missing for a reason that other
+        variables carry; it gives up every test but those two and, where an indicator has many weak
+        parents or parents with missing values, accuracy on large graphs. On Erdos-Renyi graphs of
+        10 to 100 variables (mean degree 2 or 4; 500 to 10,000 rows; 10 to 30% missing), with one
+        observed parent per indicator, ``"mvpc"`` had fewer errors in 14 of 72 settings at
+        ``alpha=0.01`` and 28 at the default 0.05, and more in none. Over both levels together (144
+        settings), it tied in 136 with values missing completely at random; it was behind in 12 of
+        the 141 judged with many weak parents per indicator (3 again on fresh seeds) and, with one
+        parent that has missing values itself, ahead in 12 of 144 and behind in 24 (9 again); the
+        repeated ones all had 50 or 100 variables and 20 or 30% missing (see Limitations). See
+        **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -737,13 +740,13 @@ def fci(
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
         sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
         independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). It
-        gives up some of ``"gsq"``'s power in the sparsest tables, where its p-values come out too
-        large, and, with ``"gsq"``, time: a sum of hypergeometric terms per cell, not timed against
-        ``"nonempty"``. ``"nonempty"`` favors detection on sparse tables: it rejects more often
-        there, keeping ``"gsq"``'s power where ``"mean"`` loses it. It gives up the level: 11.1% and
-        21.7% of the same true independences were rejected. Their power was not measured as a pair.
-        Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
         How FCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
@@ -781,13 +784,15 @@ def fci(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. ``"testwise"`` favors every row each test can read: with 20 variables and
-        1,000 rows, PC's median errors were 6.5 to 7.5 against 4.0 on the complete data with 10 to
-        30% of the values missing, where dropping the incomplete rows kept a median of 124.5 to 0.5
-        rows (0.11.0 release card). It gives up its guarantee outside values missing completely at
-        random: where values are missing for a reason that other variables carry, ``pc``'s
-        ``"mvpc"`` made fewer errors in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05. See
-        **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With 20 variables and 1,000 rows, 10 to 30% of
+        the values missing completely at random, FCI made median errors of 28.5 to 30.5 where
+        dropping the incomplete rows made 32.5 and 42.0 on 124 and 10 complete rows and had no
+        complete row at 30% (complete data: 28.0; 0.11.0 release card). Where values are missing for
+        a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100 variables with one
+        observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors in 14 of 72 settings at
+        ``alpha=0.01`` and 28 at 0.05, and more in none; not measured with FCI. See **Missing
+        values.** in Notes.
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of FCI's possible-d-separation step [2]_ [3]_, which removes edges the first step
         kept, one at a time, so each removal changes what the step tests after it.
@@ -1236,13 +1241,13 @@ def gfci(
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
         sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
         independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). It
-        gives up some of ``"gsq"``'s power in the sparsest tables, where its p-values come out too
-        large, and, with ``"gsq"``, time: a sum of hypergeometric terms per cell, not timed against
-        ``"nonempty"``. ``"nonempty"`` favors detection on sparse tables: it rejects more often
-        there, keeping ``"gsq"``'s power where ``"mean"`` loses it. It gives up the level: 11.1% and
-        21.7% of the same true independences were rejected. Their power was not measured as a pair.
-        Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test, in ``(0, 1)``. Smaller values give
         sparser graphs.
@@ -1630,13 +1635,13 @@ def cdnod(
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
         sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
         independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). It
-        gives up some of ``"gsq"``'s power in the sparsest tables, where its p-values come out too
-        large, and, with ``"gsq"``, time: a sum of hypergeometric terms per cell, not timed against
-        ``"nonempty"``. ``"nonempty"`` favors detection on sparse tables: it rejects more often
-        there, keeping ``"gsq"``'s power where ``"mean"`` loses it. It gives up the level: 11.1% and
-        21.7% of the same true independences were rejected. Their power was not measured as a pair.
-        Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, as for :func:`~andrey.pc`: ``"p_value"`` by the
         largest p-value that separated each collider's endpoints, so the colliders do not depend on
@@ -1681,13 +1686,15 @@ def cdnod(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. ``"testwise"`` favors every row each test can read: with 20 variables and
-        1,000 rows, PC's median errors were 6.5 to 7.5 against 4.0 on the complete data with 10 to
-        30% of the values missing, where dropping the incomplete rows kept a median of 124.5 to 0.5
-        rows (0.11.0 release card). It gives up its guarantee outside values missing completely at
-        random: where values are missing for a reason that other variables carry, ``pc``'s
-        ``"mvpc"`` made fewer errors in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05. See
-        **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors in
+        14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none. Not measured with this
+        method. See **Missing values.** in Notes.
     dependence_threshold : float or None, default=None
         Runs the independent-change step at this threshold, in ``(0, 1)``, on its module
         dependence measure: two modules, the distributions of a candidate cause and of its effect
@@ -2077,13 +2084,13 @@ def fci_jci(
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
         sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
         independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). It
-        gives up some of ``"gsq"``'s power in the sparsest tables, where its p-values come out too
-        large, and, with ``"gsq"``, time: a sum of hypergeometric terms per cell, not timed against
-        ``"nonempty"``. ``"nonempty"`` favors detection on sparse tables: it rejects more often
-        there, keeping ``"gsq"``'s power where ``"mean"`` loses it. It gives up the level: 11.1% and
-        21.7% of the same true independences were rejected. Their power was not measured as a pair.
-        Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
         How a collider is decided on a triple ``x - z - y`` where ``x`` and ``y`` are not adjacent,
         as for :func:`~andrey.fci`: by the separating set that removed the edge ``x - y``
@@ -2121,13 +2128,15 @@ def fci_jci(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. ``"testwise"`` favors every row each test can read: with 20 variables and
-        1,000 rows, PC's median errors were 6.5 to 7.5 against 4.0 on the complete data with 10 to
-        30% of the values missing, where dropping the incomplete rows kept a median of 124.5 to 0.5
-        rows (0.11.0 release card). It gives up its guarantee outside values missing completely at
-        random: where values are missing for a reason that other variables carry, ``pc``'s
-        ``"mvpc"`` made fewer errors in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05. See
-        **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors in
+        14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none. Not measured with this
+        method. See **Missing values.** in Notes.
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of the possible-d-separation step, as for :func:`~andrey.fci`: ``"order_free"``
         visits the pairs and nodes by a rank computed from the data, and ``"fast"`` in column

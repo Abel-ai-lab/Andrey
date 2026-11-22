@@ -512,13 +512,13 @@ def pcmci(
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
         sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
         independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). It
-        gives up some of ``"gsq"``'s power in the sparsest tables, where its p-values come out too
-        large, and, with ``"gsq"``, time: a sum of hypergeometric terms per cell, not timed against
-        ``"nonempty"``. ``"nonempty"`` favors detection on sparse tables: it rejects more often
-        there, keeping ``"gsq"``'s power where ``"mean"`` loses it. It gives up the level: 11.1% and
-        21.7% of the same true independences were rejected. Their power was not measured as a pair.
-        Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -529,13 +529,15 @@ def pcmci(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. ``"testwise"`` favors every row each test can read: with 20 variables and
-        1,000 rows, PC's median errors were 6.5 to 7.5 against 4.0 on the complete data with 10 to
-        30% of the values missing, where dropping the incomplete rows kept a median of 124.5 to 0.5
-        rows (0.11.0 release card). It gives up its guarantee outside values missing completely at
-        random: where values are missing for a reason that other variables carry, ``pc``'s
-        ``"mvpc"`` made fewer errors in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05. See
-        **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors in
+        14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none. Not measured with this
+        method. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -876,13 +878,13 @@ def pcmciplus(
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
         sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
         independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). It
-        gives up some of ``"gsq"``'s power in the sparsest tables, where its p-values come out too
-        large, and, with ``"gsq"``, time: a sum of hypergeometric terms per cell, not timed against
-        ``"nonempty"``. ``"nonempty"`` favors detection on sparse tables: it rejects more often
-        there, keeping ``"gsq"``'s power where ``"mean"`` loses it. It gives up the level: 11.1% and
-        21.7% of the same true independences were rejected. Their power was not measured as a pair.
-        Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -893,13 +895,15 @@ def pcmciplus(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. ``"testwise"`` favors every row each test can read: with 20 variables and
-        1,000 rows, PC's median errors were 6.5 to 7.5 against 4.0 on the complete data with 10 to
-        30% of the values missing, where dropping the incomplete rows kept a median of 124.5 to 0.5
-        rows (0.11.0 release card). It gives up its guarantee outside values missing completely at
-        random: where values are missing for a reason that other variables carry, ``pc``'s
-        ``"mvpc"`` made fewer errors in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05. See
-        **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors in
+        14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none. Not measured with this
+        method. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -1516,13 +1520,13 @@ def lpcmci(
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
         sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
         independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). It
-        gives up some of ``"gsq"``'s power in the sparsest tables, where its p-values come out too
-        large, and, with ``"gsq"``, time: a sum of hypergeometric terms per cell, not timed against
-        ``"nonempty"``. ``"nonempty"`` favors detection on sparse tables: it rejects more often
-        there, keeping ``"gsq"``'s power where ``"mean"`` loses it. It gives up the level: 11.1% and
-        21.7% of the same true independences were rejected. Their power was not measured as a pair.
-        Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1533,13 +1537,15 @@ def lpcmci(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. ``"testwise"`` favors every row each test can read: with 20 variables and
-        1,000 rows, PC's median errors were 6.5 to 7.5 against 4.0 on the complete data with 10 to
-        30% of the values missing, where dropping the incomplete rows kept a median of 124.5 to 0.5
-        rows (0.11.0 release card). It gives up its guarantee outside values missing completely at
-        random: where values are missing for a reason that other variables carry, ``pc``'s
-        ``"mvpc"`` made fewer errors in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05. See
-        **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors in
+        14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none. Not measured with this
+        method. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which

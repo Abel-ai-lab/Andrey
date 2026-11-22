@@ -534,14 +534,19 @@ class WGCM(_RegressionTest):
     variant : {"est", "fix"}, default="est"
         ``"est"`` estimates one weight function on 30% of the rows and tests on the rest;
         ``"fix"`` tests a fixed set of weight functions on every row and takes the largest
-        statistic. ``"est"`` favors one weight learned from the data, whose power does not spread
-        over the conditioning variables; it gives up time, 30% of the rows, and a p-value that
-        changes little with the seed. ``"fix"`` favors every row, half the time, and a steadier
-        level; it gives up power as the conditioning set grows, 7 weights per variable. With
-        ``"boosting"``, on the null designs of [1]_ at 200 and 400 rows, ``"est"`` rejected a true
-        independence at 0.05 in 6.8% of draws against 6.0% (over 12 designs, those of [2]_
-        included: 6.6% against 6.4%, by design from 4 to 13% against 4 to 8.6%), and a query took
-        21 to 26 s against 11 to 15 s. Their power was not measured against each other.
+        statistic. ``"est"`` favors one weight learned from the data, whose number does not grow
+        with the conditioning set; it gives up 30% of the rows, time, and, where measured, power.
+        ``"fix"`` favors every row, half the time, power, and a steadier level; it gives up a
+        learned weight: 7 fixed weights per conditioning variable, each a sign along one variable.
+        On the same 200 draws of each of the 7 alternative cells of [1]_ (example 7, 1D, and
+        10D.Add, at 200 and 400 rows), with ``"boosting"`` under the tuning of
+        :class:`~andrey.core.ci_regression.GCM`, ``"fix"`` rejected at 0.05 in 21 to 96.5% of
+        draws against 10.5 to 60.5%, more often in all 7, and in all 7 too at critical values from
+        each variant's own null draws (15 to 95% against 10.5 to 52.5%); their power was not
+        measured as a pair under the shipped tuning. With the shipped ``"boosting"``, over the 12
+        null designs of Limitations, ``"est"`` rejected a true independence at 0.05 in 4 to 13% of
+        draws by design against 4 to 8.6%, and at 200 to 400 rows a query took 21 to 26 s against
+        11 to 15 s.
     regression : {"boosting", "forest", "linear"}, default="boosting"
         The regression of each variable, and of the products of residuals, on the conditioning set.
         ``"boosting"`` is boosted regression trees whose learning rate (0.1, 0.2, 0.3, or 0.5),
@@ -596,11 +601,13 @@ class WGCM(_RegressionTest):
     regression fits 281 boosted models of up to 500 rounds, 28 settings on 10 folds and the chosen
     one on every row, so a query takes several times as long as the GCM's; ``"est"`` runs five such
     regressions per query, its split being the query's own. ``"fix"`` uses 7 weights per
-    conditioning variable, so with many conditioning variables the maximum spreads its power thin.
-    At a few hundred rows, where the conditional means are hard to learn, neither variant holds its
-    level. With ``"boosting"``, pooled over draws of the paper's null designs at 200 and 400 rows
-    [1]_, ``"est"`` rejected a true independence at 0.05 in about 6.8% of draws and ``"fix"`` in
-    6.0%, up to 7.8% on one design for either; pooled over 12 null designs (those, further nulls
+    conditioning variable, so its maximum spreads over more of them as the conditioning set grows;
+    on 10 conditioning variables (10D.Add of [1]_ at 200 rows) it still rejected more often than
+    ``"est"`` (see ``variant``). At a few hundred rows, where the conditional means are hard to
+    learn, neither variant holds its level. With ``"boosting"``, pooled over draws of the paper's
+    null designs at 200 and 400 rows [1]_, ``"est"`` rejected a true independence at 0.05 in about
+    6.8% of draws and ``"fix"`` in 6.0% (6.8% and 6.5% on a second set of draws), up to 7.8% on one
+    design for either; pooled over 12 null designs (those, further nulls
     of [2]_, and example 7 of [1]_ without its dependence), 6.6% and 6.4%, from 4 to 13% by design
     for ``"est"``, the most on the a = 4 null of [2]_, and from 4 to 8.6% for ``"fix"``.
 

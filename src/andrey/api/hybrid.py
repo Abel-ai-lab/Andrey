@@ -137,13 +137,13 @@ def mmhc(
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
         sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
         independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). It
-        gives up some of ``"gsq"``'s power in the sparsest tables, where its p-values come out too
-        large, and, with ``"gsq"``, time: a sum of hypergeometric terms per cell, not timed against
-        ``"nonempty"``. ``"nonempty"`` favors detection on sparse tables: it rejects more often
-        there, keeping ``"gsq"``'s power where ``"mean"`` loses it. It gives up the level: 11.1% and
-        21.7% of the same true independences were rejected. Their power was not measured as a pair.
-        Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     score_func : str or None, default=None
         Local score of the hill-climbing phase, any of :func:`~andrey.hc`'s: ``"bic"`` (Gaussian
         BIC) for continuous data, ``"bdeu"`` or ``"discrete_bic"`` for categorical data,
@@ -407,13 +407,13 @@ def rsmax2(
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
         sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
         independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). It
-        gives up some of ``"gsq"``'s power in the sparsest tables, where its p-values come out too
-        large, and, with ``"gsq"``, time: a sum of hypergeometric terms per cell, not timed against
-        ``"nonempty"``. ``"nonempty"`` favors detection on sparse tables: it rejects more often
-        there, keeping ``"gsq"``'s power where ``"mean"`` loses it. It gives up the level: 11.1% and
-        21.7% of the same true independences were rejected. Their power was not measured as a pair.
-        Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     score_func : str or None, default=None
         Local score of the maximize phase, any of :func:`~andrey.hc`'s. ``"normal_scores"``,
         experimental, is ``"bic"`` on each column's normal scores, for continuous data that are

@@ -146,10 +146,14 @@ def boss(
         ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
         fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
         ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
-        up time: each round runs the search again. With the default 10 rounds, over the six searches
-        in which it is supported, from 10 to 50 variables and 100 to 2,000 rows, a setting's median
-        fit took 2 to 72 times as long as the same search on the complete data (0.17.0 missing-data
-        benchmark). See **Missing values.** in Notes.
+        up time: each round runs the search again. In the 0.17.0 missing-data benchmark
+        (linear-Gaussian data, 10 to 50 variables, 100 to 2,000 rows, 10 to 50% missing; the
+        searches at ``ebic_gamma=0``), against dropping the incomplete rows, ``"em"`` made fewer
+        errors in 186 of the 225 settings judged with GES, BOSS, GRaSP, and NOTEARS, as many in 39,
+        and more in none, and in 204 more dropping the rows left too few to fit most datasets; HC
+        and Tabu were not compared with it. With the default 10 rounds, a setting's median fit in
+        the six searches took 2 to 72 times as long as the same search on the complete data. See
+        **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
         1. Each round runs the search once, so the time grows with them. A fit whose last round
@@ -571,10 +575,14 @@ def grasp(
         ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
         fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
         ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
-        up time: each round runs the search again. With the default 10 rounds, over the six searches
-        in which it is supported, from 10 to 50 variables and 100 to 2,000 rows, a setting's median
-        fit took 2 to 72 times as long as the same search on the complete data (0.17.0 missing-data
-        benchmark). See **Missing values.** in Notes.
+        up time: each round runs the search again. In the 0.17.0 missing-data benchmark
+        (linear-Gaussian data, 10 to 50 variables, 100 to 2,000 rows, 10 to 50% missing; the
+        searches at ``ebic_gamma=0``), against dropping the incomplete rows, ``"em"`` made fewer
+        errors in 186 of the 225 settings judged with GES, BOSS, GRaSP, and NOTEARS, as many in 39,
+        and more in none, and in 204 more dropping the rows left too few to fit most datasets; HC
+        and Tabu were not compared with it. With the default 10 rounds, a setting's median fit in
+        the six searches took 2 to 72 times as long as the same search on the complete data. See
+        **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
         1. Each round runs the search once, so the time grows with them. A fit whose last round
@@ -982,13 +990,13 @@ def igsp(
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
         sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
         independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). It
-        gives up some of ``"gsq"``'s power in the sparsest tables, where its p-values come out too
-        large, and, with ``"gsq"``, time: a sum of hypergeometric terms per cell, not timed against
-        ``"nonempty"``. ``"nonempty"`` favors detection on sparse tables: it rejects more often
-        there, keeping ``"gsq"``'s power where ``"mean"`` loses it. It gives up the level: 11.1% and
-        21.7% of the same true independences were rejected. Their power was not measured as a pair.
-        Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     invariance_test : {"gaussian", "indicator"} or None, default=None
         The invariance test, which asks whether a variable's distribution given a set of others is
         the same in a setting as in the observational rows. ``"gaussian"`` compares the linear
@@ -1336,13 +1344,13 @@ def ut_igsp(
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
         sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
         independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). It
-        gives up some of ``"gsq"``'s power in the sparsest tables, where its p-values come out too
-        large, and, with ``"gsq"``, time: a sum of hypergeometric terms per cell, not timed against
-        ``"nonempty"``. ``"nonempty"`` favors detection on sparse tables: it rejects more often
-        there, keeping ``"gsq"``'s power where ``"mean"`` loses it. It gives up the level: 11.1% and
-        21.7% of the same true independences were rejected. Their power was not measured as a pair.
-        Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     invariance_test : {"gaussian", "indicator"} or None, default=None
         The invariance test, which asks whether a variable's distribution given a set of others is
         the same in a setting as in the observational rows. ``"gaussian"`` compares the linear
@@ -1718,13 +1726,13 @@ def boss_fci(
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
         sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
         independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). It
-        gives up some of ``"gsq"``'s power in the sparsest tables, where its p-values come out too
-        large, and, with ``"gsq"``, time: a sum of hypergeometric terms per cell, not timed against
-        ``"nonempty"``. ``"nonempty"`` favors detection on sparse tables: it rejects more often
-        there, keeping ``"gsq"``'s power where ``"mean"`` loses it. It gives up the level: 11.1% and
-        21.7% of the same true independences were rejected. Their power was not measured as a pair.
-        Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
@@ -2073,13 +2081,13 @@ def grasp_fci(
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
         sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
         independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). It
-        gives up some of ``"gsq"``'s power in the sparsest tables, where its p-values come out too
-        large, and, with ``"gsq"``, time: a sum of hypergeometric terms per cell, not timed against
-        ``"nonempty"``. ``"nonempty"`` favors detection on sparse tables: it rejects more often
-        there, keeping ``"gsq"``'s power where ``"mean"`` loses it. It gives up the level: 11.1% and
-        21.7% of the same true independences were rejected. Their power was not measured as a pair.
-        Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
