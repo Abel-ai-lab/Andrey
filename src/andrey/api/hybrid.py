@@ -383,12 +383,13 @@ def rsmax2(
         ``"pc"`` keeps the skeleton of :func:`~andrey.pc`'s adjacency search [4]_. With
         ``knowledge``, ``"mmpc"`` and ``"pc"`` read it in the restrict phase, and ``"iamb"`` and
         ``"inter_iamb"`` read the data alone; ``knowledge`` below says why. ``"mmpc"`` favors
-        time; it gives up some accuracy. ``"iamb"`` favors accuracy; it gives up time. On
-        linear-Gaussian graphs of 20 to 100 variables (see Limitations), in the setting closest to
-        the empty graph, 20 variables at mean degree 4, ``"mmpc"`` had 29 to 31 pairs wrong and
-        ``"iamb"`` 21 to 24; over all settings a fit took 0.04 to 3.5 s with ``"mmpc"`` and 0.07 to
-        8.8 s with ``"iamb"``. ``"inter_iamb"`` and
-        ``"pc"`` were not measured against them. See Notes.
+        time; it gives up accuracy. ``"iamb"`` favors accuracy; it gives up time. On the
+        linear-Gaussian graphs of Limitations, with ``maximize="hc"``, ``"iamb"`` had lower mean
+        CPDAG errors than ``"mmpc"`` in all 12 settings (20, 50, and 100 variables; 1,000 and 5,000
+        rows; mean degree 2 and 4), by 0.7 to 39.7, and its fits took longer in all 12, about 0.05
+        to 8.8 s against 0.02 to 3.5 s. The means are not paired: in two settings ``"iamb"`` was
+        scored on 14 datasets where ``"mmpc"`` was on 15 and 20. ``"inter_iamb"`` and ``"pc"``
+        were not measured against them. See Notes.
     maximize : {"hc", "tabu"}, default="hc"
         The maximize phase: :func:`~andrey.hc` or :func:`~andrey.tabu`.
     alpha : float, default=0.05
@@ -577,10 +578,10 @@ def rsmax2(
     one core, with ``restrict="mmpc"`` and ``"iamb"`` and ``maximize="hc"``. In every setting the
     mean CPDAG errors stay below the empty graph's; the closest is at 20 variables and mean degree
     4, with 29 to 31 pairs wrong for ``"mmpc"`` and 21 to 24 for ``"iamb"``, against 40 for the
-    empty graph. A fit took 0.04 to 3.5 s with ``"mmpc"`` and 0.07 to 8.8 s with ``"iamb"``, the
-    longest at 100 variables, 5,000 rows, and mean degree 4. An edge the restrict phase misses is
-    never added, and the maximize phase stops at a local optimum. MMPC tests each candidate against
-    every subset of the current members, so its cost grows exponentially with the size of a
+    empty graph. A fit took about 0.02 to 3.5 s with ``"mmpc"`` and 0.05 to 8.8 s with ``"iamb"``,
+    the longest at 100 variables, 5,000 rows, and mean degree 4. An edge the restrict phase misses
+    is never added, and the maximize phase stops at a local optimum. MMPC tests each candidate
+    against every subset of the current members, so its cost grows exponentially with the size of a
     variable's parents-and-children set. IAMB and Inter-IAMB condition on the whole current blanket,
     so each of their tests needs more rows as the blankets grow. With true ``required_paths`` or
     ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated linear-Gaussian data (10 to

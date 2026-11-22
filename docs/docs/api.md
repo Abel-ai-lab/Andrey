@@ -894,8 +894,8 @@ the wGCM paper's 7 alternative cells, under the GCM's tuning only:
 | `regression="forest"` | Nonlinear conditional means without tuning | Time: 500 trees per regression | Not measured against the other two |
 
 Choosing the regression of `"pcm"`, on the paper's Section 6.1 null (seven conditioning variables)
-and Section 6.2 null (an interaction in the conditional means), 500 draws per cell, rejections of a
-true independence at 0.05:
+and Section 6.2 null (an interaction in the conditional means), rejections of a true independence
+at 0.05; each of the additive default's cells has 500 draws:
 
 | Setting | Favors | Gives up | Measured |
 |---|---|---|---|
