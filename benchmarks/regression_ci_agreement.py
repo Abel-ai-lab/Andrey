@@ -15,8 +15,9 @@ so both sides test the same numbers. PCM is compared in its paper's direction, t
         uv run python benchmarks/regression_ci_agreement.py <empty folder>
 
 `benchmarks/start_regression_ci_r.sh` builds the two R libraries the reference needs, read from
-`ANDREY_BENCH_R_LIBS` (GCM and PCM) and `ANDREY_BENCH_R_LIBS_WGCM` (wGCM) when they are set. The
-script prints one Markdown table per test.
+`ANDREY_BENCH_R_LIBS` (GCM and PCM) and `ANDREY_BENCH_R_LIBS_WGCM` (wGCM) when they are set, and
+clones the PCM authors' code, printing its `PCM_CODE`. The script prints one Markdown table per
+test.
 """
 
 from __future__ import annotations
