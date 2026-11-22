@@ -1,7 +1,7 @@
 ---
 name: docs-index
-description: Andrey's documentation - install it, learn the concepts, choose a causal discovery
-  method, run the examples, and look up the API and command line.
+description: Andrey documentation for installation, concepts, choosing a causal discovery method,
+  examples, and the API and command line.
 meta:
   type: index
 ---
@@ -71,8 +71,8 @@ What changed in each release.
   family, with the data it reads and the graph it returns.
 - [API reference](api.md): methods, graph structures, and visualization.
 - [CLI reference](api.md#command-line-interface): run methods from the shell.
-- [Handling missing values](guides/missing-values.md): which handling to use for your data and the
-  reason its values are missing.
+- [Handling missing values](guides/missing-values.md): which handling fits your data and the reason
+  for its gaps.
 - [Graph types](guides/graph-types.md): DAGs, CPDAGs, PAGs, and temporal graphs, with diagrams.
 - [Graph representation](guides/graph-representation.md): Andrey's graph model compared with other
   causal discovery packages.

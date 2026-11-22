@@ -1,7 +1,7 @@
 ---
 name: changelog
-description: Changes in each Andrey release - new methods, new features, fixes, and the changes
-  that need an update to your code, newest first.
+description: Changes in each Andrey release, newest first, covering new methods, features, fixes,
+  and required updates to your code.
 meta:
   type: guide
   tags: [release, changelog]

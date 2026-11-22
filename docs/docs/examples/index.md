@@ -157,9 +157,9 @@ fits several datasets, and GIN finds latent variables.
 :img-top: /_generated/thumbs/functional.svg
 :img-alt: The DAG CAM recovers in this notebook
 
-CAM, RESIT, SCORE, NoGAM, and DAS learn a DAG, with every edge oriented, when each variable is a
-nonlinear function of its parents plus independent noise; CAM-UV allows hidden causes and marks the
-pairs they join, and CPCM's graph search lets each variable follow a family you choose.
+CAM, RESIT, SCORE, NoGAM, and DAS learn a fully oriented DAG when each variable is a nonlinear
+function of its parents plus independent noise; CAM-UV allows hidden causes and marks the pairs they
+join, and CPCM's graph search lets each variable follow a family you choose.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
