@@ -41,9 +41,10 @@ acyclicity of hypergraphs, and selectively reduce acyclic hypergraphs. SIAM Jour
 from __future__ import annotations
 
 import math
+import threading
 import warnings
 from collections.abc import Callable, Generator, Iterator
-from contextlib import ExitStack, contextmanager
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 import numpy as np
@@ -394,50 +395,30 @@ def _heuristic(
     return _best(run(_searches(design, rows, effect, log_penalties, starts, rng)))
 
 
-def _init_worker() -> None:
-    from andrey.core import backend
-
-    global _WORKER_LIMIT
-    _WORKER_LIMIT = backend.one_blas_thread()  # kept for the worker's life
-
-
-_WORKER_LIMIT = None
-
-
 @contextmanager
 def search_pool(workers: int) -> Generator[Run]:
-    """A ``run`` function for :func:`fit` that spreads searches over ``workers`` threads (worker
-    processes when ``ANDREY_SKEWD_POOL=process``); with one worker, the searches run in this
-    thread. A search spends its time in NumPy and SciPy array operations, which release the
-    interpreter lock. Every search draws from its own stream, so the results do not depend on the
-    number of workers. BLAS runs on one thread inside the block: its products are small, and a
-    threaded product rounds differently, so the fit would depend on the machine's thread count."""
-    import os
-    from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+    """A ``run`` function for :func:`fit` that spreads searches over ``workers`` threads; with one
+    worker, the searches run in this thread. A search spends its time in NumPy and SciPy array
+    operations, which release the interpreter lock. Every search draws from its own stream, so the
+    results do not depend on the number of workers."""
+    if workers <= 1:
+        yield _serial
+        return
+    from concurrent.futures import ThreadPoolExecutor
 
-    from andrey.core import backend
-
-    with ExitStack() as stack:
-        stack.enter_context(backend.one_blas_thread())  # every thread of this process
-        if workers <= 1:
-            yield _serial
-            return
-        if os.environ.get("ANDREY_SKEWD_POOL") != "process":
-            pool = stack.enter_context(ThreadPoolExecutor(max_workers=workers))
-        else:
-            from andrey.search._parallel import pick_context
-
-            pool = stack.enter_context(
-                ProcessPoolExecutor(
-                    max_workers=workers, mp_context=pick_context(), initializer=_init_worker
-                )
-            )
+    with ThreadPoolExecutor(max_workers=workers) as pool:
         yield lambda searches: list(pool.map(_run_search, searches))
 
 
 def _best(found: list[tuple[np.ndarray, float]]) -> tuple[np.ndarray, float]:
     """The search result with the lowest value, the first on a tie."""
     return min(found, key=lambda f: f[1])
+
+
+#: Held around each change of the warning filters: :func:`warnings.catch_warnings` saves and
+#: restores the filters of the whole process, so two such blocks in concurrent threads must not
+#: overlap.
+_FILTERS = threading.Lock()
 
 
 def _tune(
@@ -476,7 +457,7 @@ def _tune(
         for log_penalties in candidates:
             held_out, fold_estimates = 0.0, []
             for _, test in folds:
-                theta, _ = _best([next(found)])
+                theta, _ = next(found)
                 rows = _row_log_likelihoods(
                     theta[None, :], design.location[test], design.scale[test], effect[test]
                 )
@@ -498,7 +479,7 @@ def _tune(
         )
         values = np.array(scores)
         finite = np.isfinite(values)
-        with warnings.catch_warnings():
+        with _FILTERS, warnings.catch_warnings():
             # A kernel parameter at its bound only shapes the acquisition, not the fit.
             warnings.simplefilter("ignore", ConvergenceWarning)
             process.fit(np.array(points)[finite], values[finite])

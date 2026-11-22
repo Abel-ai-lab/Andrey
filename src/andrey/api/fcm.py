@@ -1741,6 +1741,12 @@ def skewd_mv(
     of the paper's runs. The columns are fitted in the order of their values' ranks, so the DAG does
     not depend on the column order; ties follow ``andrey.config.tie_break``.
 
+    ``n_jobs`` above 1 (``andrey.config`` or ``ANDREY_N_JOBS``) runs the conditional models, and
+    the CMA-ES searches of each, on that many threads. Each search draws from its own random
+    stream, split from ``seed`` in a fixed order, so the DAG and its likelihoods are the same bit
+    for bit with any number of workers. The models are fitted on one BLAS thread with any number of
+    workers, so the result does not depend on the machine's BLAS thread count either.
+
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
@@ -1749,7 +1755,8 @@ def skewd_mv(
     **Limitations.** Not benchmarked yet. The paper measures it on skew-normal location-scale
     graphs of 6 and 10 variables with 1,000 rows [1]_. Its cost grows with the number of distinct
     parent sets the class allows, exponentially in a variable's undirected edges, and each fit
-    takes minutes at the defaults; it refuses a class that needs more than 100 (``max_fits``),
+    takes minutes at the defaults on one worker (16 workers ran a 10-variable graph about 7.5 times
+    faster); it refuses a class that needs more than 100 (``max_fits``),
     where the paper counts parent-child configurations and expects the method to apply while they
     are in the order of 100. An edge PC misses or misorients stays wrong: the likelihood only
     chooses among the class's DAGs. The numbers are a reference, not a hard limit: they change
@@ -1784,6 +1791,7 @@ def skewd_mv(
     from andrey.fcm.skewd import (
         LISTED_DAGS,
         Budget,
+        Fit,
         class_candidates,
         class_size,
         fit,
@@ -1814,16 +1822,21 @@ def skewd_mv(
     terms: dict[tuple[int, tuple[int, ...]], float] = {}
     converged = True
     workers = backend.worker_count()
-    with search_pool(workers) as run:
+
+    def model(each: tuple[int, tuple[int, ...]]) -> Fit:
+        y, parents = each
+        return fit(X[:, list(parents)], X[:, y], budget, seed, run)
+
+    # One BLAS thread: a threaded product rounds differently from a serial one, so the result
+    # would depend on the machine's thread count.
+    with one_blas_thread(), search_pool(workers) as run:
         if workers > 1 and len(fits) > 1:
             from concurrent.futures import ThreadPoolExecutor
 
-            with ThreadPoolExecutor(max_workers=len(fits)) as each:
-                results = list(
-                    each.map(lambda f: fit(X[:, list(f[1])], X[:, f[0]], budget, seed, run), fits)
-                )
+            with ThreadPoolExecutor(max_workers=len(fits)) as pool:
+                results = list(pool.map(model, fits))
         else:
-            results = [fit(X[:, list(parents)], X[:, y], budget, seed) for y, parents in fits]
+            results = [model(each) for each in fits]
     for (y, parents), result in zip(fits, results, strict=True):
         terms[(y, parents)] = n * result.log_likelihood
         converged &= result.converged

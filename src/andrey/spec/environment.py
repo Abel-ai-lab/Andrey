@@ -69,7 +69,8 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             '(`restrict="pc"`) with `fisherz`, `student_t`, `normal_scores`, or `rcot`, and the '
             "possible-d-separation searches of FCI and GFCI with `fisherz`, `student_t`, or "
             "`normal_scores` and of FCI-JCI with `fisherz` or `student_t`, and worker threads for "
-            "the two directions of `pnl`; `0` or `1` runs serially. "
+            "the two directions of `pnl` and the searches of `skewd` and `skewd_mv`; `0` or `1` "
+            "runs serially. "
             "Separate from `ANDREY_BACKEND`, which picks the numeric code."
         ),
         group="backend",

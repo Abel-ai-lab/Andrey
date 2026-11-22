@@ -1054,6 +1054,12 @@ def skewd(
     edge. Both directions draw their random numbers from the same ``seed``, so swapping the
     columns swaps the fits.
 
+    ``n_jobs`` above 1 (``andrey.config`` or ``ANDREY_N_JOBS``) runs the two directions, and the
+    CMA-ES searches of each, on that many threads. Each search draws from its own random stream,
+    split from ``seed`` in a fixed order, so the result is the same bit for bit with any number of
+    workers. The fits and the tests run on one BLAS thread with any number of workers, so the
+    result does not depend on the machine's BLAS thread count either.
+
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits read only the rows
     where both columns are observed, which for a pair are the rows test-wise deletion keeps;
     ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. Fewer than 8 such
@@ -1066,7 +1072,8 @@ def skewd(
     **Limitations.** Not benchmarked yet. The paper measures it on skewed location-scale pairs of
     1,000 rows and on established pair benchmarks [1]_. A fit at the defaults runs about 490
     CMA-ES searches in each direction, 8 folds for each of the ``tuning_iter`` penalty settings and
-    9 final starts, and takes tens of minutes per pair; ``tuning_iter`` sets most of that cost. Each
+    9 final starts, and takes tens of minutes per pair on one worker; ``tuning_iter`` sets most of
+    that cost, and 16 workers ran a pair about 9 times faster. Each
     HSIC test builds matrices with one row and one column per sample. The skew-normal's skewness
     lies within about -1 and 1, so noise more skewed than that is misspecified, and the likelihood
     criterion assumes Gaussian marginals of the standardized variables [1]_. A change of units
@@ -1106,10 +1113,9 @@ def skewd(
             f"skewd: alpha must be None under criterion='likelihood', which compares two "
             f"likelihoods and no p-values, got {alpha!r}"
         )
-    from andrey.core import backend
     from andrey.core.independence import hsic_median_statistic_log_p
     from andrey.core.warning_policy import warn_search_limit
-    from andrey.fcm.skewd import Budget, fit, search_pool
+    from andrey.fcm.skewd import Budget
 
     assert seed is not None  # method_spec resolves it
     X, labels, rows = _pair_matrix("skewd", data, standardize=True)
@@ -1126,29 +1132,25 @@ def skewd(
             f"skewd needs at least {budget.folds} rows where both columns are observed, one for "
             f"each cross-validation fold, got {X.shape[0]}"
         )
-    workers = backend.worker_count()
-    with search_pool(workers) as run:
-        if workers > 1:
-            from concurrent.futures import ThreadPoolExecutor
-
-            with ThreadPoolExecutor(max_workers=2) as both:
-                ahead = both.submit(fit, x, y[:, 0], budget, seed, run)
-                back = both.submit(fit, y, x[:, 0], budget, seed, run)
-                forward, backward = ahead.result(), back.result()
-        else:
-            forward, backward = fit(x, y[:, 0], budget, seed), fit(y, x[:, 0], budget, seed)
-    if not (forward.converged and backward.converged):
-        warn_search_limit("skewd", "max_iter", max_iter, "ECM iterations")
-    extra = {
-        "log_likelihoods": {"forward": forward.log_likelihood, "backward": backward.log_likelihood},
-        **rows,
-    }
-    if criterion == "likelihood":
-        return likelihood_output(
-            forward.log_likelihood, backward.log_likelihood, labels=labels, extra=extra
-        )
-    stat_forward, log_p_forward = hsic_median_statistic_log_p(x[:, 0], forward.residual)
-    stat_backward, log_p_backward = hsic_median_statistic_log_p(y[:, 0], backward.residual)
+    # One BLAS thread: a threaded product rounds differently from a serial one, so the result
+    # would depend on the machine's thread count.
+    with one_blas_thread():
+        forward, backward = _skewd_directions(x, y, budget, seed)
+        if not (forward.converged and backward.converged):
+            warn_search_limit("skewd", "max_iter", max_iter, "ECM iterations")
+        extra = {
+            "log_likelihoods": {
+                "forward": forward.log_likelihood,
+                "backward": backward.log_likelihood,
+            },
+            **rows,
+        }
+        if criterion == "likelihood":
+            return likelihood_output(
+                forward.log_likelihood, backward.log_likelihood, labels=labels, extra=extra
+            )
+        stat_forward, log_p_forward = hsic_median_statistic_log_p(x[:, 0], forward.residual)
+        stat_backward, log_p_backward = hsic_median_statistic_log_p(y[:, 0], backward.residual)
     return pairwise_output(
         math.exp(log_p_forward),
         math.exp(log_p_backward),
@@ -1159,6 +1161,26 @@ def skewd(
         labels=labels,
         extra=extra,
     )
+
+
+def _skewd_directions(x: np.ndarray, y: np.ndarray, budget, seed: int):
+    """SkewD's fits of ``y`` on ``x`` and of ``x`` on ``y``, bit for bit the serial ones.
+
+    Both directions and their searches run on ``andrey.config(n_jobs)`` threads when it is above 1.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    from andrey.core import backend
+    from andrey.fcm.skewd import fit, search_pool
+
+    workers = backend.worker_count()
+    with search_pool(workers) as run:
+        if workers <= 1:
+            return fit(x, y[:, 0], budget, seed, run), fit(y, x[:, 0], budget, seed, run)
+        with ThreadPoolExecutor(max_workers=2) as both:
+            forward = both.submit(fit, x, y[:, 0], budget, seed, run)
+            backward = both.submit(fit, y, x[:, 0], budget, seed, run)
+            return forward.result(), backward.result()
 
 
 @method_spec("rcd")
