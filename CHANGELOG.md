@@ -56,9 +56,9 @@ names its pull request.
   even when dropped rows held every missing value. ([#1102])
 - `n_em_iterations` on the ten searches that take `missing="em"` (`ges`, `xges`, `hc`, `tabu`,
   `exact_search`, `boss`, `grasp`, `notears`, `dagma`, `calm`) sets the number of structural EM
-  rounds. The unchanged default is 10, as in Gao et al. (2022), preserving results without the
-  argument. The warning when the last round changes the graph names the argument; values other than
-  10 are not benchmarked. ([#1095])
+  rounds. The default stays 10, as in Gao et al. (2022), preserving results without the argument.
+  The warning when the last round changes the graph names the argument; values other than 10 are not
+  benchmarked. ([#1095])
 - `pc(missing="mvpc")` records the minimum and median row counts of corrected tests as
   `metadata["corrected_edges"]["rows_tested"]`, showing when the correction ran on few rows. The
   graph and the other metadata are unchanged. ([#1094])
@@ -114,16 +114,16 @@ names its pull request.
   units or sign only when rounding moves a value or a sorted column is symmetric about its mean. On
   data with missing values, a query below its test's row requirement, 4 for `"gcm"` and for `"wgcm"`
   with `variant="fix"`, 17 for `"wgcm"`'s default `variant="est"`, and 12 for `"pcm"`, is not
-  tested. Differences between the papers and authors' code were compared in reduced versions of the
-  papers' simulation designs: the wGCM weight is the fitted value, as in the authors' code, which
-  gave more power at the same level than the paper's sign of the fit; the fixed weights' multiplier
-  draws use the centered products, the PCM variance adds its shift to the fit's positive part, and
-  the PCM statistic's standard deviation divides by the row count, as in the papers, since the
-  code's choices gave no more power; the PCM's additive default regresses the fit of the response,
-  not its predictor's term, on the conditioning set, and fits the variance with half the mean fits'
-  basis functions, as in the authors' code; with both, its power was at or above that code's in
-  every setting measured in the paper's direction. A contributor's script compares all three,
-  including additive PCM, with the authors' code. ([#1147], [#1129], [#1162], [#1175])
+  tested. Where the papers and the authors' code differ, each choice was measured against the other
+  in reduced versions of the papers' simulation designs: the wGCM weight is the fitted value, as in
+  the authors' code, which gave more power at the same level than the paper's sign of the fit; the
+  fixed weights' multiplier draws use the centered products, the PCM variance adds its shift to the
+  fit's positive part, and the PCM statistic's standard deviation divides by the row count, as in
+  the papers, since the code's choices gave no more power; the PCM's additive default regresses the
+  fit of the response, not its predictor's term, on the conditioning set, and fits the variance with
+  half the mean fits' basis functions, as in the authors' code; with both, its power was at or above
+  that code's in every setting measured in the paper's direction. A contributor's script compares
+  all three, including additive PCM, with the authors' code. ([#1147], [#1129], [#1162], [#1175])
 - `target` takes a list of columns on `iamb`, `inter_iamb`, `mmpc`, and `icp`: one call returns one
   result per target in list order, each equal to a separate call. The three set learners use one
   search and test setup for all targets, and MMPC learns a variable's set once when two targets'
@@ -133,8 +133,8 @@ names its pull request.
   calls. `andrey run` takes the list as `'target=[a,b]'`, by header name or position, or as a list
   in `--config`; its envelope holds `multi: true` and `results`, one per target, and the
   `--help --json` schema types `target` as a string or a list of strings. `andrey run icp` names the
-  target and the parents by the header's column names, for single and list targets.
-  ([#1058], [#1153])
+  target and the parents by the header's column names, for single and list targets. ([#1058],
+  [#1153])
 
 ### Changed
 
@@ -153,7 +153,7 @@ names its pull request.
   datasets. ([#1161])
 - `cpcm` and `cpcm_graph` are supported: the pair test's forced direction and the graph search. On
   their paper's pairs (Tables 1 and 2 and model (16) with gamma > 0) and graphs of 4 to 8 variables,
-  they made as many errors as its published code, except the conservative estimate at gamma 0 under
+  they made as many errors as the paper's code, except the conservative estimate at gamma 0 under
   `"pareto"` (see the Pareto gap), and fewer than a coin flip, the majority direction, or the empty
   graph, except on Table 2's Pareto pairs drawn by the authors' generator, where neither did (see
   the PARg gap); on the first seeds no other measured method was both more accurate and faster by
@@ -217,10 +217,10 @@ names its pull request.
   and the source-code pages are not indexed; and the docs home, the example notebooks, the
   changelog, and the blog index have their own titles and descriptions. ([#1132])
 - `iamb` and `inter_iamb` order the candidates of each grow step by their p-values to nine
-  significant digits, avoiding the ties below 5e-10 from rounding to nine decimals and the resulting
-  choice by data-derived rank. On categorical data blankets for some targets can change, as can
-  graphs of `rsmax2` with `restrict="iamb"` or `"inter_iamb"`; results on continuous data do not
-  change. ([#969])
+  significant digits, where they compared p-values rounded to nine decimals, which tied every
+  p-value below 5e-10 and left the choice to a rank computed from the data. On categorical data
+  blankets for some targets can change, as can graphs of `rsmax2` with `restrict="iamb"` or
+  `"inter_iamb"`; results on continuous data do not change. ([#969])
 - The skeleton scans of `pc` and `fci` and the conditioning-set scans of the blanket learners build
   each chunk of conditioning sets as int-array rows from cached combination tables. Every output,
   `metadata["n_tests"]` included, is the same bit for bit. ([#1036], [#1042])
@@ -255,7 +255,7 @@ names its pull request.
   validity sentence for values missing completely at random, and the guide's text on `None` and on
   structural EM is corrected. ([#1102])
 - The docs name `normal_scores` among the partial-correlation tests that need more rows where their
-  variables are observed; the other tests need 2 rows. ([#1102])
+  variables are observed; they gave it the 2 rows of the other tests. ([#1102])
 - On data with missing values, a `fisherz` or `student_t` query gets the same statistic and p-value,
   bit for bit, alone or with other queries in any order, including on more than 8,192 rows.
   ([#1142])
