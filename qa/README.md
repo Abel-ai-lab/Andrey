@@ -63,7 +63,9 @@ difference and `--shuffle` on a difference beyond rounding:
   every possible-d-sep search sent to the worker pool.
 
 Method names select methods, as in `uv run python -m qa.identity PC GES --workers 4`, and `--seeds`
-sets the draws per dataset.
+sets the draws per dataset. SkewD and SkewD-MV run with the quality gate's search budget; their
+larger fits, two draws each, took 362 s (`lsnm_pair_n1500`, 161 and 201 s) and 712 s
+(`anm_er_n1000_d6`, 644 and 68 s) on one AMD EPYC 7713 core, on top of their gate datasets' draws.
 
 ## Profile
 

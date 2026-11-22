@@ -16,8 +16,9 @@ names its pull request.
   `"pareto"`, since the deviance is infinite at the edge of the support. ([#1165])
 - `skewd` decides by the likelihood by default (`criterion="likelihood"`), so a call without
   `criterion` returns the likelihood's direction, no `p_values` or `statistics`, and raises
-  `ValueError` when it passes `alpha`; pass `criterion="independence"` for the earlier default.
-  ([#1181])
+  `ValueError` when it passes `alpha`; pass `criterion="independence"` for the earlier default,
+  which the paper found more accurate on pairs whose marginals are not Gaussian (85% against 77%
+  over its 13 established pair benchmarks, 67% against 46% on the Tübingen pairs). ([#1181])
 
 ### Added
 

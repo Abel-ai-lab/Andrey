@@ -1008,11 +1008,13 @@ def skewd(
     as the paper says, and ``alpha`` acts as for :func:`~andrey.loci`. Both criteria read the same
     two fits, so they cost the same. ``"likelihood"`` favors accuracy on location-scale pairs: it
     was right on all 160 measured pairs, against 154 for ``"independence"``, which fell to 17 of 20
-    on Gaussian location-scale pairs; it gives up a p-value and assumes Gaussian marginals of the
-    standardized variables. ``"independence"`` favors robustness, which the paper finds across other
-    pair benchmarks [1]_, and gives a p-value, with an edge only at a chosen ``alpha``. Both
-    directions draw their random numbers from the same ``seed``, so swapping the columns swaps the
-    fits.
+    on Gaussian location-scale pairs; it gives up a p-value and accuracy on pairs whose marginals
+    are not Gaussian, as it assumes Gaussian marginals of the standardized variables: on the
+    paper's 13 established pair benchmarks the likelihood averaged 77% right against 85% for the
+    independence test, and 46% against 67% on the Tübingen pairs [1]_. ``"independence"`` favors
+    robustness across such benchmarks and gives a p-value, with an edge only at a chosen
+    ``alpha``. Both directions draw their random numbers from the same ``seed``, so swapping the
+    columns swaps the fits.
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits read only the rows
     where both columns are observed, which for a pair are the rows test-wise deletion keeps;

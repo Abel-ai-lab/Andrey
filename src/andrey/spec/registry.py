@@ -3254,10 +3254,11 @@ _add(
                 choices=("likelihood", "independence"),
                 doc="likelihood = the direction whose model has the larger likelihood (SkewD-LL); "
                 "right on all 160 measured pairs, no p-value, assumes Gaussian marginals of the "
-                "standardized variables. independence = an HSIC test of each direction's scaled "
+                "standardized variables: on the paper's 13 established pair benchmarks it "
+                "averaged 77% right against 85% for the independence test, 46% against 67% on "
+                "the Tübingen pairs. independence = an HSIC test of each direction's scaled "
                 "residual against its proposed cause decides (SkewD-IT); a p-value and alpha, "
-                "more robust across other pair benchmarks in the paper, right on 154 of the 160. "
-                "Both read the same fits.",
+                "right on 154 of the 160. Both read the same fits.",
             ),
             _TUNING_ITER,
             concept_param(
