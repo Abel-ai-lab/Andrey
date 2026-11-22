@@ -44,8 +44,9 @@ requested backend uses `auto`, without a warning.
 ## Parallel search
 
 - `ANDREY_N_JOBS`: the worker processes for GES and GFCI, and the worker threads for the two
-  directions of `pnl` and for the searches of `skewd` and `skewd_mv`. PC, FCI, GFCI, BOSS-FCI, GRaSP-FCI, CD-NOD, and RSMAX2 with `restrict="pc"`
-  also use the worker processes for their skeleton search with the `fisherz`, `student_t`,
+  directions of `pnl` and for the searches of `skewd` and `skewd_mv`. PC, FCI, GFCI, BOSS-FCI,
+  GRaSP-FCI, CD-NOD, and RSMAX2 with `restrict="pc"` also use the worker processes for their
+  skeleton search with the `fisherz`, `student_t`,
   `normal_scores`, and `rcot` tests on complete data, and send a conditioning-set size to them only
   when it has enough tests to repay them; with `rcot` the p-values are the same with any number of
   workers. FCI and GFCI also send each large possible-d-separation search to them with the
