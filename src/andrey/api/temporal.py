@@ -2315,15 +2315,15 @@ def rpcmci(
         The conditional-independence test behind every p-value, a partial-correlation test for
         linear effects: ``"student_t"`` takes the p-value from the Student-t distribution,
         ``"fisherz"`` from Fisher's z-transform and the normal distribution.
-        ``metadata["indep_test"]`` names it. ``"student_t"`` favors an exact level on Gaussian data
-        and a test that runs with one step fewer (``|S| + 3`` against ``|S| + 4`` for ``|S|``
-        conditions); it gives up agreement with the p-values of :func:`~andrey.pcmci`'s default,
-        ``"fisherz"``. ``"fisherz"`` favors that agreement; it gives up the exact level on a regime
-        with few steps. The two are nearly the same test: on Gaussian data with two conditions,
-        Fisher's z at ``alpha=0.01`` rejects a true independence with probability 1.13% at 20 steps,
-        1.05% at 50, and 1.02% at 100, calculated from the null distribution of the partial
-        correlation, against 1% for ``"student_t"``. Their effect on Regime-PCMCI's graphs was not
-        measured.
+        ``metadata["indep_test"]`` names it. ``"student_t"`` favors an exact level on independent
+        Gaussian rows and a test that runs with one row fewer (``|S| + 3`` against ``|S| + 4`` for
+        ``|S|`` conditions); it gives up agreement with the p-values of :func:`~andrey.pcmci`'s
+        default, ``"fisherz"``. ``"fisherz"`` favors that agreement; it gives up the exact level on
+        a test with few rows. The two are nearly the same test: on independent Gaussian rows with
+        two conditions, Fisher's z at ``alpha=0.01`` rejects a true independence with probability
+        1.13% on 20 rows, 1.05% on 50, and 1.02% on 100, calculated from the null distribution of
+        the partial correlation, against 1% for ``"student_t"``. Their effect on Regime-PCMCI's
+        graphs was not measured.
     n_starts : int, default=50
         The number of starts, at least ``1``, each from its own random regime assignment; the
         start with the lowest objective is returned.
