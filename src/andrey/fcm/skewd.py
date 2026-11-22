@@ -418,9 +418,10 @@ def _best(found: list[tuple[np.ndarray, float]]) -> tuple[np.ndarray, float]:
     return min(found, key=lambda f: f[1])
 
 
-#: Held around every scikit-learn call a search thread makes: scikit-learn and the penalty search
-#: change the warning filters with :func:`warnings.catch_warnings`, which saves and restores the
-#: filters of the whole process, so two such blocks in concurrent threads must not overlap.
+#: Held around every scikit-learn call that changes the warning filters on a thread that runs a
+#: fit (the spline bases, and the Gaussian process's fit and prediction): scikit-learn and the
+#: penalty search enter :func:`warnings.catch_warnings`, which saves and restores the filters of
+#: the whole process, so two such blocks in concurrent threads must not overlap.
 _FILTERS = threading.Lock()
 
 
