@@ -241,9 +241,9 @@ def iamb(
         to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
         had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
         missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
-        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors in
-        14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none. Not measured with this
-        method. See **Missing values.** in Notes.
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -566,9 +566,9 @@ def inter_iamb(
         to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
         had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
         missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
-        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors in
-        14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none. Not measured with this
-        method. See **Missing values.** in Notes.
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -888,9 +888,9 @@ def mmpc(
         to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
         had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
         missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
-        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors in
-        14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none. Not measured with this
-        method. See **Missing values.** in Notes.
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which

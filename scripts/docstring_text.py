@@ -201,7 +201,7 @@ SHARED = {
         "complete rows and had no complete row at 30% (complete data: 4.0; 0.11.0 release card). "
         "Where values are missing for a reason that other variables carry, on Erdos-Renyi graphs of "
         '10 to 100 variables with one observed parent per indicator, ``pc``\'s ``"mvpc"`` made fewer '
-        "errors in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none. Not "
+        "errors than test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none. Not "
         "measured with this method. See **Missing values.** in Notes.",
         lambda m: m in CONCEPTS["missing"].conforming and m != "fci",
     ),
@@ -219,7 +219,7 @@ SHARED = {
         "had no complete row at 30% (complete data: 28.0; 0.11.0 release card). Where values are "
         "missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100 "
         'variables with one observed parent per indicator, ``pc``\'s ``"mvpc"`` made fewer errors '
-        "in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none; not measured with "
+        "than test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none; not measured with "
         "FCI. See **Missing values.** in Notes.",
         lambda m: m == "fci" and m in CONCEPTS["missing"].conforming,
     ),

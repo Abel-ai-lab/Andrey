@@ -1765,18 +1765,20 @@ def lges(
     schedule : {"lges", "lges0_released"}, default="lges"
         The order of the search's phases (see Notes). ``"lges"`` is the paper's main method, LGES
         (its Algorithm 1): before each single edge addition it deletes, then reverses, edges until
-        neither improves the score, and it stops when no move improves it. ``"lges0_released"``
-        is the paper's LGES-0 (its Algorithm 8) in the phase order of the code published with the
+        neither improves the score, and it stops when no move improves it. ``"lges0_released"`` is
+        the paper's LGES-0 (its Algorithm 8) in the phase order of the code published with the
         paper: additions, then deletions, then reversals, each phase run once until no move improves
-        the score. ``"lges"`` is the default as the paper's main method. ``"lges"`` favors denser
-        graphs; it gives up time. ``"lges0_released"`` favors time; it gives up denser graphs. On
-        the simulation of ``insertion``, counting a schedule better in a setting and rule when its
-        mean error is lower and it is lower on more graphs than higher, LGES was better in 15 of 16
-        at mean degree 3 and 12 of 16 at mean degree 4, LGES-0 in 1 and 2. At mean degree 1 and 2
-        the two made about as many errors, 457 against 459 summed over the 32 settings and rules of
-        the mean errors, with LGES-0 better in 12, LGES in 5, and 15 ties. LGES rescans the
-        deletions and reversals after every addition: its median fit took 0.9 to 1.8 times as long
-        as LGES-0's (mean degree 2, 4, and 6).
+        the score. ``"lges"`` is the default as the paper's main method. ``"lges"`` favors accuracy
+        on denser graphs; it gives up time. ``"lges0_released"`` favors time; it gives up accuracy
+        on denser graphs. On the simulation of ``insertion``, counting a schedule better in a
+        setting and rule when its mean error is lower and it is lower on more graphs than higher,
+        LGES was better in 15 of 16 at mean degree 3 and 12 of 16 at mean degree 4, LGES-0 in 1
+        and 2. At mean degree 1 and 2 the two made about as many errors, 457 against 459 summed over
+        the 32 settings and rules of the mean errors, with LGES-0 better in 12, LGES in 5, and 15
+        ties. LGES rescans the deletions and reversals after every addition: its median fit took 0.9
+        to 1.8 times as long as LGES-0's (mean degree 2, 4, and 6); over every setting the ratio
+        reached 25, at mean degree 1 and 3, where the LGES fit ran first in its process and took
+        about 0.25 s more.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,

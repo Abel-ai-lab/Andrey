@@ -144,7 +144,7 @@ names its pull request.
 
 - Each option added or changed in this release states what each value favors and what it gives
   up, with the measured numbers and their setting, or "not measured": `lges`'s `schedule` and
-  `insertion`, `possibly_separable`, the `"wgcm"` `variant` and the `"gcm"` and `"wgcm"`
+  `insertion`, `possibly_separable`, the `"wgcm"` `variant`, the `"gcm"`, `"wgcm"`, and `"pcm"`
   `regression`, CPCM's forced direction and conservative estimate, the missing-value handlings,
   `degrees_of_freedom`, Regime-PCMCI's `fdr_method` and `indep_test`, and rsmax2's `restrict`. The
   API reference and the missing-values guide have "Choosing an option" tables. ([#1177])

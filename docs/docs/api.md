@@ -806,8 +806,8 @@ insertion rule counts as a setting of its own.
 
 | Option | Favors | Gives up | Measured |
 |---|---|---|---|
-| `schedule="lges"` (default) | Denser graphs | Time | Better in 15 of 16 settings at mean degree 3 and 12 of 16 at degree 4; fits took 0.9 to 1.8 times as long as LGES-0's |
-| `schedule="lges0_released"` | Time | Denser graphs | Better in 1 of 16 settings at mean degree 3; at mean degree 1 and 2 about as many errors as LGES (mean errors summed over 32 settings, 459 against 457), better in 12, LGES in 5, with 15 ties |
+| `schedule="lges"` (default) | Accuracy on denser graphs | Time | Better in 15 of 16 settings at mean degree 3 and 12 of 16 at degree 4; median fits took 0.9 to 1.8 times as long as LGES-0's (mean degree 2, 4, and 6), and up to 25 times as long over every setting, at mean degree 1 and 3, where the LGES fit ran first in its process and took about 0.25 s more |
+| `schedule="lges0_released"` | Time | Accuracy on denser graphs | Better in 1 of 16 settings at mean degree 3; at mean degree 1 and 2 about as many errors as LGES (mean errors summed over 32 settings, 459 against 457), better in 12, LGES in 5, with 15 ties |
 | `insertion="safe"` (default) | The paper's proof that the search recovers the true class as the rows grow | Accuracy | 9,029 errors over the 480 graphs of mean degree 1 to 3, under `schedule="lges"` |
 | `insertion="conservative"` | Fewer errors | That proof | 6,789 errors on those graphs; the lower mean error in 31 of 38 settings, the higher in 3 |
 
@@ -881,9 +881,9 @@ andrey.pc(data, indep_test="cmiknn_k5")
 ```
 
 Choosing a setting of `"gcm"` and `"wgcm"`, passed through `make_indep_test`, measured with boosted
-trees at 200 and 400 rows: the level over 12 null designs of the wGCM paper and of Shah and Peters,
-and power on the same 200 draws of each of the wGCM paper's 7 alternative cells, under the GCM's
-tuning:
+trees at 200 and 400 rows: the level over 12 null designs of the wGCM paper and of Shah and Peters
+and the time per query, both under the shipped tuning, and power on the same 200 draws of each of
+the wGCM paper's 7 alternative cells, under the GCM's tuning only:
 
 | Setting | Favors | Gives up | Measured |
 |---|---|---|---|
@@ -892,6 +892,17 @@ tuning:
 | `regression="boosting"` (default) | Nonlinear conditional means of several variables | Time: 51 boosted fits per regression in `"gcm"`, 281 in `"wgcm"` | Not measured against the other two |
 | `regression="linear"` | Time: one fit | The level, wherever a conditional mean is not linear | Not measured against the other two |
 | `regression="forest"` | Nonlinear conditional means without tuning | Time: 500 trees per regression | Not measured against the other two |
+
+Choosing the regression of `"pcm"`, on the paper's Section 6.1 null (seven conditioning variables)
+and Section 6.2 null (an interaction in the conditional means), 500 draws per cell, rejections of a
+true independence at 0.05:
+
+| Setting | Favors | Gives up | Measured |
+|---|---|---|---|
+| `regression="additive"` (default) | The level where the conditional means are additive | Interactions, and time as the rows grow | 0.4% of the 6.1 null at 250 rows and 0.2% at 500; 97.6% of the 6.2 null at 500 rows; about 7 s per query on nine columns at 250 rows, 29 s at 500, and 6 minutes at 1,000 |
+| `regression="forest"` | Interactions | The 6.1 null | 34.4% of the 6.2 null at 500 rows and 4.0% of 50 draws at 10,000; 99.9% of the 6.1 null at 250 rows and 97.3% at 500 |
+| `regression="boosting"` | Nonlinear conditional means of several variables | The 6.1 null | 97.7% of the 6.1 null at 250 rows |
+| `regression="linear"` | Time: one fit | The level, wherever a conditional mean is not linear | Not measured |
 
 {py:meth}`CMIknn.statistic <andrey.core.ci_cmiknn.CMIknn.statistic>` returns the conditional
 mutual information estimate the test's p-value is built on, a dependence measure of its own.

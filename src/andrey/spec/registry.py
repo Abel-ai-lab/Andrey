@@ -910,12 +910,15 @@ _add(
                 "then reversing edges until neither improves the score before each single "
                 "addition; lges0_released is its LGES-0 (Algorithm 8) in the order of the "
                 "authors' code: additions, deletions, then reversals, once. lges is the "
-                "default as the paper's main method. lges favors denser graphs and gives up "
-                "time (0.9 to 1.8 times as long); lges0_released favors time and gives up denser "
-                "graphs. On the paper's linear-Gaussian simulation lges was better in 15 of 16 "
-                "settings at mean degree 3; at mean degree 1 and 2 the two made about as many "
-                "errors (mean errors summed over 32 settings, 457 against 459), lges0_released "
-                "better in 12, lges in 5, with 15 ties.",
+                "default as the paper's main method. lges favors accuracy on denser graphs and "
+                "gives up time (its median fit took 0.9 to 1.8 times as long at mean degree 2, "
+                "4, and 6, and up to 25 times as long over every setting, at mean degree 1 and "
+                "3, where the LGES fit ran first in its process and took about 0.25 s more); "
+                "lges0_released favors time and gives up accuracy on denser graphs. On the "
+                "paper's linear-Gaussian simulation lges was better in 15 of 16 settings at "
+                "mean degree 3; at mean degree 1 and 2 the two made about as many errors (mean "
+                "errors summed over 32 settings, 457 against 459), lges0_released better in "
+                "12, lges in 5, with 15 ties.",
             ),
             _CATEGORICAL,
         ),

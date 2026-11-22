@@ -168,13 +168,13 @@ def pc(
         variables carry; it gives up every test but those two and, where an indicator has many weak
         parents or parents with missing values, accuracy on large graphs. On Erdos-Renyi graphs of
         10 to 100 variables (mean degree 2 or 4; 500 to 10,000 rows; 10 to 30% missing), with one
-        observed parent per indicator, ``"mvpc"`` had fewer errors in 14 of 72 settings at
-        ``alpha=0.01`` and 28 at the default 0.05, and more in none. Over both levels together (144
-        settings), it tied in 136 with values missing completely at random; it was behind in 12 of
-        the 141 judged with many weak parents per indicator (3 again on fresh seeds) and, with one
-        parent that has missing values itself, ahead in 12 of 144 and behind in 24 (9 again); the
-        repeated ones all had 50 or 100 variables and 20 or 30% missing (see Limitations). See
-        **Missing values.** in Notes.
+        observed parent per indicator, ``"mvpc"`` had fewer errors than ``"testwise"`` in 14 of 72
+        settings at ``alpha=0.01`` and 28 at the default 0.05, and more in none. Over both levels
+        together (144 settings), it tied in 136 with values missing completely at random; it was
+        behind in 12 of the 141 judged with many weak parents per indicator (3 again on fresh seeds)
+        and, with one parent that has missing values itself, ahead in 12 of 144 and behind in 24 (9
+        again); the repeated ones all had 50 or 100 variables and 20 or 30% missing (see
+        Limitations). See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -767,12 +767,12 @@ def fci(
         collider pass before the possible-d-separation step reads it too, so that step's sets, the
         skeleton, and ``metadata["not_tested"]`` can change.
         ``"orient"`` favors arrowheads and accuracy; it gives up protection from false colliders.
-        ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them. On
-        merged cohorts of three graph sizes, with about 29 to 76 true edges, that no row bridges (20
-        seeds each, conditioning sets of up to 3), ``"ambiguous"`` took FCI's false colliders per
-        fit from 21.5-165.4 to at most 0.1 and the share of true arrowheads it found from 0.61-0.81
-        to 0, and raised its errors by 0.5 to 4.4, still fewer than the empty graph's in 6 of 6
-        settings; on bridged cohorts and complete data the two gave the same graphs.
+        ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them, and
+        accuracy. On merged cohorts of three graph sizes, with about 29 to 76 true edges, that no
+        row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took FCI's false
+        colliders per fit from 21.5-165.4 to at most 0.1 and the share of true arrowheads it found
+        from 0.61-0.81 to 0, and raised its errors by 0.5 to 4.4, still fewer than the empty graph's
+        in 6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -790,9 +790,9 @@ def fci(
         dropping the incomplete rows made 32.5 and 42.0 on 124 and 10 complete rows and had no
         complete row at 30% (complete data: 28.0; 0.11.0 release card). Where values are missing for
         a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100 variables with one
-        observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors in 14 of 72 settings at
-        ``alpha=0.01`` and 28 at 0.05, and more in none; not measured with FCI. See **Missing
-        values.** in Notes.
+        observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than test-wise deletion
+        in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none; not measured with
+        FCI. See **Missing values.** in Notes.
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of FCI's possible-d-separation step [2]_ [3]_, which removes edges the first step
         kept, one at a time, so each removal changes what the step tests after it.
@@ -1692,9 +1692,9 @@ def cdnod(
         to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
         had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
         missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
-        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors in
-        14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none. Not measured with this
-        method. See **Missing values.** in Notes.
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
     dependence_threshold : float or None, default=None
         Runs the independent-change step at this threshold, in ``(0, 1)``, on its module
         dependence measure: two modules, the distributions of a candidate cause and of its effect
@@ -2134,9 +2134,9 @@ def fci_jci(
         to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
         had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
         missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
-        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors in
-        14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none. Not measured with this
-        method. See **Missing values.** in Notes.
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of the possible-d-separation step, as for :func:`~andrey.fci`: ``"order_free"``
         visits the pairs and nodes by a rank computed from the data, and ``"fast"`` in column
