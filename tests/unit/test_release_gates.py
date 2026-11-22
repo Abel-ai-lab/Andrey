@@ -11,6 +11,7 @@ import subprocess
 import tarfile
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -167,7 +168,23 @@ def _evaluate(condition: str, needs: str | list[str], **context: dict) -> bool:
 def test_the_quality_gate_runs_on_pull_requests_into_main():
     triggers = _workflow("quality-gate.yml")["on"]
     assert triggers["pull_request"]["branches"] == ["main"]
-    assert "workflow_call" in triggers
+    assert set(triggers) == {"pull_request", "workflow_dispatch", "workflow_call"}
+
+
+@pytest.mark.parametrize(
+    ("event", "base", "marks"),
+    [
+        ("pull_request", "release/0.19.0", "not release"),
+        ("pull_request", "lcd", "not release"),
+        ("pull_request", "main", ""),  # the release pull request runs every test
+        ("push", "", ""),
+        ("workflow_dispatch", "", ""),
+    ],
+)
+def test_only_pull_requests_outside_main_deselect_the_release_tests(event, base, marks):
+    condition = _workflow("ci.yml")["env"]["TEST_MARKS"]
+    github = SimpleNamespace(event_name=event, base_ref=base)
+    assert _evaluate(condition, [], github=github) == marks
 
 
 def test_the_publish_gate_runs_unless_the_lookup_found_a_run():

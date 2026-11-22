@@ -36,6 +36,7 @@ from andrey.spec.concepts import (
 )
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.ci_tests import PValueOnly
+from tests.release import release_cases
 from tests.unit.methods import REQUIRED, SHORT, domains, environments, results
 
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
@@ -648,12 +649,15 @@ def test_every_behavior_has_an_observation():
 
 @pytest.mark.parametrize(
     ("concept", "method"),
-    [
-        pytest.param(c, m, id=f"{c.key}-{m}")
-        for c in BEHAVIORS
-        for m in REGISTRY
-        if m in c.suitable or c.deviation(m) or c.key == "env"
-    ],
+    release_cases(
+        [
+            pytest.param(c, m, id=f"{c.key}-{m}")
+            for c in BEHAVIORS
+            for m in REGISTRY
+            if m in c.suitable or c.deviation(m) or c.key == "env"
+        ],
+        {"units-skewd", "units-skewd_mv"},
+    ),
 )
 def test_behavior_cell(concept, method):
     observe, expected = OBSERVE[concept.key]

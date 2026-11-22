@@ -15,6 +15,7 @@ import pytest
 import andrey
 from andrey.api._adapt import dag_from_adjacency
 from andrey.metrics import shd, to_cpdag
+from tests.release import release_cases
 
 # 0 -> 1, 0 -> 2, 1 -> 3, 2 -> 4, with weights of both signs.
 TREE = {(0, 1): 1.2, (0, 2): -0.9, (1, 3): 1.0, (2, 4): 0.8}
@@ -27,6 +28,12 @@ FITS = {
 # The robust DAGMA fits below repeat a five-stage central path; fewer steps keep the test short.
 QUICK = {"notears": {}, "dagma": {"warm_iter": 3000, "max_iter": 6000}}
 NAMES = list(FITS)
+#: Each method with and without ``robust``; robust NOTEARS takes about a minute a fit pair.
+ROBUST_CASES = release_cases(
+    [(name, robust) for name in NAMES for robust in (False, True)],
+    {"notears-True"},
+    id=lambda case: f"{case[0]}-{case[1]}",
+)
 
 
 def _sample(
@@ -174,16 +181,14 @@ def test_standardize_makes_the_fit_independent_of_the_units(name, tree) -> None:
 # ---- determinism and column order ----------------------------------------------------------------
 
 
-@pytest.mark.parametrize("robust", [False, True])
-@pytest.mark.parametrize("name", NAMES)
+@pytest.mark.parametrize(("name", "robust"), ROBUST_CASES)
 def test_a_repeated_fit_is_identical(name, robust, chain) -> None:
     first = _quick_fit(name, chain, robust=robust)
     second = _quick_fit(name, chain, robust=robust)
     np.testing.assert_array_equal(first.weighted_adjacency, second.weighted_adjacency)
 
 
-@pytest.mark.parametrize("robust", [False, True])
-@pytest.mark.parametrize("name", NAMES)
+@pytest.mark.parametrize(("name", "robust"), ROBUST_CASES)
 def test_reordering_the_columns_only_reorders_the_weights(name, robust, chain) -> None:
     """The columns are fit in the order of their ranks, so the order they arrive in is lost."""
     order = np.array([2, 0, 1])
