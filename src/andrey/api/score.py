@@ -339,10 +339,10 @@ def ges(
     each label as a category. It assumes no hidden common cause; :func:`~andrey.gfci` allows them.
 
     **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``. The
-    score sums one term per variable over every row; terms over different rows cannot score one
-    dataset, so the search cannot delete rows per test as conditional-independence searches do.
-    ``missing="em"`` runs structural EM [11]_ [12]_ with the linear-Gaussian BIC, which reads the
-    data only through their covariance: under a linear-Gaussian model of the current graph, each
+    score sums one term per variable over every row; terms over different rows do not sum to one
+    dataset's score, so the search cannot delete rows per test as conditional-independence searches
+    do. ``missing="em"`` runs structural EM [11]_ [12]_ with the linear-Gaussian BIC, which reads
+    the data only through their covariance: under a linear-Gaussian model of the current graph, each
     row's missing values are Gaussian given its observed ones, and their conditional means and
     covariances give the expected covariance of the data (the E-step); the search runs on it over
     every row, with all of its settings, and the model's coefficients and noise variances are fit
@@ -366,9 +366,9 @@ def ges(
     the result on the last round's expected covariance. EM holds when values are missing completely
     at random or at random given observed values; when missingness depends on the missing values
     themselves, the expected covariance is biased, and the data cannot show it. On complete data,
-    ``"em"`` gives the complete-data result.
-    Without ``"em"``, drop the incomplete rows yourself, which suits values missing completely at
-    random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows yourself,
+    which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
     ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
@@ -639,10 +639,10 @@ def ages(
     the parents.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score sums one term per
-    variable over every row; terms over different rows cannot score one dataset, so the search
-    cannot delete rows per test as conditional-independence searches do.
-    Drop the incomplete rows yourself, which suits values missing completely at random, or use
-    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    variable over every row; terms over different rows do not sum to one dataset's score, so the
+    search cannot delete rows per test as conditional-independence searches do. Drop the incomplete
+    rows yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on the paper's simulation at 10 variables only: 23 settings of strong
     and weak edges with 100, 1,000, and 10,000 rows, 20 datasets each. The paper's 100-variable
@@ -930,10 +930,10 @@ def gies(
     edges).
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score sums one term per
-    variable over every row; terms over different rows cannot score one dataset, so the search
-    cannot delete rows per test as conditional-independence searches do.
-    Drop the incomplete rows yourself, which suits values missing completely at random, or use
-    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    variable over every row; terms over different rows do not sum to one dataset's score, so the
+    search cannot delete rows per test as conditional-independence searches do. Drop the incomplete
+    rows yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured at the standard BIC (``ebic_gamma=0.0``) on simulated linear-Gaussian
     data from Erdos-Renyi graphs with single-variable interventions on 40% of the variables, the
@@ -1213,10 +1213,10 @@ def gnies(
     own: that rescales the noise variances the method reads, and changes the result.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score sums one term per
-    variable over every row; terms over different rows cannot score one dataset, so the search
-    cannot delete rows per test as conditional-independence searches do.
-    Drop the incomplete rows yourself, which suits values missing completely at random, or use
-    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    variable over every row; terms over different rows do not sum to one dataset's score, so the
+    search cannot delete rows per test as conditional-independence searches do. Drop the incomplete
+    rows yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured with the targets unknown on simulated data from the model above:
     Erdos-Renyi graphs of 10 variables at mean degree 2.7 or 4, two to ten environments with 10 to
@@ -1536,10 +1536,10 @@ def xges(
     edges).
 
     **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``. The
-    score sums one term per variable over every row; terms over different rows cannot score one
-    dataset, so the search cannot delete rows per test as conditional-independence searches do.
-    ``missing="em"``, experimental, runs structural EM [5]_ [6]_ with the linear-Gaussian BIC, which
-    reads the data only through their covariance: under a linear-Gaussian model of the current
+    score sums one term per variable over every row; terms over different rows do not sum to one
+    dataset's score, so the search cannot delete rows per test as conditional-independence searches
+    do. ``missing="em"``, experimental, runs structural EM [5]_ [6]_ with the linear-Gaussian BIC,
+    which reads the data only through their covariance: under a linear-Gaussian model of the current
     graph, each row's missing values are Gaussian given its observed ones, and their conditional
     means and covariances give the expected covariance of the data (the E-step); the search runs on
     it over every row, with all of its settings, and the model's coefficients and noise variances
@@ -1563,9 +1563,9 @@ def xges(
     ``metadata["score"]`` is the score of the result on the last round's expected covariance. EM
     holds when values are missing completely at random or at random given observed values; when
     missingness depends on the missing values themselves, the expected covariance is biased, and the
-    data cannot show it. On complete data, ``"em"`` gives the complete-data result.
-    Without ``"em"``, drop the incomplete rows yourself, which suits values missing completely at
-    random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    data cannot show it. On complete data, ``"em"`` gives the complete-data result. Without
+    ``"em"``, drop the incomplete rows yourself, which suits values missing completely at random, or
+    use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
     ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4
@@ -1874,10 +1874,10 @@ def lges(
     ``ebic_gamma=1.0``, so the two searches score the same data differently unless it is set.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score sums one term per
-    variable over every row; terms over different rows cannot score one dataset, so the search
-    cannot delete rows per test as conditional-independence searches do.
-    Drop the incomplete rows yourself, which suits values missing completely at random, or use
-    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    variable over every row; terms over different rows do not sum to one dataset's score, so the
+    search cannot delete rows per test as conditional-independence searches do. Drop the incomplete
+    rows yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Not benchmarked yet. Its tests run it on up to 20 variables with 5,000 rows.
     With the linear-Gaussian BIC, ``"lges0_released"`` was compared with the authors' code on the
@@ -2203,36 +2203,36 @@ def hc(
     moves that do not improve the score, can leave it in one run.
 
     **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``. The
-    score sums one term per variable over every row; terms over different rows cannot score one
-    dataset, so the search cannot delete rows per test as conditional-independence searches do.
-    ``missing="em"`` runs structural EM [7]_ [8]_ with the linear-Gaussian BIC, which reads the data
-    only through their covariance: under a linear-Gaussian model of the current graph, each row's
-    missing values are Gaussian given its observed ones, and their conditional means and covariances
-    give the expected covariance of the data (the E-step); the search runs on it over every row,
-    with all of its settings, and the model's coefficients and noise variances are fit again by
-    least squares on a DAG of the graph it returns (the M-step). A row with no observed value is
-    dropped first because it holds no model information. It runs ``n_em_iterations`` rounds, by
-    default the 10 that Gao et al. [8]_ run, from no edges and each column's mean and variance over
-    its observed values, and it alternates as Friedman [7]_ describes: before each search after the
-    first, 5 parameter steps refit the current graph's coefficients and noise variances, each on the
-    expected covariance under the step before it. Friedman [7]_ leaves the number of parameter steps
-    open. The first search reads the expected covariance under the edgeless model, which shrinks
-    every covariance toward zero. Measured with ``ges``, ``boss``, and ``grasp`` at 2,000 rows, the
-    first search returned many extra edges; with one refit per round, later rounds removed them
-    slowly and graphs kept changing after 10 rounds; with 5 parameter steps, most fits settled
-    within them. ``metadata["em"]`` records ``iterations``, the rounds; ``parameter_steps``, the
-    parameter steps before each search after the first; ``log_likelihood``, the observed-data
-    log-likelihood of the model after each round, which can fall in a round that changes the graph;
-    and ``graph_changed``, whether the graph changed from the previous round. A graph change in the
-    last round means EM has not settled, more commonly with few rows, and triggers a warning naming
-    ``n_em_iterations``: more rounds stabilize some graphs, while others keep changing; values other
-    than 10 are not benchmarked. ``metadata["score"]`` is the score of the result on the last
-    round's expected covariance. EM holds when values are missing completely at random or at random
-    given observed values; when missingness depends on the missing values themselves, the expected
-    covariance is biased, and the data cannot show it. On complete data, ``"em"`` gives the
-    complete-data result.
-    Without ``"em"``, drop the incomplete rows yourself, which suits values missing completely at
-    random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    score sums one term per variable over every row; terms over different rows do not sum to one
+    dataset's score, so the search cannot delete rows per test as conditional-independence searches
+    do. ``missing="em"`` runs structural EM [7]_ [8]_ with the linear-Gaussian BIC, which reads the
+    data only through their covariance: under a linear-Gaussian model of the current graph, each
+    row's missing values are Gaussian given its observed ones, and their conditional means and
+    covariances give the expected covariance of the data (the E-step); the search runs on it over
+    every row, with all of its settings, and the model's coefficients and noise variances are fit
+    again by least squares on a DAG of the graph it returns (the M-step). A row with no observed
+    value is dropped first because it holds no model information. It runs ``n_em_iterations``
+    rounds, by default the 10 that Gao et al. [8]_ run, from no edges and each column's mean and
+    variance over its observed values, and it alternates as Friedman [7]_ describes: before each
+    search after the first, 5 parameter steps refit the current graph's coefficients and noise
+    variances, each on the expected covariance under the step before it. Friedman [7]_ leaves the
+    number of parameter steps open. The first search reads the expected covariance under the
+    edgeless model, which shrinks every covariance toward zero. Measured with ``ges``, ``boss``, and
+    ``grasp`` at 2,000 rows, the first search returned many extra edges; with one refit per round,
+    later rounds removed them slowly and graphs kept changing after 10 rounds; with 5 parameter
+    steps, most fits settled within them. ``metadata["em"]`` records ``iterations``, the rounds;
+    ``parameter_steps``, the parameter steps before each search after the first; ``log_likelihood``,
+    the observed-data log-likelihood of the model after each round, which can fall in a round that
+    changes the graph; and ``graph_changed``, whether the graph changed from the previous round. A
+    graph change in the last round means EM has not settled, more commonly with few rows, and
+    triggers a warning naming ``n_em_iterations``: more rounds stabilize some graphs, while others
+    keep changing; values other than 10 are not benchmarked. ``metadata["score"]`` is the score of
+    the result on the last round's expected covariance. EM holds when values are missing completely
+    at random or at random given observed values; when missingness depends on the missing values
+    themselves, the expected covariance is biased, and the data cannot show it. On complete data,
+    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows yourself,
+    which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
     ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
@@ -2621,9 +2621,9 @@ def tabu(
     each label as a category. It assumes no hidden common cause; :func:`~andrey.gfci` allows them.
 
     **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``. The
-    score sums one term per variable over every row; terms over different rows cannot score one
-    dataset, so the search cannot delete rows per test as conditional-independence searches do.
-    ``missing="em"`` runs structural EM [9]_ [10]_ with the linear-Gaussian BIC, which reads the
+    score sums one term per variable over every row; terms over different rows do not sum to one
+    dataset's score, so the search cannot delete rows per test as conditional-independence searches
+    do. ``missing="em"`` runs structural EM [9]_ [10]_ with the linear-Gaussian BIC, which reads the
     data only through their covariance: under a linear-Gaussian model of the current graph, each
     row's missing values are Gaussian given its observed ones, and their conditional means and
     covariances give the expected covariance of the data (the E-step); the search runs on it over
@@ -2648,9 +2648,9 @@ def tabu(
     the result on the last round's expected covariance. EM holds when values are missing completely
     at random or at random given observed values; when missingness depends on the missing values
     themselves, the expected covariance is biased, and the data cannot show it. On complete data,
-    ``"em"`` gives the complete-data result.
-    Without ``"em"``, drop the incomplete rows yourself, which suits values missing completely at
-    random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows yourself,
+    which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
     ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
@@ -2961,10 +2961,10 @@ def exact_search(
     measured.
 
     **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``. The
-    score sums one term per variable over every row; terms over different rows cannot score one
-    dataset, so the search cannot delete rows per test as conditional-independence searches do.
-    ``missing="em"``, experimental, runs structural EM [8]_ [9]_ with the linear-Gaussian BIC, which
-    reads the data only through their covariance: under a linear-Gaussian model of the current
+    score sums one term per variable over every row; terms over different rows do not sum to one
+    dataset's score, so the search cannot delete rows per test as conditional-independence searches
+    do. ``missing="em"``, experimental, runs structural EM [8]_ [9]_ with the linear-Gaussian BIC,
+    which reads the data only through their covariance: under a linear-Gaussian model of the current
     graph, each row's missing values are Gaussian given its observed ones, and their conditional
     means and covariances give the expected covariance of the data (the E-step); the search runs on
     it over every row, with all of its settings, and the model's coefficients and noise variances
@@ -2986,10 +2986,10 @@ def exact_search(
     commonly with few rows, and triggers a warning naming ``n_em_iterations``: more rounds stabilize
     some graphs, while others keep changing; values other than 10 are not benchmarked. EM holds when
     values are missing completely at random or at random given observed values; when missingness
-    depends on the missing values themselves, the expected covariance is biased,
-    and the data cannot show it. On complete data, ``"em"`` gives the complete-data result. Without
-    ``"em"``, drop the incomplete rows yourself, which suits values missing completely at random, or
-    use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    depends on the missing values themselves, the expected covariance is biased, and the data cannot
+    show it. On complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the
+    incomplete rows yourself, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for ``ebic_gamma=0.0``. Measured on
     simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores with a cap of 1 h and 28 GB

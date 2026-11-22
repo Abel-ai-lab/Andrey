@@ -667,16 +667,16 @@ def pcmci(
     ``metadata["not_tested"]`` counts the conditioning sets not tested. A link no tested query could
     decide, as one between variables never observed together, is undecided: it is left out of the
     graph, has no p-value (``NaN``), and is listed in ``metadata["undecided_pairs"]``, and no test
-    conditions on a lagged parent without a tested result. A test conditions on candidates,
-    strongest first, only while enough rows remain, excluding combinations no row observes together.
-    A drawn link an untested conditioning set might have separated, one a test left a candidate out
-    of or one with an end an undecided link joins, is listed in ``metadata["possibly_separable"]``:
-    a flag of untested conditions, not evidence of a false link. A continuous column constant on a
-    test's rows raises ``ValueError``. The categorical, mixed-data, and nonlinear
-    tests delete rows the same way. Test-wise deletion is valid when values are missing completely
-    at random, which means that whether a value is missing depends on no value in the data; the rows
-    a test reads are then a random sample of all rows, and otherwise they are a selected sample that
-    more rows do not correct.
+    conditions on a lagged parent without a tested result. A test conditions only on the candidates,
+    strongest first, that leave enough rows for the test, so its rows do not mix variables no row
+    observes together. A drawn link an untested conditioning set might have separated, one a test
+    left a candidate out of or one with an end an undecided link joins, is listed in
+    ``metadata["possibly_separable"]``: a flag of untested conditions, not evidence of a false link.
+    A continuous column constant on a test's rows raises ``ValueError``. The categorical,
+    mixed-data, and nonlinear tests delete rows the same way. Test-wise deletion is valid when
+    values are missing completely at random, which means that whether a value is missing depends on
+    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
+    they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured with ``fdr_method="none"`` on simulated linear-Gaussian time series
     with lagged links, of ``max(1000, 8 * (d + 1))`` time steps for ``d`` variables and of five
@@ -1060,12 +1060,12 @@ def pcmciplus(
     ``metadata["not_tested"]`` counts the conditioning sets not tested. A link no tested query could
     decide, as one between variables never observed together, is undecided: it is left out of the
     graph, has no p-value (``NaN``), and is listed in ``metadata["undecided_pairs"]``, and no test
-    conditions on a lagged parent without a tested result. A test conditions on candidates,
-    strongest first, only while enough rows remain, excluding combinations no row observes together.
-    A drawn link an untested conditioning set might have separated, one a test left a candidate out
-    of or one with an end an undecided link joins, is listed in ``metadata["possibly_separable"]``:
-    a flag of untested conditions, not evidence of a false link; under
-    ``possibly_separable="ambiguous"``, no collider vote reads a triple with a flagged side. A
+    conditions on a lagged parent without a tested result. A test conditions only on the candidates,
+    strongest first, that leave enough rows for the test, so its rows do not mix variables no row
+    observes together. A drawn link an untested conditioning set might have separated, one a test
+    left a candidate out of or one with an end an undecided link joins, is listed in
+    ``metadata["possibly_separable"]``: a flag of untested conditions, not evidence of a false link;
+    under ``possibly_separable="ambiguous"``, no collider vote reads a triple with a flagged side. A
     continuous column constant on a test's rows raises ``ValueError``. The categorical, mixed-data,
     and nonlinear tests delete rows the same way. Test-wise deletion is valid when values are
     missing completely at random, which means that whether a value is missing depends on no value in

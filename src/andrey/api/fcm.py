@@ -1293,10 +1293,11 @@ def das(
     the result does not depend on the columns' units; on raw columns whose variance grows along the
     causal order, code that reads the units can order more edges correctly, and there the code
     published with the paper made fewer errors on sparse graphs (19 against 28 at 50 variables). The
-    paper used raw columns, likely explaining DAS's higher errors on some sparse graphs; on dense
-    graphs of 500 variables, the higher errors remain unexplained and units are not ruled out: on
-    z-scored columns the code published with the paper is above the paper's limit there as well. The
-    `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#das>`_ has the numbers.
+    paper used raw columns, the likely reason DAS's errors are above the paper's on sparse graphs;
+    on dense graphs of 500 variables they are above it too, a gap not traced, where units are not
+    ruled out: on z-scored columns the code published with the paper is above the paper's limit
+    there as well. The `0.19.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#das>`_ has the numbers.
     Its SCORE causal order has the limits stated by :func:`~andrey.score_matching`: where links have
     a strong linear part, it did no better than a random order. The leaf rule is exact only for
     Gaussian noise; :func:`~andrey.nogam` and :func:`~andrey.resit` drop that assumption. Neither an
@@ -1304,9 +1305,9 @@ def das(
     reference's can be recovered by pruning. Each step factors a matrix with one row and one column
     per sample, so the order search's time grows with the cube of ``n_samples`` and its memory with
     the square. Binary columns, and any column with fewer than 3 distinct values, are not supported:
-    the pruning fits a smooth term of each parent, and such a
-    column raises ``ValueError`` before the fit. The numbers are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    the pruning fits a smooth term of each parent, and such a column raises ``ValueError`` before
+    the fit. The numbers are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------

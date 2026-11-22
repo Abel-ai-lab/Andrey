@@ -52,8 +52,8 @@ def _listed(names: Sequence[str]) -> str:
 
 #: The next steps offered when missing values are refused: for a table of independent rows,
 #: ``{name}`` the data's argument; for one time series, which cannot drop a step; for a panel; and
-#: for several datasets read with their contexts, which no other method does. The caller drops rows
-#: under the same conditions as test-wise deletion.
+#: for several datasets read with their contexts, which no other method does. Dropping rows is the
+#: caller's own step, valid when test-wise deletion is.
 DROP_ROWS = (
     "drop the rows of {name} that hold a missing value yourself (for a DataFrame, "
     "{name}.dropna()), with the same rows of every argument that has one entry per row, which "
