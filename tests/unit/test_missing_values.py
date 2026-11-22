@@ -581,6 +581,18 @@ def test_testwise_is_the_default_handling_and_the_fit_records_it(name):
     assert complete.structure == _fit(name, _continuous(400)).structure
 
 
+def test_skewd_repeats_on_missing_values_and_records_its_handling():
+    """SkewD on gapped data, on fewer rows than the registry-wide cases: the fit repeats and
+    records the default handling and the rows each test reads."""
+    x = _gaps(_continuous(60), 0.1)
+    first, again = _fit("skewd", x), _fit("skewd", x)
+    assert first.structure == again.structure
+    assert first.metadata == again.metadata
+    assert first.metadata["missing"] == "testwise"
+    rows = first.metadata["rows_tested"]
+    assert 0 < rows["min"] <= rows["median"] <= len(x)
+
+
 @pytest.mark.parametrize("name", SUPPORTED)
 def test_a_handling_the_method_does_not_list_raises_naming_the_argument(name):
     with pytest.raises(ValueError, match=rf"^{name}: missing must be one of 'testwise'.*'em'"):
