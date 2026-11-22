@@ -402,12 +402,13 @@ def test_counting_records_each_outermost_query_and_restores_the_methods(x: np.nd
     test = make_indep_test("fisherz", x)
     original = ci.PartialCorrelationTest.__dict__["batched_call"]
     with identity.counting(alpha=0.05) as counts:
-        test(0, 2, (1,))
+        test(0, 2, (1,))  # one query, though it calls statistic_pvalue
+        test.statistic_pvalue(0, 3, (1,))
         test.batched_call(0, 2, iter([(), (1, 3)]))
         test.first_order_pvalues(0, 1, [2, 3])
         test._canonical_pvalues(np.array([0, 2]), np.array([3, 3]), np.array([[1, 2], [0, 1]]))
     assert ci.PartialCorrelationTest.__dict__["batched_call"] is original
-    assert counts.summary()["ci_queries"] == 7
+    assert counts.summary()["ci_queries"] == 8
     assert counts.summary()["ci_sets"] == {"0": 1, "1": 3, "2": 3}
 
 

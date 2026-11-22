@@ -16,6 +16,10 @@ benchmarks/uv.lock
 # The R package library benchmarks/start_r.sh builds for the R lane, beside the venv.
 benchmarks/.r-lib-bench/
 benchmarks/.r-lib-regression-ci/
+benchmarks/.r-lib-regression-ci-wgcm/
+# The PCM authors' code that benchmarks/start_regression_ci_r.sh fetches, read from disk and never
+# committed.
+benchmarks/.pcm-code/
 # The authors' RESIT code that benchmarks/start_resit_r.sh fetches, read from disk and never committed.
 benchmarks/.resit-r/
 # The authors' CPCM code that benchmarks/start_cpcm.sh fetches, read from disk and never committed.
