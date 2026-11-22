@@ -11,13 +11,13 @@ so both sides test the same numbers. PCM is compared in its paper's direction, t
 - end to end: each side with its own regressions (boosted trees, random forests, or the PCM's
   additive models), the sample splits shared, so a difference comes from the regressions.
 
-    ANDREY_BENCH_RSCRIPT=Rscript PCM_CODE=<clone of the PCM authors' code> \\
+    ANDREY_BENCH_RSCRIPT=Rscript ANDREY_BENCH_PCM_CODE=<clone of the PCM authors' code> \\
         uv run python benchmarks/regression_ci_agreement.py <empty folder>
 
 `benchmarks/start_regression_ci_r.sh` builds the two R libraries the reference needs, read from
 `ANDREY_BENCH_R_LIBS` (GCM and PCM) and `ANDREY_BENCH_R_LIBS_WGCM` (wGCM) when they are set, and
-clones the PCM authors' code, printing its `PCM_CODE`. The script prints one Markdown table per
-test.
+clones the PCM authors' code, printing its `ANDREY_BENCH_PCM_CODE`. The script prints one
+Markdown table per test.
 """
 
 from __future__ import annotations

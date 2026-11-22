@@ -293,7 +293,9 @@ names its pull request.
 - For contributors, `qa/identity.py` counts the partial-correlation tests' `statistic_pvalue` as a
   query, so the query counts of IAMB, Inter-IAMB, and CALM no longer depend on which path answered
   them, and `benchmarks/start_regression_ci_r.sh` clones the PCM authors' code into
-  `benchmarks/.pcm-code` when no folder is given, so `benchmarks/run_tests.sh` builds it. ([#1179])
+  `benchmarks/.pcm-code` when no folder is given, so `benchmarks/run_tests.sh` builds it. The
+  agreement script reads that folder from `ANDREY_BENCH_PCM_CODE`, which replaces `PCM_CODE`.
+  ([#1179])
 
 ## [0.18.0] - 2026-11-19
 
