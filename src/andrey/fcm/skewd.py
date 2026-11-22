@@ -137,14 +137,15 @@ def _difference_penalty(columns: int) -> np.ndarray:
 
 def _design(parents: np.ndarray, knots: int) -> _Design:
     def basis(n_knots: int) -> np.ndarray:
-        return np.hstack(
-            [
-                SplineTransformer(
-                    n_knots=n_knots, degree=DEGREE, extrapolation="linear"
-                ).fit_transform(parents[:, [t]])
-                for t in range(parents.shape[1])
-            ]
-        )
+        with _FILTERS:
+            return np.hstack(
+                [
+                    SplineTransformer(
+                        n_knots=n_knots, degree=DEGREE, extrapolation="linear"
+                    ).fit_transform(parents[:, [t]])
+                    for t in range(parents.shape[1])
+                ]
+            )
 
     location, scale = basis(knots), basis(SCALE_KNOTS)
     s = parents.shape[1]
@@ -417,9 +418,9 @@ def _best(found: list[tuple[np.ndarray, float]]) -> tuple[np.ndarray, float]:
     return min(found, key=lambda f: f[1])
 
 
-#: Held around each change of the warning filters: :func:`warnings.catch_warnings` saves and
-#: restores the filters of the whole process, so two such blocks in concurrent threads must not
-#: overlap.
+#: Held around every scikit-learn call a search thread makes: scikit-learn and the penalty search
+#: change the warning filters with :func:`warnings.catch_warnings`, which saves and restores the
+#: filters of the whole process, so two such blocks in concurrent threads must not overlap.
 _FILTERS = threading.Lock()
 
 
@@ -492,12 +493,12 @@ def _tune(
         )
         values = np.array(scores)
         finite = np.isfinite(values)
+        candidates = rng.uniform(low, high, size=(EI_CANDIDATES, dim))
         with _FILTERS, warnings.catch_warnings():
             # A kernel parameter at its bound only shapes the acquisition, not the fit.
             warnings.simplefilter("ignore", ConvergenceWarning)
             process.fit(np.array(points)[finite], values[finite])
-        candidates = rng.uniform(low, high, size=(EI_CANDIDATES, dim))
-        mean, sd = process.predict(candidates, return_std=True)
+            mean, sd = process.predict(candidates, return_std=True)
         gain = values[finite].min() - mean - EI_MARGIN
         z = gain / np.maximum(sd, 1e-12)
         improvement = gain * _ndtr(z) + sd * np.exp(-0.5 * z**2) / math.sqrt(2 * math.pi)
