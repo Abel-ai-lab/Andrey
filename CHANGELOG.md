@@ -290,6 +290,10 @@ names its pull request.
 - The backward phase of `mmpc` keeps the best separating set of each size it tests, not a record
   of every set, so its memory no longer grows with the number of sets. Answers are unchanged.
   ([#1019])
+- For contributors, `qa/identity.py` counts the partial-correlation tests' `statistic_pvalue` as a
+  query, so the query counts of IAMB, Inter-IAMB, and CALM no longer depend on which path answered
+  them, and `benchmarks/start_regression_ci_r.sh` clones the PCM authors' code into
+  `benchmarks/.pcm-code` when no folder is given, so `benchmarks/run_tests.sh` builds it. ([#1179])
 
 ## [0.18.0] - 2026-11-19
 
@@ -2957,6 +2961,7 @@ First alpha release.
 [#1147]: https://github.com/Abel-ai-lab/Andrey/pull/1147
 [#1162]: https://github.com/Abel-ai-lab/Andrey/pull/1162
 [#1175]: https://github.com/Abel-ai-lab/Andrey/pull/1175
+[#1179]: https://github.com/Abel-ai-lab/Andrey/pull/1179
 [#1161]: https://github.com/Abel-ai-lab/Andrey/pull/1161
 [#1169]: https://github.com/Abel-ai-lab/Andrey/pull/1169
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
