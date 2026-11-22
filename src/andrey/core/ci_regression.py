@@ -433,10 +433,10 @@ class GCM(_RegressionTest):
         leave smaller residuals. ``"forest"`` is a random forest of 500 trees; ``"linear"``
         ordinary least squares. ``"boosting"`` favors conditional means it can learn from the
         data, nonlinear and of several variables; it gives up time, 51 boosted fits per
-        regression. ``"linear"`` favors time, one fit; it gives up the level wherever a conditional
-        mean is not linear, which then reads as dependence. ``"forest"`` favors nonlinear means
-        without tuning; it gives up time, 500 trees per regression. The three were not measured
-        against each other.
+        regression. ``"linear"`` favors time, one fit; it gives up the level where a nonlinear
+        conditional mean leaves a covariance in the residuals, which then reads as dependence (see
+        Limitations). ``"forest"`` favors nonlinear means without tuning; it gives up time, 500
+        trees per regression. The three were not measured against each other.
     seed : int or None, default=None
         Seed for the cross-validation folds of ``"boosting"`` and the trees of ``"forest"``.
         ``None`` uses ``ANDREY_SEED``, or ``0`` when it is unset.

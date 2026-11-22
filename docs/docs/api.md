@@ -890,7 +890,7 @@ the wGCM paper's 7 alternative cells, under the GCM's tuning only:
 | `"wgcm"`, `variant="est"` (default) | One weight learned from the data, however many conditioning variables | 30% of the rows, time, and, where measured, power | Rejected a true independence at 0.05 in 4 to 13% of draws by design; 21 to 26 s per query; rejected 10.5 to 60.5% of the alternatives' draws |
 | `"wgcm"`, `variant="fix"` | Every row, half the time, power, and a steadier level | A learned weight: 7 fixed weights per conditioning variable | 4 to 8.6% by design; 11 to 15 s per query; rejected 21 to 96.5% of the alternatives' draws, more than `"est"` in all 7 cells, 10 conditioning variables included, and in all 7 at critical values from each variant's own null draws; power not measured as a pair under the shipped tuning |
 | `regression="boosting"` (default) | Nonlinear conditional means of several variables | Time: 51 boosted fits per regression in `"gcm"`, 281 in `"wgcm"` | Not measured against the other two |
-| `regression="linear"` | Time: one fit | The level, wherever a conditional mean is not linear | Not measured against the other two |
+| `regression="linear"` | Time: one fit | The level, where a nonlinear conditional mean leaves a covariance in the residuals | Not measured against the other two |
 | `regression="forest"` | Nonlinear conditional means without tuning | Time: 500 trees per regression | Not measured against the other two |
 
 Choosing the regression of `"pcm"`, on the paper's Section 6.1 null (seven conditioning variables)
@@ -902,7 +902,7 @@ true independence at 0.05:
 | `regression="additive"` (default) | The level where the conditional means are additive | Interactions, and time as the rows grow | 0.4% of the 6.1 null at 250 rows and 0.2% at 500; 97.6% of the 6.2 null at 500 rows; about 7 s per query on nine columns at 250 rows, 29 s at 500, and 6 minutes at 1,000 |
 | `regression="forest"` | Interactions | The 6.1 null | 34.4% of the 6.2 null at 500 rows and 4.0% of 50 draws at 10,000; 99.9% of the 6.1 null at 250 rows and 97.3% at 500 |
 | `regression="boosting"` | Nonlinear conditional means of several variables | The 6.1 null | 97.7% of the 6.1 null at 250 rows |
-| `regression="linear"` | Time: one fit | The level, wherever a conditional mean is not linear | Not measured |
+| `regression="linear"` | Time: one fit | The level, where a nonlinear conditional mean leaves a covariance in the residuals | Not measured |
 
 {py:meth}`CMIknn.statistic <andrey.core.ci_cmiknn.CMIknn.statistic>` returns the conditional
 mutual information estimate the test's p-value is built on, a dependence measure of its own.
