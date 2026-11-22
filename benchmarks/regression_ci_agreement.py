@@ -8,8 +8,8 @@ so both sides test the same numbers. PCM is compared in its paper's direction, t
 
 - the statistic: Andrey's statistic and p-value computed from the residuals, weights, and sample
   split the reference produced, which isolates the test from the regressions;
-- end to end: each side with its own regressions (boosted trees or random forests), the sample
-  splits shared, so a difference comes from the regressions.
+- end to end: each side with its own regressions (boosted trees, random forests, or the PCM's
+  additive models), the sample splits shared, so a difference comes from the regressions.
 
     ANDREY_BENCH_RSCRIPT=Rscript PCM_CODE=<clone of the PCM authors' code> \\
         uv run python benchmarks/regression_ci_agreement.py <empty folder>
@@ -96,7 +96,14 @@ def run_reference(folder: Path, mode: str, names: list[str], seeds: list[int]) -
     env = {**os.environ, "R_LIBS": lib} if lib else None
     if not (folder / f"reference_{mode}.csv").exists():  # a rerun reuses the reference's output
         subprocess.run([rscript, "--vanilla", str(SCRIPT), str(folder), mode], check=True, env=env)
-    rows = np.genfromtxt(folder / f"reference_{mode}.csv", delimiter=",", names=True, dtype=None)
+    rows = np.genfromtxt(
+        folder / f"reference_{mode}.csv",
+        delimiter=",",
+        names=True,
+        dtype=None,
+        missing_values="NA",  # a reference call that stopped with an error
+        filling_values=np.nan,
+    )
     return [dict(zip(rows.dtype.names, r)) for r in np.atleast_1d(rows)]
 
 
@@ -199,24 +206,32 @@ def gcm_and_wgcm(folder: Path) -> None:
     print("\n### wGCM.fix\n\n" + table(head, out_fix))
 
 
+# The PCM comparisons: the reference mode, Andrey's regression, the sizes, the splits, the seeds,
+# and the table's label. Least squares is the exact layer; forests (Section 6.2's designs) and
+# additive models (Section 6.1's) are end to end.
+PCM_MODES = (
+    ("pcm_lm", "linear", (250,), 1, SEEDS, "least squares, 1 split"),
+    ("pcm_rf", "forest", (250, 500), 6, SEEDS[:2], "random forests, 6 splits"),
+    ("pcm_gam", "additive", (250,), 6, SEEDS[:2], "additive models, 6 splits"),
+)
+
+
 def pcm(folder: Path) -> None:
-    """PCM: least squares (exact layer) and random forests (end to end) on the authors' settings."""
-    for forest, ns in ((False, (250,)), (True, (250, 500))):
+    """PCM: least squares, random forests, and additive models on the authors' settings."""
+    for mode, regression, ns, n_splits, case_seeds, label in PCM_MODES:
+        forest = regression == "forest"
         names, seeds, tests = [], [], {}
         for setting in (0, 1, 3):
             for n in ns:
-                for seed in SEEDS[: 3 if not forest else 2]:
-                    name = f"p{int(forest)}_{len(names)}"
+                for seed in case_seeds:
+                    name = f"{mode}_{len(names)}"
                     data = pcm_case(setting, n, np.random.default_rng([seed, n]), forest=forest)
-                    regression = "forest" if forest else "linear"
-                    test = cr.PCM(
-                        data, regression=regression, n_splits=6 if forest else 1, seed=seed
-                    )
+                    test = cr.PCM(data, regression=regression, n_splits=n_splits, seed=seed)
                     write_case(folder, name, test, data)  # column 1 is the paper's Y
                     tests[name] = (setting, n, seed, test)
                     names.append(name)
                     seeds.append(seed)
-        rows = run_reference(folder, "pcm_rf" if forest else "pcm_lm", names, seeds)
+        rows = run_reference(folder, mode, names, seeds)
         out = []
         for name, r in zip(names, rows):
             setting, n, seed, test = tests[name]
@@ -246,11 +261,13 @@ def pcm(folder: Path) -> None:
                     mean * np.sqrt((n // 2 + n % 2 - 1) / (n // 2 + n % 2)),
                     p_ref,
                     float(ndtr(-mean)),
-                    (ndtr(-mean) < 0.05) == (p_ref < 0.05),
+                    # A reference call that stopped with an error gives no decision.
+                    "reference failed"
+                    if np.isnan(p_ref)
+                    else (ndtr(-mean) < 0.05) == (p_ref < 0.05),
                     cols.index(1) > cols.index(0),
                 ]
             )
-        label = "random forests, 6 splits" if forest else "least squares, 1 split"
         print(
             f"\n### PCM, {label}\n\n"
             + table(

@@ -96,28 +96,38 @@ names its pull request.
   every method that takes one: `"gcm"`, the generalized covariance measure (Shah and Peters 2020),
   which tests the covariance of the residuals of boosted-tree regressions; `"wgcm"`, the weighted
   generalized covariance measure (Scheidegger, Hörrmann, and Bühlmann 2022), which weights that
-  covariance by its fitted value given the conditioning set (`variant="fix"` takes fixed
-  weights); and `"pcm"`, the projected covariance measure (Lundborg, Kim, Shah, and Samworth
-  2024), which tests whether one variable improves a random-forest prediction of the other. Each
-  takes `regression="boosting"`, `"forest"`, or `"linear"`; `"wgcm"`'s boosted trees are tuned as
-  in the wGCM authors' current code, over 28 pairs of learning rate and depth by the folds' mean
-  cross-validated error. With boosted trees at 200 and 400 rows, pooled over the wGCM paper's null
-  designs, `"gcm"` and `"wgcm"` reject a true independence at 0.05 in about 6 to 7.6% of draws, and
-  from 4 to 13% by design over those and further null designs; the authors' code also rejects more
-  often than 0.05 there. Each fit and each sample split reads only the query's columns,
-  standardized, rounded, and signed, with the rows in an order of their values, so a p-value depends
-  on neither the row nor the column order, nor on columns outside the query, and changes with a
-  column's units or sign only where the rounding moves a value or a column is symmetric about its
-  mean once sorted. On data with missing values, a query with fewer
-  rows than its test needs, 4 for `"gcm"` and for `"wgcm"` with `variant="fix"`, 17 for `"wgcm"`'s
-  default `variant="est"`, and 12 for `"pcm"`, is not tested. Where the papers and the authors'
-  code differ, each choice was measured against the other in reduced versions of the papers'
-  simulation designs: the wGCM weight is the fitted value, as in the authors' code, which gave
-  more power at the same level than the paper's sign of the fit; the fixed weights' multiplier
-  draws use the centered products, the PCM variance adds its shift to the fit's positive part, and
-  the PCM statistic's standard deviation divides by the row count, as in the papers, where the
-  code's choices gave no more power. A contributor's script compares them with the authors' code.
-  ([#1147], [#1129], [#1162])
+  covariance by its fitted value given the conditioning set (`variant="fix"` takes fixed weights);
+  and `"pcm"`, the projected covariance measure (Lundborg, Kim, Shah, and Samworth 2024), which
+  tests whether one variable improves an additive-model prediction of the other, the paper's
+  regression for its additive settings as the authors' code fits it. Each takes
+  `regression="boosting"`, `"forest"`, or `"linear"`, and `"pcm"` also `"additive"`, its default;
+  `"wgcm"`'s boosted trees are tuned as in the wGCM authors' current code, over 28 pairs of learning
+  rate and depth by the folds' mean cross-validated error. With boosted trees at 200 and 400 rows,
+  pooled over the wGCM paper's null designs, `"gcm"` and `"wgcm"` reject a true independence at 0.05
+  in about 6 to 7.6% of draws, and from 4 to 13% by design over those and further null designs; the
+  authors' code also rejects more often than 0.05 there. On the PCM paper's Section 6.1 designs at
+  250 and 500 rows, in the paper's direction (y the response), `"pcm"` rejects a true independence
+  in 0.2 to 0.4% of draws, and its power is at or above the authors' code's on the same data; on the
+  Section 6.2 null, whose conditional means hold an interaction, it rejects 97.6% at 500 rows, as
+  the authors' code does (95.6%), and its random forests reject 97 to 99.9% of the Section 6.1 null.
+  Each fit and each sample split reads
+  only the query's columns, standardized, rounded, and signed, with the rows in an order of their
+  values, so a p-value depends on neither the row nor the column order, nor on columns outside the
+  query, and changes with a column's units or sign only where the rounding moves a value or a column
+  is symmetric about its mean once sorted. On data with missing values, a query with fewer rows than
+  its test needs, 4 for `"gcm"` and for `"wgcm"` with `variant="fix"`, 17 for `"wgcm"`'s default
+  `variant="est"`, and 12 for `"pcm"`, is not tested. Where the papers and the authors' code differ,
+  each choice was measured against the other in reduced versions of the papers' simulation designs:
+  the wGCM weight is the fitted value, as in the authors' code, which gave more power at the same
+  level than the paper's sign of the fit; the fixed weights' multiplier draws use the centered
+  products, the PCM variance adds its shift to the fit's positive part, and the PCM statistic's
+  standard deviation divides by the row count, as in the papers, where the code's choices gave no
+  more power; the PCM's additive default regresses the fit of the response, not its predictor's
+  term, on the conditioning set, and fits the variance with half the mean fits' basis functions, as
+  in the authors' code; with both, its power was at or above that code's in every setting measured
+  in the paper's direction.
+  A contributor's script compares the three, the additive PCM included, with the authors' code.
+  ([#1147], [#1129], [#1162], [#1175])
 - `target` takes a list of columns on `iamb`, `inter_iamb`, `mmpc`, and `icp`: one call returns one
   result per target, in the list's order, each equal to a call for that target alone. The three set
   learners answer every target with one search, which sets up the test once, and MMPC learns the
@@ -2946,6 +2956,7 @@ First alpha release.
 [#1127]: https://github.com/Abel-ai-lab/Andrey/pull/1127
 [#1147]: https://github.com/Abel-ai-lab/Andrey/pull/1147
 [#1162]: https://github.com/Abel-ai-lab/Andrey/pull/1162
+[#1175]: https://github.com/Abel-ai-lab/Andrey/pull/1175
 [#1161]: https://github.com/Abel-ai-lab/Andrey/pull/1161
 [#1169]: https://github.com/Abel-ai-lab/Andrey/pull/1169
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132

@@ -147,6 +147,7 @@ def _nonlinear(n: int = 80, seed: int = 0) -> np.ndarray:
 ALL_OPTIONS = [
     *(pytest.param(CLASSES[k], LINEAR[k], id=f"{k}-linear") for k in LINEAR),
     *(pytest.param(CLASSES[k], TREES[k], id=f"{k}-trees") for k in TREES),
+    pytest.param(cr.PCM, {"n_splits": 1}, id="pcm-additive"),
 ]
 
 
@@ -205,6 +206,35 @@ def test_pcm_detects_an_interaction_the_gcm_misses():
     data = np.column_stack([x, y, z])
     assert cr.GCM(data, regression="linear")(0, 1, [2]) > 0.05
     assert cr.PCM(data, regression="forest", n_splits=1)(0, 1, [2]) < 0.01
+
+
+def _sine_null(n: int, seed: int) -> np.ndarray:
+    """``x`` and ``y`` independent given ``z``, ``x`` almost a copy of their shared conditional
+    mean ``sin(2 pi z)``: the PCM paper's Section 6.1 null with one conditioning variable."""
+    rng = np.random.default_rng(seed)
+    z = rng.standard_normal(n)
+    mean = np.sin(2 * np.pi * z)
+    return np.column_stack([mean + 0.1 * rng.standard_normal(n), mean + rng.standard_normal(n), z])
+
+
+def test_pcm_keeps_its_level_where_x_copies_the_conditional_mean():
+    rejections = sum(cr.PCM(_sine_null(200, s), seed=s)(0, 1, [2]) < 0.05 for s in range(60))
+    assert rejections <= 9  # the 0.999 quantile of the binomial count at 5%
+
+
+def test_pcm_detects_the_squared_effect_of_its_papers_first_setting():
+    # Section 6.1, setting 1: y depends on x through 0.2 x**2 beyond sin(2 pi z1), with z ~ N7.
+    rng = np.random.default_rng(0)
+    z = rng.standard_normal((500, 7))
+    mean = np.sin(2 * np.pi * z[:, 0])
+    x = mean + rng.standard_normal(500)
+    y = mean + 0.2 * x**2 + rng.standard_normal(500)
+    test = cr.PCM(np.column_stack([x, y, z]), seed=0)
+    rows, cols = test._layout(range(9))
+    block, features = test._data[rows], [c for c in cols if c > 1]
+    # The paper's direction, y the response, whichever variable the query's rule would pick.
+    statistics = [test._split_statistic(block, s, 1, 0, features) for s in test._splits]
+    assert ndtr(-np.mean(statistics)) < 0.05
 
 
 def test_default_regressions_on_the_chain():
