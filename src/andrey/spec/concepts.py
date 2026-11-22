@@ -456,11 +456,13 @@ _CONCEPTS = (
             "statistic when y is shuffled within each configuration of the conditioning set; "
             "nonempty = (r_x - 1) * (r_y - 1) per configuration over the values of x and y present "
             "in it, the table's empty rows and columns struck. They differ only on sparse tables. "
-            "On sparse tables mean favors a level near the nominal one and gives up some of "
-            "G-square's power in the sparsest tables, and time; nonempty favors the classic rule "
-            "and gives up that level: over 35,808 true independences of random discrete networks,"
-            " a test at 0.05 rejected 11.1% (chisq) and 21.7% (gsq) with it, against 4.9% and "
-            "3.8% with mean. "
+            "There mean favors a level near the nominal one: over 35,808 true independences of "
+            "random discrete networks, a test at 0.05 rejected 4.9% (chisq) and 3.8% (gsq). It "
+            "gives up some of G-square's power in the sparsest tables, where its p-values come "
+            "out too large, and, with gsq, time: a hypergeometric sum per cell, not timed "
+            "against nonempty. nonempty favors detection on sparse tables, keeping G-square's "
+            "power where mean loses it; it gives up the level: 11.1% and 21.7% of the same true "
+            "independences were rejected. Their power was not measured as a pair. "
             "Only chisq and gsq read it: passing it with another test raises ValueError.",
             choices=DEGREES_OF_FREEDOM,
         ),

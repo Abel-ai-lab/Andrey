@@ -144,8 +144,10 @@ def ges(
         ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
         fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
         ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
-        up time: each round runs the search again, and a fit took 2 to 72 times as long as the same
-        search on complete data in the release benchmarks. See **Missing values.** in Notes.
+        up time: each round runs the search again. With the default 10 rounds, over the six searches
+        in which it is supported, from 10 to 50 variables and 100 to 2,000 rows, a setting's median
+        fit took 2 to 72 times as long as the same search on the complete data (0.17.0 missing-data
+        benchmark). See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
         1. Each round runs the search once, so the time grows with them. A fit whose last round
@@ -1434,7 +1436,8 @@ def xges(
         value and the fewest rows two columns share; two columns that share no observed row raise
         ``ValueError``. ``"em"`` favors the partly observed rows, which dropping the incomplete rows
         loses; it gives up time: each round runs the search again, so the default 10 rounds run it
-        10 times. See **Missing values.** in Notes.
+        10 times. Its time against complete data was not measured with this search. See **Missing
+        values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
         1. Each round runs the search once, so the time grows with them. A fit whose last round
@@ -1761,15 +1764,15 @@ def lges(
         neither improves the score, and it stops when no move improves it. ``"lges0_released"``
         is the paper's LGES-0 (its Algorithm 8) in the phase order of the code published with the
         paper: additions, then deletions, then reversals, each phase run once until no move improves
-        the score. ``"lges"`` is the default as the paper's main method.
-        ``"lges"`` favors denser graphs; it gives up time and some of the sparsest graphs.
-        ``"lges0_released"`` favors the sparsest graphs and time; it gives up denser graphs. On the
-        simulation of ``insertion``, counting a schedule better in a setting and rule when its mean
-        error is lower and it is lower on more graphs than higher, LGES was better in 15 of 16 at
-        mean degree 3 and 12 of 16 at mean degree 4, LGES-0 in 1 and 2; at mean degree 1 and 2,
-        LGES-0 was better in 12 of 32 and LGES in 5, with 15 ties. LGES rescans the deletions and
-        reversals after every addition: its median fit took 0.9 to 1.8 times as long as LGES-0's
-        (mean degree 2, 4, and 6).
+        the score. ``"lges"`` is the default as the paper's main method. ``"lges"`` favors denser
+        graphs; it gives up time. ``"lges0_released"`` favors time; it gives up denser graphs. On
+        the simulation of ``insertion``, counting a schedule better in a setting and rule when its
+        mean error is lower and it is lower on more graphs than higher, LGES was better in 15 of 16
+        at mean degree 3 and 12 of 16 at mean degree 4, LGES-0 in 1 and 2. At mean degree 1 and 2
+        the two made about as many errors, 457 against 459 summed over the 32 settings and rules of
+        the mean errors, with LGES-0 better in 12, LGES in 5, and 15 ties. LGES rescans the
+        deletions and reversals after every addition: its median fit took 0.9 to 1.8 times as long
+        as LGES-0's (mean degree 2, 4, and 6).
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -2047,8 +2050,10 @@ def hc(
         ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
         fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
         ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
-        up time: each round runs the search again, and a fit took 2 to 72 times as long as the same
-        search on complete data in the release benchmarks. See **Missing values.** in Notes.
+        up time: each round runs the search again. With the default 10 rounds, over the six searches
+        in which it is supported, from 10 to 50 variables and 100 to 2,000 rows, a setting's median
+        fit took 2 to 72 times as long as the same search on the complete data (0.17.0 missing-data
+        benchmark). See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
         1. Each round runs the search once, so the time grows with them. A fit whose last round
@@ -2468,8 +2473,10 @@ def tabu(
         ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
         fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
         ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
-        up time: each round runs the search again, and a fit took 2 to 72 times as long as the same
-        search on complete data in the release benchmarks. See **Missing values.** in Notes.
+        up time: each round runs the search again. With the default 10 rounds, over the six searches
+        in which it is supported, from 10 to 50 variables and 100 to 2,000 rows, a setting's median
+        fit took 2 to 72 times as long as the same search on the complete data (0.17.0 missing-data
+        benchmark). See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
         1. Each round runs the search once, so the time grows with them. A fit whose last round
@@ -2845,7 +2852,8 @@ def exact_search(
         value and the fewest rows two columns share; two columns that share no observed row raise
         ``ValueError``. ``"em"`` favors the partly observed rows, which dropping the incomplete rows
         loses; it gives up time: each round runs the search again, so the default 10 rounds run it
-        10 times. See **Missing values.** in Notes.
+        10 times. Its time against complete data was not measured with this search. See **Missing
+        values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
         1. Each round runs the search once, so the time grows with them. A fit whose last round
@@ -3189,7 +3197,8 @@ def calm(
         value and the fewest rows two columns share; two columns that share no observed row raise
         ``ValueError``. ``"em"`` favors the partly observed rows, which dropping the incomplete rows
         loses; it gives up time: each round runs the search again, so the default 10 rounds run it
-        10 times. See **Missing values.** in Notes.
+        10 times. Its time against complete data was not measured with this search. See **Missing
+        values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
         1. Each round runs the search once, so the time grows with them. A fit whose last round

@@ -989,8 +989,10 @@ class ChiSquare:
     Spirtes et al. [1]_, less one for each cell with no expected count, in the exact form for cells
     of an empty row or column [6]_. The two rules differ only on sparse tables, and the statistic
     is the same under both: ``"mean"`` favors a level near the nominal one and gives up some of
-    G-square's power in the sparsest tables, and time; ``"nonempty"`` favors the classic rule and
-    gives up that level (see Limitations). With zero degrees of freedom the p-value is
+    G-square's power in the sparsest tables and, for G-square, time; ``"nonempty"`` favors
+    detection on sparse tables, keeping G-square's power where ``"mean"`` loses it, and gives up
+    the level (see Limitations; their power was not measured as a pair, nor their time against
+    each other). With zero degrees of freedom the p-value is
     :attr:`zero_dof_pvalue`, ``1`` by default: the rows hold no evidence for or against
     independence, and the answer reads as independence.
 

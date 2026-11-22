@@ -911,10 +911,11 @@ _add(
                 "addition; lges0_released is its LGES-0 (Algorithm 8) in the order of the "
                 "authors' code: additions, deletions, then reversals, once. lges is the "
                 "default as the paper's main method. lges favors denser graphs and gives up "
-                "time (0.9 to 1.8 times as long) and some of the sparsest graphs; lges0_released "
-                "favors the sparsest graphs and time and gives up denser graphs (on the paper's "
-                "linear-Gaussian simulation, lges was better in 15 of 16 settings at mean degree "
-                "3, lges0_released in 12 of 32 at mean degree 1 and 2 against 5).",
+                "time (0.9 to 1.8 times as long); lges0_released favors time and gives up denser "
+                "graphs. On the paper's linear-Gaussian simulation lges was better in 15 of 16 "
+                "settings at mean degree 3; at mean degree 1 and 2 the two made about as many "
+                "errors (mean errors summed over 32 settings, 457 against 459), lges0_released "
+                "better in 12, lges in 5, with 15 ties.",
             ),
             _CATEGORICAL,
         ),

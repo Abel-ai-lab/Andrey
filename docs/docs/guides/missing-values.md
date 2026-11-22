@@ -81,10 +81,10 @@ Choosing an option, by what each favors and what it gives up:
 
 | Option | Favors | Gives up | Measured |
 |---|---|---|---|
-| `missing="testwise"` | Every row each test can read, with no model of why values are missing | Validity outside values missing completely at random | PC and FCI with `fisherz` and `student_t`: [0.11.0 release card](../benchmarks/0.11.0.md#missing-values) |
+| `missing="testwise"` | Every row each test can read, with no model of why values are missing | Its guarantee outside values missing completely at random | With 20 variables and 1,000 rows, PC's median errors were 6.5 to 7.5 against 4.0 on the complete data with 10 to 30% missing, where dropping the incomplete rows kept a median of 124.5 to 0.5 rows ([0.11.0 release card](../benchmarks/0.11.0.md#missing-values)); for values missing for a reason that other variables carry, see `"mvpc"` |
 | A test without enough rows, under `"testwise"` | No pair separated or kept on rows that cannot test it | The test: it never separates a pair, and a pair that no test with rows could decide is undecided and left out of the graph | Not measured against another rule |
-| `missing="mvpc"` | Values missing for a reason that other variables carry | Every test but `fisherz` and `student_t`; accuracy on large graphs where an indicator has many weak parents or parents with missing values | On Erdos-Renyi graphs of 10 to 100 variables with one observed parent per indicator, fewer errors than `"testwise"` in 14 of 72 settings and more in none; tied in 136 of 144 with values missing completely at random; behind in 12 of 141 with many weak parents per indicator (3 again on fresh seeds); with a parent that has missing values, ahead in 12 of 144 and behind in 24 (9 again); the repeated ones all had 50 or 100 variables and 20 or 30% missing ({py:func}`~andrey.pc`, [0.16.0 release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data)) |
-| `missing="em"` | The partly observed rows, under a linear model with Gaussian noise | Time: 2 to 72 times as long as the search on complete data | [0.16.0](../benchmarks/0.16.0.md#what-we-measured-on-missing-data) and [0.17.0](../benchmarks/0.17.0.md#missing-data) release cards |
+| `missing="mvpc"` | Values missing for a reason that other variables carry | Every test but `fisherz` and `student_t`; accuracy on large graphs where an indicator has many weak parents or parents with missing values | On Erdos-Renyi graphs of 10 to 100 variables (mean degree 2 or 4; 500 to 10,000 rows; 10 to 30% missing) with one observed parent per indicator, fewer errors than `"testwise"` in 14 of 72 settings at `alpha=0.01` and 28 at the default 0.05, and more in none. Over both levels together (144 settings): tied in 136 with values missing completely at random; behind in 12 of the 141 judged with many weak parents per indicator (3 again on fresh seeds); with a parent that has missing values, ahead in 12 and behind in 24 (9 again); the repeated ones all had 50 or 100 variables and 20 or 30% missing ({py:func}`~andrey.pc`, [0.16.0 release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data)) |
+| `missing="em"` | The partly observed rows, under a linear model with Gaussian noise | Time: each of the 10 rounds runs the search again | With 10 rounds, in the six searches where it is supported, from 10 to 50 variables and 100 to 2,000 rows, a setting's median fit took 2 to 72 times as long as the same search on the complete data ([0.17.0 missing-data records][em-records]); not measured in the experimental searches |
 | `possibly_separable="orient"` | Arrowheads, and accuracy in PC and FCI, where it was measured | Protection from false colliders | The runs of `"ambiguous"` |
 | `possibly_separable="ambiguous"` | No false collider | The true arrowheads beside them | PC's false colliders per fit from 12.8-90.0 to at most 0.2, its graph farther from the truth than the empty graph in 6 of 6 settings; FCI's errors up by 0.5 to 4.4 |
 
@@ -289,8 +289,9 @@ implementation exists to compare them with, so the
 [0.16.0 release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data) reports them beside
 test-wise deletion, dropping rows, and mean imputation. What to expect from a fit:
 
-- EM costs time. With 10 rounds a fit runs the search 10 times and the E-step 56 times, and it took
-  2 to 72 times as long as the same search on complete data.
+- EM costs time. With 10 rounds a fit runs the search 10 times and the E-step 56 times. In the six
+  searches where it is supported, from 10 to 50 variables and 100 to 2,000 rows, a setting's median
+  fit took 2 to 72 times as long as the same search on the complete data.
 - EM does not always settle within its 10 rounds. The last round still changed the graph in 2 to 6%
   of the fits we measured, and in 20% of `grasp`'s, most often with 50 variables and 100 rows. Such
   a fit logs a warning, and more rows help. A larger `n_em_iterations` runs more rounds, which lets
@@ -338,3 +339,4 @@ series.
 [strobl]: https://doi.org/10.1007/s41060-017-0094-6
 [tu]: https://proceedings.mlr.press/v89/tu19a.html
 [missdag]: https://arxiv.org/abs/2205.13869
+[em-records]: https://github.com/Abel-ai-lab/Andrey/tree/main/benchmarks/published/0.17.0

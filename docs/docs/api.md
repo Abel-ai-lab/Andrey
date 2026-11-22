@@ -196,12 +196,14 @@ the degrees of freedom of the categorical tests, `"chisq"` and `"gsq"`: `"mean"`
 the mean of the statistic when `y` is shuffled within each configuration of the conditioning set,
 and `"nonempty"` is `(r_x - 1) * (r_y - 1)` per configuration over the values of `x` and `y`
 present in it, the table's empty rows and columns struck (Spirtes, Glymour and Scheines 1993). The
-two differ only on sparse tables. There `"mean"` favors a level near the nominal one and gives up
-some of G-square's power in the sparsest tables, and time; `"nonempty"` favors the classic rule
-and gives up that level: over 35,808 true independences of random discrete networks, a test at 0.05
-rejected 11.1% (`"chisq"`) and 21.7% (`"gsq"`) with it, against 4.9% and 3.8% with `"mean"`. Only
-`"chisq"` and `"gsq"` read it, so passing `degrees_of_freedom` with another test raises a
-`ValueError`.
+two differ only on sparse tables. There `"mean"` favors a level near the nominal one: over 35,808
+true independences of random discrete networks, a test at 0.05 rejected 4.9% (`"chisq"`) and 3.8%
+(`"gsq"`). It gives up some of G-square's power in the sparsest tables, where its p-values come out
+too large, and, with `"gsq"`, time: a sum of hypergeometric terms per cell, not timed against
+`"nonempty"`. `"nonempty"` favors detection on sparse tables, keeping G-square's power where
+`"mean"` loses it; it gives up the level: 11.1% and 21.7% of the same true independences were
+rejected. Their power was not measured as a pair. Only `"chisq"` and `"gsq"` read it, so passing
+`degrees_of_freedom` with another test raises a `ValueError`.
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
@@ -804,8 +806,8 @@ insertion rule counts as a setting of its own.
 
 | Option | Favors | Gives up | Measured |
 |---|---|---|---|
-| `schedule="lges"` (default) | Denser graphs | Time, and some of the sparsest graphs | Better in 15 of 16 settings at mean degree 3 and 12 of 16 at degree 4; fits took 0.9 to 1.8 times as long as LGES-0's |
-| `schedule="lges0_released"` | The sparsest graphs, and time | Denser graphs | Better in 12 of 32 settings at mean degree 1 and 2, LGES in 5, with 15 ties; better in 1 of 16 at degree 3 |
+| `schedule="lges"` (default) | Denser graphs | Time | Better in 15 of 16 settings at mean degree 3 and 12 of 16 at degree 4; fits took 0.9 to 1.8 times as long as LGES-0's |
+| `schedule="lges0_released"` | Time | Denser graphs | Better in 1 of 16 settings at mean degree 3; at mean degree 1 and 2 about as many errors as LGES (mean errors summed over 32 settings, 459 against 457), better in 12, LGES in 5, with 15 ties |
 | `insertion="safe"` (default) | The paper's proof that the search recovers the true class as the rows grow | Accuracy | 9,029 errors over the 480 graphs of mean degree 1 to 3, under `schedule="lges"` |
 | `insertion="conservative"` | Fewer errors | That proof | 6,789 errors on those graphs; the lower mean error in 31 of 38 settings, the higher in 3 |
 

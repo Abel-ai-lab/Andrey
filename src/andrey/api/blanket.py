@@ -202,12 +202,15 @@ def iamb(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one; it gives up some of
-        ``"gsq"``'s power in the sparsest tables, and time. ``"nonempty"`` favors the classic rule;
-        it gives up that level: over 35,808 true independences of random discrete networks (3 to 5
-        categories, 0 to 3 conditioning variables, 500 to 5,000 rows), a test at 0.05 rejected 11.1%
-        (``"chisq"``) and 21.7% (``"gsq"``) with it, against 4.9% and 3.8% with ``"mean"``. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). It
+        gives up some of ``"gsq"``'s power in the sparsest tables, where its p-values come out too
+        large, and, with ``"gsq"``, time: a sum of hypergeometric terms per cell, not timed against
+        ``"nonempty"``. ``"nonempty"`` favors detection on sparse tables: it rejects more often
+        there, keeping ``"gsq"``'s power where ``"mean"`` loses it. It gives up the level: 11.1% and
+        21.7% of the same true independences were rejected. Their power was not measured as a pair.
+        Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -232,8 +235,12 @@ def iamb(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. ``"testwise"`` favors every row each test can read, with no model of why
-        values are missing; it gives up validity outside values missing completely at random. See
+        handling used. ``"testwise"`` favors every row each test can read: with 20 variables and
+        1,000 rows, PC's median errors were 6.5 to 7.5 against 4.0 on the complete data with 10 to
+        30% of the values missing, where dropping the incomplete rows kept a median of 124.5 to 0.5
+        rows (0.11.0 release card). It gives up its guarantee outside values missing completely at
+        random: where values are missing for a reason that other variables carry, ``pc``'s
+        ``"mvpc"`` made fewer errors in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05. See
         **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
@@ -518,12 +525,15 @@ def inter_iamb(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one; it gives up some of
-        ``"gsq"``'s power in the sparsest tables, and time. ``"nonempty"`` favors the classic rule;
-        it gives up that level: over 35,808 true independences of random discrete networks (3 to 5
-        categories, 0 to 3 conditioning variables, 500 to 5,000 rows), a test at 0.05 rejected 11.1%
-        (``"chisq"``) and 21.7% (``"gsq"``) with it, against 4.9% and 3.8% with ``"mean"``. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). It
+        gives up some of ``"gsq"``'s power in the sparsest tables, where its p-values come out too
+        large, and, with ``"gsq"``, time: a sum of hypergeometric terms per cell, not timed against
+        ``"nonempty"``. ``"nonempty"`` favors detection on sparse tables: it rejects more often
+        there, keeping ``"gsq"``'s power where ``"mean"`` loses it. It gives up the level: 11.1% and
+        21.7% of the same true independences were rejected. Their power was not measured as a pair.
+        Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -548,8 +558,12 @@ def inter_iamb(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. ``"testwise"`` favors every row each test can read, with no model of why
-        values are missing; it gives up validity outside values missing completely at random. See
+        handling used. ``"testwise"`` favors every row each test can read: with 20 variables and
+        1,000 rows, PC's median errors were 6.5 to 7.5 against 4.0 on the complete data with 10 to
+        30% of the values missing, where dropping the incomplete rows kept a median of 124.5 to 0.5
+        rows (0.11.0 release card). It gives up its guarantee outside values missing completely at
+        random: where values are missing for a reason that other variables carry, ``pc``'s
+        ``"mvpc"`` made fewer errors in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05. See
         **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
@@ -831,12 +845,15 @@ def mmpc(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one; it gives up some of
-        ``"gsq"``'s power in the sparsest tables, and time. ``"nonempty"`` favors the classic rule;
-        it gives up that level: over 35,808 true independences of random discrete networks (3 to 5
-        categories, 0 to 3 conditioning variables, 500 to 5,000 rows), a test at 0.05 rejected 11.1%
-        (``"chisq"``) and 21.7% (``"gsq"``) with it, against 4.9% and 3.8% with ``"mean"``. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). It
+        gives up some of ``"gsq"``'s power in the sparsest tables, where its p-values come out too
+        large, and, with ``"gsq"``, time: a sum of hypergeometric terms per cell, not timed against
+        ``"nonempty"``. ``"nonempty"`` favors detection on sparse tables: it rejects more often
+        there, keeping ``"gsq"``'s power where ``"mean"`` loses it. It gives up the level: 11.1% and
+        21.7% of the same true independences were rejected. Their power was not measured as a pair.
+        Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -861,8 +878,12 @@ def mmpc(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. ``"testwise"`` favors every row each test can read, with no model of why
-        values are missing; it gives up validity outside values missing completely at random. See
+        handling used. ``"testwise"`` favors every row each test can read: with 20 variables and
+        1,000 rows, PC's median errors were 6.5 to 7.5 against 4.0 on the complete data with 10 to
+        30% of the values missing, where dropping the incomplete rows kept a median of 124.5 to 0.5
+        rows (0.11.0 release card). It gives up its guarantee outside values missing completely at
+        random: where values are missing for a reason that other variables carry, ``pc``'s
+        ``"mvpc"`` made fewer errors in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05. See
         **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,

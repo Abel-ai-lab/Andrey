@@ -510,12 +510,15 @@ def pcmci(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one; it gives up some of
-        ``"gsq"``'s power in the sparsest tables, and time. ``"nonempty"`` favors the classic rule;
-        it gives up that level: over 35,808 true independences of random discrete networks (3 to 5
-        categories, 0 to 3 conditioning variables, 500 to 5,000 rows), a test at 0.05 rejected 11.1%
-        (``"chisq"``) and 21.7% (``"gsq"``) with it, against 4.9% and 3.8% with ``"mean"``. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). It
+        gives up some of ``"gsq"``'s power in the sparsest tables, where its p-values come out too
+        large, and, with ``"gsq"``, time: a sum of hypergeometric terms per cell, not timed against
+        ``"nonempty"``. ``"nonempty"`` favors detection on sparse tables: it rejects more often
+        there, keeping ``"gsq"``'s power where ``"mean"`` loses it. It gives up the level: 11.1% and
+        21.7% of the same true independences were rejected. Their power was not measured as a pair.
+        Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -526,8 +529,12 @@ def pcmci(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. ``"testwise"`` favors every row each test can read, with no model of why
-        values are missing; it gives up validity outside values missing completely at random. See
+        handling used. ``"testwise"`` favors every row each test can read: with 20 variables and
+        1,000 rows, PC's median errors were 6.5 to 7.5 against 4.0 on the complete data with 10 to
+        30% of the values missing, where dropping the incomplete rows kept a median of 124.5 to 0.5
+        rows (0.11.0 release card). It gives up its guarantee outside values missing completely at
+        random: where values are missing for a reason that other variables carry, ``pc``'s
+        ``"mvpc"`` made fewer errors in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05. See
         **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
@@ -867,12 +874,15 @@ def pcmciplus(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one; it gives up some of
-        ``"gsq"``'s power in the sparsest tables, and time. ``"nonempty"`` favors the classic rule;
-        it gives up that level: over 35,808 true independences of random discrete networks (3 to 5
-        categories, 0 to 3 conditioning variables, 500 to 5,000 rows), a test at 0.05 rejected 11.1%
-        (``"chisq"``) and 21.7% (``"gsq"``) with it, against 4.9% and 3.8% with ``"mean"``. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). It
+        gives up some of ``"gsq"``'s power in the sparsest tables, where its p-values come out too
+        large, and, with ``"gsq"``, time: a sum of hypergeometric terms per cell, not timed against
+        ``"nonempty"``. ``"nonempty"`` favors detection on sparse tables: it rejects more often
+        there, keeping ``"gsq"``'s power where ``"mean"`` loses it. It gives up the level: 11.1% and
+        21.7% of the same true independences were rejected. Their power was not measured as a pair.
+        Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -883,8 +893,12 @@ def pcmciplus(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. ``"testwise"`` favors every row each test can read, with no model of why
-        values are missing; it gives up validity outside values missing completely at random. See
+        handling used. ``"testwise"`` favors every row each test can read: with 20 variables and
+        1,000 rows, PC's median errors were 6.5 to 7.5 against 4.0 on the complete data with 10 to
+        30% of the values missing, where dropping the incomplete rows kept a median of 124.5 to 0.5
+        rows (0.11.0 release card). It gives up its guarantee outside values missing completely at
+        random: where values are missing for a reason that other variables carry, ``pc``'s
+        ``"mvpc"`` made fewer errors in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05. See
         **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
@@ -1500,12 +1514,15 @@ def lpcmci(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one; it gives up some of
-        ``"gsq"``'s power in the sparsest tables, and time. ``"nonempty"`` favors the classic rule;
-        it gives up that level: over 35,808 true independences of random discrete networks (3 to 5
-        categories, 0 to 3 conditioning variables, 500 to 5,000 rows), a test at 0.05 rejected 11.1%
-        (``"chisq"``) and 21.7% (``"gsq"``) with it, against 4.9% and 3.8% with ``"mean"``. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). It
+        gives up some of ``"gsq"``'s power in the sparsest tables, where its p-values come out too
+        large, and, with ``"gsq"``, time: a sum of hypergeometric terms per cell, not timed against
+        ``"nonempty"``. ``"nonempty"`` favors detection on sparse tables: it rejects more often
+        there, keeping ``"gsq"``'s power where ``"mean"`` loses it. It gives up the level: 11.1% and
+        21.7% of the same true independences were rejected. Their power was not measured as a pair.
+        Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1516,8 +1533,12 @@ def lpcmci(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. ``"testwise"`` favors every row each test can read, with no model of why
-        values are missing; it gives up validity outside values missing completely at random. See
+        handling used. ``"testwise"`` favors every row each test can read: with 20 variables and
+        1,000 rows, PC's median errors were 6.5 to 7.5 against 4.0 on the complete data with 10 to
+        30% of the values missing, where dropping the incomplete rows kept a median of 124.5 to 0.5
+        rows (0.11.0 release card). It gives up its guarantee outside values missing completely at
+        random: where values are missing for a reason that other variables carry, ``pc``'s
+        ``"mvpc"`` made fewer errors in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05. See
         **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
@@ -2294,10 +2315,15 @@ def rpcmci(
         The conditional-independence test behind every p-value, a partial-correlation test for
         linear effects: ``"student_t"`` takes the p-value from the Student-t distribution,
         ``"fisherz"`` from Fisher's z-transform and the normal distribution.
-        ``metadata["indep_test"]`` names it. ``"student_t"`` favors an exact p-value for Gaussian
-        data at any number of steps. ``"fisherz"`` favors the p-values of the other temporal
-        methods' default test; it gives up that exactness on a regime with few steps. The two
-        differ less as the steps grow; the trade was not measured.
+        ``metadata["indep_test"]`` names it. ``"student_t"`` favors an exact level on Gaussian data
+        and a test that runs with one step fewer (``|S| + 3`` against ``|S| + 4`` for ``|S|``
+        conditions); it gives up agreement with the p-values of :func:`~andrey.pcmci`'s default,
+        ``"fisherz"``. ``"fisherz"`` favors that agreement; it gives up the exact level on a regime
+        with few steps. The two are nearly the same test: on Gaussian data with two conditions,
+        Fisher's z at ``alpha=0.01`` rejects a true independence with probability 1.13% at 20 steps,
+        1.05% at 50, and 1.02% at 100, calculated from the null distribution of the partial
+        correlation, against 1% for ``"student_t"``. Their effect on Regime-PCMCI's graphs was not
+        measured.
     n_starts : int, default=50
         The number of starts, at least ``1``, each from its own random regime assignment; the
         start with the lowest objective is returned.
