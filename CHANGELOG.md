@@ -142,6 +142,12 @@ names its pull request.
 
 ### Changed
 
+- Each option added or changed in this release states what each value favors and what it gives
+  up, with the measured numbers and their setting, or "not measured": `lges`'s `schedule` and
+  `insertion`, `possibly_separable`, the `"wgcm"` `variant`, the `"gcm"`, `"wgcm"`, and `"pcm"`
+  `regression`, CPCM's forced direction and conservative estimate, the missing-value handlings,
+  `degrees_of_freedom`, Regime-PCMCI's `fdr_method` and `indep_test`, and rsmax2's `restrict`. The
+  API reference and the missing-values guide have "Choosing an option" tables. ([#1177])
 - `das` is supported. On the simulation of its paper with z-scored or rescaled columns it made no
   more errors than the code published with the paper in any of 20 settings from 10 to 200
   variables, and fewer on the first 20 datasets of each, in a tenth to a fiftieth of the time, and
@@ -2984,6 +2990,7 @@ First alpha release.
 [#1156]: https://github.com/Abel-ai-lab/Andrey/pull/1156
 [#1167]: https://github.com/Abel-ai-lab/Andrey/pull/1167
 [#1171]: https://github.com/Abel-ai-lab/Andrey/pull/1171
+[#1177]: https://github.com/Abel-ai-lab/Andrey/pull/1177
 [#1129]: https://github.com/Abel-ai-lab/Andrey/pull/1129
 [#1094]: https://github.com/Abel-ai-lab/Andrey/pull/1094
 [#1095]: https://github.com/Abel-ai-lab/Andrey/pull/1095

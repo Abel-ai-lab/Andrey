@@ -77,6 +77,17 @@ The data alone do not tell you the reason. What you know about how the data were
 best guide. A fit with `missing="mvpc"` also reports what it found: `metadata["missingness_parents"]`
 names the variables that each column's gaps depend on. It cannot detect self-masking.
 
+Choosing an option, by what each favors and what it gives up:
+
+| Option | Favors | Gives up | Measured |
+|---|---|---|---|
+| `missing="testwise"` | Every row each test can read, with no model of why values are missing; in PC, accuracy on large graphs where an indicator has many weak parents or parents with missing values | Its guarantee outside values missing completely at random | With PC at 20 variables and 1,000 rows, 10 to 30% missing completely at random, median errors of 6.5 to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and had no complete row at 30% (complete data: 4.0; [0.11.0 release card](../benchmarks/0.11.0.md#missing-values)); fewer errors than `"mvpc"` in the 12 settings where `"mvpc"` was behind again on fresh seeds (50 or 100 variables, 20 or 30% missing) |
+| A test without enough rows, under `"testwise"` | No pair separated or kept on rows that cannot test it | The test: it never separates a pair, and a pair that no test with rows could decide is undecided and left out of the graph | Not measured against another rule |
+| `missing="mvpc"` | Values missing for a reason that other variables carry | Every test but `fisherz` and `student_t`; accuracy on large graphs where an indicator has many weak parents or parents with missing values | On Erdos-Renyi graphs of 10 to 100 variables (mean degree 2 or 4; 500 to 10,000 rows; 10 to 30% missing) with one observed parent per indicator, fewer errors than `"testwise"` in 14 of 72 settings at `alpha=0.01` and 28 at the default 0.05, and more in none. Over both levels together (144 settings): tied in 136 with values missing completely at random; behind in 12 of the 141 judged with many weak parents per indicator (3 again on fresh seeds); with a parent that has missing values, ahead in 12 and behind in 24 (9 again); the repeated ones all had 50 or 100 variables and 20 or 30% missing ({py:func}`~andrey.pc`, [0.16.0 release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data)) |
+| `missing="em"` | The partly observed rows, under a linear model with Gaussian noise | Time: each of the 10 rounds runs the search again | In GES, BOSS, GRaSP, and NOTEARS (10 to 50 variables, 100 to 2,000 rows, 10 to 50% missing), fewer errors than dropping the incomplete rows in 186 of the 225 settings judged, as many in 39, and more in none, and in 204 more dropping the rows left too few to fit most datasets; HC and Tabu not compared with it. With 10 rounds, a setting's median fit in the six supported searches took 2 to 72 times as long as the same search on the complete data ([0.17.0 missing-data records][em-records]); not measured in the experimental searches |
+| `possibly_separable="orient"` | Arrowheads, and accuracy in PC and FCI, where it was measured | Protection from false colliders | The runs of `"ambiguous"` |
+| `possibly_separable="ambiguous"` | No false collider | The true arrowheads beside them | On merged cohorts that no row bridges (three graph sizes, 20 seeds each; Test-wise deletion below): PC's false colliders per fit from 12.8-90.0 to at most 0.2, its graph farther from the truth than the empty graph in 6 of 6 settings; FCI's errors up by 0.5 to 4.4. On bridged cohorts and complete data, the same graphs as `"orient"` |
+
 ## Test-wise deletion
 
 {{ missing_methods }} accept missing values: each conditional-independence test reads only the rows
@@ -153,12 +164,18 @@ latent variables, so read every flagged side, since their separating sets can li
 adjacencies, and PCMCI+ every flagged link. LPCMCI lists flagged links but does not read them. The
 default, `"orient"`, reads it as any other triple.
 
-The choice is a trade. In merged cohorts that no row bridges, nearly every drawn edge is flagged,
-and `"ambiguous"` removes most false colliders and most true arrowheads with them: the graph can
-then be farther from the truth, counted by the structural Hamming distance, than the empty graph,
-and FCI's skeleton changes through the possible-d-separation step. Where cohorts share rows, few
-edges are flagged and the results change little. Keep the default when you read arrowheads, and
-use `"ambiguous"` when a false collider costs you more than a missing one.
+The choice is a trade: `"orient"` favors arrowheads and gives up protection from false colliders,
+and `"ambiguous"` favors no false collider and gives up the true arrowheads beside them. On merged
+cohorts of three graph sizes, with about 29 to 76 true edges, that no row bridges (20 seeds each,
+conditioning sets of up to 3), nearly every drawn edge is flagged. There `"ambiguous"` took PC's
+false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found from
+0.54-0.72 to 0, and PC's graph was then farther from the truth, counted by the structural Hamming
+distance, than the empty graph in all 6 settings. FCI's false colliders fell from 21.5-165.4 to at
+most 0.1 and its errors rose by 0.5 to 4.4, still fewer than the empty graph's; its skeleton changes
+through the possible-d-separation step. On lagged series that no row bridges, PCMCI+'s same-step
+arrowheads per fit fell from 1.5-1.9 to 0. On bridged cohorts and complete data the two gave the
+same graphs. Keep the default when you read arrowheads, and use `"ambiguous"` when a false collider
+costs you more than a missing one.
 
 `metadata["not_tested"]` counts the conditioning sets not tested, including those the search
 skipped because no row can test them; it measures the search more than the data, so the notice for
@@ -272,8 +289,9 @@ implementation exists to compare them with, so the
 [0.16.0 release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data) reports them beside
 test-wise deletion, dropping rows, and mean imputation. What to expect from a fit:
 
-- EM costs time. With 10 rounds a fit runs the search 10 times and the E-step 56 times, and it took
-  2 to 72 times as long as the same search on complete data.
+- EM costs time. With 10 rounds a fit runs the search 10 times and the E-step 56 times. In the six
+  searches where it is supported, from 10 to 50 variables and 100 to 2,000 rows, a setting's median
+  fit took 2 to 72 times as long as the same search on the complete data.
 - EM does not always settle within its 10 rounds. The last round still changed the graph in 2 to 6%
   of the fits we measured, and in 20% of `grasp`'s, most often with 50 variables and 100 rows. Such
   a fit logs a warning, and more rows help. A larger `n_em_iterations` runs more rounds, which lets
@@ -321,3 +339,4 @@ series.
 [strobl]: https://doi.org/10.1007/s41060-017-0094-6
 [tu]: https://proceedings.mlr.press/v89/tu19a.html
 [missdag]: https://arxiv.org/abs/2205.13869
+[em-records]: https://github.com/Abel-ai-lab/Andrey/tree/main/benchmarks/published/0.17.0

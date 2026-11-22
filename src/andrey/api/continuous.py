@@ -117,7 +117,15 @@ def notears(
         values. On data with missing values, ``metadata["missing"]`` records the handling used and
         ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
         fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
-        See **Missing values.** in Notes.
+        ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
+        up time: each round runs the search again. In the 0.17.0 missing-data benchmark
+        (linear-Gaussian data, 10 to 50 variables, 100 to 2,000 rows, 10 to 50% missing; the
+        searches at ``ebic_gamma=0``), against dropping the incomplete rows, ``"em"`` made fewer
+        errors in 186 of the 225 settings judged with GES, BOSS, GRaSP, and NOTEARS, as many in 39,
+        and more in none, and in 204 more dropping the rows left too few to fit most datasets; HC
+        and Tabu were not compared with it. With the default 10 rounds, a setting's median fit in
+        the six searches took 2 to 72 times as long as the same search on the complete data. See
+        **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
         1. Each round runs the search once, so the time grows with them. A fit whose last round
@@ -412,7 +420,10 @@ def dagma(
         refuses missing values. On data with missing values, ``metadata["missing"]`` records the
         handling used and ``metadata["em"]`` the EM record, with the rows dropped for observing no
         value and the fewest rows two columns share; two columns that share no observed row raise
-        ``ValueError``. See **Missing values.** in Notes.
+        ``ValueError``. ``"em"`` favors the partly observed rows, which dropping the incomplete rows
+        loses; it gives up time: each round runs the search again, so the default 10 rounds run it
+        10 times. Its time against complete data was not measured with this search. See **Missing
+        values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
         1. Each round runs the search once, so the time grows with them. A fit whose last round

@@ -431,7 +431,12 @@ class GCM(_RegressionTest):
         rate 0.3) minimize the 10-fold cross-validated error, the authors' default grid; the trees'
         leaf values carry no penalty, where the authors' boosting shrinks them, so the fits can
         leave smaller residuals. ``"forest"`` is a random forest of 500 trees; ``"linear"``
-        ordinary least squares.
+        ordinary least squares. ``"boosting"`` favors conditional means it can learn from the
+        data, nonlinear and of several variables; it gives up time, 51 boosted fits per
+        regression. ``"linear"`` favors time, one fit; it gives up the level where a nonlinear
+        conditional mean leaves a covariance in the residuals, which then reads as dependence (see
+        Limitations). ``"forest"`` favors nonlinear means without tuning; it gives up time, 500
+        trees per regression. The three were not measured against each other.
     seed : int or None, default=None
         Seed for the cross-validation folds of ``"boosting"`` and the trees of ``"forest"``.
         ``None`` uses ``ANDREY_SEED``, or ``0`` when it is unset.
@@ -529,7 +534,19 @@ class WGCM(_RegressionTest):
     variant : {"est", "fix"}, default="est"
         ``"est"`` estimates one weight function on 30% of the rows and tests on the rest;
         ``"fix"`` tests a fixed set of weight functions on every row and takes the largest
-        statistic.
+        statistic. ``"est"`` favors one weight learned from the data, whose number does not grow
+        with the conditioning set; it gives up 30% of the rows, time, and, where measured, power.
+        ``"fix"`` favors every row, half the time, power, and a steadier level; it gives up a
+        learned weight: 7 fixed weights per conditioning variable, each a sign along one variable.
+        On the same 200 draws of each of the 7 alternative cells of [1]_ (example 7, 1D, and
+        10D.Add, at 200 and 400 rows), with ``"boosting"`` under the tuning of
+        :class:`~andrey.core.ci_regression.GCM`, ``"fix"`` rejected at 0.05 in 21 to 96.5% of
+        draws against 10.5 to 60.5%, more often in all 7, and in all 7 too at critical values from
+        each variant's own null draws (15 to 95% against 10.5 to 52.5%); their power was not
+        measured as a pair under the shipped tuning. With the shipped ``"boosting"``, over the 12
+        null designs of Limitations, ``"est"`` rejected a true independence at 0.05 in 4 to 13% of
+        draws by design against 4 to 8.6%, and at 200 to 400 rows a query took 21 to 26 s against
+        11 to 15 s.
     regression : {"boosting", "forest", "linear"}, default="boosting"
         The regression of each variable, and of the products of residuals, on the conditioning set.
         ``"boosting"`` is boosted regression trees whose learning rate (0.1, 0.2, 0.3, or 0.5),
@@ -538,7 +555,9 @@ class WGCM(_RegressionTest):
         default; the trees' leaf values carry no penalty, where the authors' boosting shrinks them,
         and the trees search every split point exactly, where the authors' boosting grows them on
         histogram bins of each feature.
-        ``"forest"`` and ``"linear"`` are as for :class:`~andrey.core.ci_regression.GCM`.
+        ``"forest"`` and ``"linear"`` are as for :class:`~andrey.core.ci_regression.GCM`, with
+        the same character, except that ``"boosting"`` fits 281 boosted models per regression.
+        The three were not measured against each other.
     seed : int or None, default=None
         Seed for the sample split of ``"est"``, the multiplier draws of ``"fix"``, the
         cross-validation folds of ``"boosting"``, and the trees of ``"forest"``. ``None`` uses
@@ -582,11 +601,13 @@ class WGCM(_RegressionTest):
     regression fits 281 boosted models of up to 500 rounds, 28 settings on 10 folds and the chosen
     one on every row, so a query takes several times as long as the GCM's; ``"est"`` runs five such
     regressions per query, its split being the query's own. ``"fix"`` uses 7 weights per
-    conditioning variable, so with many conditioning variables the maximum spreads its power thin.
-    At a few hundred rows, where the conditional means are hard to learn, neither variant holds its
-    level. With ``"boosting"``, pooled over draws of the paper's null designs at 200 and 400 rows
-    [1]_, ``"est"`` rejected a true independence at 0.05 in about 6.8% of draws and ``"fix"`` in
-    6.0%, up to 7.8% on one design for either; pooled over 12 null designs (those, further nulls
+    conditioning variable, so its maximum spreads over more of them as the conditioning set grows;
+    on 10 conditioning variables (10D.Add of [1]_ at 200 rows) it still rejected more often than
+    ``"est"`` (see ``variant``). At a few hundred rows, where the conditional means are hard to
+    learn, neither variant holds its level. With ``"boosting"``, pooled over draws of the paper's
+    null designs at 200 and 400 rows [1]_, ``"est"`` rejected a true independence at 0.05 in about
+    6.8% of draws and ``"fix"`` in 6.0% (6.8% and 6.5% on a second set of draws), up to 7.8% on one
+    design for either; pooled over 12 null designs (those, further nulls
     of [2]_, and example 7 of [1]_ without its dependence), 6.6% and 6.4%, from 4 to 13% by design
     for ``"est"``, the most on the a = 4 null of [2]_, and from 4 to 8.6% for ``"fix"``.
 
@@ -721,7 +742,15 @@ class PCM(_RegressionTest):
         rows or fewer unsplit, as the authors' code does for its random-forest experiments; it
         learns interactions and loses the level where a conditional mean on ``z`` is hard to learn
         from a few hundred rows (see Limitations). ``"boosting"`` and ``"linear"`` are as for
-        :class:`~andrey.core.ci_regression.GCM`.
+        :class:`~andrey.core.ci_regression.GCM`. ``"additive"`` favors the level where the
+        conditional means are additive: on the null of the paper's Section 6.1 (seven conditioning
+        variables, 500 draws per size) it rejected 0.4% at 0.05 with 250 rows and 0.2% with 500. It
+        gives up interactions, rejecting 97.6% of the Section 6.2 null at 500 rows, and time as the
+        rows grow. ``"forest"`` favors interactions: it rejected 34.4% of that null at 500 rows,
+        where no regression measured held the level, and 4.0% of 50 draws at 10,000. It gives up
+        the Section 6.1 null, rejected in 99.9% of draws at 250 rows and 97.3% at 500, as
+        ``"boosting"`` rejected 97.7% at 250. ``"linear"`` and the time of the four were not
+        measured against each other.
     n_splits : int, default=6
         The number of random sample splits whose statistics are averaged, at least ``1``.
     seed : int or None, default=None

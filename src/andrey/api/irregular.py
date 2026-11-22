@@ -158,7 +158,15 @@ def anm(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
 
     Returns
     -------
@@ -310,7 +318,15 @@ def pnl(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
 
     Returns
     -------
@@ -474,8 +490,8 @@ def loci(
         ``float64``. A DataFrame's column names become the structure's ``labels``.
     alpha : float or None, default=None
         Under ``criterion="independence"``: ``None`` chooses the direction with the larger p-value,
-        or with the smaller test statistic when the p-values are equal; a significance level such
-        as ``0.05`` draws an edge only when exactly one p-value exceeds it. Must be ``None`` under
+        or with the smaller test statistic when the p-values are equal; a significance level such as
+        ``0.05`` draws an edge only when exactly one p-value exceeds it. Must be ``None`` under
         ``criterion="likelihood"``. See Notes.
     criterion : {"independence", "likelihood"}, default="independence"
         ``"independence"`` tests whether each direction's scaled residual is independent of its
@@ -485,7 +501,15 @@ def loci(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
 
     Returns
     -------
@@ -681,8 +705,20 @@ def cpcm(
         ``None`` chooses the direction with the larger p-value, or with the smaller test statistic
         when the p-values are equal (the paper's forced estimate). A significance level such as
         ``0.05`` gives no edge when the two columns test independent at that level, and otherwise
-        draws an edge only when exactly one direction's p-value exceeds it (the paper's
-        conservative estimate). See Notes.
+        draws an edge only when exactly one direction's p-value exceeds it (the paper's conservative
+        estimate). ``None`` favors a direction for every pair; it gives up the sign that a pair fits
+        both ways or neither. A level favors that sign; it gives up the pairs it leaves undecided.
+        On the paper's pairs at 1,000 and 2,000 rows the forced direction tied with the authors'
+        code after fresh seeds in every setting; on the first seeds it was right less often on Table
+        2's PARg drawn as the paper's Appendix B.3 describes (wrong on 12 of 99 pairs against 8) and
+        on model (16) at ``gamma = 2`` with 2,000 rows (4 of 99 against 0). On the paper's model
+        (16) at 500 rows under ``"pareto"``, the conservative estimate found both directions
+        plausible, the paper's outcome at ``gamma = 0``, on 73% and 78% of the pairs of two seed
+        sets against that code's 82% and 85%, so it is not supported there; at ``gamma = 1`` it
+        named the true direction on 55% and 64% of the pairs of the two seed sets, and both on 39%
+        of the first. The `0.19.0 release card
+        <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#the-conservative-estimate>`_ has the
+        numbers. See Notes.
     family : str or list of str, default="gaussian"
         The family of each variable given the other, one name for both columns or a list of two
         names, one per column: ``"gaussian"`` (mean and scale change with the cause),
@@ -919,8 +955,8 @@ def skewd(
         ``float64``. A DataFrame's column names become the structure's ``labels``.
     alpha : float or None, default=None
         Under ``criterion="independence"``: ``None`` chooses the direction with the larger p-value,
-        or with the smaller test statistic when the p-values are equal; a significance level such
-        as ``0.05`` draws an edge only when exactly one p-value exceeds it. Must be ``None`` under
+        or with the smaller test statistic when the p-values are equal; a significance level such as
+        ``0.05`` draws an edge only when exactly one p-value exceeds it. Must be ``None`` under
         ``criterion="likelihood"``.
     criterion : {"independence", "likelihood"}, default="independence"
         ``"independence"`` tests whether each direction's scaled residual is independent of its
@@ -940,7 +976,15 @@ def skewd(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
 
     Returns
     -------

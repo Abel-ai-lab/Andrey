@@ -196,7 +196,13 @@ the degrees of freedom of the categorical tests, `"chisq"` and `"gsq"`: `"mean"`
 the mean of the statistic when `y` is shuffled within each configuration of the conditioning set,
 and `"nonempty"` is `(r_x - 1) * (r_y - 1)` per configuration over the values of `x` and `y`
 present in it, the table's empty rows and columns struck (Spirtes, Glymour and Scheines 1993). The
-two differ only on sparse tables. Only `"chisq"` and `"gsq"` read it, so passing
+two differ only on sparse tables. There `"mean"` favors a level near the nominal one: over 35,808
+true independences of random discrete networks, a test at 0.05 rejected 4.9% (`"chisq"`) and 3.8%
+(`"gsq"`). With `"gsq"` it gives up time, a sum of hypergeometric terms per cell, and rejects
+below the nominal rate in the sparsest tables (0.8% at 3,125 cells). `"nonempty"` favors the
+degrees of freedom of Spirtes, Glymour and Scheines, read from the table alone; it gives up the
+level: 11.1% and 21.7% of the same true independences were rejected. Their time and their power
+were not measured against each other. Only `"chisq"` and `"gsq"` read it, so passing
 `degrees_of_freedom` with another test raises a `ValueError`.
 
 % concept: knowledge
@@ -788,12 +794,22 @@ edges as GES and GIES do, and returns a CPDAG. `schedule` picks the order of the
 `"lges"`, the default, is the paper's main method, LGES (its Algorithm 1), which deletes and
 reverses edges before each single addition; `"lges0_released"` is its LGES-0 variant (Algorithm 8)
 with the phases in the order of the authors' code: additions, deletions, then reversals, once. LGES
-is the default as the paper's main method. On the paper's linear-Gaussian simulation the two made
-about as many errors on the sparsest graphs (mean degree 1 and 2), with LGES-0 slightly ahead more
-often, and LGES made fewer on denser ones (mean degree 3 and up). With the standard BIC, its
-default, each schedule returns the CPDAGs of the authors' code run in its order on that simulation
+is the default as the paper's main method. With the standard BIC, its default, each schedule
+returns the CPDAGs of the authors' code run in its order on the paper's linear-Gaussian simulation
 when both read the same graph of each class; it is experimental until it is benchmarked in that
 setting.
+
+Choosing an option, on that simulation (the authors' generator; 10 to 100 variables at mean degree
+1, 2, 3, 4, and 6; 1,000 and 10,000 rows; 20 graphs per setting). A schedule is better in a setting
+when its mean error is lower and it is lower on more graphs than higher; for the schedules, each
+insertion rule counts as a setting of its own.
+
+| Option | Favors | Gives up | Measured |
+|---|---|---|---|
+| `schedule="lges"` (default) | Accuracy on denser graphs | Time | Better in 15 of 16 settings at mean degree 3 and 12 of 16 at degree 4; where both ran in one process (the conservative rule at mean degree 1 and 3; the safe fits there ran first and carry about 0.25 s of start-up), median fits took 1.0 to 1.33 times as long as LGES-0's; at mean degree 2, 4, and 6, timed in separate runs, so small differences are noise, 0.9 to 1.8 times |
+| `schedule="lges0_released"` | Time | Accuracy on denser graphs | Better in 1 of 16 settings at mean degree 3; at mean degree 1 and 2 about as many errors as LGES (mean errors summed over 32 settings, 459 against 457), better in 12, LGES in 5, with 15 ties |
+| `insertion="safe"` (default) | The paper's proof that the search recovers the true class as the rows grow | Accuracy | 9,029 errors over the 480 graphs of mean degree 1 to 3, under `schedule="lges"` |
+| `insertion="conservative"` | Fewer errors | That proof | 6,789 errors on those graphs; the lower mean error in 31 of 38 settings, the higher in 3 |
 
 Regime-PCMCI (Saggioro et al. 2020), {py:func}`~andrey.rpcmci`, takes one time series whose lagged
 links switch between a few persistent regimes. Each start draws random regime weights, then
@@ -863,6 +879,30 @@ cmi = test.statistic(0, 1, [2])  # the estimate itself, in nats
 register_indep_test("cmiknn_k5", partial(make_indep_test, "cmiknn", k_cmi=5))
 andrey.pc(data, indep_test="cmiknn_k5")
 ```
+
+Choosing a setting of `"gcm"` and `"wgcm"`, passed through `make_indep_test`, measured with boosted
+trees at 200 and 400 rows: the level over 12 null designs of the wGCM paper and of Shah and Peters
+and the time per query, both under the shipped tuning, and power on the same 200 draws of each of
+the wGCM paper's 7 alternative cells, under the GCM's tuning only:
+
+| Setting | Favors | Gives up | Measured |
+|---|---|---|---|
+| `"wgcm"`, `variant="est"` (default) | One weight learned from the data, however many conditioning variables | 30% of the rows, time, and, where measured, power | Rejected a true independence at 0.05 in 4 to 13% of draws by design; 21 to 26 s per query; rejected 10.5 to 60.5% of the alternatives' draws |
+| `"wgcm"`, `variant="fix"` | Every row, half the time, power, and a steadier level | A learned weight: 7 fixed weights per conditioning variable | 4 to 8.6% by design; 11 to 15 s per query; rejected 21 to 96.5% of the alternatives' draws, more than `"est"` in all 7 cells, 10 conditioning variables included, and in all 7 at critical values from each variant's own null draws; power not measured as a pair under the shipped tuning |
+| `regression="boosting"` (default) | Nonlinear conditional means of several variables | Time: 51 boosted fits per regression in `"gcm"`, 281 in `"wgcm"` | Not measured against the other two |
+| `regression="linear"` | Time: one fit | The level, where a nonlinear conditional mean leaves a covariance in the residuals | Not measured against the other two |
+| `regression="forest"` | Nonlinear conditional means without tuning | Time: 500 trees per regression | Not measured against the other two |
+
+Choosing the regression of `"pcm"`, on the paper's Section 6.1 null (seven conditioning variables)
+and Section 6.2 null (an interaction in the conditional means), rejections of a true independence
+at 0.05; each of the additive default's cells has 500 draws:
+
+| Setting | Favors | Gives up | Measured |
+|---|---|---|---|
+| `regression="additive"` (default) | The level where the conditional means are additive | Interactions, and time as the rows grow | 0.4% of the 6.1 null at 250 rows and 0.2% at 500; 97.6% of the 6.2 null at 500 rows; about 7 s per query on nine columns at 250 rows, 29 s at 500, and 6 minutes at 1,000 |
+| `regression="forest"` | Interactions | The 6.1 null | 34.4% of the 6.2 null at 500 rows, where no regression measured held the level (additive 97.6%), and 4.0% of 50 draws at 10,000; 99.9% of the 6.1 null at 250 rows and 97.3% at 500 |
+| `regression="boosting"` | Nonlinear conditional means of several variables | The 6.1 null | 97.7% of the 6.1 null at 250 rows |
+| `regression="linear"` | Time: one fit | The level, where a nonlinear conditional mean leaves a covariance in the residuals | Not measured |
 
 {py:meth}`CMIknn.statistic <andrey.core.ci_cmiknn.CMIknn.statistic>` returns the conditional
 mutual information estimate the test's p-value is built on, a dependence measure of its own.
