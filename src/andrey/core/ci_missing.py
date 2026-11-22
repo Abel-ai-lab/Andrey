@@ -16,7 +16,7 @@ sample of all rows and retains its level; with perfect tests, FCI returns the co
 own sample, potentially finding dependence absent from the population, retaining extra edges [2]_,
 and turning orientations wrong; FCI with one test per query is not generally sound [1]_. The
 procedure proven sound beyond MCAR in [1]_ confirms each independence on rows complete in every
-column; this procedure does not. :data:`TESTWISE_CLAIM` states the claim for every method using
+column; test-wise deletion does not. :data:`TESTWISE_CLAIM` states the claim for every method using
 test-wise deletion.
 
 A query whose block holds fewer rows than its test needs is not tested: it answers
@@ -211,8 +211,7 @@ class RowCounts(Counter[int]):
         """Count queries of pairs ``x < y`` with row counts ``rows`` and p-values ``p``, counting
         :data:`NOT_TESTED` queries apart; keep each conditioning set, entry ``i`` of ``conditions``,
         only inside a :func:`reading_flags` block where rules read it, except in searches reading
-        every
-        flagged pair (:func:`keeps_no_untested_sets`; :meth:`note_untested`)."""
+        every flagged pair (:func:`keeps_no_untested_sets`; :meth:`note_untested`)."""
         values = np.asarray(p, dtype=np.float64).reshape(-1)
         if not values.size:
             return

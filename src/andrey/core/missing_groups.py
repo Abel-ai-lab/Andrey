@@ -3,8 +3,8 @@
 A partial-correlation query with missing values reads rows observed in every column of block ``K``.
 Summing ``K`` over all ``n`` rows costs ``n k^2`` per block on the per-row path. Merged datasets,
 such as cohorts measuring different variables, have few structural missingness patterns plus
-scattered missing cells. :class:`GroupedSums` groups rows into ``g``, with observed set ``O_g``
-containing every member's observed columns, and stores once per group:
+scattered missing cells. :class:`GroupedSums` splits the rows into groups ``g``, with observed set
+``O_g`` containing every member's observed columns, and stores once per group:
 
 - the count, sums, and cross products over all its rows of the values less each column's observed
   mean, zero where unobserved;

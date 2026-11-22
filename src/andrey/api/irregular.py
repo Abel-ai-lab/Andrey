@@ -246,11 +246,11 @@ def anm(
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both tests use test-wise
     deletion, keeping rows where both columns are observed; ``metadata["rows_tested"]`` gives their
-    count as both ``min`` and ``median``. Fewer than 2 such
-    rows, or a column constant on them, raises ``ValueError``. Test-wise deletion is valid when
-    values are missing completely at random, which means that whether a value is missing depends on
-    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
-    they are a selected sample that more rows do not correct.
+    count as both ``min`` and ``median``. Fewer than 2 such rows, or a column constant on them,
+    raises ``ValueError``. Test-wise deletion is valid when values are missing completely at random,
+    which means that whether a value is missing depends on no value in the data; the rows a test
+    reads are then a random sample of all rows, and otherwise they are a selected sample that more
+    rows do not correct.
 
     **Limitations.** Measured on simulated cause-effect pairs with a nonlinear additive-noise
     mechanism and Gaussian noise, with rows doubling from 1,000, on 4 cores with a cap of 1 h and 28
@@ -420,11 +420,11 @@ def pnl(
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both tests use test-wise
     deletion, keeping rows where both columns are observed; ``metadata["rows_tested"]`` gives their
-    count as both ``min`` and ``median``. Fewer than 2 such
-    rows, or a column constant on them, raises ``ValueError``. Test-wise deletion is valid when
-    values are missing completely at random, which means that whether a value is missing depends on
-    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
-    they are a selected sample that more rows do not correct.
+    count as both ``min`` and ``median``. Fewer than 2 such rows, or a column constant on them,
+    raises ``ValueError``. Test-wise deletion is valid when values are missing completely at random,
+    which means that whether a value is missing depends on no value in the data; the rows a test
+    reads are then a random sample of all rows, and otherwise they are a selected sample that more
+    rows do not correct.
 
     **Limitations.** Measured on simulated cause-effect pairs with a post-nonlinear mechanism, a
     linear inner transform and an invertible nonlinear outer one, and Laplace noise, with rows
@@ -587,11 +587,11 @@ def loci(
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits use test-wise
     deletion, keeping rows where both columns are observed; ``metadata["rows_tested"]`` gives their
-    count as both ``min`` and ``median``. Fewer than 2 such
-    rows, or a column constant on them, raises ``ValueError``. Test-wise deletion is valid when
-    values are missing completely at random, which means that whether a value is missing depends on
-    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
-    they are a selected sample that more rows do not correct.
+    count as both ``min`` and ``median``. Fewer than 2 such rows, or a column constant on them,
+    raises ``ValueError``. Test-wise deletion is valid when values are missing completely at random,
+    which means that whether a value is missing depends on no value in the data; the rows a test
+    reads are then a random sample of all rows, and otherwise they are a selected sample that more
+    rows do not correct.
 
     **Limitations.** Measured on simulated cause-effect pairs of 500, 1,000, and 2,000 rows, 100
     pairs per setting, on one core: location-scale pairs with Gaussian, Gumbel, or Laplace noise,
@@ -1056,11 +1056,10 @@ def skewd(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits use test-wise
     deletion, keeping rows where both columns are observed; ``metadata["rows_tested"]`` gives their
     count as both ``min`` and ``median``. Fewer than 8 such rows (one for each cross-validation
-    fold), or a column constant on them, raises ``ValueError``.
-    Test-wise deletion is valid when values are missing completely at random, which means that
-    whether a value is missing depends on no value in the data; the rows a test reads are then a
-    random sample of all rows, and otherwise they are a selected sample that more rows do not
-    correct.
+    fold), or a column constant on them, raises ``ValueError``. Test-wise deletion is valid when
+    values are missing completely at random, which means that whether a value is missing depends on
+    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
+    they are a selected sample that more rows do not correct.
 
     **Limitations.** Not benchmarked yet. The paper measures it on skewed location-scale pairs of
     1,000 rows and on established pair benchmarks [1]_. A fit at the defaults runs about 490

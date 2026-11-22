@@ -30,8 +30,8 @@ class IndicatorTest:
     A query whose rows hold one indicator value, all observed or all missing, has no information on
     it: it returns :data:`~andrey.core.ci_missing.NOT_TESTED`, counts as not tested
     (:func:`~andrey.core.ci_missing.count_answer`), and never separates the pair. Every other query
-    is ``test``'s, which answers one with fewer rows than it needs
-    :data:`~andrey.core.ci_missing.NOT_TESTED` and counts it.
+    is ``test``'s, which answers :data:`~andrey.core.ci_missing.NOT_TESTED` for a query with fewer
+    rows than it needs and counts it.
     """
 
     def __init__(self, test: CITest, data: np.ndarray, indicator: int) -> None:

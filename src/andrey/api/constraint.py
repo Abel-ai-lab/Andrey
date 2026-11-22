@@ -2467,8 +2467,8 @@ def icp(
     Returns
     -------
     StructureOutput or list of StructureOutput
-        With a list of targets, a list of each target's result, in list order, each as a call for
-        that target alone returns it. Otherwise, wraps a ``dag``
+        With a list of targets, a list of each target's result, in list order, each equal to a call
+        for that target alone. Otherwise, wraps a ``dag``
         :class:`~andrey.core.GraphStructure` over every column, with an edge ``x -> target`` from
         each estimated parent ``x`` and no other edge; an absent edge says nothing about the pair.
         ``metadata["algorithm"]`` is ``"icp"``; ``metadata["target"]`` names the target and

@@ -78,13 +78,13 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
     """Run the facade of method ``name`` inside the steps its spec defines.
 
     Before the facade: a former argument name or value becomes the current one, and a dropped
-    argument is removed, each with one :class:`~andrey.DeprecatedArgumentWarning`; a removed
-    argument or choice raises as an unknown one does, and the message gives its current name
-    (:mod:`andrey.core.removed`); every argument the call passes is checked and converted by
-    :meth:`~andrey.spec.models.ParamSpec.check`, which raises ``TypeError`` or ``ValueError``; for a
-    method that takes ``env``, data given as each environment's rows apart become one table and
-    ``env`` (:func:`pool_environments`); a row-aligned argument that names a column of the data is
-    taken out of it (:func:`take_columns`); a seeded method's seed is resolved
+    argument is removed, each with one :class:`~andrey.DeprecatedArgumentWarning`; an argument or
+    choice that an earlier release removed raises as an unknown one does, and the message gives its
+    current name (:mod:`andrey.core.removed`); every argument the call passes is checked and
+    converted by :meth:`~andrey.spec.models.ParamSpec.check`, which raises ``TypeError`` or
+    ``ValueError``; for a method that takes ``env``, data given as each environment's rows apart
+    become one table and ``env`` (:func:`pool_environments`); a row-aligned argument that names a
+    column of the data is taken out of it (:func:`take_columns`); a seeded method's seed is resolved
     (:func:`~andrey.core.seeding.resolve_seed`) and passed on as an int; an experimental method
     warns :class:`~andrey.ExperimentalWarning` (:func:`warn_experimental`); a ``knowledge`` part the
     method does not honor raises ``NotImplementedError``, one it honors experimentally warns, and

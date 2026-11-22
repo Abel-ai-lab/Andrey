@@ -618,7 +618,7 @@ def _first_separating(
     A test-wise deletion test skips subsets holding a member never observed with ``x`` and ``y``, or
     every member when the pair is never observed together: these queries keep no rows and separate
     nothing. Skipped subsets the search would have reached count as not tested (:func:`_left_out`),
-    preserving the subset found and counts.
+    so the subset found and the counts are those of asking every subset.
     """
     if isinstance(test, TestwiseDeletion):
         together = test.together()

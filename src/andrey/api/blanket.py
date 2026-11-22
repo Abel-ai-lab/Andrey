@@ -277,8 +277,8 @@ def iamb(
     Returns
     -------
     StructureOutput or list of StructureOutput
-        With a list of targets, a list of each target's result, in list order, each as a call for
-        that target alone returns it. Without ``target``, wraps the graph ``structure`` names: a
+        With a list of targets, a list of each target's result, in list order, each equal to a call
+        for that target alone. Without ``target``, wraps the graph ``structure`` names: a
         ``cpdag`` :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the
         tests cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for
         ``"skeleton"`` and ``"moral"``. With ``target``, an ``undirected`` one whose edges join
@@ -600,8 +600,8 @@ def inter_iamb(
     Returns
     -------
     StructureOutput or list of StructureOutput
-        With a list of targets, a list of each target's result, in list order, each as a call for
-        that target alone returns it. Without ``target``, wraps the graph ``structure`` names: a
+        With a list of targets, a list of each target's result, in list order, each equal to a call
+        for that target alone. Without ``target``, wraps the graph ``structure`` names: a
         ``cpdag`` :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the
         tests cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for
         ``"skeleton"`` and ``"moral"``. With ``target``, an ``undirected`` one whose edges join
@@ -916,8 +916,8 @@ def mmpc(
     Returns
     -------
     StructureOutput or list of StructureOutput
-        With a list of targets, a list of each target's result, in list order, each as a call for
-        that target alone returns it. Without ``target``, wraps the graph ``structure`` names: an
+        With a list of targets, a list of each target's result, in list order, each equal to a call
+        for that target alone. Without ``target``, wraps the graph ``structure`` names: an
         ``undirected`` :class:`~andrey.core.GraphStructure` for ``"skeleton"``, whose edges have no
         arrowhead and join each pair in each other's set, or a ``cpdag`` one for ``"cpdag"``, whose
         undirected edges the tests cannot orient. With ``target``, an ``undirected`` one whose edges

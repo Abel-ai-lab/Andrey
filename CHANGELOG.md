@@ -89,8 +89,9 @@ names its pull request.
   regime of each time step, the regime weights, and one temporal result per regime as returned by
   `pcmci`. The regime step solves the paper's linear program with SciPy, requiring no new
   dependency. A time step joins a regime only when its weight, rounded to 9 decimals, is above
-  `switch_threshold`: the authors' code uses `>` rather than the paper's `>=` in Eq. 11. A
-  contributor's script compares it with the authors' code start by start. ([#1149], [#1159])
+  `switch_threshold`: the authors' code uses `>` rather than the paper's `>=` in Eq. 11, and Andrey
+  follows it. A contributor's script compares it with the authors' code start by start. ([#1149],
+  [#1159])
 - Three experimental regression-based conditional-independence tests are `indep_test` options for
   every method that takes one: `"gcm"`, the generalized covariance measure (Shah and Peters 2020),
   which tests the covariance of the residuals of boosted-tree regressions; `"wgcm"`, the weighted
@@ -182,8 +183,8 @@ names its pull request.
   tested pair, or with a collider's middle variable, as not tested without building its query. On
   synthetic merged cohorts of 50 columns with 134 pairs never observed together, `iamb` finished in
   17 s compared with over 14 minutes previously, with the same graph and counts. Under test-wise
-  deletion, their spouse step tests both candidate sets of each size, making
-  `metadata["not_tested"]` independent of column order. ([#1148])
+  deletion, their spouse step tests both candidate sets of each size, so `metadata["not_tested"]`
+  no longer depends on column order. ([#1148])
 - A test-wise test with too few rows, or a CD-NOD or FCI-JCI test with `env` constant on its rows,
   is not tested and no longer raises `ValueError`. Each test sets its own row floor: `fisherz` and
   `normal_scores` need `|S| + 4` rows, `cond_gauss` `|S| + 3`, and `cmiknn` with an int `k_cmi`
@@ -271,7 +272,7 @@ names its pull request.
 - `pc(missing="mvpc")` counts the corrected tests that return a p-value of 1 in
   `metadata["corrected_edges"]["p_one_tests"]`. An indicator query whose rows hold one value of the
   indicator, or too few rows, is not tested rather than returning `p = 1`, as for every test-wise
-  test: it counts in `metadata["not_tested"]` and its rows are excluded from
+  test: it counts in `metadata["not_tested"]` and its rows no longer count in
   `metadata["rows_tested"]`. A column on whose observed rows the indicator is constant conditions no
   test of that indicator and, as before, is not its parent; a column kept adjacent by a tested query
   stays a parent when a later query is not tested; the parents and graphs of the fits compared are
