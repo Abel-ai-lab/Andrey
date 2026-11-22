@@ -14,6 +14,10 @@ names its pull request.
 
 - `cpcm` and `cpcm_graph` raise `ValueError` on a 0 under `"exponential"` and on a 1 under
   `"pareto"`, since the deviance is infinite at the edge of the support. ([#1165])
+- `skewd` decides by the likelihood by default (`criterion="likelihood"`), so a call without
+  `criterion` returns the likelihood's direction, no `p_values` or `statistics`, and raises
+  `ValueError` when it passes `alpha`; pass `criterion="independence"` for the earlier default.
+  ([#PRNUM])
 
 ### Added
 
@@ -162,6 +166,15 @@ names its pull request.
   the support rule's family on location-scale pairs and on Table 2's Pareto pairs, and under
   `"pareto"` a test that can reject on causes with extreme values. The [0.19.0 release
   card][card-0190-cpcm] has the numbers. ([#1169])
+- `skewd` and `skewd_mv` are supported, and `skewd`'s default criterion is the likelihood
+  (SkewD-LL), the paper's highlighted variant. On the skewed pairs of their paper, two Gaussian
+  location-scale pair sets, and its graphs of 6 and 10 variables, they made as few errors as the
+  authors' recorded outputs, which a fresh run of the authors' code confirmed, and fewer than a coin
+  flip or the empty graph; the likelihood named all 160 pairs right and the independence criterion
+  154, and no other method measured beside them was both more accurate and faster. SkewD-MV made
+  fewer errors than PC, CAM, NoGAM, SCORE, and RESIT. Both are slow, a pair 15 to 22 CPU minutes
+  and a graph a median of 24 to 31, which their Limitations state; the [0.19.0 release
+  card][card-0190-skewd] has the numbers. ([#PRNUM])
 - With `fisherz` and `student_t` on data with missing values, test-wise deletion groups the rows by
   their missingness patterns once and computes a test's sums from the groups' tables, removing the
   scattered missing cells exactly, when that costs less than summing every row; a query whose
@@ -2959,6 +2972,7 @@ First alpha release.
 [#1175]: https://github.com/Abel-ai-lab/Andrey/pull/1175
 [#1161]: https://github.com/Abel-ai-lab/Andrey/pull/1161
 [#1169]: https://github.com/Abel-ai-lab/Andrey/pull/1169
+[#PRNUM]: https://github.com/Abel-ai-lab/Andrey/pull/PRNUM
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
 [#1146]: https://github.com/Abel-ai-lab/Andrey/pull/1146
 [#1149]: https://github.com/Abel-ai-lab/Andrey/pull/1149
@@ -2969,6 +2983,7 @@ First alpha release.
 [#1099]: https://github.com/Abel-ai-lab/Andrey/pull/1099
 [card-0190-das]: https://andrey.abel.ai/docs/benchmarks/0.19.0.html#das
 [card-0190-cpcm]: https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm
+[card-0190-skewd]: https://andrey.abel.ai/docs/benchmarks/0.19.0.html#skewd
 [card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
 [#1142]: https://github.com/Abel-ai-lab/Andrey/pull/1142
 [#1102]: https://github.com/Abel-ai-lab/Andrey/pull/1102

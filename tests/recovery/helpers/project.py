@@ -126,6 +126,13 @@ def project_output(out: Any, algorithm: str) -> dict:
             "accepted_sets": out.metadata["accepted_sets"],
             "p_values": out.metadata["p_values"],
         }
+    if algorithm == "SkewD":  # the decided graph and both models' log-likelihoods
+        return {"graph": out.structure.to_numpy()} | {
+            field: out.metadata[key][direction]
+            for field, (key, direction) in _LIKELIHOOD_FIELDS.items()
+        }
+    if algorithm == "SkewDMV":  # the DAG of the class with the largest likelihood
+        return {"graph": out.structure.to_numpy(), "candidates": out.metadata["candidates"]}
     if algorithm == "CPCMGraph":  # the DAG of lowest score and its residuals' p-value
         return {"graph": out.structure.to_numpy(), "p_value": out.metadata["p_value"]}
     if algorithm in _PAIRWISE:

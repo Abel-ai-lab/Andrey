@@ -182,6 +182,8 @@ PAIRS: dict[str, dict[str, str]] = {
 #: Rows per pair. The empty graph's SHD on a pair is 1, so a method passes only when its median SHD
 #: is 0: it names the true direction on most draws, as ANM, PNL, and LOCI do from 1,000 rows.
 PAIR_N = 1000
+#: SkewD's and SkewD-MV's search budget in the gate, that of their recovery tests.
+SKEWD_BUDGET = {"tuning_iter": 2, "max_iter": 200}
 
 #: ``(d, n)`` of GIES's published regime, ``interventional_gauss_er``, at ``n = 50d``, drawn by its
 #: benchmark driver: a share :data:`TARGET_SHARE` of the variables, rounded, are intervention
@@ -984,6 +986,10 @@ SUPPORTED: dict[str, Method] = {
     "CPCMGraph": Method(
         lambda x: andrey.cpcm_graph(x, family="gaussian_fixed_scale"), "dag", ("anm_er_n1000_d5",)
     ),
+    # SkewD and SkewD-MV at the recovery tests' budget (tuning_iter=2, max_iter=200): at the
+    # defaults ten draws take hours.
+    "SkewD": Method(lambda x: andrey.skewd(x, **SKEWD_BUDGET), "dag", (f"lsnm_pair_n{PAIR_N}",)),
+    "SkewDMV": Method(lambda x: andrey.skewd_mv(x, **SKEWD_BUDGET), "dag", ("anm_er_n1000_d5",)),
     # Time series: the published settings (lags, levels, and order), on the published regimes.
     "PCMCI": Method(
         _adapted(AndreyPCMCI(name="pcmci", indep_test="student_t", tau_max=2)),

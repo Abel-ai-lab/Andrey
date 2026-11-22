@@ -519,6 +519,8 @@ variable.
    loci
    cpcm
    cpcm_graph
+   skewd
+   skewd_mv
    rcd
    bottom_up_parce_lingam
    gin
@@ -619,6 +621,20 @@ variables and RESIT's order with greedy edge removal above. A column outside its
 raises `ValueError`: a non-integer under `"poisson"`, a value of 0 or less under `"exponential"`,
 or a value of 1 or less under `"pareto"`. The [0.19.0](benchmarks/0.19.0.md#cpcm) release card
 measures both against the authors' code on the paper's pairs and on graphs of 4 to 8 variables.
+
+SkewD (Klippert and Marx 2026), {py:func}`~andrey.skewd`, decides the direction of a variable pair
+whose noise is skewed, in the location-scale model of LOCI with a skew-normal noise. It fits the
+model in each direction, the location and the log scale smooth functions of the proposed cause and
+the shape one number, with penalties chosen by Bayesian optimization of a cross-validated
+likelihood, then decides by the larger likelihood (`criterion="likelihood"`, the default) or by an
+HSIC test of the scaled residual against the cause (`criterion="independence"`). At the defaults a
+pair takes 15 to 22 CPU minutes. SkewD-MV, {py:func}`~andrey.skewd_mv`, is the graph version: it
+learns the Markov equivalence class with PC and returns the DAG of the class whose skew-normal
+location-scale models, one per variable given its parents, have the largest likelihood. It suits a
+few variables: it fits one model per distinct parent set the class allows, and `max_fits` (100 by
+default, the order up to which the paper expects it to apply) makes it refuse a class that needs
+more, before it fits any. The [0.19.0](benchmarks/0.19.0.md#skewd) release card measures both
+against the authors' recorded outputs on the paper's pairs and on graphs of 6 and 10 variables.
 
 IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
 `target`; without one, they join a pair when each is in the other's set and return the graph
@@ -758,27 +774,9 @@ in a process.
    :toctree: api
    :nosignatures:
 
-   skewd
-   skewd_mv
    lges
    rpcmci
 ```
-
-SkewD (Klippert and Marx 2026), {py:func}`~andrey.skewd`, decides the direction of a variable pair
-whose noise is skewed, in the location-scale model of LOCI with a skew-normal noise. It fits the
-model in each direction, the location and the log scale smooth functions of the proposed cause and
-the shape one number, with penalties chosen by Bayesian optimization of a cross-validated
-likelihood, then decides by an HSIC test of the scaled residual against the cause
-(`criterion="independence"`, the default) or by the larger likelihood (`criterion="likelihood"`). At
-the defaults a pair takes tens of minutes. It is experimental until its comparison with the authors'
-code is published.
-
-SkewD-MV, {py:func}`~andrey.skewd_mv`, is the graph version: it learns the Markov equivalence class
-with PC and returns the DAG of the class whose skew-normal location-scale models, one per variable
-given its parents, have the largest likelihood. It suits a few variables: it fits one model per
-distinct parent set the class allows, and `max_fits` (100 by default, the order up to which the
-paper expects it to apply) makes it refuse a class that needs more, before it fits any. It is
-experimental until its comparison with the authors' code is published.
 
 LGES, less greedy equivalence search (Ejaz and Bareinboim 2025), {py:func}`~andrey.lges`, is GES
 with fewer edge additions: it adds no edge between two variables when one graph of the current

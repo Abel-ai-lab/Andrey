@@ -899,7 +899,7 @@ def skewd(
     data: npt.ArrayLike,
     *,
     alpha: float | None = None,
-    criterion: str = "independence",
+    criterion: str = "likelihood",
     tuning_iter: int = 60,
     max_iter: int = 5000,
     seed: int | None = None,
@@ -921,11 +921,11 @@ def skewd(
         Under ``criterion="independence"``: ``None`` chooses the direction with the larger p-value,
         or with the smaller test statistic when the p-values are equal; a significance level such
         as ``0.05`` draws an edge only when exactly one p-value exceeds it. Must be ``None`` under
-        ``criterion="likelihood"``.
-    criterion : {"independence", "likelihood"}, default="independence"
+        ``criterion="likelihood"``, the default.
+    criterion : {"likelihood", "independence"}, default="likelihood"
+        ``"likelihood"`` chooses the direction whose model has the larger likelihood (SkewD-LL);
         ``"independence"`` tests whether each direction's scaled residual is independent of its
-        proposed cause (SkewD-IT); ``"likelihood"`` chooses the direction whose model has the
-        larger likelihood (SkewD-LL). See Notes.
+        proposed cause (SkewD-IT). See Notes.
     tuning_iter : int, default=60
         The penalty settings, at least 1, that the Bayesian optimization scores by
         cross-validation in each direction; the first two thirds, rounded up, are Latin hypercube
@@ -964,8 +964,6 @@ def skewd(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process: the method is not benchmarked yet.
     SearchLimitWarning
         When a direction's refinement stops at ``max_iter`` rather than on its own rule.
     DataTypeWarning
@@ -979,9 +977,10 @@ def skewd(
     independent of the cause ``x``, and no hidden common cause of the two [1]_. It is designed for
     pairs whose noise is skewed, where a model with symmetric noise such as :func:`~andrey.loci`
     can misjudge the scale and the direction; with symmetric noise its model reduces to
-    :func:`~andrey.loci`'s Gaussian one. The paper finds the likelihood criterion the more
-    accurate on skewed location-scale pairs and the independence criterion the more robust across
-    other benchmarks, so the independence criterion is the default.
+    :func:`~andrey.loci`'s Gaussian one. On the paper's skewed additive and location-scale pairs
+    and on Gaussian location-scale pairs, 1,000 rows each, it named the direction as often as the
+    code published with the paper, with either criterion; the likelihood criterion, the default,
+    named it on all 160 pairs measured.
 
     In each direction, the effect given the cause is skew-normal with location ``f``, scale
     ``g``, and one shape ``lambda`` for every row; ``f`` is a cubic B-spline of 12 knots (14
@@ -1001,14 +1000,19 @@ def skewd(
     gives the identical result, and any other factor changes the standardized values in their
     last digits (see Limitations).
 
-    With ``criterion="independence"`` (SkewD-IT), each direction's scaled residual
-    ``(y - f(x)) / g(x)`` is tested against the proposed cause with the HSIC test of
-    :func:`~andrey.loci`: Gaussian kernels, each bandwidth the median distance between the rows,
-    and a gamma approximation of the null distribution [2]_. The larger p-value decides, as the
-    paper says, and ``alpha`` acts as for :func:`~andrey.loci`. With ``criterion="likelihood"``
-    (SkewD-LL), the direction with the larger mean log-likelihood decides, and equal ones give no
-    edge. Both directions draw their random numbers from the same ``seed``, so swapping the
-    columns swaps the fits.
+    With ``criterion="likelihood"`` (SkewD-LL), the direction with the larger mean log-likelihood
+    decides, and equal ones give no edge. With ``criterion="independence"`` (SkewD-IT), each
+    direction's scaled residual ``(y - f(x)) / g(x)`` is tested against the proposed cause with the
+    HSIC test of :func:`~andrey.loci`: Gaussian kernels, each bandwidth the median distance between
+    the rows, and a gamma approximation of the null distribution [2]_. The larger p-value decides,
+    as the paper says, and ``alpha`` acts as for :func:`~andrey.loci`. Both criteria read the same
+    two fits, so they cost the same. ``"likelihood"`` favors accuracy on location-scale pairs: it
+    was right on all 160 measured pairs, against 154 for ``"independence"``, which fell to 17 of 20
+    on Gaussian location-scale pairs; it gives up a p-value and assumes Gaussian marginals of the
+    standardized variables. ``"independence"`` favors robustness, which the paper finds across other
+    pair benchmarks [1]_, and gives a p-value, with an edge only at a chosen ``alpha``. Both
+    directions draw their random numbers from the same ``seed``, so swapping the columns swaps the
+    fits.
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits read only the rows
     where both columns are observed, which for a pair are the rows test-wise deletion keeps;
@@ -1019,19 +1023,18 @@ def skewd(
     random sample of all rows, and otherwise they are a selected sample that more rows do not
     correct.
 
-    **Limitations.** Not benchmarked yet. The paper measures it on skewed location-scale pairs of
-    1,000 rows and on established pair benchmarks [1]_. A fit at the defaults runs about 490
-    CMA-ES searches in each direction, 8 folds for each of the ``tuning_iter`` penalty settings and
-    9 final starts, and takes tens of minutes per pair; ``tuning_iter`` sets most of that cost. Each
-    HSIC test builds matrices with one row and one column per sample. The skew-normal's skewness
-    lies within about -1 and 1, so noise more skewed than that is misspecified, and the likelihood
-    criterion assumes Gaussian marginals of the standardized variables [1]_. A change of units
-    by a factor that is not a power of two changed no edge in 120 refits of 20 pairs (80 to 150
-    rows, ``tuning_iter=3``) and moved 2 of the 240 likelihoods by more than ``1e-6`` (both by
-    0.014, on a pair with no direction), so an edge can change only where the two directions
-    already lie within what another ``seed`` changes. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    **Limitations.** A fit at the defaults runs about 490 CMA-ES searches in each direction, 8 folds
+    for each of the ``tuning_iter`` penalty settings and 9 final starts: on pairs of 1,000 rows it
+    took 15 to 22 CPU minutes (the median of each set), where :func:`~andrey.loci` takes under a
+    second; ``tuning_iter`` sets most of that cost. The `0.19.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#skewd>`_ has the numbers. Each HSIC test
+    builds matrices with one row and one column per sample. The skew-normal's skewness lies within
+    about -1 and 1, so noise more skewed than that is misspecified [1]_. A change of units by a
+    factor that is not a power of two changed no edge in 120 refits of 20 pairs (80 to 150 rows,
+    ``tuning_iter=3``) and moved 2 of the 240 likelihoods by more than ``1e-6`` (both by 0.014, on a
+    pair with no direction), so an edge can change only where the two directions already lie within
+    what another ``seed`` changes. The numbers are a reference, not a hard limit: they change with
+    the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1053,14 +1056,15 @@ def skewd(
     >>> noise = skewnorm.rvs(5, size=300, random_state=rng)
     >>> y = np.tanh(2 * x) + x + (0.4 + 0.2 * np.tanh(x)) * noise
     >>> data = np.column_stack([x, y])
-    >>> out = skewd(data, criterion="likelihood", tuning_iter=2, max_iter=50, seed=0)
+    >>> out = skewd(data, tuning_iter=2, max_iter=50, seed=0)
     >>> out.structure.oriented_edges()
     [(0, 1, 'directed')]
     """
     if criterion == "likelihood" and alpha is not None:
         raise ValueError(
-            f"skewd: alpha must be None under criterion='likelihood', which compares two "
-            f"likelihoods and no p-values, got {alpha!r}"
+            f"skewd: alpha must be None under criterion='likelihood', the default, which compares "
+            f"two likelihoods and no p-values; pass criterion='independence' to test at a level, "
+            f"got {alpha!r}"
         )
     from andrey.core.independence import hsic_median_statistic_log_p
     from andrey.core.warning_policy import warn_search_limit

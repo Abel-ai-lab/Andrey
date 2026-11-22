@@ -107,7 +107,11 @@ five paired fits at 500 variables, and the check of its order search on raw colu
 come from [`published/0.19.0/cpcm.json`](published/0.19.0/cpcm.json), the pair test and the graph
 search with the authors' R code on the paper's pairs and graphs, which also holds the conservative
 estimate's outcomes, the floors, the fresh seeds, and LOCI, ANM, PNL, and eight graph methods on the
-same data. The path and confounder claims are in no release
+same data. Its SkewD rows come from [`published/0.19.0/skewd.json`](published/0.19.0/skewd.json),
+SkewD under both criteria and SkewD-MV against the authors' recorded outputs on the paper's pairs
+and graphs, which also holds the fresh run of the authors' code that checks those outputs, the
+floors, the fresh graph seeds, and LOCI, ANM, PNL, CAM, and five graph methods on the same data. The
+path and confounder claims are in no release
 summary: [`published/0.16.0/knowledge-paths.json`](published/0.16.0/knowledge-paths.json) holds the
 rows of the first eight methods and
 [`published/0.17.0/knowledge-paths.json`](published/0.17.0/knowledge-paths.json) those of the other

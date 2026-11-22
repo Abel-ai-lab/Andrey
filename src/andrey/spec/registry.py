@@ -2128,7 +2128,7 @@ _add(
             "of DAGs scored and fits the number of conditional models fitted.",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         params=(
@@ -3250,11 +3250,13 @@ _add(
             ParamSpec(
                 name="criterion",
                 type="str",
-                default="independence",
-                choices=("independence", "likelihood"),
-                doc="independence = an HSIC test of each direction's scaled residual against its "
-                "proposed cause decides (SkewD-IT); likelihood = the direction whose model has the "
-                "larger likelihood (SkewD-LL).",
+                default="likelihood",
+                choices=("likelihood", "independence"),
+                doc="likelihood = the direction whose model has the larger likelihood (SkewD-LL); "
+                "right on all 160 measured pairs, no p-value, assumes Gaussian marginals of the "
+                "standardized variables. independence = an HSIC test of each direction's scaled "
+                "residual against its proposed cause decides (SkewD-IT); a p-value and alpha, "
+                "robust to that assumption, right on 154 of the 160. Both read the same fits.",
             ),
             _TUNING_ITER,
             concept_param(
@@ -3279,7 +3281,7 @@ _add(
             "statistic, divided by its mean under independence, of each test.",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         references=("Klippert & Marx 2026", "Gretton et al. 2008"),
     )

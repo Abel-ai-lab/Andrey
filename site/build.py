@@ -504,6 +504,12 @@ REGIMES |= {
     "cpcm_graph_paper_lambda1": f"{CPCM_PAPER} graphs of 5 variables, edge penalty 1",
     "cpcm_graph_greedy": f"{CPCM_PAPER} exponential graphs of 4 to 8 variables",
 }
+# The 0.19.0 summary's SkewD cells: the SkewD paper's skewed pairs with the Tagasovska et al.
+# location-scale sets, and its skew-normal graphs of 6 and 10 variables.
+REGIMES |= {
+    "skewd_pairs": "the SkewD paper's skewed pairs and two Gaussian location-scale pair sets",
+    "skewd_mv_graphs": "the SkewD paper's skew-normal location-scale graphs of 6 and 10 variables",
+}
 # The 0.17.0 summary's cells: SCORE and NoGAM on the simulation of their papers, with Gaussian,
 # Laplace, or Gumbel noise, every column z-scored, or each variable rescaled to unit variance
 # before its children read it.
@@ -585,7 +591,8 @@ NOT_SHOWN = {("nonlinear", "anm_er"), ("boss-grasp", "diabetes")}
 # paper's Assumption 3, and its nonlinear cells with GPDC, whose reference reads one column of the
 # dummies. LOCI shows its default criterion, independence, and omits the likelihood criterion.
 # CPCM shows its claimed family arms and omits Table 1's misspecified families, the other family
-# arm of Table 2, and the graphs' edge penalty 1.
+# arm of Table 2, and the graphs' edge penalty 1. SkewD shows its default criterion, the
+# likelihood, and omits the independence criterion.
 # SCORE, NoGAM, and DAS show their z-scored and rescaled cells and omit the cells in the
 # simulation's own units, where the references read those units and Andrey standardizes. NOTEARS
 # omits its cells in the simulation's own units and its rescaled cells, which its release card
@@ -608,6 +615,7 @@ NOT_SHOWN_LANES = {
     "cpcm.misspecified",
     "cpcm.other_arm",
     "cpcm_graph.lambda1",
+    "skewd.independence",
     "score_matching.raw",
     "nogam.raw",
     "das.raw",
@@ -2768,6 +2776,7 @@ RESEARCH_CODE = {
     "NOTEARS authors' code",
     "authors' R RESIT",
     "CPCM authors' R code",
+    "SkewD authors' recorded outputs",
 }
 # Families whose graphs beat the empty graph by link F1 (cross-variable links in the window graph,
 # or adjacencies for LPCMCI), not by errors: a lag window can hold far more errors than the empty
