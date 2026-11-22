@@ -806,7 +806,7 @@ insertion rule counts as a setting of its own.
 
 | Option | Favors | Gives up | Measured |
 |---|---|---|---|
-| `schedule="lges"` (default) | Accuracy on denser graphs | Time | Better in 15 of 16 settings at mean degree 3 and 12 of 16 at degree 4; median fits took 0.9 to 1.8 times as long as LGES-0's (mean degree 2, 4, and 6), and up to 25 times as long over every setting, at mean degree 1 and 3, where the LGES fit ran first in its process and took about 0.25 s more |
+| `schedule="lges"` (default) | Accuracy on denser graphs | Time | Better in 15 of 16 settings at mean degree 3 and 12 of 16 at degree 4; where both ran in one process (the conservative rule at mean degree 1 and 3; the safe fits there ran first and carry about 0.25 s of start-up), median fits took 1.0 to 1.33 times as long as LGES-0's; at mean degree 2, 4, and 6, timed in separate runs, so small differences are noise, 0.9 to 1.8 times |
 | `schedule="lges0_released"` | Time | Accuracy on denser graphs | Better in 1 of 16 settings at mean degree 3; at mean degree 1 and 2 about as many errors as LGES (mean errors summed over 32 settings, 459 against 457), better in 12, LGES in 5, with 15 ties |
 | `insertion="safe"` (default) | The paper's proof that the search recovers the true class as the rows grow | Accuracy | 9,029 errors over the 480 graphs of mean degree 1 to 3, under `schedule="lges"` |
 | `insertion="conservative"` | Fewer errors | That proof | 6,789 errors on those graphs; the lower mean error in 31 of 38 settings, the higher in 3 |

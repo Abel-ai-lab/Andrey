@@ -1775,10 +1775,11 @@ def lges(
         LGES was better in 15 of 16 at mean degree 3 and 12 of 16 at mean degree 4, LGES-0 in 1
         and 2. At mean degree 1 and 2 the two made about as many errors, 457 against 459 summed over
         the 32 settings and rules of the mean errors, with LGES-0 better in 12, LGES in 5, and 15
-        ties. LGES rescans the deletions and reversals after every addition: its median fit took 0.9
-        to 1.8 times as long as LGES-0's (mean degree 2, 4, and 6); over every setting the ratio
-        reached 25, at mean degree 1 and 3, where the LGES fit ran first in its process and took
-        about 0.25 s more.
+        ties. LGES rescans the deletions and reversals after every addition: where both ran in one
+        process (the conservative rule at mean degree 1 and 3; the safe fits there ran first and
+        carry about 0.25 s of start-up), its median fit took 1.0 to 1.33 times as long as LGES-0's;
+        at mean degree 2, 4, and 6, timed in separate runs, so small differences are noise, 0.9 to
+        1.8 times.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
