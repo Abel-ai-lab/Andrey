@@ -1,7 +1,8 @@
 """The ``release`` mark on single cases of a parametrized test.
 
-A ``release`` test is a heavy accuracy check: the release freeze runs it, and pull-request CI
-deselects it with ``-m "not release"`` (``DEVELOPMENT.md``).
+A ``release`` test is a heavy accuracy check: CI deselects it with ``-m "not release"`` on a pull
+request into a release or topic branch and runs it on the release pull request into ``main``
+(``DEVELOPMENT.md``).
 """
 
 from __future__ import annotations

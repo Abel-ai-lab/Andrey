@@ -1,6 +1,6 @@
 """Release gate: find a passing quality-gate run that already checked what is about to be checked.
 
-The quality-gate workflow runs by hand and from ``publish.yml``. A squash merge keeps the tree of
+The quality gate runs on the release pull request into ``main``. A squash merge keeps the tree of
 the pull request's head, so a passing run on a commit with the published commit's tree already
 checked the published files, and ``publish.yml`` skips its own gate. A run on any other tree does
 not count, and neither does a failed run or a lookup that errors: the publish then runs the gate.

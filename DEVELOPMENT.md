@@ -8,7 +8,8 @@ a fork to a pull request, [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) the websi
 ## Repository layout
 
 - `src/andrey/`: the library and its public API.
-- `tests/`: correctness checks; every pull request runs all but the `release`-marked ones.
+- `tests/`: correctness checks; the release pull request runs all of them, and other pull
+  requests all but the `release`-marked ones.
 - `qa/`: the pre-release quality gate, the identity check, baseline capture, and calibration.
 - `benchmarks/`: comparisons with other packages and older Andrey builds.
 - `examples/`: the notebooks.
@@ -288,9 +289,10 @@ reaching a code path no other test reaches, on the smallest input that reaches i
 - Pull-request CI stays fast. A test that is release evidence rather than a correctness check (a
   large-input repeat, a campaign-style recovery cell, anything over about 30 seconds on a CI
   runner) carries `@pytest.mark.release`, on the test or, through `release_cases`
-  (`tests/release.py`), on single cases of a parametrized test. Pull-request CI deselects it with
-  `-m "not release"`; a push to `main`, a manual run of `ci.yml`, and the release freeze run the
-  whole suite, marked tests included. Every method keeps an unmarked recovery test, so a broken
+  (`tests/release.py`), on single cases of a parametrized test. CI deselects it with
+  `-m "not release"` on a pull request into a release or topic branch; the release pull request
+  into `main`, a push to `main`, and a manual run of `ci.yml` run the whole suite, marked tests
+  included. Every method keeps an unmarked recovery test, so a broken
   method still fails on its pull request: a method's only recovery test stays unmarked however long
   it takes.
 
@@ -350,13 +352,13 @@ uv run python -m qa.quality_gate <NAME>
 ```
 
 On each dataset the method passes when its median SHD is below the empty graph's and within its
-tolerance of the recorded baseline in either direction. The gate is a release gate: it runs once
-per release, at the release freeze, and no pull request runs it. The `quality-gate` workflow runs
-it by hand (`gh workflow run quality-gate.yml --ref <branch>`); a run on a commit that changes only
-`docs/`, `site/`, or top-level Markdown files since a passing run reuses that run, and the publish
-reuses a passing run when the tagged commit has the same tree and runs the gate itself otherwise.
-`--jobs N` fits N cells at a time. A pull request that changes a method's gate check runs only the
-gate's consistency tests, `tests/recovery/test_quality_gate.py`, which read the ledger without
+tolerance of the recorded baseline in either direction. The gate runs once per release, on the
+release pull request into `main`, which `main` requires to pass; a push that changes only `docs/`,
+`site/`, or top-level Markdown files reuses an earlier passing run, and the publish reuses that run
+when the tagged commit has the same tree and runs the gate itself otherwise. The `quality-gate`
+workflow also runs by hand: `gh workflow run quality-gate.yml --ref <branch>`. `--jobs N` fits N
+cells at a time. A pull request into a release branch that changes a method's gate check runs only
+the gate's consistency tests, `tests/recovery/test_quality_gate.py`, which read the ledger without
 fitting the methods; run the method's cells with `qa.quality_gate <NAME>` before asking for review.
 [`qa/README.md`](qa/README.md#quality-gate) lists the datasets and tolerances. Reference parity is a
 soft gate: the quality gate also flags any published benchmark row where Andrey makes more errors
@@ -408,17 +410,14 @@ release's tag follows it. A required check, `release-branch`, fails a pull reque
 any other branch, or from a release branch whose `pyproject.toml` version is not the branch's
 `<x.y.z>`, since the tag and the site take the package's version. A post release,
 `release/<x.y.z>.post<n>`, fixes the site or the docs of the release on `main`: the check also
-fails one that changes anything under `src/` or whose `main` is not at `<x.y.z>`.
+fails one that changes anything under `src/` or whose `main` is not at `<x.y.z>`. The release pull
+request runs the quality gate (`qa/README.md`), also required, once for the whole release.
 
 Pull-request CI (`.github/workflows/ci.yml`, [Testing](docs/docs/ci.md)) runs lint, types, the
-unit tests, the cheap recovery checks, and the fast consistency tests, with `-m "not release"`;
-its other triggers (a push to `main`, a manual run, and the tag's site deploy) run every test.
-The heavy accuracy checks are release gates, run once per release at the freeze on the code
-being released: the full test suite with every extra and the `release`-marked tests
-(`pytest tests -n auto --dist loadfile`), and the quality gate (`qa/README.md`). The freeze report
-records each gate's command, machine, and result. `main`'s ruleset requires a passing
-`quality-gate` check on the release pull request's head, so after the last push to the release
-branch the workflow runs by hand on it: `gh workflow run quality-gate.yml --ref release/<x.y.z>`.
+unit tests, the cheap recovery checks, and the fast consistency tests; on a pull request into a
+release or topic branch it deselects the heavy accuracy checks with `-m "not release"`. The release
+pull request into `main` runs every test, the `release`-marked ones included, and so do CI's other
+triggers: a push to `main`, a manual run, and the tag's site deploy.
 
 At each release's freeze the benchmark harness's own tests run too, outside CI: CI runs only the two
 endpoint-conversion files of `benchmarks/tests`, and the rest, which need the harness environments,

@@ -23,10 +23,10 @@ env:
   OPENBLAS_NUM_THREADS: 1
   MKL_NUM_THREADS: 1
   NUMEXPR_NUM_THREADS: 1
-  # A pull request deselects the heavy accuracy checks, the tests marked `release`
-  # (DEVELOPMENT.md); a push to main, a manual run, and a call from deploy-prod.yml run every test
-  # (an empty `-m` selects them all).
-  TEST_MARKS: ${{ github.event_name == 'pull_request' && 'not release' || '' }}
+  # A pull request into a release or topic branch deselects the heavy accuracy checks, the tests
+  # marked `release` (DEVELOPMENT.md); the release pull request into main, a push to main, a manual
+  # run, and a call from deploy-prod.yml run every test (an empty `-m` selects them all).
+  TEST_MARKS: ${{ github.event_name == 'pull_request' && github.base_ref != 'main' && 'not release' || '' }}
 
 # Jobs that need more (lint's PR file list) say so themselves.
 permissions:
