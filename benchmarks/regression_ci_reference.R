@@ -18,7 +18,8 @@
 #   pcm_gam   6 calls of that pcm_test with their additive models (gam_reg_method, gam_gtilde, and
 #             gam_vhat_reg_method), as their Section 6.1 simulations run it; a call that stops with
 #             an error of the smoothing fit gives NA
-# The PCM authors' code is read from `$PCM_CODE` (a clone of their simulation repository).
+# The PCM authors' code is read from `$ANDREY_BENCH_PCM_CODE`, a clone of their simulation
+# repository.
 
 args <- commandArgs(TRUE)
 folder <- args[1]
@@ -35,7 +36,7 @@ if (mode %in% c("wgcm_est", "wgcm_fix")) {
   resid <- function(v, Z) as.numeric(weightedGCM:::get_residuals(v, Z, "xgboost"))
 }
 if (mode %in% c("pcm_lm", "pcm_rf", "pcm_gam")) {
-  source(file.path(Sys.getenv("PCM_CODE"), "test_functions.R"))
+  source(file.path(Sys.getenv("ANDREY_BENCH_PCM_CODE"), "test_functions.R"))
   suppressPackageStartupMessages(library(ranger))
   suppressPackageStartupMessages(library(mgcv))
 }
