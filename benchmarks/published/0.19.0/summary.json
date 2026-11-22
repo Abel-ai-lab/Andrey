@@ -79,6 +79,11 @@
      "AMD EPYC 7713 64-Core Processor",
      "AMD EPYC 9534 64-Core Processor"
     ],
+    "cpu_by_part": {
+     "pairs": "AMD EPYC 9534 64-Core Processor",
+     "graphs, seeds 0-19": "AMD EPYC 7713 64-Core Processor",
+     "graphs, seeds 20-39": "AMD EPYC 9534 64-Core Processor"
+    },
     "cores_per_fit": 1,
     "blas_threads": 1
    }
@@ -9526,7 +9531,7 @@
    "comparator_setting": "SkewD-LL as recorded per dataset by the code published with the paper (commit 312632b), run by the authors with the paper's arguments on the same data files; checked by a reduced fresh run (reference_check in the lane file)",
    "lane": "skewd",
    "output": "two-node DAG",
-   "hardware": "AMD EPYC 7713 64-Core Processor, AMD EPYC 9534 64-Core Processor for Andrey's fits, 1 core per fit, 1 BLAS thread; the recorded outputs hold no times",
+   "hardware": "AMD EPYC 9534 64-Core Processor for Andrey's fits of every method on the pairs, 1 core per fit, 1 BLAS thread; the recorded outputs hold no times",
    "cores": 1,
    "build": "Andrey at commit 4c1cda49b of the functional-models line, from before 0.18.0. The SkewD code of 0.18.0 and 0.19.0 is the same, except that each column's mean and variance are summed over its sorted values (so they do not depend on the row order), which changes the standardized values in their last digits: refits of 3 of these pairs, both criteria, and one 6-variable graph at small budgets gave the same edges on both builds, with likelihoods that agree to about 1e-9 relative, and PC's class as SkewD-MV computes it, with the same column order, is the same on all 80 graph datasets under both builds. The criteria are read from one fit per pair",
    "same_graph_test": "the same direction",
@@ -10140,7 +10145,7 @@
    "comparator_setting": "SkewD-IT as recorded per dataset by the code published with the paper (commit 312632b), run by the authors with the paper's arguments on the same data files; checked by a reduced fresh run (reference_check in the lane file)",
    "lane": "skewd.independence",
    "output": "two-node DAG",
-   "hardware": "AMD EPYC 7713 64-Core Processor, AMD EPYC 9534 64-Core Processor for Andrey's fits, 1 core per fit, 1 BLAS thread; the recorded outputs hold no times",
+   "hardware": "AMD EPYC 9534 64-Core Processor for Andrey's fits of every method on the pairs, 1 core per fit, 1 BLAS thread; the recorded outputs hold no times",
    "cores": 1,
    "build": "Andrey at commit 4c1cda49b of the functional-models line, from before 0.18.0. The SkewD code of 0.18.0 and 0.19.0 is the same, except that each column's mean and variance are summed over its sorted values (so they do not depend on the row order), which changes the standardized values in their last digits: refits of 3 of these pairs, both criteria, and one 6-variable graph at small budgets gave the same edges on both builds, with likelihoods that agree to about 1e-9 relative, and PC's class as SkewD-MV computes it, with the same column order, is the same on all 80 graph datasets under both builds. The criteria are read from one fit per pair",
    "same_graph_test": "the same direction",
@@ -10754,7 +10759,7 @@
    "comparator_setting": "SkewD-MV as recorded per dataset by the code published with the paper (commit 312632b), with its PC class; checked by a reduced fresh run",
    "lane": "skewd_mv",
    "output": "DAG",
-   "hardware": "AMD EPYC 7713 64-Core Processor, AMD EPYC 9534 64-Core Processor for Andrey's fits, 1 core per fit, 1 BLAS thread",
+   "hardware": "AMD EPYC 7713 64-Core Processor for Andrey's fits of every method on seeds 0-19 and AMD EPYC 9534 64-Core Processor on seeds 20-39, 1 core per fit, 1 BLAS thread",
    "cores": 1,
    "build": "Andrey at commit 4c1cda49b of the functional-models line, from before 0.18.0. The SkewD code of 0.18.0 and 0.19.0 is the same, except that each column's mean and variance are summed over its sorted values (so they do not depend on the row order), which changes the standardized values in their last digits: refits of 3 of these pairs, both criteria, and one 6-variable graph at small budgets gave the same edges on both builds, with likelihoods that agree to about 1e-9 relative, and PC's class as SkewD-MV computes it, with the same column order, is the same on all 80 graph datasets under both builds. The criteria are read from one fit per pair",
    "same_graph_test": "the same adjacency",
