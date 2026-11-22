@@ -18,13 +18,13 @@ names its pull request.
 ### Added
 
 - In every conditional-independence search that deletes rows per test, a query with too few rows,
-  including a pair never observed together, or zero degrees of freedom is not tested: it neither
-  separates a pair nor confirms a link; `markov_check` leaves such facts out of its summary and
-  sparse-table warning. `metadata["not_tested"]` counts the conditioning sets not tested, including
-  those skipped because no row can test them, `metadata["undecided_pairs"]` lists the pairs no
-  tested query could decide, and `metadata["never_observed_together"]` the pairs of columns no row
-  observes together; the notice for `missing=None` counts each kind of pair over every fit of a
-  `bootstrap`, and names them when there are at most five. An undecided pair is left out of the
+  including a pair never observed together, or zero degrees of freedom is not tested: it never
+  separates a pair and never confirms a link; `markov_check` leaves such facts out of its summary
+  and sparse-table warning. `metadata["not_tested"]` counts the conditioning sets not tested,
+  including those skipped because no row can test them, `metadata["undecided_pairs"]` lists the
+  pairs no tested query could decide, and `metadata["never_observed_together"]` the pairs of columns
+  no row observes together; the notice for `missing=None` counts each kind of pair over every fit of
+  a `bootstrap`, and names them when there are at most five. An undecided pair is left out of the
   graph of PC, FCI, CD-NOD, FCI-JCI, PCMCI, PCMCI+, and LPCMCI and the Markov-blanket searches'
   sets, and no orientation reads it as adjacent or apart: a triple whose ends are undecided, and in
   LPCMCI one with an undecided side, is neither a collider nor a non-collider. In PC, FCI, CD-NOD,
@@ -252,7 +252,7 @@ names its pull request.
 
 ### Fixed
 
-- The docs omit the claim that FCI with test-wise deletion stays sound when values are missing for a
+- The docs no longer say that FCI with test-wise deletion stays sound when values are missing for a
   reason: its citation covers another procedure. Every method that deletes rows per test shares one
   validity sentence for values missing completely at random, and the guide's text on `None` and on
   structural EM is corrected. ([#1102])

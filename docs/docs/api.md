@@ -109,16 +109,17 @@ accept missing values, a `NaN` cell, pandas' `NA`, or an empty, `NA`, or `N/A` f
 each conditional-independence test reads only the rows where all of its variables are observed
 (test-wise deletion), as do the pair tests `anm`, `pnl`, `loci`, and `skewd`, which read the rows
 where both columns are observed; `metadata["rows_tested"]` gives the fewest (`min`) and the median
-rows a test read. Test-wise deletion is valid when values are missing completely at random, meaning
-missingness depends on no value in the data; the rows a test reads are then a random sample of all
-rows, and otherwise they are a selected sample that more rows do not correct. Their argument
-`missing` names the handling: `"testwise"` is test-wise deletion, and `None`, the default, picks
-`"testwise"` and logs one notice per process naming it; `metadata["missing"]` records the one a fit
-used. In the conditional-independence searches, a test with too few rows or zero remaining degrees
-of freedom is not tested: it neither separates a pair nor confirms a link; the pair methods instead
-raise `ValueError` when fewer than 2 rows observe both columns. `metadata["p_one_tests"]`, present
-when it is not zero, counts the tests that returned a p-value of 1. `metadata["not_tested"]` counts
-the conditioning sets not tested, including those the search skipped because no row can test them,
+rows a test read. Test-wise deletion is valid when values are missing completely at random, which
+means that whether a value is missing depends on no value in the data; the rows a test reads are
+then a random sample of all rows, and otherwise they are a selected sample that more rows do not
+correct. Their argument `missing` names the handling: `"testwise"` is test-wise deletion, and
+`None`, the default, picks `"testwise"` and logs one notice per process naming it;
+`metadata["missing"]` records the one a fit used. In the conditional-independence searches, a test
+with fewer rows than it needs, or with zero degrees of freedom left, is not tested: it never
+separates a pair and never confirms a link; the pair methods instead raise `ValueError` when fewer
+than 2 rows observe both columns. `metadata["p_one_tests"]`, present when it is not zero, counts the
+tests that returned a p-value of 1. `metadata["not_tested"]` counts the conditioning sets not
+tested, including those the search skipped because no row can test them,
 `metadata["undecided_pairs"]` lists the pairs no tested query could decide, which the graph leaves
 out and no orientation reads, and `metadata["never_observed_together"]` the pairs of columns no row
 observes together. In PC, FCI, CD-NOD, FCI-JCI, the Markov-blanket searches, PCMCI, PCMCI+, and

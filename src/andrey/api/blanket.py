@@ -364,18 +364,17 @@ def iamb(
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
     the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
-    2 for most other tests), or with no degrees of freedom left, is not tested: it neither separates
-    a pair nor confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
     tested, including sets skipped because no row can test them. A candidate no tested query
     separated stays in the target's set, but a pair no tested query could decide, as a variable
     never observed with the target, is undecided: it is left out of the set and the graph and listed
     in ``metadata["undecided_pairs"]``. A drawn edge an untested conditioning set might have
-    separated is listed in ``metadata["possibly_separable"]``: a flag of untested conditions, not
-    evidence of a false edge; under ``possibly_separable="ambiguous"``, the CPDAG takes a triple
-    with a side it reads (see ``possibly_separable``) as neither a collider nor a non-collider. On
-    merged cohorts, pairs measured only in different cohorts are undecided. A continuous column
-    constant on a test's rows raises
-    ``ValueError``. Test-wise deletion is valid
+    separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could not
+    check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``, the CPDAG
+    takes a triple with a side it reads (see ``possibly_separable``) as neither a collider nor a
+    non-collider. On merged cohorts, pairs measured only in different cohorts are undecided. A
+    continuous column constant on a test's rows raises ``ValueError``. Test-wise deletion is valid
     when values are missing completely at random, which means that whether a value is missing
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.
@@ -691,18 +690,17 @@ def inter_iamb(
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
     the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
-    2 for most other tests), or with no degrees of freedom left, is not tested: it neither separates
-    a pair nor confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
     tested, including sets skipped because no row can test them. A candidate no tested query
     separated stays in the target's set, but a pair no tested query could decide, as a variable
     never observed with the target, is undecided: it is left out of the set and the graph and listed
     in ``metadata["undecided_pairs"]``. A drawn edge an untested conditioning set might have
-    separated is listed in ``metadata["possibly_separable"]``: a flag of untested conditions, not
-    evidence of a false edge; under ``possibly_separable="ambiguous"``, the CPDAG takes a triple
-    with a side it reads (see ``possibly_separable``) as neither a collider nor a non-collider. On
-    merged cohorts, pairs measured only in different cohorts are undecided. A continuous column
-    constant on a test's rows raises
-    ``ValueError``. Test-wise deletion is valid
+    separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could not
+    check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``, the CPDAG
+    takes a triple with a side it reads (see ``possibly_separable``) as neither a collider nor a
+    non-collider. On merged cohorts, pairs measured only in different cohorts are undecided. A
+    continuous column constant on a test's rows raises ``ValueError``. Test-wise deletion is valid
     when values are missing completely at random, which means that whether a value is missing
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.
@@ -1008,18 +1006,17 @@ def mmpc(
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
     the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
-    2 for most other tests), or with no degrees of freedom left, is not tested: it neither separates
-    a pair nor confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
     tested, including sets skipped because no row can test them. A candidate no tested query
     separated stays in the target's set, but a pair no tested query could decide, as a variable
     never observed with the target, is undecided: it is left out of the set and the graph and listed
     in ``metadata["undecided_pairs"]``. A drawn edge an untested conditioning set might have
-    separated is listed in ``metadata["possibly_separable"]``: a flag of untested conditions, not
-    evidence of a false edge; under ``possibly_separable="ambiguous"``, the CPDAG takes a triple
-    with a side it reads (see ``possibly_separable``) as neither a collider nor a non-collider. On
-    merged cohorts, pairs measured only in different cohorts are undecided. A continuous column
-    constant on a test's rows raises
-    ``ValueError``. Test-wise deletion is valid
+    separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could not
+    check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``, the CPDAG
+    takes a triple with a side it reads (see ``possibly_separable``) as neither a collider nor a
+    non-collider. On merged cohorts, pairs measured only in different cohorts are undecided. A
+    continuous column constant on a test's rows raises ``ValueError``. Test-wise deletion is valid
     when values are missing completely at random, which means that whether a value is missing
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.

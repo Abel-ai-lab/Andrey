@@ -533,11 +533,11 @@ class WGCM(_RegressionTest):
         learned weight. On the same 200 draws of each of the 7 alternative cells of [1]_ (example 7,
         1D, and 10D.Add, at 200 and 400 rows), with ``"boosting"`` tuned as in
         :class:`~andrey.core.ci_regression.GCM`, ``"fix"`` rejected at 0.05 in 21 to 96.5% against
-        10.5 to 60.5%, more often in all 7, including at critical values from each variant's null
-        draws (15 to 95% against 10.5 to 52.5%); paired power was not measured under shipped tuning.
-        With shipped ``"boosting"`` on the 12 null designs of Limitations, ``"est"`` rejected true
-        independence at 0.05 in 4 to 13% by design against 4 to 8.6%, and queries at 200 to 400 rows
-        took 21 to 26 s against 11 to 15 s.
+        10.5 to 60.5%, more often in all 7, and in all 7 too at critical values from each variant's
+        null draws (15 to 95% against 10.5 to 52.5%); paired power was not measured under shipped
+        tuning. With shipped ``"boosting"`` on the 12 null designs of Limitations, ``"est"``
+        rejected true independence at 0.05 in 4 to 13% by design against 4 to 8.6%, and queries at
+        200 to 400 rows took 21 to 26 s against 11 to 15 s.
     regression : {"boosting", "forest", "linear"}, default="boosting"
         The regression of each variable, and of the products of residuals, on the conditioning set.
         ``"boosting"`` is boosted regression trees whose learning rate (0.1, 0.2, 0.3, or 0.5),

@@ -66,10 +66,10 @@ Four limits apply to the first table:
   orientations wrong. This holds for `fci` too: the procedure that
   [Strobl, Visweswaran, and Spirtes (2018)][strobl] prove sound for values missing for a reason
   confirms each independence on the complete rows, and it is not the one `"testwise"` runs.
-- You can drop incomplete rows before running the method. For independent rows, this preserves the
-  population when values are missing completely at random and enough complete rows remain. Check how
-  many remain, and drop the same rows from `env` and every other argument with one entry per row.
-  Never drop a step of a time series.
+- Dropping incomplete rows, then running the method, is your own step. For independent rows, this
+  keeps the population when values are missing completely at random and enough complete rows
+  remain. Check how many remain, and drop the same rows from `env` and every other argument with one
+  entry per row. Never drop a step of a time series.
 - Every other method [refuses missing values](#methods-that-refuse-missing-values).
 
 The data alone cannot explain the missingness; how they were collected is the best guide. With
@@ -114,11 +114,12 @@ out.metadata["rows_tested"]
 andrey.pc(gappy, missing="testwise").structure == out.structure
 ```
 
-For every method, test-wise deletion is valid when values are missing completely at random:
-missingness depends on no value in the data, so each test reads a random sample of all rows.
-Otherwise, it reads a selected sample that more rows do not correct. With a selected sample, the
-tests can find dependence where the population has none, and a fit can keep extra edges
-([Tu et al., 2019][tu]) and get orientations wrong.
+Test-wise deletion is valid when values are missing completely at random, which means that whether a
+value is missing depends on no value in the data; the rows a test reads are then a random sample of
+all rows, and otherwise they are a selected sample that more rows do not correct. This is the
+condition for every method that deletes rows per test. With a selected sample, the tests can find
+dependence where the population has none, and a fit can keep extra edges ([Tu et al., 2019][tu]) and
+get orientations wrong.
 
 A time series keeps every step: each row of the lagged design that reads a missing value holds it.
 Each test of PCMCI, PCMCI+, or LPCMCI reads the design rows where all of its lagged variables are
@@ -126,9 +127,9 @@ observed.
 
 A test needs enough rows where its variables are observed: `|S| + 4` for `fisherz` and
 `normal_scores`, `|S| + 3` for `student_t` and `cond_gauss`, with `|S|` the size of its conditioning
-set, and 2 for most other tests. A test with too few rows or zero remaining degrees of freedom, as
+set, and 2 for most other tests. A test with fewer rows, or with zero degrees of freedom left, as
 when a column has one category on the test's rows, is not tested, a pair never observed together
-included: it neither separates a pair nor confirms a link. So is a CD-NOD or FCI-JCI test whose
+included: it never separates a pair and never confirms a link. So is a CD-NOD or FCI-JCI test whose
 `env` is constant on its rows, which then come from one environment. CD-NOD and FCI-JCI need a
 complete `env`.
 
@@ -184,10 +185,11 @@ Merged cohorts often leave undecided pairs; cohort membership is rarely random, 
 deletion may be invalid. A few rows that observe every column decide the pairs the cohorts keep
 apart, but a test of such a pair reads only those rows, and the row floor above is the statistical
 minimum: a test on a few rows has little power, so it can separate a pair that the rest of the data
-show dependent and remove a true edge. Only rows that observe both columns of a pair decide it:
-capping the conditioning sets with `max_depth` (`max_p_global` in LPCMCI and the same-step phases of
-PCMCI+) decides none. With `max_depth=0`, PC, FCI, and the Markov-blanket searches flag no edge
-because they ask no conditioning set, not because one was checked.
+show dependent and remove a true edge. Such rows decide more pairs and cost some edges between
+variables observed together. Only rows that observe both columns of a pair decide it: capping the
+conditioning sets with `max_depth` (`max_p_global` in LPCMCI and the same-step phases of PCMCI+)
+decides none. With `max_depth=0`, PC, FCI, and the Markov-blanket searches flag no edge because they
+ask no conditioning set, not because one was checked.
 
 With `fisherz` and `student_t`, tests compute correlations directly from their rows, many tests at
 once. When the rows fall into a few missingness patterns, as in data merged from cohorts that each
