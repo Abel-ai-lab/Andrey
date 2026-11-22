@@ -746,10 +746,11 @@ class PCM(_RegressionTest):
         conditional means are additive: on the null of the paper's Section 6.1 (seven conditioning
         variables, 500 draws per size) it rejected 0.4% at 0.05 with 250 rows and 0.2% with 500. It
         gives up interactions, rejecting 97.6% of the Section 6.2 null at 500 rows, and time as the
-        rows grow. ``"forest"`` favors interactions, rejecting 34.4% of that null at 500 rows and
-        4.0% of 50 draws at 10,000; it gives up the Section 6.1 null, rejected in 99.9% of draws at
-        250 rows and 97.3% at 500, as ``"boosting"`` rejected 97.7% at 250. ``"linear"`` and the
-        time of the four were not measured against each other.
+        rows grow. ``"forest"`` favors interactions: it rejected 34.4% of that null at 500 rows,
+        where no regression measured held the level, and 4.0% of 50 draws at 10,000. It gives up
+        the Section 6.1 null, rejected in 99.9% of draws at 250 rows and 97.3% at 500, as
+        ``"boosting"`` rejected 97.7% at 250. ``"linear"`` and the time of the four were not
+        measured against each other.
     n_splits : int, default=6
         The number of random sample splits whose statistics are averaged, at least ``1``.
     seed : int or None, default=None

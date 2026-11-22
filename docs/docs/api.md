@@ -900,7 +900,7 @@ at 0.05; each of the additive default's cells has 500 draws:
 | Setting | Favors | Gives up | Measured |
 |---|---|---|---|
 | `regression="additive"` (default) | The level where the conditional means are additive | Interactions, and time as the rows grow | 0.4% of the 6.1 null at 250 rows and 0.2% at 500; 97.6% of the 6.2 null at 500 rows; about 7 s per query on nine columns at 250 rows, 29 s at 500, and 6 minutes at 1,000 |
-| `regression="forest"` | Interactions | The 6.1 null | 34.4% of the 6.2 null at 500 rows and 4.0% of 50 draws at 10,000; 99.9% of the 6.1 null at 250 rows and 97.3% at 500 |
+| `regression="forest"` | Interactions | The 6.1 null | 34.4% of the 6.2 null at 500 rows, where no regression measured held the level (additive 97.6%), and 4.0% of 50 draws at 10,000; 99.9% of the 6.1 null at 250 rows and 97.3% at 500 |
 | `regression="boosting"` | Nonlinear conditional means of several variables | The 6.1 null | 97.7% of the 6.1 null at 250 rows |
 | `regression="linear"` | Time: one fit | The level, where a nonlinear conditional mean leaves a covariance in the residuals | Not measured |
 
