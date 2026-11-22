@@ -127,11 +127,11 @@ def notears(
         the six searches took 2 to 72 times as long as the same search on the complete data. See
         **Missing values.** in Notes.
     n_em_iterations : int, default=10
-        The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
-        1. Each round runs the search once, so the time grows with them. A fit whose last round
-        still changed the graph logs a warning; more rounds let some such fits settle on a graph,
-        and others keep changing between graphs. Values other than 10 are not benchmarked yet.
-        Changes nothing on complete data or with ``missing=None``. See **Missing values.** in Notes.
+        Structural EM rounds for ``missing="em"`` on data with missing values, at least 1. Each
+        round runs the search once, increasing runtime. A fit whose last round changed the graph
+        logs a warning; more rounds stabilize some graphs, while others keep changing. Values other
+        than 10 are not benchmarked. Changes nothing on complete data or with ``missing=None``. See
+        **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Forbidden edges, edges into an
@@ -216,35 +216,34 @@ def notears(
     thread, so the host's thread count does not change it.
 
     **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``: the loss
-    fits every variable over the same rows, so a row with a missing value has no place in it. The
-    loss reads the data only through their covariance, so ``missing="em"`` runs structural EM [7]_
-    [8]_, which Gao et al. [8]_ run with NOTEARS: under a linear-Gaussian model of the current
-    graph, each row's missing values are Gaussian given its observed ones, and their conditional
-    means and covariances give the expected covariance of the data (the E-step); the fit runs on it,
-    with all of its settings, and the model's coefficients and noise variances are fit again by
-    least squares on the parents the fit returns (the M-step). Gao et al. [8]_ keep, in the M-step,
-    the weights the fit returns and one noise variance shared by every variable; here the weights
-    and each variable's noise variance are fit again. The weights it returns are the last round's
-    fit on its expected covariance. ``standardize`` scales the expected covariance to unit
-    variances. A row that observes no value is dropped first: it holds no information on the model.
-    It runs ``n_em_iterations`` rounds, by default the 10 that Gao et al. [8]_ run, from no edges
-    and each column's mean and variance over its observed values, and it alternates as Friedman [7]_
-    describes: before each fit after the first, 5 parameter steps refit the current graph's
-    coefficients and noise variances, each on the expected covariance under the step before it.
-    Friedman [7]_ leaves the number of parameter steps open. The first fit reads the expected
-    covariance under the model with no edge, where every covariance is shrunk toward zero. Measured
-    with ``ges``, ``boss``, and ``grasp`` at 2,000 rows, the first search returned many extra edges;
-    with one refit per round the later rounds removed them slowly and the graph was still changing
-    after 10 rounds, and with 5 parameter steps it had settled within them in most fits.
+    requires complete rows for every variable. The loss reads the data only through their
+    covariance, so ``missing="em"`` runs structural EM [7]_ [8]_, which Gao et al. [8]_ run with
+    NOTEARS: under a linear-Gaussian model of the current graph, each row's missing values are
+    Gaussian given its observed ones, and their conditional means and covariances give the expected
+    covariance of the data (the E-step); the fit runs on it, with all of its settings, and the
+    model's coefficients and noise variances are fit again by least squares on the parents the fit
+    returns (the M-step). Gao et al. [8]_ keep, in the M-step, the weights the fit returns and one
+    noise variance shared by every variable; here the weights and each variable's noise variance are
+    fit again. The weights it returns are the last round's fit on its expected covariance.
+    ``standardize`` scales the expected covariance to unit variances. A row with no observed value
+    is dropped first because it holds no model information. It runs ``n_em_iterations`` rounds, by
+    default the 10 that Gao et al. [8]_ run, from no edges and each column's mean and variance over
+    its observed values, and it alternates as Friedman [7]_ describes: before each fit after the
+    first, 5 parameter steps refit the current graph's coefficients and noise variances, each on the
+    expected covariance under the step before it. Friedman [7]_ leaves the number of parameter steps
+    open. The first fit reads the expected covariance under the edgeless model, which shrinks every
+    covariance toward zero. Measured with ``ges``, ``boss``, and ``grasp`` at 2,000 rows, the first
+    search returned many extra edges; with one refit per round, later rounds removed them slowly and
+    graphs kept changing after 10 rounds; with 5 parameter steps, most fits settled within them.
     ``metadata["em"]`` records ``iterations``, the rounds; ``parameter_steps``, the parameter steps
     before each fit after the first; ``log_likelihood``, the observed-data log-likelihood of the
     model after each round, which can fall in a round that changes the graph; and ``graph_changed``,
-    whether each round's fit returned another graph than the round before. When the last round
-    changed the graph, EM has not settled on one, which is more common with few rows, and the fit
-    logs a warning that names ``n_em_iterations``: more rounds let some such fits settle on a graph,
-    others keep changing between graphs, and values other than 10 are not benchmarked yet. EM holds
-    when values are missing completely at random or at random given observed values; when whether a
-    value is missing depends on the missing values themselves, the expected covariance is biased,
+    whether the graph changed from the previous round. A graph change in the last round means EM has
+    not settled, more commonly with few rows, and triggers a warning naming ``n_em_iterations``:
+    more rounds stabilize some graphs, while others keep changing; values other than 10 are not
+    benchmarked. EM holds when values are missing completely at random or at random given observed
+    values; when missingness depends on the missing values themselves, the expected covariance is
+    biased,
     and the data cannot show it. On complete data, ``"em"`` gives the complete-data result. Without
     ``"em"``, drop the incomplete rows yourself, which suits values missing completely at random, or
     use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
@@ -425,11 +424,11 @@ def dagma(
         10 times. Its time against complete data was not measured with this search. See **Missing
         values.** in Notes.
     n_em_iterations : int, default=10
-        The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
-        1. Each round runs the search once, so the time grows with them. A fit whose last round
-        still changed the graph logs a warning; more rounds let some such fits settle on a graph,
-        and others keep changing between graphs. Values other than 10 are not benchmarked yet.
-        Changes nothing on complete data or with ``missing=None``. See **Missing values.** in Notes.
+        Structural EM rounds for ``missing="em"`` on data with missing values, at least 1. Each
+        round runs the search once, increasing runtime. A fit whose last round changed the graph
+        logs a warning; more rounds stabilize some graphs, while others keep changing. Values other
+        than 10 are not benchmarked. Changes nothing on complete data or with ``missing=None``. See
+        **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Forbidden edges, edges into an
@@ -518,35 +517,34 @@ def dagma(
     thread, so the host's thread count does not change it.
 
     **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``: the loss
-    fits every variable over the same rows, so a row with a missing value has no place in it. The
-    loss reads the data only through their covariance, so ``missing="em"``, experimental, runs
-    structural EM [7]_ [8]_, which Gao et al. [8]_ run with NOTEARS: under a linear-Gaussian model
-    of the current graph, each row's missing values are Gaussian given its observed ones, and their
-    conditional means and covariances give the expected covariance of the data (the E-step); the fit
-    runs on it, with all of its settings, and the model's coefficients and noise variances are fit
-    again by least squares on the parents the fit returns (the M-step). Gao et al. [8]_ keep, in the
-    M-step, the weights the fit returns and one noise variance shared by every variable; here the
-    weights and each variable's noise variance are fit again. The weights it returns are the last
-    round's fit on its expected covariance. ``standardize`` scales the expected covariance to unit
-    variances. A row that observes no value is dropped first: it holds no information on the model.
-    It runs ``n_em_iterations`` rounds, by default the 10 that Gao et al. [8]_ run, from no edges
-    and each column's mean and variance over its observed values, and it alternates as Friedman [7]_
+    requires complete rows for every variable. The loss reads the data only through their
+    covariance, so ``missing="em"``, experimental, runs structural EM [7]_ [8]_, which Gao et al.
+    [8]_ run with NOTEARS: under a linear-Gaussian model of the current graph, each row's missing
+    values are Gaussian given its observed ones, and their conditional means and covariances give
+    the expected covariance of the data (the E-step); the fit runs on it, with all of its settings,
+    and the model's coefficients and noise variances are fit again by least squares on the parents
+    the fit returns (the M-step). Gao et al. [8]_ keep, in the M-step, the weights the fit returns
+    and one noise variance shared by every variable; here the weights and each variable's noise
+    variance are fit again. The weights it returns are the last round's fit on its expected
+    covariance. ``standardize`` scales the expected covariance to unit variances. A row with no
+    observed value is dropped first because it holds no model information. It runs
+    ``n_em_iterations`` rounds, by default the 10 that Gao et al. [8]_ run, from no edges and each
+    column's mean and variance over its observed values, and it alternates as Friedman [7]_
     describes: before each fit after the first, 5 parameter steps refit the current graph's
     coefficients and noise variances, each on the expected covariance under the step before it.
     Friedman [7]_ leaves the number of parameter steps open. The first fit reads the expected
-    covariance under the model with no edge, where every covariance is shrunk toward zero. Measured
-    with ``ges``, ``boss``, and ``grasp`` at 2,000 rows, the first search returned many extra edges;
-    with one refit per round the later rounds removed them slowly and the graph was still changing
-    after 10 rounds, and with 5 parameter steps it had settled within them in most fits.
-    ``metadata["em"]`` records ``iterations``, the rounds; ``parameter_steps``, the parameter steps
-    before each fit after the first; ``log_likelihood``, the observed-data log-likelihood of the
-    model after each round, which can fall in a round that changes the graph; and ``graph_changed``,
-    whether each round's fit returned another graph than the round before. When the last round
-    changed the graph, EM has not settled on one, which is more common with few rows, and the fit
-    logs a warning that names ``n_em_iterations``: more rounds let some such fits settle on a graph,
-    others keep changing between graphs, and values other than 10 are not benchmarked yet. EM holds
-    when values are missing completely at random or at random given observed values; when whether a
-    value is missing depends on the missing values themselves, the expected covariance is biased,
+    covariance under the edgeless model, which shrinks every covariance toward zero. Measured with
+    ``ges``, ``boss``, and ``grasp`` at 2,000 rows, the first search returned many extra edges; with
+    one refit per round, later rounds removed them slowly and graphs kept changing after 10 rounds;
+    with 5 parameter steps, most fits settled within them. ``metadata["em"]`` records
+    ``iterations``, the rounds; ``parameter_steps``, the parameter steps before each fit after the
+    first; ``log_likelihood``, the observed-data log-likelihood of the model after each round, which
+    can fall in a round that changes the graph; and ``graph_changed``, whether the graph changed
+    from the previous round. A graph change in the last round means EM has not settled, more
+    commonly with few rows, and triggers a warning naming ``n_em_iterations``: more rounds stabilize
+    some graphs, while others keep changing; values other than 10 are not benchmarked. EM holds when
+    values are missing completely at random or at random given observed values; when missingness
+    depends on the missing values themselves, the expected covariance is biased,
     and the data cannot show it. On complete data, ``"em"`` gives the complete-data result. Without
     ``"em"``, drop the incomplete rows yourself, which suits values missing completely at random, or
     use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.

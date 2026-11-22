@@ -594,12 +594,12 @@ def cpcm_graph(
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
         method, the argument, what it accepts, and the value. Also if ``data`` has fewer than 2
-        columns, holds ``NaN`` or ``inf``, or has fewer than ``4 d + 12`` rows for ``d`` columns,
-        if ``family`` names an unknown family or does not give one name per column, or if a column
-        holds a value outside its family's support, such as a non-integer under ``"poisson"`` or
-        a value of at most 1 under ``"pareto"``. Also if a column's residual on a set of parents the
-        search reads is the same on every row, as when the column is an exact function of them,
-        or if a fit ends away from a maximum; the message names the columns.
+        columns, holds ``NaN`` or ``inf``, or has fewer than ``4 d + 12`` rows for ``d`` columns, if
+        ``family`` names an unknown family or does not give one name per column, or if a column
+        holds a value outside its family's support, such as a non-integer under ``"poisson"`` or a
+        value of at most 1 under ``"pareto"``. Also if a column's residual given a parent set the
+        search reads is constant, as when the column is an exact function of them, or if a fit ends
+        away from a maximum; the message names the columns.
 
     Warns
     -----
@@ -1224,17 +1224,17 @@ def das(
     Notes
     -----
     **When to use.** DAS suits i.i.d. continuous observational data whose effects are nonlinear in
-    every parent, with additive Gaussian noise and no unmeasured common causes [1]_, when there
-    are too many variables for :func:`~andrey.score_matching`'s pruning: it finds the same causal
-    order and prunes at most ``max_parents`` candidates per variable instead of every variable
-    before it. The paper shows it on 10 to 1,000 variables and 1,000 rows, with a DAG close to
-    SCORE's and a fit several times faster from 20 variables up. It is the fastest of the methods
-    here for this model. :func:`~andrey.cam` made fewer errors on the same data in every setting
-    measured but dense graphs of 10 variables, where they tied, and took 1.5 to 2.7 times as long,
-    except on sparse graphs of 10 variables, where it was as fast; use it when time allows. With
-    fewer variables :func:`~andrey.score_matching` prunes every edge its order allows; with linear
-    effects and Gaussian noise use :func:`~andrey.pc` or :func:`~andrey.ges`, and for additive
-    noise that is not Gaussian, :func:`~andrey.nogam` or :func:`~andrey.resit`.
+    every parent, with additive Gaussian noise and no unmeasured common causes [1]_, when there are
+    too many variables for :func:`~andrey.score_matching`'s pruning: it finds the same causal order
+    and prunes at most ``max_parents`` candidates per variable instead of every variable before it.
+    The paper shows it on 10 to 1,000 variables and 1,000 rows, with a DAG close to SCORE's and a
+    fit several times faster from 20 variables up. It is the fastest of the methods here for this
+    model. :func:`~andrey.cam` made fewer errors on the same data in all measured settings but dense
+    graphs of 10 variables, where they tied, and took 1.5 to 2.7 times as long, except on sparse
+    graphs of 10 variables, where it was as fast; use it when time allows. With fewer variables
+    :func:`~andrey.score_matching` prunes every edge its order allows; with linear effects and
+    Gaussian noise use :func:`~andrey.pc` or :func:`~andrey.ges`, and for additive noise that is not
+    Gaussian, :func:`~andrey.nogam` or :func:`~andrey.resit`.
 
     **The steps.** The paper's three phases [1]_:
 
@@ -1292,20 +1292,19 @@ def das(
     datasets of 500 variables and on none of 1,000. The order search reads standardized columns, so
     the result does not depend on the columns' units; on raw columns whose variance grows along the
     causal order, code that reads the units can order more edges correctly, and there the code
-    published with the paper made fewer errors on sparse graphs (19 against 28 at 50 variables).
-    This is the likely reason that, on sparse graphs, DAS's errors are above the paper's where they
-    are, since the paper used raw columns; on dense graphs of 500 variables they are above the
-    paper's too, a gap not traced, where the units are not ruled out: on z-scored columns the code
-    published with the paper is above the paper's limit there as well. The `0.19.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#das>`_ has the numbers. Its causal order is
-    SCORE's, so the limits :func:`~andrey.score_matching` states for the order are its own: where
-    links have a strong linear part, it did no better than a random order. The leaf rule is exact
-    only for Gaussian noise; :func:`~andrey.nogam` and :func:`~andrey.resit` drop that assumption.
-    An edge the order reverses cannot be recovered, and the screen can drop a true parent whose
-    entries are small next to the reference's, which the pruning cannot add back. Each step factors
-    a matrix with one row and one column per sample, so the order search's time grows with the cube
-    of ``n_samples`` and its memory with the square. Binary columns, and any column with fewer than
-    3 distinct values, are not supported: the pruning fits a smooth term of each parent, and such a
+    published with the paper made fewer errors on sparse graphs (19 against 28 at 50 variables). The
+    paper used raw columns, likely explaining DAS's higher errors on some sparse graphs; on dense
+    graphs of 500 variables, the higher errors remain unexplained and units are not ruled out: on
+    z-scored columns the code published with the paper is above the paper's limit there as well. The
+    `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#das>`_ has the numbers.
+    Its SCORE causal order has the limits stated by :func:`~andrey.score_matching`: where links have
+    a strong linear part, it did no better than a random order. The leaf rule is exact only for
+    Gaussian noise; :func:`~andrey.nogam` and :func:`~andrey.resit` drop that assumption. Neither an
+    edge reversed by the order nor a true parent screened out for entries small relative to the
+    reference's can be recovered by pruning. Each step factors a matrix with one row and one column
+    per sample, so the order search's time grows with the cube of ``n_samples`` and its memory with
+    the square. Binary columns, and any column with fewer than 3 distinct values, are not supported:
+    the pruning fits a smooth term of each parent, and such a
     column raises ``ValueError`` before the fit. The numbers are a reference, not a hard limit: they
     change with the data generator, the density, the method's settings, and the machine.
 
@@ -1656,7 +1655,7 @@ def skewd_mv(
     alpha : float, default=0.05
         Significance level of PC's conditional-independence tests, in ``(0, 1)``.
     indep_test : str or None, default="kci"
-        PC's conditional-independence test, a test of continuous data as in :func:`~andrey.pc`:
+        PC's conditional-independence test for continuous data, as in :func:`~andrey.pc`:
         ``"fisherz"``, ``"student_t"``, ``"kci"``, ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``,
         ``"wgcm"``, or ``"pcm"``, but not ``"normal_scores"``: the likelihood stage reads the
         values, which ranks would hide. The default is the kernel test [3]_, the authors' choice.

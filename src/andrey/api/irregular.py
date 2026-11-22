@@ -244,9 +244,9 @@ def anm(
     result does not depend on the order of the rows, and a table whose rows stay the same when its
     two columns swap gives no edge.
 
-    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both tests read only the rows
-    where both columns are observed, which for a pair are the rows test-wise deletion keeps;
-    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. Fewer than 2 such
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both tests use test-wise
+    deletion, keeping rows where both columns are observed; ``metadata["rows_tested"]`` gives their
+    count as both ``min`` and ``median``. Fewer than 2 such
     rows, or a column constant on them, raises ``ValueError``. Test-wise deletion is valid when
     values are missing completely at random, which means that whether a value is missing depends on
     no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
@@ -418,9 +418,9 @@ def pnl(
     float64 matrices; when the threads asked for would hold more than 4 GiB, fewer run, with a
     ``PerformanceWarning``.
 
-    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both tests read only the rows
-    where both columns are observed, which for a pair are the rows test-wise deletion keeps;
-    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. Fewer than 2 such
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both tests use test-wise
+    deletion, keeping rows where both columns are observed; ``metadata["rows_tested"]`` gives their
+    count as both ``min`` and ``median``. Fewer than 2 such
     rows, or a column constant on them, raises ``ValueError``. Test-wise deletion is valid when
     values are missing completely at random, which means that whether a value is missing depends on
     no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
@@ -490,8 +490,8 @@ def loci(
         ``float64``. A DataFrame's column names become the structure's ``labels``.
     alpha : float or None, default=None
         Under ``criterion="independence"``: ``None`` chooses the direction with the larger p-value,
-        or with the smaller test statistic when the p-values are equal; a significance level such as
-        ``0.05`` draws an edge only when exactly one p-value exceeds it. Must be ``None`` under
+        breaking p-value ties by the smaller test statistic; a significance level such as ``0.05``
+        draws an edge only when exactly one p-value exceeds it. Must be ``None`` under
         ``criterion="likelihood"``. See Notes.
     criterion : {"independence", "likelihood"}, default="independence"
         ``"independence"`` tests whether each direction's scaled residual is independent of its
@@ -585,9 +585,9 @@ def loci(
     depend on the order of the rows, and a table whose rows stay the same when its two columns swap
     gives no edge.
 
-    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits read only the rows
-    where both columns are observed, which for a pair are the rows test-wise deletion keeps;
-    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. Fewer than 2 such
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits use test-wise
+    deletion, keeping rows where both columns are observed; ``metadata["rows_tested"]`` gives their
+    count as both ``min`` and ``median``. Fewer than 2 such
     rows, or a column constant on them, raises ``ValueError``. Test-wise deletion is valid when
     values are missing completely at random, which means that whether a value is missing depends on
     no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
@@ -702,21 +702,21 @@ def cpcm(
         The two variables, one per column: column 0 is ``x`` and column 1 is ``y``. Coerced to
         ``float64``. A DataFrame's column names become the structure's ``labels``.
     alpha : float or None, default=None
-        ``None`` chooses the direction with the larger p-value, or with the smaller test statistic
-        when the p-values are equal (the paper's forced estimate). A significance level such as
-        ``0.05`` gives no edge when the two columns test independent at that level, and otherwise
-        draws an edge only when exactly one direction's p-value exceeds it (the paper's conservative
-        estimate). ``None`` favors a direction for every pair; it gives up the sign that a pair fits
-        both ways or neither. A level favors that sign; it gives up the pairs it leaves undecided.
-        On the paper's pairs at 1,000 and 2,000 rows the forced direction tied with the authors'
-        code after fresh seeds in every setting; on the first seeds it was right less often on Table
-        2's PARg drawn as the paper's Appendix B.3 describes (wrong on 12 of 99 pairs against 8) and
-        on model (16) at ``gamma = 2`` with 2,000 rows (4 of 99 against 0). On the paper's model
-        (16) at 500 rows under ``"pareto"``, the conservative estimate found both directions
-        plausible, the paper's outcome at ``gamma = 0``, on 73% and 78% of the pairs of two seed
-        sets against that code's 82% and 85%, so it is not supported there; at ``gamma = 1`` it
-        named the true direction on 55% and 64% of the pairs of the two seed sets, and both on 39%
-        of the first. The `0.19.0 release card
+        ``None`` chooses the direction with the larger p-value, breaking p-value ties by the smaller
+        test statistic (the paper's forced estimate). A significance level such as ``0.05`` gives no
+        edge when the two columns test independent at that level, and otherwise draws an edge only
+        when exactly one direction's p-value exceeds it (the paper's conservative estimate).
+        ``None`` favors a direction for every pair without indicating whether both or neither fit; a
+        level reveals that distinction but leaves some pairs undecided. On the paper's pairs at
+        1,000 and 2,000 rows the forced direction tied with the authors' code after fresh seeds in
+        every setting; on the first seeds it was right less often on Table 2's PARg drawn as the
+        paper's Appendix B.3 describes (wrong on 12 of 99 pairs against 8) and on model (16) at
+        ``gamma = 2`` with 2,000 rows (4 of 99 against 0). On the paper's model (16) at 500 rows
+        under ``"pareto"``, the conservative estimate found both directions plausible, the paper's
+        outcome at ``gamma = 0``, on 73% and 78% of the pairs of two seed sets against that code's
+        82% and 85%, so it is not supported there; at ``gamma = 1`` it named the true direction on
+        55% and 64% of the pairs of the two seed sets, and both on 39% of the first. The `0.19.0
+        release card
         <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#the-conservative-estimate>`_ has the
         numbers. See Notes.
     family : str or list of str, default="gaussian"
@@ -752,12 +752,11 @@ def cpcm(
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
         method, the argument, what it accepts, and the value. Also if ``data`` does not have 2
-        columns, holds ``NaN`` or ``inf``, or has fewer than 20 rows, if ``family`` names an
-        unknown family or does not give one name per column, or if a column holds a value outside
-        its family's support, such as a non-integer under ``"poisson"`` or a value of at most 1
-        under ``"pareto"``. Also if a column's residual is the same on every row, as when the
-        column is an exact function of the other, or if a fit ends away from a maximum; the message
-        names the columns.
+        columns, holds ``NaN`` or ``inf``, or has fewer than 20 rows, if ``family`` names an unknown
+        family or does not give one name per column, or if a column holds a value outside its
+        family's support, such as a non-integer under ``"poisson"`` or a value of at most 1 under
+        ``"pareto"``. Also if a column's residual is constant, as when the column is an exact
+        function of the other, or if a fit ends away from a maximum; the message names the columns.
 
     Warns
     -----
@@ -848,27 +847,27 @@ def cpcm(
     **Limitations.** On the paper's pairs of 1,000 and 2,000 rows, CPCM's forced direction was right
     as often as the code published with the paper and more often than a coin flip or the majority
     direction, except on Table 2's Pareto pairs drawn by the authors' generator, whose effect is a
-    Pareto of scale theta and shape 1, which neither family the support rule picks (exponential,
-    or Pareto of scale 1) holds: there it was right on 38% and 47% of the pairs of two seed sets,
-    as often as the authors' code and no better than a coin flip. The `0.19.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm>`_ has the numbers. The family must be
-    chosen: the paper's rule that picks one from each column's support, and its sequential choice
-    between one- and two-parameter families, are not offered, and the benchmark passed the support
-    rule's family. On location-scale and multiplicative pairs that rule picks
-    ``"gaussian_fixed_scale"``, an additive-noise family, which named the true direction
-    on 0% to 58% of them in both implementations, so pass ``"gaussian"`` there. On fresh
-    multiplicative pairs, :func:`~andrey.loci` was right more often, 98% against 84%, and faster.
-    Under ``"pareto"``, when the cause's largest value is thousands of times its median, the test of
-    one direction can reject where the authors' code does not. On the paper's model (16) at
-    ``gamma = 0`` the conservative estimate found both directions plausible, the paper's claim
-    there, on 73% and 78% of the pairs of two seed sets against the reference's 82% and 85%, fewer
-    on both, so the conservative estimate under ``"pareto"`` is not supported until the cause, the
-    rank-10 thin plate spline of the cause on such values, is fixed. At 2,000 rows the forced
-    direction was wrong on 8 of the 199 pairs both fitted against 1 (the authors' code stopped with
-    an error on one). Each HSIC test builds matrices with one row and one column per sample, so time
-    and memory grow with the square of ``n_samples``. Under the count families the rank-10 spline
-    must follow the mean to within the counts' own noise, about ``1 / sqrt(mean)`` of it, which it
-    does for means up to a few hundred: from means of a few thousand that vary strongly with the
+    Pareto of scale theta and shape 1, which neither family the support rule picks (exponential, or
+    Pareto of scale 1) holds: there it was right on 38% and 47% of the pairs of two seed sets, as
+    often as the authors' code and no better than a coin flip. The
+    `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm>`_ has the
+    numbers. The family must be chosen: the paper's support-based and sequential one- or
+    two-parameter selection rules are not offered; the benchmark used the support rule's family. On
+    location-scale and multiplicative pairs that rule picks ``"gaussian_fixed_scale"``, an
+    additive-noise family, which named the true direction on 0% to 58% of them in both
+    implementations, so pass ``"gaussian"`` there. On fresh multiplicative pairs,
+    :func:`~andrey.loci` was right more often, 98% against 84%, and faster. Under ``"pareto"``, when
+    the cause's largest value is thousands of times its median, the test of one direction can reject
+    where the authors' code does not. On the paper's model (16) at ``gamma = 0`` the conservative
+    estimate found both directions plausible, the paper's claim there, on 73% and 78% of the pairs
+    of two seed sets against the reference's 82% and 85%, fewer on both, so the conservative
+    estimate under ``"pareto"`` is unsupported because of the rank-10 thin plate spline of the cause
+    on such values. At 2,000 rows the forced direction was wrong on 8 of the 199 pairs both fitted
+    against 1 (the authors' code stopped with an error on one). Each HSIC test builds matrices with
+    one row and one column per sample, so time and memory grow with the square of ``n_samples``.
+    Under the count families the rank-10 spline must follow the mean to within the counts' own
+    noise, about ``1 / sqrt(mean)`` of it, which it does for means up to a few hundred: from means
+    of a few thousand that vary strongly with the
     cause, the true direction's test rejects too. The numbers are a reference, not a hard limit:
     they change with the data generator, the density, the method's settings, and the machine.
 
@@ -955,8 +954,8 @@ def skewd(
         ``float64``. A DataFrame's column names become the structure's ``labels``.
     alpha : float or None, default=None
         Under ``criterion="independence"``: ``None`` chooses the direction with the larger p-value,
-        or with the smaller test statistic when the p-values are equal; a significance level such as
-        ``0.05`` draws an edge only when exactly one p-value exceeds it. Must be ``None`` under
+        breaking p-value ties by the smaller test statistic; a significance level such as ``0.05``
+        draws an edge only when exactly one p-value exceeds it. Must be ``None`` under
         ``criterion="likelihood"``.
     criterion : {"independence", "likelihood"}, default="independence"
         ``"independence"`` tests whether each direction's scaled residual is independent of its
@@ -1054,10 +1053,10 @@ def skewd(
     edge. Both directions draw their random numbers from the same ``seed``, so swapping the
     columns swaps the fits.
 
-    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits read only the rows
-    where both columns are observed, which for a pair are the rows test-wise deletion keeps;
-    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. Fewer than 8 such
-    rows (one for each cross-validation fold), or a column constant on them, raises ``ValueError``.
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits use test-wise
+    deletion, keeping rows where both columns are observed; ``metadata["rows_tested"]`` gives their
+    count as both ``min`` and ``median``. Fewer than 8 such rows (one for each cross-validation
+    fold), or a column constant on them, raises ``ValueError``.
     Test-wise deletion is valid when values are missing completely at random, which means that
     whether a value is missing depends on no value in the data; the rows a test reads are then a
     random sample of all rows, and otherwise they are a selected sample that more rows do not
