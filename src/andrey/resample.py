@@ -1115,10 +1115,10 @@ def bootstrap(
         (:data:`andrey.config`), and ``averaged_graph``: ``"vote"``, ``"nearest_resample"`` when
         the averaged graph is the valid resample graph nearest the others, or
         ``"nearest_resample_invalid"`` when no resample is a valid graph of the method's kind.
-        On data with missing values, nonempty ``never_observed_together``, ``undecided_pairs``, and
-        ``possibly_separable`` lists contain pairs any fit listed under that key. Undecided pairs
-        leave a fit's graph and count as not drawn in its frequency, like separated pairs; the list
-        distinguishes them.
+        On data with missing values, ``never_observed_together``, ``undecided_pairs``, and
+        ``possibly_separable``, each present when not empty, list the pairs any fit listed under
+        that key. Undecided pairs leave a fit's graph and count as not drawn in its frequency, like
+        separated pairs; the list distinguishes them.
 
     Raises
     ------

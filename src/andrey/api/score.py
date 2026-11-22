@@ -3329,10 +3329,10 @@ def calm(
     commonly with few rows, and triggers a warning naming ``n_em_iterations``: more rounds stabilize
     some graphs, while others keep changing; values other than 10 are not benchmarked. EM holds when
     values are missing completely at random or at random given observed values; when missingness
-    depends on the missing values themselves, the expected covariance is biased,
-    and the data cannot show it. On complete data, ``"em"`` gives the complete-data result. Without
-    ``"em"``, drop the incomplete rows yourself, which suits values missing completely at random, or
-    use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    depends on the missing values themselves, the expected covariance is biased, and the data cannot
+    show it. On complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the
+    incomplete rows yourself, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores
     with a cap of 1 h and 28 GB per fit. The largest sizes through which its median errors (SHD)

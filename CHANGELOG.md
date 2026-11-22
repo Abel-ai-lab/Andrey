@@ -184,8 +184,8 @@ names its pull request.
   17 s compared with over 14 minutes previously, with the same graph and counts. Under test-wise
   deletion, their spouse step tests both candidate sets of each size, making
   `metadata["not_tested"]` independent of column order. ([#1148])
-- A test-wise test with too few rows or a CD-NOD or FCI-JCI test with constant `env` on its rows is
-  not tested and does not raise `ValueError`. Each test sets its own row floor: `fisherz` and
+- A test-wise test with too few rows, or a CD-NOD or FCI-JCI test with `env` constant on its rows,
+  is not tested and no longer raises `ValueError`. Each test sets its own row floor: `fisherz` and
   `normal_scores` need `|S| + 4` rows, `cond_gauss` `|S| + 3`, and `cmiknn` with an int `k_cmi`
   `k_cmi + 1`. LPCMCI's collider votes leave a triple ambiguous when a subset not tested could
   change the verdict. On the command line, a nonfinite number, such as an untested query's p-value,
@@ -269,8 +269,8 @@ names its pull request.
   `metadata["missing"]`, gives `metadata["rows_tested"]` as `{"min": 0, "median": 0}`, and logs the
   default-handling notice under `missing=None`. ([#1151])
 - `pc(missing="mvpc")` counts the corrected tests that return a p-value of 1 in
-  `metadata["corrected_edges"]["p_one_tests"]`. An indicator query with a constant, uninformative
-  indicator or too few rows is not tested rather than returning `p = 1`, as for every test-wise
+  `metadata["corrected_edges"]["p_one_tests"]`. An indicator query whose rows hold one value of the
+  indicator, or too few rows, is not tested rather than returning `p = 1`, as for every test-wise
   test: it counts in `metadata["not_tested"]` and its rows are excluded from
   `metadata["rows_tested"]`. A column on whose observed rows the indicator is constant conditions no
   test of that indicator and, as before, is not its parent; a column kept adjacent by a tested query
@@ -286,8 +286,8 @@ names its pull request.
   process, reaching `run.warnings` instead of standard error. Each record keeps the file, line, and
   function that logged it, and those of a resample that raises are logged before its error.
   ([#1151])
-- The backward phase of `mmpc` keeps only the best separating set of each tested size, so memory
-  does not grow with the number of sets. Answers are unchanged. ([#1019])
+- The backward phase of `mmpc` keeps only the best separating set of each tested size, so its memory
+  no longer grows with the number of sets. Answers are unchanged. ([#1019])
 - For contributors, `qa/identity.py` counts the partial-correlation tests' `statistic_pvalue` as a
   query, making IAMB, Inter-IAMB, and CALM query counts independent of the answering path, and
   `benchmarks/start_regression_ci_r.sh` clones the PCM authors' code into `benchmarks/.pcm-code`

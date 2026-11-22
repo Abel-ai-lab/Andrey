@@ -243,10 +243,9 @@ def notears(
     more rounds stabilize some graphs, while others keep changing; values other than 10 are not
     benchmarked. EM holds when values are missing completely at random or at random given observed
     values; when missingness depends on the missing values themselves, the expected covariance is
-    biased,
-    and the data cannot show it. On complete data, ``"em"`` gives the complete-data result. Without
-    ``"em"``, drop the incomplete rows yourself, which suits values missing completely at random, or
-    use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    biased, and the data cannot show it. On complete data, ``"em"`` gives the complete-data result.
+    Without ``"em"``, drop the incomplete rows yourself, which suits values missing completely at
+    random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The result depends on the data's scale (varsortability [5]_); the `0.18.0
     release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#notears>`_ has the numbers.
@@ -544,10 +543,10 @@ def dagma(
     commonly with few rows, and triggers a warning naming ``n_em_iterations``: more rounds stabilize
     some graphs, while others keep changing; values other than 10 are not benchmarked. EM holds when
     values are missing completely at random or at random given observed values; when missingness
-    depends on the missing values themselves, the expected covariance is biased,
-    and the data cannot show it. On complete data, ``"em"`` gives the complete-data result. Without
-    ``"em"``, drop the incomplete rows yourself, which suits values missing completely at random, or
-    use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    depends on the missing values themselves, the expected covariance is biased, and the data cannot
+    show it. On complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the
+    incomplete rows yourself, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The result depends on the data's scale (varsortability [5]_); the `0.18.0
     release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma>`_ has the numbers.

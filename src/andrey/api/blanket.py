@@ -277,16 +277,16 @@ def iamb(
     Returns
     -------
     StructureOutput or list of StructureOutput
-        A list of targets gives their individual results in list order. Without ``target``, wraps
-        the graph ``structure`` names: a ``cpdag`` :class:`~andrey.core.GraphStructure` for
-        ``"cpdag"``, whose undirected edges the tests cannot orient, or an ``undirected`` one, whose
-        edges have no arrowhead, for ``"skeleton"`` and ``"moral"``. With ``target``, an
-        ``undirected`` one whose edges join ``target`` to each member of its Markov blanket, which
-        holds its parents, its children, and its children's other parents; ``metadata["target"]``
-        names it and ``metadata["markov_blanket"]`` lists the members in the order they joined, by
-        column label or 0-based position. ``metadata["algorithm"]`` is ``"iamb"``. Under a
-        mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it read. With
-        a randomized
+        With a list of targets, a list of each target's result, in list order, each as a call for
+        that target alone returns it. Without ``target``, wraps the graph ``structure`` names: a
+        ``cpdag`` :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the
+        tests cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for
+        ``"skeleton"`` and ``"moral"``. With ``target``, an ``undirected`` one whose edges join
+        ``target`` to each member of its Markov blanket, which holds its parents, its children, and
+        its children's other parents; ``metadata["target"]`` names it and
+        ``metadata["markov_blanket"]`` lists the members in the order they joined, by column label
+        or 0-based position. ``metadata["algorithm"]`` is ``"iamb"``. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
         ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["tie_break"]`` is the
         tie-break rule the fit ran under, ``andrey.config.tie_break``.
 
@@ -600,18 +600,18 @@ def inter_iamb(
     Returns
     -------
     StructureOutput or list of StructureOutput
-        A list of targets gives their individual results in list order. Without ``target``, wraps
-        the graph ``structure`` names: a ``cpdag`` :class:`~andrey.core.GraphStructure` for
-        ``"cpdag"``, whose undirected edges the tests cannot orient, or an ``undirected`` one, whose
-        edges have no arrowhead, for ``"skeleton"`` and ``"moral"``. With ``target``, an
-        ``undirected`` one whose edges join ``target`` to each member of its Markov blanket, which
-        holds its parents, its children, and its children's other parents; ``metadata["target"]``
-        names it and ``metadata["markov_blanket"]`` lists the members in the order they joined, by
-        column label or 0-based position. ``metadata["algorithm"]`` is ``"inter_iamb"``. Under a
-        mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it read. With
-        a randomized
-        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["tie_break"]`` is the
-        tie-break rule the fit ran under, ``andrey.config.tie_break``.
+        With a list of targets, a list of each target's result, in list order, each as a call for
+        that target alone returns it. Without ``target``, wraps the graph ``structure`` names: a
+        ``cpdag`` :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the
+        tests cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for
+        ``"skeleton"`` and ``"moral"``. With ``target``, an ``undirected`` one whose edges join
+        ``target`` to each member of its Markov blanket, which holds its parents, its children, and
+        its children's other parents; ``metadata["target"]`` names it and
+        ``metadata["markov_blanket"]`` lists the members in the order they joined, by column label
+        or 0-based position. ``metadata["algorithm"]`` is ``"inter_iamb"``. Under a mixed-data
+        setting, ``metadata["categorical"]`` lists the categorical columns it read. With a
+        randomized ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["tie_break"]``
+        is the tie-break rule the fit ran under, ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -916,15 +916,15 @@ def mmpc(
     Returns
     -------
     StructureOutput or list of StructureOutput
-        A list of targets gives their individual results in list order. Without ``target``, wraps
-        the graph ``structure`` names: an ``undirected`` :class:`~andrey.core.GraphStructure` for
-        ``"skeleton"``, whose edges have no arrowhead and join each pair in each other's set, or a
-        ``cpdag`` one for ``"cpdag"``, whose undirected edges the tests cannot orient. With
-        ``target``, an ``undirected`` one whose edges join ``target`` to each of its parents and
-        children; ``metadata["target"]`` names it and ``metadata["parents_and_children"]`` lists the
-        members in the order they joined, by column label or 0-based position.
-        ``metadata["algorithm"]`` is ``"mmpc"``. Under a mixed-data setting,
-        ``metadata["categorical"]`` lists the categorical columns it read. With a
+        With a list of targets, a list of each target's result, in list order, each as a call for
+        that target alone returns it. Without ``target``, wraps the graph ``structure`` names: an
+        ``undirected`` :class:`~andrey.core.GraphStructure` for ``"skeleton"``, whose edges have no
+        arrowhead and join each pair in each other's set, or a ``cpdag`` one for ``"cpdag"``, whose
+        undirected edges the tests cannot orient. With ``target``, an ``undirected`` one whose edges
+        join ``target`` to each of its parents and children; ``metadata["target"]`` names it and
+        ``metadata["parents_and_children"]`` lists the members in the order they joined, by column
+        label or 0-based position. ``metadata["algorithm"]`` is ``"mmpc"``. Under a mixed-data
+        setting, ``metadata["categorical"]`` lists the categorical columns it read. With a
         randomized ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["tie_break"]``
         is the tie-break rule the fit ran under, ``andrey.config.tie_break``.
 
