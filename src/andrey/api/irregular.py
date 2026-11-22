@@ -707,16 +707,16 @@ def cpcm(
         edge when the two columns test independent at that level, and otherwise draws an edge only
         when exactly one direction's p-value exceeds it (the paper's conservative estimate).
         ``None`` favors a direction for every pair without indicating whether both or neither fit; a
-        level reveals that distinction but leaves some pairs undecided. On the paper's pairs at
-        1,000 and 2,000 rows the forced direction tied with the authors' code after fresh seeds in
-        every setting; on the first seeds it was right less often on Table 2's PARg drawn as the
-        paper's Appendix B.3 describes (wrong on 12 of 99 pairs against 8) and on model (16) at
-        ``gamma = 2`` with 2,000 rows (4 of 99 against 0). On the paper's model (16) at 500 rows
+        level favors that distinction at the cost of the pairs it leaves undecided. On the paper's
+        pairs at 1,000 and 2,000 rows the forced direction tied with the authors' code after fresh
+        seeds in every setting; on the first seeds it was right less often on Table 2's PARg drawn
+        as the paper's Appendix B.3 describes (wrong on 12 of 99 pairs against 8) and on model (16)
+        at ``gamma = 2`` with 2,000 rows (4 of 99 against 0). On the paper's model (16) at 500 rows
         under ``"pareto"``, the conservative estimate found both directions plausible, the paper's
         outcome at ``gamma = 0``, on 73% and 78% of the pairs of two seed sets against that code's
         82% and 85%, so it is not supported there; at ``gamma = 1`` it named the true direction on
-        55% and 64% of the pairs of the two seed sets, and both on 39% of the first. The `0.19.0
-        release card
+        55% and 64% of the pairs of the two seed sets, and both on 39% of the first. The
+        `0.19.0 release card
         <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#the-conservative-estimate>`_ has the
         numbers. See Notes.
     family : str or list of str, default="gaussian"

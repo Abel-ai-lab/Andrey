@@ -43,11 +43,11 @@ names its pull request.
   nor a non-collider, in FCI's discriminating-path rule too, when an untested conditioning set of
   that side lies within the other nodes adjacent to one of its ends or undecided with it; FCI,
   FCI-JCI, and PCMCI+ so read every listed side. LPCMCI lists such links but does not read them. The
-  default, `"orient"`, reads it as any other triple. On merged cohorts with no bridging row it
-  removes most false colliders and most true arrowheads with them: PC's graph is then farther from
-  the truth than the empty graph, and in FCI and FCI-JCI the skeleton and `metadata["not_tested"]`
-  change through the possible-d-separation step. Results can change when every pair shares rows but
-  some conditioning set has none. ([#1171])
+  default, `"orient"`, reads it as any other triple, as before. On merged cohorts with no bridging
+  row it removes most false colliders and most true arrowheads with them: PC's graph is then farther
+  from the truth than the empty graph, and in FCI and FCI-JCI the skeleton and
+  `metadata["not_tested"]` change through the possible-d-separation step. Results can change when
+  every pair shares rows but some conditioning set has none. ([#1171])
 
 - `metadata["p_one_tests"]` counts every test returning `p = 1` in a fit with missing values,
   regardless of test type, including tests with an exactly zero statistic. ([#1102])
@@ -68,8 +68,8 @@ names its pull request.
   its error. The example notebook covers values missing not at random, FCI, categorical data, and a
   time series. ([#1096])
 - `degrees_of_freedom`, an argument of every method that takes the categorical tests `"chisq"` and
-  `"gsq"`, and of `ChiSquare`: `"mean"`, the default, is the mean of the statistic when `y` is
-  shuffled within each configuration of the conditioning set; `"nonempty"` is
+  `"gsq"`, and of `ChiSquare`: `"mean"`, the default and the rule so far, is the mean of the
+  statistic when `y` is shuffled within each configuration of the conditioning set; `"nonempty"` is
   `(r_x - 1) * (r_y - 1)` per configuration over the values present, excluding each table's empty
   rows and columns (Spirtes, Glymour, and Scheines 1993). The two differ only on sparse tables.
   Passing it with another test raises `ValueError`. ([#981])
@@ -138,12 +138,12 @@ names its pull request.
 
 ### Changed
 
-- Each option added or changed in this release states each value's tradeoffs with measurements and
-  their setting, or "not measured": `lges`'s `schedule` and `insertion`, `possibly_separable`, the
-  `"wgcm"` `variant`, the `"gcm"`, `"wgcm"`, and `"pcm"` `regression`, CPCM's forced direction and
-  conservative estimate, the missing-value handlings, `degrees_of_freedom`, Regime-PCMCI's
-  `fdr_method` and `indep_test`, and rsmax2's `restrict`. The API reference and the missing-values
-  guide have "Choosing an option" tables. ([#1177])
+- Each option added or changed in this release states what each value favors and what it gives up,
+  with the measurements and their setting, or "not measured": `lges`'s `schedule` and `insertion`,
+  `possibly_separable`, the `"wgcm"` `variant`, the `"gcm"`, `"wgcm"`, and `"pcm"` `regression`,
+  CPCM's forced direction and conservative estimate, the missing-value handlings,
+  `degrees_of_freedom`, Regime-PCMCI's `fdr_method` and `indep_test`, and rsmax2's `restrict`. The
+  API reference and the missing-values guide have "Choosing an option" tables. ([#1177])
 - `das` is supported. On its paper's simulation with z-scored or rescaled columns it made no more
   errors than the paper's code in any of 20 settings from 10 to 200 variables, and fewer on the
   first 20 datasets of each, in a tenth to a fiftieth of the time, and fewer than the empty graph up
@@ -205,8 +205,8 @@ names its pull request.
 - When a test cannot run on rows observing its variables, the error advises capping conditioning
   sets with `max_depth` first and warns that dropping a column with many missing values can remove a
   common cause of the remaining columns. ([#1102])
-- `missing="em"` raises `ValueError` when two columns share no observed row, because their
-  covariance would come solely from the model. ([#1102])
+- `missing="em"` raises `ValueError` when two columns share no observed row, as the data hold no
+  covariance for them; such data ran before, on a covariance the model alone supplied. ([#1102])
 - On data with missing values, `fisherz` and `student_t` conditional p-values can differ from 0.18.0
   in the last digits (relative change up to about 1e-11 measured), because each block's sums use a
   fixed order; graphs are unchanged on the fits compared. ([#1142])

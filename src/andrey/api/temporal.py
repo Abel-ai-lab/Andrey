@@ -2313,8 +2313,8 @@ def rpcmci(
         keeps each p-value as tested; ``"fdr_bh"`` replaces them with their Benjamini-Hochberg
         adjusted values [3]_ over all of the regime's links together, and a link is then in the
         graph when its adjusted p-value is at most ``alpha``. ``"none"`` favors true links without
-        controlling extra ones; ``"fdr_bh"`` reduces extra links at the cost of some true ones. Not
-        measured with Regime-PCMCI; :func:`~andrey.pcmci` states the trade as measured there.
+        controlling extra ones; ``"fdr_bh"`` favors fewer extra links at the cost of some true ones.
+        Not measured with Regime-PCMCI; :func:`~andrey.pcmci` states the trade as measured there.
     indep_test : {"student_t", "fisherz"}, default="student_t"
         The conditional-independence test behind every p-value, a partial-correlation test for
         linear effects: ``"student_t"`` takes the p-value from the Student-t distribution,

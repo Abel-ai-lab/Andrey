@@ -424,11 +424,12 @@ class GCM(_RegressionTest):
         with depth (1, 3, 4, 5, or 6) and rounds (up to 50, learning rate 0.3) minimizing 10-fold
         cross-validated error, the authors' default grid; unpenalized leaf values, unlike their
         shrinkage, can leave smaller residuals. ``"forest"`` uses a random forest of 500 trees;
-        ``"linear"`` uses ordinary least squares. ``"boosting"`` learns nonlinear conditional means
-        of several variables at the cost of 51 boosted fits per regression. ``"linear"`` needs one
-        fit but loses its level when nonlinear conditional means leave residual covariance
-        interpreted as dependence (see Limitations). ``"forest"`` learns nonlinear means without
-        tuning at the cost of its trees. The three were not measured against each other.
+        ``"linear"`` uses ordinary least squares. ``"boosting"`` favors nonlinear conditional means
+        of several variables at the cost of time, 51 boosted fits per regression. ``"linear"``
+        favors time, one fit, at the cost of the level where a nonlinear conditional mean leaves
+        residual covariance read as dependence (see Limitations). ``"forest"`` favors nonlinear
+        means without tuning at the cost of time, 500 trees per regression. The three were not
+        measured against each other.
     seed : int or None, default=None
         Seed for the cross-validation folds of ``"boosting"`` and the trees of ``"forest"``.
         ``None`` uses ``ANDREY_SEED``, or ``0`` when it is unset.
