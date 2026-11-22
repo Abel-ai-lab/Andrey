@@ -3256,7 +3256,8 @@ _add(
                 "right on all 160 measured pairs, no p-value, assumes Gaussian marginals of the "
                 "standardized variables. independence = an HSIC test of each direction's scaled "
                 "residual against its proposed cause decides (SkewD-IT); a p-value and alpha, "
-                "robust to that assumption, right on 154 of the 160. Both read the same fits.",
+                "more robust across other pair benchmarks in the paper, right on 154 of the 160. "
+                "Both read the same fits.",
             ),
             _TUNING_ITER,
             concept_param(

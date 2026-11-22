@@ -17,7 +17,7 @@ names its pull request.
 - `skewd` decides by the likelihood by default (`criterion="likelihood"`), so a call without
   `criterion` returns the likelihood's direction, no `p_values` or `statistics`, and raises
   `ValueError` when it passes `alpha`; pass `criterion="independence"` for the earlier default.
-  ([#PRNUM])
+  ([#1181])
 
 ### Added
 
@@ -174,7 +174,7 @@ names its pull request.
   154, and no other method measured beside them was both more accurate and faster. SkewD-MV made
   fewer errors than PC, CAM, NoGAM, SCORE, and RESIT. Both are slow, a pair 15 to 22 CPU minutes
   and a graph a median of 24 to 31, which their Limitations state; the [0.19.0 release
-  card][card-0190-skewd] has the numbers. ([#PRNUM])
+  card][card-0190-skewd] has the numbers. ([#1181])
 - With `fisherz` and `student_t` on data with missing values, test-wise deletion groups the rows by
   their missingness patterns once and computes a test's sums from the groups' tables, removing the
   scattered missing cells exactly, when that costs less than summing every row; a query whose
@@ -2972,7 +2972,7 @@ First alpha release.
 [#1175]: https://github.com/Abel-ai-lab/Andrey/pull/1175
 [#1161]: https://github.com/Abel-ai-lab/Andrey/pull/1161
 [#1169]: https://github.com/Abel-ai-lab/Andrey/pull/1169
-[#PRNUM]: https://github.com/Abel-ai-lab/Andrey/pull/PRNUM
+[#1181]: https://github.com/Abel-ai-lab/Andrey/pull/1181
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
 [#1146]: https://github.com/Abel-ai-lab/Andrey/pull/1146
 [#1149]: https://github.com/Abel-ai-lab/Andrey/pull/1149

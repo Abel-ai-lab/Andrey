@@ -1316,6 +1316,8 @@ def cells(methods: list[str] | None = None) -> list[tuple[str, str]]:
 #: The cells that take over 10 seconds on a CI runner, slowest first. With several jobs they start
 #: first, so no worker is left fitting one long cell after the others have finished.
 SLOWEST_FIRST: tuple[tuple[str, str], ...] = (
+    ("SkewDMV", "anm_er_n1000_d5"),
+    ("SkewD", "lsnm_pair_n1000"),
     ("NOTEARS", "notears_paper_standardized_d50"),
     ("CMIknn", "anm_er_d5"),
     ("CPCMGraph", "anm_er_n1000_d5"),

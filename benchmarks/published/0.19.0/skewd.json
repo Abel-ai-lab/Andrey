@@ -33,7 +33,72 @@
   "skewd_pairs": "the SkewD paper's skewed pairs, 1,000 rows: additive (ANs) and location-scale (LSs) noise models at three noise skewnesses (-0.455, 0.985 and 1.750), and Tagasovska et al.'s (2020) Gaussian-noise location-scale sets LS and LS-s, 20 pairs each, the column order swapped on 10",
   "skewd_mv_graphs": "the SkewD paper's skew-normal location-scale graphs (Table 2): Erdos-Renyi DAGs with as many edges as variables, 6 and 10 variables, 1,000 rows, sources uniform on [-3.5, 3.5], 20 datasets per size and 20 fresh"
  },
- "data_identity": "each recorded pair output stores the standardized data it fitted; it equals the standardized (cause, effect) Andrey's arm read on all 320 pairs of the eight sets, seeds 0-39. The recorded graph outputs reproduce the paper's Table 2 (mean SHD 2.27 at 6 variables and 4.72 at 10 over datasets 1-100) and its pair outputs Table 5",
+ "data_identity": "each recorded pair output stores the standardized data it fitted; it agrees to 1e-12 with the standardized (cause, effect) Andrey's arm read on 320 of the 320 pairs of the eight sets, seeds 0-39",
+ "recorded_outputs": {
+  "about": "the recorded outputs over every pair of each set and the first 100 graphs of each size: the share each criterion names right, the paper's Table 5, and the mean SHD (a reversal counting 2), the paper's Table 2",
+  "pairs": {
+   "P1": {
+    "set": "ANs(-0.455)",
+    "pairs": 200,
+    "it_share": 0.985,
+    "ll_share": 1.0
+   },
+   "P2": {
+    "set": "ANs(0.985)",
+    "pairs": 200,
+    "it_share": 0.975,
+    "ll_share": 1.0
+   },
+   "P3": {
+    "set": "ANs(1.750)",
+    "pairs": 100,
+    "it_share": 1.0,
+    "ll_share": 1.0
+   },
+   "P4": {
+    "set": "LSs(-0.455)",
+    "pairs": 200,
+    "it_share": 0.86,
+    "ll_share": 1.0
+   },
+   "P5": {
+    "set": "LSs(0.985)",
+    "pairs": 200,
+    "it_share": 0.825,
+    "ll_share": 1.0
+   },
+   "P6": {
+    "set": "LSs(1.750)",
+    "pairs": 100,
+    "it_share": 0.92,
+    "ll_share": 1.0
+   },
+   "S1": {
+    "set": "LS (Gaussian noise)",
+    "pairs": 100,
+    "it_share": 0.87,
+    "ll_share": 1.0
+   },
+   "S2": {
+    "set": "LSs (Gaussian noise, sigmoid)",
+    "pairs": 100,
+    "it_share": 0.97,
+    "ll_share": 1.0
+   }
+  },
+  "graphs": {
+   "M1": {
+    "d": 6,
+    "datasets": 100,
+    "mean_shd": 2.27
+   },
+   "M2": {
+    "d": 10,
+    "datasets": 100,
+    "mean_shd": 4.72
+   }
+  }
+ },
  "parity": [
   {
    "method": "SkewD",
