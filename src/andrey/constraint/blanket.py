@@ -89,9 +89,9 @@ def _tests_every_set(test: CITest) -> bool:
 
 
 def _pvalue_key(p: float, significant: bool) -> float:
-    """A p-value's strength key: ``p`` to ``KEY_DP`` significant digits when ``significant``, so
-    p-values far below ``10**-KEY_DP``, common for strong dependence on many rows, keep the order of
-    their sizes, else to ``KEY_DP`` decimals."""
+    """A p-value's strength key: ``p`` to ``KEY_DP`` significant digits when ``significant``,
+    preserving the order far below ``10**-KEY_DP``, common for strong dependence on many rows;
+    otherwise, to ``KEY_DP`` decimals."""
     return float(f"{p:.{KEY_DP}g}") if significant else round(p, KEY_DP)
 
 
@@ -120,11 +120,10 @@ def _dependences(
     """:func:`_dependence` of every candidate in ``xs`` against one conditioning set.
 
     A partial-correlation test on complete data (``statistic_pvalue`` and
-    ``statistic_pvalues_given``) answers two or more candidates in one call, from one factor of the
-    set's correlation block, equal to the calls one by one up to rounding. A test with
-    ``pvalues_given`` and no ``statistic_pvalue`` scans the candidates together, which gives the
-    p-values of the calls one by one and the key :func:`_dependence` derives from them. Any other
-    test answers one call at a time.
+    ``statistic_pvalues_given``) answers two or more candidates from one factor of the set's
+    correlation block, matching separate calls up to rounding. A test with ``pvalues_given`` but no
+    ``statistic_pvalue`` scans candidates together, giving the same p-values as separate calls and
+    the key :func:`_dependence` derives from them. Other tests answer one call at a time.
     """
     given = getattr(test, "statistic_pvalues_given", None)
     if given is not None and getattr(test, "statistic_pvalue", None) is not None:
@@ -235,9 +234,9 @@ def markov_blanket(
             elif x not in separated:
                 untested.append(x)
         if best_x is None:
-            # A candidate whose test given the blanket was not tested, and that no test separated
-            # before, stays: a test without rows separates no pair. One with no test that had rows,
-            # as a variable never observed with the target, is undecided and left out.
+            # A candidate whose blanket test was not tested stays if no earlier test separated it: a
+            # test without rows separates no pair. One with no tested query, such as a variable
+            # never observed with the target, is undecided and left out.
             untested = [x for x in untested if x in decided]
             blanket.extend(sorted(untested, key=lambda x: ranks[x]))
             if interleaved and untested:
@@ -272,11 +271,10 @@ def _count_beside_undecided(
     max_depth: int | None,
     undecided: list[int],
 ) -> None:
-    """Count, for each of ``members`` outside ``required``, one conditioning set of it and
-    ``target`` as not tested when a search leaves the ``undecided`` candidates out: a set holding
-    one of them, which no test asked and which might separate the member from ``target``. A
-    required member is never tested, and with ``max_depth`` 0 no set is asked, so neither counts
-    one."""
+    """For each of ``members`` outside ``required``, count one untested conditioning set with
+    ``target`` when a search omits ``undecided`` candidates: a set holding one of them was never
+    tested and might separate the member from ``target``. Required members are never tested, and
+    ``max_depth`` 0 permits no set, so neither counts one."""
     if max_depth == 0 or not isinstance(test, TestwiseDeletion):
         return
     held = [[u] for u in undecided]
@@ -406,10 +404,9 @@ def _weakest(
 
 
 def _weaker(p: float, skipped: bool, alpha: float) -> float:
-    """The largest p-value ``p`` of the sets that were tested, or
-    :data:`~andrey.core.ci_missing.NOT_TESTED` when a set was not (``skipped``) and ``p`` does not
-    exceed ``alpha``: a tested set that separates decides, and otherwise the set not tested might
-    have."""
+    """The largest tested p-value ``p``, or :data:`~andrey.core.ci_missing.NOT_TESTED` when a set
+    was not tested (``skipped``) and ``p`` does not exceed ``alpha``: a tested separating set
+    decides; otherwise, the untested set might have separated."""
     return NOT_TESTED if skipped and not p > alpha else p
 
 
@@ -554,9 +551,9 @@ def _separating(
     above ``alpha``) with the largest p-value, ties as :func:`_largest_sets` breaks them, or
     ``None`` when no set does.
 
-    Every such set is tested, those lying inside ``skip_within`` excepted
-    (:func:`~andrey.constraint._skeleton.scan_conditioning_sets`). Only the best separating set so
-    far is kept, so the memory does not grow with the number of sets.
+    Every such set outside ``skip_within`` is tested
+    (:func:`~andrey.constraint._skeleton.scan_conditioning_sets`). Keeping only the best separating
+    set so far makes memory independent of the number of sets.
     """
     best: list[tuple[tuple[int, ...], float]] = []
 

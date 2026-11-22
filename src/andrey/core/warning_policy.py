@@ -115,9 +115,8 @@ def warn_once(message: str, category: type[AndreyWarning], *, key: str | None = 
 def log_once(logger: logging.Logger, key: str, message: str) -> None:
     """Log ``message`` at warning level through ``logger`` the first time this process sees ``key``.
 
-    For a notice about a default the fit chose, which changes no result and needs no filter: it
-    goes through :mod:`logging`, so it reaches standard error unless the caller configures logging
-    otherwise.
+    For a default-handling notice that changes no result and needs no filter: :mod:`logging` sends
+    it to standard error unless the caller configures otherwise.
     """
     with _lock:
         if key in _logged:
@@ -137,8 +136,8 @@ def mark_logged(key: str) -> None:
 
 @contextlib.contextmanager
 def logged_later(key: str) -> Generator[None]:
-    """Keep :func:`log_once` silent for ``key`` inside the block; afterwards it logs ``key`` as it
-    would have, so the caller can log one notice for every fit the block ran."""
+    """Silence :func:`log_once` for ``key`` inside the block, restoring normal logging afterward so
+    the caller can log one notice for all its fits."""
     with _lock:
         fresh = key not in _logged
         _logged.add(key)
@@ -165,19 +164,16 @@ class _Held(logging.Handler):
 def held_records() -> Generator[list[logging.LogRecord]]:
     """Hold the records of the ``andrey`` loggers inside the block, in order.
 
-    The block holds every record their levels let through, so a lower level set by the caller
-    holds more, and every warning-level record whatever the levels.
+    The block holds records permitted by the logger levels, including more at lower caller-set
+    levels, and all warning-level records regardless of level.
 
-    During the block the ``andrey`` logger holds only the handler that keeps them and does not
-    propagate, so no record reaches standard error, through the root logger's handlers or an
-    embedding application's either; its level is lowered to ``WARNING`` when it, or the logger it
-    inherits from, is set above it. Each ``andrey.`` logger below it holds no handler and
-    propagates, with its level lowered to ``WARNING`` when it is set above it, so every record
-    reaches the held handler and none goes out on its way. The handlers, the propagation, and the
-    levels are restored after the block. A block in another thread waits until this one ends, so
-    each restores what it found; a block nested in this thread holds the records of its own span.
-    As the loggers are the process's, the block also holds what other threads log through them
-    while it lasts.
+    During the block, ``andrey`` has only the holding handler and does not propagate, so no record
+    reaches standard error through root or embedding-application handlers; its effective level is
+    lowered to ``WARNING`` if higher. Descendant ``andrey.`` loggers have no handlers, propagate to
+    the holding handler, and have any level above ``WARNING`` lowered to it, so no record escapes.
+    Handlers, propagation, and levels are restored afterward. Blocks in other threads wait so each
+    restores the state it found; nested blocks in this thread hold their own records. Since loggers
+    are process-wide, records from other threads during the block are held too.
     """
     with _holding:
         handler = _Held()
@@ -243,9 +239,8 @@ def convergence_as_search_limit(source: str, fit: Callable[[], _T]) -> _T:
 def _reset_after_fork() -> None:
     """Replace the inherited locks in a forked child.
 
-    A child forked while another thread is warning, or holding records, inherits the lock held,
-    with no thread left to release it. The warned messages are kept: the child does not repeat
-    what the parent showed.
+    A child forked while another thread warns or holds records inherits a held lock with no thread
+    to release it. Warned messages are retained so the child does not repeat the parent's notices.
     """
     global _lock, _holding
     _lock = threading.RLock()

@@ -51,8 +51,8 @@ from andrey.core.ties import KEY_DP, stable_key, tie_ranks
 
 from .pcmci import PCMCIResult, lagged_design, pcmci
 
-#: The iteration from which a start also stops on a small change of ``Gamma``, and the share of
-#: ``K * T`` (in percent, doubled) that counts as small: the authors' code's values.
+#: The iteration enabling early stopping on small ``Gamma`` changes, and the small-change share of
+#: ``K * T`` (percent, doubled): the authors' code's values.
 SMALL_CHANGE_FROM = 5
 SMALL_CHANGE_PERCENT = 2
 
@@ -95,13 +95,12 @@ def regime_costs(
 ) -> np.ndarray:
     """The ``(T,)`` cost of one regime: its standardized squared residuals summed over variables.
 
-    Each variable ``j`` is regressed with an intercept on the lagged ``(i, lag)`` values in
-    ``parents[j]`` over the steps ``t >= tau_max`` that ``selected`` marks, and predicted at every
-    step from ``tau_max`` on. The regression runs on the values standardized over the selected
-    steps (``ddof=0``; a constant one keeps its scale), so a residual is in units of variable
-    ``j``'s standard deviation over those steps, and neither the columns' units nor their offsets
-    reach the fit. Parents enter in the order of their variables' ``ranks``, then lag, and the
-    variables are summed in rank order, so the cost does not depend on the column order.
+    Each variable ``j`` is regressed with an intercept on lagged ``(i, lag)`` values in
+    ``parents[j]`` over ``selected`` steps ``t >= tau_max``, then predicted from ``tau_max`` onward.
+    Values are standardized over selected steps (``ddof=0``; constants keep their scale), expressing
+    residuals in variable ``j``'s standard deviations and making fits independent of column units
+    and offsets. Parents follow variable ``ranks``, then lag; variables are summed in rank order,
+    making cost independent of column order.
     """
     n_steps = data.shape[0]
     fit = selected[tau_max:]

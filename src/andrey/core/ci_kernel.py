@@ -203,8 +203,8 @@ class KCI:
         entries = max(1, _CACHE_BYTES // (8 * self._n * self._n))
         self._resid = lru_cache(entries)(self._residual_maker)
         self._resid_y = lru_cache(entries)(self._residualized_kernel)
-        # A column's kernel without conditions does not depend on its partner, so the queries
-        # that pair it with others share it; kept only when two kernels fit the cache's bytes.
+        # An unconditional column kernel is shared across partners; cached only when two kernels
+        # fit.
         self._kernel = (
             lru_cache(entries)(self._marginal_kernel) if entries > 1 else self._marginal_kernel
         )

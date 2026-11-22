@@ -188,9 +188,9 @@ def shield_undecided(
     """``skeleton`` with the ``undecided`` pairs joined again, and their boolean mask, both ways;
     ``None`` in place of the mask when there are none.
 
-    The possible-d-sep step runs on it with the mask kept (never tested): a pair no test with rows
-    decided may be adjacent, so its paths still reach the nodes beyond, and the caller leaves the
-    pairs out of the marks again after the step.
+    The possible-d-sep step keeps the masked pairs without testing them: undecided pairs may be
+    adjacent, so their paths reach nodes beyond them; the caller removes these pairs from the marks
+    after the step.
     """
     if not undecided:
         return skeleton, None
@@ -615,11 +615,10 @@ def _first_separating(
     at the first that separates the pair; on the pool, tests after it may run, but the subset found
     is the serial one.
 
-    A test that deletes rows per test asks no subset holding a member that no row observes
-    together with ``x`` and ``y``, every member when no row observes the pair: such a query keeps
-    no rows and separates nothing. The subsets left out that the search would have reached are
-    counted as not tested (:func:`_left_out`), so the subset found and the counts are those of
-    asking every subset.
+    A test-wise deletion test skips subsets holding a member never observed with ``x`` and ``y``, or
+    every member when the pair is never observed together: these queries keep no rows and separate
+    nothing. Skipped subsets the search would have reached count as not tested (:func:`_left_out`),
+    preserving the subset found and counts.
     """
     if isinstance(test, TestwiseDeletion):
         together = test.together()
@@ -659,9 +658,8 @@ def _left_out(
     :func:`_iter_dsep_choices` order, less the subsets inside one of ``within``, reaches before
     ``found``, or reaches at all when ``found`` is ``None``.
 
-    Counted per size from the positions in ``dsep`` (:func:`_outside_count`): the subsets of
-    ``dsep`` less those of ``kept``, every size below ``found``'s whole and ``found``'s own size up
-    to ``found``.
+    Counts come from positions in ``dsep`` (:func:`_outside_count`): subsets of ``dsep`` outside
+    ``kept``, at every size below ``found``'s and at its size up to ``found``.
     """
     position = {v: i for i, v in enumerate(dsep)}
     every = list(range(len(dsep)))
@@ -984,9 +982,9 @@ def fci_orient(
     ``selection_bias=False`` skips R5-R7, the rules for selection bias, leaving R1-R4 and R8-R10,
     Zhang's complete set for PAGs without selection bias.
 
-    The rules skip the ``ambiguous`` triples, keyed ``(a, b, c)`` with ``a < c``, and R4 decides no
-    triple ``a, b, c`` with a side in ``flagged``, pairs in either order: an edge a conditioning set
-    no row could test might have separated may be absent.
+    The rules skip ``ambiguous`` triples, keyed ``(a, b, c)`` with ``a < c``; R4 decides no triple
+    ``a, b, c`` with a side in ``flagged``, pairs in either order: an untested conditioning set
+    might have separated that edge.
     """
     flagged = frozenset((min(a, b), max(a, b)) for a, b in flagged)
     if not in_column_order:

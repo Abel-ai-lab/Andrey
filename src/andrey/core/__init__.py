@@ -1,10 +1,9 @@
 """andrey.core -- the public, composable substrate (provisional until 1.0).
 
-The method-agnostic building blocks shared across algorithm families: the first-class ``Structure``
-(an ABC with concrete ``GraphStructure`` / ``TemporalStructure`` subclasses) backed by one canonical
-compact CSR store, and the ``StructureOutput`` run envelope that every algorithm returns
-(``multi_group_direct_lingam``, one per group; ``rpcmci``, a ``RegimeOutput`` with one per
-regime). The CI-test and score protocols live in
+Shared building blocks: the first-class ``Structure`` ABC (concrete ``GraphStructure`` /
+``TemporalStructure`` subclasses) backed by one canonical compact CSR store, and the
+``StructureOutput`` envelope every algorithm returns (``multi_group_direct_lingam``, one per group;
+``rpcmci``, a ``RegimeOutput`` with one per regime). CI-test and score protocols live in
 ``andrey.core.ci`` and ``andrey.core.score``.
 
 The statistical primitives (``cov`` / ``corrcoef`` / ``entropy``) live in ``andrey.core.stats``; the

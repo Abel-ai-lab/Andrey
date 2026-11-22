@@ -10,15 +10,14 @@ built over those rows of those columns, kept in data order, and asked the same q
 p-value is the one that test gives on that block exactly. Each test thus keeps every row its own
 variables allow, where deleting every row with a missing value would drop rows for all of them.
 
-Deleting rows per test is valid when the values are missing completely at random (MCAR): the rows
-a test keeps are then a random sample of all rows, so each test keeps its level; with perfect
-tests FCI then returns the graph it returns on complete data [1]_, and [2]_ argue the same for PC.
-When whether a value is missing depends on the variables, the rows a test keeps are a selected
-sample, and each test selects its own. The tests can then find dependence where the full population
-has none, which keeps extra edges [2]_ and can turn orientations wrong; FCI with one test per query
-is then not sound in general [1]_. The procedure that [1]_ proves sound beyond MCAR confirms each
-independence on the rows complete in every column, and is not this one. :data:`TESTWISE_CLAIM`
-is the sentence every method that deletes rows per test states.
+Test-wise deletion is valid under missing completely at random (MCAR): each test keeps a random
+sample of all rows and retains its level; with perfect tests, FCI returns the complete-data graph
+[1]_, and [2]_ argue the same for PC. When missingness depends on variables, each test selects its
+own sample, potentially finding dependence absent from the population, retaining extra edges [2]_,
+and turning orientations wrong; FCI with one test per query is not generally sound [1]_. The
+procedure proven sound beyond MCAR in [1]_ confirms each independence on rows complete in every
+column; this procedure does not. :data:`TESTWISE_CLAIM` states the claim for every method using
+test-wise deletion.
 
 A query whose block holds fewer rows than its test needs is not tested: it answers
 :data:`NOT_TESTED`, which never separates a pair and never confirms a link, and is counted apart
@@ -79,8 +78,8 @@ __all__ = ["TestwiseDeletion"]
 #: deletes rows per test (:class:`TestwiseDeletion`), the default of every method that takes it.
 TESTWISE = "testwise"
 MISSING_HANDLING = (TESTWISE,)
-#: When test-wise deletion is valid, in the one sentence that the docstring of every method that
-#: runs it, the ``missing`` concept, and the notice of a default handling share.
+#: The validity sentence shared by docstrings of methods using test-wise deletion, the ``missing``
+#: concept, and the default-handling notice.
 TESTWISE_CLAIM = (
     "Test-wise deletion is valid when values are missing completely at random, which means that "
     "whether a value is missing depends on no value in the data; the rows a test reads are then a "
@@ -92,8 +91,8 @@ TESTWISE_CLAIM = (
 #: holds: a search reads it as no evidence, separating no pair and confirming no link
 #: (:func:`not_tested`). Its statistic is ``NaN`` too.
 NOT_TESTED = float("nan")
-#: The sentence on a query without the rows its test needs, which the docstring of every method
-#: that deletes rows per test, the ``missing`` concept, and the notice share.
+#: The insufficient-rows sentence shared by docstrings of methods using test-wise deletion, the
+#: ``missing`` concept, and the notice.
 NOT_TESTED_CLAIM = (
     "A test whose variables are observed together on fewer rows than it needs or that has no "
     "degrees of freedom left, a pair never observed together included, is not tested: it never "
@@ -101,8 +100,8 @@ NOT_TESTED_CLAIM = (
     "as a pair never observed together, is undecided: it is left out of the graph, no orientation "
     'reads it as adjacent or apart, and metadata["undecided_pairs"] lists it.'
 )
-#: The sentence on the edges a conditioning set not tested might have removed, which the
-#: docstring of every method that lists them and the notice share.
+#: The sentence on edges untested conditioning sets might remove, shared by the notice and
+#: docstrings of methods listing them.
 POSSIBLY_SEPARABLE_CLAIM = (
     "An edge drawn although a conditioning set that could not be tested might have separated its "
     'pair is listed in metadata["possibly_separable"]: the flag says what the data could not '
@@ -170,17 +169,14 @@ _R = TypeVar("_R")
 
 
 class RowCounts(Counter[int]):
-    """The tests of a fit by the rows each read, the tests that answered ``p = 1``, and the
-    queries that were not tested.
+    """A fit's tests by row count, its ``p = 1`` answers, and its untested queries.
 
-    Every query a :class:`TestwiseDeletion` answers is counted here, whichever test it runs and
-    whichever way it is asked, by :meth:`add`. A tested query counts its row count, and ``p_one``
-    when its p-value is exactly ``1``, as a test whose statistic is exactly zero answers. A query
-    answered :data:`NOT_TESTED`, which a query with zero degrees of freedom is, counts in
-    ``not_tested``, by its pair of the test's columns, ``(x, y)`` with ``x < y``. ``largest`` keeps
-    each tested pair's largest p-value, which tells whether a tested query separated it.
-    ``untested_sets`` keeps each pair's conditioning sets that were not tested
-    (:meth:`note_untested`).
+    :meth:`add` counts every :class:`TestwiseDeletion` query, regardless of test or call path.
+    Tested queries count their rows and, for p-value ``1``, increment ``p_one``, as when the
+    statistic is exactly zero. Queries answered :data:`NOT_TESTED`, including those with zero
+    degrees of freedom, count in ``not_tested`` by column pair ``(x, y)``, ``x < y``. ``largest``
+    keeps each tested pair's largest p-value to identify separated pairs; ``untested_sets`` keeps
+    each pair's untested conditioning sets (:meth:`note_untested`).
     """
 
     def __init__(self) -> None:
@@ -212,11 +208,11 @@ class RowCounts(Counter[int]):
         y: npt.ArrayLike,
         conditions: Sequence[Iterable[int]] | np.ndarray | None = None,
     ) -> None:
-        """Count the queries of the pairs ``x < y`` answered with the row counts ``rows`` and the
-        p-values ``p``, a :data:`NOT_TESTED` one apart, with its conditioning set, entry ``i`` of
-        ``conditions``, kept inside a :func:`reading_flags` block only, the one place a rule reads
-        it, and not in a search that reads every flagged pair (:func:`keeps_no_untested_sets`;
-        :meth:`note_untested`)."""
+        """Count queries of pairs ``x < y`` with row counts ``rows`` and p-values ``p``, counting
+        :data:`NOT_TESTED` queries apart; keep each conditioning set, entry ``i`` of ``conditions``,
+        only inside a :func:`reading_flags` block where rules read it, except in searches reading
+        every
+        flagged pair (:func:`keeps_no_untested_sets`; :meth:`note_untested`)."""
         values = np.asarray(p, dtype=np.float64).reshape(-1)
         if not values.size:
             return
@@ -245,9 +241,9 @@ class RowCounts(Counter[int]):
     def note_untested(self, x: int, y: int, columns: Iterable[int] | None) -> None:
         """Keep ``columns`` as a conditioning set of the pair ``x < y`` that was not tested.
 
-        A set a search left out without building it is kept by the columns that kept it from rows,
-        a subset of it. A set not known, ``None``, is kept as the empty set, which lies within
-        every set of columns (:meth:`separable_within`)."""
+        An unbuilt set is stored as the subset of columns that kept it from rows. An unknown set,
+        ``None``, is stored as the empty set, contained in every set of columns
+        (:meth:`separable_within`)."""
         sets = self.untested_sets.setdefault((x, y), set())
         sets.add(frozenset() if columns is None else frozenset(int(c) for c in columns))
 
@@ -263,14 +259,13 @@ class RowCounts(Counter[int]):
             self.largest[pair] = max(self.largest.get(pair, -np.inf), value)
 
     def untested(self) -> list[tuple[int, int]]:
-        """The pairs with a query that was not tested and no query that was: no test with rows
-        could decide them, as a pair never observed together."""
+        """Pairs with untested queries and no tested query: no test with rows could decide them, as
+        when they are never observed together."""
         return [pair for pair in self.not_tested if pair not in self.largest]
 
     def possibly_separable(self, drawn: np.ndarray) -> list[tuple[int, int]]:
-        """The pairs adjacent in the boolean ``drawn`` with a query tested and one not tested: a
-        conditioning set that no row could test might have separated them. A pair of columns
-        ``drawn`` does not hold is left out."""
+        """Pairs adjacent in boolean ``drawn`` with both tested and untested queries: an untested
+        conditioning set might have separated them. Pairs outside ``drawn`` are omitted."""
         d = len(drawn)
         return [
             (a, b) for a, b in self.not_tested if b < d and (a, b) in self.largest and drawn[a, b]
@@ -281,11 +276,10 @@ class RowCounts(Counter[int]):
         within the possible adjacencies of one of its ends: the other columns adjacent to it in
         ``drawn``, and those it forms an undecided pair with (:meth:`untested`).
 
-        A set that separates a pair, when every variable is measured, lies within the parents of
-        one of its ends. A search that removes no true edge keeps each parent adjacent, or leaves
-        it undecided when no test with rows could decide the pair, so a set not tested beyond both
-        ends' possible adjacencies is no separating set that the search missed. A pair whose sets
-        not tested are not known is kept."""
+        When every variable is measured, a separating set lies within an endpoint's parents. A
+        search removing no true edge keeps each parent adjacent or undecided for lack of rows, so an
+        untested set outside both ends' possible adjacencies cannot be a missed separating set.
+        Pairs with unknown untested sets are kept."""
         undecided: dict[int, set[int]] = {}
         for a, b in self.untested():
             undecided.setdefault(a, set()).add(b)
@@ -324,9 +318,9 @@ def rows_tested() -> Generator[RowCounts]:
 
 
 def counts_its_tests(search: Callable[_P, _R]) -> Callable[_P, _R]:
-    """Run ``search`` inside :func:`search_outcomes`, so the flags it reads
-    (:func:`running_flags`) count its own tests even when no :func:`rows_tested` block runs, as
-    when a search is called directly; inside one, the block takes its counts as before."""
+    """Run ``search`` inside :func:`search_outcomes` so :func:`running_flags` reflects its tests
+    even without a :func:`rows_tested` block, as in a direct call; an enclosing block receives its
+    counts."""
 
     @functools.wraps(search)
     def counted(*args: _P.args, **kwargs: _P.kwargs) -> _R:
@@ -338,9 +332,9 @@ def counts_its_tests(search: Callable[_P, _R]) -> Callable[_P, _R]:
 
 @contextlib.contextmanager
 def reading_flags(on: bool = True) -> Generator[None]:
-    """Inside the block, with ``on``, the searches read a triple with a side that
-    :func:`running_flags` lists as neither a collider nor a non-collider; outside it they read no
-    flag, as ``possibly_separable="orient"`` does."""
+    """With ``on``, searches inside the block treat triples with a side listed by
+    :func:`running_flags` as neither colliders nor non-colliders; outside, they ignore flags, as
+    with ``possibly_separable="orient"``."""
     token = _READ_FLAGS.set(on)
     try:
         yield
@@ -349,9 +343,9 @@ def reading_flags(on: bool = True) -> Generator[None]:
 
 
 def keeps_no_untested_sets(search: Callable[_P, _R]) -> Callable[_P, _R]:
-    """Run ``search`` keeping no untested conditioning set (:meth:`RowCounts.note_untested`), for a
-    search that reads every flagged pair (``running_flags(..., latent=True)``, as FCI does, or
-    :func:`~andrey.temporal.pcmci.flagged_links`) and so never reads the sets."""
+    """Run ``search`` without keeping untested conditioning sets (:meth:`RowCounts.note_untested`)
+    when it reads every flagged pair (``running_flags(..., latent=True)``, as FCI does, or
+    :func:`~andrey.temporal.pcmci.flagged_links`) and never reads the sets."""
 
     @functools.wraps(search)
     def run(*args: _P.args, **kwargs: _P.kwargs) -> _R:
@@ -381,15 +375,14 @@ def running_counter() -> RowCounts | None:
 
 
 def running_flags(adjacency: np.ndarray, *, latent: bool = False) -> list[tuple[int, int]]:
-    """The pairs adjacent in the boolean ``adjacency`` that the tests counted so far in the running
-    :func:`rows_tested` block flag as possibly separable, with a conditioning set not tested within
-    an end's possible adjacencies (:meth:`RowCounts.separable_within`); none outside a
-    :func:`reading_flags` block or a counting block, or when every query was tested, as on
-    complete data.
+    """Pairs adjacent in boolean ``adjacency`` flagged as possibly separable by tests in the running
+    :func:`rows_tested` block, with an untested conditioning set within an end's possible
+    adjacencies (:meth:`RowCounts.separable_within`); none outside a :func:`reading_flags` or
+    counting block, or when every query was tested, as on complete data.
 
-    With ``latent``, for a search that allows latent variables, every flagged pair is listed
-    (:meth:`RowCounts.possibly_separable`): a set that separates a pair then lies within the
-    possible-d-separating set of an end, not within its adjacencies."""
+    With ``latent``, every flagged pair is listed (:meth:`RowCounts.possibly_separable`): a
+    separating set for a search allowing latent variables lies within an end's possible-d-separating
+    set, not its adjacencies."""
     counter = _ROWS.get()
     if counter is None or not counter.not_tested or not _READ_FLAGS.get():
         return []
@@ -412,9 +405,8 @@ def count_answer(
 
 @contextlib.contextmanager
 def rows_tested_elsewhere() -> Generator[RowCounts]:
-    """:func:`rows_tested` for tests over another matrix than the data's, as MVPC's indicator
-    search runs: on exit, the running counter outside, if any, absorbs the counts
-    (:meth:`RowCounts.absorb`), without the pairs, which are not the data's."""
+    """:func:`rows_tested` over another matrix, as in MVPC's indicator search: on exit, an enclosing
+    counter absorbs counts (:meth:`RowCounts.absorb`) without pairs, which are not the data's."""
     outer = _ROWS.get()
     with rows_tested() as counter:
         yield counter
@@ -424,9 +416,9 @@ def rows_tested_elsewhere() -> Generator[RowCounts]:
 
 @contextlib.contextmanager
 def search_outcomes() -> Generator[RowCounts]:
-    """:func:`rows_tested` for one search, whose result reads which pairs its tests decided
-    (:meth:`RowCounts.untested`); on exit, the running counter outside, if any, takes its counts,
-    pairs included (:meth:`RowCounts.merge`)."""
+    """:func:`rows_tested` for a search whose result reads which pairs its tests decided
+    (:meth:`RowCounts.untested`); on exit, an enclosing counter takes its counts and pairs
+    (:meth:`RowCounts.merge`)."""
     outer = _ROWS.get()
     with rows_tested() as counter:
         yield counter
@@ -496,9 +488,8 @@ def _not_tested_metadata(
 
 
 def named_pairs(pairs: Iterable[tuple[int, int]], name: Callable[[int], Any]) -> list[list]:
-    """``pairs`` of columns as ``[name(a), name(b)]`` lists; each pair and the list in the order of
-    the names' text, so the list does not depend on the column order when ``name`` gives
-    labels."""
+    """Column ``pairs`` as ``[name(a), name(b)]`` lists, with pairs and the list sorted by name
+    text, independent of column order when ``name`` gives labels."""
     named = [sorted((name(a), name(b)), key=str) for a, b in pairs]
     return sorted(named, key=lambda pair: (str(pair[0]), str(pair[1])))
 
@@ -577,9 +568,9 @@ class TestwiseDeletion:
         self.pin_blas = _pins_blas(test_class, data.shape[0])
 
     def mark_environments(self, columns: Iterable[int]) -> None:
-        """Read ``columns`` as environment indicators, as CD-NOD and FCI-JCI add: a query whose
-        block holds one of them constant is not tested, since the block's rows come from one
-        environment and no test there can tell environments apart."""
+        """Mark ``columns`` as environment indicators, as in CD-NOD and FCI-JCI: queries with a
+        constant indicator are not tested because their rows come from one environment and cannot
+        distinguish environments."""
         self._environments[list(columns)] = True
         self._cache.clear()
         self._held = 0
@@ -590,9 +581,8 @@ class TestwiseDeletion:
         return np.flatnonzero(self._environments)
 
     def from_columns(self, source: npt.ArrayLike) -> None:
-        """Record the pairs of the queries in the counter as columns ``source[x]`` and
-        ``source[y]``: the test runs over the columns of another matrix in another order, as a
-        search in rank order runs, and ``source`` gives each one's position in that matrix."""
+        """Record query pairs in the counter as ``source[x]`` and ``source[y]``: ``source`` maps
+        test columns to positions in another matrix, as for a search in rank order."""
         self._source = np.asarray(source, dtype=np.int64)
 
     def _count(
@@ -741,10 +731,10 @@ class TestwiseDeletion:
         return self._together
 
     def conditionable(self, x: int, y: int, ordered: Iterable[int]) -> list[int]:
-        """The members of ``ordered`` that a query of ``x`` and ``y`` keeps as conditions, taken
-        in order: each joins when the rows that observe ``x``, ``y``, the members taken before it,
-        and it hold at least :meth:`least_rows` for one more condition, so the query over all of
-        them is tested and its block does not mix columns that no row observes together."""
+        """The conditions from ``ordered`` for a query of ``x`` and ``y``, selected in order: each
+        joins if rows observing it, ``x``, ``y``, and earlier selections meet :meth:`least_rows` for
+        another condition, keeping the full query testable and excluding columns never observed
+        together."""
         rows = self._observed[:, x] & self._observed[:, y]
         kept: list[int] = []
         for column in ordered:
@@ -757,13 +747,13 @@ class TestwiseDeletion:
     def count_not_tested(
         self, x: int, y: int, queries: int, held: Iterable[Iterable[int]] | None = None
     ) -> None:
-        """Count ``queries`` queries of ``x`` and ``y`` as not tested in the running
-        :func:`rows_tested` counter without asking them, as a search counts the conditioning sets
-        that keep no rows (:meth:`together`); the pair is recorded as :meth:`_count` records it.
+        """Count ``queries`` of ``x`` and ``y`` as not tested in the running :func:`rows_tested`
+        counter without asking them, as for sets keeping no rows (:meth:`together`); record the pair
+        as :meth:`_count` does.
 
-        Each of ``held`` is the columns that keep some of those sets from rows, which the sets
-        hold, kept as :meth:`RowCounts.add` keeps them (:meth:`RowCounts.note_untested`); ``None``
-        when they are not known."""
+        Each of ``held`` contains columns preventing some sets from keeping rows, stored as
+        :meth:`RowCounts.add` stores them (:meth:`RowCounts.note_untested`); ``None`` when
+        unknown."""
         counter = _ROWS.get()
         if counter is None or not queries:
             return
@@ -931,10 +921,9 @@ class GaussianDeletion(PartialCorrelationDeletion):
     :meth:`statistic_pvalues`, and the canonical query arrays the skeleton searches pass) gives it
     the same bits.
 
-    When the rows fall into a few missingness patterns, the sums come from tables kept once per
-    group of patterns instead of from every row (:mod:`~andrey.core.missing_groups`); the path is
-    chosen once per test, from the data, and the two paths give the same row counts and agree up to
-    rounding.
+    With few missingness patterns, sums use tables stored once per pattern group
+    (:mod:`~andrey.core.missing_groups`) instead of every row; the path is chosen once per test from
+    the data, with identical row counts and sums agreeing up to rounding.
 
     A query whose block has fewer rows than the test needs is not tested: its rows are counted from
     the observed masks, or from the groups, and its block is never summed. A query with a continuous
@@ -1073,10 +1062,10 @@ class GaussianDeletion(PartialCorrelationDeletion):
         """Answer the ``flagged`` queries by the exact path, in order, and count every query.
 
         ``query(k)`` is query ``k`` as ``(x, y, conditioning set)``, ``pairs[k]`` its ``(x, y)``,
-        and ``conds[k]`` its conditioning set. ``r`` and ``p`` hold the fast answers,
-        :data:`NOT_TESTED` for a query without the rows it needs, and take the exact ones in place;
-        ``rows`` holds each query's row count. The queries are counted in order, so a query that
-        raises does so after the queries before it, as the exact path's loop does.
+        and ``conds[k]`` its conditioning set. ``r`` and ``p`` hold fast answers, :data:`NOT_TESTED`
+        for insufficient rows, replaced in place by exact answers; ``rows`` holds row counts.
+        Queries are counted in order, so errors follow preceding queries as in the exact path's
+        loop.
         """
         counter = _ROWS.get()
         start = 0
@@ -1244,9 +1233,9 @@ class GaussianDeletion(PartialCorrelationDeletion):
         return blocks, counts
 
     def _grouped_sums(self) -> GroupedSums | None:
-        """The grouped sums of :mod:`~andrey.core.missing_groups` when the data take that path
-        (:func:`~andrey.core.missing_groups.grouping_for`), else ``None`` for the per-row sums;
-        chosen from the data at the first block, so every block of the test takes one path."""
+        """Grouped sums from :mod:`~andrey.core.missing_groups` when
+        :func:`~andrey.core.missing_groups.grouping_for` selects them; otherwise ``None`` for
+        per-row sums, chosen from the data at the first block for the entire test."""
         if not self._chosen:
             from .ties import tie_ranks
 
