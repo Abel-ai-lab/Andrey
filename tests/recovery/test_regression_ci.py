@@ -71,9 +71,10 @@ def test_pc_with_partial_correlation_misses_the_additive_noise_graph():
         # seed 0 is one of the 3 others (SHD 3).
         pytest.param(
             "wgcm",
-            marks=pytest.mark.xfail(
-                strict=True, raises=AssertionError, reason="wGCM misses seed 0"
-            ),
+            marks=[
+                pytest.mark.xfail(strict=True, raises=AssertionError, reason="wGCM misses seed 0"),
+                pytest.mark.release,
+            ],
         ),
     ],
 )

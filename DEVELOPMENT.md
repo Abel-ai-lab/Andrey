@@ -287,9 +287,10 @@ reaching a code path no other test reaches, on the smallest input that reaches i
 - Nothing runs on a schedule: with dependencies locked, an unchanged commit gives the same result.
 - Pull-request CI stays fast. A test that is release evidence rather than a correctness check (a
   large-input repeat, a campaign-style recovery cell, anything over about 30 seconds on one core)
-  carries `@pytest.mark.release`, on the test or on one `pytest.param`. Pull-request CI deselects
-  it with `-m "not release"`; the release freeze runs the whole suite, marked tests included. Every
-  method keeps an unmarked recovery test, so a broken method still fails on its pull request.
+  carries `@pytest.mark.release`, on the test or, through `release_cases` (`tests/release.py`), on
+  single cases of a parametrized test. Pull-request CI deselects it with `-m "not release"`; the
+  release freeze runs the whole suite, marked tests included. Every method keeps an unmarked
+  recovery test, so a broken method still fails on its pull request.
 
 ### 1. Recovery tests
 
