@@ -912,7 +912,7 @@ _add(
                 "authors' code: additions, deletions, then reversals, once. lges is the "
                 "default as the paper's main method. lges favors accuracy on denser graphs and "
                 "gives up time (where both ran in one process, the conservative rule at mean "
-                "degree 1 and 3, whose safe fits ran first and carry about 0.25 s of start-up, "
+                "degree 1 and 3, where the safe fits ran first and carry about 0.25 s of start-up, "
                 "its median fit took 1.0 to 1.33 times as long as LGES-0's; at mean degree 2, "
                 "4, and 6, timed in separate runs, so small differences are noise, 0.9 to 1.8 "
                 "times); "
