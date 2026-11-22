@@ -31,6 +31,7 @@ import andrey.search.em as em_module
 from andrey import data
 from andrey.data import missingness
 from andrey.metrics import shd
+from tests.unit.methods import SHORT
 
 COLLIDER = [(0, 2, "directed"), (1, 2, "directed")]
 BIC_SEARCHES = ("ges", "xges", "hc", "tabu", "exact_search", "boss", "grasp")
@@ -76,6 +77,21 @@ def test_the_continuous_searches_learn_the_collider_by_em(name):
     assert getattr(andrey, name)(selected_collider(0), missing="em").structure.oriented_edges() == (
         COLLIDER
     )
+
+
+@pytest.mark.filterwarnings("ignore::andrey.SearchLimitWarning")
+def test_calm_by_em_repeats_and_records_its_rounds():
+    """CALM's EM path on its short schedule: the fit repeats and records each round."""
+    pytest.importorskip("torch")
+    X = selected_collider(0)
+    first, second = (
+        andrey.calm(X, missing="em", n_em_iterations=2, **SHORT["calm"]) for _ in range(2)
+    )
+    assert np.array_equal(first.structure.to_numpy(), second.structure.to_numpy())
+    assert first.metadata["missing"] == "em"
+    assert first.metadata["em"] == second.metadata["em"]
+    assert first.metadata["em"]["iterations"] == 2
+    assert len(first.metadata["em"]["log_likelihood"]) == 2
 
 
 @pytest.mark.release
