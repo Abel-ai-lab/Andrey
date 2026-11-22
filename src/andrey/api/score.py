@@ -1749,31 +1749,31 @@ def lges(
         paper proves that LGES then recovers the true class as the rows grow (its Corollary 1; Notes
         cover LGES-0) [1]_. ``"conservative"`` (ConservativeInsert) also leaves out a pair when any
         valid addition of the edge worsens the score; it made fewer errors in the paper's
-        simulations, with no such proof. ``"safe"`` favors proven recovery over accuracy;
-        ``"conservative"`` favors fewer errors without that proof. On the paper's linear-Gaussian
-        simulation (the authors' generator; 10, 20, 50, and 100 variables at mean degree 1 to 4, and
-        10, 20, and 50 at degree 6; 1,000 and 10,000 rows; 20 graphs per setting), under
-        ``schedule="lges"``, ``"conservative"`` had the lower mean error in 31 of 38 settings, the
-        higher in 3 (by 0.1 to 1.15 edges, all at mean degree 4 and 6), and tied in 4; over the 480
-        graphs of mean degree 1 to 3 it made 6,789 errors against 9,029, and its median fit took
-        0.78 to 1.03 times as long (mean degree 2, 4, and 6).
+        simulations, with no such proof. ``"safe"`` favors the proof of recovery; it gives up
+        accuracy. ``"conservative"`` favors fewer errors; it gives up that proof. On the paper's
+        linear-Gaussian simulation (the authors' generator; 10, 20, 50, and 100 variables at mean
+        degree 1 to 4, and 10, 20, and 50 at degree 6; 1,000 and 10,000 rows; 20 graphs per
+        setting), under ``schedule="lges"``, ``"conservative"`` had the lower mean error in 31 of 38
+        settings, the higher in 3 (by 0.1 to 1.15 edges, all at mean degree 4 and 6), and tied in 4;
+        over the 480 graphs of mean degree 1 to 3 it made 6,789 errors against 9,029, and its median
+        fit took 0.78 to 1.03 times as long (mean degree 2, 4, and 6).
     schedule : {"lges", "lges0_released"}, default="lges"
         The order of the search's phases (see Notes). ``"lges"`` is the paper's main method, LGES
         (its Algorithm 1): before each single edge addition it deletes, then reverses, edges until
         neither improves the score, and it stops when no move improves it. ``"lges0_released"`` is
         the paper's LGES-0 (its Algorithm 8) in the phase order of the code published with the
         paper: additions, then deletions, then reversals, each phase run once until no move improves
-        the score. ``"lges"`` favors accuracy on denser graphs at the cost of time;
-        ``"lges0_released"`` favors time at the cost of that accuracy. On the simulation of
-        ``insertion``, counting a schedule better in a setting and rule when its mean error is lower
-        and it is lower on more graphs than higher, LGES was better in 15 of 16 at mean degree 3 and
-        12 of 16 at mean degree 4, LGES-0 in 1 and 2. At mean degree 1 and 2 the two made about as
-        many errors, 457 against 459 summed over the 32 settings and rules of the mean errors, with
-        LGES-0 better in 12, LGES in 5, and 15 ties. LGES rescans the deletions and reversals after
-        every addition: where both ran in one process (the conservative rule at mean degree 1 and 3;
-        the safe fits there ran first and carry about 0.25 s of start-up), its median fit took 1.0
-        to 1.33 times LGES-0's time; at mean degree 2, 4, and 6, timed in separate runs, so small
-        differences are noise, 0.9 to 1.8 times.
+        the score. ``"lges"`` favors accuracy on denser graphs; it gives up time.
+        ``"lges0_released"`` favors time; it gives up accuracy on denser graphs. On the simulation
+        of ``insertion``, counting a schedule better in a setting and rule when its mean error is
+        lower and it is lower on more graphs than higher, LGES was better in 15 of 16 at mean degree
+        3 and 12 of 16 at mean degree 4, LGES-0 in 1 and 2. At mean degree 1 and 2 the two made
+        about as many errors, 457 against 459 summed over the 32 settings and rules of the mean
+        errors, with LGES-0 better in 12, LGES in 5, and 15 ties. LGES rescans the deletions and
+        reversals after every addition: where both ran in one process (the conservative rule at mean
+        degree 1 and 3; the safe fits there ran first and carry about 0.25 s of start-up), its
+        median fit took 1.0 to 1.33 times LGES-0's time; at mean degree 2, 4, and 6, timed in
+        separate runs, so small differences are noise, 0.9 to 1.8 times.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,

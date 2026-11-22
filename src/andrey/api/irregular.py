@@ -706,17 +706,17 @@ def cpcm(
         test statistic (the paper's forced estimate). A significance level such as ``0.05`` gives no
         edge when the two columns test independent at that level, and otherwise draws an edge only
         when exactly one direction's p-value exceeds it (the paper's conservative estimate).
-        ``None`` favors a direction for every pair without indicating whether both or neither fit; a
-        level favors that distinction at the cost of the pairs it leaves undecided. On the paper's
-        pairs at 1,000 and 2,000 rows the forced direction tied with the authors' code after fresh
-        seeds in every setting; on the first seeds it was right less often on Table 2's PARg drawn
-        as the paper's Appendix B.3 describes (wrong on 12 of 99 pairs against 8) and on model (16)
-        at ``gamma = 2`` with 2,000 rows (4 of 99 against 0). On the paper's model (16) at 500 rows
-        under ``"pareto"``, the conservative estimate found both directions plausible, the paper's
-        outcome at ``gamma = 0``, on 73% and 78% of the pairs of two seed sets against that code's
-        82% and 85%, so it is not supported there; at ``gamma = 1`` it named the true direction on
-        55% and 64% of the pairs of the two seed sets, and both on 39% of the first. The
-        `0.19.0 release card
+        ``None`` favors a direction for every pair; it gives up the sign that a pair fits both ways
+        or neither. A level favors that sign; it gives up the pairs it leaves undecided. On the
+        paper's pairs at 1,000 and 2,000 rows the forced direction tied with the authors' code after
+        fresh seeds in every setting; on the first seeds it was right less often on Table 2's PARg
+        drawn as the paper's Appendix B.3 describes (wrong on 12 of 99 pairs against 8) and on model
+        (16) at ``gamma = 2`` with 2,000 rows (4 of 99 against 0). On the paper's model (16) at 500
+        rows under ``"pareto"``, the conservative estimate found both directions plausible, the
+        paper's outcome at ``gamma = 0``, on 73% and 78% of the pairs of two seed sets against that
+        code's 82% and 85%, so it is not supported there; at ``gamma = 1`` it named the true
+        direction on 55% and 64% of the pairs of the two seed sets, and both on 39% of the first.
+        The `0.19.0 release card
         <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#the-conservative-estimate>`_ has the
         numbers. See Notes.
     family : str or list of str, default="gaussian"
@@ -851,25 +851,25 @@ def cpcm(
     Pareto of scale 1) holds: there it was right on 38% and 47% of the pairs of two seed sets, as
     often as the authors' code and no better than a coin flip. The
     `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm>`_ has the
-    numbers. The family must be chosen: the paper's support-based and sequential one- or
-    two-parameter selection rules are not offered; the benchmark used the support rule's family. On
-    location-scale and multiplicative pairs that rule picks ``"gaussian_fixed_scale"``, an
-    additive-noise family, which named the true direction on 0% to 58% of them in both
-    implementations, so pass ``"gaussian"`` there. On fresh multiplicative pairs,
-    :func:`~andrey.loci` was right more often, 98% against 84%, and faster. Under ``"pareto"``, when
-    the cause's largest value is thousands of times its median, the test of one direction can reject
-    where the authors' code does not. On the paper's model (16) at ``gamma = 0`` the conservative
-    estimate found both directions plausible, the paper's claim there, on 73% and 78% of the pairs
-    of two seed sets against the reference's 82% and 85%, fewer on both, so the conservative
-    estimate under ``"pareto"`` is unsupported because of the rank-10 thin plate spline of the cause
-    on such values. At 2,000 rows the forced direction was wrong on 8 of the 199 pairs both fitted
-    against 1 (the authors' code stopped with an error on one). Each HSIC test builds matrices with
-    one row and one column per sample, so time and memory grow with the square of ``n_samples``.
-    Under the count families the rank-10 spline must follow the mean to within the counts' own
-    noise, about ``1 / sqrt(mean)`` of it, which it does for means up to a few hundred: from means
-    of a few thousand that vary strongly with the
-    cause, the true direction's test rejects too. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    numbers. The family must be chosen: the paper's rule that picks a family from each column's
+    support and its sequential choice between one- and two-parameter families are not offered; the
+    benchmark used the support rule's family. On location-scale and multiplicative pairs that rule
+    picks ``"gaussian_fixed_scale"``, an additive-noise family, which named the true direction on 0%
+    to 58% of them in both implementations, so pass ``"gaussian"`` there. On fresh multiplicative
+    pairs, :func:`~andrey.loci` was right more often, 98% against 84%, and faster. Under
+    ``"pareto"``, when the cause's largest value is thousands of times its median, the test of one
+    direction can reject where the authors' code does not. On the paper's model (16) at
+    ``gamma = 0`` the conservative estimate found both directions plausible, the paper's claim
+    there, on 73% and 78% of the pairs of two seed sets against the reference's 82% and 85%, fewer
+    on both, so the conservative estimate under ``"pareto"`` is unsupported because of the rank-10
+    thin plate spline of the cause on such values. At 2,000 rows the forced direction was wrong on 8
+    of the 199 pairs both fitted against 1 (the authors' code stopped with an error on one). Each
+    HSIC test builds matrices with one row and one column per sample, so time and memory grow with
+    the square of ``n_samples``. Under the count families the rank-10 spline must follow the mean to
+    within the counts' own noise, about ``1 / sqrt(mean)`` of it, which it does for means up to a
+    few hundred: from means of a few thousand that vary strongly with the cause, the true
+    direction's test rejects too. The numbers are a reference, not a hard limit: they change with
+    the data generator, the density, the method's settings, and the machine.
 
     References
     ----------

@@ -134,13 +134,13 @@ def pc(
         rule orients through it, when a conditioning set not tested of that side lies within the
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
         lies within the parents of one end, so the search might have missed that separating set.
-        ``"orient"`` favors arrowheads and accuracy at the cost of protection from false colliders;
-        ``"ambiguous"`` favors avoiding false colliders at the cost of neighboring true arrowheads
-        and accuracy. On merged cohorts of three graph sizes, with about 29 to 76 true edges, that
-        no row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's
-        false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it
-        found from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty
-        graph in 6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs.
+        ``"orient"`` favors arrowheads and accuracy; it gives up protection from false colliders.
+        ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them, and
+        accuracy. On merged cohorts of three graph sizes, with about 29 to 76 true edges, that no
+        row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's false
+        colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found
+        from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty graph in
+        6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -761,14 +761,14 @@ def fci(
         pair lies within the possible-d-separating set of one end, beyond its adjacencies, so any
         untested conditioning set might be a missed separating set. The collider pass before the
         possible-d-separation step reads it too, so that step's sets, the skeleton, and
-        ``metadata["not_tested"]`` can change. ``"orient"`` favors arrowheads and accuracy at the
-        cost of protection from false colliders; ``"ambiguous"`` favors avoiding false colliders at
-        the cost of neighboring true arrowheads and accuracy. On merged cohorts of three graph
-        sizes, with about 29 to 76 true edges, that no row bridges (20 seeds each, conditioning sets
-        of up to 3), ``"ambiguous"`` took FCI's false colliders per fit from 21.5-165.4 to at most
-        0.1 and the share of true arrowheads it found from 0.61-0.81 to 0, and raised its errors by
-        0.5 to 4.4, still fewer than the empty graph's in 6 of 6 settings; on bridged cohorts and
-        complete data the two gave the same graphs.
+        ``metadata["not_tested"]`` can change. ``"orient"`` favors arrowheads and accuracy; it gives
+        up protection from false colliders. ``"ambiguous"`` favors no false collider; it gives up
+        the true arrowheads beside them, and accuracy. On merged cohorts of three graph sizes, with
+        about 29 to 76 true edges, that no row bridges (20 seeds each, conditioning sets of up to
+        3), ``"ambiguous"`` took FCI's false colliders per fit from 21.5-165.4 to at most 0.1 and
+        the share of true arrowheads it found from 0.61-0.81 to 0, and raised its errors by 0.5 to
+        4.4, still fewer than the empty graph's in 6 of 6 settings; on bridged cohorts and complete
+        data the two gave the same graphs.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1660,14 +1660,14 @@ def cdnod(
         rule orients through it, when a conditioning set not tested of that side lies within the
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
         lies within the parents of one end, so the search might have missed that separating set.
-        ``"orient"`` favors arrowheads at the cost of protection from false colliders;
-        ``"ambiguous"`` favors avoiding false colliders at the cost of neighboring true arrowheads.
-        With :func:`~andrey.pc`, on merged cohorts of three graph sizes, with about 29 to 76 true
-        edges, that no row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"``
-        took PC's false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true
-        arrowheads it found from 0.54-0.72 to 0, and PC's graph was then farther from the truth than
-        the empty graph in 6 of 6 settings; on bridged cohorts and complete data the two gave the
-        same graphs. With CD-NOD, its effect on accuracy was not measured.
+        ``"orient"`` favors arrowheads; it gives up protection from false colliders. ``"ambiguous"``
+        favors no false collider; it gives up the true arrowheads beside them. With
+        :func:`~andrey.pc`, on merged cohorts of three graph sizes, with about 29 to 76 true edges,
+        that no row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's
+        false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it
+        found from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty
+        graph in 6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs.
+        With CD-NOD, its effect on accuracy was not measured.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -2101,9 +2101,9 @@ def fci_jci(
         pair lies within the possible-d-separating set of one end, beyond its adjacencies, so any
         untested conditioning set might be a missed separating set. The collider pass before the
         possible-d-separation step reads it too, so that step's sets, the skeleton, and
-        ``metadata["not_tested"]`` can change. ``"orient"`` favors arrowheads at the cost of
-        protection from false colliders; ``"ambiguous"`` favors avoiding false colliders at the cost
-        of neighboring true arrowheads. With :func:`~andrey.fci`, on merged cohorts of three graph
+        ``metadata["not_tested"]`` can change. ``"orient"`` favors arrowheads; it gives up
+        protection from false colliders. ``"ambiguous"`` favors no false collider; it gives up the
+        true arrowheads beside them. With :func:`~andrey.fci`, on merged cohorts of three graph
         sizes, with about 29 to 76 true edges, that no row bridges (20 seeds each, conditioning sets
         of up to 3), ``"ambiguous"`` took FCI's false colliders per fit from 21.5-165.4 to at most
         0.1 and the share of true arrowheads it found from 0.61-0.81 to 0, and raised its errors by

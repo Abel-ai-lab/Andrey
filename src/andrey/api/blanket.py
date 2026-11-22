@@ -220,15 +220,14 @@ def iamb(
         rule orients through it, when a conditioning set not tested of that side lies within the
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
         lies within the parents of one end, so the search might have missed that separating set.
-        ``"orient"`` favors arrowheads at the cost of protection from false colliders;
-        ``"ambiguous"`` favors avoiding false colliders at the cost of neighboring true arrowheads.
-        With :func:`~andrey.pc`, on merged cohorts of three graph sizes, with about 29 to 76 true
-        edges, that no row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"``
-        took PC's false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true
-        arrowheads it found from 0.54-0.72 to 0, and PC's graph was then farther from the truth than
-        the empty graph in 6 of 6 settings; on bridged cohorts and complete data the two gave the
-        same graphs. With IAMB, its effect on accuracy was not measured. Read under
-        ``structure="cpdag"`` only.
+        ``"orient"`` favors arrowheads; it gives up protection from false colliders. ``"ambiguous"``
+        favors no false collider; it gives up the true arrowheads beside them. With
+        :func:`~andrey.pc`, on merged cohorts of three graph sizes, with about 29 to 76 true edges,
+        that no row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's
+        false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it
+        found from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty
+        graph in 6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs.
+        With IAMB, its effect on accuracy was not measured. Read under ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
@@ -544,15 +543,15 @@ def inter_iamb(
         rule orients through it, when a conditioning set not tested of that side lies within the
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
         lies within the parents of one end, so the search might have missed that separating set.
-        ``"orient"`` favors arrowheads at the cost of protection from false colliders;
-        ``"ambiguous"`` favors avoiding false colliders at the cost of neighboring true arrowheads.
-        With :func:`~andrey.pc`, on merged cohorts of three graph sizes, with about 29 to 76 true
-        edges, that no row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"``
-        took PC's false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true
-        arrowheads it found from 0.54-0.72 to 0, and PC's graph was then farther from the truth than
-        the empty graph in 6 of 6 settings; on bridged cohorts and complete data the two gave the
-        same graphs. With Inter-IAMB, its effect on accuracy was not measured. Read under
-        ``structure="cpdag"`` only.
+        ``"orient"`` favors arrowheads; it gives up protection from false colliders. ``"ambiguous"``
+        favors no false collider; it gives up the true arrowheads beside them. With
+        :func:`~andrey.pc`, on merged cohorts of three graph sizes, with about 29 to 76 true edges,
+        that no row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's
+        false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it
+        found from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty
+        graph in 6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs.
+        With Inter-IAMB, its effect on accuracy was not measured. Read under ``structure="cpdag"``
+        only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
@@ -864,15 +863,14 @@ def mmpc(
         rule orients through it, when a conditioning set not tested of that side lies within the
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
         lies within the parents of one end, so the search might have missed that separating set.
-        ``"orient"`` favors arrowheads at the cost of protection from false colliders;
-        ``"ambiguous"`` favors avoiding false colliders at the cost of neighboring true arrowheads.
-        With :func:`~andrey.pc`, on merged cohorts of three graph sizes, with about 29 to 76 true
-        edges, that no row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"``
-        took PC's false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true
-        arrowheads it found from 0.54-0.72 to 0, and PC's graph was then farther from the truth than
-        the empty graph in 6 of 6 settings; on bridged cohorts and complete data the two gave the
-        same graphs. With MMPC, its effect on accuracy was not measured. Read under
-        ``structure="cpdag"`` only.
+        ``"orient"`` favors arrowheads; it gives up protection from false colliders. ``"ambiguous"``
+        favors no false collider; it gives up the true arrowheads beside them. With
+        :func:`~andrey.pc`, on merged cohorts of three graph sizes, with about 29 to 76 true edges,
+        that no row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's
+        false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it
+        found from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty
+        graph in 6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs.
+        With MMPC, its effect on accuracy was not measured. Read under ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's

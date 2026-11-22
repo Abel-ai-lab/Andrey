@@ -847,10 +847,10 @@ def pcmciplus(
         ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
         any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider: no
         collider vote reads it, and no rule orients through it. ``"orient"`` favors same-step
-        arrowheads over protection from false colliders; ``"ambiguous"`` favors that protection over
-        same-step arrowheads. On lagged series whose modules are observed in different periods, so
-        that no row bridges them, ``"ambiguous"`` took the same-step arrowheads per fit from 1.5-1.9
-        to 0; what that does to accuracy was not measured.
+        arrowheads; it gives up protection from false colliders. ``"ambiguous"`` favors no false
+        collider; it gives up the same-step arrowheads. On lagged series whose modules are observed
+        in different periods, so that no row bridges them, ``"ambiguous"`` took the same-step
+        arrowheads per fit from 1.5-1.9 to 0; what that does to accuracy was not measured.
     indep_test : str or None, default=None
         The conditional-independence test behind every p-value. ``"fisherz"`` and ``"student_t"``
         test partial correlation, for linear effects in continuous data: ``"fisherz"`` applies
@@ -2312,9 +2312,10 @@ def rpcmci(
         How each regime's MCI p-values are corrected for the number of links tested. ``"none"``
         keeps each p-value as tested; ``"fdr_bh"`` replaces them with their Benjamini-Hochberg
         adjusted values [3]_ over all of the regime's links together, and a link is then in the
-        graph when its adjusted p-value is at most ``alpha``. ``"none"`` favors true links without
-        controlling extra ones; ``"fdr_bh"`` favors fewer extra links at the cost of some true ones.
-        Not measured with Regime-PCMCI; :func:`~andrey.pcmci` states the trade as measured there.
+        graph when its adjusted p-value is at most ``alpha``. ``"none"`` favors true links; it gives
+        up control of the extra ones. ``"fdr_bh"`` favors fewer extra links; it gives up some true
+        ones. Not measured with Regime-PCMCI; :func:`~andrey.pcmci` states the trade as measured
+        there.
     indep_test : {"student_t", "fisherz"}, default="student_t"
         The conditional-independence test behind every p-value, a partial-correlation test for
         linear effects: ``"student_t"`` takes the p-value from the Student-t distribution,
@@ -2322,12 +2323,12 @@ def rpcmci(
         ``metadata["indep_test"]`` names it. ``"student_t"`` favors an exact level on independent
         Gaussian rows and a test that runs with one row fewer (``|S| + 3`` against ``|S| + 4`` for
         ``|S|`` conditions); it gives up agreement with the p-values of :func:`~andrey.pcmci`'s
-        default, ``"fisherz"``. ``"fisherz"`` favors that agreement over an exact level with few
-        rows. The two are nearly the same test: on independent Gaussian rows with two conditions,
-        Fisher's z at ``alpha=0.01`` rejects a true independence with probability 1.13% on 20 rows,
-        1.05% on 50, and 1.02% on 100, calculated from the null distribution of the partial
-        correlation, against 1% for ``"student_t"``. Their effect on Regime-PCMCI's graphs was not
-        measured.
+        default, ``"fisherz"``. ``"fisherz"`` favors that agreement; it gives up the exact level on
+        a test with few rows. The two are nearly the same test: on independent Gaussian rows with
+        two conditions, Fisher's z at ``alpha=0.01`` rejects a true independence with probability
+        1.13% on 20 rows, 1.05% on 50, and 1.02% on 100, calculated from the null distribution of
+        the partial correlation, against 1% for ``"student_t"``. Their effect on Regime-PCMCI's
+        graphs was not measured.
     n_starts : int, default=50
         The number of starts, at least ``1``, each with a random regime assignment; the start with
         the lowest objective is returned.

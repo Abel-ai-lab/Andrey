@@ -85,7 +85,7 @@ Choosing an option, by what each favors and what it gives up:
 | `missing="mvpc"` | Values missing for a reason that other variables carry | Every test but `fisherz` and `student_t`; accuracy on large graphs where an indicator has many weak parents or parents with missing values | On Erdos-Renyi graphs of 10 to 100 variables (mean degree 2 or 4; 500 to 10,000 rows; 10 to 30% missing) with one observed parent per indicator, fewer errors than `"testwise"` in 14 of 72 settings at `alpha=0.01` and 28 at the default 0.05, and more in none. Over both levels together (144 settings): tied in 136 with values missing completely at random; behind in 12 of the 141 judged with many weak parents per indicator (3 again on fresh seeds); with a parent that has missing values, ahead in 12 and behind in 24 (9 again); the repeated ones all had 50 or 100 variables and 20 or 30% missing ({py:func}`~andrey.pc`, [0.16.0 release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data)) |
 | `missing="em"` | The partly observed rows, under a linear model with Gaussian noise | Time: each of the 10 rounds runs the search again | In GES, BOSS, GRaSP, and NOTEARS (10 to 50 variables, 100 to 2,000 rows, 10 to 50% missing), fewer errors than dropping the incomplete rows in 186 of the 225 settings judged, as many in 39, and more in none, and in 204 more dropping the rows left too few to fit most datasets; HC and Tabu not compared with it. With 10 rounds, a setting's median fit in the six supported searches took 2 to 72 times as long as the same search on the complete data ([0.17.0 missing-data records][em-records]); not measured in the experimental searches |
 | `possibly_separable="orient"` | Arrowheads, and accuracy in PC and FCI, where it was measured | Protection from false colliders | The runs of `"ambiguous"` |
-| `possibly_separable="ambiguous"` | No false collider | The true arrowheads beside them | On merged cohorts that no row bridges (three graph sizes, 20 seeds each; Test-wise deletion below): PC's false colliders per fit from 12.8-90.0 to at most 0.2, its graph farther from the truth than the empty graph in 6 of 6 settings; FCI's errors up by 0.5 to 4.4. On bridged cohorts and complete data, the same graphs as `"orient"` |
+| `possibly_separable="ambiguous"` | No false collider | The true arrowheads beside them | On merged cohorts that no row bridges, see Test-wise deletion below. On bridged cohorts and complete data, the same graphs as `"orient"` |
 
 ## Test-wise deletion
 
@@ -127,20 +127,21 @@ observed.
 A test needs enough rows where its variables are observed: `|S| + 4` for `fisherz` and
 `normal_scores`, `|S| + 3` for `student_t` and `cond_gauss`, with `|S|` the size of its conditioning
 set, and 2 for most other tests. A test with too few rows or zero remaining degrees of freedom, as
-when a column has one category on its rows, is not tested, a pair never observed together included:
-it neither separates a pair nor confirms a link. So is a CD-NOD or FCI-JCI test whose `env` is
-constant on its rows, which then come from one environment. CD-NOD and FCI-JCI need a complete
-`env`.
+when a column has one category on the test's rows, is not tested, a pair never observed together
+included: it neither separates a pair nor confirms a link. So is a CD-NOD or FCI-JCI test whose
+`env` is constant on its rows, which then come from one environment. CD-NOD and FCI-JCI need a
+complete `env`.
 
-A pair no test with enough rows could decide, such as one never observed together, is omitted from
-the graph and listed in `metadata["undecided_pairs"]`. No orientation reads an undecided pair as
-adjacent or as apart, so a triple over one produces no mark: PC, FCI, CD-NOD, and FCI-JCI leave
-every triple whose ends are undecided unoriented, and LPCMCI every triple with an undecided side.
-The Markov-blanket searches leave an undecided candidate out of the target's set, and PCMCI, PCMCI+,
-and LPCMCI leave an undecided link out of the graph, where it has no p-value (`NaN`, `null` on the
-command line). In PCMCI and PCMCI+, a test conditions only on the candidates, strongest first, that
-leave enough rows for the test, so its rows do not mix cohorts that are never observed together;
-LPCMCI conditions no test on a node whose link to either end of the tested pair is undecided.
+A pair no test with enough rows could decide, such as one never observed together, is undecided: the
+graph leaves it out and `metadata["undecided_pairs"]` lists it. No orientation reads an undecided
+pair as adjacent or as apart, so a triple over one produces no mark: PC, FCI, CD-NOD, and FCI-JCI
+leave every triple whose ends are undecided unoriented, and LPCMCI every triple with an undecided
+side. The Markov-blanket searches leave an undecided candidate out of the target's set, and PCMCI,
+PCMCI+, and LPCMCI leave an undecided link out of the graph, where it has no p-value (`NaN`, `null`
+on the command line). In PCMCI and PCMCI+, a test conditions only on the candidates, strongest
+first, that leave enough rows for the test, so its rows do not mix cohorts that are never observed
+together; LPCMCI conditions no test on a node whose link to either end of the tested pair is
+undecided.
 
 An edge is drawn if no test with enough rows separated its pair, though an untested conditioning set
 might have. PC, FCI, CD-NOD, FCI-JCI, the Markov-blanket searches, PCMCI, PCMCI+, and LPCMCI list
@@ -148,16 +149,16 @@ such edges in `metadata["possibly_separable"]`. In data merged from cohorts, thi
 whose true separating set is never observed with their pair. In PCMCI, PCMCI+, and LPCMCI, a link is
 flagged when a test omitted a candidate for lack of rows, or when it shares an end with an undecided
 link whose other node no test conditions on; a Markov-blanket search flags every edge of its target
-when it leaves an undecided candidate out. The flag identifies what the data could not check,
-without declaring the edge false: in the smallest merged cohorts, every drawn edge is flagged, since
-another cohort's variable could have separated it. With `possibly_separable="ambiguous"`, PC, FCI,
-CD-NOD, FCI-JCI, the Markov-blanket searches' CPDAG, and PCMCI+ read a triple with a flagged side as
-neither a collider nor a non-collider, as for a triple whose ends are undecided, when an untested
-conditioning set of that side lies within the other nodes adjacent to or undecided with one end,
-since a set that separates a pair lies within the parents of one end. FCI and FCI-JCI, which allow
-latent variables, so read every flagged side, since their separating sets can lie beyond the
-adjacencies, and PCMCI+ every flagged link. LPCMCI lists flagged links but does not read them. The
-default, `"orient"`, reads it as any other triple.
+when it leaves an undecided candidate out. The flag says what the data could not check, not that the
+edge is false: in the smallest merged cohorts, every drawn edge is flagged, since another cohort's
+variable could have separated it. A flagged edge may be absent, and so may the triple it forms. With
+`possibly_separable="ambiguous"`, PC, FCI, CD-NOD, FCI-JCI, the Markov-blanket searches' CPDAG, and
+PCMCI+ read a triple with a flagged side as neither a collider nor a non-collider, as for a triple
+whose ends are undecided, when an untested conditioning set of that side lies within the other nodes
+adjacent to or undecided with one end, since a set that separates a pair lies within the parents of
+one end. FCI and FCI-JCI, which allow latent variables, so read every flagged side, since their
+separating sets can lie beyond the adjacencies, and PCMCI+ every flagged link. LPCMCI lists flagged
+links but does not read them. The default, `"orient"`, reads it as any other triple.
 
 On merged cohorts of three graph sizes, with about 29 to 76 true edges, that no row bridges (20
 seeds each, conditioning sets of up to 3), nearly every drawn edge is flagged. `"ambiguous"` took

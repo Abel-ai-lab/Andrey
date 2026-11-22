@@ -62,11 +62,11 @@ names its pull request.
 - `pc(missing="mvpc")` records the minimum and median row counts of corrected tests as
   `metadata["corrected_edges"]["rows_tested"]`, showing when the correction ran on few rows. The
   graph and the other metadata are unchanged. ([#1094])
-- A [missing values guide](https://andrey.abel.ai/docs/guides/missing-values.html) covers
-  missing-value handling, with a table mapping data types and missingness reasons to the `missing`
-  value and methods that accept it. A method that does not accept missing values names the guide in
-  its error. The example notebook covers values missing not at random, FCI, categorical data, and a
-  time series. ([#1096])
+- A [missing values guide](https://andrey.abel.ai/docs/guides/missing-values.html) holds what the
+  getting-started guide said about missing values, with a table mapping data types and missingness
+  reasons to the `missing` value and methods that accept it. A method that does not accept missing
+  values names the guide in its error. The example notebook covers values missing not at random,
+  FCI, categorical data, and a time series. ([#1096])
 - `degrees_of_freedom`, an argument of every method that takes the categorical tests `"chisq"` and
   `"gsq"`, and of `ChiSquare`: `"mean"`, the default and the rule so far, is the mean of the
   statistic when `y` is shuffled within each configuration of the conditioning set; `"nonempty"` is
@@ -176,12 +176,12 @@ names its pull request.
   with the tested pair as not tested without building its query, matching the other tests; FCI's
   possible-d-sep step does so with every test, both preserving output; the skeleton's warning of a
   costly pass counts only the sets it builds. On synthetic merged cohorts of 40 and 50 columns, `pc`
-  with `max_depth=None` finishes in about a second, and `fci` in 12 to 58 s at 40 columns, compared
-  with over 10 minutes previously, and 4 to 6 minutes at 50. ([#1167])
+  with `max_depth=None` finishes in about a second, and `fci` in 12 to 58 s at 40 columns (over 10
+  minutes before) and in 4 to 6 minutes at 50. ([#1167])
 - The Markov-blanket searches mark a conditioning set containing a column never observed with the
-  tested pair or a collider's middle variable as not tested without building its query. On synthetic
-  merged cohorts of 50 columns with 134 pairs never observed together, `iamb` finished in 17 s
-  compared with over 14 minutes previously, with the same graph and counts. Under test-wise
+  tested pair, or with a collider's middle variable, as not tested without building its query. On
+  synthetic merged cohorts of 50 columns with 134 pairs never observed together, `iamb` finished in
+  17 s compared with over 14 minutes previously, with the same graph and counts. Under test-wise
   deletion, their spouse step tests both candidate sets of each size, making
   `metadata["not_tested"]` independent of column order. ([#1148])
 - A test-wise test with too few rows or a CD-NOD or FCI-JCI test with constant `env` on its rows is
@@ -222,8 +222,9 @@ names its pull request.
   blankets for some targets can change, as can graphs of `rsmax2` with `restrict="iamb"` or
   `"inter_iamb"`; results on continuous data do not change. ([#969])
 - The skeleton scans of `pc` and `fci` and the conditioning-set scans of the blanket learners build
-  each chunk of conditioning sets as int-array rows from cached combination tables. Every output,
-  `metadata["n_tests"]` included, is the same bit for bit. ([#1036], [#1042])
+  each chunk of conditioning sets as int-array rows from cached combination tables, not tuples
+  converted back per chunk. Every output, `metadata["n_tests"]` included, is the same bit for bit.
+  ([#1036], [#1042])
 - `indep_test="kci"` caches each column's kernel for queries without a conditioning set (up to 256
   MB, as its other matrix caches do), so `pc`, `fci`, and `cdnod` run faster with it on many
   variables and few rows. Every graph, p-value, and `metadata["n_tests"]` is the same bit for bit.
@@ -231,16 +232,17 @@ names its pull request.
 - A grow scan of `iamb` and `inter_iamb` (including the restrict phase of `rsmax2` with
   `restrict="iamb"` or `"inter_iamb"`) tests many candidates against one conditioning set. With
   `fisherz`, `student_t`, or `normal_scores` on complete data, a scan with two or more variables
-  uses one Cholesky factor of the set's correlation block; a smaller scan uses one batched call,
-  bitwise identical to one call per candidate. At 5,000 rows on one core, `iamb` at one target on
-  1,000 variables is 3.9 times faster, and `iamb` on 100 variables 4.4 times. Every `iamb` and
-  `inter_iamb` graph on the identity corpus is unchanged, including column shuffles. The factor's
-  p-values agree with the per-query ones to about 1e-10 relative, not bit for bit, so a p-value on a
-  rounding boundary can differ in its ninth significant digit. `ANDREY_SHARED_SCAN_MIN_WORK`
-  (default `128`, candidates times the set size plus two) sets the smallest scan that takes the
-  factor; blocks near the singular threshold, missing values, and the other tests keep the per-query
-  path. A repeated variable in the conditioning set counts once, and a correlation matrix that is
-  not exactly symmetric gives each pair the same answer for either target. ([#1047], [#1048])
+  uses one Cholesky factor of the set's correlation block, not one inverted submatrix per candidate;
+  a smaller scan uses one batched call, bitwise identical to one call per candidate. At 5,000 rows
+  on one core, `iamb` at one target on 1,000 variables is 3.9 times faster, and `iamb` on 100
+  variables 4.4 times. Every `iamb` and `inter_iamb` graph on the identity corpus is unchanged,
+  including column shuffles. The factor's p-values agree with the per-query ones to about 1e-10
+  relative, not bit for bit, so a p-value on a rounding boundary can differ in its ninth significant
+  digit. `ANDREY_SHARED_SCAN_MIN_WORK` (default `128`, candidates times the set size plus two) sets
+  the smallest scan that takes the factor; blocks near the singular threshold, missing values, and
+  the other tests keep the per-query path. A repeated variable in the conditioning set counts once,
+  and a correlation matrix that is not exactly symmetric gives each pair the same answer for either
+  target. ([#1047], [#1048])
 - `cpcm` and `cpcm_graph` choose smoothing parameters for the `"exponential"` and `"pareto"` fits by
   the generalized cross-validation score of the deviance and those of the `"poisson"` fit by the
   unbiased risk estimate, as in the authors' code; the two-parameter families keep the Laplace
@@ -257,8 +259,8 @@ names its pull request.
 - The docs name `normal_scores` among the partial-correlation tests that need more rows where their
   variables are observed; they gave it the 2 rows of the other tests. ([#1102])
 - On data with missing values, a `fisherz` or `student_t` query gets the same statistic and p-value,
-  bit for bit, alone or with other queries in any order, including on more than 8,192 rows.
-  ([#1142])
+  bit for bit, alone or with other queries in any order, including on more than 8,192 rows, where
+  the last bits followed the queries computed with it. ([#1142])
 - A test-wise fit that runs no test on data with missing values, such as `pc` on one column, sets
   `metadata["missing"]`, gives `metadata["rows_tested"]` as `{"min": 0, "median": 0}`, and logs the
   default-handling notice under `missing=None`. ([#1151])
@@ -266,10 +268,10 @@ names its pull request.
   `metadata["corrected_edges"]["p_one_tests"]`. An indicator query with a constant, uninformative
   indicator or too few rows is not tested rather than returning `p = 1`, as for every test-wise
   test: it counts in `metadata["not_tested"]` and its rows are excluded from
-  `metadata["rows_tested"]`. A column with a constant indicator on its observed rows neither
-  conditions a test of that indicator nor becomes its parent; a column kept adjacent by a tested
-  query stays a parent when a later query is not tested; the parents and graphs of the fits compared
-  are unchanged. A corrected test needs enough rows to leave a degree of freedom, `|S| + 4` for
+  `metadata["rows_tested"]`. A column on whose observed rows the indicator is constant conditions no
+  test of that indicator and, as before, is not its parent; a column kept adjacent by a tested query
+  stays a parent when a later query is not tested; the parents and graphs of the fits compared are
+  unchanged. A corrected test needs enough rows to leave a degree of freedom, `|S| + 4` for
   `fisherz`, or the pair keeps its test-wise answer. ([#1151])
 - Under `missing="em"` with the linear-Gaussian BIC, copies among the observed values raise
   `CopiedColumnsError` before a pair sharing no observed row, as on complete data. The error for

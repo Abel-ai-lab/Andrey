@@ -71,10 +71,11 @@ class PermutationCorrection:
 
     The regressions and test need ``max(t, |W| + 2)`` rows in the block, with ``t`` the test's
     ``least_rows``: ``|S| + 4`` for ``FisherZ`` and ``|S| + 3`` for ``StudentT``, leaving a degree
-    of freedom. Queries with fewer rows or empty ``W`` use ``deletion`` and add their pair to
-    ``uncorrected``: the paper leaves this case open, and the correction can only remove an edge
-    deletion kept. ``rows`` counts the rows each PermC query reads, no more than deletion reads for
-    that query, and the queries answered ``p = 1``.
+    of freedom. A query with an empty ``W`` uses ``deletion``. A query with fewer rows also uses
+    ``deletion`` and adds its pair to ``uncorrected``: the paper leaves this case open, the
+    correction can only remove an edge the deletion tests kept, and the pair keeps the deletion
+    test's answer for that conditioning set. ``rows`` counts the rows each PermC query reads, no
+    more than deletion reads for that query, and the queries PermC answers ``p = 1``.
 
     The draw comes from a generator seeded by ``seed`` and by the fingerprints of the queried
     columns, a digest of where each one's values are missing: a p-value then depends on neither the

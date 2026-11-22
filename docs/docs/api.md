@@ -166,8 +166,8 @@ fewer is not tested. `cdnod` and `fci_jci` need a complete `env`. Every other me
 `n_em_iterations`, the number of rounds `missing="em"` runs on data with missing values, each with
 one search. The default, 10, is the number Gao et al. (2022) run. If the last round changed the
 graph, the fit logs a warning naming the argument: more rounds let some fits settle while others
-keep changing graphs, and take more time. Values other than 10 are not benchmarked yet. On complete
-data or without `missing="em"` it changes nothing.
+keep changing graphs, and each round adds time. Values other than 10 are not benchmarked yet. On
+complete data or without `missing="em"` it changes nothing.
 
 % concept: indep_test
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
