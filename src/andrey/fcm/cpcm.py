@@ -58,8 +58,7 @@ _LOG_SP_RANGE = 20.0
 #: The search over the log smoothing parameters moves by a step that halves from the first of
 #: these to the second, so every point it reads lies on one lattice around the start.
 _SP_STEPS = (4.0, 1.0 / 16.0)
-#: A point of that search replaces the best one only if its criterion is lower by more than this
-#: share.
+#: A search point replaces the best only when its criterion is lower by more than this share.
 _SCORE_GAIN = 1e-6
 _NEWTON_TOL = 1e-11
 _MAX_NEWTON = 100
@@ -84,10 +83,10 @@ NB_LOG_SIZE_MAX = (12.0, 20.0)
 #: every count or more and the family is within 1 part in 148 of its Poisson limit's variance,
 #: while the largest count is at most ``exp(15)``, where the bound reaches its upper end.
 NB_LOG_SIZE_OVER_MAX = 5.0
-#: A Hessian is singular to working precision if, with its diagonal brought to 1, an eigenvalue is
-#: below this. The coefficients and the log determinant at such a point follow the table's last
-#: digits (their rounding error is the machine's divided by that eigenvalue), so its criterion is
-#: not a number two runs agree on, and the point has no fit.
+#: A Hessian is singular to working precision when an eigenvalue falls below this after scaling its
+#: diagonal to 1. Coefficients and log determinant then depend on the table's last digits (machine
+#: rounding error divided by that eigenvalue), making the criterion irreproducible across runs; the
+#: point has no fit.
 _SINGULAR = 1e-8
 #: A residual, a probability, is the same on every row if its values lie within this of each other.
 _CONSTANT = 1e-9
@@ -112,13 +111,12 @@ class Family:
     second predictor from above, and ``floor`` is the lower bound of a ``"smooth"`` second
     predictor's log scale (:data:`LOG_SCALE_FLOOR`).
 
-    ``criterion`` is what the log smoothing parameters minimize (:meth:`_Model.score`): ``"laml"``,
-    the negative Laplace approximate marginal likelihood; ``"gcv"``, the generalized
-    cross-validation score ``n D / (n - edf)^2``; or ``"ubre"``, the unbiased risk estimate
-    ``D / n + 2 edf / n - 1`` of a family whose scale is known to be 1. ``D`` is
-    ``deviance(y, etas)``, twice the negative log-likelihood less its value when each row's
-    parameter fits that row alone, summed from each row's own difference so that large values do
-    not cancel, and ``edf`` the fit's effective degrees of freedom.
+    Log smoothing parameters minimize ``criterion`` (:meth:`_Model.score`): ``"laml"``, negative
+    Laplace approximate marginal likelihood; ``"gcv"``, generalized cross-validation
+    ``n D / (n - edf)^2``; or ``"ubre"``, unbiased risk estimate ``D / n + 2 edf / n - 1`` for scale
+    known to be 1. ``D`` is ``deviance(y, etas)``, twice the negative log-likelihood minus its value
+    with each row fitted alone, summed by row to avoid cancellation of large values; ``edf`` is the
+    fit's effective degrees of freedom.
     """
 
     name: str

@@ -199,8 +199,8 @@ def hsic_kernel(x: np.ndarray) -> HSICKernel:
     """Return the centered kernel of ``x`` as :func:`hsic_statistic_log_p` builds it, with its
     trace and the sum of its squared entries.
 
-    The kernel depends on ``x`` alone, so a caller that tests ``x`` against many variables builds
-    it once and passes it to :func:`hsic_kernels_statistic_log_p`.
+    The kernel depends only on ``x``, so tests against multiple variables reuse it through
+    :func:`hsic_kernels_statistic_log_p`.
     """
     kernel = _centered_kernel(_as_columns(x))
     return HSICKernel(kernel, np.trace(kernel), np.sum(kernel**2))

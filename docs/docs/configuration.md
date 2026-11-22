@@ -53,12 +53,12 @@ requested backend uses `auto`, without a warning.
   `student_t`; the pairs are still searched one at a time, in the serial order, and every graph is
   the serial one. IAMB, Inter-IAMB, and MMPC split a list of two or more targets over them with the
   `fisherz`, `student_t`, and `normal_scores` tests on complete data, with the same results for any
-  number of workers. `andrey.bootstrap` fits its resamples on them, one fit per worker, with the same
-  result at any number. `1` (the default) and `0` run serially; `-1` uses every usable core. `pnl`
-  with one worker leaves the BLAS threads unlimited and with several limits each thread to one, so
-  on a machine with several cores its p-values and statistics can differ in the last digits between
-  one worker and several. Each `pnl` thread holds three n x n float64 matrices; when the threads
-  you ask for would hold more than 4 GiB, fewer run, with a `PerformanceWarning`.
+  number of workers. `andrey.bootstrap` fits one resample per worker, with the same result at any
+  number. `1` (the default) and `0` run serially; `-1` uses every usable core. `pnl` with one worker
+  leaves the BLAS threads unlimited and with several limits each thread to one, so on a machine with
+  several cores its p-values and statistics can differ in the last digits between one worker and
+  several. Each `pnl` thread holds three n x n float64 matrices; when the threads you ask for would
+  hold more than 4 GiB, fewer run, with a `PerformanceWarning`.
 - `ANDREY_GES_PARALLEL_MIN_WORK`: a GES pass uses the workers only when it expects to evaluate more
   candidates than this. The default is `10000`; `0` always uses them.
 - `ANDREY_SKELETON_PARALLEL_MIN_WORK`: a conditioning-size pass of the skeleton search of PC, FCI,
@@ -94,12 +94,12 @@ forkserver, as on Linux from Python 3.14; otherwise it keeps the default.
 - `ANDREY_SHARED_SCAN_MIN_WORK`: with `fisherz`, `student_t`, or `normal_scores` on complete data, a
   grow scan of `iamb` or `inter_iamb` (also as the restrict phase of `rsmax2` with `restrict="iamb"`
   or `"inter_iamb"`) of two or more candidates against one conditioning set of two or more variables
-  is answered from one Cholesky factor of the set's correlation block only when its candidates times
-  the block size (the set plus two) reach this value; below it each candidate inverts its own
-  submatrix. The default is `128`, measured on an AMD EPYC 7713 server running Linux on one core,
-  where the factor was slower below about 64 and faster from 128 for every set size sampled. The two
-  paths agree to about 1e-10 relative in the p-value; the per-query path is the exact one, and `0`
-  factors every such scan.
+  uses one Cholesky factor of the set's correlation block only when its candidates times the block
+  size (the set plus two) reach this value; otherwise each candidate inverts its submatrix. The
+  default is `128`, measured on an AMD EPYC 7713 server running Linux on one core, where the factor
+  was slower below about 64 and faster from 128 for every set size sampled. The two paths agree to
+  about 1e-10 relative in the p-value; the per-query path is the exact one, and `0` factors every
+  such scan.
 - `ANDREY_LINGAM_PRUNE_MIN_WORK`: a step of the `pwling` order search (DirectLiNGAM and the methods
   built on it) stops scoring a candidate that can no longer be picked only when its rows times
   ordered pairs of candidates reach this value (default `100000`, about the break-even on one core
@@ -107,17 +107,16 @@ forkserver, as on Linux from Python 3.14; otherwise it keeps the default.
 
 ## Test-wise deletion
 
-With `fisherz` or `student_t` on data with missing values, a test reads the rows observed in every
-one of its columns. When the rows fall into a few missingness patterns, as in data merged from
-cohorts that each measure their own variables, the rows are grouped by pattern once, and each
-test's sums come from the groups' tables instead of from every row. The groups follow the
-patterns, not the row or the column order. The path is chosen once per test from the data, by the
-variables below, and only when the groups in which a block can take the cheaper grouped sums hold
-enough rows to repay the tables. Within it, each block of columns takes the cheaper of the two
-sums, and a block that keeps only a small share of its groups' rows is summed over every row, where
-the groups' sums would lose digits. A block whose groups hold too few rows for its test is not
-tested without being summed. The two paths count the same rows for every tested query and agree
-up to the last digits of the p-values.
+With `fisherz` or `student_t` on data with missing values, a test reads the rows observed in all its
+columns. When the rows fall into a few missingness patterns, as in data merged from cohorts that
+each measure their own variables, the rows are grouped by pattern once, and each test sums the
+groups' tables instead of every row. The groups follow the patterns, not the row or the column
+order. The variables below select this path once per test from the data, only when the groups in
+which a block can take the cheaper grouped sums hold enough rows to repay the tables. Within it,
+each block of columns takes the cheaper of the two sums, and sums every row when it keeps so few of
+its groups' rows that the groups' sums would lose digits. A block whose groups hold too few rows for
+its test is not tested without being summed. The two paths count the same rows for every tested
+query and agree up to the last digits of the p-values.
 
 - `ANDREY_TESTWISE_GROUP_BYTES`: the grouped path is used only when its tables fit in this many
   bytes (default `268435456`, 256 MiB); `0` keeps every test on the per-row path.
@@ -136,10 +135,9 @@ up to the last digits of the p-values.
   its estimated per-row cost is at least this many times its grouped cost (default `2`).
 
 Three constants are fixed. The cost of opening a group sets how the rows split into groups, not
-whether a test uses them. The share of the pairs of columns that `ANDREY_TESTWISE_GROUP_MAX_SHARED`
-is read on is a quarter. A block that keeps fewer than one sixteenth of its groups' rows, or fewer
-rows than twice its columns, is summed over every row; this bounds the rounding, which no speed
-setting loosens.
+whether a test uses them. `ANDREY_TESTWISE_GROUP_MAX_SHARED` is read on a quarter of the column
+pairs. A block that keeps fewer than one sixteenth of its groups' rows, or fewer rows than twice its
+columns, is summed over every row; this bounds the rounding, which no speed setting loosens.
 
 ## GPU dispatch
 
@@ -171,9 +169,8 @@ already running in the process, so a CPU fit never pays to start a GPU.
   BOSS, GRaSP, ICA-LiNGAM, CALM, IGSP and UT-IGSP with `n_starts` above 1 (the default), hill
   climbing and tabu search with `n_starts` above 1, and the searches that test independence, with
   the `rcot`, `cmiknn`, `gpdc`, `gcm`, `wgcm`, and `pcm` tests. The default is `0`; it takes any
-  integer from `0` to `2**32 - 1`. So `seed=None` is this configured seed, not a fresh random one,
-  and a call repeats. A call that gives `seed=` does not depend on it. Deterministic methods ignore
-  it.
+  integer from `0` to `2**32 - 1`. `seed=None` uses this configured seed, so a call repeats. A call
+  that gives `seed=` does not depend on it. Deterministic methods ignore it.
 - `ANDREY_TIE_BREAK`: how the searches choose between tied candidates. `rank` (the default) orders
   them by a rank computed from the data, which a row shuffle, a change of units, or a sign flip
   leaves in place, with [a few exceptions](guides/column-order.md#how-andrey-breaks-ties), so

@@ -1,19 +1,16 @@
 """Regression-based conditional-independence tests: GCM, weighted GCM, and PCM.
 
-Selected through ``indep_test="gcm"``, ``"wgcm"``, and ``"pcm"``. Each test regresses the two
-variables, or one of them, on the conditioning set and tests the covariance of what the
-regressions leave. The tests follow the :class:`~andrey.core.ci.CITest` protocol: built once over
-the data and called as ``test(x, y, condition_set)``, returning a p-value where a larger value means
-more independent.
+Selected through ``indep_test="gcm"``, ``"wgcm"``, and ``"pcm"``, each test regresses one or both
+variables on the conditioning set and tests the residual covariance. Tests follow
+:class:`~andrey.core.ci.CITest`: built once over the data and called as
+``test(x, y, condition_set)``, returning a p-value where larger means more independent.
 
-The three share one data layout and one regression layer. Each column is standardized, rounded
-to 9 decimal places, and given the sign its sorted values fix, so the values the fits read do not
-change with the units or the sign of a column. Each fit reads only the columns it uses: their
-:func:`~andrey.core.ties.tie_ranks` order within that block gives the order of the features, and
-the rows in lexicographic order of the block's values give the order of the rows. The sample
-splits, cross-validation folds, and multiplier draws are drawn from ``seed`` over that row order,
-so a query's p-value depends only on the values of its own columns: not on the row, the column, or
-the argument order, not on the other columns, and not on which queries came before it.
+The three share a data layout and regression layer. Each column is standardized, rounded to 9
+decimal places, and signed by its sorted values, making fit inputs independent of column units and
+sign. Each fit reads only its own columns, ordered by :func:`~andrey.core.ties.tie_ranks` within the
+block, with rows in lexicographic order of the block's values. Sample splits, cross-validation
+folds, and multipliers use ``seed`` over that row order, so a query's p-value depends only on its
+columns' values, regardless of row, column, or argument order, other columns, or previous queries.
 """
 
 from __future__ import annotations
@@ -48,22 +45,20 @@ _BOOST_DEPTHS = (1, 3, 4, 5, 6)
 _BOOST_ROUNDS = 50
 _BOOST_FOLDS = 10
 _BOOST_PATIENCE = 10
-# Boosted trees as the wGCM authors' current code: 10-fold cross-validation over the learning rates
-# 0.1, 0.2, 0.3, 0.5 and the depths 1 to 7, up to 500 rounds, the folds' mean error stopped 10
-# rounds after its best. Three differences from that code: the trees' leaf values carry no
-# penalty, where the authors' boosting shrinks them; every grid point uses the same folds, where
-# the authors' code draws new folds for each; and the trees search every split point exactly,
-# where the authors' boosting grows them on histogram bins of each feature.
+# Boosted trees follow the wGCM authors' current code: 10-fold cross-validation over learning rates
+# 0.1, 0.2, 0.3, 0.5 and depths 1 to 7, up to 500 rounds, stopping 10 rounds after the best mean
+# error. Three differences: unpenalized leaf values instead of shrinkage, identical folds at every
+# grid point instead of new draws, and exact split searches instead of feature histogram bins.
 _MEAN_CV_RATES = (0.1, 0.2, 0.3, 0.5)
 _MEAN_CV_DEPTHS = (1, 2, 3, 4, 5, 6, 7)
 _MEAN_CV_ROUNDS = 500
-# A random forest as the PCM authors': 500 trees, every predictor tried at each split, and nodes of
-# 5 rows or fewer left unsplit. A node's size counts the distinct rows in it, where the authors'
-# forest counts a row its bootstrap draws twice as two.
+# A random forest as in the PCM authors' code: 500 trees, every predictor tried at each split, and
+# nodes of 5 rows or fewer unsplit. Node size counts distinct rows; the authors' forest counts a row
+# drawn twice as two.
 _FOREST_TREES = 500
 _FOREST_MIN_SPLIT = 6
-# The decimal places the standardized values keep, so that copies of a column in other units, whose
-# standardized values differ in their last bits, give the same fits.
+# Decimal places retained after standardization so copies in other units give identical fits despite
+# differences in their last standardized bits.
 _DECIMALS = 9
 
 Predictor = Callable[[np.ndarray], np.ndarray]
@@ -166,8 +161,8 @@ def _mean_cv_error(
 
 
 def _fit_boosting_mean_cv(features: np.ndarray, target: np.ndarray, folds: np.ndarray) -> Predictor:
-    """Boosted trees whose learning rate, depth, and number of rounds minimize the folds' mean
-    cross-validated error; of equal errors, the first in the order of the depths, then the rates."""
+    """Boosted trees minimizing mean cross-validated error over learning rate, depth, and rounds;
+    ties favor the first depth, then rate."""
     best = (np.inf, _MEAN_CV_RATES[0], _MEAN_CV_DEPTHS[0], 1)
     for depth in _MEAN_CV_DEPTHS:
         for rate in _MEAN_CV_RATES:
@@ -265,9 +260,9 @@ def _fit_additive_log(features: np.ndarray, target: np.ndarray) -> Predictor:
 def _canonical_columns(arr: np.ndarray) -> np.ndarray:
     """Each column of ``arr`` standardized, rounded to ``_DECIMALS`` places, and signed.
 
-    The mean and the standard deviation are sums over the sorted values, so they do not change with
-    the row order. Of a column and its negation, the one whose sorted values are larger at the first
-    place they differ is kept; a column equal to its negation once sorted keeps its sign.
+    Mean and standard deviation sum sorted values, independent of row order. Between a column and
+    its negation, the one with larger sorted values at the first difference is kept; equal sorted
+    values preserve the sign.
     """
     ordered = np.sort(arr, axis=0)
     with np.errstate(over="ignore", under="ignore"):  # either one raises below
@@ -344,9 +339,8 @@ class _RegressionTest:
     def _layout(self, columns: Iterable[int]) -> tuple[np.ndarray, list[int]]:
         """The row order and the column order in which a fit reads a block of columns.
 
-        The columns are in their :func:`~andrey.core.ties.tie_ranks` order within the block, and
-        the rows in lexicographic order of the block's values in that column order, so the layout
-        depends on the block's values alone.
+        Columns follow :func:`~andrey.core.ties.tie_ranks` within the block; rows follow
+        lexicographic order in that column order, so the layout depends only on the block's values.
         """
         key = tuple(sorted(set(columns)))
         layout = self._layouts.get(key)
@@ -396,8 +390,8 @@ class _RegressionTest:
 def _normalized_mean(products: np.ndarray) -> float:
     """``sqrt(n)`` times the mean of ``products`` over their standard deviation.
 
-    The standard deviation divides by ``n``. Constant products give ``nan`` when they are zero, no
-    covariance to detect, and an infinity of their sign otherwise, a covariance without noise.
+    Standard deviation divides by ``n``. Constant products give ``nan`` when zero, with no
+    covariance to detect, and signed infinity otherwise, for noiseless covariance.
     """
     mean = float(np.mean(products))
     var = float(np.mean(products * products)) - mean * mean
@@ -417,23 +411,22 @@ def _gcm_answer(rx: np.ndarray, ry: np.ndarray) -> tuple[float, float]:
 class GCM(_RegressionTest):
     """The generalized covariance measure (GCM): the normalized covariance of two residuals.
 
-    Each query regresses ``x`` and ``y`` on the conditioning set, multiplies the two residuals, and
-    tests whether the mean of the products is zero, which it is when ``x`` and ``y`` are
-    conditionally independent and the regressions are accurate enough.
+    Each query regresses ``x`` and ``y`` on the conditioning set and tests whether their residual
+    products have zero mean, as when ``x`` and ``y`` are conditionally independent and the
+    regressions are accurate enough.
 
     Parameters
     ----------
     data : ndarray of shape (n_samples, n_variables)
         Observed data, one row per sample. Each column is standardized to unit variance.
     regression : {"boosting", "forest", "linear"}, default="boosting"
-        The regression of each variable on the conditioning set. ``"boosting"`` is boosted
-        regression trees whose depth (1, 3, 4, 5, or 6) and number of rounds (up to 50, learning
-        rate 0.3) minimize the 10-fold cross-validated error, the authors' default grid; the trees'
-        leaf values carry no penalty, where the authors' boosting shrinks them, so the fits can
-        leave smaller residuals. ``"forest"`` is a random forest of 500 trees; ``"linear"``
-        ordinary least squares. ``"boosting"`` favors conditional means it can learn from the
-        data, nonlinear and of several variables; it gives up time, 51 boosted fits per
-        regression. ``"linear"`` favors time, one fit; it gives up the level where a nonlinear
+        The regression of each variable on the conditioning set. ``"boosting"`` uses boosted trees
+        with depth (1, 3, 4, 5, or 6) and rounds (up to 50, learning rate 0.3) minimizing 10-fold
+        cross-validated error, the authors' default grid; unpenalized leaf values, unlike their
+        shrinkage, can leave smaller residuals. ``"forest"`` uses a random forest of 500 trees;
+        ``"linear"`` uses ordinary least squares. ``"boosting"`` favors conditional means it can
+        learn from the data, nonlinear and of several variables; it gives up time, 51 boosted fits
+        per regression. ``"linear"`` favors time, one fit; it gives up the level where a nonlinear
         conditional mean leaves a covariance in the residuals, which then reads as dependence (see
         Limitations). ``"forest"`` favors nonlinear means without tuning; it gives up time, 500
         trees per regression. The three were not measured against each other.
@@ -523,30 +516,28 @@ _MULTIPLIER_DRAWS = 499
 class WGCM(_RegressionTest):
     """The weighted generalized covariance measure (wGCM): the GCM of weighted residual products.
 
-    The GCM's products of residuals are multiplied by a function of the conditioning set before
-    their mean is tested, so that a conditional covariance of ``x`` and ``y`` that changes sign
-    over the conditioning set, and averages to zero, is detected.
+    Multiplying the GCM's residual products by a function of the conditioning set before testing
+    their mean detects conditional covariance of ``x`` and ``y`` that changes sign and averages to
+    zero.
 
     Parameters
     ----------
     data : ndarray of shape (n_samples, n_variables)
         Observed data, one row per sample. Each column is standardized to unit variance.
     variant : {"est", "fix"}, default="est"
-        ``"est"`` estimates one weight function on 30% of the rows and tests on the rest;
-        ``"fix"`` tests a fixed set of weight functions on every row and takes the largest
-        statistic. ``"est"`` favors one weight learned from the data, whose number does not grow
-        with the conditioning set; it gives up 30% of the rows, time, and, where measured, power.
-        ``"fix"`` favors every row, half the time, power, and a steadier level; it gives up a
-        learned weight: 7 fixed weights per conditioning variable, each a sign along one variable.
-        On the same 200 draws of each of the 7 alternative cells of [1]_ (example 7, 1D, and
-        10D.Add, at 200 and 400 rows), with ``"boosting"`` under the tuning of
-        :class:`~andrey.core.ci_regression.GCM`, ``"fix"`` rejected at 0.05 in 21 to 96.5% of
-        draws against 10.5 to 60.5%, more often in all 7, and in all 7 too at critical values from
-        each variant's own null draws (15 to 95% against 10.5 to 52.5%); their power was not
-        measured as a pair under the shipped tuning. With the shipped ``"boosting"``, over the 12
-        null designs of Limitations, ``"est"`` rejected a true independence at 0.05 in 4 to 13% of
-        draws by design against 4 to 8.6%, and at 200 to 400 rows a query took 21 to 26 s against
-        11 to 15 s.
+        ``"est"`` estimates one weight function on 30% of the rows and tests on the rest; ``"fix"``
+        tests 7 fixed weights per conditioning variable, each a sign along one variable, on every
+        row and takes the largest statistic. ``"est"`` favors a learned weight whose number does not
+        grow with the conditioning set; it gives up 30% of the rows, time, and, where measured,
+        power. ``"fix"`` favors every row, half the time, power, and a steadier level; it gives up a
+        learned weight. On the same 200 draws of each of the 7 alternative cells of [1]_ (example 7,
+        1D, and 10D.Add, at 200 and 400 rows), with ``"boosting"`` tuned as in
+        :class:`~andrey.core.ci_regression.GCM`, ``"fix"`` rejected at 0.05 in 21 to 96.5% against
+        10.5 to 60.5%, more often in all 7, and in all 7 too at critical values from each variant's
+        null draws (15 to 95% against 10.5 to 52.5%); paired power was not measured under shipped
+        tuning. With shipped ``"boosting"`` on the 12 null designs of Limitations, ``"est"``
+        rejected true independence at 0.05 in 4 to 13% by design against 4 to 8.6%, and queries at
+        200 to 400 rows took 21 to 26 s against 11 to 15 s.
     regression : {"boosting", "forest", "linear"}, default="boosting"
         The regression of each variable, and of the products of residuals, on the conditioning set.
         ``"boosting"`` is boosted regression trees whose learning rate (0.1, 0.2, 0.3, or 0.5),
@@ -799,10 +790,9 @@ class PCM(_RegressionTest):
     least-squares line, as is one whose smoothing search fails; a variance fit through the log link
     without a minimum, or with a squared residual of 0, uses the identity link with the same basis.
 
-    The measurements in these notes take the paper's ``y`` as the response, as the paper does; on
-    the paper's designs, the rank rule above makes the paper's ``y`` the response in about half of
-    the draws, and the other direction was not measured. Where the paper and the authors' code
-    differ, Andrey takes:
+    These measurements use the paper's ``y`` as response, as the paper does; the rank rule selects
+    it in about half the draws on those designs, and the reverse direction was not measured. Where
+    the paper and authors' code differ, Andrey uses:
 
     - ``m`` regresses ``g``, as in the authors' code; the paper regresses ``g~``, which in the
       measurements had more power in the paper's first setting at 250 rows (71.6% against 54.8%)

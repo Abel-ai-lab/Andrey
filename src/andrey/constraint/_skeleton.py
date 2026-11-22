@@ -267,9 +267,8 @@ def _query_arrays(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """The canonical query arrays ``(x, y, conditions)`` of ``queries``, in order.
 
-    Each query is ``(x, y, subsets)`` with ``x < y`` and the pair tested against every subset, a
-    row of the ``(N, size)`` int array ``subsets``, sorted and distinct. The arrays hold one row
-    per subset.
+    Each query is ``(x, y, subsets)`` with ``x < y``; the pair is tested against each row of the
+    ``(N, size)`` int array ``subsets``, a sorted, distinct subset.
     """
     counts = [len(subsets) for _, _, subsets in queries]
     xs = np.repeat(np.array([x for x, _, _ in queries], dtype=np.intp), counts)
@@ -461,8 +460,8 @@ def _stacked_first_order(
     pvalues: Callable[..., np.ndarray],
     queries: Iterable[tuple[int, int, list[int]]],
 ) -> Iterator[tuple[int, int, list[int], np.ndarray]]:
-    """Yield each query of :func:`_first_order_queries` as ``(x, y, candidates, p-values)``, the
-    p-values those of its candidates in order.
+    """Each query of :func:`_first_order_queries` as ``(x, y, candidates, p-values)``, with p-values
+    in candidate order.
 
     ``pvalues`` takes canonical query arrays. Consecutive queries are stacked, whole, as size-1
     chunks (:func:`_stacks`); the first-order closed form is elementwise, so each p-value is the one
@@ -641,8 +640,8 @@ def _evaluated(
 
 
 def testable_queries(test: CITest, neighbors: list[np.ndarray], x: int, y: int, size: int) -> int:
-    """:func:`pair_queries` less the sets a test that deletes rows per test leaves out because a
-    member keeps no rows with the pair (:func:`kept_apart`): the queries the scan builds."""
+    """:func:`pair_queries` excluding sets with a member that keeps no rows with the pair under
+    test-wise deletion (:func:`kept_apart`): the queries the scan builds."""
     if not isinstance(test, TestwiseDeletion):
         return pair_queries(neighbors, x, y, size)
     together = test.together()
@@ -872,10 +871,10 @@ def flagged_triples(
     """The unshielded triples ``(a, b, c)``, ``a < c``, of the boolean ``adjacency`` with a side in
     ``flagged``, pairs in either order.
 
-    A flagged side is an edge a conditioning set no row could test might have separated
-    (:func:`~andrey.core.ci_missing.running_flags`), so it may be absent and the triple with it:
-    whether ``b`` is a collider is unknown, and no rule reads the triple as a collider or a
-    non-collider. With no flagged pair, as on complete data, there are none.
+    A flagged side might have been separated by an untested conditioning set
+    (:func:`~andrey.core.ci_missing.running_flags`), so the edge and triple may be absent: no rule
+    classifies ``b`` as a collider or non-collider. With no flagged pair, as on complete data, there
+    are none.
     """
     if not flagged:
         return frozenset()

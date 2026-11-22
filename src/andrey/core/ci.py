@@ -420,12 +420,11 @@ class PartialCorrelationTest:
         columns, so a matrix that is not exactly symmetric gives each pair one answer whichever
         column is ``x``.
 
-        The other calls take :meth:`statistic_pvalues`, in chunks of at most
-        ``FALLBACK_STACK_ENTRIES`` submatrix entries, which answers or raises as it does: a
-        smaller set, fewer candidates, and any call with a block that the factor does not show to
-        be well inside the nonsingular range of :func:`_invert_nonsingular`, so that every block
-        the current rule calls singular, such as a candidate that copies ``x`` or a member of the
-        set, raises the same error. ``ys`` excludes ``x`` and the members of the set.
+        Other calls use :meth:`statistic_pvalues` in chunks of at most ``FALLBACK_STACK_ENTRIES``
+        submatrix entries: smaller sets, fewer candidates, or any block not demonstrably well inside
+        the nonsingular range of :func:`_invert_nonsingular`; they return or raise as that method
+        does, so blocks classified as singular, such as a candidate copying ``x`` or a set member,
+        raise the same error. ``ys`` excludes ``x`` and set members.
         """
         cols = np.asarray(ys, dtype=np.intp).reshape(-1)
         cond = np.unique(np.fromiter(condition_set, dtype=np.intp))
@@ -603,8 +602,8 @@ class FisherZ(PartialCorrelationTest):
 
     @staticmethod
     def least_rows(size: int, **options: object) -> int:
-        """The fewest rows a query given ``size`` conditioning variables has degrees of freedom on,
-        ``n - size - 3 >= 1``: ``size + 4``."""
+        """The fewest rows given ``size`` conditioning variables: ``size + 4``, so
+        ``n - size - 3 >= 1`` leaves degrees of freedom."""
         return size + 4
 
     @staticmethod
@@ -634,8 +633,8 @@ class StudentT(PartialCorrelationTest):
 
     @staticmethod
     def least_rows(size: int, **options: object) -> int:
-        """The fewest rows a query given ``size`` conditioning variables has degrees of freedom on,
-        ``n - size - 2 >= 1``: ``size + 3``."""
+        """The fewest rows given ``size`` conditioning variables: ``size + 3``, so
+        ``n - size - 2 >= 1`` leaves degrees of freedom."""
         return size + 3
 
     @staticmethod
@@ -685,12 +684,11 @@ def _null_means_batch(margins: Sequence[_Margins], g_square: bool) -> list[np.nd
 def _nonempty_dofs(n_sx: np.ndarray, n_sy: np.ndarray, n_s: np.ndarray) -> np.ndarray:
     """The degrees of freedom of each configuration's table with its empty rows and columns struck.
 
-    That is ``(r_x - 1) * (r_y - 1)``, with ``r_x`` and ``r_y`` the values of ``x`` and ``y``
-    present in the configuration, and ``0`` for a configuration with one value of either. A cell
-    of a row or a column with no rows has no expected count, and striking it with the margin it
-    would fit is the exact reduction of the degrees of freedom for such cells [Spirtes et al. 1993,
-    Section 5.5; Bishop, Fienberg and Holland 1975]. ``n_s`` is unused; it keeps the margins'
-    shape of :func:`_null_means`.
+    ``(r_x - 1) * (r_y - 1)``, with ``r_x`` and ``r_y`` the values of ``x`` and ``y`` present in the
+    configuration; ``0`` when either has one value. Cells in empty rows or columns have no expected
+    counts; removing them and their fitted margins exactly reduces the degrees of freedom [Spirtes
+    et al. 1993, Section 5.5; Bishop, Fienberg and Holland 1975]. Unused ``n_s`` preserves the
+    margins' shape of :func:`_null_means`.
     """
     present_x, present_y, informative = _informative(n_sx, n_sy)
     return np.where(informative, (present_x - 1) * (present_y - 1), 0).astype(np.float64)
@@ -1492,8 +1490,8 @@ class ChiSquare:
         return statistic, self._table_pvalue(statistic, bounds, per_table)
 
     def _table_sums(self, tables: np.ndarray, bounds: np.ndarray) -> tuple[np.ndarray, _Margins]:
-        """The statistics of the tests of :meth:`_table_statistics`, and the margins of their
-        tables, from which :meth:`_dofs` gives the degrees of freedom."""
+        """The test statistics and table margins of :meth:`_table_statistics`; :meth:`_dofs` derives
+        the degrees of freedom from the margins."""
         m, kx, ky = tables.shape
         n_sx = np.einsum("sxy->sx", tables)
         n_sy = np.einsum("sxy->sy", tables)

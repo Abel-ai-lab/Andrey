@@ -54,10 +54,9 @@ def fit_blanket(
 ) -> StructureOutput | list[StructureOutput]:
     """Check the settings, run the search, and wrap the graph ``structure`` names or the set.
 
-    A list of targets gives one result for each, in its order. Only the CPDAG of every variable
-    reads flagged sides (``possibly_separable``); a target's set and the other structures orient
-    nothing, so their searches keep no untested sets
-    (:func:`~andrey.core.ci_missing.reading_flags`).
+    A target list gives one result per target, in list order. Only the CPDAG of every variable reads
+    flagged sides (``possibly_separable``); a target's set and the other structures orient nothing,
+    so their searches keep no untested sets (:func:`~andrey.core.ci_missing.reading_flags`).
     """
     from andrey.constraint._parallel_targets import answers
     from andrey.constraint.blanket import local_search, local_set, local_structure
@@ -120,7 +119,7 @@ def fit_blanket(
 def _target_set(method: str, search: LocalSearch, t: int) -> list[int]:
     """Return ``t``'s set by the learner ``method``, in the order its members joined.
 
-    The set is the Markov blanket of a ``"blanket"`` learner and the parents and children of a
+    The set holds the Markov blanket for a ``"blanket"`` learner or parents and children for a
     ``"pc"`` learner.
     """
     pc, mb, _ = search.local(method, t)
@@ -134,8 +133,8 @@ def _target_answer(
 ) -> tuple[np.ndarray, dict[str, object]]:
     """Return ``t``'s set ``members`` as endpoint marks and metadata.
 
-    The marks are an undirected graph joining ``t`` to each member; the metadata names ``t`` and
-    lists the set.
+    The marks join ``t`` to each member without directions; the metadata names ``t`` and lists the
+    set.
     """
     adjacent = np.zeros((d, d), dtype=bool)
     adjacent[t, members] = adjacent[members, t] = True
@@ -174,11 +173,11 @@ def iamb(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     target : str, int, list of them, or None, default=None
-        The variable whose set to learn: a column label (a string) or a 0-based position (an
-        integer). A list of them learns each one's set with one search, which sets up the test
-        once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
-        ``indep_test``; with missing values, each target has a search of its own. ``None`` learns
-        every variable's set and keeps a pair when each variable is in the other's set.
+        The target: a column label (string) or 0-based position (integer). A list learns each
+        target's set in one search, setting up the test once, on ``andrey.config.n_jobs`` worker
+        processes for a partial-correlation ``indep_test``; with missing values, each target has a
+        separate search. ``None`` learns every variable's set and keeps a pair when each variable is
+        in the other's set.
     structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
@@ -220,8 +219,7 @@ def iamb(
         any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
         rule orients through it, when a conditioning set not tested of that side lies within the
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
-        lies within the parents of one end, so that set might be the separating set the search
-        missed.
+        lies within the parents of one end, so the search might have missed that separating set.
         ``"orient"`` favors arrowheads; it gives up protection from false colliders. ``"ambiguous"``
         favors no false collider; it gives up the true arrowheads beside them. With
         :func:`~andrey.pc`, on merged cohorts of three graph sizes, with about 29 to 76 true edges,
@@ -229,8 +227,7 @@ def iamb(
         false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it
         found from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty
         graph in 6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs.
-        With IAMB, what the option does to accuracy was not measured. Read under
-        ``structure="cpdag"`` only.
+        With IAMB, its effect on accuracy was not measured. Read under ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
@@ -280,15 +277,15 @@ def iamb(
     Returns
     -------
     StructureOutput or list of StructureOutput
-        With a list of targets, a list holding each target's result, in its order, as that target
-        alone gives it. Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
-        :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
-        cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
-        and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
-        member of its Markov blanket, which holds its parents, its children, and its children's
-        other parents; ``metadata["target"]`` names it and ``metadata["markov_blanket"]`` lists the
-        members in the order they joined, by column label or 0-based position.
-        ``metadata["algorithm"]`` is ``"iamb"``. Under a mixed-data setting,
+        With a list of targets, a list of each target's result, in list order, each equal to a call
+        for that target alone. Without ``target``, wraps the graph ``structure`` names: a
+        ``cpdag`` :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the
+        tests cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for
+        ``"skeleton"`` and ``"moral"``. With ``target``, an ``undirected`` one whose edges join
+        ``target`` to each member of its Markov blanket, which holds its parents, its children, and
+        its children's other parents; ``metadata["target"]`` names it and
+        ``metadata["markov_blanket"]`` lists the members in the order they joined, by column label
+        or 0-based position. ``metadata["algorithm"]`` is ``"iamb"``. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
         ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["tie_break"]`` is the
         tie-break rule the fit ran under, ``andrey.config.tie_break``.
@@ -340,9 +337,9 @@ def iamb(
     The strength is the absolute partial correlation for ``"fisherz"`` and ``"student_t"``, compared
     to nine decimals, which keeps its order where p-values underflow to zero, and the p-value for
     the other tests, compared to nine significant digits, so p-values far below ``1e-9`` keep their
-    order. Candidates whose strengths agree, as p-values that are exactly zero do, go to the column
-    whose rank, computed from the data, comes first, as for :func:`~andrey.hc`, so the sets do not
-    depend on the column order unless two columns are identical.
+    order. Tied strengths, including p-values of exactly zero, favor the column ranked first from
+    the data, as for :func:`~andrey.hc`, so the sets do not depend on the column order unless two
+    columns are identical.
 
     **From blankets to a graph.** Without a target, a pair is kept when each variable is in the
     other's blanket, which gives the moral graph (``structure="moral"``). The skeleton drops each
@@ -369,16 +366,15 @@ def iamb(
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
-    tested, including those the search skipped because no row can test them. A candidate no tested
-    query separated stays in the target's set, but a pair no tested query could decide, as a
-    variable never observed with the target, is undecided: it is left out of the set and the graph
-    and listed in ``metadata["undecided_pairs"]``. A drawn edge that a conditioning set not tested
-    might have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data
-    could not check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``,
-    the CPDAG takes a triple with a side it reads (see ``possibly_separable``) as neither a collider
-    nor a non-collider. On merged cohorts, every pair of variables measured only in different
-    cohorts is therefore undecided. A continuous column constant on a test's rows raises
-    ``ValueError``. Test-wise deletion is valid
+    tested, including sets skipped because no row can test them. A candidate no tested query
+    separated stays in the target's set, but a pair no tested query could decide, as a variable
+    never observed with the target, is undecided: it is left out of the set and the graph and listed
+    in ``metadata["undecided_pairs"]``. A drawn edge an untested conditioning set might have
+    separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could not
+    check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``, the CPDAG
+    takes a triple with a side it reads (see ``possibly_separable``) as neither a collider nor a
+    non-collider. On merged cohorts, pairs measured only in different cohorts are undecided. A
+    continuous column constant on a test's rows raises ``ValueError``. Test-wise deletion is valid
     when values are missing completely at random, which means that whether a value is missing
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.
@@ -499,11 +495,11 @@ def inter_iamb(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     target : str, int, list of them, or None, default=None
-        The variable whose set to learn: a column label (a string) or a 0-based position (an
-        integer). A list of them learns each one's set with one search, which sets up the test
-        once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
-        ``indep_test``; with missing values, each target has a search of its own. ``None`` learns
-        every variable's set and keeps a pair when each variable is in the other's set.
+        The target: a column label (string) or 0-based position (integer). A list learns each
+        target's set in one search, setting up the test once, on ``andrey.config.n_jobs`` worker
+        processes for a partial-correlation ``indep_test``; with missing values, each target has a
+        separate search. ``None`` learns every variable's set and keeps a pair when each variable is
+        in the other's set.
     structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
@@ -545,8 +541,7 @@ def inter_iamb(
         any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
         rule orients through it, when a conditioning set not tested of that side lies within the
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
-        lies within the parents of one end, so that set might be the separating set the search
-        missed.
+        lies within the parents of one end, so the search might have missed that separating set.
         ``"orient"`` favors arrowheads; it gives up protection from false colliders. ``"ambiguous"``
         favors no false collider; it gives up the true arrowheads beside them. With
         :func:`~andrey.pc`, on merged cohorts of three graph sizes, with about 29 to 76 true edges,
@@ -554,8 +549,8 @@ def inter_iamb(
         false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it
         found from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty
         graph in 6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs.
-        With Inter-IAMB, what the option does to accuracy was not measured. Read under
-        ``structure="cpdag"`` only.
+        With Inter-IAMB, its effect on accuracy was not measured. Read under ``structure="cpdag"``
+        only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
@@ -605,18 +600,18 @@ def inter_iamb(
     Returns
     -------
     StructureOutput or list of StructureOutput
-        With a list of targets, a list holding each target's result, in its order, as that target
-        alone gives it. Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
-        :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
-        cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
-        and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
-        member of its Markov blanket, which holds its parents, its children, and its children's
-        other parents; ``metadata["target"]`` names it and ``metadata["markov_blanket"]`` lists the
-        members in the order they joined, by column label or 0-based position.
-        ``metadata["algorithm"]`` is ``"inter_iamb"``. Under a mixed-data setting,
-        ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
-        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["tie_break"]`` is the
-        tie-break rule the fit ran under, ``andrey.config.tie_break``.
+        With a list of targets, a list of each target's result, in list order, each equal to a call
+        for that target alone. Without ``target``, wraps the graph ``structure`` names: a
+        ``cpdag`` :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the
+        tests cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for
+        ``"skeleton"`` and ``"moral"``. With ``target``, an ``undirected`` one whose edges join
+        ``target`` to each member of its Markov blanket, which holds its parents, its children, and
+        its children's other parents; ``metadata["target"]`` names it and
+        ``metadata["markov_blanket"]`` lists the members in the order they joined, by column label
+        or 0-based position. ``metadata["algorithm"]`` is ``"inter_iamb"``. Under a mixed-data
+        setting, ``metadata["categorical"]`` lists the categorical columns it read. With a
+        randomized ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["tie_break"]``
+        is the tie-break rule the fit ran under, ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -668,9 +663,9 @@ def inter_iamb(
     The strength is the absolute partial correlation for ``"fisherz"`` and ``"student_t"``, compared
     to nine decimals, which keeps its order where p-values underflow to zero, and the p-value for
     the other tests, compared to nine significant digits, so p-values far below ``1e-9`` keep their
-    order. Candidates whose strengths agree, as p-values that are exactly zero do, go to the column
-    whose rank, computed from the data, comes first, as for :func:`~andrey.hc`, so the sets do not
-    depend on the column order unless two columns are identical.
+    order. Tied strengths, including p-values of exactly zero, favor the column ranked first from
+    the data, as for :func:`~andrey.hc`, so the sets do not depend on the column order unless two
+    columns are identical.
 
     **From blankets to a graph.** Without a target, a pair is kept when each variable is in the
     other's blanket, which gives the moral graph (``structure="moral"``). The skeleton drops each
@@ -697,16 +692,15 @@ def inter_iamb(
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
-    tested, including those the search skipped because no row can test them. A candidate no tested
-    query separated stays in the target's set, but a pair no tested query could decide, as a
-    variable never observed with the target, is undecided: it is left out of the set and the graph
-    and listed in ``metadata["undecided_pairs"]``. A drawn edge that a conditioning set not tested
-    might have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data
-    could not check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``,
-    the CPDAG takes a triple with a side it reads (see ``possibly_separable``) as neither a collider
-    nor a non-collider. On merged cohorts, every pair of variables measured only in different
-    cohorts is therefore undecided. A continuous column constant on a test's rows raises
-    ``ValueError``. Test-wise deletion is valid
+    tested, including sets skipped because no row can test them. A candidate no tested query
+    separated stays in the target's set, but a pair no tested query could decide, as a variable
+    never observed with the target, is undecided: it is left out of the set and the graph and listed
+    in ``metadata["undecided_pairs"]``. A drawn edge an untested conditioning set might have
+    separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could not
+    check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``, the CPDAG
+    takes a triple with a side it reads (see ``possibly_separable``) as neither a collider nor a
+    non-collider. On merged cohorts, pairs measured only in different cohorts are undecided. A
+    continuous column constant on a test's rows raises ``ValueError``. Test-wise deletion is valid
     when values are missing completely at random, which means that whether a value is missing
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.
@@ -821,12 +815,11 @@ def mmpc(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     target : str, int, list of them, or None, default=None
-        The variable whose set to learn: a column label (a string) or a 0-based position (an
-        integer). A list of them learns each one's set with one search, which sets up the test
-        once and learns the set of a variable two targets' symmetry checks read once, on
-        ``andrey.config.n_jobs`` worker processes for a partial-correlation ``indep_test``; with
-        missing values, each target has a search of its own. ``None`` learns every variable's set
-        and keeps a pair when each variable is in the other's set.
+        The target: a column label (string) or 0-based position (integer). A list learns each
+        target's set in one search, setting up the test and learning any set shared by two targets'
+        symmetry checks once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
+        ``indep_test``; with missing values, each target has a separate search. ``None`` learns
+        every variable's set and keeps a pair when each variable is in the other's set.
     structure : {"skeleton", "cpdag"}, default="skeleton"
         The graph returned when ``target`` is ``None``. ``"skeleton"``: the adjacencies with no
         directions, each variable joined to its parents and children, the graph the sets give.
@@ -867,8 +860,7 @@ def mmpc(
         any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
         rule orients through it, when a conditioning set not tested of that side lies within the
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
-        lies within the parents of one end, so that set might be the separating set the search
-        missed.
+        lies within the parents of one end, so the search might have missed that separating set.
         ``"orient"`` favors arrowheads; it gives up protection from false colliders. ``"ambiguous"``
         favors no false collider; it gives up the true arrowheads beside them. With
         :func:`~andrey.pc`, on merged cohorts of three graph sizes, with about 29 to 76 true edges,
@@ -876,8 +868,7 @@ def mmpc(
         false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it
         found from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty
         graph in 6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs.
-        With MMPC, what the option does to accuracy was not measured. Read under
-        ``structure="cpdag"`` only.
+        With MMPC, its effect on accuracy was not measured. Read under ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
@@ -925,12 +916,12 @@ def mmpc(
     Returns
     -------
     StructureOutput or list of StructureOutput
-        With a list of targets, a list holding each target's result, in its order, as that target
-        alone gives it. Without ``target``, wraps the graph ``structure`` names: an ``undirected``
-        :class:`~andrey.core.GraphStructure` for ``"skeleton"``, whose edges have no arrowhead and
-        join each pair in each other's set, or a ``cpdag`` one for ``"cpdag"``, whose undirected
-        edges the tests cannot orient. With ``target``, an ``undirected`` one whose edges join
-        ``target`` to each of its parents and children; ``metadata["target"]`` names it and
+        With a list of targets, a list of each target's result, in list order, each equal to a call
+        for that target alone. Without ``target``, wraps the graph ``structure`` names: an
+        ``undirected`` :class:`~andrey.core.GraphStructure` for ``"skeleton"``, whose edges have no
+        arrowhead and join each pair in each other's set, or a ``cpdag`` one for ``"cpdag"``, whose
+        undirected edges the tests cannot orient. With ``target``, an ``undirected`` one whose edges
+        join ``target`` to each of its parents and children; ``metadata["target"]`` names it and
         ``metadata["parents_and_children"]`` lists the members in the order they joined, by column
         label or 0-based position. ``metadata["algorithm"]`` is ``"mmpc"``. Under a mixed-data
         setting, ``metadata["categorical"]`` lists the categorical columns it read. With a
@@ -1017,16 +1008,15 @@ def mmpc(
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
-    tested, including those the search skipped because no row can test them. A candidate no tested
-    query separated stays in the target's set, but a pair no tested query could decide, as a
-    variable never observed with the target, is undecided: it is left out of the set and the graph
-    and listed in ``metadata["undecided_pairs"]``. A drawn edge that a conditioning set not tested
-    might have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data
-    could not check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``,
-    the CPDAG takes a triple with a side it reads (see ``possibly_separable``) as neither a collider
-    nor a non-collider. On merged cohorts, every pair of variables measured only in different
-    cohorts is therefore undecided. A continuous column constant on a test's rows raises
-    ``ValueError``. Test-wise deletion is valid
+    tested, including sets skipped because no row can test them. A candidate no tested query
+    separated stays in the target's set, but a pair no tested query could decide, as a variable
+    never observed with the target, is undecided: it is left out of the set and the graph and listed
+    in ``metadata["undecided_pairs"]``. A drawn edge an untested conditioning set might have
+    separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could not
+    check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``, the CPDAG
+    takes a triple with a side it reads (see ``possibly_separable``) as neither a collider nor a
+    non-collider. On merged cohorts, pairs measured only in different cohorts are undecided. A
+    continuous column constant on a test's rows raises ``ValueError``. Test-wise deletion is valid
     when values are missing completely at random, which means that whether a value is missing
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.
