@@ -407,21 +407,22 @@ _WORKER_LIMIT = None
 @contextmanager
 def search_pool(workers: int) -> Generator[Run]:
     """A ``run`` function for :func:`fit` that spreads searches over ``workers`` threads (worker
-    processes when ``ANDREY_SKEWD_POOL=process``), each on one BLAS thread; with one worker, the
-    searches run in this thread. A search spends its time in NumPy and SciPy array operations, which
-    release the interpreter lock. Every search draws from its own stream, so the results do not
-    depend on the number of workers."""
-    if workers <= 1:
-        yield _serial
-        return
+    processes when ``ANDREY_SKEWD_POOL=process``); with one worker, the searches run in this
+    thread. A search spends its time in NumPy and SciPy array operations, which release the
+    interpreter lock. Every search draws from its own stream, so the results do not depend on the
+    number of workers. BLAS runs on one thread inside the block: its products are small, and a
+    threaded product rounds differently, so the fit would depend on the machine's thread count."""
     import os
     from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
     from andrey.core import backend
 
     with ExitStack() as stack:
+        stack.enter_context(backend.one_blas_thread())  # every thread of this process
+        if workers <= 1:
+            yield _serial
+            return
         if os.environ.get("ANDREY_SKEWD_POOL") != "process":
-            stack.enter_context(backend.one_blas_thread())  # every thread of this process
             pool = stack.enter_context(ThreadPoolExecutor(max_workers=workers))
         else:
             from andrey.search._parallel import pick_context
