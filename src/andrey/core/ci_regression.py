@@ -737,8 +737,8 @@ class PCM(_RegressionTest):
 
     Notes
     -----
-    **When to use.** For continuous data at hundreds to thousands of rows where, with the default
-    additive regression, the conditional mean of each variable is a sum of smooth functions of one
+    **When to use.** For continuous data at a few hundred rows where, with the default additive
+    regression, the conditional mean of each variable is a sum of smooth functions of one
     variable each: of ``z`` for both variables, and of ``x`` and ``z`` for the response [1]_. It
     tests conditional mean independence, which conditional independence implies, and keeps its
     level whenever the regressions on the conditioning set are accurate enough, whatever the
@@ -770,7 +770,10 @@ class PCM(_RegressionTest):
     least-squares line, as is one whose smoothing search fails; a variance fit through the log link
     without a minimum, or with a squared residual of 0, uses the identity link with the same basis.
 
-    Where the paper and the authors' code differ, Andrey takes:
+    The measurements in these notes take the paper's ``y`` as the response, as the paper does; on
+    the paper's designs, the rank rule above makes the paper's ``y`` the response in about half of
+    the draws, and the other direction was not measured. Where the paper and the authors' code
+    differ, Andrey takes:
 
     - ``m`` regresses ``g``, as in the authors' code; the paper regresses ``g~``, which in the
       measurements had more power in the paper's first setting at 250 rows (71.6% against 54.8%)
@@ -785,26 +788,24 @@ class PCM(_RegressionTest):
       which in the measurements turned a few rejections near the level into acceptances and
       changed no other decision.
 
-    **Limitations.** Every measurement below takes the paper's ``y`` as the response, as the paper
-    does; on the paper's designs, the rank rule of **How it works** makes the paper's ``y`` the
-    response in about half of the draws, and the other direction was not measured. On the null
-    design of the paper's Section 6.1 (seven conditioning variables, 500 draws per size), the
-    default rejected a true independence at 0.05 in 0.4% of draws at 250 rows and 0.2% at 500 (the
-    authors' code with the same regressions: 0.6% and 0.2%), and in the paper's three alternative
-    settings its power was at or above the authors' code's on the same data, for example 54.8%
-    against 48.8% in the first setting at 250 rows and 13.4% against 7.6% in the third at 500. On
-    the null of Section 6.2, whose conditional means hold an interaction, it rejected 97.6% at 500
-    rows (the authors' code 95.6%); the paper runs that design from 10,000 rows, and no regression
-    measured holds it at 500 (the forest rejected 34.4%). The tree regressions fail the Section 6.1
-    null, where ``x`` nearly copies the conditional mean of ``y`` on ``z``: ``"forest"`` rejected
-    99.9% at 250 rows and 97.3% at 500, ``"boosting"`` 97.7% at 250. A query on nine columns takes
-    about 7 s at 250 rows and 29 s at 500 on one core, so a PC search, which runs a query for each
-    pair and conditioning set it tries, is slow. The variance floor of 0.01, in units of the
-    standardized response, is the authors' code's value; the paper sets none. The test detects a
-    dependence of the mean of ``y`` on ``x``; one that changes only the spread of ``y`` goes unseen,
-    as does a dependence of the mean of ``x`` on ``y`` that leaves the mean of ``y`` unchanged.
-    Which variable is the response follows a rule on the data that has nothing to do with the causal
-    question, so swapping the roles can change the answer.
+    **Limitations.** On the null design of the paper's Section 6.1 (seven conditioning variables,
+    500 draws per size), the default rejected a true independence at 0.05 in 0.4% of draws at 250
+    rows and 0.2% at 500 (the authors' code with the same regressions: 0.6% and 0.2%), and in the
+    paper's three alternative settings its power was at or above the authors' code's on the same
+    data, for example 54.8% against 48.8% in the first setting at 250 rows and 13.4% against 7.6% in
+    the third at 500. On the null of Section 6.2, whose conditional means hold an interaction, it
+    rejected 97.6% at 500 rows (the authors' code 95.6%); the paper runs that design from 10,000
+    rows, where ``"forest"`` rejected 4.0% of 50 draws, and no regression measured holds it at 500
+    (the forest rejected 34.4%). The tree regressions fail the Section 6.1 null, where ``x`` nearly
+    copies the conditional mean of ``y`` on ``z``: ``"forest"`` rejected 99.9% at 250 rows and 97.3%
+    at 500, ``"boosting"`` 97.7% at 250. A query on nine columns takes about 7 s at 250 rows, 29 s
+    at 500, and 6 minutes at 1,000 on one core, so a PC search, which runs a query for each pair and
+    conditioning set it tries, is slow. The variance floor of 0.01, in units of the standardized
+    response, is the authors' code's value; the paper sets none. The test detects a dependence of
+    the mean of ``y`` on ``x``; one that changes only the spread of ``y`` goes unseen, as does a
+    dependence of the mean of ``x`` on ``y`` that leaves the mean of ``y`` unchanged. Which variable
+    is the response follows a rule on the data that has nothing to do with the causal question, so
+    swapping the roles can change the answer.
 
     References
     ----------

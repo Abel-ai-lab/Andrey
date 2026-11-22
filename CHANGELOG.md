@@ -124,7 +124,8 @@ names its pull request.
   standard deviation divides by the row count, as in the papers, where the code's choices gave no
   more power; the PCM's additive default regresses the fit of the response, not its predictor's
   term, on the conditioning set, and fits the variance with half the mean fits' basis functions, as
-  in the authors' code; with both, its power was at or above that code's in every setting measured.
+  in the authors' code; with both, its power was at or above that code's in every setting measured
+  in the paper's direction.
   A contributor's script compares the three, the additive PCM included, with the authors' code.
   ([#1147], [#1129], [#1162], [#1175])
 - `target` takes a list of columns on `iamb`, `inter_iamb`, `mmpc`, and `icp`: one call returns one
