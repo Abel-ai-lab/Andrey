@@ -312,7 +312,8 @@ KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
   Gaussian location-scale family, the family its benchmark gives it on location-scale pairs, and
   its graph search with the fixed-scale Gaussian family, an additive-noise model. SkewD and
   SkewD-MV run with the search budget of their recovery tests, since at the defaults ten draws
-  take hours.
+  take hours. At that budget the SkewD cell's ten draws took 1,034 s and the SkewD-MV cell's
+  2,915 s on one AMD EPYC (Zen 3) core, the two slowest cells of the gate.
 - **Time series.** The published time-series regimes, drawn by the benchmark harness
   (`benchmarks/andrey_bench`), which the gate imports; each method runs through its benchmark
   adapter with the published settings. The sizes are published sizes at which the method's median

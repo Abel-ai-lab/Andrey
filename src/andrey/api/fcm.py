@@ -1747,17 +1747,17 @@ def skewd_mv(
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** It is slow: on those graphs a fit at the defaults took a median of 31 CPU
-    minutes at 6 variables and 24 at 10, and up to 1.8 and 2.4 CPU hours, where :func:`~andrey.cam`
-    takes under a second; the `0.19.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#skewd-mv>`_ has the numbers. Its cost grows
-    with the number of distinct parent sets the class allows, exponentially in a variable's
+    **Limitations.** It is slow: on those graphs a fit at the defaults took a median of 49 CPU
+    minutes at 6 variables and 37 at 10 on an AMD EPYC 7713, 28 and 18 on an AMD EPYC 9534, and up
+    to 1.8 and 2.4 CPU hours, where :func:`~andrey.cam` takes under a second; the `0.19.0 release
+    card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#skewd-mv>`_ has the numbers. Its cost
+    grows with the number of distinct parent sets the class allows, exponentially in a variable's
     undirected edges; it refuses a class that needs more than 100 (``max_fits``), where the paper
     counts parent-child configurations and expects the method to apply while they are in the order
     of 100. An edge PC misses or misorients stays wrong: the likelihood only chooses among the
-    class's DAGs, and PC's skeleton had an F1 of 0.90 at 6 variables and 0.82 at 10. The numbers are
-    a reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    class's DAGs, and PC's skeleton had an F1 of 0.90 at 6 variables and 0.82 at 10. The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------

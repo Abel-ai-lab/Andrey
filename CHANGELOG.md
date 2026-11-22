@@ -172,9 +172,10 @@ names its pull request.
   authors' recorded outputs, which a fresh run of the authors' code confirmed, and fewer than a coin
   flip or the empty graph; the likelihood named all 160 pairs right and the independence criterion
   154, and no other method measured beside them was both more accurate and faster. SkewD-MV made
-  fewer errors than PC, CAM, NoGAM, SCORE, and RESIT. Both are slow, a pair 15 to 22 CPU minutes
-  and a graph a median of 24 to 31, which their Limitations state; the [0.19.0 release
-  card][card-0190-skewd] has the numbers. ([#1181])
+  fewer errors than PC, CAM, NoGAM, SCORE, and RESIT. Both are slow, which their Limitations
+  state: a pair takes 15 to 22 CPU minutes on an AMD EPYC 9534, and a graph of 6 or 10 variables a
+  median of 37 to 49 CPU minutes on an AMD EPYC 7713 and 18 to 28 on the EPYC 9534; the [0.19.0
+  release card][card-0190-skewd] has the numbers. ([#1181])
 - With `fisherz` and `student_t` on data with missing values, test-wise deletion groups the rows by
   their missingness patterns once and computes a test's sums from the groups' tables, removing the
   scattered missing cells exactly, when that costs less than summing every row; a query whose
