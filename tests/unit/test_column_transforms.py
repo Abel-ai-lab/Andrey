@@ -30,6 +30,7 @@ import andrey
 from andrey.core import TemporalStructure
 from andrey.core.stats import normal_scores
 from andrey.spec import list_specs
+from tests.release import release_cases
 from tests.unit.methods import fit_settings, regime_paths, results
 
 N = 300
@@ -179,7 +180,9 @@ def rescale(x: np.ndarray) -> np.ndarray:
     return x * FACTORS[: x.shape[1]]
 
 
-@pytest.mark.parametrize("spec", TABLE_SPECS, ids=lambda spec: spec.name)
+@pytest.mark.parametrize(
+    "spec", release_cases(TABLE_SPECS, {"skewd_mv"}, id=lambda spec: spec.name)
+)
 def test_rescaling_each_column_keeps_the_graph_unless_the_method_reads_units(spec):
     if spec.name == "calm":
         pytest.importorskip("torch")

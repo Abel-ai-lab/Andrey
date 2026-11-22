@@ -249,6 +249,10 @@ names its pull request.
   approximate marginal likelihood. On heavy-tailed Pareto pairs the marginal likelihood picked a
   stiffer spline, under which the test of the true direction rejected well above its level.
   ([#1165])
+- For contributors, CI on a pull request into a release branch runs lint, types, the unit tests,
+  cheap recovery checks, and the fast consistency tests. The heavy accuracy checks carry a
+  `release` pytest mark; the release pull request into `main` runs every test, as do pushes to
+  `main`. The quality gate's workflow also runs by hand. ([#1185])
 
 ### Fixed
 
@@ -2957,6 +2961,7 @@ First alpha release.
 [#1162]: https://github.com/Abel-ai-lab/Andrey/pull/1162
 [#1175]: https://github.com/Abel-ai-lab/Andrey/pull/1175
 [#1179]: https://github.com/Abel-ai-lab/Andrey/pull/1179
+[#1185]: https://github.com/Abel-ai-lab/Andrey/pull/1185
 [#1161]: https://github.com/Abel-ai-lab/Andrey/pull/1161
 [#1169]: https://github.com/Abel-ai-lab/Andrey/pull/1169
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132

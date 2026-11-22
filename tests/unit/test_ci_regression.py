@@ -9,6 +9,7 @@ from scipy.special import ndtr
 
 from andrey.core import ci
 from andrey.core import ci_regression as cr
+from tests.release import release_cases
 
 N = 300
 
@@ -171,7 +172,7 @@ def test_testwise_deletion_outside_the_query_equals_the_complete_test(name):
     assert ci.make_indep_test(name, wider, **options)(0, 1, [2]) == complete(0, 1, [2])
 
 
-@pytest.mark.parametrize(("cls", "options"), ALL_OPTIONS)
+@pytest.mark.parametrize(("cls", "options"), release_cases(ALL_OPTIONS, {"wgcm-trees"}))
 def test_p_values_ignore_the_units_and_signs(cls, options):
     x = _nonlinear()
     scaled = x * np.array([3.7, 0.013, 11.3]) + np.array([2.5, -1.0, 2.5])
@@ -217,6 +218,7 @@ def _sine_null(n: int, seed: int) -> np.ndarray:
     return np.column_stack([mean + 0.1 * rng.standard_normal(n), mean + rng.standard_normal(n), z])
 
 
+@pytest.mark.release
 def test_pcm_keeps_its_level_where_x_copies_the_conditional_mean():
     rejections = sum(cr.PCM(_sine_null(200, s), seed=s)(0, 1, [2]) < 0.05 for s in range(60))
     assert rejections <= 9  # the 0.999 quantile of the binomial count at 5%

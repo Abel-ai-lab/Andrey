@@ -116,6 +116,9 @@ only-include = ["src/andrey", "README.md"]  # README.md: the package description
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "."]  # "." for test helpers and QA tools
+markers = [
+    "release: a heavy accuracy check that pull requests into release or topic branches skip",
+]
 
 [tool.ty.environment]
 python-version = "3.11"

@@ -23,6 +23,10 @@ env:
   OPENBLAS_NUM_THREADS: 1
   MKL_NUM_THREADS: 1
   NUMEXPR_NUM_THREADS: 1
+  # A pull request into a release or topic branch deselects the heavy accuracy checks, the tests
+  # marked `release` (DEVELOPMENT.md); the release pull request into main, a push to main, a manual
+  # run, and a call from deploy-prod.yml run every test (an empty `-m` selects them all).
+  TEST_MARKS: ${{ github.event_name == 'pull_request' && github.base_ref != 'main' && 'not release' || '' }}
 
 # Jobs that need more (lint's PR file list) say so themselves.
 permissions:
@@ -57,13 +61,11 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         with:
-          # Recovery tests self-check the quality gate; unit tests use QA helpers.
+          # A pull request that changes none of these paths skips build-install.
           filters: |
             code:
               - 'src/**'
               - 'tests/**'
-              - 'qa/quality_gate.py'
-              - 'qa/quality_baselines.json'
               - 'pyproject.toml'
               - 'uv.lock'
               - 'README.md'
@@ -74,7 +76,6 @@ jobs:
               - 'scripts/gate_reuse.py'
               - '.github/workflows/ci.yml'
               - '.github/workflows/publish.yml'
-              - '.github/workflows/quality-gate.yml'
       - name: Ruff (lint + format check)
         run: |
           uvx ruff check .
@@ -103,7 +104,7 @@ jobs:
       - name: Ground-truth recovery and recorded-output regression
         # On every core, one file per worker, as in the extras job.
         run: >-
-          uv run --no-sync python -m pytest tests/recovery tests/metrics
+          uv run --no-sync python -m pytest tests/recovery tests/metrics -m "$TEST_MARKS"
           -n logical --dist loadfile -q --durations=15
       - name: Benchmark endpoint conversion
         # Needs only numpy; the rest of benchmarks/tests needs the harness environment.
@@ -165,7 +166,7 @@ jobs:
         run: |
           uv sync --all-extras --python ${{ matrix.python-version }}
           uv run --no-sync python -c "import torch; print('torch', torch.__version__)"
-          uv run --no-sync python -m pytest tests --shard ${{ matrix.shard }} -n logical --dist loadfile -q -rs --durations=15
+          uv run --no-sync python -m pytest tests -m "$TEST_MARKS" --shard ${{ matrix.shard }} -n logical --dist loadfile -q -rs --durations=15
 
   # The single required check. `build-install` is path-filtered, so a PR touching only
   # unfiltered paths skips it, and a skipped check never reports a conclusion - leaving a required

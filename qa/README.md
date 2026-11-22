@@ -145,7 +145,8 @@ uv run python -m qa.quality_gate
 ```
 
 The `quality-gate` workflow runs the same command once per release, on the head of the release pull
-request into `main`, and `main`'s ruleset requires it. The publish workflow skips its own run when a
+request into `main`, and `main`'s ruleset requires it; it also runs by hand, as
+`gh workflow run quality-gate.yml --ref <branch>`. The publish workflow skips its own run when a
 passing run has the tree of the commit it publishes (`scripts/gate_reuse.py`; a squash merge keeps
 the tree), so the published files are the ones the gate passed. A change after the gate, or a lookup
 that fails, runs the gate again. Every job that publishes to PyPI must need a job that calls the

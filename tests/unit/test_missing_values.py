@@ -45,6 +45,7 @@ from andrey.spec import REGISTRY
 from andrey.spec.generate import render_skill
 from andrey.temporal.pcmci import design_test, lagged_design
 from tests.recovery.helpers.ci_tests import PValueOnly
+from tests.release import release_cases
 from tests.unit.methods import SHORT
 
 SUPPORTED = [name for name, spec in REGISTRY.items() if spec.data.missing]
@@ -557,7 +558,7 @@ def _fit(name: str, x, **kwargs):
     return fit(x, **kwargs)
 
 
-@pytest.mark.parametrize("name", SUPPORTED)
+@pytest.mark.parametrize("name", release_cases(SUPPORTED, {"skewd"}))
 def test_a_supported_method_runs_on_missing_values_and_repeats(name):
     x = _gaps(_continuous(400), 0.1)
     first, again = _fit(name, x), _fit(name, x)
@@ -568,7 +569,7 @@ def test_a_supported_method_runs_on_missing_values_and_repeats(name):
     assert "rows_tested" not in _fit(name, _continuous(400)).metadata
 
 
-@pytest.mark.parametrize("name", SUPPORTED)
+@pytest.mark.parametrize("name", release_cases(SUPPORTED, {"skewd"}))
 def test_testwise_is_the_default_handling_and_the_fit_records_it(name):
     x = _gaps(_continuous(400), 0.1)
     default, testwise = _fit(name, x), _fit(name, x, missing="testwise")
@@ -578,6 +579,18 @@ def test_testwise_is_the_default_handling_and_the_fit_records_it(name):
     complete = _fit(name, _continuous(400), missing="testwise")
     assert "missing" not in complete.metadata
     assert complete.structure == _fit(name, _continuous(400)).structure
+
+
+def test_skewd_repeats_on_missing_values_and_records_its_handling():
+    """SkewD on gapped data, on fewer rows than the registry-wide cases: the fit repeats and
+    records the default handling and the rows each test reads."""
+    x = _gaps(_continuous(60), 0.1)
+    first, again = _fit("skewd", x), _fit("skewd", x)
+    assert first.structure == again.structure
+    assert first.metadata == again.metadata
+    assert first.metadata["missing"] == "testwise"
+    rows = first.metadata["rows_tested"]
+    assert 0 < rows["min"] <= rows["median"] <= len(x)
 
 
 @pytest.mark.parametrize("name", SUPPORTED)
@@ -810,7 +823,7 @@ def _notices(caplog) -> list[str]:
     return [r.getMessage() for r in caplog.records if r.name == "andrey.api._method"]
 
 
-@pytest.mark.parametrize("name", SUPPORTED)
+@pytest.mark.parametrize("name", release_cases(SUPPORTED, {"skewd"}))
 def test_the_default_handling_logs_one_notice_naming_it_and_its_assumption(name, caplog):
     x = _gaps(_continuous(400), 0.1)
     with caplog.at_level(logging.WARNING, logger="andrey"):
@@ -931,7 +944,7 @@ def _ask_path(test, query: tuple, path: str) -> float:
     return float(test.statistic_pvalues(xs, ys, conds)[1][0])
 
 
-@pytest.mark.parametrize("name", ci.available_indep_tests())
+@pytest.mark.parametrize("name", release_cases(ci.available_indep_tests(), {"wgcm"}))
 def test_every_registered_test_counts_the_queries_it_answers_with_p_one(name):
     x, mask, queries = _starved_queries(name)
     test = make_indep_test(name, x, categorical=mask)

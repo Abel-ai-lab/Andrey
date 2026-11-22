@@ -17,6 +17,7 @@ from andrey.core import TemporalStructure, backend
 from andrey.core.knowledge import column_position
 from andrey.core.structure import node_labels
 from andrey.spec import list_specs
+from tests.release import release_cases
 from tests.unit.methods import domains, environments, fit_settings, regime_paths, results
 
 COLUMNS = ["x", "y", "z"]
@@ -136,7 +137,9 @@ def named_marks(out) -> list[dict]:
     return found
 
 
-@pytest.mark.parametrize("spec", TABLE_SPECS, ids=lambda spec: spec.name)
+@pytest.mark.parametrize(
+    "spec", release_cases(TABLE_SPECS, {"skewd", "skewd_mv"}, id=lambda spec: spec.name)
+)
 def test_reordering_the_columns_relabels_the_result(spec, monkeypatch):
     """A method marked order-free names the same edges under reordered columns, and exactly the
     methods marked ``tie_break`` read the setting during a fit. A pairwise method's two columns
@@ -162,7 +165,10 @@ def test_reordering_the_columns_relabels_the_result(spec, monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "spec", [spec for spec in TABLE_SPECS if spec.data.missing], ids=lambda spec: spec.name
+    "spec",
+    release_cases(
+        [spec for spec in TABLE_SPECS if spec.data.missing], {"skewd"}, id=lambda spec: spec.name
+    ),
 )
 def test_reordering_the_columns_of_data_with_missing_values_relabels_the_result(spec):
     """A method that deletes rows per test names the same edges under reordered columns."""

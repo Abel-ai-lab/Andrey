@@ -31,6 +31,7 @@ import andrey.search.em as em_module
 from andrey import data
 from andrey.data import missingness
 from andrey.metrics import shd
+from tests.unit.methods import SHORT
 
 COLLIDER = [(0, 2, "directed"), (1, 2, "directed")]
 BIC_SEARCHES = ("ges", "xges", "hc", "tabu", "exact_search", "boss", "grasp")
@@ -78,6 +79,22 @@ def test_the_continuous_searches_learn_the_collider_by_em(name):
     )
 
 
+@pytest.mark.filterwarnings("ignore::andrey.SearchLimitWarning")
+def test_calm_by_em_repeats_and_records_its_rounds():
+    """CALM's EM path on its short schedule: the fit repeats and records each round."""
+    pytest.importorskip("torch")
+    X = selected_collider(0)
+    first, second = (
+        andrey.calm(X, missing="em", n_em_iterations=2, **SHORT["calm"]) for _ in range(2)
+    )
+    assert np.array_equal(first.structure.to_numpy(), second.structure.to_numpy())
+    assert first.metadata["missing"] == "em"
+    assert first.metadata["em"] == second.metadata["em"]
+    assert first.metadata["em"]["iterations"] == 2
+    assert len(first.metadata["em"]["log_likelihood"]) == 2
+
+
+@pytest.mark.release
 def test_calm_learns_the_collider_by_em():
     pytest.importorskip("torch")
     assert andrey.calm(selected_collider(0), missing="em").structure.oriented_edges() == COLLIDER
@@ -164,6 +181,7 @@ def test_em_makes_fewer_errors_than_the_complete_rows_or_mean_imputation(name, m
     assert em < mean and em < empty
 
 
+@pytest.mark.release
 def test_notears_by_em_beats_the_complete_rows_and_is_within_spread_of_mean_imputation_under_mar():
     em, rows, mean, empty = _errors(andrey.notears, missingness.mar(0.3)).sum(axis=0)
     # NOTEARS's graph moves with the last bits of its input: a relative change of 1e-12 in the data
@@ -175,6 +193,7 @@ def test_notears_by_em_beats_the_complete_rows_and_is_within_spread_of_mean_impu
     assert em < rows and em < empty and em <= mean + 4 and mean < empty
 
 
+@pytest.mark.release
 def test_dagma_by_em_makes_no_more_errors_than_the_complete_rows_under_mar():
     em, rows, mean, empty = _errors(andrey.dagma, missingness.mar(0.3), d=8, seeds=4).sum(axis=0)
     assert em <= rows and em < mean and em < empty
