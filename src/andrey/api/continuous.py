@@ -127,11 +127,11 @@ def notears(
         the six searches took 2 to 72 times as long as the same search on the complete data. See
         **Missing values.** in Notes.
     n_em_iterations : int, default=10
-        Structural EM rounds for ``missing="em"`` on data with missing values, at least 1. Each
-        round runs the search once, increasing runtime. A fit whose last round changed the graph
-        logs a warning; more rounds stabilize some graphs, while others keep changing. Values other
-        than 10 are not benchmarked. Changes nothing on complete data or with ``missing=None``. See
-        **Missing values.** in Notes.
+        The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
+        least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
+        the graph logs a warning; more rounds stabilize some graphs, while others keep changing.
+        Values other than 10 are not benchmarked. Changes nothing on complete data or with
+        ``missing=None``. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Forbidden edges, edges into an
@@ -424,11 +424,11 @@ def dagma(
         10 times. Its time against complete data was not measured with this search. See **Missing
         values.** in Notes.
     n_em_iterations : int, default=10
-        Structural EM rounds for ``missing="em"`` on data with missing values, at least 1. Each
-        round runs the search once, increasing runtime. A fit whose last round changed the graph
-        logs a warning; more rounds stabilize some graphs, while others keep changing. Values other
-        than 10 are not benchmarked. Changes nothing on complete data or with ``missing=None``. See
-        **Missing values.** in Notes.
+        The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
+        least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
+        the graph logs a warning; more rounds stabilize some graphs, while others keep changing.
+        Values other than 10 are not benchmarked. Changes nothing on complete data or with
+        ``missing=None``. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Forbidden edges, edges into an
