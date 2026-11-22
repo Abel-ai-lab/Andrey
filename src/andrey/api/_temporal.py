@@ -198,8 +198,8 @@ def adapt_pcmci(result: PCMCIResult, extra: Mapping[str, object] | None = None) 
 def adapt_rpcmci(result: RPCMCIResult, labels: tuple[str, ...] | None) -> RegimeOutput:
     """Regime-PCMCI result -> ``RegimeOutput``: one :func:`adapt_pcmci` output per regime.
 
-    Each regime's structure is named by ``labels``; the start's objective, index, iterations, and
-    stopping, and the number of failed starts, ride in the result's ``metadata``.
+    Each regime's structure is named by ``labels``; the result's ``metadata`` holds the start's
+    objective, index, iterations, stopping, and failed-start count.
     """
     return RegimeOutput.new(
         [with_labels(adapt_pcmci(fit), labels) for fit in result.results],

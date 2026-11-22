@@ -488,18 +488,18 @@ class LPCMCISearch:
         return node[1] * self.n + node[0]
 
     def untested(self) -> frozenset[Key]:
-        """The links with a test not tested (:data:`~andrey.core.ci_missing.NOT_TESTED`) and none
-        tested: no test with rows decided them."""
+        """Links with untested queries (:data:`~andrey.core.ci_missing.NOT_TESTED`) and no tested
+        query to decide them."""
         return frozenset(self.skipped - self.tested)
 
     def usable(self, a: Node, b: Node) -> bool:
-        """Whether an orientation rule may read the link ``a - b``: not one no test with rows
-        decided (:meth:`untested`), which may be there or not."""
+        """Whether a rule may read ``a - b``: links no test decided (:meth:`untested`) may be absent
+        and are excluded."""
         return _key(a, b)[0] not in self.untested()
 
     def unconditioned(self, a: Node, b: Node, untested: frozenset[Key]) -> set[Node]:
-        """The nodes linked to ``a`` or ``b`` by a link in ``untested``: no test of the pair
-        conditions on them, as the rows that observe both are likely too few."""
+        """Nodes joined to ``a`` or ``b`` by ``untested`` links, excluded from the pair's conditions
+        because jointly observed rows are likely too few."""
         if not untested:
             return set()
         return {c for end in (a, b) for c in self.linked(end) if _key(end, c)[0] in untested}
@@ -555,8 +555,8 @@ class LPCMCISearch:
     def _record(
         self, key: Key, statistic: float, p_value: float, *, rank: bool, report: bool
     ) -> None:
-        """Update the link's smallest absolute statistic and its largest p-value; a test that was
-        not tested updates neither and marks the link ``skipped``."""
+        """Update the link's smallest absolute statistic and largest p-value; an untested query
+        updates neither and marks it ``skipped``."""
         if math.isnan(p_value):
             self.skipped.add(key)
             return
@@ -1072,9 +1072,9 @@ class LPCMCISearch:
         return middle == "!" or (middle == "R" and b_first) or (middle == "L" and not b_first)
 
     def _unshielded(self) -> Iterable[tuple[Node, Node, Node]]:
-        """Every unshielded triple ``(a, b, c)``, both orders of ``a`` and ``c``, but those with a
-        side no test with rows decided (:meth:`untested`): such a link may be there or not, so no
-        rule reads the triple.
+        """Every unshielded triple ``(a, b, c)`` in both orders of ``a`` and ``c``, except those
+        with an undecided side (:meth:`untested`): that link may be absent, so no rule reads the
+        triple.
 
         Each triple appears once, moved so its latest node is at time ``t``.
         """
@@ -1207,8 +1207,8 @@ class LPCMCISearch:
         return marks, {}, {}
 
     def rule_r2(self) -> tuple[dict, dict, dict]:
-        """R2': ``A -> B *-> C`` or ``A *-> B -> C`` with ``A *-o C``: ``A *-> C``. No link of the
-        pattern is one no test with rows decided (:meth:`usable`)."""
+        """R2': ``A -> B *-> C`` or ``A *-> B -> C`` with ``A *-o C``: ``A *-> C``. No pattern link
+        may be undecided for lack of rows (:meth:`usable`)."""
         marks: dict = {}
         untested = self.untested()
 
@@ -1238,7 +1238,7 @@ class LPCMCISearch:
 
     def rule_r3(self) -> tuple[dict, dict, dict]:
         """R3': ``A *-> B <-* C`` unshielded, ``A *-o D o-* C``, ``D *-o B``, ``D`` in the set. No
-        link of ``D`` is one no test with rows decided (:meth:`usable`)."""
+        ``D`` link may be undecided for lack of rows (:meth:`usable`)."""
         marks: dict = {}
         untested = self.untested()
 

@@ -125,8 +125,7 @@ class PCMCIPlusResult:
 
 
 class Recorder:
-    """Passes queries to ``test``; keeps each column pair's largest p-value and its statistic, of
-    the queries that were tested."""
+    """Passes queries to ``test`` and keeps each pair's largest tested p-value and its statistic."""
 
     def __init__(self, test: LinkTest) -> None:
         self.test = test
@@ -164,9 +163,8 @@ def mark_undecided(
     undecided: np.ndarray,
     untested: list[list[Link]],
 ) -> None:
-    """Mark, in place, the links phase 2's ``undecided`` misses, each lagged link of
-    ``untested[j]``, which has no tested result, and leave every undecided link out of
-    ``adjacency``: no test with rows decided it, so it is not drawn. An undecided link gets
+    """Mark in place the untested lagged links in ``untested[j]`` missed by phase 2's ``undecided``,
+    removing every undecided link from ``adjacency`` because none has a tested result. Each gets
     :data:`~andrey.core.ci_missing.NOT_TESTED` as its p-value and statistic."""
     for j, links in enumerate(untested):
         for i, lag in links:
@@ -217,10 +215,9 @@ def _conditions(
 def _testable(
     test: LinkTest, n_vars: int, i: int, lag: int, j: int, pool: Iterable[int]
 ) -> list[int]:
-    """The lag-0 variables of ``pool`` a test of ``X^i_{t-lag}`` and ``X^j_t`` can condition on
-    alone (:func:`~andrey.temporal.pcmci.conditionable`): on data with missing values, a variable
-    the rows that observe both ends leave too few rows for is left out; all of them on complete
-    data."""
+    """Lag-0 variables from ``pool`` individually testable as conditions of ``X^i_{t-lag}`` and
+    ``X^j_t`` (:func:`~andrey.temporal.pcmci.conditionable`): on missing data, a variable leaving
+    too few jointly observed rows is left out; all are kept on complete data."""
     pool = list(pool)
     if not deletes_rows(test):
         return pool
@@ -249,12 +246,10 @@ def _test_subsets(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Test ``X^i_{t-lag}`` against ``X^j_t`` given each subset, all one size, in one call.
 
-    On data with missing values, each test conditions on its subset and on the parents, strongest
-    first, that keep its block testable
-    (:meth:`~andrey.core.ci_missing.TestwiseDeletion.conditionable`), so the block does not mix
-    columns no row observes together, and a test that leaves a parent out counts its whole set as
-    not tested (:func:`~andrey.temporal.pcmci.count_not_tested`); the tests are then asked in one
-    call per number of conditions.
+    With missing values, each test conditions on its subset and the strongest parents keeping its
+    block testable (:meth:`~andrey.core.ci_missing.TestwiseDeletion.conditionable`), excluding
+    columns never observed together; omitted parents cause the full set to count as untested
+    (:func:`~andrey.temporal.pcmci.count_not_tested`), with one call per condition count.
     """
     x_column = lag * n_vars + i
     if not deletes_rows(test):
@@ -296,10 +291,10 @@ def skeleton(
 ]:
     """Phase 2: return ``(adjacency, largest p-values, their statistics, sepsets, undecided)``.
 
-    ``undecided`` marks the adjacent links that have a test not tested
-    (:data:`~andrey.core.ci_missing.NOT_TESTED`) and none tested; such a test neither removes a link
-    nor sets its strength or largest p-value, and a lag-0 neighbor whose link is undecided after a
-    round is left out of the subsets of later rounds, so no test conditions on it.
+    ``undecided`` marks adjacent links with untested queries
+    (:data:`~andrey.core.ci_missing.NOT_TESTED`) and none tested; untested queries neither remove
+    links nor set strength or largest p-value, and lag-0 neighbors still undecided after a round are
+    excluded from later conditioning subsets.
 
     The p-value array holds ``-1`` for a link phase 2 never tested. ``ranks`` holds each
     variable's :func:`~andrey.core.ties.tie_ranks`: a lag-0 pair is tested first from its end of
@@ -414,11 +409,10 @@ def _separating_subsets(
     """Every distinct subset of the lag-0 neighbors of ``j`` (and of ``i`` at lag 0) that
     separates, and every one not tested for want of rows.
 
-    A subset separates ``X^i_{t-lag}`` and ``X^j_t`` when its test, with the phase-2 conditions
-    added, gives a p-value above ``pc_alpha``. ``max_p_global`` caps the subsets' size, and a
-    subset draws only from ``middles`` when it is given. A subset holding a neighbor that no test of
-    the pair can condition on alone (:func:`_testable`) is not tested, without being asked, and
-    counts as not tested.
+    A subset separates ``X^i_{t-lag}`` and ``X^j_t`` when its test with phase-2 conditions gives a
+    p-value above ``pc_alpha``. ``max_p_global`` caps subset size; ``middles``, when given, limits
+    candidates. Subsets with a neighbor individually untestable as a condition (:func:`_testable`)
+    count as untested without being asked.
     """
     families = [_neighbors(adjacency, j)] + ([_neighbors(adjacency, i)] if lag == 0 else [])
     if middles is not None:
@@ -480,10 +474,10 @@ def colliders(
 ) -> tuple[np.ndarray, frozenset[Triple]]:
     """Phase 3: return the lag-0 marks with the colliders oriented, and the ambiguous triples.
 
-    A triple over an ``undecided`` link, shaped as ``adjacency``, which phase 2 left out of it
-    (:func:`mark_undecided`), is ambiguous under every rule: the link may be there or not. So is a
-    triple with a side ``flagged`` marks, shaped as ``adjacency``: a conditioning set not tested
-    might have separated that link (:func:`~andrey.temporal.pcmci.flagged_links`).
+    Triples over an ``undecided`` link, shaped as ``adjacency`` and removed in phase 2
+    (:func:`mark_undecided`), are ambiguous under every rule because the link may be absent. So are
+    triples with a side marked by ``flagged``, shaped as ``adjacency``: an untested conditioning set
+    might have separated it (:func:`~andrey.temporal.pcmci.flagged_links`).
 
     With ``constraints``, the lag-0 links they decide are directed first, and no collider reverses
     one. With ``collider_rule="sepsets"``, a triple over a pair they keep apart has no separating

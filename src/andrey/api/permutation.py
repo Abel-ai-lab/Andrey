@@ -155,11 +155,11 @@ def boss(
         the six searches took 2 to 72 times as long as the same search on the complete data. See
         **Missing values.** in Notes.
     n_em_iterations : int, default=10
-        The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
-        1. Each round runs the search once, so the time grows with them. A fit whose last round
-        still changed the graph logs a warning; more rounds let some such fits settle on a graph,
-        and others keep changing between graphs. Values other than 10 are not benchmarked yet.
-        Changes nothing on complete data or with ``missing=None``. See **Missing values.** in Notes.
+        The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
+        least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
+        the graph logs a warning; more rounds stabilize some graphs, while others keep changing.
+        Values other than 10 are not benchmarked. Changes nothing on complete data or with
+        ``missing=None``. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Each variable's parents exclude the
@@ -314,37 +314,36 @@ def boss(
     category. It assumes no hidden common cause; :func:`~andrey.boss_fci` allows them.
 
     **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``. The
-    score adds one term per variable, each over every row, and terms over different rows do not add
-    up to the score of one dataset, so the search cannot delete rows per test as the
-    conditional-independence searches do. ``missing="em"`` runs structural EM [8]_ [9]_ with the
-    linear-Gaussian BIC, which reads the data only through their covariance: under a linear-Gaussian
-    model of the current graph, each row's missing values are Gaussian given its observed ones, and
-    their conditional means and covariances give the expected covariance of the data (the E-step);
-    the search runs on it over every row, with all of its settings, and the model's coefficients and
-    noise variances are fit again by least squares on a DAG of the graph it returns (the M-step). A
-    row that observes no value is dropped first: it holds no information on the model. It runs
-    ``n_em_iterations`` rounds, by default the 10 that Gao et al. [9]_ run, from no edges and each
-    column's mean and variance over its observed values, and it alternates as Friedman [8]_
-    describes: before each search after the first, 5 parameter steps refit the current graph's
-    coefficients and noise variances, each on the expected covariance under the step before it.
-    Friedman [8]_ leaves the number of parameter steps open. The first search reads the expected
-    covariance under the model with no edge, where every covariance is shrunk toward zero. Measured
-    with ``ges``, ``boss``, and ``grasp`` at 2,000 rows, the first search returned many extra edges;
-    with one refit per round the later rounds removed them slowly and the graph was still changing
-    after 10 rounds, and with 5 parameter steps it had settled within them in most fits.
-    ``metadata["em"]`` records ``iterations``, the rounds; ``parameter_steps``, the parameter steps
-    before each search after the first; ``log_likelihood``, the observed-data log-likelihood of the
-    model after each round, which can fall in a round that changes the graph; and ``graph_changed``,
-    whether each round's search returned another graph than the round before. When the last round
-    changed the graph, EM has not settled on one, which is more common with few rows, and the fit
-    logs a warning that names ``n_em_iterations``: more rounds let some such fits settle on a graph,
-    others keep changing between graphs, and values other than 10 are not benchmarked yet.
-    ``metadata["score"]`` is the score of the result on the last round's expected covariance. EM
-    holds when values are missing completely at random or at random given observed values; when
-    whether a value is missing depends on the missing values themselves, the expected covariance is
-    biased, and the data cannot show it. On complete data, ``"em"`` gives the complete-data result.
-    Without ``"em"``, drop the incomplete rows yourself, which suits values missing completely at
-    random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    score sums one term per variable over every row; terms over different rows do not sum to one
+    dataset's score, so the search cannot delete rows per test as conditional-independence searches
+    do. ``missing="em"`` runs structural EM [8]_ [9]_ with the linear-Gaussian BIC, which reads the
+    data only through their covariance: under a linear-Gaussian model of the current graph, each
+    row's missing values are Gaussian given its observed ones, and their conditional means and
+    covariances give the expected covariance of the data (the E-step); the search runs on it over
+    every row, with all of its settings, and the model's coefficients and noise variances are fit
+    again by least squares on a DAG of the graph it returns (the M-step). A row with no observed
+    value is dropped first because it holds no model information. It runs ``n_em_iterations``
+    rounds, by default the 10 that Gao et al. [9]_ run, from no edges and each column's mean and
+    variance over its observed values, and it alternates as Friedman [8]_ describes: before each
+    search after the first, 5 parameter steps refit the current graph's coefficients and noise
+    variances, each on the expected covariance under the step before it. Friedman [8]_ leaves the
+    number of parameter steps open. The first search reads the expected covariance under the
+    edgeless model, which shrinks every covariance toward zero. Measured with ``ges``, ``boss``, and
+    ``grasp`` at 2,000 rows, the first search returned many extra edges; with one refit per round,
+    later rounds removed them slowly and graphs kept changing after 10 rounds; with 5 parameter
+    steps, most fits settled within them. ``metadata["em"]`` records ``iterations``, the rounds;
+    ``parameter_steps``, the parameter steps before each search after the first; ``log_likelihood``,
+    the observed-data log-likelihood of the model after each round, which can fall in a round that
+    changes the graph; and ``graph_changed``, whether the graph changed from the previous round. A
+    graph change in the last round means EM has not settled, more commonly with few rows, and
+    triggers a warning naming ``n_em_iterations``: more rounds stabilize some graphs, while others
+    keep changing; values other than 10 are not benchmarked. ``metadata["score"]`` is the score of
+    the result on the last round's expected covariance. EM holds when values are missing completely
+    at random or at random given observed values; when missingness depends on the missing values
+    themselves, the expected covariance is biased, and the data cannot show it. On complete data,
+    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows yourself,
+    which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for ``ebic_gamma=0.0``. Measured on
     simulated linear-Gaussian data from Erdos-Renyi graphs, with ``penalty_discount=4.0``, on 4
@@ -584,11 +583,11 @@ def grasp(
         the six searches took 2 to 72 times as long as the same search on the complete data. See
         **Missing values.** in Notes.
     n_em_iterations : int, default=10
-        The rounds of structural EM that ``missing="em"`` runs on data with missing values, at least
-        1. Each round runs the search once, so the time grows with them. A fit whose last round
-        still changed the graph logs a warning; more rounds let some such fits settle on a graph,
-        and others keep changing between graphs. Values other than 10 are not benchmarked yet.
-        Changes nothing on complete data or with ``missing=None``. See **Missing values.** in Notes.
+        The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
+        least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
+        the graph logs a warning; more rounds stabilize some graphs, while others keep changing.
+        Values other than 10 are not benchmarked. Changes nothing on complete data or with
+        ``missing=None``. See **Missing values.** in Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Each variable's parents exclude the
@@ -756,37 +755,36 @@ def grasp(
     category. It assumes no hidden common cause; :func:`~andrey.grasp_fci` allows them.
 
     **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``. The
-    score adds one term per variable, each over every row, and terms over different rows do not add
-    up to the score of one dataset, so the search cannot delete rows per test as the
-    conditional-independence searches do. ``missing="em"`` runs structural EM [8]_ [9]_ with the
-    linear-Gaussian BIC, which reads the data only through their covariance: under a linear-Gaussian
-    model of the current graph, each row's missing values are Gaussian given its observed ones, and
-    their conditional means and covariances give the expected covariance of the data (the E-step);
-    the search runs on it over every row, with all of its settings, and the model's coefficients and
-    noise variances are fit again by least squares on a DAG of the graph it returns (the M-step). A
-    row that observes no value is dropped first: it holds no information on the model. It runs
-    ``n_em_iterations`` rounds, by default the 10 that Gao et al. [9]_ run, from no edges and each
-    column's mean and variance over its observed values, and it alternates as Friedman [8]_
-    describes: before each search after the first, 5 parameter steps refit the current graph's
-    coefficients and noise variances, each on the expected covariance under the step before it.
-    Friedman [8]_ leaves the number of parameter steps open. The first search reads the expected
-    covariance under the model with no edge, where every covariance is shrunk toward zero. Measured
-    with ``ges``, ``boss``, and ``grasp`` at 2,000 rows, the first search returned many extra edges;
-    with one refit per round the later rounds removed them slowly and the graph was still changing
-    after 10 rounds, and with 5 parameter steps it had settled within them in most fits.
-    ``metadata["em"]`` records ``iterations``, the rounds; ``parameter_steps``, the parameter steps
-    before each search after the first; ``log_likelihood``, the observed-data log-likelihood of the
-    model after each round, which can fall in a round that changes the graph; and ``graph_changed``,
-    whether each round's search returned another graph than the round before. When the last round
-    changed the graph, EM has not settled on one, which is more common with few rows, and the fit
-    logs a warning that names ``n_em_iterations``: more rounds let some such fits settle on a graph,
-    others keep changing between graphs, and values other than 10 are not benchmarked yet.
-    ``metadata["score"]`` is the score of the result on the last round's expected covariance. EM
-    holds when values are missing completely at random or at random given observed values; when
-    whether a value is missing depends on the missing values themselves, the expected covariance is
-    biased, and the data cannot show it. On complete data, ``"em"`` gives the complete-data result.
-    Without ``"em"``, drop the incomplete rows yourself, which suits values missing completely at
-    random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    score sums one term per variable over every row; terms over different rows do not sum to one
+    dataset's score, so the search cannot delete rows per test as conditional-independence searches
+    do. ``missing="em"`` runs structural EM [8]_ [9]_ with the linear-Gaussian BIC, which reads the
+    data only through their covariance: under a linear-Gaussian model of the current graph, each
+    row's missing values are Gaussian given its observed ones, and their conditional means and
+    covariances give the expected covariance of the data (the E-step); the search runs on it over
+    every row, with all of its settings, and the model's coefficients and noise variances are fit
+    again by least squares on a DAG of the graph it returns (the M-step). A row with no observed
+    value is dropped first because it holds no model information. It runs ``n_em_iterations``
+    rounds, by default the 10 that Gao et al. [9]_ run, from no edges and each column's mean and
+    variance over its observed values, and it alternates as Friedman [8]_ describes: before each
+    search after the first, 5 parameter steps refit the current graph's coefficients and noise
+    variances, each on the expected covariance under the step before it. Friedman [8]_ leaves the
+    number of parameter steps open. The first search reads the expected covariance under the
+    edgeless model, which shrinks every covariance toward zero. Measured with ``ges``, ``boss``, and
+    ``grasp`` at 2,000 rows, the first search returned many extra edges; with one refit per round,
+    later rounds removed them slowly and graphs kept changing after 10 rounds; with 5 parameter
+    steps, most fits settled within them. ``metadata["em"]`` records ``iterations``, the rounds;
+    ``parameter_steps``, the parameter steps before each search after the first; ``log_likelihood``,
+    the observed-data log-likelihood of the model after each round, which can fall in a round that
+    changes the graph; and ``graph_changed``, whether the graph changed from the previous round. A
+    graph change in the last round means EM has not settled, more commonly with few rows, and
+    triggers a warning naming ``n_em_iterations``: more rounds stabilize some graphs, while others
+    keep changing; values other than 10 are not benchmarked. ``metadata["score"]`` is the score of
+    the result on the last round's expected covariance. EM holds when values are missing completely
+    at random or at random given observed values; when missingness depends on the missing values
+    themselves, the expected covariance is biased, and the data cannot show it. On complete data,
+    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows yourself,
+    which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** The benchmark numbers in this paragraph are for ``ebic_gamma=0.0``. Measured on
     simulated linear-Gaussian data from Erdos-Renyi graphs, with ``penalty_discount=4.0``, on 4
@@ -1718,7 +1716,7 @@ def boss_fci(
         ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are, else
         ``"fisherz"``. A column is declared categorical by ``categorical`` or by a DataFrame's
         ``category``, ``bool``, or text type, never by its values. ``metadata["indep_test"]`` names
-        the test the fit used: the one picked from the declared column types when this is ``None``.
+        the test used, including the choice for ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
@@ -2073,7 +2071,7 @@ def grasp_fci(
         ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are, else
         ``"fisherz"``. A column is declared categorical by ``categorical`` or by a DataFrame's
         ``category``, ``bool``, or text type, never by its values. ``metadata["indep_test"]`` names
-        the test the fit used: the one picked from the declared column types when this is ``None``.
+        the test used, including the choice for ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning

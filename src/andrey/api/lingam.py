@@ -367,7 +367,7 @@ def ica_lingam(
     variable; the :doc:`column-order guide </docs/guides/column-order>` gives the measured limit.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the independent components
-    unmix every variable over the same rows, so a row with a missing value has no place in them.
+    require complete rows to unmix every variable.
     Drop the incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 

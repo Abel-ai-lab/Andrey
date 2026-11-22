@@ -1,9 +1,8 @@
 """Answers for many targets over one :class:`~andrey.constraint.blanket.LocalSearch`, in this
 process or on worker processes.
 
-One search answers every target, so a run that two targets read is made once. Each run depends
-only on the data, the settings, and its variable, so an answer is the one a search of its own
-would give.
+One search answers every target, reusing runs shared by targets. Each run depends only on the data,
+settings, and its variable, so each answer matches a separate search.
 
 With more than one worker, at least two targets, and a FisherZ, StudentT, or NormalScores test
 (:func:`~andrey.constraint._skeleton.canonical_capable`), the targets are cut into contiguous
@@ -28,8 +27,8 @@ from andrey.core.ci_missing import TestwiseDeletion, rows_tested
 
 T = TypeVar("T")
 
-#: Chunks per worker: smaller chunks balance targets of unequal cost, and a worker keeps its search
-#: from one chunk to the next, so only runs two workers both need are made twice.
+#: Chunks per worker: smaller chunks balance unequal target costs; workers keep searches across
+#: chunks, so only runs two workers both need are made twice.
 CHUNKS_PER_WORKER = 4
 
 _WORKER_SEARCH: LocalSearch | None = None
@@ -62,11 +61,11 @@ def answers(
     targets: Sequence[int],
     workers: int = 1,
 ) -> list[tuple[T, Counter[int]]]:
-    """``answer(search, t)`` for each target ``t``, with the rows read by every test it read
-    (:func:`~andrey.core.ci_missing.rows_tested`), in the order of ``targets``.
+    """``answer(search, t)`` for each target ``t``, in ``targets`` order, with the rows its tests
+    read (:func:`~andrey.core.ci_missing.rows_tested`).
 
-    ``search_of`` makes a new search. ``answer`` is a module-level function when ``workers`` is
-    above 1, so that it reaches the workers.
+    ``search_of`` makes a new search. With ``workers`` above 1, ``answer`` is a module-level
+    function so it reaches the workers.
     """
     search = search_of()
     if isinstance(search.test, TestwiseDeletion):

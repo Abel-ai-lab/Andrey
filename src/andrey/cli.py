@@ -1117,17 +1117,16 @@ def fit_errors() -> Generator[None]:
 
 
 class LogWarning(Warning):
-    """The category ``run.warnings`` gives a warning-level log record of a fit."""
+    """The category ``run.warnings`` records a fit's warning-level log entry."""
 
 
 @contextlib.contextmanager
 def recorded_warnings() -> Generator[list[warnings.WarningMessage]]:
     """Record a fit's warnings and the warning-level records of its loggers, for ``run.warnings``.
 
-    The list fills when the block exits, the warnings first and the warning-level log records
-    after, each record as a :class:`LogWarning`. The records are held by
-    :func:`~andrey.core.warning_policy.held_records`, so none reaches standard error, and none is
-    lost to a logger whose level is above ``WARNING``.
+    The list fills on block exit with warnings followed by warning-level log records, each as a
+    :class:`LogWarning`. :func:`~andrey.core.warning_policy.held_records` holds them, so none
+    reaches standard error or is lost to a logger above ``WARNING``.
     """
     with held_records() as records:
         with warnings.catch_warnings(record=True) as caught:
@@ -1161,8 +1160,8 @@ def run_info(
 
 
 def strict_json(value: object) -> str:
-    """``value`` as standard JSON, indented: a number that is not finite, as the p-value of a test
-    that was not tested, is ``null``."""
+    """``value`` as indented standard JSON: a nonfinite number, such as an untested p-value, is
+    ``null``."""
 
     def finite(item: object) -> object:
         if isinstance(item, float) and not math.isfinite(item):

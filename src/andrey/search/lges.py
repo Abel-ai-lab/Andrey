@@ -40,9 +40,9 @@ SCHEDULES: tuple[str, ...] = ("lges", "lges0_released")
 def extension(adj: np.ndarray, ranks: Sequence[int]) -> np.ndarray:
     """The DAG of the class of the CPDAG ``adj`` that SafeInsert reads.
 
-    :func:`~andrey.core.orient.pdag2dag` removes the lowest-numbered sink whose neighbors are
-    adjacent first; here the nodes are numbered by ``ranks``, so the DAG follows the columns' tie
-    ranks and not their positions.
+    :func:`~andrey.core.orient.pdag2dag` first removes the lowest-numbered sink with adjacent
+    neighbors; numbering nodes by ``ranks`` makes the DAG follow column tie ranks rather than
+    positions.
     """
     order = np.argsort(np.asarray(ranks), kind="stable")
     dag = pdag2dag(adj[np.ix_(order, order)])
@@ -112,13 +112,12 @@ def lges(
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by less greedy equivalence search over a decomposable score.
 
-    Starts from the empty graph. Under ``schedule="lges"`` it repeats: Delete moves until none
-    improves, turning moves until none improves, then the best Insert of :func:`insert_moves`,
-    stopping when no move of any kind improves: when no Insert improves after a pass without a
-    turning move. Under ``schedule="lges0_released"`` it runs the Insert phase,
-    then the Delete phase, then the turning phase, each until no move improves. A move improves when
-    it lowers the score by more than :data:`~andrey.core.ties.EPS_IMPROVE`; the CPDAG is re-formed
-    after every move. Returns the CPDAG and its total score (lower is better), recomputed from it
+    Starts from the empty graph. ``schedule="lges"`` repeats Delete moves until none improves,
+    turning moves until none improves, then the best Insert of :func:`insert_moves`; it stops when
+    no move improves, meaning no improving Insert follows a pass without a turning move.
+    ``schedule="lges0_released"`` runs Insert, Delete, then turning, each until no move improves.
+    Improvement means lowering the score by more than :data:`~andrey.core.ties.EPS_IMPROVE`; each
+    move re-forms the CPDAG. Returns the CPDAG and its recomputed total score, lower being better
     (:func:`~andrey.search.ges.recompute_objective`).
 
     Parameters

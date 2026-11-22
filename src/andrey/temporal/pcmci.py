@@ -203,9 +203,8 @@ def design_test(
     rows observed in all of its columns. Two columns are then copies when they repeat each other on
     the rows where both are observed.
 
-    ``rows``, a boolean mask over the design rows (time steps ``2 * tau_max`` to ``T - 1``), keeps
-    the marked rows only: each test then reads the steps whose effect is marked, with the lagged
-    values of every earlier step.
+    ``rows`` masks design rows (time steps ``2 * tau_max`` to ``T - 1``): tests read marked effect
+    steps with lagged values from every earlier step.
     """
     mask = None if categorical is None else np.tile(categorical, 2 * tau_max + 1)
     design = lagged_design(data, 2 * tau_max)
@@ -388,8 +387,8 @@ def _strongest_others(columns: np.ndarray, p: int) -> np.ndarray:
 
 
 def _deletion(test: object) -> TestwiseDeletion | None:
-    """The test that deletes rows per test (:class:`~andrey.core.ci_missing.TestwiseDeletion`)
-    that ``test`` is or wraps, through the ``test`` attributes of its wrappers, or ``None``."""
+    """The :class:`~andrey.core.ci_missing.TestwiseDeletion` that ``test`` is or wraps through
+    wrapper ``test`` attributes, or ``None``."""
     while not isinstance(test, TestwiseDeletion):
         test = getattr(test, "test", None)
         if test is None:
@@ -441,10 +440,9 @@ def deletes_rows(test: object) -> bool:
 
 
 def count_not_tested(test: object, x: int, y: int, queries: int = 1) -> None:
-    """Count ``queries`` conditioning sets of ``x`` and ``y`` that a search did not ask, for want of
-    rows, as not tested
-    (:meth:`~andrey.core.ci_missing.TestwiseDeletion.count_not_tested`); a wrapper of the test
-    counts through its own ``count_not_tested``, in its columns."""
+    """Count ``queries`` unasked conditioning sets of ``x`` and ``y`` as untested for lack of rows
+    (:meth:`~andrey.core.ci_missing.TestwiseDeletion.count_not_tested`); wrappers use their own
+    ``count_not_tested`` in their columns."""
     method = getattr(test, "count_not_tested", None)
     if method is not None:
         method(x, y, queries)
@@ -453,11 +451,11 @@ def count_not_tested(test: object, x: int, y: int, queries: int = 1) -> None:
 
 
 def conditionable(test: object, x: int, y: int, ordered: Iterable[int]) -> list[int]:
-    """The columns of ``ordered``, strongest first, that a test of ``x`` and ``y`` conditions on:
-    on data with missing values, those that keep the test's block testable, taken in order
-    (:meth:`~andrey.core.ci_missing.TestwiseDeletion.conditionable`), so the block does not mix
-    columns no row observes together; all of them on complete data. A wrapper of the test answers
-    through its own ``conditionable``, in its columns."""
+    """Columns from ``ordered``, strongest first, for conditioning ``x`` and ``y``: on missing data,
+    those keeping the block testable
+    (:meth:`~andrey.core.ci_missing.TestwiseDeletion.conditionable`), excluding columns never
+    observed together; all on complete data. Wrappers use their own ``conditionable`` in their
+    columns."""
     method = getattr(test, "conditionable", None)
     return list(ordered) if method is None else method(x, y, ordered)
 

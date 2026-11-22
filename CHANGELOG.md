@@ -12,214 +12,205 @@ names its pull request.
 
 ### Breaking
 
-- `cpcm` and `cpcm_graph` raise `ValueError` on a 0 under `"exponential"` and on a 1 under
-  `"pareto"`, since the deviance is infinite at the edge of the support. ([#1165])
+- `cpcm` and `cpcm_graph` raise `ValueError` on 0 under `"exponential"` and on 1 under `"pareto"`,
+  since the deviance is infinite at the edge of the support. ([#1165])
 
 ### Added
 
-- A test-wise test with fewer rows than it needs, a pair never observed together included, or with
-  zero degrees of freedom left is not tested: it never separates a pair and never confirms a link,
-  in every conditional-independence search that deletes rows per test; `markov_check` leaves such
-  facts out of its summary and of its sparse-table warning. `metadata["not_tested"]` counts the
-  conditioning sets not tested, including those the search skipped because no row can test them,
-  `metadata["undecided_pairs"]` lists the pairs no tested query could decide, and
-  `metadata["never_observed_together"]` the pairs of columns no row observes together; the notice
-  for `missing=None` gives the number of each kind of pair, over every fit of a `bootstrap`, and
-  names them when there are at most five. An undecided pair is left out of the graph of PC, FCI,
-  CD-NOD, FCI-JCI, PCMCI, PCMCI+, and LPCMCI and of the Markov-blanket searches' sets, and no
-  orientation reads it as adjacent or apart: a triple whose ends are undecided, and in LPCMCI one
-  with an undecided side, is neither a collider nor a non-collider. In PC, FCI, CD-NOD, FCI-JCI,
-  the Markov-blanket searches, PCMCI, PCMCI+, and LPCMCI, `metadata["possibly_separable"]` lists
-  the drawn edges that a conditioning set not tested might have separated, which the notice names
-  too, every edge of its target when a Markov-blanket search leaves an undecided candidate out;
+- In every conditional-independence search that deletes rows per test, a query with too few rows,
+  including a pair never observed together, or zero degrees of freedom is not tested: it never
+  separates a pair and never confirms a link; `markov_check` leaves such facts out of its summary
+  and sparse-table warning. `metadata["not_tested"]` counts the conditioning sets not tested,
+  including those skipped because no row can test them, `metadata["undecided_pairs"]` lists the
+  pairs no tested query could decide, and `metadata["never_observed_together"]` the pairs of columns
+  no row observes together; the notice for `missing=None` counts each kind of pair over every fit of
+  a `bootstrap`, and names them when there are at most five. An undecided pair is left out of the
+  graph of PC, FCI, CD-NOD, FCI-JCI, PCMCI, PCMCI+, and LPCMCI and the Markov-blanket searches'
+  sets, and no orientation reads it as adjacent or apart: a triple whose ends are undecided, and in
+  LPCMCI one with an undecided side, is neither a collider nor a non-collider. In PC, FCI, CD-NOD,
+  FCI-JCI, the Markov-blanket searches, PCMCI, PCMCI+, and LPCMCI, `metadata["possibly_separable"]`
+  lists drawn edges that an untested conditioning set might have separated, all named in the notice,
+  including every edge of a target whose Markov-blanket search omits an undecided candidate;
   `bootstrap` lists the pairs of all three kinds over its fits in its metadata. MVPC's correction
-  removes only the edges its own tests separate. PCMCI, PCMCI+, and
-  J-PCMCI+ condition no test on a lagged parent without a tested result, and LPCMCI none on a node
-  whose link to either end of the tested pair is undecided; PCMCI and PCMCI+ condition each test
-  only on the candidates, strongest first, that keep its rows enough for the test, so its rows do
-  not mix cohorts never observed together. ([#1151], [#1156], [#1167])
+  removes only the edges its own tests separate. PCMCI, PCMCI+, and J-PCMCI+ condition no test on a
+  lagged parent without a tested result, and LPCMCI none on a node whose link to either end of the
+  tested pair is undecided; PCMCI and PCMCI+ condition each test only on candidates, strongest
+  first, that leave enough rows for the test, avoiding mixtures of cohorts never observed together.
+  ([#1151], [#1156], [#1167])
 
 - `possibly_separable="ambiguous"` in PC, FCI, CD-NOD, FCI-JCI, the Markov-blanket searches' CPDAG,
   and PCMCI+ reads a triple with a side in `metadata["possibly_separable"]` as neither a collider
-  nor a non-collider, in FCI's discriminating-path rule too, when a conditioning set not tested of
+  nor a non-collider, in FCI's discriminating-path rule too, when an untested conditioning set of
   that side lies within the other nodes adjacent to one of its ends or undecided with it; FCI,
-  FCI-JCI, and PCMCI+ so read every listed side. LPCMCI lists such links but does not read them.
-  The default, `"orient"`, reads it as any other triple, as before. On merged cohorts that no row
-  bridges it removes most false colliders and most true arrowheads with them: PC's graph is then
-  farther from the truth than the empty graph, and in FCI and FCI-JCI the skeleton and
-  `metadata["not_tested"]` change through the possible-d-separation step. It can change results on
-  data where every pair shares rows, when some conditioning set has none. ([#1171])
+  FCI-JCI, and PCMCI+ so read every listed side. LPCMCI lists such links but does not read them. The
+  default, `"orient"`, reads it as any other triple, as before. On merged cohorts with no bridging
+  row it removes most false colliders and most true arrowheads with them: PC's graph is then farther
+  from the truth than the empty graph, and in FCI and FCI-JCI the skeleton and
+  `metadata["not_tested"]` change through the possible-d-separation step. Results can change when
+  every pair shares rows but some conditioning set has none. ([#1171])
 
-- `metadata["p_one_tests"]` counts every test of a fit on data with missing values that returned
-  `p = 1`, whichever test it is, as a test whose statistic is exactly zero answers. ([#1102])
-- `metadata["em"]` records `rows_dropped`, the rows dropped for observing no value, and
-  `min_shared_rows`, the fewest rows that observe both columns of a pair. A fit whose every missing
-  value sat in a dropped row records its handling too. ([#1102])
+- `metadata["p_one_tests"]` counts every test returning `p = 1` in a fit with missing values,
+  regardless of test type, including tests with an exactly zero statistic. ([#1102])
+- `metadata["em"]` records `rows_dropped`, rows dropped for observing no value, and
+  `min_shared_rows`, the fewest rows that observe both columns of a pair. A fit records its handling
+  even when dropped rows held every missing value. ([#1102])
 - `n_em_iterations` on the ten searches that take `missing="em"` (`ges`, `xges`, `hc`, `tabu`,
   `exact_search`, `boss`, `grasp`, `notears`, `dagma`, `calm`) sets the number of structural EM
-  rounds. The default stays 10, the number Gao et al. (2022) run, so a fit without the argument
-  returns what it did. The warning of a fit whose last round still changed the graph names the
-  argument; values other than 10 are not benchmarked yet. ([#1095])
-- `pc(missing="mvpc")` records the fewest and the median rows a corrected test read as
-  `metadata["corrected_edges"]["rows_tested"]`, so a fit shows when the correction ran on few rows.
-  The graph and the other metadata are unchanged. ([#1094])
+  rounds. The default stays 10, as in Gao et al. (2022), preserving results without the argument.
+  The warning when the last round changes the graph names the argument; values other than 10 are not
+  benchmarked. ([#1095])
+- `pc(missing="mvpc")` records the minimum and median row counts of corrected tests as
+  `metadata["corrected_edges"]["rows_tested"]`, showing when the correction ran on few rows. The
+  graph and the other metadata are unchanged. ([#1094])
 - A [missing values guide](https://andrey.abel.ai/docs/guides/missing-values.html) holds what the
-  getting-started guide said about missing values, with a table from the kind of data and the
-  reason its values are missing to the `missing` value and the methods that take it. A method that
-  does not accept missing values names the guide in its error. The example notebook adds values
-  missing not at random, FCI, categorical data, and a time series. ([#1096])
-- `degrees_of_freedom`, an argument of every method that takes the categorical tests, `"chisq"` and
+  getting-started guide said about missing values, with a table mapping data types and missingness
+  reasons to the `missing` value and methods that accept it. A method that does not accept missing
+  values names the guide in its error. The example notebook covers values missing not at random,
+  FCI, categorical data, and a time series. ([#1096])
+- `degrees_of_freedom`, an argument of every method that takes the categorical tests `"chisq"` and
   `"gsq"`, and of `ChiSquare`: `"mean"`, the default and the rule so far, is the mean of the
   statistic when `y` is shuffled within each configuration of the conditioning set; `"nonempty"` is
-  `(r_x - 1) * (r_y - 1)` per configuration over the values present, each table's empty rows and
-  columns struck (Spirtes, Glymour, and Scheines 1993). The two differ only on sparse tables.
+  `(r_x - 1) * (r_y - 1)` per configuration over the values present, excluding each table's empty
+  rows and columns (Spirtes, Glymour, and Scheines 1993). The two differ only on sparse tables.
   Passing it with another test raises `ValueError`. ([#981])
 - For contributors, a benchmark lane runs `anm`, `pnl`, `loci`, and `resit` beside the authors'
   code of QCCD, HECI, and GRCI on the Tübingen cause-effect pairs, and a summary script turns its
   records into a weighted-accuracy table. ([#1127])
 - `lges`, experimental: less greedy equivalence search (Ejaz and Bareinboim 2025), a score search
-  next to `ges` and `xges` that adds no edge between two variables the score already holds
-  independent given the parents of one of them in a graph of the current class, and deletes and
-  reverses edges as GES and GIES do. `schedule` picks the paper's main method, LGES (Algorithm 1,
-  `"lges"`, the default), which deletes and reverses before each addition, or its LGES-0 in the
-  order of the authors' code (`"lges0_released"`: additions, deletions, then reversals).
-  `insertion` picks SafeInsert, the default, or ConservativeInsert. It takes the scores of `ges`,
-  with the standard BIC (`ebic_gamma=0.0`) as its default. ([#1146])
-- `rpcmci`, experimental: Regime-PCMCI (Saggioro et al. 2020) for one time series whose lagged
-  causal links switch between a few persistent regimes. It returns an `andrey.RegimeOutput`: the
-  regime of each time step, the regime weights, and one temporal result per regime, as `pcmci`
-  returns it. The regime step solves the paper's linear program with SciPy, so it needs no new
+  alongside `ges` and `xges` that adds no edge between two variables the score holds independent
+  given the parents of one of them in a graph of the current class, and deletes and reverses edges
+  as GES and GIES do. `schedule` picks the paper's main method, LGES (Algorithm 1, `"lges"`, the
+  default), which deletes and reverses before each addition, or its LGES-0 in the authors' code
+  order (`"lges0_released"`: additions, deletions, then reversals). `insertion` picks SafeInsert,
+  the default, or ConservativeInsert. It takes the scores of `ges`, with standard BIC
+  (`ebic_gamma=0.0`) as its default. ([#1146])
+- `rpcmci`, experimental: Regime-PCMCI (Saggioro et al. 2020) for one time series with lagged causal
+  links that switch between a few persistent regimes. It returns an `andrey.RegimeOutput`: the
+  regime of each time step, the regime weights, and one temporal result per regime as returned by
+  `pcmci`. The regime step solves the paper's linear program with SciPy, requiring no new
   dependency. A time step joins a regime only when its weight, rounded to 9 decimals, is above
-  `switch_threshold`: the paper's Eq. 11 reads `>=`, and Andrey follows the authors' code, which
-  uses `>`. A contributor's script compares it with the authors' code start by start. ([#1149], [#1159])
-- Three experimental regression-based conditional-independence tests, as `indep_test` options of
+  `switch_threshold`: the authors' code uses `>` rather than the paper's `>=` in Eq. 11, and Andrey
+  follows it. A contributor's script compares it with the authors' code start by start. ([#1149],
+  [#1159])
+- Three experimental regression-based conditional-independence tests are `indep_test` options for
   every method that takes one: `"gcm"`, the generalized covariance measure (Shah and Peters 2020),
   which tests the covariance of the residuals of boosted-tree regressions; `"wgcm"`, the weighted
   generalized covariance measure (Scheidegger, Hörrmann, and Bühlmann 2022), which weights that
   covariance by its fitted value given the conditioning set (`variant="fix"` takes fixed weights);
   and `"pcm"`, the projected covariance measure (Lundborg, Kim, Shah, and Samworth 2024), which
-  tests whether one variable improves an additive-model prediction of the other, the paper's
-  regression for its additive settings as the authors' code fits it. Each takes
-  `regression="boosting"`, `"forest"`, or `"linear"`, and `"pcm"` also `"additive"`, its default;
-  `"wgcm"`'s boosted trees are tuned as in the wGCM authors' current code, over 28 pairs of learning
-  rate and depth by the folds' mean cross-validated error. With boosted trees at 200 and 400 rows,
-  pooled over the wGCM paper's null designs, `"gcm"` and `"wgcm"` reject a true independence at 0.05
-  in about 6 to 7.6% of draws, and from 4 to 13% by design over those and further null designs; the
-  authors' code also rejects more often than 0.05 there. On the PCM paper's Section 6.1 designs at
-  250 and 500 rows, in the paper's direction (y the response), `"pcm"` rejects a true independence
-  in 0.2 to 0.4% of draws, and its power is at or above the authors' code's on the same data; on the
-  Section 6.2 null, whose conditional means hold an interaction, it rejects 97.6% at 500 rows, as
-  the authors' code does (95.6%), and its random forests reject 97 to 99.9% of the Section 6.1 null.
-  Each fit and each sample split reads
-  only the query's columns, standardized, rounded, and signed, with the rows in an order of their
-  values, so a p-value depends on neither the row nor the column order, nor on columns outside the
-  query, and changes with a column's units or sign only where the rounding moves a value or a column
-  is symmetric about its mean once sorted. On data with missing values, a query with fewer rows than
-  its test needs, 4 for `"gcm"` and for `"wgcm"` with `variant="fix"`, 17 for `"wgcm"`'s default
-  `variant="est"`, and 12 for `"pcm"`, is not tested. Where the papers and the authors' code differ,
-  each choice was measured against the other in reduced versions of the papers' simulation designs:
-  the wGCM weight is the fitted value, as in the authors' code, which gave more power at the same
-  level than the paper's sign of the fit; the fixed weights' multiplier draws use the centered
-  products, the PCM variance adds its shift to the fit's positive part, and the PCM statistic's
-  standard deviation divides by the row count, as in the papers, where the code's choices gave no
-  more power; the PCM's additive default regresses the fit of the response, not its predictor's
-  term, on the conditioning set, and fits the variance with half the mean fits' basis functions, as
-  in the authors' code; with both, its power was at or above that code's in every setting measured
-  in the paper's direction.
-  A contributor's script compares the three, the additive PCM included, with the authors' code.
-  ([#1147], [#1129], [#1162], [#1175])
+  tests whether one variable improves an additive-model prediction of the other, using the paper's
+  additive-setting regression as fitted by the authors' code. Each takes `regression="boosting"`,
+  `"forest"`, or `"linear"`, and `"pcm"` takes `"additive"` as its default; `"wgcm"`'s boosted trees
+  are tuned as in the wGCM authors' current code, over 28 learning-rate and depth pairs by the
+  folds' mean cross-validated error. With boosted trees at 200 and 400 rows, pooled over the wGCM
+  paper's null designs, `"gcm"` and `"wgcm"` reject a true independence at 0.05 in about 6 to 7.6%
+  of draws, and from 4 to 13% by design over those and further null designs; the authors' code also
+  rejects more often than 0.05 there. On the PCM paper's Section 6.1 designs at 250 and 500 rows, in
+  the paper's direction (y the response), `"pcm"` rejects a true independence in 0.2 to 0.4% of
+  draws, and its power is at or above the authors' code's on the same data; on the Section 6.2 null,
+  whose conditional means hold an interaction, it rejects 97.6% at 500 rows, as the authors' code
+  does (95.6%), and its random forests reject 97 to 99.9% of the Section 6.1 null. Each fit and
+  sample split uses only the query's columns, standardized, rounded, and signed, with rows ordered
+  by value; p-values are independent of row and column order and other columns, and change with
+  units or sign only when rounding moves a value or a sorted column is symmetric about its mean. On
+  data with missing values, a query below its test's row requirement, 4 for `"gcm"` and for `"wgcm"`
+  with `variant="fix"`, 17 for `"wgcm"`'s default `variant="est"`, and 12 for `"pcm"`, is not
+  tested. Where the papers and the authors' code differ, each choice was measured against the other
+  in reduced versions of the papers' simulation designs: the wGCM weight is the fitted value, as in
+  the authors' code, which gave more power at the same level than the paper's sign of the fit; the
+  fixed weights' multiplier draws use the centered products, the PCM variance adds its shift to the
+  fit's positive part, and the PCM statistic's standard deviation divides by the row count, as in
+  the papers, since the code's choices gave no more power; the PCM's additive default regresses the
+  fit of the response, not its predictor's term, on the conditioning set, and fits the variance with
+  half the mean fits' basis functions, as in the authors' code; with both, its power was at or above
+  that code's in every setting measured in the paper's direction. A contributor's script compares
+  all three, including additive PCM, with the authors' code. ([#1147], [#1129], [#1162], [#1175])
 - `target` takes a list of columns on `iamb`, `inter_iamb`, `mmpc`, and `icp`: one call returns one
-  result per target, in the list's order, each equal to a call for that target alone. The three set
-  learners answer every target with one search, which sets up the test once, and MMPC learns the
-  set of a variable that two targets' symmetry checks read once; with a partial-correlation test
-  they split the targets over `andrey.config(n_jobs=...)` worker processes, with the same results
-  for any number of workers. With missing values, each target has a search of its own. A list
-  shares the work of one call, so it takes less time than separate calls. `andrey run` takes the
-  list as `'target=[a,b]'`, by header name or position, or as a list in `--config`; its envelope
-  then holds `multi: true` and `results`, one per target, and the `--help --json` schema types
-  `target` as a string or a list of strings. `andrey run icp` names the target and the parents by
-  the header's column names, for one target as for a list. ([#1058], [#1153])
+  result per target in list order, each equal to a separate call. The three set learners use one
+  search and test setup for all targets, and MMPC learns a variable's set once when two targets'
+  symmetry checks use it; with a partial-correlation test they split the targets over
+  `andrey.config(n_jobs=...)` worker processes, with the same results for any number of workers.
+  With missing values, each target has its own search. Shared work makes a list faster than separate
+  calls. `andrey run` takes the list as `'target=[a,b]'`, by header name or position, or as a list
+  in `--config`; its envelope holds `multi: true` and `results`, one per target, and the
+  `--help --json` schema types `target` as a string or a list of strings. `andrey run icp` names the
+  target and the parents by the header's column names, for single and list targets. ([#1058],
+  [#1153])
 
 ### Changed
 
-- Each option added or changed in this release states what each value favors and what it gives
-  up, with the measured numbers and their setting, or "not measured": `lges`'s `schedule` and
-  `insertion`, `possibly_separable`, the `"wgcm"` `variant`, the `"gcm"`, `"wgcm"`, and `"pcm"`
-  `regression`, CPCM's forced direction and conservative estimate, the missing-value handlings,
+- Each option added or changed in this release states what each value favors and what it gives up,
+  with the measurements and their setting, or "not measured": `lges`'s `schedule` and `insertion`,
+  `possibly_separable`, the `"wgcm"` `variant`, the `"gcm"`, `"wgcm"`, and `"pcm"` `regression`,
+  CPCM's forced direction and conservative estimate, the missing-value handlings,
   `degrees_of_freedom`, Regime-PCMCI's `fdr_method` and `indep_test`, and rsmax2's `restrict`. The
   API reference and the missing-values guide have "Choosing an option" tables. ([#1177])
-- `das` is supported. On the simulation of its paper with z-scored or rescaled columns it made no
-  more errors than the code published with the paper in any of 20 settings from 10 to 200
-  variables, and fewer on the first 20 datasets of each, in a tenth to a fiftieth of the time, and
-  fewer than the empty graph up to 1,000 variables. On the
-  simulation's own units that code made fewer errors on sparse graphs, since DAS standardizes the
-  columns in its order search; its Limitations state this, and the
+- `das` is supported. On its paper's simulation with z-scored or rescaled columns it made no more
+  errors than the paper's code in any of 20 settings from 10 to 200 variables, and fewer on the
+  first 20 datasets of each, in a tenth to a fiftieth of the time, and fewer than the empty graph up
+  to 1,000 variables. In the simulation's own units that code made fewer errors on sparse graphs,
+  since DAS standardizes the columns in its order search; its Limitations state this, and the
   [0.19.0 release card][card-0190-das] has the numbers, with `cam`, SCORE, and NoGAM on the same
   datasets. ([#1161])
 - `cpcm` and `cpcm_graph` are supported: the pair test's forced direction and the graph search. On
-  the pairs of their paper (its Tables 1 and 2 and model (16) with gamma > 0) and its graphs of 4
-  to 8 variables, they made as many errors as the code published with the paper, except the
-  conservative estimate at gamma 0 under `"pareto"` (see the Pareto gap), and fewer than a coin
-  flip, the majority direction, or the empty graph, except on Table 2's Pareto pairs drawn by the
-  authors' generator, where neither implementation did (see the PARg gap); on the first seeds no
-  other method measured beside them was both more accurate and faster by the paired interval where
-  their times pair, and the graph search ran about ten times faster. The conservative estimate
-  under `"pareto"` and Table 2's Pareto setup are not supported. Their Limitations state the gaps:
-  the support rule's family on location-scale pairs and on Table 2's Pareto pairs, and under
-  `"pareto"` a test that can reject on causes with extreme values. The [0.19.0 release
-  card][card-0190-cpcm] has the numbers. ([#1169])
-- With `fisherz` and `student_t` on data with missing values, test-wise deletion groups the rows by
-  their missingness patterns once and computes a test's sums from the groups' tables, removing the
-  scattered missing cells exactly, when that costs less than summing every row; a query whose
-  groups hold too few rows for it is not tested without a scan. On synthetic merged cohorts, with
-  or without a few rows that observe every column, `pc` ran 2.5 to 6.6 times faster, and `iamb`
-  1.6 to 4.2 times, with the same graphs, the same tests not tested, and the same
-  row counts for every tested query. Data missing completely at random keep the per-row sums, and
-  so do series with outages, where nearly every pair of columns is observed together in about half
-  the rows or more. P-values change in their last digits. Six `ANDREY_TESTWISE_GROUP_*` settings
-  set when the path is used. ([#1148])
+  their paper's pairs (Tables 1 and 2 and model (16) with gamma > 0) and graphs of 4 to 8 variables,
+  they made as many errors as the paper's code, except the conservative estimate at gamma 0 under
+  `"pareto"` (see the Pareto gap), and fewer than a coin flip, the majority direction, or the empty
+  graph, except on Table 2's Pareto pairs drawn by the authors' generator, where neither did (see
+  the PARg gap); on the first seeds no other measured method was both more accurate and faster by
+  the paired interval where their times pair, and the graph search ran about ten times faster. The
+  conservative estimate under `"pareto"` and Table 2's Pareto setup are not supported. Their
+  Limitations describe the gaps: the support rule's family on location-scale pairs and on Table 2's
+  Pareto pairs, and under `"pareto"` a test that can reject on causes with extreme values. The
+  [0.19.0 release card][card-0190-cpcm] has the numbers. ([#1169])
+- With `fisherz` and `student_t` on data with missing values, test-wise deletion groups rows by
+  missingness pattern once and computes a test's sums from the groups' tables, removing the
+  scattered missing cells exactly, when that costs less than summing every row; a query with too few
+  rows in its groups is marked not tested without a scan. On synthetic merged cohorts, with or
+  without a few rows that observe every column, `pc` ran 2.5 to 6.6 times faster, and `iamb` 1.6 to
+  4.2 times, with identical graphs, untested queries, and row counts for every tested query. Per-row
+  sums remain for data missing completely at random and series with outages, where nearly every pair
+  of columns is observed together in about half the rows or more. P-values change in their last
+  digits. Six `ANDREY_TESTWISE_GROUP_*` settings set when the path is used. ([#1148])
 - The skeleton search of PC, FCI, CD-NOD, and FCI-JCI with `fisherz`, `student_t`, or
-  `normal_scores` on data with missing values counts a conditioning set that holds a column no row
-  observes with the tested pair as not tested without building its query, as the other tests
-  already did, and FCI's possible-d-sep step does so with every test, both with the same output;
-  the skeleton's warning of a costly pass counts only the sets it builds. On synthetic merged
-  cohorts of 40 and 50 columns, `pc` with `max_depth=None` finishes in about a second, and `fci`
-  in 12 to 58 s at 40 columns, where it ran past 10 minutes before, and 4 to 6 minutes at 50.
-  ([#1167])
-- The Markov-blanket searches count a conditioning set that holds a column no row observes with the
+  `normal_scores` on data with missing values marks a conditioning set with a column never observed
+  with the tested pair as not tested without building its query, matching the other tests; FCI's
+  possible-d-sep step does so with every test, both preserving output; the skeleton's warning of a
+  costly pass counts only the sets it builds. On synthetic merged cohorts of 40 and 50 columns, `pc`
+  with `max_depth=None` finishes in about a second, and `fci` in 12 to 58 s at 40 columns (over 10
+  minutes before) and in 4 to 6 minutes at 50. ([#1167])
+- The Markov-blanket searches mark a conditioning set containing a column never observed with the
   tested pair, or with a collider's middle variable, as not tested without building its query. On
   synthetic merged cohorts of 50 columns with 134 pairs never observed together, `iamb` finished in
-  17 s where it ran past 14 minutes, with the same graph and counts. Under test-wise deletion,
-  their spouse step now tests both candidate sets of each size, so `metadata["not_tested"]` no
-  longer depends on the column order. ([#1148])
-- A test-wise test with too few rows no longer raises `ValueError`, nor does a CD-NOD or FCI-JCI
-  test whose `env` is constant on its rows: both are not tested. Each test sets its own row floor:
-  `fisherz` and `normal_scores` need `|S| + 4` rows, `cond_gauss` `|S| + 3`, and `cmiknn` with an
-  int `k_cmi` `k_cmi + 1`. LPCMCI's collider votes leave a triple ambiguous when a subset not tested
-  could change the verdict. On the command line, a number that is not finite, as the p-value of a
-  test not tested, is `null` in the JSON output. A test variant registered as
-  `partial(make_indep_test, "cmiknn", k_cmi=5)` keeps the row floor of its test. In
-  `markov_check`, a p-value that is `NaN` though no row shortage explains it raises, as one
-  outside `[0, 1]` does. In the PCMCI family, a lagged candidate is undecided when its first test
-  is not tested, whatever its statistic. ([#1151])
+  17 s compared with over 14 minutes previously, with the same graph and counts. Under test-wise
+  deletion, their spouse step tests both candidate sets of each size, so `metadata["not_tested"]`
+  no longer depends on column order. ([#1148])
+- A test-wise test with too few rows, or a CD-NOD or FCI-JCI test with `env` constant on its rows,
+  is not tested and no longer raises `ValueError`. Each test sets its own row floor: `fisherz` and
+  `normal_scores` need `|S| + 4` rows, `cond_gauss` `|S| + 3`, and `cmiknn` with an int `k_cmi`
+  `k_cmi + 1`. LPCMCI's collider votes leave a triple ambiguous when a subset not tested could
+  change the verdict. On the command line, a nonfinite number, such as an untested query's p-value,
+  is `null` in the JSON output. A test variant registered as
+  `partial(make_indep_test, "cmiknn", k_cmi=5)` keeps the row floor of its test. In `markov_check`,
+  a `NaN` p-value unexplained by row shortage or one outside `[0, 1]` raises. In the PCMCI family, a
+  lagged candidate is undecided when its first test is not tested, whatever its statistic. ([#1151])
 - With `missing=None` on data with missing values, a method whose tests delete rows logs one notice
-  per process that names the handling, test-wise deletion, and when it is valid. Pass
-  `missing="testwise"` to choose it by name. `bootstrap` logs it once for all of its worker
-  processes. On the command line, `run.warnings` holds it, and any other warning-level log of the
-  fit, as a `LogWarning`; nothing goes to stderr. ([#1102])
-- A refusal of missing values leads with what you can do. A time series is pointed to `pcmci`,
-  `pcmciplus`, and `lpcmci` in place of filling in the missing steps, and dropping rows is named as
-  your own step, with the same rows of every row-aligned argument. `jpcmciplus`, whose datasets
-  with their contexts no other method reads, is pointed to dropping the datasets that hold a missing
-  value. ([#1102])
-- The error of a test that cannot run on the rows where its variables are observed advises capping
-  the conditioning sets with `max_depth` first, and says that dropping a column with many missing
-  values can remove a common cause of the columns that stay. ([#1102])
+  per process naming test-wise deletion and when it is valid. Pass `missing="testwise"` to choose it
+  by name. `bootstrap` logs it once for all of its worker processes. On the command line,
+  `run.warnings` holds it and the fit's other warning-level logs as a `LogWarning`; nothing goes to
+  stderr. ([#1102])
+- Errors refusing missing values lead with your options: for time series, `pcmci`, `pcmciplus`, and
+  `lpcmci` instead of filling missing steps; dropping rows is your own step and must match across
+  row-aligned arguments. For `jpcmciplus`, whose datasets and contexts no other method reads, the
+  advice is to drop datasets containing missing values. ([#1102])
+- When a test cannot run on rows observing its variables, the error advises capping conditioning
+  sets with `max_depth` first and warns that dropping a column with many missing values can remove a
+  common cause of the remaining columns. ([#1102])
 - `missing="em"` raises `ValueError` when two columns share no observed row, as the data hold no
-  covariance for them. Such data ran before, on a covariance the model alone supplied. ([#1102])
-- On data with missing values, `fisherz` and `student_t` p-values with a conditioning set can
-  differ from 0.18.0 in the last digits (relative change up to about 1e-11 measured), as each
-  block's sums run in a fixed order; graphs are unchanged on the fits compared. ([#1142])
+  covariance for them; such data ran before, on a covariance the model alone supplied. ([#1102])
+- On data with missing values, `fisherz` and `student_t` conditional p-values can differ from 0.18.0
+  in the last digits (relative change up to about 1e-11 measured), because each block's sums use a
+  fixed order; graphs are unchanged on the fits compared. ([#1142])
 - The website is easier to find and quote in search and AI answers. The homepage's description, its
   structured data, and `llms.txt` say what Andrey is, starting with the speed claim; `llms.txt` also
   links the methods and comparison pages, says how to cite Andrey, and marks each experimental
@@ -229,36 +220,36 @@ names its pull request.
 - `iamb` and `inter_iamb` order the candidates of each grow step by their p-values to nine
   significant digits, where they compared p-values rounded to nine decimals, which tied every
   p-value below 5e-10 and left the choice to a rank computed from the data. On categorical data
-  their blankets can change for some targets, and so can the graphs of `rsmax2` with
-  `restrict="iamb"` or `"inter_iamb"`; results on continuous data do not change. ([#969])
-- The skeleton scans of `pc` and `fci` and the conditioning-set scans of the blanket learners
-  build each chunk of conditioning sets as the rows of an int array from cached combination
-  tables, where they built tuples and converted each chunk back. Every output,
-  `metadata["n_tests"]` included, is the same bit for bit. ([#1036], [#1042])
-- `indep_test="kci"` keeps the kernel of each column for the queries without a conditioning set
-  (up to 256 MB, as its other matrix caches do), so `pc`, `fci`, and `cdnod` with it run faster on
-  many variables at few rows. Every graph, p-value, and `metadata["n_tests"]` is the same bit for
-  bit. ([#1072], [#1073])
-- A grow scan of `iamb` and `inter_iamb` (also as the restrict phase of `rsmax2` with
-  `restrict="iamb"` or `"inter_iamb"`) asks many candidates against one conditioning set. With
-  `fisherz`, `student_t`, or `normal_scores` on complete data, a scan given two or more variables is
-  answered from one Cholesky factor of the set's correlation block, where each candidate inverted
-  its own submatrix, and a smaller scan in one batched call, with the same bits as one call per
-  candidate. At 5,000 rows on one core, `iamb` at one target on 1,000 variables is 3.9 times faster,
-  and `iamb` on 100 variables 4.4 times. Every graph of `iamb` and `inter_iamb` on the identity
-  corpus is unchanged, column shuffles included. The factor's p-values agree with the per-query ones
-  to about 1e-10 relative, not bit for bit, so a p-value on a rounding boundary can differ in its
-  ninth significant digit. `ANDREY_SHARED_SCAN_MIN_WORK` (default `128`, candidates times the set
-  size plus two) sets the smallest scan that takes the factor; blocks near the singular threshold,
-  missing values, and the other tests keep the per-query path. A repeated variable in the
-  conditioning set counts once, and a correlation matrix that is not exactly symmetric gives each
-  pair one answer whichever variable is the target. ([#1047], [#1048])
-- `cpcm` and `cpcm_graph` choose the smoothing parameters of the `"exponential"` and `"pareto"`
-  fits by the generalized cross-validation score of the deviance and those of the `"poisson"` fit
-  by the unbiased risk estimate, the criteria of the authors' code; the two-parameter families keep
-  the Laplace approximate marginal likelihood. On heavy-tailed Pareto pairs the marginal likelihood
-  picked a stiffer spline, under which the test of the true direction rejected well above its
-  level. ([#1165])
+  blankets for some targets can change, as can graphs of `rsmax2` with `restrict="iamb"` or
+  `"inter_iamb"`; results on continuous data do not change. ([#969])
+- The skeleton scans of `pc` and `fci` and the conditioning-set scans of the blanket learners build
+  each chunk of conditioning sets as int-array rows from cached combination tables, not tuples
+  converted back per chunk. Every output, `metadata["n_tests"]` included, is the same bit for bit.
+  ([#1036], [#1042])
+- `indep_test="kci"` caches each column's kernel for queries without a conditioning set (up to 256
+  MB, as its other matrix caches do), so `pc`, `fci`, and `cdnod` run faster with it on many
+  variables and few rows. Every graph, p-value, and `metadata["n_tests"]` is the same bit for bit.
+  ([#1072], [#1073])
+- A grow scan of `iamb` and `inter_iamb` (including the restrict phase of `rsmax2` with
+  `restrict="iamb"` or `"inter_iamb"`) tests many candidates against one conditioning set. With
+  `fisherz`, `student_t`, or `normal_scores` on complete data, a scan with two or more variables
+  uses one Cholesky factor of the set's correlation block, not one inverted submatrix per candidate;
+  a smaller scan uses one batched call, bitwise identical to one call per candidate. At 5,000 rows
+  on one core, `iamb` at one target on 1,000 variables is 3.9 times faster, and `iamb` on 100
+  variables 4.4 times. Every `iamb` and `inter_iamb` graph on the identity corpus is unchanged,
+  including column shuffles. The factor's p-values agree with the per-query ones to about 1e-10
+  relative, not bit for bit, so a p-value on a rounding boundary can differ in its ninth significant
+  digit. `ANDREY_SHARED_SCAN_MIN_WORK` (default `128`, candidates times the set size plus two) sets
+  the smallest scan that takes the factor; blocks near the singular threshold, missing values, and
+  the other tests keep the per-query path. A repeated variable in the conditioning set counts once,
+  and a correlation matrix that is not exactly symmetric gives each pair the same answer for either
+  target. ([#1047], [#1048])
+- `cpcm` and `cpcm_graph` choose smoothing parameters for the `"exponential"` and `"pareto"` fits by
+  the generalized cross-validation score of the deviance and those of the `"poisson"` fit by the
+  unbiased risk estimate, as in the authors' code; the two-parameter families keep the Laplace
+  approximate marginal likelihood. On heavy-tailed Pareto pairs the marginal likelihood picked a
+  stiffer spline, under which the test of the true direction rejected well above its level.
+  ([#1165])
 - For contributors, CI on a pull request into a release branch runs lint, types, the unit tests,
   cheap recovery checks, and the fast consistency tests. The heavy accuracy checks carry a
   `release` pytest mark; the release pull request into `main` runs every test, as do pushes to
@@ -270,45 +261,42 @@ names its pull request.
 ### Fixed
 
 - The docs no longer say that FCI with test-wise deletion stays sound when values are missing for a
-  reason: the cited result covers another procedure. Every method that deletes rows per test now
-  states one shared sentence, valid when values are missing completely at random, and the guide's
-  text on `None` and on structural EM is corrected. ([#1102])
+  reason: its citation covers another procedure. Every method that deletes rows per test shares one
+  validity sentence for values missing completely at random, and the guide's text on `None` and on
+  structural EM is corrected. ([#1102])
 - The docs name `normal_scores` among the partial-correlation tests that need more rows where their
   variables are observed; they gave it the 2 rows of the other tests. ([#1102])
-- On data with missing values, a `fisherz` or `student_t` query gets the same statistic and
-  p-value, bit for bit, whether it is asked alone or with other queries, in any order. On more
-  than 8,192 rows the last bits followed the queries computed with it. ([#1142])
+- On data with missing values, a `fisherz` or `student_t` query gets the same statistic and p-value,
+  bit for bit, alone or with other queries in any order, including on more than 8,192 rows, where
+  the last bits followed the queries computed with it. ([#1142])
 - A test-wise fit that runs no test on data with missing values, such as `pc` on one column, sets
-  `metadata["missing"]`, gives `metadata["rows_tested"]` as `{"min": 0, "median": 0}`, and logs
-  the notice of the default handling under `missing=None`. ([#1151])
+  `metadata["missing"]`, gives `metadata["rows_tested"]` as `{"min": 0, "median": 0}`, and logs the
+  default-handling notice under `missing=None`. ([#1151])
 - `pc(missing="mvpc")` counts the corrected tests that return a p-value of 1 in
   `metadata["corrected_edges"]["p_one_tests"]`. An indicator query whose rows hold one value of the
-  indicator, and so carry no information on it, or fewer rows than its test needs is not tested, as
-  every test-wise test is, where it returned `p = 1`: it counts in `metadata["not_tested"]`, and its
-  rows no longer count in `metadata["rows_tested"]`. A column on whose observed rows the indicator
-  holds one value conditions no test of that indicator and, as before, is not its parent, and a
-  column that a tested query kept adjacent stays a parent when a later query of it is not tested;
-  the parents and graphs of the fits compared are unchanged. A corrected test needs the rows that
-  leave its test a degree of freedom, `|S| + 4` for `fisherz`, or the pair keeps its test-wise
-  answer. ([#1151])
+  indicator, or too few rows, is not tested rather than returning `p = 1`, as for every test-wise
+  test: it counts in `metadata["not_tested"]` and its rows no longer count in
+  `metadata["rows_tested"]`. A column on whose observed rows the indicator is constant conditions no
+  test of that indicator and, as before, is not its parent; a column kept adjacent by a tested query
+  stays a parent when a later query is not tested; the parents and graphs of the fits compared are
+  unchanged. A corrected test needs enough rows to leave a degree of freedom, `|S| + 4` for
+  `fisherz`, or the pair keeps its test-wise answer. ([#1151])
 - Under `missing="em"` with the linear-Gaussian BIC, copies among the observed values raise
-  `CopiedColumnsError` before a pair of columns that shares no observed row, as on complete data.
-  The error for such a pair names a DataFrame's columns by their labels. ([#1151])
-- The CLI records a fit's warning-level log records in `run.warnings` when the `andrey` logger, a
-  logger under it, or the root logger is set above `WARNING`, or a logger under `andrey` has its
-  own handler or does not propagate, and `bootstrap` logs the records of fits that ran in worker
-  processes in the calling process, once each, so they reach `run.warnings` instead of standard
-  error. Each record keeps the file, line, and function that logged it, and those of a resample
-  that raises are logged before its error. ([#1151])
-- The backward phase of `mmpc` keeps the best separating set of each size it tests, not a record
-  of every set, so its memory no longer grows with the number of sets. Answers are unchanged.
-  ([#1019])
+  `CopiedColumnsError` before a pair sharing no observed row, as on complete data. The error for
+  such a pair names a DataFrame's columns by their labels. ([#1151])
+- The CLI records a fit's warning-level logs in `run.warnings` when the `andrey` logger, a logger
+  under it, or the root logger is set above `WARNING`, or a logger under `andrey` has its own
+  handler or does not propagate, and `bootstrap` logs worker fits' records once each in the calling
+  process, reaching `run.warnings` instead of standard error. Each record keeps the file, line, and
+  function that logged it, and those of a resample that raises are logged before its error.
+  ([#1151])
+- The backward phase of `mmpc` keeps only the best separating set of each tested size, so its memory
+  no longer grows with the number of sets. Answers are unchanged. ([#1019])
 - For contributors, `qa/identity.py` counts the partial-correlation tests' `statistic_pvalue` as a
-  query, so the query counts of IAMB, Inter-IAMB, and CALM no longer depend on which path answered
-  them, and `benchmarks/start_regression_ci_r.sh` clones the PCM authors' code into
-  `benchmarks/.pcm-code` when no folder is given, so `benchmarks/run_tests.sh` builds it. The
-  agreement script reads that folder from `ANDREY_BENCH_PCM_CODE`, which replaces `PCM_CODE`.
-  ([#1179])
+  query, making IAMB, Inter-IAMB, and CALM query counts independent of the answering path, and
+  `benchmarks/start_regression_ci_r.sh` clones the PCM authors' code into `benchmarks/.pcm-code`
+  when no folder is given, so `benchmarks/run_tests.sh` builds it. The agreement script reads that
+  folder from `ANDREY_BENCH_PCM_CODE`, which replaces `PCM_CODE`. ([#1179])
 - `skewd` and `skewd_mv` fit on one BLAS thread at any number of workers, so their results no
   longer depend on the machine's BLAS thread count, which changed a fit's log-likelihoods in their
   last digits. ([#1189])

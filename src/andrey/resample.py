@@ -882,8 +882,8 @@ def _draw(job: Job, b: int) -> list[np.ndarray]:
     return [rng.integers(0, n, size=n) for n in sizes]
 
 
-#: A log record as ``(logger name, level, message, path, line, function)``, which pickles as a
-#: record may not.
+#: A pickleable log record as ``(logger name, level, message, path, line, function)``; records may
+#: not pickle.
 Logged = tuple[str, int, str, str, int, str]
 #: What one resample's fit returns: the fit, the warnings it raised, and its log records.
 Fitted = tuple[Any, list[tuple[type[Warning], str]], list[Logged]]
@@ -912,9 +912,9 @@ def _relog(records: Sequence[Logged], seen: set[tuple[str, int, str]]) -> None:
 def _run_one(job: Job, b: int) -> Fitted:
     """Fit resample ``b``; return the fit, the warnings it raised, and the records it logged.
 
-    The records are held (:func:`~andrey.core.warning_policy.held_records`) in a worker process as
-    in this one, so :func:`fit_resamples` logs them in the calling process, whatever the workers. A
-    fit that raises carries its records on the error, as its attribute ``_RECORDS``.
+    :func:`~andrey.core.warning_policy.held_records` holds records in this process or a worker so
+    :func:`fit_resamples` logs them in the caller. A failed fit carries its records in the error's
+    ``_RECORDS`` attribute.
     """
     idx = _draw(job, b)
     if job.unit in _PANEL_UNITS:
@@ -948,8 +948,8 @@ _BLAS: object = None  # a held threadpoolctl controller capping this worker's BL
 def _init_worker(job: Job) -> None:
     """Pin a worker to one fit at a time on one BLAS thread, with the parent's settings.
 
-    A worker logs no notice of a default handling of missing values: :func:`bootstrap` logs it in
-    the calling process, once for every worker.
+    Workers suppress default missing-value handling notices; :func:`bootstrap` logs once for all
+    workers in the calling process.
     """
     global _JOB, _BLAS
     from threadpoolctl import threadpool_limits
@@ -971,9 +971,9 @@ def _task(b: int) -> Fitted:
 def fit_resamples(job: Job, n_resamples: int, workers: int) -> list[Fitted]:
     """Fit every resample, in order, in this process or on ``workers`` worker processes.
 
-    The records each fit logged are logged here as its result comes in, in order, once each by
-    logger, level, and message (:func:`_relog`); a fit that raises has its records logged before
-    its error goes on, after those of the fits before it.
+    Fit records are logged as results arrive in resample order, once per logger, level, and message
+    (:func:`_relog`); a failed fit's records follow earlier fits' records before its error
+    propagates.
     """
     seen: set[tuple[str, int, str]] = set()
     results: list[Fitted] = []
@@ -1116,10 +1116,9 @@ def bootstrap(
         the averaged graph is the valid resample graph nearest the others, or
         ``"nearest_resample_invalid"`` when no resample is a valid graph of the method's kind.
         On data with missing values, ``never_observed_together``, ``undecided_pairs``, and
-        ``possibly_separable``, each present when it is not empty, list the pairs any fit listed
-        under that key. A fit leaves an undecided pair out of its graph, so the pair counts as
-        not drawn in that fit's frequency, as a pair the fit separated does; the list tells them
-        apart.
+        ``possibly_separable``, each present when not empty, list the pairs any fit listed under
+        that key. Undecided pairs leave a fit's graph and count as not drawn in its frequency, like
+        separated pairs; the list distinguishes them.
 
     Raises
     ------
@@ -1143,12 +1142,10 @@ def bootstrap(
         Each distinct warning the fits raised, once; and, with ``strict=False``, when the vote has
         no valid graph of the method's kind, so the averaged graph is the valid resample graph
         nearest the others, or, when no resample is valid, the resample graph nearest the others.
-        Each distinct record the fits logged, at least each warning-level one, is logged once
-        too, through its own logger and from where it was logged, as its fit returns, in the
-        order of the resamples, whether the fits ran in this process or in worker processes;
-        those of a fit that raises are logged before its error goes on. While a fit runs in this
-        process, a record an ``andrey`` logger logs in another thread is held with the fit's own
-        and logged with them.
+        Distinct log records, at least all warning-level ones, are logged once through their
+        original logger and location as fits return in resample order, regardless of worker use; a
+        failed fit's records precede its error. During a fit in this process, records from
+        ``andrey`` loggers in other threads are held and logged with its own.
 
     Notes
     -----
@@ -1358,9 +1355,9 @@ def bootstrap(
 def _not_tested_over(fits: list) -> dict:
     """Return the not-tested metadata of ``fits`` for the notice.
 
-    The pairs never observed together, the undecided pairs, and the possibly separable edges of any
-    fit, in order of first appearance, and the conditioning sets not tested over all of them, which
-    the notice reads only as whether any was.
+    Pairs never observed together, undecided pairs, and possibly separable edges from any fit, in
+    first-appearance order, plus all untested conditioning sets, which the notice reads only for
+    presence.
     """
     merged: dict = {"not_tested": sum(out.metadata.get("not_tested", 0) for out in fits)}
     for key in ("never_observed_together", "undecided_pairs", "possibly_separable"):
