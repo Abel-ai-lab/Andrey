@@ -263,6 +263,10 @@ names its pull request.
   cheap recovery checks, and the fast consistency tests. The heavy accuracy checks carry a
   `release` pytest mark; the release pull request into `main` runs every test, as do pushes to
   `main`. The quality gate's workflow also runs by hand. ([#1185])
+- `skewd` and `skewd_mv` read `andrey.config(n_jobs)` (or `ANDREY_N_JOBS`): above 1, they run
+  their CMA-ES searches, the two directions of `skewd`, and the conditional models of `skewd_mv` on
+  that many threads, with the same result bit for bit at any number. On 16 threads a pair ran
+  about 9 times faster and a 10-variable graph about 7.5 times faster. ([#1189])
 
 ### Fixed
 
@@ -306,6 +310,9 @@ names its pull request.
   `benchmarks/.pcm-code` when no folder is given, so `benchmarks/run_tests.sh` builds it. The
   agreement script reads that folder from `ANDREY_BENCH_PCM_CODE`, which replaces `PCM_CODE`.
   ([#1179])
+- `skewd` and `skewd_mv` fit on one BLAS thread at any number of workers, so their results no
+  longer depend on the machine's BLAS thread count: 16 BLAS threads changed a fit's
+  log-likelihoods by up to 4e-10 and ran a two-parent fit 3.8 times slower. ([#1189])
 
 ## [0.18.0] - 2026-11-19
 
@@ -2975,6 +2982,7 @@ First alpha release.
 [#1175]: https://github.com/Abel-ai-lab/Andrey/pull/1175
 [#1179]: https://github.com/Abel-ai-lab/Andrey/pull/1179
 [#1185]: https://github.com/Abel-ai-lab/Andrey/pull/1185
+[#1189]: https://github.com/Abel-ai-lab/Andrey/pull/1189
 [#1161]: https://github.com/Abel-ai-lab/Andrey/pull/1161
 [#1169]: https://github.com/Abel-ai-lab/Andrey/pull/1169
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
