@@ -1778,6 +1778,7 @@ def skewd_mv(
     ('dag', 3)
     """
     from andrey.api.constraint import pc
+    from andrey.core import backend
     from andrey.core.ties import tie_ranks
     from andrey.core.warning_policy import warn_search_limit
     from andrey.fcm.skewd import (
@@ -1787,6 +1788,7 @@ def skewd_mv(
         class_size,
         fit,
         merge_components,
+        search_pool,
     )
 
     X = data_matrix(data, method="skewd_mv", min_rows=MIN_ROWS)
@@ -1811,8 +1813,18 @@ def skewd_mv(
     n = X.shape[0]
     terms: dict[tuple[int, tuple[int, ...]], float] = {}
     converged = True
-    for y, parents in fits:
-        result = fit(X[:, list(parents)], X[:, y], budget, seed)
+    workers = backend.worker_count()
+    with search_pool(workers) as run:
+        if workers > 1 and len(fits) > 1:
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ThreadPoolExecutor(max_workers=len(fits)) as each:
+                results = list(
+                    each.map(lambda f: fit(X[:, list(f[1])], X[:, f[0]], budget, seed, run), fits)
+                )
+        else:
+            results = [fit(X[:, list(parents)], X[:, y], budget, seed) for y, parents in fits]
+    for (y, parents), result in zip(fits, results, strict=True):
         terms[(y, parents)] = n * result.log_likelihood
         converged &= result.converged
     if not converged:

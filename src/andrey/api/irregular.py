@@ -1106,9 +1106,10 @@ def skewd(
             f"skewd: alpha must be None under criterion='likelihood', which compares two "
             f"likelihoods and no p-values, got {alpha!r}"
         )
+    from andrey.core import backend
     from andrey.core.independence import hsic_median_statistic_log_p
     from andrey.core.warning_policy import warn_search_limit
-    from andrey.fcm.skewd import Budget, fit
+    from andrey.fcm.skewd import Budget, fit, search_pool
 
     assert seed is not None  # method_spec resolves it
     X, labels, rows = _pair_matrix("skewd", data, standardize=True)
@@ -1125,7 +1126,17 @@ def skewd(
             f"skewd needs at least {budget.folds} rows where both columns are observed, one for "
             f"each cross-validation fold, got {X.shape[0]}"
         )
-    forward, backward = fit(x, y[:, 0], budget, seed), fit(y, x[:, 0], budget, seed)
+    workers = backend.worker_count()
+    with search_pool(workers) as run:
+        if workers > 1:
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ThreadPoolExecutor(max_workers=2) as both:
+                ahead = both.submit(fit, x, y[:, 0], budget, seed, run)
+                back = both.submit(fit, y, x[:, 0], budget, seed, run)
+                forward, backward = ahead.result(), back.result()
+        else:
+            forward, backward = fit(x, y[:, 0], budget, seed), fit(y, x[:, 0], budget, seed)
     if not (forward.converged and backward.converged):
         warn_search_limit("skewd", "max_iter", max_iter, "ECM iterations")
     extra = {

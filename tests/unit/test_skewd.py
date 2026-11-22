@@ -568,3 +568,21 @@ def test_a_search_does_not_read_the_signs_of_the_eigenvectors(monkeypatch):
     again = search()
     np.testing.assert_array_equal(again[0], first[0])
     assert again[1] == first[1]
+
+
+@pytest.mark.parametrize("pool", ["thread", "process"])
+def test_a_fit_on_workers_gives_the_serial_fit_bit_for_bit(monkeypatch, pool):
+    # Every search draws from its own stream, spawned in a fixed order, so where the searches
+    # run cannot change a bit of the fit.
+    monkeypatch.setenv("ANDREY_SKEWD_POOL", pool)
+    rng = np.random.default_rng(4)
+    parents = rng.standard_normal((120, 2))
+    effect = np.tanh(parents).sum(axis=1) + skewnorm.rvs(4, size=120, random_state=rng)
+    parents = (parents - parents.mean(axis=0)) / parents.std(axis=0)
+    effect = (effect - effect.mean()) / effect.std()
+    budget = native.Budget(knots=6, folds=3, tuning_iter=3, initial=2, max_iter=50)
+    serial = native.fit(parents, effect, budget, 0)
+    with native.search_pool(3) as run:
+        spread = native.fit(parents, effect, budget, 0, run)
+    assert spread.log_likelihood == serial.log_likelihood
+    assert np.array_equal(spread.residual, serial.residual)
