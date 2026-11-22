@@ -1,8 +1,9 @@
 # Ground-truth recovery and regression tests
 
 This suite checks Andrey against fixed cases, known ground truth, and its own recorded outputs.
-Every PR runs all but the `release`-marked tests, the heavy accuracy checks that run at the release
-freeze; every method keeps an unmarked check. GPU device parity lives in `tests/gpu/`.
+Every PR runs all but the `release`-marked tests, the heavy accuracy checks that pushes to `main`
+and the release freeze run; every method keeps an unmarked check. GPU device parity lives in
+`tests/gpu/`.
 
 Recorded outputs are regression baselines: a mismatch identifies a change to review.
 Ground-truth tests establish whether the recovered structure is correct.

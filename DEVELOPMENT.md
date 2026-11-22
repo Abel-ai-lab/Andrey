@@ -286,11 +286,13 @@ reaching a code path no other test reaches, on the smallest input that reaches i
   of another file.
 - Nothing runs on a schedule: with dependencies locked, an unchanged commit gives the same result.
 - Pull-request CI stays fast. A test that is release evidence rather than a correctness check (a
-  large-input repeat, a campaign-style recovery cell, anything over about 30 seconds on one core)
-  carries `@pytest.mark.release`, on the test or, through `release_cases` (`tests/release.py`), on
-  single cases of a parametrized test. Pull-request CI deselects it with `-m "not release"`; the
-  release freeze runs the whole suite, marked tests included. Every method keeps an unmarked
-  recovery test, so a broken method still fails on its pull request.
+  large-input repeat, a campaign-style recovery cell, anything over about 30 seconds on a CI
+  runner) carries `@pytest.mark.release`, on the test or, through `release_cases`
+  (`tests/release.py`), on single cases of a parametrized test. Pull-request CI deselects it with
+  `-m "not release"`; a push to `main`, a manual run of `ci.yml`, and the release freeze run the
+  whole suite, marked tests included. Every method keeps an unmarked recovery test, so a broken
+  method still fails on its pull request: a method's only recovery test stays unmarked however long
+  it takes.
 
 ### 1. Recovery tests
 
@@ -409,7 +411,8 @@ any other branch, or from a release branch whose `pyproject.toml` version is not
 fails one that changes anything under `src/` or whose `main` is not at `<x.y.z>`.
 
 Pull-request CI (`.github/workflows/ci.yml`, [Testing](docs/docs/ci.md)) runs lint, types, the
-unit tests, the cheap recovery checks, and the fast consistency tests, with `-m "not release"`.
+unit tests, the cheap recovery checks, and the fast consistency tests, with `-m "not release"`;
+its other triggers (a push to `main`, a manual run, and the tag's site deploy) run every test.
 The heavy accuracy checks are release gates, run once per release at the freeze on the code
 being released: the full test suite with every extra and the `release`-marked tests
 (`pytest tests -n auto --dist loadfile`), and the quality gate (`qa/README.md`). The freeze report

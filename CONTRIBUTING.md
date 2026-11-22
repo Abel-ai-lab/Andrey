@@ -121,7 +121,7 @@ uv sync --all-extras                      # the optional methods' tests need the
 uv run --no-sync ruff format --check .    # formatting (`ruff format .` fixes it)
 uv run --no-sync ruff check .             # lint
 uv run --no-sync ty check                 # types
-uv run --no-sync pytest tests -m "not release"   # the tests CI runs
+uv run --no-sync pytest tests -m "not release"   # the tests a pull request runs
 ```
 
 The suite takes about 25 minutes on one core. `-n auto --dist loadfile` runs it on every core,
@@ -129,11 +129,12 @@ as CI does, with the same tests and results; `--dist loadfile` keeps the tests o
 worker, so they share its fixtures. `-n 0` runs without workers, one test at a time, to debug a
 failure. `--shard 1/2` runs the first of two disjoint halves of the tests, as one of CI's two jobs
 per Python version does. Run `tests/gpu` without `-n`: the workers would share one GPU. Tests
-marked `release` are heavy accuracy checks that run once per release, not on pull requests; drop
+marked `release` are heavy accuracy checks that pull requests skip and each release runs; drop
 `-m "not release"` to run them too.
 
 For a change to one page or one function, the tests next to it are enough to start with, for
-example `uv run pytest tests/unit -k <name>`; CI runs every test not marked `release`.
+example `uv run pytest tests/unit -k <name>`; a pull request's CI runs every test not marked
+`release`.
 
 `prek install` (or `pre-commit install`) adds the hooks in `.pre-commit-config.yaml` to your
 checkout, so formatting, lint, and a scan for secrets run on every commit.

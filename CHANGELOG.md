@@ -260,9 +260,9 @@ names its pull request.
   picked a stiffer spline, under which the test of the true direction rejected well above its
   level. ([#1165])
 - For contributors, pull-request CI runs lint, types, the unit tests, cheap recovery checks, and
-  the fast consistency tests. The heavy accuracy checks carry a `release` pytest mark and run at
-  the release freeze with the quality gate, whose workflow runs by hand and from the publish
-  workflow instead of on each push to the release pull request. ([#1185])
+  the fast consistency tests. The heavy accuracy checks carry a `release` pytest mark and run on
+  pushes to `main` and at the release freeze with the quality gate, whose workflow runs by hand
+  and from the publish workflow instead of on each push to the release pull request. ([#1185])
 
 ### Fixed
 

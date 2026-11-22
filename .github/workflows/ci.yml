@@ -23,6 +23,10 @@ env:
   OPENBLAS_NUM_THREADS: 1
   MKL_NUM_THREADS: 1
   NUMEXPR_NUM_THREADS: 1
+  # A pull request deselects the heavy accuracy checks, the tests marked `release`
+  # (DEVELOPMENT.md); a push to main, a manual run, and a call from deploy-prod.yml run every test
+  # (an empty `-m` selects them all).
+  TEST_MARKS: ${{ github.event_name == 'pull_request' && 'not release' || '' }}
 
 # Jobs that need more (lint's PR file list) say so themselves.
 permissions:
@@ -98,10 +102,9 @@ jobs:
         # A module-level import of an optional dependency fails here, not in a contributor's checkout.
         run: uv run --no-sync python -m pytest --collect-only -qq tests/unit
       - name: Ground-truth recovery and recorded-output regression
-        # On every core, one file per worker, as in the extras job. Tests marked `release` are
-        # heavy accuracy checks that the release freeze runs instead (DEVELOPMENT.md).
+        # On every core, one file per worker, as in the extras job.
         run: >-
-          uv run --no-sync python -m pytest tests/recovery tests/metrics -m "not release"
+          uv run --no-sync python -m pytest tests/recovery tests/metrics -m "$TEST_MARKS"
           -n logical --dist loadfile -q --durations=15
       - name: Benchmark endpoint conversion
         # Needs only numpy; the rest of benchmarks/tests needs the harness environment.
@@ -157,14 +160,13 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
       - name: Correctness suites, all extras - recovery, determinism, torch kernels
-        # Tests marked `release` run at the release freeze, not here. pytest-xdist runs one worker
-        # per core (4 on a hosted runner; `logical` counts the cores the same with or without
-        # psutil). `loadfile` keeps a file's tests, and the module-scoped fixtures they share, on
-        # one worker.
+        # pytest-xdist runs one worker per core (4 on a hosted runner; `logical` counts the cores
+        # the same with or without psutil). `loadfile` keeps a file's tests, and the module-scoped
+        # fixtures they share, on one worker.
         run: |
           uv sync --all-extras --python ${{ matrix.python-version }}
           uv run --no-sync python -c "import torch; print('torch', torch.__version__)"
-          uv run --no-sync python -m pytest tests -m "not release" --shard ${{ matrix.shard }} -n logical --dist loadfile -q -rs --durations=15
+          uv run --no-sync python -m pytest tests -m "$TEST_MARKS" --shard ${{ matrix.shard }} -n logical --dist loadfile -q -rs --durations=15
 
   # The single required check. `build-install` is path-filtered, so a PR touching only
   # unfiltered paths skips it, and a skipped check never reports a conclusion - leaving a required

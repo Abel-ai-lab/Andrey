@@ -13,12 +13,12 @@ Every pull request, from a fork too, runs the test suite on Linux with every ext
 and 3.14, and the recovery tests without the extras. That suite holds the unit tests, at least one
 cheap recovery check per method, and the fast consistency tests; the heavy accuracy checks, such as
 large-input repeats and campaign-style recovery cells, are marked `release` and left to the release
-gates. Each job uses all of the runner's cores with pytest-xdist, and the suite is split into two
-jobs per Python version, which together run every test once with the same results as one core. A
-pull request that changes the code also builds and installs the wheel, and one that changes the
-code, the documentation, or the notebooks builds this website and reruns every notebook, which must
-reproduce the outputs the website shows. NumPy in float64 is the reference: the PyTorch paths must
-match its results and repeat exactly.
+gates and to the runs on `main`, which run every test. Each job uses all of the runner's cores with
+pytest-xdist, and the suite is split into two jobs per Python version, which together run every
+test once with the same results as one core. A pull request that changes the code also builds and
+installs the wheel, and one that changes the code, the documentation, or the notebooks builds this
+website and reruns every notebook, which must reproduce the outputs the website shows. NumPy in
+float64 is the reference: the PyTorch paths must match its results and repeat exactly.
 
 Each release runs its gates once, at the release freeze, on the code being released: the full
 test suite with every extra, the `release`-marked checks included, and a quality gate that fits
