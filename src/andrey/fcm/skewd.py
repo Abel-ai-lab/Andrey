@@ -41,6 +41,7 @@ acyclicity of hypergraphs, and selectively reduce acyclic hypergraphs. SIAM Jour
 from __future__ import annotations
 
 import math
+import os
 import threading
 import warnings
 from collections.abc import Callable, Generator, Iterator
@@ -308,12 +309,13 @@ def _identified(design: _Design) -> np.ndarray:
 
 @dataclass(frozen=True)
 class _Search:
-    """One CMA-ES search: the rows' bases and effect, the penalties, the start (in the coordinates
-    of ``frame`` when it is set), the bounds, and the stream the search draws from."""
+    """One CMA-ES search: the design and effect with the rows it reads, the penalties, the start (in
+    the coordinates of ``frame`` when it is set), the bounds, and the stream the search draws from.
+    The rows are read when the search runs, so a list of searches holds no copy of the data."""
 
-    location: np.ndarray
-    scale: np.ndarray
+    design: _Design
     effect: np.ndarray
+    rows: np.ndarray
     k_alpha: np.ndarray
     m_kappa: np.ndarray
     frame: np.ndarray | None
@@ -329,14 +331,14 @@ Run = Callable[[list[_Search]], list[tuple[np.ndarray, float]]]
 
 def _run_search(search: _Search) -> tuple[np.ndarray, float]:
     """Run one search; return its best parameters, in the raw coordinates, and its value."""
-    frame = search.frame
+    frame, rows = search.frame, search.rows
+    design, y = search.design, search.effect[rows]
+    location, scale = design.location[rows], design.scale[rows]
 
     def objective(theta: np.ndarray) -> np.ndarray:
         if frame is not None:
             theta = np.hstack([theta[:, : frame.shape[1]] @ frame.T, theta[:, frame.shape[1] :]])
-        return _penalized_nll(
-            theta, search.location, search.scale, search.effect, search.k_alpha, search.m_kappa
-        )
+        return _penalized_nll(theta, location, scale, y, search.k_alpha, search.m_kappa)
 
     best, value = _cma_es(objective, search.start, search.lower, search.upper, search.stream)
     if frame is not None:
@@ -377,7 +379,7 @@ def _searches(
         lower, upper = np.concatenate([-free, lower[q:]]), np.concatenate([free, upper[q:]])
         points = [np.concatenate([frame.T @ point[:q], point[q:]]) for point in points]
     return [
-        _Search(location, scale, y, k_alpha, m_kappa, frame, point, lower, upper, stream)
+        _Search(design, effect, rows, k_alpha, m_kappa, frame, point, lower, upper, stream)
         for point, stream in zip(points, rng.spawn(len(points)), strict=True)
     ]
 
@@ -419,6 +421,17 @@ def _best(found: list[tuple[np.ndarray, float]]) -> tuple[np.ndarray, float]:
 #: restores the filters of the whole process, so two such blocks in concurrent threads must not
 #: overlap.
 _FILTERS = threading.Lock()
+
+
+def _reset_after_fork() -> None:
+    """Give a forked child an unlocked :data:`_FILTERS`: a child forked while another thread holds
+    it inherits it locked, with no thread left to release it."""
+    global _FILTERS
+    _FILTERS = threading.Lock()
+
+
+if hasattr(os, "register_at_fork"):
+    os.register_at_fork(after_in_child=_reset_after_fork)
 
 
 def _tune(

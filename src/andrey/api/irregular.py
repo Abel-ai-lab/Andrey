@@ -1073,7 +1073,7 @@ def skewd(
     1,000 rows and on established pair benchmarks [1]_. A fit at the defaults runs about 490
     CMA-ES searches in each direction, 8 folds for each of the ``tuning_iter`` penalty settings and
     9 final starts, and takes tens of minutes per pair on one worker; ``tuning_iter`` sets most of
-    that cost, and 16 workers ran a pair about 9 times faster. Each
+    that cost, and most of it divides over ``n_jobs`` workers. Each
     HSIC test builds matrices with one row and one column per sample. The skew-normal's skewness
     lies within about -1 and 1, so noise more skewed than that is misspecified, and the likelihood
     criterion assumes Gaussian marginals of the standardized variables [1]_. A change of units

@@ -265,8 +265,7 @@ names its pull request.
   `main`. The quality gate's workflow also runs by hand. ([#1185])
 - `skewd` and `skewd_mv` read `andrey.config(n_jobs)` (or `ANDREY_N_JOBS`): above 1, they run
   their CMA-ES searches, the two directions of `skewd`, and the conditional models of `skewd_mv` on
-  that many threads, with the same result bit for bit at any number. On 16 threads a pair ran
-  about 9 times faster and a 10-variable graph about 7.5 times faster. ([#1189])
+  that many threads, with the same result bit for bit at any number. ([#1189])
 
 ### Fixed
 
@@ -311,8 +310,8 @@ names its pull request.
   agreement script reads that folder from `ANDREY_BENCH_PCM_CODE`, which replaces `PCM_CODE`.
   ([#1179])
 - `skewd` and `skewd_mv` fit on one BLAS thread at any number of workers, so their results no
-  longer depend on the machine's BLAS thread count: 16 BLAS threads changed a fit's
-  log-likelihoods by up to 4e-10 and ran a two-parent fit 3.8 times slower. ([#1189])
+  longer depend on the machine's BLAS thread count, which changed a fit's log-likelihoods in their
+  last digits. ([#1189])
 
 ## [0.18.0] - 2026-11-19
 

@@ -1755,8 +1755,8 @@ def skewd_mv(
     **Limitations.** Not benchmarked yet. The paper measures it on skew-normal location-scale
     graphs of 6 and 10 variables with 1,000 rows [1]_. Its cost grows with the number of distinct
     parent sets the class allows, exponentially in a variable's undirected edges, and each fit
-    takes minutes at the defaults on one worker (16 workers ran a 10-variable graph about 7.5 times
-    faster); it refuses a class that needs more than 100 (``max_fits``),
+    takes minutes at the defaults on one worker, most of which divides over ``n_jobs`` workers; it
+    refuses a class that needs more than 100 (``max_fits``),
     where the paper counts parent-child configurations and expects the method to apply while they
     are in the order of 100. An edge PC misses or misorients stays wrong: the likelihood only
     chooses among the class's DAGs. The numbers are a reference, not a hard limit: they change
@@ -1833,7 +1833,7 @@ def skewd_mv(
         if workers > 1 and len(fits) > 1:
             from concurrent.futures import ThreadPoolExecutor
 
-            with ThreadPoolExecutor(max_workers=len(fits)) as pool:
+            with ThreadPoolExecutor(max_workers=min(workers, len(fits))) as pool:
                 results = list(pool.map(model, fits))
         else:
             results = [model(each) for each in fits]
