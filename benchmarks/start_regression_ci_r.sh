@@ -9,9 +9,12 @@
 # two libraries, each tarball with its SHA-256 checked. The PCM authors' simulation code, which
 # loads vimp and the archived CondIndTests, is cloned at a fixed commit into the folder given, else
 # `$ANDREY_BENCH_PCM_CODE` (default `benchmarks/.pcm-code`); it carries no license, so it is never
-# committed. The script prints the `ANDREY_BENCH_PCM_CODE` export the agreement script reads, which
-# `benchmarks/run_tests.sh` applies and records. The libraries are `$ANDREY_BENCH_R_LIBS`
-# and, for wGCM, `$ANDREY_BENCH_R_LIBS_WGCM`; the agreement script reads both variables.
+# committed. The script prints the `ANDREY_BENCH_PCM_CODE` export the agreement script reads. The
+# libraries are `$ANDREY_BENCH_R_LIBS` (default `benchmarks/.r-lib-regression-ci`) and, for wGCM,
+# `$ANDREY_BENCH_R_LIBS_WGCM` (default `benchmarks/.r-lib-regression-ci-wgcm`), and the agreement
+# script reads both variables. The other R start scripts take `ANDREY_BENCH_R_LIBS` as the R lane's
+# library, which the `env.sh` of `benchmarks/run_tests.sh` records, so sourcing that file does not
+# set up the agreement script: point both variables at this script's libraries when running it.
 
 set -euo pipefail
 

@@ -16,8 +16,10 @@ so both sides test the same numbers. PCM is compared in its paper's direction, t
 
 `benchmarks/start_regression_ci_r.sh` builds the two R libraries the reference needs, read from
 `ANDREY_BENCH_R_LIBS` (GCM and PCM) and `ANDREY_BENCH_R_LIBS_WGCM` (wGCM) when they are set, and
-clones the PCM authors' code, printing its `ANDREY_BENCH_PCM_CODE`. The script prints one
-Markdown table per test.
+clones the PCM authors' code, printing its `ANDREY_BENCH_PCM_CODE`. The R lane's start scripts use
+`ANDREY_BENCH_R_LIBS` for their own library, which the `env.sh` of `benchmarks/run_tests.sh`
+records, so both variables are set here to the libraries the start script built. The script prints
+one Markdown table per test.
 """
 
 from __future__ import annotations

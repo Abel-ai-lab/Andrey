@@ -18,7 +18,8 @@
 #   pcm_gam   6 calls of that pcm_test with their additive models (gam_reg_method, gam_gtilde, and
 #             gam_vhat_reg_method), as their Section 6.1 simulations run it; a call that stops with
 #             an error of the smoothing fit gives NA
-# The PCM authors' code is read from `$ANDREY_BENCH_PCM_CODE` (a clone of their simulation repository).
+# The PCM authors' code is read from `$ANDREY_BENCH_PCM_CODE`, a clone of their simulation
+# repository.
 
 args <- commandArgs(TRUE)
 folder <- args[1]
