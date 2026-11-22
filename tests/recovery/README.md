@@ -1,7 +1,8 @@
 # Ground-truth recovery and regression tests
 
 This suite checks Andrey against fixed cases, known ground truth, and its own recorded outputs.
-All algorithm tests run on every PR. GPU device parity lives in `tests/gpu/`.
+Every PR runs all but the `release`-marked tests, the heavy accuracy checks that run at the release
+freeze; every method keeps an unmarked check. GPU device parity lives in `tests/gpu/`.
 
 Recorded outputs are regression baselines: a mismatch identifies a change to review.
 Ground-truth tests establish whether the recovered structure is correct.
@@ -14,8 +15,8 @@ Ground-truth tests establish whether the recovered structure is correct.
 - `test_quality_gate.py` self-checks the pre-publish gate of `qa/quality_gate.py`: the gate covers
   the supported methods, rejects wrong answers, and returns the same results in the same order with
   one job or two, which one test shows by fitting three PC and GES cells. The gate itself
-  measures method quality and runs with `uv run python -m qa.quality_gate` and on the release pull
-  request into `main`, not on other pull requests.
+  measures method quality and runs with `uv run python -m qa.quality_gate` at the release freeze
+  and by hand as the `quality-gate` workflow, not on pull requests.
 
 Structural fields match exactly. Numeric fields use `helpers/tolerances.py`; ExactSearch compares
 CPDAGs because score-equivalent DAG optima can differ in orientation. Ground-truth and independent

@@ -1,17 +1,16 @@
 name: quality-gate
 
 # The release's quality gate: every supported method against data with a known graph
-# (`qa/README.md`). It runs once per release, on the head of the release pull request into `main`
-# (`release-flow.yml` lets only `release/<x.y.z>` merge there), and `main`'s ruleset requires it.
-# `publish.yml` reuses a passing run on the published tree (`scripts/gate_reuse.py`) or calls this
-# workflow itself; every job that publishes to PyPI needs a job that calls it, as
-# `tests/unit/test_release_gates.py` checks. A push that changes only files the gate does not read
-# (`docs/`, `site/`, and top-level Markdown files) reuses a passing run on an earlier commit: the job
-# still succeeds under this name, and its steps after the lookup are skipped
-# (`scripts/gate_reuse.py --ancestor`).
+# (`qa/README.md`). Its refits are release evidence, not a pull-request check: the release freeze
+# runs `qa.quality_gate` with the other release gates, and this workflow runs it by hand
+# (workflow_dispatch) or from `publish.yml`. `publish.yml` reuses a passing run on the published
+# tree (`scripts/gate_reuse.py`) or calls this workflow itself; every job that publishes to PyPI
+# needs a job that calls it, as `tests/unit/test_release_gates.py` checks. A run on a commit that
+# changes only files the gate does not read (`docs/`, `site/`, and top-level Markdown files) since
+# an earlier passing run reuses that run: the job still succeeds under this name, and its steps
+# after the lookup are skipped (`scripts/gate_reuse.py --ancestor`).
 on:
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
   workflow_call:
 
 permissions:
@@ -28,9 +27,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          # The pull request's head, not the merge with `main`: the run records the head's tree,
-          # which `publish.yml` compares with the tree it publishes.
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           # The lookup compares this commit with the commits of earlier runs.
           fetch-depth: 0
       - name: A passing run on an earlier commit, with only unread files changed since

@@ -57,13 +57,11 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         with:
-          # Recovery tests self-check the quality gate; unit tests use QA helpers.
+          # A pull request that changes none of these paths skips build-install.
           filters: |
             code:
               - 'src/**'
               - 'tests/**'
-              - 'qa/quality_gate.py'
-              - 'qa/quality_baselines.json'
               - 'pyproject.toml'
               - 'uv.lock'
               - 'README.md'
@@ -74,7 +72,6 @@ jobs:
               - 'scripts/gate_reuse.py'
               - '.github/workflows/ci.yml'
               - '.github/workflows/publish.yml'
-              - '.github/workflows/quality-gate.yml'
       - name: Ruff (lint + format check)
         run: |
           uvx ruff check .
@@ -101,9 +98,10 @@ jobs:
         # A module-level import of an optional dependency fails here, not in a contributor's checkout.
         run: uv run --no-sync python -m pytest --collect-only -qq tests/unit
       - name: Ground-truth recovery and recorded-output regression
-        # On every core, one file per worker, as in the extras job.
+        # On every core, one file per worker, as in the extras job. Tests marked `release` are
+        # heavy accuracy checks that the release freeze runs instead (DEVELOPMENT.md).
         run: >-
-          uv run --no-sync python -m pytest tests/recovery tests/metrics
+          uv run --no-sync python -m pytest tests/recovery tests/metrics -m "not release"
           -n logical --dist loadfile -q --durations=15
       - name: Benchmark endpoint conversion
         # Needs only numpy; the rest of benchmarks/tests needs the harness environment.
@@ -159,13 +157,14 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
       - name: Correctness suites, all extras - recovery, determinism, torch kernels
-        # pytest-xdist runs one worker per core (4 on a hosted runner; `logical` counts the cores
-        # the same with or without psutil). `loadfile` keeps a file's tests, and the module-scoped
-        # fixtures they share, on one worker.
+        # Tests marked `release` run at the release freeze, not here. pytest-xdist runs one worker
+        # per core (4 on a hosted runner; `logical` counts the cores the same with or without
+        # psutil). `loadfile` keeps a file's tests, and the module-scoped fixtures they share, on
+        # one worker.
         run: |
           uv sync --all-extras --python ${{ matrix.python-version }}
           uv run --no-sync python -c "import torch; print('torch', torch.__version__)"
-          uv run --no-sync python -m pytest tests --shard ${{ matrix.shard }} -n logical --dist loadfile -q -rs --durations=15
+          uv run --no-sync python -m pytest tests -m "not release" --shard ${{ matrix.shard }} -n logical --dist loadfile -q -rs --durations=15
 
   # The single required check. `build-install` is path-filtered, so a PR touching only
   # unfiltered paths skips it, and a skipped check never reports a conclusion - leaving a required

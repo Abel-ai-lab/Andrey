@@ -164,10 +164,9 @@ def _evaluate(condition: str, needs: str | list[str], **context: dict) -> bool:
     return eval(expression, {"__builtins__": {}}, context)
 
 
-def test_the_quality_gate_runs_on_pull_requests_into_main():
+def test_the_quality_gate_runs_by_hand_and_from_the_publish_only():
     triggers = _workflow("quality-gate.yml")["on"]
-    assert triggers["pull_request"]["branches"] == ["main"]
-    assert "workflow_call" in triggers
+    assert set(triggers) == {"workflow_dispatch", "workflow_call"}
 
 
 def test_the_publish_gate_runs_unless_the_lookup_found_a_run():

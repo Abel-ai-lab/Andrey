@@ -144,24 +144,25 @@ One command checks the current commit before a release, and exits 1 if any check
 uv run python -m qa.quality_gate
 ```
 
-The `quality-gate` workflow runs the same command once per release, on the head of the release pull
-request into `main`, and `main`'s ruleset requires it. The publish workflow skips its own run when a
-passing run has the tree of the commit it publishes (`scripts/gate_reuse.py`; a squash merge keeps
-the tree), so the published files are the ones the gate passed. A change after the gate, or a lookup
-that fails, runs the gate again. Every job that publishes to PyPI must need a job that calls the
-workflow; `tests/unit/test_release_gates.py` fails otherwise. Other pull requests do not run the
-gate.
+The gate is a release gate: it runs once per release, at the release freeze, with the full test
+suite and the other release checks, and no pull request runs it. The `quality-gate` workflow runs
+the same command by hand (`gh workflow run quality-gate.yml --ref <branch>`) and from the publish
+workflow. The publish workflow skips its own run when a passing run of the workflow has the tree of
+the commit it publishes (`scripts/gate_reuse.py`; a squash merge keeps the tree), so the published
+files are the ones the gate passed. A change after the gate, or a lookup that fails, runs the gate
+again. Every job that publishes to PyPI must need a job that calls the workflow;
+`tests/unit/test_release_gates.py` fails otherwise.
 
-A push to the release pull request that changes only `docs/`, `site/`, and top-level Markdown
-files (the CHANGELOG, the README) does not run the gate again. Nothing the gate reads is in those
+A run on a commit that changes only `docs/`, `site/`, and top-level Markdown files (the CHANGELOG,
+the README) since a passing run does not fit the methods again. Nothing the gate reads is in those
 paths: the gate reads `src/`, `benchmarks/` (the harness and the published summaries that
 reference parity checks), `qa/`, `pyproject.toml`, and `uv.lock`. The first step of the job looks
 for a passing run, on an earlier commit of the branch, that differs from this commit only in those
 paths (`scripts/gate_reuse.py --ancestor`), and the job's other steps are skipped when it finds
-one. The job still succeeds under its name, so the ruleset is satisfied, and its log and summary
-name the run and its commit. A run reused this way was itself a pass on its own tree, so a chain of
-such pushes traces back to a run that fitted the methods. A path outside those paths, a lookup that
-fails, or no such run, runs the gate.
+one. The job still succeeds under its name, and its log and summary name the run and its commit.
+A run reused this way was itself a pass on its own tree, so a chain of such commits traces back to
+a run that fitted the methods. A path outside those paths, a lookup that fails, or no such run, runs
+the gate.
 
 The gate checks PC, FCI, GFCI, CD-NOD, FCI-JCI, IAMB, Inter-IAMB, MMPC, GES, GIES, GnIES, IGSP, ICP,
 XGES, AGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, NOTEARS, DAGMA, BOSS, GRaSP, BOSS-FCI,
