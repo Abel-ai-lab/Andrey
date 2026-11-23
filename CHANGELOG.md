@@ -33,24 +33,25 @@ names its pull request.
 - `das` is supported. On its paper's simulation with z-scored or rescaled columns it made no more
   errors than the paper's code in any of 20 settings from 10 to 200 variables, and fewer on the
   first 20 datasets of each, in a tenth to a fiftieth of the time, and fewer than the empty graph up
-  to 1,000 variables. In the simulation's own units that code made fewer errors on sparse graphs,
-  since DAS standardizes the columns in its order search; its Limitations state this, and the
-  [0.19.0 release card][card-0190-das] has the numbers, with `cam`, SCORE, and NoGAM on the same
-  datasets. ([#1161])
+  to 1,000 variables. In the simulation's own units that code made fewer errors on sparse (ER1)
+  graphs at 20 and 50 variables, and tied at 10, since DAS standardizes the columns in its order
+  search; its Limitations state this, and the [0.19.0 release card][card-0190-das] has the numbers,
+  with `cam`, SCORE, and NoGAM on the same datasets. ([#1161])
 - `cpcm` and `cpcm_graph` are supported: the pair test's forced direction and the graph search. On
   their paper's pairs (Tables 1 and 2 and model (16) with gamma > 0) and graphs of 4 to 8 variables,
   they made as many errors as the paper's code, except the conservative estimate at gamma 0 under
   `"pareto"`, and fewer than a coin flip, the majority direction, or the empty graph, except on
-  Table 2's Pareto pairs drawn by the authors' generator, where neither did; the graph search ran
-  about ten times faster. The conservative estimate under `"pareto"` and Table 2's Pareto setup are
-  not supported, and the [0.19.0 release card][card-0190-cpcm] has the numbers. ([#1169])
+  Table 2's Pareto pairs drawn by the authors' generator, where neither did; the graph search ran 8
+  to 18 times faster on graphs of 4 to 8 variables. The conservative estimate under `"pareto"` and
+  Table 2's Pareto setup are not supported, and the [0.19.0 release card][card-0190-cpcm] has the
+  numbers. ([#1169])
 - Two experimental methods and three experimental tests: `lges`, less greedy equivalence search
   (Ejaz and Bareinboim 2025); `rpcmci`, Regime-PCMCI (Saggioro et al. 2020), for one time series
-  whose lagged links switch between a few persistent regimes; and the regression-based tests
-  `"gcm"` (Shah and Peters 2020), `"wgcm"` (Scheidegger, Hörrmann, and Bühlmann 2022), and `"pcm"`
-  (Lundborg, Kim, Shah, and Samworth 2024), for every method that takes `indep_test`. The release
-  card compares each with its authors' code and says where it follows that code over the paper.
-  ([#1146], [#1147], [#1149], [#1159], [#1162], [#1175])
+  whose lagged links switch between a few persistent regimes; and the regression-based tests `"gcm"`
+  (Shah and Peters 2020), `"wgcm"` (Scheidegger, Hörrmann, and Bühlmann 2022), and `"pcm"`
+  (Lundborg, Kim, Shah, and Samworth 2024), for every method that takes `indep_test` except
+  `rpcmci`. The release card compares each with its authors' code and says where it follows that
+  code over the paper. ([#1146], [#1147], [#1149], [#1159], [#1162], [#1175])
 - `target` takes a list of columns on `iamb`, `inter_iamb`, `mmpc`, and `icp`: one call returns one
   result per target, each equal to a separate call, and on complete data the three set learners
   share one search and test setup across the targets. ([#1058], [#1153])
@@ -158,10 +159,10 @@ names its pull request.
 - `indep_test="kci"` caches each column's kernel for queries without a conditioning set, so `pc`,
   `fci`, and `cdnod` with it run faster on many variables and few rows, with the same output bit
   for bit. ([#1072], [#1073])
-- A grow scan of `iamb` and `inter_iamb` with `fisherz`, `student_t`, or `normal_scores` on
-  complete data uses one Cholesky factor per conditioning set, so `iamb` at 5,000 rows is 3.9
-  times faster at one target on 1,000 variables and 4.4 times on 100 variables. ([#1047],
-  [#1048])
+- A grow scan of `iamb` and `inter_iamb` with `fisherz`, `student_t`, or `normal_scores` on complete
+  data uses one Cholesky factor per conditioning set, so `iamb` at 5,000 rows is 3.9 times faster at
+  one target on 1,000 variables and 4.4 times at every target on 100 variables. ([#1047], [#1048],
+  [#1144])
 - `skewd` and `skewd_mv` run their searches on `andrey.config(n_jobs)` threads, with the same
   result at any number. ([#1189])
 - For contributors, CI on a pull request into a release branch runs the fast checks, and the
@@ -2895,8 +2896,9 @@ First alpha release.
 [#1019]: https://github.com/Abel-ai-lab/Andrey/pull/1019
 [#1072]: https://github.com/Abel-ai-lab/Andrey/issues/1072
 [#1073]: https://github.com/Abel-ai-lab/Andrey/pull/1073
-[#1047]: https://github.com/Abel-ai-lab/Andrey/pull/1047
+[#1047]: https://github.com/Abel-ai-lab/Andrey/issues/1047
 [#1048]: https://github.com/Abel-ai-lab/Andrey/pull/1048
+[#1144]: https://github.com/Abel-ai-lab/Andrey/pull/1144
 [#1058]: https://github.com/Abel-ai-lab/Andrey/pull/1058
 [#1153]: https://github.com/Abel-ai-lab/Andrey/pull/1153
 [#1165]: https://github.com/Abel-ai-lab/Andrey/pull/1165
