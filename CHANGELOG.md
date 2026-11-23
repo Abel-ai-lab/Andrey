@@ -130,6 +130,10 @@ names its pull request.
   and additive models by default for `"pcm"`. ([#1129], [#1147], [#1162], [#1175])
 - `target` takes a list of columns on `iamb`, `inter_iamb`, `mmpc`, and `icp`, and `andrey run`
   takes it as `'target=[a,b]'`, returning one result per target. ([#1058], [#1153])
+- `skewd` and `skewd_mv` take `optimizer="lbfgs"`, L-BFGS-B with the analytic gradient in every
+  search, beside the default `"cmaes"`, the paper's CMA-ES: on the paper's simulations it decided
+  no worse in any setting at 5.6 to 14.7 times less time per pair and 2.3 times per graph, with a
+  lower penalized likelihood in 289 of 738 fitted models and a higher one in 239. ([#1194])
 
 ### Changed
 
@@ -2865,6 +2869,7 @@ First alpha release.
 [#1191]: https://github.com/Abel-ai-lab/Andrey/pull/1191
 [#1185]: https://github.com/Abel-ai-lab/Andrey/pull/1185
 [#1189]: https://github.com/Abel-ai-lab/Andrey/pull/1189
+[#1194]: https://github.com/Abel-ai-lab/Andrey/pull/1194
 [#1161]: https://github.com/Abel-ai-lab/Andrey/pull/1161
 [#1169]: https://github.com/Abel-ai-lab/Andrey/pull/1169
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
