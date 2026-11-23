@@ -169,6 +169,12 @@ html[data-theme="dark"] .release-cover {
     var(--andrey-ground-navy);
 }
 
+.bd-content .sd-card:is(.release-cover, .release-tile).release-art-0-19-0 {
+  background:
+    url("release-cards/0.19.0.jpg") center 62% / cover no-repeat,
+    var(--andrey-ground-navy);
+}
+
 /* A release without its own art: the stipple ground, and on the cover the wordmark's image
    (`_static/wordmark-dark.svg`, in a `sd-card-text` paragraph) in the title's place. It has no
    amber dot: the wordmark's amber stroke and the ground's amber corner are its accents

@@ -21,15 +21,14 @@ posts of the features it changes. A card keeps the numbers its release published
 :::{card}
 :link: benchmarks/0.19.0
 :link-type: doc
-:link-alt: The 0.19.0 release card
-:class-card: release-cover release-default
+:link-alt: The 0.19.0 release card: missing values in merged data
+:class-card: release-cover release-art release-art-0-19-0
 :shadow: none
 :margin: 0
 
 Release card
 
-<p class="sd-card-text"><img class="dark-light" src="../_static/wordmark-dark.svg" alt="Andrey"
-width="190" height="40"></p>
+Missing values in merged data
 
 0.19.0
 :::
@@ -616,7 +615,7 @@ The homepage's speed claim and charts come from these release cards.
 ```{toctree}
 :hidden:
 
-0.19.0 <benchmarks/0.19.0>
+0.19.0: missing values in merged data <benchmarks/0.19.0>
 0.18.0 <benchmarks/0.18.0>
 0.17.0 <benchmarks/0.17.0>
 0.16.0 <benchmarks/0.16.0>
