@@ -48,9 +48,9 @@ names its pull request.
   (Ejaz and Bareinboim 2025); `rpcmci`, Regime-PCMCI (Saggioro et al. 2020), for one time series
   whose lagged links switch between a few persistent regimes; and the regression-based tests
   `"gcm"` (Shah and Peters 2020), `"wgcm"` (Scheidegger, Hörrmann, and Bühlmann 2022), and `"pcm"`
-  (Lundborg, Kim, Shah, and Samworth 2024), for every method that takes `indep_test`. Each follows
-  its paper, and the release card compares it with its authors' code. ([#1146], [#1147], [#1149],
-  [#1159], [#1162], [#1175])
+  (Lundborg, Kim, Shah, and Samworth 2024), for every method that takes `indep_test`. The release
+  card compares each with its authors' code and says where it follows that code over the paper.
+  ([#1146], [#1147], [#1149], [#1159], [#1162], [#1175])
 - `target` takes a list of columns on `iamb`, `inter_iamb`, `mmpc`, and `icp`: one call returns one
   result per target, each equal to a separate call, and on complete data the three set learners
   share one search and test setup across the targets. ([#1058], [#1153])
@@ -143,8 +143,7 @@ names its pull request.
   times faster on synthetic merged cohorts, with identical graphs. ([#1148])
 - PC, FCI, CD-NOD, FCI-JCI, and the Markov-blanket searches mark a conditioning set holding a
   column never observed with the tested pair as not tested without building it, so `pc` with
-  `max_depth=None` on synthetic merged cohorts of 40 and 50 columns finishes in about a second.
-  ([#1148], [#1167])
+  `max_depth=None` finishes on synthetic merged cohorts of 40 and 50 columns. ([#1148], [#1167])
 - Each test sets its own row floor under test-wise deletion, `|S| + 4` rows for `fisherz` and
   `normal_scores`, and a CD-NOD or FCI-JCI test with `env` constant on its rows is not tested.
   ([#1151])
