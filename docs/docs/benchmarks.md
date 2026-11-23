@@ -42,7 +42,7 @@ arrive, experimental.
 
 :::{div} release-actions
 [Read the release card](benchmarks/0.19.0.md)
-[Post: Missing values in merged data](../blog/20261124-andrey-0-19-0.md)
+[Post: Missing values in merged data](../blog/20261123-andrey-0-19-0.md)
 [Post: Functional causal models](../blog/20261103-andrey-0-13-0.md)
 [Post: Pairwise direction](../blog/20261015-andrey-0-4-0.md)
 :::

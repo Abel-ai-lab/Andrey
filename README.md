@@ -30,7 +30,7 @@ in every setting. DAS and CPCM are supported, LGES, Regime-PCMCI, and the GCM, w
 arrive, experimental, and `target` takes a list of columns.
 
 **[0.19.0 release card](https://andrey.abel.ai/docs/benchmarks/0.19.0.html)** · Post:
-**[Missing values in merged data](https://andrey.abel.ai/blog/20261124-andrey-0-19-0.html)**
+**[Missing values in merged data](https://andrey.abel.ai/blog/20261123-andrey-0-19-0.html)**
 
 ---
 
@@ -189,7 +189,7 @@ If you use Andrey in your work, please cite it, or use the
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.18.0},
+  version = {0.19.0},
   url = {https://andrey.abel.ai},
 }
 ```
