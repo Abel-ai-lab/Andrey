@@ -22,15 +22,15 @@ banner links the website's homepage. -->
 
 ## ⭐ What's new in 0.19.0
 
-0.19.0 is about missing values in merged data. When cohorts that each measure their own variables
-are merged, a test without enough rows is not tested, a pair that no test decides is left out of
-the graph and listed, and an edge that an untested set might have separated is flagged. On
-simulated merged cohorts of 20 to 50 variables, PC's graph made fewer errors than the empty graph
-in every setting. DAS and CPCM are supported, LGES, Regime-PCMCI, and the GCM, wGCM, and PCM tests
-arrive, experimental, and `target` takes a list of columns.
+0.19.0 is about datasets with overlapping variables. When cohorts that each measure their own
+variables are stacked into one table, a test without enough rows is not tested, a pair that no test
+decides is left out of the graph and listed, and an edge that an untested set might have separated
+is flagged. On simulated cohorts of 20 to 50 variables, PC's graph made fewer errors than the empty
+graph in every setting. DAS and CPCM are supported, LGES, Regime-PCMCI, and the GCM, wGCM, and PCM
+tests arrive, experimental, and `target` takes a list of columns.
 
 **[0.19.0 release card](https://andrey.abel.ai/docs/benchmarks/0.19.0.html)** · Post:
-**[Missing values in merged data](https://andrey.abel.ai/blog/20261123-andrey-0-19-0.html)**
+**[Datasets with overlapping variables](https://andrey.abel.ai/blog/20261123-andrey-0-19-0.html)**
 
 ---
 

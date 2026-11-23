@@ -14,19 +14,19 @@ names its pull request.
 
 ### Highlights
 
-- Missing values in merged data. On data merged from cohorts that each measure their own columns, a
-  conditional-independence test with too few rows, such as a test of a pair never observed
-  together, is not tested: it never separates a pair and never confirms a link. A pair that no
-  tested query decides is left out of the graph and listed in `metadata["undecided_pairs"]`, an edge
-  that an untested conditioning set might have separated is listed in
+- Datasets with overlapping variables. On cohorts that each measure their own columns, stacked into
+  one table, a conditional-independence test with too few rows, such as a test of a pair never
+  observed together, is not tested: it never separates a pair and never confirms a link. A pair that
+  no tested query decides is left out of the graph and listed in `metadata["undecided_pairs"]`, an
+  edge that an untested conditioning set might have separated is listed in
   `metadata["possibly_separable"]`, and one notice per process counts both kinds and the pairs never
-  observed together, naming them when there are at most five. On merged cohorts
-  of 20, 40, and 50 variables that no row bridges (20 seeds each), PC's graph made fewer errors than
-  the empty graph in every setting and found 0.87 to 0.95 of the true edges between variables
-  observed together, about as many as on the complete data (0.88 to 0.96), where answering each
-  untested test with p = 1 found 0.21 to 0.34. `possibly_separable="ambiguous"` reads no collider
-  from a flagged side, test-wise deletion sums over missingness-pattern groups when that costs less,
-  and `missing="em"` refuses two columns that share no row. The
+  observed together, naming them when there are at most five. On simulated cohorts of 20, 40, and 50
+  variables that no row bridges (20 seeds each), PC's graph made fewer errors than the empty graph
+  in every setting and found 0.87 to 0.95 of the true edges between variables observed together,
+  about as many as on the complete data (0.88 to 0.96), where answering each untested test with
+  p = 1 found 0.21 to 0.34. `possibly_separable="ambiguous"` reads no collider from a flagged side,
+  test-wise deletion sums over missingness-pattern groups when that costs less, and `missing="em"`
+  refuses two columns that share no row. The
   [release post](https://andrey.abel.ai/blog/20261123-andrey-0-19-0.html) tells the story, and the
   [0.19.0 release card][card-0190-missing] has the numbers. ([#1102], [#1148], [#1151], [#1156],
   [#1167], [#1171])
@@ -93,8 +93,8 @@ names its pull request.
 
 - `possibly_separable="ambiguous"` in PC, FCI, CD-NOD, FCI-JCI, the Markov-blanket searches' CPDAG,
   and PCMCI+ reads a triple with a flagged side as neither a collider nor a non-collider, which on
-  merged cohorts removed nearly every false collider and nearly every true arrowhead with them.
-  ([#1171])
+  cohorts with overlapping variables removed nearly every false collider and nearly every true
+  arrowhead with them. ([#1171])
 - On data with missing values, the conditional-independence searches that delete rows per test
   record, each when it is not empty, `metadata["not_tested"]`, `metadata["undecided_pairs"]`, and
   `metadata["never_observed_together"]`, PC, FCI, CD-NOD, FCI-JCI, the Markov-blanket searches,
@@ -144,12 +144,13 @@ names its pull request.
   code. ([#1161])
 - `cpcm` and `cpcm_graph` are supported, and the [0.19.0 release card][card-0190-cpcm] compares
   them with their paper's code. ([#1169])
-- With `fisherz` and `student_t` on data merged from cohorts, test-wise deletion computes a test's
-  sums from missingness-pattern groups, which made `pc` 2.5 to 6.6 times and `iamb` 1.6 to 4.2
-  times faster on synthetic merged cohorts, with identical graphs. ([#1148])
-- PC, FCI, CD-NOD, FCI-JCI, and the Markov-blanket searches mark a conditioning set holding a
-  column never observed with the tested pair as not tested without building it, so `pc` with
-  `max_depth=None` finishes on synthetic merged cohorts of 40 and 50 columns. ([#1148], [#1167])
+- With `fisherz` and `student_t` on cohorts with overlapping variables, test-wise deletion computes
+  a test's sums from missingness-pattern groups, which made `pc` 2.5 to 6.6 times and `iamb` 1.6 to
+  4.2 times faster on synthetic cohorts with overlapping variables, with identical graphs. ([#1148])
+- PC, FCI, CD-NOD, FCI-JCI, and the Markov-blanket searches mark a conditioning set holding a column
+  never observed with the tested pair as not tested without building it, so `pc` with
+  `max_depth=None` finishes on synthetic cohorts with overlapping variables of 40 and 50 columns.
+  ([#1148], [#1167])
 - Each test sets its own row floor under test-wise deletion, `|S| + 4` rows for `fisherz` and
   `normal_scores`, and a CD-NOD or FCI-JCI test with `env` constant on its rows is not tested.
   ([#1151])
@@ -2889,7 +2890,7 @@ First alpha release.
 [#1099]: https://github.com/Abel-ai-lab/Andrey/pull/1099
 [card-0190-das]: https://andrey.abel.ai/docs/benchmarks/0.19.0.html#das
 [card-0190-cpcm]: https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm
-[card-0190-missing]: https://andrey.abel.ai/docs/benchmarks/0.19.0.html#missing-values-in-merged-data
+[card-0190-missing]: https://andrey.abel.ai/docs/benchmarks/0.19.0.html#datasets-with-overlapping-variables
 [card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
 [#1142]: https://github.com/Abel-ai-lab/Andrey/pull/1142
 [#1102]: https://github.com/Abel-ai-lab/Andrey/pull/1102
