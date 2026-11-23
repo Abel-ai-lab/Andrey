@@ -2130,7 +2130,12 @@ _SKEWD_OPTIMIZER = ParamSpec(
     choices=("cmaes", "lbfgs"),
     doc="The optimizer of each search of the penalized likelihood: cmaes = CMA-ES, the paper's "
     "heuristic; lbfgs = L-BFGS-B with the analytic gradient, from the same starts within the same "
-    "bounds.",
+    "bounds. cmaes favors the paper's optimizer and gives up time; lbfgs favors time and gives up "
+    "the paper's optimizer. On the paper's simulated pairs and graphs of 1,000 rows (graphs of 6 "
+    "and 10 variables; 20 seeds each, one worker), lbfgs decided worse than cmaes in no setting by "
+    "a paired bootstrap, at a median of 5.6 to 14.7 times less time per pair and 2.3 times less "
+    "per graph, and its penalized likelihood was lower in 289 of the 738 fitted models and higher "
+    "in 239.",
 )
 
 _add(
