@@ -1640,6 +1640,7 @@ def skewd_mv(
     tuning_iter: int = 20,
     max_iter: int = 3000,
     max_fits: int | None = 100,
+    optimizer: str = "cmaes",
     seed: int | None = None,
 ) -> StructureOutput:
     """Learn a DAG of a skew-normal location-scale model with SkewD-MV.
@@ -1675,6 +1676,10 @@ def skewd_mv(
         While it is set, a group of undirected edges with more than 65,536 orientations is
         refused too, and so are groups that share a cycle and have more than 65,536 acyclic
         combinations.
+    optimizer : {"cmaes", "lbfgs"}, default="cmaes"
+        The optimizer of each search of a conditional model's penalized likelihood, as in
+        :func:`~andrey.skewd`: ``"cmaes"`` is CMA-ES, the paper's heuristic; ``"lbfgs"`` is
+        L-BFGS-B with the analytic gradient, from the same starts within the same bounds.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed of PC's randomized tests and of the random
@@ -1742,7 +1747,7 @@ def skewd_mv(
     not depend on the column order; ties follow ``andrey.config.tie_break``.
 
     ``n_jobs`` above 1 (``andrey.config`` or ``ANDREY_N_JOBS``) runs the conditional models, and
-    the CMA-ES searches of each, on that many threads. Each search draws from its own random
+    the searches of each, on that many threads. Each search draws from its own random
     stream, split from ``seed`` in a fixed order, so the DAG and its likelihoods are the same bit
     for bit with any number of workers. The models are fitted on one BLAS thread with any number of
     workers, so the result does not depend on the machine's BLAS thread count either.
@@ -1816,7 +1821,12 @@ def skewd_mv(
             "skewd_mv: PC's graph leaves no DAG that keeps its directed edges and adds no collider"
         )
     budget = Budget(
-        knots=8, folds=5, tuning_iter=tuning_iter, initial=-(-tuning_iter // 2), max_iter=max_iter
+        knots=8,
+        folds=5,
+        tuning_iter=tuning_iter,
+        initial=-(-tuning_iter // 2),
+        max_iter=max_iter,
+        optimizer=optimizer,
     )
     n = X.shape[0]
     terms: dict[tuple[int, tuple[int, ...]], float] = {}

@@ -10,11 +10,12 @@ difference penalties on each parent's spline coefficients, ``alpha_t`` on the lo
 
 1. Bayesian optimization chooses the penalties: each candidate's score is the held-out
    log-likelihood, without penalty, of a k-fold cross-validation (Appendix B.1).
-2. CMA-ES (Hansen 2016) maximizes the penalized log-likelihood at the chosen penalties from
-   several starts: least squares with ``rho = 0`` and ``lambda`` the effect's sample skewness, and
-   each fold's estimate at those penalties. With several parents it reads the location
-   coefficients as those whose parents' blocks have equal sums, as ECM does: a constant moved
-   from one block to another changes no fitted value.
+2. A search maximizes the penalized log-likelihood at the chosen penalties from several starts:
+   least squares with ``rho = 0`` and ``lambda`` the effect's sample skewness, and each fold's
+   estimate at those penalties. Each search, here and in each fold of step 1, is CMA-ES (Hansen
+   2016), the paper's heuristic, or L-BFGS-B (Byrd et al. 1995) with the analytic gradient. With
+   several parents it reads the location coefficients as those whose parents' blocks have equal
+   sums, as ECM does: a constant moved from one block to another changes no fitted value.
 3. Expectation conditional maximization (ECM, Section 4) refines the best of them: the E-step's
    moments of the latent truncated normal, a closed-form step in ``(psi, lambda)``, then the
    maximum over ``rho`` of the expected penalized log-likelihood. That function is concave in
@@ -27,6 +28,9 @@ References
 Klippert and Marx (2026). Skewness-robust causal discovery in location-scale noise models. ICML.
 
 Hansen (2016). The CMA evolution strategy: a tutorial. arXiv:1604.00772.
+
+Byrd, Lu, Nocedal, and Zhu (1995). A limited memory algorithm for bound constrained optimization.
+SIAM Journal on Scientific Computing 16(5).
 
 Eilers and Marx (1996). Flexible smoothing with B-splines and penalties. Statistical Science 11(2).
 
@@ -79,6 +83,10 @@ GENERATIONS = 5000
 #: ``WINDOW`` iterations (Appendix B.1, Section 4).
 WINDOW = 25
 TOLERANCE = 1e-6
+#: L-BFGS-B's options: it stops at the limit of float precision, or after SciPy's own caps.
+LBFGS_OPTIONS = {"ftol": 1e-15, "gtol": 1e-10, "maxiter": 15000, "maxfun": 15000}
+#: The searches' optimizers: CMA-ES (the paper's) and L-BFGS-B with the analytic gradient.
+OPTIMIZERS = ("cmaes", "lbfgs")
 #: The most DAGs one undirected component may list while ``max_fits`` caps the conditional models: a
 #: sparse component with conflicting colliders has about ``2^edges`` acyclic orientations for a few
 #: models per edge, so the cap on models alone does not stop its listing.
@@ -94,13 +102,15 @@ _LOG_NORM = math.log(2.0) - 0.5 * math.log(2.0 * math.pi)
 class Budget:
     """The settings of one fit: the location spline's knots, the cross-validation folds, the
     penalty settings the Bayesian optimization scores and how many of them start it at Latin
-    hypercube points, and the most ECM iterations."""
+    hypercube points, the most ECM iterations, and the searches' optimizer (one of
+    :data:`OPTIMIZERS`)."""
 
     knots: int
     folds: int
     tuning_iter: int
     initial: int
     max_iter: int
+    optimizer: str
 
 
 @dataclass(frozen=True)
@@ -196,6 +206,66 @@ def _penalized_nll(
     value += 0.5 * np.einsum("mi,ij,mj->m", psi, k_alpha, psi)
     value += 0.5 * np.einsum("mi,ij,mj->m", rho, m_kappa, rho)
     return np.where(np.isfinite(value), value, np.inf)
+
+
+def _penalized_nll_gradient(
+    theta: np.ndarray,
+    location: np.ndarray,
+    scale: np.ndarray,
+    effect: np.ndarray,
+    k_alpha: np.ndarray,
+    m_kappa: np.ndarray,
+) -> np.ndarray:
+    """The gradient of :func:`_penalized_nll` at one parameter vector ``theta`` (d,).
+
+    With ``r = (y - N psi) e^(-v / 2)``, ``v = Z rho``, ``u = lambda r``, and ``w = phi(u) /
+    Phi(u)``, a row's log density ``C - v / 2 - r^2 / 2 + log Phi(u)`` has the derivatives
+    ``(r - lambda w) e^(-v / 2) N`` in ``psi``, ``(r^2 - lambda r w - 1) Z / 2`` in ``rho``, and
+    ``r w`` in ``lambda``.
+    """
+    q, p = location.shape[1], scale.shape[1]
+    psi, rho, shape = theta[:q], theta[q : q + p], theta[-1]
+    spread = np.exp(-0.5 * (scale @ rho))
+    r = (effect - location @ psi) * spread
+    u = shape * r
+    ratio = np.exp(-0.5 * u**2 - 0.5 * math.log(2 * math.pi) - log_ndtr(u))  # phi / Phi
+    return np.concatenate(
+        [
+            location.T @ ((shape * ratio - r) * spread) + k_alpha @ psi,
+            scale.T @ (0.5 - 0.5 * r**2 + 0.5 * shape * r * ratio) + m_kappa @ rho,
+            [-float(r @ ratio)],
+        ]
+    )
+
+
+def _lbfgs(
+    objective, gradient, start: np.ndarray, lower: np.ndarray, upper: np.ndarray
+) -> tuple[np.ndarray, float]:
+    """Minimize ``objective`` (rows of candidates -> values) by L-BFGS-B from ``start`` with the
+    analytic ``gradient`` (one parameter vector -> its gradient), within the bounds.
+
+    It stops at the limit of float precision (:data:`LBFGS_OPTIONS`) or after SciPy's caps on the
+    iterations and evaluations. A point whose value is not finite counts as infinite, so the line
+    search stays where the value is finite and the result is never worse than the start. It
+    returns the point and its value under ``objective``, the function CMA-ES minimizes.
+    """
+
+    def value_and_gradient(theta: np.ndarray) -> tuple[float, np.ndarray]:
+        value = float(objective(theta[None, :])[0])
+        if not math.isfinite(value):
+            return math.inf, np.zeros_like(theta)
+        return value, gradient(theta)
+
+    found = minimize(
+        value_and_gradient,
+        np.clip(start, lower, upper),
+        jac=True,
+        method="L-BFGS-B",
+        bounds=list(zip(lower, upper, strict=True)),
+        options=LBFGS_OPTIONS,
+    )
+    best = np.asarray(found.x, dtype=float)
+    return best, float(objective(best[None, :])[0])
 
 
 def _bounds(q: int, p: int) -> tuple[np.ndarray, np.ndarray]:
@@ -310,9 +380,10 @@ def _identified(design: _Design) -> np.ndarray:
 
 @dataclass(frozen=True)
 class _Search:
-    """One CMA-ES search: the design and effect with the rows it reads, the penalties, the start (in
-    the coordinates of ``frame`` when it is set), the bounds, and the stream the search draws from.
-    The rows are read when the search runs, so a list of searches holds no copy of the data."""
+    """One search: the design and effect with the rows it reads, the penalties, the start (in the
+    coordinates of ``frame`` when it is set), the bounds, the optimizer, and the stream CMA-ES draws
+    from (L-BFGS-B draws nothing). The rows are read when the search runs, so a list of searches
+    holds no copy of the data."""
 
     design: _Design
     effect: np.ndarray
@@ -323,6 +394,7 @@ class _Search:
     start: np.ndarray
     lower: np.ndarray
     upper: np.ndarray
+    optimizer: str
     stream: np.random.Generator
 
 
@@ -341,7 +413,20 @@ def _run_search(search: _Search) -> tuple[np.ndarray, float]:
             theta = np.hstack([theta[:, : frame.shape[1]] @ frame.T, theta[:, frame.shape[1] :]])
         return _penalized_nll(theta, location, scale, y, search.k_alpha, search.m_kappa)
 
-    best, value = _cma_es(objective, search.start, search.lower, search.upper, search.stream)
+    def gradient(theta: np.ndarray) -> np.ndarray:
+        k = 0 if frame is None else frame.shape[1]
+        raw = theta if frame is None else np.concatenate([frame @ theta[:k], theta[k:]])
+        g = _penalized_nll_gradient(raw, location, scale, y, search.k_alpha, search.m_kappa)
+        return (
+            g
+            if frame is None
+            else np.concatenate([frame.T @ g[: frame.shape[0]], g[frame.shape[0] :]])
+        )
+
+    if search.optimizer == "lbfgs":
+        best, value = _lbfgs(objective, gradient, search.start, search.lower, search.upper)
+    else:
+        best, value = _cma_es(objective, search.start, search.lower, search.upper, search.stream)
     if frame is not None:
         best = np.concatenate([frame @ best[: frame.shape[1]], best[frame.shape[1] :]])
     return best, value
@@ -358,10 +443,12 @@ def _searches(
     log_penalties: np.ndarray,
     starts: list[np.ndarray],
     rng: np.random.Generator,
+    optimizer: str,
 ) -> list[_Search]:
-    """The CMA-ES searches on ``rows`` from the least-squares start and ``starts``, each with its
-    own stream spawned from ``rng``, so the draws of a search do not depend on how many
-    generations the searches before it ran, nor on the order or the place they run in.
+    """The searches by ``optimizer`` on ``rows`` from the least-squares start and ``starts``, each
+    with its own stream spawned from ``rng``, so the draws of a search do not depend on how many
+    generations the searches before it ran, nor on the order or the place they run in. Spawning
+    draws nothing from ``rng``, so the fit's other draws are the same for either optimizer.
 
     With several parents the searches read ``psi`` in the coordinates of :func:`_identified`: along
     a constant moved between the parents' blocks the likelihood is flat, so the distribution's mean
@@ -380,7 +467,9 @@ def _searches(
         lower, upper = np.concatenate([-free, lower[q:]]), np.concatenate([free, upper[q:]])
         points = [np.concatenate([frame.T @ point[:q], point[q:]]) for point in points]
     return [
-        _Search(design, effect, rows, k_alpha, m_kappa, frame, point, lower, upper, stream)
+        _Search(
+            design, effect, rows, k_alpha, m_kappa, frame, point, lower, upper, optimizer, stream
+        )
         for point, stream in zip(points, rng.spawn(len(points)), strict=True)
     ]
 
@@ -392,10 +481,12 @@ def _heuristic(
     log_penalties: np.ndarray,
     starts: list[np.ndarray],
     rng: np.random.Generator,
+    optimizer: str,
     run: Run = _serial,
 ) -> tuple[np.ndarray, float]:
-    """The best CMA-ES estimate on ``rows`` over ``starts`` (the least-squares start first)."""
-    return _best(run(_searches(design, rows, effect, log_penalties, starts, rng)))
+    """The best estimate by ``optimizer`` on ``rows`` over ``starts`` (the least-squares start
+    first)."""
+    return _best(run(_searches(design, rows, effect, log_penalties, starts, rng, optimizer)))
 
 
 @contextmanager
@@ -466,7 +557,7 @@ def _tune(
             search
             for log_penalties in candidates
             for train, _ in folds
-            for search in _searches(design, train, effect, log_penalties, [], rng)
+            for search in _searches(design, train, effect, log_penalties, [], rng, budget.optimizer)
         ]
         found = iter(run(searches))
         for log_penalties in candidates:
@@ -594,7 +685,10 @@ def fit(
     design = _design(parents, budget.knots)
     log_penalties, fold_estimates = _tune(design, effect, budget, rng, run)
     every = np.arange(effect.size)
-    theta, _ = _best(run(_searches(design, every, effect, log_penalties, fold_estimates, rng)))
+    searches = _searches(
+        design, every, effect, log_penalties, fold_estimates, rng, budget.optimizer
+    )
+    theta, _ = _best(run(searches))
     theta, converged = _ecm(design, effect, theta, log_penalties, budget.max_iter)
     q, p = design.location.shape[1], design.scale.shape[1]
     rows = _row_log_likelihoods(theta[None, :], design.location, design.scale, effect)[:, 0]

@@ -2123,6 +2123,16 @@ _add(
         ),
     )
 )
+_SKEWD_OPTIMIZER = ParamSpec(
+    name="optimizer",
+    type="str",
+    default="cmaes",
+    choices=("cmaes", "lbfgs"),
+    doc="The optimizer of each search of the penalized likelihood: cmaes = CMA-ES, the paper's "
+    "heuristic; lbfgs = L-BFGS-B with the analytic gradient, from the same starts within the same "
+    "bounds.",
+)
+
 _add(
     MethodSpec(
         name="skewd_mv",
@@ -2185,6 +2195,7 @@ _add(
                 "ValueError, raised once they are found, before any is fitted. 100 is the order up "
                 "to which the paper expects the method to apply. null sets no cap.",
             ),
+            _SKEWD_OPTIMIZER,
             concept_param(
                 "seed",
                 doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
@@ -3275,6 +3286,7 @@ _add(
                 "direction, at least 1; 5000 is the value of the paper's runs. Reaching it warns "
                 "with SearchLimitWarning.",
             ),
+            _SKEWD_OPTIMIZER,
             concept_param(
                 "seed",
                 doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "

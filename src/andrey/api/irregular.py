@@ -937,6 +937,7 @@ def skewd(
     criterion: str = "independence",
     tuning_iter: int = 60,
     max_iter: int = 5000,
+    optimizer: str = "cmaes",
     seed: int | None = None,
     missing: str | None = None,
 ) -> StructureOutput:
@@ -968,6 +969,11 @@ def skewd(
     max_iter : int, default=5000
         The most iterations, at least 1, of the expectation conditional maximization that refines
         each direction's fit.
+    optimizer : {"cmaes", "lbfgs"}, default="cmaes"
+        The optimizer of each search of the penalized likelihood, in the cross-validation and from
+        the final starts: ``"cmaes"`` is CMA-ES [4]_, the paper's heuristic; ``"lbfgs"`` is
+        L-BFGS-B [5]_ with the analytic gradient, from the same starts within the same bounds. See
+        Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed of the random draws of the optimization.
@@ -1026,23 +1032,26 @@ def skewd(
     accurate on skewed location-scale pairs and the independence criterion the more robust across
     other benchmarks, so the independence criterion is the default.
 
-    In each direction, the effect given the cause is skew-normal with location ``f``, scale
-    ``g``, and one shape ``lambda`` for every row; ``f`` is a cubic B-spline of 12 knots (14
-    columns) and ``log g^2`` one of 5 knots (7 columns), each extended linearly past the data's
-    range [1]_. The estimate maximizes the log-likelihood less a second-order difference penalty
-    on each spline's coefficients [3]_, in three steps [1]_: Bayesian optimization chooses the
-    two penalties, each candidate scored by the held-out log-likelihood of an 8-fold
-    cross-validation, ``tuning_iter`` candidates with a Gaussian-process model of the scores and
-    the expected improvement; CMA-ES [4]_, with a population of 100 and fixed learning rates
-    where the paper's runs adapt them, maximizes the penalized likelihood from least squares and
-    from each fold's estimate; and expectation conditional maximization refines the best of them
-    until the parameters move less than ``1e-6`` over 25 iterations, or for ``max_iter``
-    iterations. The defaults, 60 candidates and 5,000 iterations, are those of the paper's runs.
-    Each column is standardized first, as in [1]_, so the model does not depend on the units of
-    either variable; the Gaussian marginals of the two standardized causes are then equal, so
-    the likelihoods compare the two conditional models. A change of units by a power of two
-    gives the identical result, and any other factor changes the standardized values in their
-    last digits (see Limitations).
+    In each direction, the effect given the cause is skew-normal with location ``f``, scale ``g``,
+    and one shape ``lambda`` for every row; ``f`` is a cubic B-spline of 12 knots (14 columns) and
+    ``log g^2`` one of 5 knots (7 columns), each extended linearly past the data's range [1]_. The
+    estimate maximizes the log-likelihood less a second-order difference penalty on each spline's
+    coefficients [3]_, in three steps [1]_: Bayesian optimization chooses the two penalties, each
+    candidate scored by the held-out log-likelihood of an 8-fold cross-validation, ``tuning_iter``
+    candidates with a Gaussian-process model of the scores and the expected improvement; a search
+    maximizes the penalized likelihood from least squares and from each fold's estimate; and
+    expectation conditional maximization refines the best of them until the parameters move less
+    than ``1e-6`` over 25 iterations, or for ``max_iter`` iterations. With ``optimizer="cmaes"``
+    each search, in the folds and from the final starts, is CMA-ES [4]_ with a population of 100 and
+    fixed learning rates where the paper's runs adapt them; with ``optimizer="lbfgs"`` it is
+    L-BFGS-B [5]_ with the gradient of the penalized likelihood, run to the limit of float
+    precision. The penalties are chosen the same way under either, from the same folds and the same
+    first candidates. The defaults, 60 candidates and 5,000 iterations, are those of the paper's
+    runs. Each column is standardized first, as in [1]_, so the model does not depend on the units
+    of either variable; the Gaussian marginals of the two standardized causes are then equal, so the
+    likelihoods compare the two conditional models. A change of units by a power of two gives the
+    identical result, and any other factor changes the standardized values in their last digits (see
+    Limitations).
 
     With ``criterion="independence"`` (SkewD-IT), each direction's scaled residual
     ``(y - f(x)) / g(x)`` is tested against the proposed cause with the HSIC test of
@@ -1054,7 +1063,7 @@ def skewd(
     columns swaps the fits.
 
     ``n_jobs`` above 1 (``andrey.config`` or ``ANDREY_N_JOBS``) runs the two directions, and the
-    CMA-ES searches of each, on that many threads. Each search draws from its own random stream,
+    searches of each, on that many threads. Each search draws from its own random stream,
     split from ``seed`` in a fixed order, so the result is the same bit for bit with any number of
     workers. The fits and the tests run on one BLAS thread with any number of workers, so the
     result does not depend on the machine's BLAS thread count either.
@@ -1069,18 +1078,17 @@ def skewd(
 
     **Limitations.** Not benchmarked yet. The paper measures it on skewed location-scale pairs of
     1,000 rows and on established pair benchmarks [1]_. A fit at the defaults runs about 490
-    CMA-ES searches in each direction, 8 folds for each of the ``tuning_iter`` penalty settings and
-    9 final starts, and takes tens of minutes per pair on one worker; ``tuning_iter`` sets most of
-    that cost, and most of it divides over ``n_jobs`` workers. Each
-    HSIC test builds matrices with one row and one column per sample. The skew-normal's skewness
-    lies within about -1 and 1, so noise more skewed than that is misspecified, and the likelihood
-    criterion assumes Gaussian marginals of the standardized variables [1]_. A change of units
-    by a factor that is not a power of two changed no edge in 120 refits of 20 pairs (80 to 150
-    rows, ``tuning_iter=3``) and moved 2 of the 240 likelihoods by more than ``1e-6`` (both by
-    0.014, on a pair with no direction), so an edge can change only where the two directions
-    already lie within what another ``seed`` changes. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    searches in each direction, 8 folds for each of the ``tuning_iter`` penalty settings and 9 final
+    starts, and takes tens of minutes per pair on one worker with CMA-ES; ``tuning_iter`` sets most
+    of that cost, and most of it divides over ``n_jobs`` workers. Each HSIC test builds matrices
+    with one row and one column per sample. The skew-normal's skewness lies within about -1 and 1,
+    so noise more skewed than that is misspecified, and the likelihood criterion assumes Gaussian
+    marginals of the standardized variables [1]_. A change of units by a factor that is not a power
+    of two changed no edge in 120 refits of 20 pairs (80 to 150 rows, ``tuning_iter=3``) and moved 2
+    of the 240 likelihoods by more than ``1e-6`` (both by 0.014, on a pair with no direction), so an
+    edge can change only where the two directions already lie within what another ``seed`` changes.
+    The numbers are a reference, not a hard limit: they change with the data generator, the density,
+    the method's settings, and the machine.
 
     References
     ----------
@@ -1091,6 +1099,8 @@ def skewd(
     .. [3] Eilers, P. H. C., and Marx, B. D. (1996). Flexible smoothing with B-splines and
        penalties. Statistical Science 11(2), 89-121.
     .. [4] Hansen, N. (2016). The CMA evolution strategy: a tutorial. arXiv:1604.00772.
+    .. [5] Byrd, R. H., Lu, P., Nocedal, J., and Zhu, C. (1995). A limited memory algorithm for
+       bound constrained optimization. SIAM Journal on Scientific Computing 16(5), 1190-1208.
 
     Examples
     --------
@@ -1124,6 +1134,7 @@ def skewd(
         tuning_iter=tuning_iter,
         initial=-(-2 * tuning_iter // 3),
         max_iter=max_iter,
+        optimizer=optimizer,
     )
     if X.shape[0] < budget.folds:
         raise ValueError(
