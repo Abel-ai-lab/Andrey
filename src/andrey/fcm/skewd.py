@@ -54,7 +54,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from scipy.optimize import minimize
-from scipy.special import log_ndtr
+from scipy.special import erfcx, log_ndtr
 from scipy.stats import qmc
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.gaussian_process import GaussianProcessRegressor
@@ -221,14 +221,15 @@ def _penalized_nll_gradient(
     With ``r = (y - N psi) e^(-v / 2)``, ``v = Z rho``, ``u = lambda r``, and ``w = phi(u) /
     Phi(u)``, a row's log density ``C - v / 2 - r^2 / 2 + log Phi(u)`` has the derivatives
     ``(r - lambda w) e^(-v / 2) N`` in ``psi``, ``(r^2 - lambda r w - 1) Z / 2`` in ``rho``, and
-    ``r w`` in ``lambda``.
+    ``r w`` in ``lambda``. The ratio is ``w = sqrt(2 / pi) / erfcx(-u / sqrt(2))``, accurate to
+    rounding however far below zero ``u`` is.
     """
     q, p = location.shape[1], scale.shape[1]
     psi, rho, shape = theta[:q], theta[q : q + p], theta[-1]
     spread = np.exp(-0.5 * (scale @ rho))
     r = (effect - location @ psi) * spread
     u = shape * r
-    ratio = np.exp(-0.5 * u**2 - 0.5 * math.log(2 * math.pi) - log_ndtr(u))  # phi / Phi
+    ratio = math.sqrt(2 / math.pi) / erfcx(-u / math.sqrt(2))  # phi(u) / Phi(u)
     return np.concatenate(
         [
             location.T @ ((shape * ratio - r) * spread) + k_alpha @ psi,
