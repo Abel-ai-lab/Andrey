@@ -198,6 +198,10 @@ names its pull request.
   folder is given. ([#1179], [#1191])
 - `skewd` and `skewd_mv` fit on one BLAS thread, so their results no longer depend on the machine's
   BLAS thread count. ([#1189])
+- The ECM step that ends every `skewd` and `skewd_mv` fit, with either optimizer, computes the
+  normal density over its distribution function in the form the `optimizer="lbfgs"` gradient uses,
+  accurate to rounding however far below zero its argument is, where the old form's relative error
+  reached 1e-4 at -1e6. ([#1200])
 
 ## [0.18.0] - 2026-11-19
 
@@ -2872,6 +2876,7 @@ First alpha release.
 [#1189]: https://github.com/Abel-ai-lab/Andrey/pull/1189
 [#1194]: https://github.com/Abel-ai-lab/Andrey/pull/1194
 [#1198]: https://github.com/Abel-ai-lab/Andrey/pull/1198
+[#1200]: https://github.com/Abel-ai-lab/Andrey/pull/1200
 [#1161]: https://github.com/Abel-ai-lab/Andrey/pull/1161
 [#1169]: https://github.com/Abel-ai-lab/Andrey/pull/1169
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132

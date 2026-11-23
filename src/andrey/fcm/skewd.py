@@ -208,6 +208,13 @@ def _penalized_nll(
     return np.where(np.isfinite(value), value, np.inf)
 
 
+def _pdf_cdf_ratio(u: np.ndarray) -> np.ndarray:
+    """``phi(u) / Phi(u)``, the standard normal density over its distribution function, as
+    ``sqrt(2 / pi) / erfcx(-u / sqrt(2))``, accurate to rounding however far below zero ``u`` is.
+    """
+    return math.sqrt(2 / math.pi) / erfcx(-u / math.sqrt(2))
+
+
 def _penalized_nll_gradient(
     theta: np.ndarray,
     location: np.ndarray,
@@ -221,15 +228,14 @@ def _penalized_nll_gradient(
     With ``r = (y - N psi) e^(-v / 2)``, ``v = Z rho``, ``u = lambda r``, and ``w = phi(u) /
     Phi(u)``, a row's log density ``C - v / 2 - r^2 / 2 + log Phi(u)`` has the derivatives
     ``(r - lambda w) e^(-v / 2) N`` in ``psi``, ``(r^2 - lambda r w - 1) Z / 2`` in ``rho``, and
-    ``r w`` in ``lambda``. The ratio is ``w = sqrt(2 / pi) / erfcx(-u / sqrt(2))``, accurate to
-    rounding however far below zero ``u`` is.
+    ``r w`` in ``lambda``, with ``w`` from :func:`_pdf_cdf_ratio`.
     """
     q, p = location.shape[1], scale.shape[1]
     psi, rho, shape = theta[:q], theta[q : q + p], theta[-1]
     spread = np.exp(-0.5 * (scale @ rho))
     r = (effect - location @ psi) * spread
     u = shape * r
-    ratio = math.sqrt(2 / math.pi) / erfcx(-u / math.sqrt(2))  # phi(u) / Phi(u)
+    ratio = _pdf_cdf_ratio(u)
     return np.concatenate(
         [
             location.T @ ((shape * ratio - r) * spread) + k_alpha @ psi,
@@ -637,7 +643,7 @@ def _ecm(
         variance = np.exp(scale @ rho)
         sd = np.sqrt(variance)
         u = shape * residual / sd
-        ratio = np.exp(-0.5 * u**2 - 0.5 * math.log(2 * math.pi) - log_ndtr(u))  # phi / Phi
+        ratio = _pdf_cdf_ratio(u)
         v = shape * residual + sd * ratio
         v2 = (shape * residual) ** 2 + variance + shape * sd * residual * ratio
         weight = 1.0 / variance
