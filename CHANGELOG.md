@@ -187,9 +187,9 @@ names its pull request.
   process. ([#1151])
 - The backward phase of `mmpc` keeps only the best separating set of each tested size, so its memory
   no longer grows with the number of sets. ([#1019])
-- For contributors, `qa/identity.py` counts every partial-correlation query, and
-  `benchmarks/start_regression_ci_r.sh` clones the PCM authors' code when no folder is given.
-  ([#1179])
+- For contributors, `qa/identity.py` counts every conditional-independence query, those asked in
+  batches included, and `benchmarks/start_regression_ci_r.sh` clones the PCM authors' code when no
+  folder is given. ([#1179], [#1191])
 - `skewd` and `skewd_mv` fit on one BLAS thread, so their results no longer depend on the machine's
   BLAS thread count. ([#1189])
 
@@ -2860,6 +2860,7 @@ First alpha release.
 [#1162]: https://github.com/Abel-ai-lab/Andrey/pull/1162
 [#1175]: https://github.com/Abel-ai-lab/Andrey/pull/1175
 [#1179]: https://github.com/Abel-ai-lab/Andrey/pull/1179
+[#1191]: https://github.com/Abel-ai-lab/Andrey/pull/1191
 [#1185]: https://github.com/Abel-ai-lab/Andrey/pull/1185
 [#1189]: https://github.com/Abel-ai-lab/Andrey/pull/1189
 [#1161]: https://github.com/Abel-ai-lab/Andrey/pull/1161
