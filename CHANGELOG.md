@@ -300,6 +300,12 @@ names its pull request.
 - `skewd` and `skewd_mv` fit on one BLAS thread at any number of workers, so their results no
   longer depend on the machine's BLAS thread count, which changed a fit's log-likelihoods in their
   last digits. ([#1189])
+- The column-order guide lists `cpcm`, `skewd`, and `skewd_mv` among the methods that run on one
+  BLAS thread. ([#1191])
+- For contributors, `qa/identity.py` counts each p-value of the CI tests' `statistic_pvalues` and
+  of the partial-correlation tests' `residual_statistic_pvalues` as a query, so the query counts of
+  IAMB, Inter-IAMB, MMPC, PCMCI, PCMCI+, LPCMCI, and J-PCMCI+ include the queries they ask in
+  batches. ([#1191])
 
 ## [0.18.0] - 2026-11-19
 
@@ -2968,6 +2974,7 @@ First alpha release.
 [#1162]: https://github.com/Abel-ai-lab/Andrey/pull/1162
 [#1175]: https://github.com/Abel-ai-lab/Andrey/pull/1175
 [#1179]: https://github.com/Abel-ai-lab/Andrey/pull/1179
+[#1191]: https://github.com/Abel-ai-lab/Andrey/pull/1191
 [#1185]: https://github.com/Abel-ai-lab/Andrey/pull/1185
 [#1189]: https://github.com/Abel-ai-lab/Andrey/pull/1189
 [#1161]: https://github.com/Abel-ai-lab/Andrey/pull/1161
