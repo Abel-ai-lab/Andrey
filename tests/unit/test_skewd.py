@@ -586,6 +586,31 @@ def test_the_gradient_keeps_its_precision_far_into_the_tails(u, shape):
     np.testing.assert_allclose(gradient, reference, rtol=1e-12, atol=1e-12)
 
 
+@pytest.mark.parametrize("u", [-1e10, -1e9, -1e8, -1e6, -1e3, -30.0, -1.0, 1.0, 30.0, 1e3])
+@pytest.mark.parametrize("shape", [-4.0, 3.0])
+def test_the_ecm_location_step_keeps_its_precision_far_into_the_tails(u, shape):
+    # One row at u = lambda r (u = 0 leaves one row's shape step undefined) and intercepts for
+    # the location and the log scale: the location after one ECM step against the same step at
+    # 60 digits. The step reads phi(u) / Phi(u) through v = lambda e + sd w, which is small beside
+    # the effect, so the location keeps the ratio's precision.
+    mp = pytest.importorskip("mpmath")
+    psi, rho = 0.3, 0.4
+    effect = np.array([psi + u / shape * np.exp(rho / 2)])
+    ones = np.ones((1, 1))
+    design = native._Design(ones, ones, np.array([[0.7]]), np.array([[0.2]]), 1)
+    theta = np.array([psi, rho, shape])
+    step, _ = native._ecm(design, effect, theta, np.zeros(2), 1)
+
+    with mp.workdps(60):
+        lam, sd = mp.mpf(shape), mp.exp(mp.mpf(rho) / 2)
+        e = mp.mpf(effect[0]) - mp.mpf(psi)
+        w = mp.npdf(lam * e / sd) / mp.ncdf(lam * e / sd)
+        shrink = 1 + lam**2
+        rhs = (mp.mpf(effect[0]) - lam / shrink * (lam * e + sd * w)) / sd**2
+        reference = float(rhs / (1 / sd**2 + mp.mpf(0.7) / shrink))
+    np.testing.assert_allclose(step[0], reference, rtol=1e-12, atol=1e-12)
+
+
 @pytest.mark.parametrize("parents", [1, 2])
 def test_an_lbfgs_search_ends_at_a_stationary_point_no_worse_than_its_start(parents):
     # With two parents the search moves in the coordinates of the identified frame, so its
