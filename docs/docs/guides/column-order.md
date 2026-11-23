@@ -82,10 +82,10 @@ and the restrict phases of `mmhc` and `rsmax2`, with the partial-correlation, mi
 CMIknn, and GPDC tests, and with KCI below 2,000 rows, the scores of `ges` (and so of `gfci`'s first
 phase), `gies`, `gnies`, `xges`, `lges`, `ages`, `hc`, `tabu`, `mmhc`, and `rsmax2`, the fits of
 `notears`, `dagma`, `dynotears`, `cam`, `resit`, `score_matching`, `nogam`, `das`, `camuv`, `cpcm`,
-`skewd`, and `skewd_mv`, and the tests of `pcmci`, `pcmciplus`, `jpcmciplus`, and `lpcmci` and their
-worker processes run on one BLAS thread, so the host's thread count cannot change their results.
-From 2,000 rows, KCI runs on every BLAS thread, where its kernel products run faster; its p-values
-then repeat for a fixed thread count.
+`cpcm_graph`, `skewd`, and `skewd_mv`, and the tests of `pcmci`, `pcmciplus`, `jpcmciplus`, and
+`lpcmci` and their worker processes run on one BLAS thread, so the host's thread count cannot change
+their results. From 2,000 rows, KCI runs on every BLAS thread, where its kernel products run faster;
+its p-values then repeat for a fixed thread count.
 
 Two methods depend on more than ties. `calm` trains with PyTorch: its results repeat on one machine
 with one torch version, and another platform can give another graph. When the likelihood fit of
