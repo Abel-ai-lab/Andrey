@@ -693,11 +693,22 @@ def _moves(base: Iterable[int], moves: Iterable[tuple[str, int]]) -> list[list[i
     return [base, *([*base, u] if op == "add" else [p for p in base if p != u] for op, u in moves)]
 
 
+def _rows(x: Any, y: Any, conditions: Any, p_values: Any) -> list[tuple[int, int, Any, float]]:
+    """The queries of a call that answers many, one per p-value: query ``i`` asks ``x[i]`` and
+    ``y[i]`` given row ``i`` of the ``(N, m)`` array ``conditions``."""
+    sets = np.asarray(conditions).reshape(len(x), -1) if len(x) else []
+    return list(zip(x, y, sets, p_values))
+
+
 #: The CI tests' query methods, each with the ``(x, y, conditioning set, p-value)`` of every test
 #: one call makes, read from the call's result, the test, and the call's arguments.
 CI_QUERIES: dict[str, Callable[..., Iterable[tuple[int, int, Any, float]]]] = {
     "__call__": lambda p, test, x, y, conditions=(): [(x, y, conditions, p)],
     "statistic_pvalue": lambda rp, test, x, y, condition_set=(): [(x, y, condition_set, rp[1])],
+    "statistic_pvalues": lambda rp, test, x, y, conditions: _rows(x, y, conditions, rp[1]),
+    "residual_statistic_pvalues": lambda rp, test, data, x, y, conditions: _rows(
+        x, y, conditions, rp[1]
+    ),
     "_bounded_pvalue": lambda p, test, x, y, conditions, *settings, **options: [
         (x, y, conditions, p)
     ],
