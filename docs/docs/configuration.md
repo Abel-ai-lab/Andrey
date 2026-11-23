@@ -44,21 +44,26 @@ requested backend uses `auto`, without a warning.
 ## Parallel search
 
 - `ANDREY_N_JOBS`: the worker processes for GES and GFCI, and the worker threads for the two
-  directions of `pnl`. PC, FCI, GFCI, BOSS-FCI, GRaSP-FCI, CD-NOD, and RSMAX2 with `restrict="pc"`
-  also use the worker processes for their skeleton search with the `fisherz`, `student_t`,
-  `normal_scores`, and `rcot` tests on complete data, and send a conditioning-set size to them only
-  when it has enough tests to repay them; with `rcot` the p-values are the same with any number of
-  workers. FCI and GFCI also send each large possible-d-separation search to them with the
-  `fisherz`, `student_t`, and `normal_scores` tests on complete data, and FCI-JCI with `fisherz` and
-  `student_t`; the pairs are still searched one at a time, in the serial order, and every graph is
-  the serial one. IAMB, Inter-IAMB, and MMPC split a list of two or more targets over them with the
-  `fisherz`, `student_t`, and `normal_scores` tests on complete data, with the same results for any
-  number of workers. `andrey.bootstrap` fits one resample per worker, with the same result at any
-  number. `1` (the default) and `0` run serially; `-1` uses every usable core. `pnl` with one worker
-  leaves the BLAS threads unlimited and with several limits each thread to one, so on a machine with
-  several cores its p-values and statistics can differ in the last digits between one worker and
-  several. Each `pnl` thread holds three n x n float64 matrices; when the threads you ask for would
-  hold more than 4 GiB, fewer run, with a `PerformanceWarning`.
+  directions of `pnl` and for the searches of `skewd` and `skewd_mv`. PC, FCI, GFCI, BOSS-FCI,
+  GRaSP-FCI, CD-NOD, and RSMAX2 with `restrict="pc"` also use the worker processes for their
+  skeleton search with the `fisherz`, `student_t`, `normal_scores`, and `rcot` tests on complete
+  data, and send a conditioning-set size to them only when it has enough tests to repay them; with
+  `rcot` the p-values are the same with any number of workers. FCI and GFCI also send each large
+  possible-d-separation search to them with the `fisherz`, `student_t`, and `normal_scores` tests on
+  complete data, and FCI-JCI with `fisherz` and `student_t`; the pairs are still searched one at a
+  time, in the serial order, and every graph is the serial one. IAMB, Inter-IAMB, and MMPC split a
+  list of two or more targets over them with the `fisherz`, `student_t`, and `normal_scores` tests
+  on complete data, with the same results for any number of workers. `andrey.bootstrap` fits one
+  resample per worker, with the same result at any number. `1` (the default) and `0` run serially;
+  `-1` uses every usable core. `pnl` with one worker leaves the BLAS threads unlimited and with
+  several limits each thread to one, so on a machine with several cores its p-values and statistics
+  can differ in the last digits between one worker and several. Each `pnl` thread holds three n x n
+  float64 matrices; when the threads you ask for would hold more than 4 GiB, fewer run, with a
+  `PerformanceWarning`. `skewd` runs its two directions and their CMA-ES searches on the threads,
+  and `skewd_mv` its conditional models and their searches; every search draws from its own random
+  stream, so the results are the same bit for bit with any number of workers. Unlike `pnl`, both run
+  on one BLAS thread with any number of workers, so their results do not depend on the BLAS thread
+  count either; the limit applies to the whole process while a fit runs.
 - `ANDREY_GES_PARALLEL_MIN_WORK`: a GES pass uses the workers only when it expects to evaluate more
   candidates than this. The default is `10000`; `0` always uses them.
 - `ANDREY_SKELETON_PARALLEL_MIN_WORK`: a conditioning-size pass of the skeleton search of PC, FCI,

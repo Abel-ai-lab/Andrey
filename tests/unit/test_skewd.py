@@ -5,12 +5,15 @@ from __future__ import annotations
 import itertools
 import time
 import warnings
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import pandas as pd
 import pytest
 from scipy.stats import skewnorm
+from threadpoolctl import threadpool_info, threadpool_limits
 
+import andrey
 from andrey import skewd, skewd_mv
 from andrey.api.irregular import _pair_matrix
 from andrey.core.orient import ARROW, NULL, TAIL, dag2cpdag
@@ -270,7 +273,7 @@ def test_skewd_mv_returns_the_most_likely_dag_of_the_class(monkeypatch, root):
     def column(values: np.ndarray) -> int:
         return int(np.argmax([abs(np.corrcoef(values, data[:, j])[0, 1]) for j in range(3)]))
 
-    def fit(parents, effect, budget, seed):
+    def fit(parents, effect, budget, seed, run):
         edge = (column(parents[:, 0]), column(effect))
         return native.Fit(0.0 if edge in edges[root] else -1.0, effect, True)
 
@@ -568,3 +571,113 @@ def test_a_search_does_not_read_the_signs_of_the_eigenvectors(monkeypatch):
     again = search()
     np.testing.assert_array_equal(again[0], first[0])
     assert again[1] == first[1]
+
+
+_SIXTEEN_BLAS_THREADS = """
+import pickle, sys
+from threadpoolctl import threadpool_info
+import andrey
+from andrey.fcm import skewd as native
+
+method, data, kwargs, counts = pickle.load(sys.stdin.buffer)
+outside = [lib["num_threads"] for lib in threadpool_info() if lib["user_api"] == "blas"]
+inside, fit = [], native.fit
+
+def recording(*args):
+    inside.extend(lib["num_threads"] for lib in threadpool_info() if lib["user_api"] == "blas")
+    return fit(*args)
+
+native.fit = recording
+outs = []
+for n_jobs in counts:
+    with andrey.config(n_jobs=n_jobs):
+        out = getattr(andrey, method)(data, **kwargs)
+    outs.append((repr(out.metadata), out.structure.oriented_edges()))
+pickle.dump((outside, inside, outs), sys.stdout.buffer)
+"""
+
+
+def _under_sixteen_blas_threads(method: str, data, kwargs: dict, counts: tuple[int, ...]):
+    """``method``'s metadata (as its ``repr``) and edges at each worker count, in a process started
+    with 16 BLAS threads, after checking that every fit there saw one BLAS thread."""
+    import os
+    import pickle
+    import subprocess
+    import sys
+
+    names = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
+    threads = dict.fromkeys(names, "16")
+    proc = subprocess.run(
+        [sys.executable, "-c", _SIXTEEN_BLAS_THREADS],
+        input=pickle.dumps((method, data, kwargs, counts)),
+        capture_output=True,
+        env={**os.environ, **threads},
+        timeout=600,
+    )
+    assert proc.returncode == 0, proc.stderr.decode()
+    outside, inside, outs = pickle.loads(proc.stdout)
+    if not outside or max(outside) == 1:
+        pytest.skip("no BLAS here runs on 16 threads")
+    assert inside and set(inside) == {1}
+    return outs
+
+
+@pytest.mark.parametrize("workers", [4, 8])
+def test_a_fit_on_workers_gives_the_serial_fit_bit_for_bit(workers):
+    # Every search draws from its own stream, spawned in a fixed order, so where the searches
+    # run cannot change a bit of the fit. Two fits with two parents run at once, each with a
+    # candidate chosen by the Gaussian process, so two threads change the warning filters.
+    rng = np.random.default_rng(4)
+    parents = rng.standard_normal((120, 2))
+    effect = np.tanh(parents).sum(axis=1) + skewnorm.rvs(4, size=120, random_state=rng)
+    parents = (parents - parents.mean(axis=0)) / parents.std(axis=0)
+    effect = (effect - effect.mean()) / effect.std()
+    budget = native.Budget(knots=6, folds=3, tuning_iter=3, initial=2, max_iter=50)
+    serial = native.fit(parents, effect, budget, 0)
+    filters = list(warnings.filters)
+    with native.search_pool(workers) as run, ThreadPoolExecutor(max_workers=2) as both:
+        spread = [both.submit(native.fit, parents, effect, budget, 0, run) for _ in range(2)]
+    assert warnings.filters == filters
+    for each in spread:
+        assert each.result().log_likelihood == serial.log_likelihood
+        assert np.array_equal(each.result().residual, serial.residual)
+
+
+def test_skewd_gives_the_same_bits_on_any_number_of_workers():
+    data = pd.DataFrame(_pair(), columns=["x", "y"])
+    first = skewd(data, **SHORT_PAIR)
+    for workers in (4, 8):
+        with threadpool_limits(limits=2), andrey.config(n_jobs=workers):
+            before = threadpool_info()
+            out = skewd(data, **SHORT_PAIR)
+            assert threadpool_info() == before  # the fit's one BLAS thread is restored
+        assert out.metadata == first.metadata
+        assert out.structure.oriented_edges() == first.structure.oriented_edges()
+    assert (
+        _under_sixteen_blas_threads("skewd", data, SHORT_PAIR, (1, 4))
+        == [(repr(first.metadata), first.structure.oriented_edges())] * 2
+    )
+    with andrey.config(n_jobs=4):
+        swapped = skewd(data[["y", "x"]], **SHORT_PAIR)
+    assert swapped.structure.oriented_edges() == first.structure.oriented_edges()
+    fits = first.metadata["log_likelihoods"]
+    assert swapped.metadata["log_likelihoods"] == {
+        "forward": fits["backward"],
+        "backward": fits["forward"],
+    }
+
+
+def test_skewd_mv_gives_the_same_bits_on_any_number_of_workers():
+    data = pd.DataFrame(_chain(), columns=["x", "y", "z"])
+    first = skewd_mv(data, **SHORT_GRAPH)
+    for workers in (4, 8):
+        with andrey.config(n_jobs=workers):
+            out = skewd_mv(data, **SHORT_GRAPH)
+        assert out.metadata == first.metadata
+        assert out.structure.oriented_edges() == first.structure.oriented_edges()
+    assert _under_sixteen_blas_threads("skewd_mv", data, SHORT_GRAPH, (4,)) == [
+        (repr(first.metadata), first.structure.oriented_edges())
+    ]
+    with andrey.config(n_jobs=4):
+        reordered = skewd_mv(data[["z", "x", "y"]], **SHORT_GRAPH)
+    assert sorted(reordered.structure.oriented_edges()) == sorted(first.structure.oriented_edges())

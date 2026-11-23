@@ -769,15 +769,17 @@ model in each direction, the location and the log scale smooth functions of the 
 the shape one number, with penalties chosen by Bayesian optimization of a cross-validated
 likelihood, then decides by an HSIC test of the scaled residual against the cause
 (`criterion="independence"`, the default) or by the larger likelihood (`criterion="likelihood"`). At
-the defaults a pair takes tens of minutes. It is experimental until its comparison with the authors'
-code is published.
+the defaults a pair takes tens of minutes on one worker; `andrey.config(n_jobs)` runs its searches
+on that many threads with the same result bit for bit. It is experimental until its comparison
+with the authors' code is published.
 
 SkewD-MV, {py:func}`~andrey.skewd_mv`, is the graph version: it learns the Markov equivalence class
 with PC and returns the DAG of the class whose skew-normal location-scale models, one per variable
 given its parents, have the largest likelihood. It suits a few variables: it fits one model per
 distinct parent set the class allows, and `max_fits` (100 by default, the order up to which the
-paper expects it to apply) makes it refuse a class that needs more, before it fits any. It is
-experimental until its comparison with the authors' code is published.
+paper expects it to apply) makes it refuse a class that needs more, before it fits any. Its models
+and their searches run on `n_jobs` threads, as SkewD's do. It is experimental until its comparison
+with the authors' code is published.
 
 LGES, less greedy equivalence search (Ejaz and Bareinboim 2025), {py:func}`~andrey.lges`, is GES
 with fewer edge additions: it adds no edge between two variables when one graph of the current class

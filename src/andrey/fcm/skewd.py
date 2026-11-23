@@ -41,8 +41,11 @@ acyclicity of hypergraphs, and selectively reduce acyclic hypergraphs. SIAM Jour
 from __future__ import annotations
 
 import math
+import os
+import threading
 import warnings
-from collections.abc import Iterator
+from collections.abc import Callable, Generator, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 import numpy as np
@@ -134,14 +137,15 @@ def _difference_penalty(columns: int) -> np.ndarray:
 
 def _design(parents: np.ndarray, knots: int) -> _Design:
     def basis(n_knots: int) -> np.ndarray:
-        return np.hstack(
-            [
-                SplineTransformer(
-                    n_knots=n_knots, degree=DEGREE, extrapolation="linear"
-                ).fit_transform(parents[:, [t]])
-                for t in range(parents.shape[1])
-            ]
-        )
+        with _FILTERS:
+            return np.hstack(
+                [
+                    SplineTransformer(
+                        n_knots=n_knots, degree=DEGREE, extrapolation="linear"
+                    ).fit_transform(parents[:, [t]])
+                    for t in range(parents.shape[1])
+                ]
+            )
 
     location, scale = basis(knots), basis(SCALE_KNOTS)
     s = parents.shape[1]
@@ -159,9 +163,22 @@ def _row_log_likelihoods(
 ) -> np.ndarray:
     """Each row's skew-normal log density, one column per parameter vector in ``theta`` (m, d)."""
     q, p = location.shape[1], scale.shape[1]
+    # The operations of ``C - v / 2 - r^2 / 2 + log Phi(lambda r)``, ``r = (y - N psi) e^(-v / 2)``,
+    # in that order, written into three arrays instead of a new one per operation.
     log_variance = scale @ theta[:, q : q + p].T
-    r = (effect[:, None] - location @ theta[:, :q].T) * np.exp(-0.5 * log_variance)
-    return _LOG_NORM - 0.5 * log_variance - 0.5 * r**2 + log_ndtr(theta[:, -1] * r)
+    r = location @ theta[:, :q].T
+    np.subtract(effect[:, None], r, out=r)
+    other = np.multiply(log_variance, -0.5)
+    np.exp(other, out=other)
+    np.multiply(r, other, out=r)
+    np.multiply(theta[:, -1], r, out=other)
+    log_ndtr(other, out=other)
+    out = np.multiply(log_variance, 0.5, out=log_variance)
+    np.subtract(_LOG_NORM, out, out=out)
+    np.square(r, out=r)
+    np.multiply(r, 0.5, out=r)
+    np.subtract(out, r, out=out)
+    return np.add(out, other, out=out)
 
 
 def _penalized_nll(
@@ -291,22 +308,65 @@ def _identified(design: _Design) -> np.ndarray:
     return np.hstack([np.kron(np.eye(s), helmert), np.full((q, 1), 1.0 / math.sqrt(q))])
 
 
-def _heuristic(
+@dataclass(frozen=True)
+class _Search:
+    """One CMA-ES search: the design and effect with the rows it reads, the penalties, the start (in
+    the coordinates of ``frame`` when it is set), the bounds, and the stream the search draws from.
+    The rows are read when the search runs, so a list of searches holds no copy of the data."""
+
+    design: _Design
+    effect: np.ndarray
+    rows: np.ndarray
+    k_alpha: np.ndarray
+    m_kappa: np.ndarray
+    frame: np.ndarray | None
+    start: np.ndarray
+    lower: np.ndarray
+    upper: np.ndarray
+    stream: np.random.Generator
+
+
+#: Runs a list of searches and returns their results in order.
+Run = Callable[[list[_Search]], list[tuple[np.ndarray, float]]]
+
+
+def _run_search(search: _Search) -> tuple[np.ndarray, float]:
+    """Run one search; return its best parameters, in the raw coordinates, and its value."""
+    frame, rows = search.frame, search.rows
+    design, y = search.design, search.effect[rows]
+    location, scale = design.location[rows], design.scale[rows]
+
+    def objective(theta: np.ndarray) -> np.ndarray:
+        if frame is not None:
+            theta = np.hstack([theta[:, : frame.shape[1]] @ frame.T, theta[:, frame.shape[1] :]])
+        return _penalized_nll(theta, location, scale, y, search.k_alpha, search.m_kappa)
+
+    best, value = _cma_es(objective, search.start, search.lower, search.upper, search.stream)
+    if frame is not None:
+        best = np.concatenate([frame @ best[: frame.shape[1]], best[frame.shape[1] :]])
+    return best, value
+
+
+def _serial(searches: list[_Search]) -> list[tuple[np.ndarray, float]]:
+    return [_run_search(search) for search in searches]
+
+
+def _searches(
     design: _Design,
     rows: np.ndarray,
     effect: np.ndarray,
     log_penalties: np.ndarray,
     starts: list[np.ndarray],
     rng: np.random.Generator,
-) -> tuple[np.ndarray, float]:
-    """The best CMA-ES estimate on ``rows`` over ``starts`` (the least-squares start first).
+) -> list[_Search]:
+    """The CMA-ES searches on ``rows`` from the least-squares start and ``starts``, each with its
+    own stream spawned from ``rng``, so the draws of a search do not depend on how many
+    generations the searches before it ran, nor on the order or the place they run in.
 
-    Each search draws from its own stream spawned from ``rng``, so the draws of a search do not
-    depend on how many generations the searches before it ran. With several parents the searches
-    read ``psi`` in the coordinates of :func:`_identified`: along a constant moved between the
-    parents' blocks the likelihood is flat, so the distribution's mean would wander along it and
-    the stop rule on the mean would not hold. The same constant in ``rho`` stays, as its bounds
-    keep it from wandering far.
+    With several parents the searches read ``psi`` in the coordinates of :func:`_identified`: along
+    a constant moved between the parents' blocks the likelihood is flat, so the distribution's mean
+    would wander along it and the stop rule on the mean would not hold. The same constant in
+    ``rho`` stays, as its bounds keep it from wandering far.
     """
     location, scale, y = design.location[rows], design.scale[rows], effect[rows]
     k_alpha, m_kappa = design.penalties(log_penalties)
@@ -319,24 +379,69 @@ def _heuristic(
         free = np.full(frame.shape[1], np.inf)  # psi has no bounds
         lower, upper = np.concatenate([-free, lower[q:]]), np.concatenate([free, upper[q:]])
         points = [np.concatenate([frame.T @ point[:q], point[q:]]) for point in points]
-
-    def objective(theta: np.ndarray) -> np.ndarray:
-        if frame is not None:
-            theta = np.hstack([theta[:, : frame.shape[1]] @ frame.T, theta[:, frame.shape[1] :]])
-        return _penalized_nll(theta, location, scale, y, k_alpha, m_kappa)
-
-    found = [
-        _cma_es(objective, point, lower, upper, stream)
+    return [
+        _Search(design, effect, rows, k_alpha, m_kappa, frame, point, lower, upper, stream)
         for point, stream in zip(points, rng.spawn(len(points)), strict=True)
     ]
-    best, value = min(found, key=lambda f: f[1])
-    if frame is not None:
-        best = np.concatenate([frame @ best[: frame.shape[1]], best[frame.shape[1] :]])
-    return best, value
+
+
+def _heuristic(
+    design: _Design,
+    rows: np.ndarray,
+    effect: np.ndarray,
+    log_penalties: np.ndarray,
+    starts: list[np.ndarray],
+    rng: np.random.Generator,
+    run: Run = _serial,
+) -> tuple[np.ndarray, float]:
+    """The best CMA-ES estimate on ``rows`` over ``starts`` (the least-squares start first)."""
+    return _best(run(_searches(design, rows, effect, log_penalties, starts, rng)))
+
+
+@contextmanager
+def search_pool(workers: int) -> Generator[Run]:
+    """A ``run`` function for :func:`fit` that spreads searches over ``workers`` threads; with one
+    worker, the searches run in this thread. A search spends its time in NumPy and SciPy array
+    operations, which release the interpreter lock. Every search draws from its own stream, so the
+    results do not depend on the number of workers."""
+    if workers <= 1:
+        yield _serial
+        return
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        yield lambda searches: list(pool.map(_run_search, searches))
+
+
+def _best(found: list[tuple[np.ndarray, float]]) -> tuple[np.ndarray, float]:
+    """The search result with the lowest value, the first on a tie."""
+    return min(found, key=lambda f: f[1])
+
+
+#: Held around every scikit-learn call that changes the warning filters on a thread that runs a
+#: fit (the spline bases, and the Gaussian process's fit and prediction): scikit-learn and the
+#: penalty search enter :func:`warnings.catch_warnings`, which saves and restores the filters of
+#: the whole process, so two such blocks in concurrent threads must not overlap.
+_FILTERS = threading.Lock()
+
+
+def _reset_after_fork() -> None:
+    """Give a forked child an unlocked :data:`_FILTERS`: a child forked while another thread holds
+    it inherits it locked, with no thread left to release it."""
+    global _FILTERS
+    _FILTERS = threading.Lock()
+
+
+if hasattr(os, "register_at_fork"):
+    os.register_at_fork(after_in_child=_reset_after_fork)
 
 
 def _tune(
-    design: _Design, effect: np.ndarray, budget: Budget, rng: np.random.Generator
+    design: _Design,
+    effect: np.ndarray,
+    budget: Budget,
+    rng: np.random.Generator,
+    run: Run = _serial,
 ) -> tuple[np.ndarray, list[np.ndarray]]:
     """The log penalties with the best cross-validated held-out log-likelihood, and each fold's
     estimate at them.
@@ -344,7 +449,8 @@ def _tune(
     The first ``budget.initial`` candidates are Latin hypercube points over
     :data:`LOG_PENALTY_BOUNDS`; each later one maximizes the expected improvement over a Gaussian
     process of the scores so far, among :data:`EI_CANDIDATES` uniform points. Every candidate
-    reads the same folds.
+    reads the same folds. ``run`` runs a list of searches and returns their results in order; the
+    Latin hypercube candidates' searches go to it together, and each later candidate's folds.
     """
     dim = 2 * design.parents
     low, high = LOG_PENALTY_BOUNDS
@@ -355,22 +461,29 @@ def _tune(
     scores: list[float] = []
     estimates: list[list[np.ndarray]] = []
 
-    def score(log_penalties: np.ndarray) -> None:
-        held_out, fold_estimates = 0.0, []
-        for train, test in folds:
-            theta, _ = _heuristic(design, train, effect, log_penalties, [], rng)
-            rows = _row_log_likelihoods(
-                theta[None, :], design.location[test], design.scale[test], effect[test]
-            )
-            held_out -= float(rows.sum())
-            fold_estimates.append(theta)
-        points.append(log_penalties)
-        scores.append(held_out / len(folds))
-        estimates.append(fold_estimates)
+    def score(candidates: np.ndarray) -> None:
+        searches = [
+            search
+            for log_penalties in candidates
+            for train, _ in folds
+            for search in _searches(design, train, effect, log_penalties, [], rng)
+        ]
+        found = iter(run(searches))
+        for log_penalties in candidates:
+            held_out, fold_estimates = 0.0, []
+            for _, test in folds:
+                theta, _ = next(found)
+                rows = _row_log_likelihoods(
+                    theta[None, :], design.location[test], design.scale[test], effect[test]
+                )
+                held_out -= float(rows.sum())
+                fold_estimates.append(theta)
+            points.append(log_penalties)
+            scores.append(held_out / len(folds))
+            estimates.append(fold_estimates)
 
     sampler = qmc.LatinHypercube(d=dim, seed=int(rng.integers(2**31)))
-    for point in qmc.scale(sampler.random(budget.initial), [low] * dim, [high] * dim):
-        score(point)
+    score(qmc.scale(sampler.random(budget.initial), [low] * dim, [high] * dim))
     kernel = (
         ConstantKernel(1.0, (0.01, 1000.0)) * Matern(np.ones(dim), (0.01, 100.0), nu=2.5)
         + WhiteKernel()
@@ -381,16 +494,16 @@ def _tune(
         )
         values = np.array(scores)
         finite = np.isfinite(values)
-        with warnings.catch_warnings():
+        candidates = rng.uniform(low, high, size=(EI_CANDIDATES, dim))
+        with _FILTERS, warnings.catch_warnings():
             # A kernel parameter at its bound only shapes the acquisition, not the fit.
             warnings.simplefilter("ignore", ConvergenceWarning)
             process.fit(np.array(points)[finite], values[finite])
-        candidates = rng.uniform(low, high, size=(EI_CANDIDATES, dim))
-        mean, sd = process.predict(candidates, return_std=True)
+            mean, sd = process.predict(candidates, return_std=True)
         gain = values[finite].min() - mean - EI_MARGIN
         z = gain / np.maximum(sd, 1e-12)
         improvement = gain * _ndtr(z) + sd * np.exp(-0.5 * z**2) / math.sqrt(2 * math.pi)
-        score(candidates[int(np.argmax(improvement))])
+        score(candidates[[int(np.argmax(improvement))]])
     best = int(np.argmin(scores))
     return points[best], estimates[best]
 
@@ -467,17 +580,21 @@ def _ecm(
     return history[-1], False
 
 
-def fit(parents: np.ndarray, effect: np.ndarray, budget: Budget, seed: int) -> Fit:
+def fit(
+    parents: np.ndarray, effect: np.ndarray, budget: Budget, seed: int, run: Run = _serial
+) -> Fit:
     """Fit the skew-normal location-scale model of ``effect`` given ``parents`` by Algorithm 1.
 
     ``parents`` is ``(n, s)`` and ``effect`` ``(n,)``, both standardized by the caller. The fit
-    draws its random numbers from ``seed`` alone, so the same data and seed give the same fit.
+    draws its random numbers from ``seed`` alone, so the same data and seed give the same fit,
+    whatever ``run`` (a function that runs a list of searches and returns their results in order)
+    runs the searches on.
     """
     rng = np.random.default_rng(seed)
     design = _design(parents, budget.knots)
-    log_penalties, fold_estimates = _tune(design, effect, budget, rng)
+    log_penalties, fold_estimates = _tune(design, effect, budget, rng, run)
     every = np.arange(effect.size)
-    theta, _ = _heuristic(design, every, effect, log_penalties, fold_estimates, rng)
+    theta, _ = _best(run(_searches(design, every, effect, log_penalties, fold_estimates, rng)))
     theta, converged = _ecm(design, effect, theta, log_penalties, budget.max_iter)
     q, p = design.location.shape[1], design.scale.shape[1]
     rows = _row_log_likelihoods(theta[None, :], design.location, design.scale, effect)[:, 0]
