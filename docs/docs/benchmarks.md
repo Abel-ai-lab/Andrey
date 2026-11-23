@@ -35,10 +35,10 @@ Datasets with overlapping variables
 
 ::::{div} release-tldr
 
-0.19.0 is here. On datasets with overlapping variables, a test without enough rows is not tested, a
-pair no test decides is left out of the graph, and an edge that an untested set might have separated
-is flagged. DAS and CPCM are supported, and LGES, Regime-PCMCI, and the GCM, wGCM, and PCM tests
-arrive, experimental.
+0.19.0 is here. On datasets with overlapping variables, a conditional independence test without
+enough rows is skipped, a pair no test can decide is left out of the graph, and an edge that a
+skipped test might have removed is listed. DAS and CPCM are supported, and LGES, Regime-PCMCI, and
+the GCM, wGCM, and PCM tests arrive, experimental.
 
 :::{div} release-actions
 [Read the release card](benchmarks/0.19.0.md)

@@ -15,18 +15,18 @@ names its pull request.
 ### Highlights
 
 - Datasets with overlapping variables. On cohorts that each measure their own columns, stacked into
-  one table, a conditional-independence test with too few rows, such as a test of a pair never
-  observed together, is not tested: it never separates a pair and never confirms a link. A pair that
-  no tested query decides is left out of the graph and listed in `metadata["undecided_pairs"]`, an
-  edge that an untested conditioning set might have separated is listed in
-  `metadata["possibly_separable"]`, and one notice per process counts both kinds and the pairs never
+  one table, a conditional independence test with too few rows, such as a test of a pair never
+  observed together, is skipped: it never removes an edge and never counts as evidence of
+  dependence. A pair that no test with rows can decide is left out of the graph and listed in
+  `metadata["undecided_pairs"]`, an edge that a skipped test might have removed is listed in
+  `metadata["possibly_separable"]`, and one log message per process counts both and the pairs never
   observed together, naming them when there are at most five. On simulated cohorts of 20, 40, and 50
-  variables that no row bridges (20 seeds each), PC's graph made fewer errors than the empty graph
+  variables with no complete rows (20 seeds each), PC's graph made fewer errors than the empty graph
   in every setting and found 0.87 to 0.95 of the true edges between variables observed together,
-  about as many as on the complete data (0.88 to 0.96), where answering each untested test with
-  p = 1 found 0.21 to 0.34. `possibly_separable="ambiguous"` reads no collider from a flagged side,
-  test-wise deletion sums over missingness-pattern groups when that costs less, and `missing="em"`
-  refuses two columns that share no row. The
+  about as many as on the complete data (0.88 to 0.96), where answering each skipped test with
+  p = 1 found 0.21 to 0.34. With `possibly_separable="ambiguous"`, a listed edge never creates a
+  collider; test-wise deletion sums each missingness pattern's rows once when that costs less; and
+  `missing="em"` refuses two columns that share no row. The
   [release post](https://andrey.abel.ai/blog/20261123-andrey-0-19-0.html) tells the story, and the
   [0.19.0 release card][card-0190-missing] has the numbers. ([#1102], [#1148], [#1151], [#1156],
   [#1167], [#1171])
