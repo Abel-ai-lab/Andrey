@@ -52,8 +52,8 @@ names its pull request.
   its paper, and the release card compares it with its authors' code. ([#1146], [#1147], [#1149],
   [#1159], [#1162], [#1175])
 - `target` takes a list of columns on `iamb`, `inter_iamb`, `mmpc`, and `icp`: one call returns one
-  result per target, each equal to a separate call, and shares the search's setup across targets.
-  ([#1058], [#1153])
+  result per target, each equal to a separate call, and on complete data the three set learners
+  share one search and test setup across the targets. ([#1058], [#1153])
 - Each option added or changed in this release states what each value favors and what it gives
   up, with the measurements behind it, and the API reference and the missing-values guide have
   "Choosing an option" tables. ([#1177])
@@ -94,11 +94,12 @@ names its pull request.
   and PCMCI+ reads a triple with a flagged side as neither a collider nor a non-collider, which on
   merged cohorts removed nearly every false collider and nearly every true arrowhead with them.
   ([#1171])
-- Each fit that deletes rows per test records `metadata["not_tested"]`,
-  `metadata["undecided_pairs"]`, `metadata["never_observed_together"]`, and
-  `metadata["possibly_separable"]`, and the `missing=None` notice counts each kind of pair, over
-  every fit of a `bootstrap` too, and names them when there are at most five. ([#1151], [#1156],
-  [#1167])
+- On data with missing values, the conditional-independence searches that delete rows per test
+  record, each when it is not empty, `metadata["not_tested"]`, `metadata["undecided_pairs"]`, and
+  `metadata["never_observed_together"]`, PC, FCI, CD-NOD, FCI-JCI, the Markov-blanket searches,
+  PCMCI, PCMCI+, and LPCMCI also `metadata["possibly_separable"]`, and the `missing=None` notice
+  counts each kind of pair, over every fit of a `bootstrap` too, and names them when there are at
+  most five. ([#1151], [#1156], [#1167])
 - `metadata["p_one_tests"]` counts the tests that returned `p = 1` in a fit with missing values,
   a test with an exactly zero statistic included. ([#1102])
 - `metadata["em"]` records `rows_dropped`, the rows dropped for observing no value, and
