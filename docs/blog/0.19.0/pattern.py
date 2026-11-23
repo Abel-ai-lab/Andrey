@@ -129,11 +129,15 @@ def figure() -> str:
             )
     key_y = bottom + 22
     key_x = LEFT
+    for k in range(len(SIZES)):
+        parts.append(
+            f'<rect x="{key_x + 17 * k}" y="{key_y - 7}" width="14" height="14" rx="2" '
+            f'class="ov-c{k + 1}"/>'
+        )
     parts += [
-        f'<rect x="{key_x}" y="{key_y - 7}" width="14" height="14" rx="2" class="ov-c1"/>',
-        f'<text x="{key_x + 20}" y="{key_y}" class="ov-key">Measured</text>',
-        f'<rect x="{key_x + 110}" y="{key_y - 7}" width="14" height="14" rx="2" class="ov-miss"/>',
-        f'<text x="{key_x + 130}" y="{key_y}" class="ov-key">Never measured: missing</text>',
+        f'<text x="{key_x + 58}" y="{key_y}" class="ov-key">Measured, one color per cohort</text>',
+        f'<rect x="{key_x + 268}" y="{key_y - 7}" width="14" height="14" rx="2" class="ov-miss"/>',
+        f'<text x="{key_x + 288}" y="{key_y}" class="ov-key">Not measured: missing</text>',
     ]
     width = xs[-1] + CELL + 8
     height = key_y + 16
@@ -141,10 +145,10 @@ def figure() -> str:
         "<style>"
         ".ov-figure svg{width:100%;height:auto;max-width:600px;display:block;margin:0 auto}"
         ".ov-figure text{font-family:var(--andrey-font-sans);fill:var(--andrey-ink)}"
-        ".ov-group{font-size:12px;font-weight:600;text-anchor:middle}"
+        ".ov-group{font-size:13px;font-weight:600;text-anchor:middle}"
         ".ov-rule{stroke:var(--andrey-muted);stroke-width:1}"
-        ".ov-cohort{font-size:12px;text-anchor:end;dominant-baseline:middle}"
-        ".ov-key{font-size:12px;dominant-baseline:middle}"
+        ".ov-cohort{font-size:13px;text-anchor:end;dominant-baseline:middle}"
+        ".ov-key{font-size:13px;dominant-baseline:middle}"
         ".ov-c1{fill:var(--andrey-categorical-1)}"
         ".ov-c2{fill:var(--andrey-categorical-2)}"
         ".ov-c3{fill:var(--andrey-categorical-3)}"
@@ -162,7 +166,7 @@ def figure() -> str:
         "<figcaption>The small configuration of the benchmark: three cohorts over 20 variables, "
         "each drawn as a band as tall as its rows. Every cohort measures the core, cohorts 1 and 2 "
         "also module A, cohort 3 module B, and each cohort a few variables of its own. The hollow "
-        f"blocks are never measured, which leaves {never_together(measured)} pairs of variables "
+        f"blocks were never measured, which leaves {never_together(measured)} pairs of variables "
         "never observed together.</figcaption>"
     )
     return f'{style}<figure class="ov-figure">{svg}{caption}</figure>\n'
