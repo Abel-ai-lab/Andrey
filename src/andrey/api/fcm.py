@@ -1683,9 +1683,9 @@ def skewd_mv(
         ``"cmaes"`` favors the paper's optimizer; it gives up time. ``"lbfgs"`` favors time; it
         gives up the paper's optimizer. On the paper's simulated pairs and graphs of 1,000 rows
         (graphs of 6 and 10 variables; 20 seeds each, one worker), ``"lbfgs"`` decided worse than
-        ``"cmaes"`` in no setting by a paired bootstrap, at a median of 5.6 to 14.7 times less time
-        per pair and 2.3 times less per graph, and its penalized likelihood was lower in 289 of the
-        738 fitted models and higher in 239.
+        ``"cmaes"`` in no setting by a paired bootstrap, at a median of 5.8 to 14.9 times less time
+        per pair and 2.4 times less per graph, and its penalized likelihood was lower in 306 of the
+        738 fitted models and higher in 233.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed of PC's randomized tests and of the random

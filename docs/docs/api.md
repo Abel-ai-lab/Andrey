@@ -773,9 +773,9 @@ likelihood, then decides by an HSIC test of the scaled residual against the caus
 the defaults a pair takes tens of minutes on one worker; `andrey.config(n_jobs)` runs its searches
 on that many threads with the same result bit for bit. `optimizer="lbfgs"` runs each search with
 L-BFGS-B and the analytic gradient instead of the paper's CMA-ES: on the paper's simulations it
-decided worse in no setting by a paired bootstrap, at a median of 5.6 to 14.7 times less time per
-pair and 2.3 times less per graph, and its penalized likelihood was lower in 289 of 738 fitted
-models and higher in 239. It is experimental until its comparison with the authors' code is
+decided worse in no setting by a paired bootstrap, at a median of 5.8 to 14.9 times less time per
+pair and 2.4 times less per graph, and its penalized likelihood was lower in 306 of 738 fitted
+models and higher in 233. It is experimental until its comparison with the authors' code is
 published.
 
 SkewD-MV, {py:func}`~andrey.skewd_mv`, is the graph version: it learns the Markov equivalence class
