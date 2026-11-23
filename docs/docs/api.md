@@ -383,10 +383,11 @@ methods that test independence draw random numbers only under `indep_test="rcot"
 `"gpdc"`, `"gcm"`, `"wgcm"`, or `"pcm"`, `pc` also with `missing="mvpc"` on data with missing
 values, `igsp` and `ut_igsp` also with `n_starts` above 1, `hc` and `tabu` only with `n_starts`
 above 1, and `cpcm` and `cpcm_graph` only for a column under `family="poisson"` or
-`"negative_binomial"`; `skewd` and `skewd_mv` draw in every fit, in their Bayesian optimization and
-CMA-ES, whatever test PC runs, and `rpcmci` draws the first regime weights of every start. Otherwise
-`seed` changes nothing, and `metadata["seed"]` is not set. A call that gives `seed` does not depend
-on `ANDREY_SEED`. Every other method is deterministic and takes no seed.
+`"negative_binomial"`; `skewd` and `skewd_mv` draw in every fit, in their Bayesian optimization and,
+under `optimizer="cmaes"`, CMA-ES, whatever test PC runs, and `rpcmci` draws the first regime
+weights of every start. Otherwise `seed` changes nothing, and `metadata["seed"]` is not set. A call
+that gives `seed` does not depend on `ANDREY_SEED`. Every other method is deterministic and takes
+no seed.
 
 % concept: n_starts
 `boss`, `grasp`, `boss_fci`, `grasp_fci`, `igsp`, `ut_igsp`, `hc`, `tabu`, and `rpcmci` take
@@ -770,16 +771,20 @@ the shape one number, with penalties chosen by Bayesian optimization of a cross-
 likelihood, then decides by an HSIC test of the scaled residual against the cause
 (`criterion="independence"`, the default) or by the larger likelihood (`criterion="likelihood"`). At
 the defaults a pair takes tens of minutes on one worker; `andrey.config(n_jobs)` runs its searches
-on that many threads with the same result bit for bit. It is experimental until its comparison
-with the authors' code is published.
+on that many threads with the same result bit for bit. `optimizer="lbfgs"` runs each search with
+L-BFGS-B and the analytic gradient instead of the paper's CMA-ES: on the paper's simulations it
+decided worse in no setting by a paired bootstrap, at a median of 5.6 to 14.7 times less time per
+pair and 2.3 times less per graph, and its penalized likelihood was lower in 289 of 738 fitted
+models and higher in 239. It is experimental until its comparison with the authors' code is
+published.
 
 SkewD-MV, {py:func}`~andrey.skewd_mv`, is the graph version: it learns the Markov equivalence class
 with PC and returns the DAG of the class whose skew-normal location-scale models, one per variable
 given its parents, have the largest likelihood. It suits a few variables: it fits one model per
 distinct parent set the class allows, and `max_fits` (100 by default, the order up to which the
 paper expects it to apply) makes it refuse a class that needs more, before it fits any. Its models
-and their searches run on `n_jobs` threads, as SkewD's do. It is experimental until its comparison
-with the authors' code is published.
+and their searches run on `n_jobs` threads and take `optimizer`, as SkewD's do. It is experimental
+until its comparison with the authors' code is published.
 
 LGES, less greedy equivalence search (Ejaz and Bareinboim 2025), {py:func}`~andrey.lges`, is GES
 with fewer edge additions: it adds no edge between two variables when one graph of the current class

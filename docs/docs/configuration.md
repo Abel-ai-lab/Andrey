@@ -59,7 +59,7 @@ requested backend uses `auto`, without a warning.
   several limits each thread to one, so on a machine with several cores its p-values and statistics
   can differ in the last digits between one worker and several. Each `pnl` thread holds three n x n
   float64 matrices; when the threads you ask for would hold more than 4 GiB, fewer run, with a
-  `PerformanceWarning`. `skewd` runs its two directions and their CMA-ES searches on the threads,
+  `PerformanceWarning`. `skewd` runs its two directions and their searches on the threads,
   and `skewd_mv` its conditional models and their searches; every search draws from its own random
   stream, so the results are the same bit for bit with any number of workers. Unlike `pnl`, both run
   on one BLAS thread with any number of workers, so their results do not depend on the BLAS thread
