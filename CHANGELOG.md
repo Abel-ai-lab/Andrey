@@ -64,13 +64,13 @@ names its pull request.
   test with too few rows or with no degrees of freedom left, which in 0.18.0 returned p = 1 and so
   removed its edge, or raised `ValueError`, is now not tested: it never separates a pair, and an
   edge it might have removed is listed in `metadata["possibly_separable"]`. A pair that no tested
-  query decides, such as one never
-  observed together, is left out of the graph of PC, FCI, CD-NOD, FCI-JCI, PCMCI, PCMCI+, and
-  LPCMCI and out of the Markov-blanket searches' sets, and no triple whose ends are undecided is
-  oriented. PCMCI and PCMCI+ condition a test only on candidates that leave it enough rows, MVPC's
-  correction removes only the edges its own tests separate, and `markov_check` raises on a `NaN`
-  p-value that too few rows do not explain or a p-value outside `[0, 1]`. On complete data and on
-  data where every test has enough rows, the graphs do not change. ([#1151], [#1167])
+  query decides, such as one never observed together, is left out of the graph of PC, FCI, CD-NOD,
+  FCI-JCI, PCMCI, PCMCI+, and LPCMCI and out of the Markov-blanket searches' sets, and no triple
+  whose ends are undecided is oriented. PCMCI and PCMCI+ condition a test only on candidates that
+  leave it enough rows, MVPC's correction removes only the edges its own tests separate, and
+  `markov_check` raises on a `NaN` p-value that too few rows do not explain or a p-value outside
+  `[0, 1]`. On complete data and on data where every test has enough rows, these changes leave the
+  graphs as they were. ([#1151], [#1167])
 - `missing="em"` raises `ValueError` when two columns share no observed row, as the data hold no
   covariance for them; in 0.18.0 such data ran on a covariance the model alone supplied. ([#1102])
 - `cpcm` and `cpcm_graph` raise `ValueError` on 0 under `"exponential"` and on 1 under `"pareto"`,
@@ -90,9 +90,9 @@ names its pull request.
 
 ### Added
 
-- `possibly_separable="ambiguous"` in PC, FCI, CD-NOD, FCI-JCI, the Markov-blanket searches'
-  CPDAG, and PCMCI+ reads a triple with a flagged side as neither a collider nor a non-collider,
-  which on merged cohorts removed nearly every false collider and every true arrowhead with them.
+- `possibly_separable="ambiguous"` in PC, FCI, CD-NOD, FCI-JCI, the Markov-blanket searches' CPDAG,
+  and PCMCI+ reads a triple with a flagged side as neither a collider nor a non-collider, which on
+  merged cohorts removed nearly every false collider and nearly every true arrowhead with them.
   ([#1171])
 - Each fit that deletes rows per test records `metadata["not_tested"]`,
   `metadata["undecided_pairs"]`, `metadata["never_observed_together"]`, and
