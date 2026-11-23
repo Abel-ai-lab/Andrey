@@ -560,6 +560,32 @@ def test_the_gradient_is_the_derivative_of_the_penalized_likelihood(parents):
         np.testing.assert_allclose(gradient, central, rtol=1e-5, atol=1e-5)
 
 
+@pytest.mark.parametrize("u", [-1e10, -1e9, -1e8, -1e6, -1e3, -30.0, -1.0, 0.0, 1.0, 30.0, 1e3])
+@pytest.mark.parametrize("shape", [-4.0, 3.0])
+def test_the_gradient_keeps_its_precision_far_into_the_tails(u, shape):
+    # One row at u = lambda r, an intercept for the location and the log scale, against a
+    # finite difference of the same penalized likelihood at 60 digits.
+    mp = pytest.importorskip("mpmath")
+    psi, rho = 0.3, 0.4
+    effect = np.array([psi + u / shape * np.exp(rho / 2)])
+    theta = np.array([psi, rho, shape])
+    ones, k_alpha, m_kappa = np.ones((1, 1)), np.array([[0.7]]), np.array([[0.2]])
+    gradient = native._penalized_nll_gradient(theta, ones, ones, effect, k_alpha, m_kappa)
+
+    def penalized_nll(psi, rho, shape):
+        r = (mp.mpf(effect[0]) - psi) * mp.exp(-rho / 2)
+        log_density = -rho / 2 - r**2 / 2 + mp.log(mp.ncdf(shape * r))
+        return -log_density + mp.mpf(0.7) * psi**2 / 2 + mp.mpf(0.2) * rho**2 / 2
+
+    with mp.workdps(60):
+        point = [mp.mpf(v) for v in theta]
+        reference = [
+            float(mp.diff(lambda x, k=k: penalized_nll(*point[:k], x, *point[k + 1 :]), point[k]))
+            for k in range(3)
+        ]
+    np.testing.assert_allclose(gradient, reference, rtol=1e-12, atol=1e-12)
+
+
 @pytest.mark.parametrize("parents", [1, 2])
 def test_an_lbfgs_search_ends_at_a_stationary_point_no_worse_than_its_start(parents):
     # With two parents the search moves in the coordinates of the identified frame, so its
