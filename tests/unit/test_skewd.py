@@ -566,7 +566,6 @@ def test_the_gradient_keeps_its_precision_far_into_the_tails(u, shape):
     # One row at u = lambda r, an intercept for the location and the log scale, against a
     # finite difference of the same penalized likelihood at 60 digits.
     mp = pytest.importorskip("mpmath")
-    mp.mp.dps = 60
     psi, rho = 0.3, 0.4
     effect = np.array([psi + u / shape * np.exp(rho / 2)])
     theta = np.array([psi, rho, shape])
@@ -578,11 +577,12 @@ def test_the_gradient_keeps_its_precision_far_into_the_tails(u, shape):
         log_density = -rho / 2 - r**2 / 2 + mp.log(mp.ncdf(shape * r))
         return -log_density + mp.mpf(0.7) * psi**2 / 2 + mp.mpf(0.2) * rho**2 / 2
 
-    point = [mp.mpf(v) for v in theta]
-    reference = [
-        float(mp.diff(lambda x, k=k: penalized_nll(*point[:k], x, *point[k + 1 :]), point[k]))
-        for k in range(3)
-    ]
+    with mp.workdps(60):
+        point = [mp.mpf(v) for v in theta]
+        reference = [
+            float(mp.diff(lambda x, k=k: penalized_nll(*point[:k], x, *point[k + 1 :]), point[k]))
+            for k in range(3)
+        ]
     np.testing.assert_allclose(gradient, reference, rtol=1e-12, atol=1e-12)
 
 
