@@ -633,17 +633,17 @@ HSIC test of the scaled residual against the cause (`criterion="independence"`).
 {py:func}`~andrey.skewd_mv`, is the graph version: it learns the Markov equivalence class with PC
 and returns the DAG of the class whose skew-normal location-scale models, one per variable given its
 parents, have the largest likelihood. It suits a few variables: it fits one model per distinct
-parent set the class allows, and `max_fits` (100 by default, the order up to which the paper
-expects it to apply) makes it refuse a class that needs more, before it fits any. Both favor
-accuracy on skewed location-scale data and give up time: at the defaults a pair took 15 to 22 CPU
-minutes and a graph of 6 or 10 variables a median of 18 to 49, by the size and the CPU, where LOCI
-and CAM take under a second. `andrey.config(n_jobs)` runs their searches on that many threads with
-the same result bit for bit, which cuts the wall time. `optimizer="lbfgs"` runs each search with
-L-BFGS-B and the analytic gradient instead of the paper's CMA-ES: on the paper's simulations it
-decided worse in no setting by a paired bootstrap, at a median of 5.8 to 14.9 times less time per
-pair and 2.4 times less per graph, and its penalized likelihood was lower in 306 of 738 fitted
-models and higher in 233. The [0.19.0](benchmarks/0.19.0.md#skewd) release card measures both
-against the authors' recorded outputs on the paper's pairs and on graphs of 6 and 10 variables.
+parent set the class allows, and `max_fits` (100 by default, the order up to which the paper expects
+it to apply) makes it refuse a class that needs more, before it fits any. Both favor accuracy on
+skewed location-scale data and give up time: at the defaults a pair took a median of 15 to 22 CPU
+minutes per set and a graph of 6 or 10 variables 18 to 49, by the size, the CPU, and the seeds,
+where LOCI and CAM take a median under a second. `andrey.config(n_jobs)` runs their searches on that
+many threads with the same result bit for bit, which cuts the wall time. `optimizer="lbfgs"` runs
+each search with L-BFGS-B and the analytic gradient instead of the paper's CMA-ES: on the paper's
+simulations it decided worse in no setting by a paired bootstrap, at a median of 5.8 to 14.9 times
+less time per pair and 2.4 times less per graph, and its penalized likelihood was lower in 306 of
+738 fitted models and higher in 233. The [0.19.0](benchmarks/0.19.0.md#skewd) release card measures
+both against the authors' recorded outputs on the paper's pairs and on graphs of 6 and 10 variables.
 
 IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
 `target`; without one, they join a pair when each is in the other's set and return the graph

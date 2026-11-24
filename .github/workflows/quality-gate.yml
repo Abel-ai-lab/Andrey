@@ -25,8 +25,9 @@ env:
 jobs:
   quality-gate:
     runs-on: ubuntu-24.04
-    # SkewD-MV's cell alone takes about 49 minutes on one core (`qa/README.md`); it starts first.
-    timeout-minutes: 90
+    # SkewD-MV's cell alone took about 49 minutes on one AMD EPYC (Zen 3) core (`qa/README.md`) and
+    # starts first; a fit takes about twice as long on some runners (see the Host CPU step).
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

@@ -1035,9 +1035,9 @@ def skewd(
     paper's skewed additive and location-scale pairs and on Gaussian location-scale pairs, 1,000
     rows each, it named the direction as often as the code published with the paper, with either
     criterion, and the likelihood criterion, the default, named all 160 right; :func:`~andrey.loci`
-    named as many on most of these sets in under a second, and 15 of 20 against 20 on the most
-    skewed location-scale set. A pair took 15 to 22 CPU minutes on an AMD EPYC 9534 (the median of
-    each set); ``andrey.config(n_jobs)`` runs its searches on threads, which cuts the wall time.
+    was as accurate by the paired interval on every set but the most skewed location-scale one, 15
+    of 20 against 20, in under a second. A pair took 15 to 22 CPU minutes on an AMD EPYC 9534 (the
+    median of each set); ``andrey.config(n_jobs)`` runs its searches on threads, which cuts the wall time.
 
     In each direction, the effect given the cause is skew-normal with location ``f``, scale ``g``,
     and one shape ``lambda`` for every row; ``f`` is a cubic B-spline of 12 knots (14 columns) and
@@ -1072,8 +1072,8 @@ def skewd(
     are not Gaussian, as it assumes Gaussian marginals of the standardized variables: on the
     paper's 13 established pair benchmarks the likelihood averaged 77% right against 85% for the
     independence test, and 46% against 67% on the Tübingen pairs [1]_. ``"independence"`` favors
-    robustness across such benchmarks and gives a p-value, with an edge only at a chosen
-    ``alpha``. Both directions draw their random numbers from the same ``seed``, so swapping the
+    robustness across such benchmarks and gives a p-value, which ``alpha`` can test at a level.
+    Both directions draw their random numbers from the same ``seed``, so swapping the
     columns swaps the fits.
 
     ``n_jobs`` above 1 (``andrey.config`` or ``ANDREY_N_JOBS``) runs the two directions, and the
@@ -1095,8 +1095,7 @@ def skewd(
     its cost; the `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#skewd>`_
     has the measured times. Each HSIC test builds matrices with one row and one column per sample.
     The skew-normal's skewness lies within about -1 and 1, so noise more skewed than that is
-    misspecified, and the likelihood criterion assumes Gaussian marginals of the standardized
-    variables [1]_. A change of units by a factor that is not a power of two changed no edge in 120
+    misspecified [1]_. A change of units by a factor that is not a power of two changed no edge in 120
     refits of 20 pairs (80 to 150 rows, ``tuning_iter=3``) and moved 2 of the 240 likelihoods by
     more than ``1e-6`` (both by 0.014, on a pair with no direction), so an edge can change only
     where the two directions already lie within what another ``seed`` changes. The numbers are a

@@ -1731,7 +1731,8 @@ def skewd_mv(
     than the empty graph and than :func:`~andrey.pc` (KCI), :func:`~andrey.cam`,
     :func:`~andrey.nogam`, :func:`~andrey.score_matching`, and :func:`~andrey.resit`, all five
     faster. A fit took a median of 49 CPU minutes at 6 variables and 37 at 10 on an AMD EPYC 7713,
-    and 28 and 18 on an AMD EPYC 9534, where :func:`~andrey.cam` took under a second;
+    and 28 and 18 on an AMD EPYC 9534 on other seeds, where :func:`~andrey.cam` took a median under
+    a second;
     ``andrey.config(n_jobs)`` runs its conditional models and their searches on threads, which cuts
     the wall time.
 
@@ -1775,8 +1776,8 @@ def skewd_mv(
     apply while they are in the order of 100. The `0.19.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#skewd-mv>`_ has the measured times, up to
     1.8 CPU hours at 6 variables and 2.4 at 10. An edge PC misses or misorients stays wrong: the
-    likelihood only chooses among the class's DAGs, and PC's skeleton had an F1 of 0.90 at 6
-    variables and 0.82 at 10. The numbers are a reference, not a hard limit: they change with the
+    likelihood only chooses among the class's DAGs, and PC's skeleton had an F1 of 0.88 and 0.92 at
+    6 variables and 0.84 and 0.80 at 10, on two sets of 20 seeds. The numbers are a reference, not a hard limit: they change with the
     data generator, the density, the method's settings, and the machine.
 
     References

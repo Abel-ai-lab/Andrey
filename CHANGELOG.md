@@ -50,10 +50,10 @@ names its pull request.
   pair sets, and its skew-normal graphs of 6 and 10 variables, they made as few errors as the
   outputs the authors recorded with the paper's code, and fewer than a coin flip or the empty graph;
   SkewD-MV made fewer errors than PC (KCI), CAM, NoGAM, SCORE, and RESIT at both sizes, all five
-  faster. A pair takes 15 to 22 CPU minutes on an AMD EPYC 9534, and a graph a median of 37 to 49
-  CPU minutes on an AMD EPYC 7713 and 18 to 28 on the EPYC 9534; `andrey.config(n_jobs)` runs the
-  searches on threads, which cuts the wall time. The [0.19.0 release card][card-0190-skewd] has the
-  numbers. ([#1181])
+  faster. A pair takes a median of 15 to 22 CPU minutes per set on an AMD EPYC 9534, and a graph 37
+  to 49 on an AMD EPYC 7713 and 18 to 28 on the EPYC 9534 on other seeds; `andrey.config(n_jobs)`
+  runs the searches on threads, which cuts the wall time. The [0.19.0 release card][card-0190-skewd]
+  has the numbers. ([#1181])
 - Two experimental methods and three experimental tests: `lges`, less greedy equivalence search
   (Ejaz and Bareinboim 2025); `rpcmci`, Regime-PCMCI (Saggioro et al. 2020), for one time series
   whose lagged links switch between a few persistent regimes; and the regression-based tests `"gcm"`
