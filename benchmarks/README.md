@@ -75,6 +75,15 @@ directory.
 and `library()` run in the adapter's `setup()`, before warm-up fits and outside fit timing. See
 [Where the clock starts](#where-the-clock-starts).
 
+The other R start scripts add their packages to the lane library, `$ANDREY_BENCH_R_LIBS`. The
+agreement check of the GCM, wGCM, and PCM tests (`regression_ci_agreement.py`) needs package
+versions of its own, such as xgboost 1.7.8.1, so `start_regression_ci_r.sh` builds two libraries
+apart from the lane's and never reads or writes `$ANDREY_BENCH_R_LIBS`: the GCM and PCM library in
+`$ANDREY_BENCH_R_LIBS_GCM` (default `benchmarks/.r-lib-regression-ci`) and the wGCM library in
+`$ANDREY_BENCH_R_LIBS_WGCM` (default `benchmarks/.r-lib-regression-ci-wgcm`). It also clones the PCM
+authors' code, and prints the exports of the two libraries and of `ANDREY_BENCH_PCM_CODE` that the
+agreement script reads; `run_tests.sh` applies them and records them in its `env.sh`.
+
 ### Separate solution environments
 
 xges pins `numpy<2` and `numba<0.60`, which bench-env cannot satisfy. Its fits use a second

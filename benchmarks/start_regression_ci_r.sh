@@ -9,18 +9,18 @@
 # two libraries, each tarball with its SHA-256 checked. The PCM authors' simulation code, which
 # loads vimp and the archived CondIndTests, is cloned at a fixed commit into the folder given, else
 # `$ANDREY_BENCH_PCM_CODE` (default `benchmarks/.pcm-code`); it carries no license, so it is never
-# committed. The script prints the `ANDREY_BENCH_PCM_CODE` export the agreement script reads. The
-# libraries are `$ANDREY_BENCH_R_LIBS` (default `benchmarks/.r-lib-regression-ci`) and, for wGCM,
-# `$ANDREY_BENCH_R_LIBS_WGCM` (default `benchmarks/.r-lib-regression-ci-wgcm`), and the agreement
-# script reads both variables. The other R start scripts take `ANDREY_BENCH_R_LIBS` as the R lane's
-# library, which the `env.sh` of `benchmarks/run_tests.sh` records, so sourcing that file does not
-# set up the agreement script: point both variables at this script's libraries when running it.
+# committed. The libraries are `$ANDREY_BENCH_R_LIBS_GCM` (GCM and PCM; default
+# `benchmarks/.r-lib-regression-ci`) and `$ANDREY_BENCH_R_LIBS_WGCM` (wGCM; default
+# `benchmarks/.r-lib-regression-ci-wgcm`), apart from the R lane's `$ANDREY_BENCH_R_LIBS`, which the
+# script never reads or writes. The script prints the three exports the agreement script reads,
+# `ANDREY_BENCH_R_LIBS_GCM`, `ANDREY_BENCH_R_LIBS_WGCM`, and `ANDREY_BENCH_PCM_CODE`, which
+# `benchmarks/run_tests.sh` applies and records in its `env.sh`.
 
 set -euo pipefail
 
 REPO="$(git rev-parse --show-toplevel)"
 R_MODULE="${ANDREY_BENCH_R_MODULE:-gcc-12.1.0-gcc-11.2.0 r-4.6.1-gcc-12.1.0}"
-R_LIBS="${ANDREY_BENCH_R_LIBS:-$REPO/benchmarks/.r-lib-regression-ci}"
+R_LIBS_GCM="${ANDREY_BENCH_R_LIBS_GCM:-$REPO/benchmarks/.r-lib-regression-ci}"
 R_LIBS_WGCM="${ANDREY_BENCH_R_LIBS_WGCM:-$REPO/benchmarks/.r-lib-regression-ci-wgcm}"
 PCM_CODE="${1:-${ANDREY_BENCH_PCM_CODE:-$REPO/benchmarks/.pcm-code}}"
 CONTRIB="https://cran.r-project.org/src/contrib"
@@ -50,8 +50,7 @@ if command -v module >/dev/null 2>&1; then
     # shellcheck disable=SC2086
     module load $R_MODULE
 fi
-mkdir -p "$R_LIBS" "$R_LIBS_WGCM"
-export R_LIBS
+mkdir -p "$R_LIBS_GCM" "$R_LIBS_WGCM"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -62,7 +61,7 @@ for entry in "${TARBALLS[@]}" "${WGCM_TARBALLS[@]}"; do
     echo "$sha  $file" | sha256sum --check --status || { echo "$path does not match $sha" >&2; exit 1; }
 done
 
-Rscript --vanilla -e '
+R_LIBS="$R_LIBS_GCM" Rscript --vanilla -e '
     lib <- Sys.getenv("R_LIBS")
     tmp <- commandArgs(TRUE)[1]
     options(repos = c(CRAN = "https://cloud.r-project.org"), Ncpus = max(1L, parallel::detectCores()))
@@ -98,4 +97,6 @@ if [ ! -d "$PCM_CODE/.git" ]; then
 fi
 git -C "$PCM_CODE" checkout --quiet "$PCM_COMMIT"
 echo "pcm_code $PCM_COMMIT"
+printf 'export ANDREY_BENCH_R_LIBS_GCM=%q\n' "$(cd "$R_LIBS_GCM" && pwd)"
+printf 'export ANDREY_BENCH_R_LIBS_WGCM=%q\n' "$(cd "$R_LIBS_WGCM" && pwd)"
 printf 'export ANDREY_BENCH_PCM_CODE=%q\n' "$(cd "$PCM_CODE" && pwd)"
