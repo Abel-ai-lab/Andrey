@@ -519,17 +519,17 @@ def search_pool(workers: int, device: str = "numpy") -> Generator[Run]:
     results do not depend on the number of workers.
 
     With a PyTorch ``device`` (from :func:`search_device`), the CMA-ES searches of each call run
-    together by :func:`_lockstep` instead, whatever ``workers`` is."""
-    if device != "numpy":
-        yield lambda searches: _lockstep(searches, device)
-        return
+    together by :func:`_lockstep` instead, and the ``workers`` threads draw their populations."""
     if workers <= 1:
-        yield _serial
+        yield _serial if device == "numpy" else (lambda searches: _lockstep(searches, device, map))
         return
     from concurrent.futures import ThreadPoolExecutor
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        yield lambda searches: list(pool.map(_run_search, searches))
+        if device == "numpy":
+            yield lambda searches: list(pool.map(_run_search, searches))
+        else:
+            yield lambda searches: _lockstep(searches, device, pool.map)
 
 
 #: Generations of each search's draws taken from its stream at once by :func:`_lockstep`: one
@@ -537,16 +537,19 @@ def search_pool(workers: int, device: str = "numpy") -> Generator[Run]:
 DRAW_BLOCK = 16
 
 
-def _lockstep(searches: list[_Search], device: str) -> list[tuple[np.ndarray, float]]:
+def _lockstep(
+    searches: list[_Search], device: str, spread: Callable = map
+) -> list[tuple[np.ndarray, float]]:
     """Run ``searches`` (CMA-ES) on the PyTorch ``device`` together, in float64, and return their
     results in order; an L-BFGS-B search runs on its own.
 
     Searches with the same rows count, design widths, and coordinates form a group that advances
     one generation at a time: each search keeps its own distribution, draws its candidates from its
     own stream as :func:`_cma_es` does, and stops on its own rule; a group's candidates are scored
-    by one batched likelihood, and a stopped search leaves the group. A search's arithmetic does not
-    read the other searches, but the device rounds differently from NumPy, so its path can differ
-    from :func:`_cma_es` in the last digits and grow from there.
+    by one batched likelihood, and a stopped search leaves the group. ``spread`` (``map``, or a
+    thread pool's) fills the searches' draws. A search's arithmetic does not read the other
+    searches, but the device rounds differently from NumPy, so its path can differ from
+    :func:`_cma_es` in the last digits and grow from there.
     """
     found: dict[int, tuple[np.ndarray, float]] = {}
     groups: dict[tuple, list[int]] = {}
@@ -563,7 +566,7 @@ def _lockstep(searches: list[_Search], device: str) -> list[tuple[np.ndarray, fl
         groups.setdefault(key, []).append(i)
     for members in groups.values():
         for i, result in zip(
-            members, _cma_es_group([searches[i] for i in members], device), strict=True
+            members, _cma_es_group([searches[i] for i in members], device, spread), strict=True
         ):
             found[i] = result
     return [found[i] for i in range(len(searches))]
@@ -592,7 +595,9 @@ def _batched_penalized_nll(theta, location, scale, effect, k_alpha, m_kappa, fra
     return torch.where(torch.isfinite(value), value, math.inf)
 
 
-def _cma_es_group(searches: list[_Search], device: str) -> list[tuple[np.ndarray, float]]:
+def _cma_es_group(
+    searches: list[_Search], device: str, spread: Callable = map
+) -> list[tuple[np.ndarray, float]]:
     """:func:`_cma_es` for searches of one shape, in lockstep on ``device`` (:func:`_lockstep`)."""
     from andrey.core import backend
 
@@ -643,11 +648,17 @@ def _cma_es_group(searches: list[_Search], device: str) -> list[tuple[np.ndarray
     path_c = torch.zeros((n_searches, dim), dtype=f64, device=device)
     path_s = torch.zeros_like(path_c)
     history = [mean]  # the means, as in _cma_es; only the last WINDOW + 1 are read
+    # Each search fills its rows of one host buffer from its own stream (pinned for a copy that
+    # does not wait); the next fill comes after the device has read the copy.
+    host = torch.empty(
+        (n_searches, DRAW_BLOCK, POPULATION, dim), dtype=f64, pin_memory=device == "cuda"
+    )
+    filled = host.numpy()
     draws = torch.empty((n_searches, 0, POPULATION, dim), dtype=f64, device=device)
     for generation in range(GENERATIONS):
         if generation % DRAW_BLOCK == 0:
-            block = (DRAW_BLOCK, POPULATION, dim)
-            draws = put(np.stack([stream.standard_normal(block) for stream in streams]))
+            list(spread(lambda i: streams[i].standard_normal(out=filled[i]), range(len(streams))))
+            draws = host[: len(streams)].to(device, non_blocking=True)
         z = draws[:, generation % DRAW_BLOCK]
         steps = z @ ((basis * scales[:, None, :]) @ basis.transpose(1, 2))
         candidates = torch.clamp(mean[:, None, :] + sigma[:, None, None] * steps, lower, upper)
