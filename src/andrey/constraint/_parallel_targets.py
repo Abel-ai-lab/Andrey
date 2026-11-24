@@ -3,7 +3,10 @@ process or on worker processes.
 
 One search answers every target, so a run or a spouse step that two targets read is made once.
 Each run depends only on the data, the settings, and its variable, and the tests that keep answers
-return the bits they would compute, so an answer is the one a search of its own would give.
+return the bits they would compute, so an answer is the one a search of its own would give. A
+test-wise deletion test, which counts the rows each test reads, the queries it does not test, and
+the pairs no test decided (:func:`~andrey.core.ci_missing.rows_tested`), answers each target with
+a search of its own in this process, so each answer counts what a call for that target alone counts.
 
 With more than one worker, at least two targets, and a FisherZ, StudentT, or NormalScores test
 (:func:`~andrey.constraint._skeleton.canonical_capable`), the targets are cut into contiguous
@@ -13,7 +16,8 @@ from, and pins BLAS to one thread, as the caller's search does inside
 :meth:`~LocalSearch.pinned`. The answers come back in the order of the targets. These tests keep no
 answers, so each kept step computes the same tests in any process, and each answer's count of tests
 (:func:`~andrey.constraint.blanket.first_reads`) equals the one a single search gives the targets in
-order, whatever the number of workers. Any other test answers in this process.
+order, whatever the number of workers. Any other test answers in this process with the one
+search.
 """
 
 from __future__ import annotations
@@ -26,6 +30,7 @@ from typing import TypeVar
 from andrey.constraint._skeleton import canonical_capable
 from andrey.constraint.blanket import LazyTieRanks, LocalSearch, Reading, Step, first_reads
 from andrey.core.ci import count_tests, counting_tests
+from andrey.core.ci_missing import TestwiseDeletion, rows_tested
 
 T = TypeVar("T")
 
@@ -70,7 +75,7 @@ def _answer_chunk(
 
 
 def answers(
-    search: LocalSearch,
+    search_of: Callable[[], LocalSearch],
     answer: Callable[[LocalSearch, int], T],
     targets: Sequence[int],
     workers: int = 1,
@@ -79,13 +84,25 @@ def answers(
     by every test it read (:func:`~andrey.core.ci_missing.rows_tested`), in the order of
     ``targets``.
 
-    A test counts toward the first answer that reads it, so the counts add up to the tests the
-    call computed, while the rows of an answer are those a search of its own would count, the
-    steps an earlier answer made included. ``answer`` is a module-level function when ``workers`` is
-    above 1, so that it reaches the workers. The tests the workers compute are added to the
-    caller's :func:`~andrey.core.ci.counting_tests` count. The rows are counted only in this
-    process: a test-wise deletion test, the one test that counts them, answers here.
+    ``search_of`` makes a new search. A test counts toward the first answer that reads it, so the
+    counts add up to the tests the call computed, while the rows of an answer are those a search of
+    its own would count, the steps an earlier answer made included. A test-wise deletion test
+    answers each target with a search of its own, whose counts are a call for that target alone
+    gives, the queries not tested and the pairs no test decided among them. ``answer`` is a
+    module-level function when ``workers`` is above 1, so that it reaches the workers. The tests the
+    workers compute are added to the caller's :func:`~andrey.core.ci.counting_tests` count. The rows
+    are counted only in this process: a test-wise deletion test, the one test that counts them,
+    answers here.
     """
+    search = search_of()
+    if isinstance(search.test, TestwiseDeletion):
+        out = []
+        for i, t in enumerate(targets):
+            own = search if i == 0 else search_of()
+            with own.pinned(), counting_tests() as tests, rows_tested() as rows:
+                found = answer(own, t)
+            out.append((found, tests.n, rows))
+        return out
     if workers > 1 and len(targets) > 1 and canonical_capable(search.test):
         return _pooled(search, answer, targets, workers)
     out = []

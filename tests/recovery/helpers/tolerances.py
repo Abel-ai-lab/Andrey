@@ -31,6 +31,7 @@ SPEC: dict[str, dict] = {
         "numeric": {},
     },
     "XGES": GRAPH_SCORE,
+    "LGES": GRAPH_SCORE,
     "AGES": GRAPH_ONLY,
     "HC": GRAPH_SCORE,
     "Tabu": GRAPH_SCORE,
@@ -116,6 +117,12 @@ SPEC: dict[str, dict] = {
             "p_values": {"atol": 1e-8, "rtol": 1e-6},
             "statistics": {"atol": 1e-8, "rtol": 1e-6},
         },
+    },
+    # Regime-PCMCI: the regime of each step and every regime's lag graphs, exactly; the linear
+    # program's objective within rounding.
+    "RPCMCI": {
+        "structural": ["regimes", "graph"],
+        "numeric": {"objective": {"atol": 1e-6, "rtol": 1e-8}},
     },
     "PCMCIplus": {
         "structural": ["graph", "conflicts"],
@@ -256,6 +263,15 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {"p_value": {"atol": 0.0, "rtol": 1e-3}},
     },
+    # SkewD: the decided graph and both models' mean log-likelihoods, the default criterion's
+    # numbers. The fit chains a Bayesian optimization, CMA-ES, and expectation conditional
+    # maximization, each seeded, so rounding can move the likelihoods in their later digits.
+    "SkewD": {
+        "structural": ["graph"],
+        "numeric": {field: {"atol": 1e-3, "rtol": 1e-3} for field in ("ll_forward", "ll_backward")},
+    },
+    # SkewD-MV: the DAG and the number of DAGs in PC's class it chose among.
+    "SkewDMV": {"structural": ["graph", "candidates"], "numeric": {}},
     "RCD": {
         "structural": ["graph"],
         "numeric": {"weighted_adjacency": {"atol": 1e-6, "rtol": 1e-5}},
@@ -269,4 +285,9 @@ SPEC: dict[str, dict] = {
     "RCoT": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
     "CMIknn": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
     "GPDC": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
+    "GCM": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
+    "WGCM": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
+    "WGCM_FIX": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
+    "PCM": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
+    "PCM6": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
 }

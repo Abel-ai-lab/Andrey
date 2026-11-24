@@ -79,7 +79,8 @@ with latent confounders. Advances in Neural Information Processing Systems 33 (N
 
 from __future__ import annotations
 
-from collections import Counter, OrderedDict
+import math
+from collections import OrderedDict
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from itertools import combinations, islice
@@ -87,8 +88,9 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from andrey.constraint._skeleton import collider_verdict
 from andrey.core import backend
-from andrey.core.ci_missing import PartialCorrelationDeletion
+from andrey.core.ci_missing import NOT_TESTED, PartialCorrelationDeletion
 from andrey.core.structure import ARROW, CIRCLE, NULL, TAIL
 from andrey.core.ties import KEY_DP, tie_ranks
 from andrey.temporal.pcmci import DesignTest, LinkTest, design_test
@@ -125,7 +127,11 @@ class LPCMCIResult:
     where no test ran, and ``1`` and ``0`` for a required link. ``sepsets[(i, j, lag)]`` lists the
     separating sets of a removed link (``i < j`` at lag 0) as ``(variable, lag)`` nodes relative
     to ``X^j_t``. ``parents[j]`` holds the ``(i, lag)`` nodes the last preliminary iteration found
-    to be parents of ``X^j_t``, kept as directed links for the final phase.
+    to be parents of ``X^j_t``, kept as directed links for the final phase. ``undecided`` holds
+    the links ``(i, j, lag)`` with a test without the rows it needs
+    (:data:`~andrey.core.ci_missing.NOT_TESTED`) and no test with rows; the marks leave them out,
+    they read ``NaN`` in ``statistics`` and ``p_values``, and no test conditions on an end of such
+    a link given the other end.
     """
 
     start_marks: np.ndarray
@@ -134,6 +140,7 @@ class LPCMCIResult:
     p_values: np.ndarray
     sepsets: dict[Key, tuple[frozenset[Node], ...]]
     parents: tuple[tuple[Node, ...], ...]
+    undecided: tuple[Key, ...] = ()
 
     @property
     def adjacency(self) -> np.ndarray:
@@ -223,15 +230,21 @@ class LPCMCISearch:
         self.near: dict[Node, tuple[list[Node], frozenset[Node]]] = {}
         self.roles_of: dict[Node, tuple[set[Node], list[Node], list[Node], list[Node]]] = {}
         self.steps_of: dict[Node, list[Node]] = {}
+        #: The links :meth:`untested` gave when ``steps_of`` was filled.
+        self.steps_untested: frozenset[Key] = frozenset()
         self.shifted: dict[tuple[Key, int], list[frozenset[Node]]] = {}
         self.imin: dict[Key, float] = {}
         self.best: dict[Key, tuple[float, float]] = {}
+        #: The links with a test that was not tested (:data:`~andrey.core.ci_missing.NOT_TESTED`),
+        #: and those with a test that was.
+        self.skipped: set[Key] = set()
+        self.tested: set[Key] = set()
         self.sepsets: dict[Key, list[frozenset[Node]]] = {}
         self.ever_directed: set[tuple[Key, bool]] = set()
         self.version = 0
         self.cache: OrderedDict[tuple[int, int, tuple[int, ...]], tuple[float, float]]
         self.cache = OrderedDict()
-        self.votes: dict[Key, tuple[int, Counter[Node]]] = {}
+        self.votes: dict[Key, tuple[list[frozenset[Node]], list[frozenset[Node]]]] = {}
         self.votes_version = -1
 
     # ---- the graph -----------------------------------------------------------------------
@@ -474,6 +487,23 @@ class LPCMCISearch:
     def _column(self, node: Node) -> int:
         return node[1] * self.n + node[0]
 
+    def untested(self) -> frozenset[Key]:
+        """Links with untested queries (:data:`~andrey.core.ci_missing.NOT_TESTED`) and no tested
+        query to decide them."""
+        return frozenset(self.skipped - self.tested)
+
+    def usable(self, a: Node, b: Node) -> bool:
+        """Whether a rule may read ``a - b``: links no test decided (:meth:`untested`) may be absent
+        and are excluded."""
+        return _key(a, b)[0] not in self.untested()
+
+    def unconditioned(self, a: Node, b: Node, untested: frozenset[Key]) -> set[Node]:
+        """Nodes joined to ``a`` or ``b`` by ``untested`` links, excluded from the pair's conditions
+        because jointly observed rows are likely too few."""
+        if not untested:
+            return set()
+        return {c for end in (a, b) for c in self.linked(end) if _key(end, c)[0] in untested}
+
     def run_tests(
         self,
         a: Node,
@@ -525,7 +555,12 @@ class LPCMCISearch:
     def _record(
         self, key: Key, statistic: float, p_value: float, *, rank: bool, report: bool
     ) -> None:
-        """Update the link's smallest absolute statistic and its largest p-value."""
+        """Update the link's smallest absolute statistic and largest p-value; an untested query
+        updates neither and marks it ``skipped``."""
+        if math.isnan(p_value):
+            self.skipped.add(key)
+            return
+        self.tested.add(key)
         if rank:
             self.imin[key] = min(abs(statistic), self.imin.get(key, np.inf))
         if report and (key not in self.best or p_value > self.best[key][1]):
@@ -622,8 +657,13 @@ class LPCMCISearch:
 
     def _record_batch(self, key: Key, statistics: np.ndarray, p_values: np.ndarray) -> None:
         """:meth:`_record` of each test in order, with ``rank`` and ``report``."""
+        tested = ~np.isnan(p_values)
+        if not tested.all():
+            self.skipped.add(key)
+            statistics, p_values = statistics[tested], p_values[tested]
         if not len(p_values):
             return
+        self.tested.add(key)
         self.imin[key] = min(float(np.abs(statistics).min()), self.imin.get(key, np.inf))
         best = int(np.argmax(p_values))  # the first of equal largest p-values, as _record keeps
         if key not in self.best or p_values[best] > self.best[key][1]:
@@ -649,14 +689,14 @@ class LPCMCISearch:
 
     # ---- separating-set queries -------------------------------------------------------------
 
-    def vote(self, key: Key) -> tuple[int, Counter[Node]]:
-        """The separating sets of the pair ``key`` for a majority vote, counted.
+    def vote(self, key: Key) -> tuple[list[frozenset[Node]], list[frozenset[Node]]]:
+        """The separating sets of the pair ``key`` for a majority vote, and the sets not tested.
 
         The sets are the stored ones and the separating sets among the subsets of ``apds_t`` of
         each node, given the parents of both; the earlier node of a lagged pair contributes the
-        empty subset only. Each distinct set counts once. Return how many sets there are and, for
-        each node, how many hold it, in the frame of ``key``. The counts last until the graph
-        changes.
+        empty subset only. Each distinct set counts once. A subset that was not tested
+        (:data:`~andrey.core.ci_missing.NOT_TESTED`) might have separated the pair, and goes in
+        the second list. Both are in the frame of ``key`` and last until the graph changes.
         """
         if self.votes_version != self.version:
             self.votes, self.votes_version = {}, self.version
@@ -665,12 +705,13 @@ class LPCMCISearch:
             return counted
         i, j, lag = key
         start, end = (i, lag), (j, 0)
-        sdef = (self.parents(start) | self.parents(end)) - {start, end}
+        dropped = self.unconditioned(start, end, self.untested())
+        sdef = (self.parents(start) | self.parents(end)) - {start, end} - dropped
         stored = set(self.sepsets.get(key, []))
-        total, holding = len(stored), Counter(node for s in stored for node in s)
+        separating, skipped = list(stored), []
         tested: frozenset[Node] | None = None  # subsets of these were tested from ``start``
         for anchor, other in ((start, end), (end, start)):
-            candidates = sorted(self.apds(anchor, other) - sdef, key=_order)
+            candidates = sorted(self.apds(anchor, other) - sdef - dropped, key=_order)
             if anchor == start and lag > 0:
                 candidates = []
             fresh = (
@@ -687,23 +728,26 @@ class LPCMCISearch:
                     _, p_values = self.run_tests(start, end, sets, rank=False)
                     for s, p_value in zip(sets, p_values):
                         if p_value > self.alpha and s not in stored:
-                            total += 1
-                            holding.update(s)
+                            separating.append(s)
+                        elif math.isnan(p_value):
+                            skipped.append(s)
             if anchor == start:
                 tested = frozenset(candidates)
-        self.votes[key] = (total, holding)
-        return total, holding
+        self.votes[key] = (separating, skipped)
+        return separating, skipped
 
-    def share(self, a: Node, b: Node, c: Node) -> float:
-        """The share of the voting separating sets of ``a`` and ``c`` that contain ``b``."""
+    def verdict(self, a: Node, b: Node, c: Node) -> str:
+        """The majority verdict on ``b`` from the voting separating sets of ``a`` and ``c``
+        (:func:`~andrey.constraint._skeleton.collider_verdict`): ambiguous when the sets not
+        tested could change it."""
         key, _ = _key(a, c)
-        total, holding = self.vote(key)
+        separating, skipped = self.vote(key)
         frame = min(a[1], c[1])
-        return holding[(b[0], b[1] - frame)] / total if total else 0.5
+        return collider_verdict(separating, (b[0], b[1] - frame), "majority", skipped)
 
     def outside_sepset(self, a: Node, b: Node, c: Node) -> bool:
         """Whether ``b`` is outside the separating set of ``a`` and ``c``, by majority."""
-        return self.share(a, b, c) < 0.5
+        return self.verdict(a, b, c) == "collider"
 
     def inside_sepset(self, a: Node, b: Node, c: Node) -> bool:
         """Whether ``b`` is inside a weakly minimal separating set of ``a`` and ``c``."""
@@ -713,7 +757,7 @@ class LPCMCISearch:
             and self.middle(a, b) == ""
             and self.middle(b, c) == ""
         ):
-            return self.share(a, b, c) > 0.5
+            return self.verdict(a, b, c) == "non-collider"
         stored = self.stored_sepsets(a, c)
         return bool(stored) and all(b in s for s in stored)
 
@@ -752,19 +796,20 @@ class LPCMCISearch:
         while True:
             removed = False
             for in_group in self._groups():
-                ranked = self._ranking()
+                ranked, untested = self._ranking(), self.untested()
                 marked = []
                 for key in sorted(k for k in self.edges if in_group(k)):
                     i, j, lag = key
                     start, end = (i, lag), (j, 0)
-                    sdef = (self.parents(start) | self.parents(end)) - {start, end}
+                    dropped = self.unconditioned(start, end, untested)
+                    sdef = (self.parents(start) | self.parents(end)) - {start, end} - dropped
                     separated = False
                     for forward in (True, False):
                         letters = ("?", "L") if forward else ("?", "R")
                         if self.edges[key][1] not in letters:
                             continue
                         anchor, other = (end, start) if forward else (start, end)
-                        search = ranked(self.apds(anchor, other) - sdef, anchor)
+                        search = ranked(self.apds(anchor, other) - sdef - dropped, anchor)
                         if not forward and lag > 0:
                             search = search[:0]  # time order: the later node is no ancestor
                         if len(search) < p or self._past_depth(p):
@@ -858,17 +903,18 @@ class LPCMCISearch:
         while True:
             removed = False
             for in_group in self._groups():
-                ranked = self._ranking()
+                ranked, untested = self._ranking(), self.untested()
                 marked = []
                 for key in sorted(k for k in self.edges if in_group(k)):
                     if self.edges[key][1] == "":
                         continue
                     i, j, lag = key
                     start, end = (i, lag), (j, 0)
-                    sdef1 = (self.parents(start) | self.parents(end)) - {start, end}
-                    sdef2 = (self.ever_parents(start) | self.ever_parents(end)) - {start, end}
-                    near_end = self.napds(end, start)
-                    near_start = self.napds(start, end)
+                    dropped = self.unconditioned(start, end, untested) | {start, end}
+                    sdef1 = (self.parents(start) | self.parents(end)) - dropped
+                    sdef2 = (self.ever_parents(start) | self.ever_parents(end)) - dropped
+                    near_end = self.napds(end, start) - dropped
+                    near_start = self.napds(start, end) - dropped
                     search1 = ranked(near_end - sdef1 - sdef2, end)
                     search2 = ranked(near_start - sdef1 - sdef2, start)
                     if len(search1) < p or (lag == 0 and len(search2) < p) or self._past_depth(p):
@@ -977,8 +1023,9 @@ class LPCMCISearch:
         while droppable := sorted(current - known, key=_order):
             trials = [current - {node} for node in droppable]
             _, p_values = self.run_tests(a, b, trials, rank=False, report=False)
-            best = max(range(len(trials)), key=lambda k: p_values[k])
-            if p_values[best] <= self.alpha:
+            # A trial not tested (NaN) never drops a node.
+            best = max(range(len(trials)), key=lambda k: np.nan_to_num(p_values[k], nan=-1.0))
+            if not p_values[best] > self.alpha:
                 break
             current = trials[best]
         return current
@@ -1025,12 +1072,15 @@ class LPCMCISearch:
         return middle == "!" or (middle == "R" and b_first) or (middle == "L" and not b_first)
 
     def _unshielded(self) -> Iterable[tuple[Node, Node, Node]]:
-        """Every unshielded triple ``(a, b, c)``, both orders of ``a`` and ``c``.
+        """Every unshielded triple ``(a, b, c)`` in both orders of ``a`` and ``c``, except those
+        with an undecided side (:meth:`untested`): that link may be absent, so no rule reads the
+        triple.
 
         Each triple appears once, moved so its latest node is at time ``t``.
         """
+        untested = self.untested()
         for b in self.window:
-            around = self.neighbors(b)
+            around = [a for a in self.neighbors(b) if _key(a, b)[0] not in untested]
             for a in around:
                 near_a = self.linked(a)
                 for c in around:
@@ -1088,13 +1138,14 @@ class LPCMCISearch:
         ``b`` are left out. Return every conditioning set that separates them.
         """
         later = min(x[1], b[1])
-        parents = (self.parents(x) | self.parents(b)) - {x, b}
+        dropped = self.unconditioned(x, b, self.untested()) | {x, b}
+        parents = self.parents(x) | self.parents(b)
         found = []
         for sepset in self.stored_sepsets(a, c) or [frozenset()]:
             nodes = frozenset(n for n in sepset | parents if later <= n[1] <= self.tau_max)
-            _, (p_value,) = self.run_tests(x, b, [nodes - {x, b}])
-            if p_value > self.alpha and nodes - {x, b} not in found:
-                found.append(nodes - {x, b})
+            _, (p_value,) = self.run_tests(x, b, [nodes - dropped])
+            if p_value > self.alpha and nodes - dropped not in found:
+                found.append(nodes - dropped)
         return found
 
     def rule_r0b(self) -> tuple[dict, dict, dict]:
@@ -1156,19 +1207,29 @@ class LPCMCISearch:
         return marks, {}, {}
 
     def rule_r2(self) -> tuple[dict, dict, dict]:
-        """R2': ``A -> B *-> C`` or ``A *-> B -> C`` with ``A *-o C``: ``A *-> C``."""
+        """R2': ``A -> B *-> C`` or ``A *-> B -> C`` with ``A *-o C``: ``A *-> C``. No pattern link
+        may be undecided for lack of rows (:meth:`usable`)."""
         marks: dict = {}
+        untested = self.untested()
+
+        def usable(x: Node, y: Node) -> bool:
+            return _key(x, y)[0] not in untested
+
         for a in self.window:
             around = self.neighbors(a)
             sides: list[tuple[Node, bool, bool]] | None = None  # b, b <-* a, a -> b
             for c in around:
-                if self.mark(c, a) != CIRCLE or self.mark(a, c) == CONFLICT:
+                if self.mark(c, a) != CIRCLE or self.mark(a, c) == CONFLICT or not usable(a, c):
                     continue
                 if sides is None:
-                    sides = [(b, self.mark(b, a) == ARROW, self.directed(a, b)) for b in around]
+                    sides = [
+                        (b, self.mark(b, a) == ARROW, self.directed(a, b))
+                        for b in around
+                        if usable(a, b)
+                    ]
                 near_c = self.linked(c)
                 for b, into_b, a_to_b in sides:
-                    if b == c or b not in near_c:
+                    if b == c or b not in near_c or not usable(b, c):
                         continue
                     into_c = self.mark(c, b) == ARROW
                     if (a_to_b and into_c) or (into_b and self.directed(b, c)):
@@ -1176,8 +1237,14 @@ class LPCMCISearch:
         return marks, {}, {}
 
     def rule_r3(self) -> tuple[dict, dict, dict]:
-        """R3': ``A *-> B <-* C`` unshielded, ``A *-o D o-* C``, ``D *-o B``, ``D`` in the set."""
+        """R3': ``A *-> B <-* C`` unshielded, ``A *-o D o-* C``, ``D *-o B``, ``D`` in the set. No
+        ``D`` link may be undecided for lack of rows (:meth:`usable`)."""
         marks: dict = {}
+        untested = self.untested()
+
+        def usable(x: Node, y: Node) -> bool:
+            return _key(x, y)[0] not in untested
+
         for a, b, c in self._unshielded():
             if _order(a) > _order(c):
                 continue
@@ -1187,6 +1254,8 @@ class LPCMCISearch:
                 if d in (a, c) or self.mark(b, d) != CIRCLE or self.mark(d, b) == CONFLICT:
                     continue
                 if not (self.adjacent(d, a) and self.adjacent(d, c)):
+                    continue
+                if not (usable(d, b) and usable(d, a) and usable(d, c)):
                     continue
                 if self.mark(d, a) != CIRCLE or self.mark(d, c) != CIRCLE:
                     continue
@@ -1206,10 +1275,12 @@ class LPCMCISearch:
         marks: dict = {}
         for b in self.window:
             for c in self.neighbors(b):
-                if self.mark(b, c) != CIRCLE:
+                if self.mark(b, c) != CIRCLE or not self.usable(b, c):
                     continue
                 for a in self.neighbors(b):
                     if a == c or not self.adjacent(a, c):
+                        continue
+                    if not (self.usable(a, b) and self.usable(a, c)):
                         continue
                     if self.mark(a, b) != ARROW or not self.directed(a, c):
                         continue
@@ -1237,10 +1308,15 @@ class LPCMCISearch:
             for d in self.neighbors(node):
                 if d in seen or self.mark(node, d) != ARROW or self.middle(node, d) != "":
                     continue
+                if not self.usable(node, d):
+                    continue
                 if not self.adjacent(d, c):
                     ends.add(d)
                 elif (
-                    self.directed(d, c) and self.middle(d, c) == "" and self.mark(d, node) == ARROW
+                    self.usable(d, c)
+                    and self.directed(d, c)
+                    and self.middle(d, c) == ""
+                    and self.mark(d, node) == ARROW
                 ):
                     seen.add(d)
                     frontier.append(d)
@@ -1251,10 +1327,21 @@ class LPCMCISearch:
         marks: dict = {}
         for a in self.window:
             for c in self.neighbors(a):
-                if self.mark(a, c) != CIRCLE or self.mark(c, a) == CONFLICT:
+                if (
+                    self.mark(a, c) != CIRCLE
+                    or self.mark(c, a) == CONFLICT
+                    or not self.usable(a, c)
+                ):
                     continue
                 near_c = self.linked(c)
-                if any(b != c and b in near_c and self.directed(b, c) for b in self._roles(a)[2]):
+                if any(
+                    b != c
+                    and b in near_c
+                    and self.usable(a, b)
+                    and self.usable(b, c)
+                    and self.directed(b, c)
+                    for b in self._roles(a)[2]
+                ):
                     self._propose(marks, a, c, TAIL, ARROW)
         return marks, {}, {}
 
@@ -1276,15 +1363,20 @@ class LPCMCISearch:
     def _steps(self, a: Node) -> list[Node]:
         """The neighbors ``b`` of ``a``, in order, whose link can be a path step ``a - b``.
 
-        The link is potentially directed, not into ``a`` and not out of ``b``, and its middle mark
-        is not ``"?"``.
+        The link is potentially directed, not into ``a`` and not out of ``b``, its middle mark is
+        not ``"?"``, and a test with rows decided it (:meth:`usable`); the steps are found again
+        once the links no such test decided change.
         """
+        untested = self.untested()
+        if untested != self.steps_untested:
+            self.steps_of, self.steps_untested = {}, untested
         found = self.steps_of.get(a)
         if found is None:
             found = []
             for b in self.neighbors(a):
                 at_a, middle, at_b = self.link(a, b)
-                if at_a in (CIRCLE, TAIL) and at_b in (CIRCLE, ARROW) and middle != "?":
+                usable = self.usable(a, b)
+                if at_a in (CIRCLE, TAIL) and at_b in (CIRCLE, ARROW) and middle != "?" and usable:
                     found.append(b)
             self.steps_of[a] = found
         return found
@@ -1295,6 +1387,8 @@ class LPCMCISearch:
         for a1 in self.window:
             for an in self.neighbors(a1):
                 if self.mark(a1, an) != CIRCLE or self.mark(an, a1) != ARROW:
+                    continue
+                if not self.usable(a1, an):
                     continue
 
                 def step_ok(path: list[Node], node: Node, an: Node = an) -> bool:
@@ -1321,9 +1415,9 @@ class LPCMCISearch:
         marks: dict = {}
         for a in self.window:
             for d in self.neighbors(a):
-                if self.mark(a, d) != CIRCLE or self.mark(d, a) != ARROW:
+                if self.mark(a, d) != CIRCLE or self.mark(d, a) != ARROW or not self.usable(a, d):
                     continue
-                into = [x for x in self._roles(d)[1] if x != a]
+                into = [x for x in self._roles(d)[1] if x != a and self.usable(x, d)]
                 if len(into) < 2:
                     continue
 
@@ -1479,7 +1573,10 @@ def _result(search: LPCMCISearch, kept: list[tuple[Key, bool]]) -> LPCMCIResult:
     shape = (tau_max + 1, n, n)
     start_marks = np.zeros(shape, dtype=np.int8)
     end_marks = np.zeros(shape, dtype=np.int8)
+    undecided = tuple(sorted(key for key in search.untested() if key in search.edges))
     for (i, j, lag), (start, _, end) in search.edges.items():
+        if (i, j, lag) in undecided and (i, j, lag) not in search.required:
+            continue  # no test with rows decided the link: it is not drawn
         start_marks[lag, i, j], end_marks[lag, i, j] = start, end
         if lag == 0:
             start_marks[0, j, i], end_marks[0, j, i] = end, start
@@ -1489,12 +1586,18 @@ def _result(search: LPCMCISearch, kept: list[tuple[Key, bool]]) -> LPCMCIResult:
         statistics[lag, i, j], p_values[lag, i, j] = statistic, p_value
         if lag == 0:
             statistics[0, j, i], p_values[0, j, i] = statistic, p_value
+    for i, j, lag in undecided:  # a link no test with rows decided: its largest p-value is unknown
+        statistics[lag, i, j], p_values[lag, i, j] = NOT_TESTED, NOT_TESTED
+        if lag == 0:
+            statistics[0, j, i], p_values[0, j, i] = NOT_TESTED, NOT_TESTED
     for i, j, lag in search.required:  # never tested
         statistics[lag, i, j], p_values[lag, i, j] = 1.0, 0.0
         if lag == 0:
             statistics[0, j, i], p_values[0, j, i] = 1.0, 0.0
     parents: list[list[Node]] = [[] for _ in range(n)]
     for (i, j, lag), start_is_tail in kept:
+        if (i, j, lag) in undecided and (i, j, lag) not in search.required:
+            continue  # not drawn, so no parent
         if start_is_tail:
             parents[j].append((i, lag))
         else:
@@ -1506,4 +1609,5 @@ def _result(search: LPCMCISearch, kept: list[tuple[Key, bool]]) -> LPCMCIResult:
         p_values=p_values,
         sepsets={key: tuple(sets) for key, sets in sorted(search.sepsets.items())},
         parents=tuple(tuple(sorted(found, key=_order)) for found in parents),
+        undecided=tuple(key for key in undecided if key not in search.required),
     )

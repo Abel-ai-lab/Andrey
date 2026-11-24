@@ -29,6 +29,7 @@ import andrey.core.ci_cmiknn
 import andrey.core.ci_gpdc
 import andrey.core.ci_kernel
 import andrey.core.ci_missing
+import andrey.core.ci_regression
 import andrey.data.discrete
 import andrey.data.interventions
 import andrey.data.measurement
@@ -63,6 +64,7 @@ PUBLIC_MODULES = (
     (andrey.core.ci_kernel, "core.ci_kernel."),
     (andrey.core.ci_cmiknn, "core.ci_cmiknn."),
     (andrey.core.ci_gpdc, "core.ci_gpdc."),
+    (andrey.core.ci_regression, "core.ci_regression."),
     (andrey.core.ci_missing, "core.ci_missing."),
     (andrey.data.real, "data."),
     (andrey.data.discrete, "data."),
@@ -258,6 +260,54 @@ def test_every_title_but_the_homepages_ends_with_the_product_and_its_subject(htm
             assert title == "Andrey: fast causal discovery in Python, built for AI agents"
         else:
             assert title.endswith(" Andrey causal discovery"), f"{page}: {title}"
+
+
+def test_no_two_indexable_pages_share_a_title(html):
+    pages: dict[str, list[str]] = {}
+    for page, text in _pages(html):
+        if 'name="robots"' in text or 'http-equiv="refresh"' in text:
+            continue
+        title = unescape(re.search(r"<title>(.*?)</title>", text, re.S)[1])
+        pages.setdefault(title, []).append(page.relative_to(html).as_posix())
+    assert not {title: names for title, names in pages.items() if len(names) > 1}
+
+
+def test_the_notebooks_the_changelog_and_the_blog_index_have_written_descriptions(html):
+    # Their own words, not a first paragraph cut short: a notebook's from its metadata.
+    pages = {"docs/changelog.html": None, "blog/index.html": None}
+    for notebook in (ROOT / "examples").glob("*.ipynb"):
+        written = json.loads(notebook.read_text(encoding="utf-8"))["metadata"]["description"]
+        pages[f"docs/examples/{notebook.stem}.html"] = written
+    for name, written in pages.items():
+        text = (html / name).read_text(encoding="utf-8")
+        description = unescape(re.search(r'<meta name="description" content="([^"]*)"', text)[1])
+        assert 70 <= len(description) <= 160 and "…" not in description, name
+        assert written is None or description == written, name
+
+
+def test_the_speed_claim_reaches_search_and_answer_engines_without_a_number(html):
+    # The homepage's description, its previews, and the software node open with "fastest" and give
+    # no number; llms.txt's summary also counts the supported methods from the registry.
+    home = (html / "index.html").read_text(encoding="utf-8")
+    head = _head_meta(home)
+    description = head["description"]
+    assert description.startswith("The fastest causal discovery package for Python")
+    assert not re.search(r"\d", description) and len(description) <= 160
+    assert description == head["og:description"] == head["twitter:description"]
+    assert _discovery_graph(home)["SoftwareSourceCode"]["description"] == description
+    summary = (html / "llms.txt").read_text().split("\n\n", 2)[1]
+    supported = sum(spec.status == "supported" for spec in andrey.spec.list_specs())
+    assert summary.startswith("> Andrey is the fastest open-source Python package")
+    assert f" {supported} supported methods." in summary
+    assert set(re.findall(r"\d+", summary)) == {str(supported)}
+
+
+def test_the_docs_home_says_what_the_docs_cover(html):
+    text = (html / "docs" / "index.html").read_text(encoding="utf-8")
+    title = unescape(re.search(r"<title>(.*?)</title>", text, re.S)[1])
+    description = unescape(re.search(r'<meta name="description" content="([^"]*)"', text)[1])
+    assert title.split(" ")[0] == "Documentation", title
+    assert 120 <= len(description) <= 150, description
 
 
 def test_every_homepage_link_and_picture_is_built(html):
@@ -626,6 +676,17 @@ def test_every_site_address_in_the_readme_and_package_metadata_is_built(html):
     assert not problems, "\n".join(problems)
 
 
+def _head_meta(text: str) -> dict[str, str]:
+    """A page's ``meta`` tags in its head, by name or property."""
+    head = text.split("</head>", 1)[0]
+    return {
+        name: unescape(content)
+        for name, content in re.findall(
+            r'<meta (?:name|property)="([^"]+)" content="([^"]*)"', head
+        )
+    }
+
+
 def _discovery_graph(text):
     scripts = re.findall(r'<script type="application/ld\+json">(.*?)</script>', text, re.S)
     assert len(scripts) == 1, "Each page must have one valid JSON-LD graph"
@@ -661,9 +722,23 @@ def test_every_page_carries_structured_data_that_matches_its_preview(html):
         assert software["license"]["name"] == "Apache-2.0"
         assert software["license"]["url"].endswith("/blob/main/LICENSE")
         assert software["codeRepository"] == "https://github.com/Abel-ai-lab/Andrey"
-        assert software["image"] == "https://andrey.abel.ai/_static/favicon.svg"
-        assert (html / "_static" / "favicon.svg").is_file()
+        # One software node on every page, at the current release, with a raster image.
+        assert software["@id"] == "https://andrey.abel.ai/#software"
+        assert software["version"] == software["softwareVersion"] == andrey.__version__
+        assert software["downloadUrl"] == "https://pypi.org/project/andrey-core/"
+        image = urlsplit(software["image"]).path.lstrip("/")
+        assert image.endswith(".png") and (html / image).read_bytes()[:4] == b"\x89PNG"
         assert node["about"]["@id"] == software["@id"]
+        # The preview image has a text alternative, the same for Open Graph and Twitter.
+        head = _head_meta(text)
+        assert head["og:image:alt"].strip() and head["og:image:alt"] == head["twitter:image:alt"]
+        # The breadcrumbs pass through the site's section: Docs for a documentation page, Blog for
+        # a post or any other page under the blog.
+        crumbs = [item["item"] for item in nodes["BreadcrumbList"]["itemListElement"]]
+        path = page.relative_to(html).as_posix()
+        for section, front in (("docs/", "docs/index.html"), ("blog/", "blog/index.html")):
+            if path.startswith(section) and path != front:
+                assert crumbs[:2] == ["https://andrey.abel.ai/", f"https://andrey.abel.ai/{front}"]
         # The names and profiles that tie the product to its package and its owner, so it is not
         # taken for a person named Andrey.
         assert software["alternateName"] == "andrey-core"
@@ -685,17 +760,27 @@ def test_the_organization_logo_is_a_png_search_results_can_show(html):
         assert logo.format == "PNG" and min(logo.size) >= 112, logo.size
 
 
-def test_a_post_carries_the_date_authors_and_release_of_its_front_matter(html):
+def test_a_post_carries_the_date_and_authors_of_its_front_matter_and_its_update(html):
     for source in (DOCS / "blog").glob("*.md"):
         content = source.read_text()
         if "blogpost: true" not in content:
             continue
         nodes = _discovery_graph((html / "blog" / (source.stem + ".html")).read_text())
         article = nodes["BlogPosting"]
-        front = {key: re.search(rf"^{key}: (.+)$", content, re.M)[1] for key in ("date", "version")}
+        front = {"date": re.search(r"^date: (.+)$", content, re.M)[1]}
         assert article["datePublished"] == front["date"], source.name
-        assert nodes["SoftwareSourceCode"]["version"] == front["version"], source.name
-        assert "dateModified" not in article
+        # Every post is about the one software node, at the current release.
+        assert nodes["SoftwareSourceCode"]["@id"] == "https://andrey.abel.ai/#software"
+        assert nodes["SoftwareSourceCode"]["version"] == andrey.__version__, source.name
+        # An updated post carries the day of its latest update; any other post, no update.
+        updates = _updates(source)
+        head = _head_meta((html / "blog" / (source.stem + ".html")).read_text())
+        if updates:
+            latest = max([front["date"], *updates])
+            assert article["dateModified"] == head["article:modified_time"] == latest, source.name
+        else:
+            assert "dateModified" not in article, source.name
+            assert "article:modified_time" not in head, source.name
         authors = re.search(r"^author: (.+)$", content, re.M)[1]
         names = [name.strip() for name in authors.strip("[]").split(",")]
         assert [person["name"] for person in article["author"]] == names, source.name
@@ -709,8 +794,26 @@ def test_llms_txt_links_public_pages_by_section_with_their_preview_text(html):
     assert re.findall(r"^## (.+)$", text, re.M) == ["At a glance", "Docs", "Release cards", "Blog"]
     glance = text[text.index("## At a glance") : text.index("## Docs")]
     assert "mixed" in glance and "time series" in glance and "Open source" in glance
+    # The counts by status are the registry's, and each experimental method is marked.
+    specs = andrey.spec.list_specs()
+    supported = sum(spec.status == "supported" for spec in specs)
+    assert (
+        f"- Methods: {len(specs)} in all, {supported} supported and {len(specs) - supported} "
+        "experimental.\n"
+    ) in glance
+    for spec in specs:
+        marked = f"`{spec.name}` (experimental)" in glance
+        assert marked == (spec.status == "experimental"), spec.name
+    # How to cite, ahead of the sections, with the FAQ's BibTeX entry.
+    cite = re.search(r"^Cite: (.+)$", text[: text.index("## ")], re.M)[1]
+    assert "Abel AI Lab" in cite and cite.endswith("docs/faq.html#how-do-i-cite-it")
+    assert 'id="how-do-i-cite-it"' in (html / "docs" / "faq.html").read_text()
+    # No address ends a sentence, where a reader would take the period as part of it.
+    assert not re.search(r"https://\S+\.(?:\s|$)", text)
     links = re.findall(r"^- \[(.*?)\]\((https://andrey\.abel\.ai/[^)]+)\): (.+)$", text, re.M)
     assert len(links) >= 12
+    for listed in ("docs/methods.html", "docs/comparison.html"):
+        assert f"https://andrey.abel.ai/{listed}" in {url for _, url, _ in links}, listed
     assert len(links) == len({url for _, url, _ in links})
     for title, url, description in links:
         path = urlsplit(url).path.lstrip("/")
@@ -734,8 +837,15 @@ def test_the_sitemap_lists_each_indexable_page_once_and_robots_txt_names_it(html
     for agent in ("GPTBot", "ClaudeBot", "PerplexityBot", "Google-Extended"):
         assert f"User-agent: {agent}\n" in robots
     assert robots.endswith("\nSitemap: https://andrey.abel.ai/sitemap.xml\n")
-    urls = re.findall(r"<loc>([^<]+)</loc>", (html / "sitemap.xml").read_text())
+    sitemap = (html / "sitemap.xml").read_text()
+    urls = re.findall(r"<loc>([^<]+)</loc>", sitemap)
     assert len(urls) == len(set(urls)) > 50
+    # A post's entry carries the day of its latest change; no other page's has a date.
+    dated = dict(re.findall(r"<loc>([^<]+)</loc><lastmod>([^<]+)</lastmod>", sitemap))
+    posts = _posts_with_updates()
+    assert sorted(dated) == sorted(f"https://andrey.abel.ai/blog/{stem}.html" for stem in posts)
+    for stem, (meta, updates) in posts.items():
+        assert dated[f"https://andrey.abel.ai/blog/{stem}.html"] == max([meta["date"], *updates])
     for url in urls:
         path = urlsplit(url).path.lstrip("/") or "index.html"
         content = (html / path).read_text()
@@ -761,11 +871,21 @@ def test_the_sitemap_lists_each_indexable_page_once_and_robots_txt_names_it(html
         assert f"https://andrey.abel.ai/{address}" not in urls, address
 
 
-def test_only_the_search_page_the_404_page_and_the_blogs_generated_pages_are_noindex(html):
+def test_only_pages_with_no_content_of_their_own_are_noindex(html):
+    # The search page, the 404 page, the general index, the source-code pages, and the blog's
+    # generated pages; none names a canonical address.
+    unindexed = {html / name for name in ("search.html", "404.html", "genindex.html")}
+    modules = list((html / "_modules").rglob("*.html"))
+    assert modules and (html / "genindex.html").is_file()
+    for page in modules:
+        text = page.read_text(encoding="utf-8")
+        assert re.findall(r'<meta name="robots" content="([^"]*)"', text) == ["noindex, follow"]
+        assert 'rel="canonical"' not in text, page
     for page, text in _pages(html):
         robots = re.findall(r'<meta name="robots" content="([^"]*)"', text)
-        if page in (html / "search.html", html / "404.html") or _is_blog_collection(text):
+        if page in unindexed or "_modules" in page.parts or _is_blog_collection(text):
             assert robots == ["noindex, follow"], page
+            assert 'rel="canonical"' not in text, page
         else:
             assert not robots, page
 
@@ -864,13 +984,17 @@ def test_a_moved_pages_old_address_sends_the_reader_to_its_new_one(html, old):
     assert not section or f'id="{section}"' in text
 
 
-def test_a_released_posts_link_to_a_moved_page_still_arrives(html):
-    # The launch post links the demos' old gallery, and a released post is not edited.
+def test_a_released_posts_link_to_a_moved_page_leads_to_the_new_page(html):
+    # The launch post's source links the demos' old gallery, and a released post is not edited; the
+    # built link skips the redirect and arrives at the section that holds the demos now.
     post = html / "blog" / "20261008-introducing-andrey.html"
     links = _Links()
     links.feed(post.read_text(encoding="utf-8"))
-    (old,) = {href for _, href in links.found if href.endswith("docs/demos/index.html")}
-    assert _redirect(html, _resolve(html, post, old).relative_to(html).as_posix()) == DEMOS
+    hrefs = {href for _, href in links.found}
+    assert not any(href.split("#")[0].endswith("docs/demos/index.html") for href in hrefs)
+    (new,) = {href for href in hrefs if href.endswith("#interactive-demos")}
+    path, _, section = DEMOS.partition("#")
+    assert _resolve(html, post, new) == html / path and new.endswith(f"#{section}")
 
 
 def test_the_examples_gallery_lists_the_same_pages_as_its_sidebar_section_by_section(html):

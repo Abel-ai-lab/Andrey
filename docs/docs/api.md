@@ -27,7 +27,9 @@ Every method has the same shape:
   `multi_group_direct_lingam` and one per column of a list `target`: the graph in `out.structure`
   and, where the method gives them, a causal order in `out.ordering`, edge weights in
   `out.weighted_adjacency`, and run details such as the test, the score, and the seed in
-  `out.metadata`.
+  `out.metadata`. `rpcmci` returns a {py:class}`~andrey.RegimeOutput` instead: the regime of each
+  time step in `out.regimes`, run details in `out.metadata`, and one such result per regime in
+  `out.outputs[k]`.
 - **Supported or experimental.** A [supported](#supported-methods) method is benchmarked against
   other packages and checked against known graphs before each release; an
   [experimental](#experimental-methods) one is not yet. `andrey list` prints each method's status.
@@ -110,19 +112,41 @@ single column gives a one-node graph.
 `local_optimal_adjustment`, `locpc_cde`, `pcmci`, `pcmciplus`, and `lpcmci` accept missing values, a
 `NaN` cell, pandas' `NA`, or an empty, `NA`, or `N/A` field of a CSV file: each
 conditional-independence test reads only the rows where all of its variables are observed (test-wise
-deletion), and so do the pair tests `anm`, `pnl`, `loci`, and `skewd`, which read the rows where
-both columns are observed; `metadata["rows_tested"]` gives the fewest (`min`) and the median rows a
-test read. Their argument `missing` names the handling: `"testwise"` is test-wise deletion, and
-`None`, the default, picks the method's default handling, `"testwise"`; `metadata["missing"]`
-records the one a fit used. `pc` also takes `missing="mvpc"`: Missing-Value PC (Tu et al., 2019)
-finds the parents of each missingness indicator and tests again the edges they could have kept.
-`ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm`, whose
-fits read the data only through their covariance, refuse missing values under `None` and take
-`missing="em"`: structural EM runs the search on the expected covariance of the data 10 times,
-refitting a linear-Gaussian model of each graph it returns, with 5 parameter-only EM steps on that
-graph before the next search (Friedman's alternating scheme). `metadata["em"]` records the rounds,
-the observed-data log-likelihood after each, and whether each changed the graph; a fit whose last
-round changed it logs a warning. A row that observes no value is dropped first. It takes
+deletion), as do the pair tests `anm`, `pnl`, `loci`, and `skewd`, which read the rows where both
+columns are observed; `metadata["rows_tested"]` gives the fewest (`min`) and the median rows a test
+read. Test-wise deletion is valid when values are missing completely at random, which means that
+whether a value is missing depends on no value in the data; the rows a test reads are then a random
+sample of all rows, and otherwise they are a selected sample that more rows do not correct. Their
+argument `missing` names the handling: `"testwise"` is test-wise deletion, and `None`, the default,
+picks `"testwise"` and logs one notice per process naming it; `metadata["missing"]` records the one
+a fit used. In the conditional-independence searches, a test with fewer rows than it needs, or with
+zero degrees of freedom left, is not tested: it never separates a pair and never confirms a link;
+the pair methods instead raise `ValueError` when fewer than 2 rows observe both columns.
+`metadata["p_one_tests"]`, present when it is not zero, counts the tests that returned a p-value of
+1. `metadata["not_tested"]` counts the conditioning sets not tested, including those the search
+skipped because no row can test them, `metadata["undecided_pairs"]` lists the pairs no tested query
+could decide, which the graph leaves out and no orientation reads, and
+`metadata["never_observed_together"]` the pairs of columns no row observes together. In PC, FCI,
+CD-NOD, FCI-JCI, the Markov-blanket searches, PCMCI, PCMCI+, and LPCMCI,
+`metadata["possibly_separable"]` lists the edges drawn although a conditioning set that could not be
+tested might have separated their pair. With `possibly_separable="ambiguous"`, FCI, FCI-JCI, and
+PCMCI+ read no triple with such a side as a collider or a non-collider; PC, CD-NOD, and the
+Markov-blanket searches' CPDAG so read a side when one of its untested conditioning sets lies within
+the other nodes adjacent to an end or undecided with it, and orient through the others as before.
+LPCMCI lists such links but does not read them. The notice gives the number of those pairs and
+edges, not of the sets. `pc` also takes `missing="mvpc"`: Missing-Value PC (Tu et al., 2019) finds
+the parents of each missingness indicator and tests again the edges they could have kept;
+`metadata["corrected_edges"]["rows_tested"]` gives the fewest and the median rows such a test read,
+and `metadata["corrected_edges"]["p_one_tests"]`, present when it is not zero, counts those that
+returned a p-value of 1. `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`,
+`dagma`, and `calm`, whose fits read only the data's covariance, refuse missing values under `None`
+and take `missing="em"`: structural EM runs the search on the expected covariance of the data in
+rounds, refitting a linear-Gaussian model of each graph it returns, with 5 parameter-only EM steps
+on that graph before the next search (Friedman's alternating scheme). `metadata["em"]` records the
+rounds, the observed-data log-likelihood after each, and whether each changed the graph; a fit whose
+last round changed it logs a warning. A row that observes no value is dropped first, and
+`metadata["em"]` records how many (`rows_dropped`) and the fewest rows that observe both columns of
+a pair (`min_shared_rows`); two columns that share no observed row raise a `ValueError`. It takes
 `score_func="bic"` only and no `env`, and it assumes values missing completely at random or at
 random given observed values. `missing="mvpc"` is supported, and so is `missing="em"` in `ges`,
 `hc`, `tabu`, `boss`, `grasp`, and `notears`: in the [missing-data
@@ -134,16 +158,26 @@ variables, at two settings of the sample size the reference's score counts. In t
 last round still changed the graph in 2 to 6% of the fits, and in 20% of `grasp`'s, most often with
 50 variables and 100 rows. In `xges`, `exact_search`, `dagma`, and `calm` it is experimental, as no
 reference implementation exists to compare them with; the benchmark reports their results beside the
-baselines. A value a method does not list raises a `ValueError` that names the values it takes. A
-column with no observed value, or a constant one over its observed values, raises a `ValueError`
-before the fit, and a test with fewer rows than it needs, `|S| + 3` for a partial-correlation test
-and 2 for the other tests, raises one during it. With a partial-correlation test
-(`"fisherz"`, `"student_t"`, or `"normal_scores"`), the `"total_conditioning"` blanket learner needs
-`d + 2` rows with every variable observed and raises before the fit without them, unless `max_depth`
-is below `d - 2` or there is one column, where it runs no such test. `cdnod` and `fci_jci` need a
-complete `env`. Every other method raises a `ValueError` that names it and says
-what to do instead, as the [Missing values](guides/missing-values.md) guide describes; each
-method's Notes say why.
+baselines. An unlisted value raises a `ValueError` naming the accepted values. A column with no
+observed value, or a constant one over its observed values, raises a `ValueError` before the fit. A
+test needs, where its variables are observed, `|S| + 4` rows for `"fisherz"` and `"normal_scores"`,
+`|S| + 3` for `"student_t"` and `"cond_gauss"`, 4 for `"gcm"` and for `"wgcm"` with `variant="fix"`,
+17 for `"wgcm"`'s default `variant="est"`, 12 for `"pcm"`, and 2 for most other tests; a test with
+fewer is not tested. With a partial-correlation test (`"fisherz"`, `"student_t"`, or
+`"normal_scores"`), the `"total_conditioning"` blanket learner needs `d + 2` rows with every
+variable observed and raises before the fit without them, unless `max_depth` is below `d - 2` or
+there is one column, where it runs no such test. `cdnod` and `fci_jci` need a complete `env`. Every
+other method raises a `ValueError` that names it and says what to do instead, as the [Missing
+values](guides/missing-values.md) guide describes; each method's Notes say why.
+
+
+% concept: n_em_iterations
+`ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm` take
+`n_em_iterations`, the number of rounds `missing="em"` runs on data with missing values, each with
+one search. The default, 10, is the number Gao et al. (2022) run. If the last round changed the
+graph, the fit logs a warning naming the argument: more rounds let some fits settle while others
+keep changing graphs, and each round adds time. Values other than 10 are not benchmarked yet. On
+complete data or without `missing="em"` it changes nothing.
 
 % concept: indep_test
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
@@ -152,15 +186,36 @@ method's Notes say why.
 `local_optimal_adjustment`, `locpc_cde`, `pcmci`, `pcmciplus`, and `lpcmci` take the same
 `indep_test` choices: `"fisherz"`, `"student_t"`, and `"normal_scores"` for continuous data,
 `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"` for mixed data, and
-the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` ([Conditional-independence
-tests](#conditional-independence-tests)). `None`, the default, picks from the declared column types,
-`"fisherz"` for continuous data. `jpcmciplus` takes the continuous and nonlinear tests, as its
-dummies enter a test as numeric columns. `skewd_mv` takes them without `"normal_scores"`, as its
-likelihood stage reads the values, and its default is `"kci"`. `pcmci`, `pcmciplus`, `jpcmciplus`,
-and `lpcmci` run each test on the lagged values of the series, and order the candidate conditions by
-the test's statistic, as tigramite does: the partial correlation, the chi-square statistic, the
-likelihood ratio, CMIknn's conditional mutual information estimate, or GPDC's distance correlation.
-A test you register that reports only p-values is ordered by its p-value, smallest first.
+the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, `"gpdc"`, `"gcm"`, `"wgcm"`, and `"pcm"`
+([Conditional-independence tests](#conditional-independence-tests)). `None`, the default, picks from
+the declared column types, `"fisherz"` for continuous data. `jpcmciplus` takes the continuous and
+nonlinear tests, as its dummies enter a test as numeric columns. `skewd_mv` takes them without
+`"normal_scores"`, as its likelihood stage reads the values, and its default is `"kci"`. `rpcmci`
+takes `"student_t"`, its default, and `"fisherz"`, as its regime step fits linear models. `pcmci`,
+`pcmciplus`, `jpcmciplus`, `lpcmci`, and `rpcmci` run each test on the lagged values of the series,
+and order the candidate conditions by the test's statistic, as tigramite does: the partial
+correlation, the chi-square statistic, the likelihood ratio, CMIknn's conditional mutual information
+estimate, or GPDC's distance correlation. A registered test reporting only p-values is ordered by
+p-value, smallest first.
+
+% concept: degrees_of_freedom
+`pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
+`fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
+`mmhc`, `rsmax2`, `igsp`, `ut_igsp`, `y_structures`, `ldp`, `ld3`, `ldecc`,
+`local_optimal_adjustment`, `locpc_cde`, `pcmci`, `pcmciplus`, and `lpcmci` take
+`degrees_of_freedom`, the degrees of freedom of the categorical tests, `"chisq"` and `"gsq"`:
+`"mean"`, the default, is the mean of the statistic when `y` is shuffled within each configuration
+of the conditioning set, and `"nonempty"` is `(r_x - 1) * (r_y - 1)` per configuration over the
+values of `x` and `y` present in it, excluding the table's empty rows and columns (Spirtes, Glymour
+and Scheines 1993). The two differ only on sparse tables. There `"mean"` favors a level near the
+nominal one: over 35,808 true independences of random discrete networks, a test at 0.05 rejected
+4.9% (`"chisq"`) and 3.8% (`"gsq"`). With `"gsq"` it gives up time, a sum of hypergeometric terms
+per cell, and rejects below the nominal rate in the sparsest tables (0.8% at 3,125 cells).
+`"nonempty"` favors the degrees of freedom of Spirtes, Glymour and Scheines, read from the table
+alone; it gives up the level: 11.1% and 21.7% of the same true independences were rejected. Their
+time and power were not compared. `pcmb` and `mmmb` default to `"nonempty"`, the test their papers
+run. Only `"chisq"` and `"gsq"` read it, so passing `degrees_of_freedom` with another test raises a
+`ValueError`.
 
 % concept: degrees_of_freedom
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
@@ -250,10 +305,10 @@ permutation searches return the CPDAG of a DAG, which always has a consistent ex
 knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 % concept: tau_max
-`pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `longitudinal_lingam`, and `dynotears` take
-`tau_max`, the largest lag, at least 1, with a default of 1; for `longitudinal_lingam` a lag counts
-time points of the panel. The ARMA order of VARMA-LiNGAM, `order=(p, q)`, is a different setting and
-keeps its name.
+`pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `rpcmci`, `granger`, `longitudinal_lingam`, and
+`dynotears` take `tau_max`, the largest lag, at least 1, with a default of 1; for
+`longitudinal_lingam` a lag counts time points of the panel. VARMA-LiNGAM takes the ARMA order,
+`order=(p, q)`, instead.
 
 % concept: measure
 `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` run
@@ -273,14 +328,15 @@ from outside, as in a randomized experiment (FCI-JCI123), so every edge the inde
 of it.
 
 % concept: fdr_method
-`pcmci`, `pcmciplus`, `jpcmciplus`, and `granger` take `fdr_method`, tigramite's name for the
-correction of the lagged links' p-values for the number of links tested. `"fdr_bh"`, the default,
-replaces them with their Benjamini-Hochberg adjusted values over all the lagged links together,
-which holds the false discovery rate at or below the level when the tests are independent or
-positively dependent. `"none"` keeps each p-value as tested, so about `alpha` of the absent links
-appear as links. `pcmci` and `granger` keep a link when its adjusted p-value is at most `alpha`;
-`pcmciplus` and `jpcmciplus` decide their links in the skeleton phase and report the adjusted values
-in `metadata["p_values"]` without changing them. LPCMCI takes none, as tigramite's LPCMCI does not.
+`pcmci`, `pcmciplus`, `jpcmciplus`, `rpcmci`, and `granger` take `fdr_method`, tigramite's name for
+correcting lagged links' p-values for the number tested. `"fdr_bh"`, the default, replaces them with
+their Benjamini-Hochberg adjusted values over all the lagged links together, which holds the false
+discovery rate at or below the level when the tests are independent or positively dependent.
+`"none"` keeps each p-value as tested, so about `alpha` of the absent links appear as links. `pcmci`
+and `granger` keep a link when its adjusted p-value is at most `alpha`, and so does `rpcmci` in each
+regime, whose default is `"none"`, as in its paper's experiments; `pcmciplus` and `jpcmciplus`
+decide their links in the skeleton phase and report the adjusted values in `metadata["p_values"]`
+without changing them. LPCMCI takes none, as tigramite's LPCMCI does not.
 
 % concept: max_depth
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
@@ -360,27 +416,29 @@ the PAG their tests then orient can put more arrowheads at a node.
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
 `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
 `mmhc`, `rsmax2`, `y_structures`, `ldp`, `ld3`, `ldecc`, `local_optimal_adjustment`, `locpc_cde`,
-`pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`, `hc`, `tabu`,
-`calm`, `ica_lingam`, `cpcm`, `cpcm_graph`, `skewd`, and `skewd_mv` take `seed`, a whole number from
-0 to 2**32 - 1 that fixes their random draws. `None`, the default, is the configured seed,
-`ANDREY_SEED` or 0 when it is unset, not a fresh random one, so a call repeats exactly. Apart from
-`boss_fci` and `grasp_fci`, whose BOSS or GRaSP phase visits the variables in a random order on
-every fit, the methods that test independence draw random numbers only under `indep_test="rcot"`,
-`"cmiknn"`, or `"gpdc"`, `pc` also with `missing="mvpc"` on data with missing values, `igsp` and
-`ut_igsp` also with `n_starts` above 1, `hc` and `tabu` only with `n_starts` above 1, and `cpcm` and
-`cpcm_graph` only for a column under `family="poisson"` or `"negative_binomial"`; `skewd` and
-`skewd_mv` draw in every fit, in their Bayesian optimization and CMA-ES, whatever test PC runs.
-Otherwise `seed` changes nothing, and `metadata["seed"]` is not set. A call that gives `seed` does
-not depend on `ANDREY_SEED`. Every other method is deterministic and takes no seed.
+`pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `rpcmci`, `boss`, `grasp`, `igsp`, `ut_igsp`, `hc`,
+`tabu`, `calm`, `ica_lingam`, `cpcm`, `cpcm_graph`, `skewd`, and `skewd_mv` take `seed`, a whole
+number from 0 to 2**32 - 1 that fixes their random draws. `None`, the default, uses the configured
+seed, `ANDREY_SEED` or 0 when unset, so a call repeats exactly. Apart from `boss_fci` and
+`grasp_fci`, whose BOSS or GRaSP phase visits the variables in a random order on every fit, the
+methods that test independence draw random numbers only under `indep_test="rcot"`, `"cmiknn"`,
+`"gpdc"`, `"gcm"`, `"wgcm"`, or `"pcm"`, `pc` also with `missing="mvpc"` on data with missing
+values, `igsp` and `ut_igsp` also with `n_starts` above 1, `hc` and `tabu` only with `n_starts`
+above 1, and `cpcm` and `cpcm_graph` only for a column under `family="poisson"` or
+`"negative_binomial"`; `skewd` and `skewd_mv` draw in every fit, in their Bayesian optimization and,
+under `optimizer="cmaes"`, CMA-ES, whatever test PC runs, and `rpcmci` draws the first regime
+weights of every start. Otherwise `seed` changes nothing, and `metadata["seed"]` is not set. A call
+that gives `seed` does not depend on `ANDREY_SEED`. Every other method is deterministic and takes no
+seed.
 
 % concept: n_starts
-`boss`, `grasp`, `boss_fci`, `grasp_fci`, `igsp`, `ut_igsp`, `hc`, and `tabu` take `n_starts`, the
-number of searches a fit runs: the first from the start the method describes, each later one from a
-start drawn from `seed` and the search's index. `boss`, `grasp`, `boss_fci`, and `grasp_fci` start
-it from a random order, `igsp` and `ut_igsp` from a minimum-degree order with its ties drawn from
-`seed`, and `hc` and `tabu` from the best DAG so far after `n_perturbations` random edge changes.
-The fit returns the best-scoring search; a later one replaces an earlier one only when it scores
-better by more than `1e-6` (for `igsp`, fewer edges, then fewer I-contradicting edges; for
+`boss`, `grasp`, `boss_fci`, `grasp_fci`, `igsp`, `ut_igsp`, `hc`, `tabu`, and `rpcmci` take
+`n_starts`, the number of searches a fit runs: the first from the start the method describes, each
+later one from a start drawn from `seed` and the search's index. `boss`, `grasp`, `boss_fci`, and
+`grasp_fci` start it from a random order, `igsp` and `ut_igsp` from a minimum-degree order with its
+ties drawn from `seed`, and `hc` and `tabu` from the best DAG so far after `n_perturbations` random
+edge changes. The fit returns the best-scoring search; a later one replaces an earlier one only when
+it scores better by more than `1e-6` (for `igsp`, fewer edges, then fewer I-contradicting edges; for
 `ut_igsp`, a lower count of edges and targets), and `boss_fci` and `grasp_fci` run their tests on
 the best search's CPDAG. `igsp` and `ut_igsp` run 10 by default. On one set of simulated datasets in
 `igsp`'s papers' settings, at `alpha=1e-3`, 10 searches and 5 had a lower SHD than one in 21 and 19
@@ -390,8 +448,10 @@ than 5 in 4 groups, 2 of them in that setting, and more in none. On dense graphs
 can stop at a much worse order: with 50 variables, mean degree 4, and 500 rows at the standard BIC,
 its mean SHD over 40 datasets was 29.6 with one start, 18.8 with `n_starts=4`, and 16.3 with
 `n_starts=8`, at median fits of 1.3, 5.1, and 10.4 s, while at mean degree 2 one start was enough.
-Each search builds its own caches and drops the previous one's, so more starts take more time but
-little more memory. `1`, the default for the others, runs one search.
+Each search builds fresh caches and drops its predecessor's, so more starts take more time but
+little more memory. `rpcmci` draws every start's regime weights from `seed` and the start's index
+and returns the start with the lowest objective, 50 by default, as in its paper's experiments. `1`,
+the default for the others, runs one search.
 
 % concept: n_perturbations
 `hc` and `tabu` take `n_perturbations`, the number of random edge additions, removals, or
@@ -414,40 +474,42 @@ twelve answer every target with one search, so a step two targets share, such as
 children of a common neighbor, is made once, and each result's `metadata["n_tests"]` counts only
 the tests no earlier result counts. With `andrey.config(n_jobs=...)` above 1 and a
 partial-correlation `indep_test` (`"fisherz"`, `"student_t"`, `"normal_scores"`), they split the
-targets over that many worker processes, with the same results for any number of workers. `icp` and
+targets over that many worker processes, with the same results for any number of workers. With
+missing values, each target has a search of its own in the calling process, so each result,
+`metadata["n_tests"]` included, is the one a call for that target alone returns. `icp` and
 `local_isa_ling` answer each target in turn. On the command line, `'target=[a,b]'` names the
 columns by header or position, and the JSON result holds `multi: true` and `results`, one entry per
 target in the list's order, in place of `structure` and `metadata`.
 
 % concept: penalty_discount
-`ges`, `gies`, `gnies`, `xges`, `ages`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`,
-`boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take `penalty_discount`, the multiplier on the BIC
-penalty per parameter, the term of Ramsey et al. (2017): larger values give sparser graphs, and
-`1.0`, the default, with `ebic_gamma=0.0` is the standard BIC. Every score but `"bdeu"` has this
-penalty, and `metadata["penalty_discount"]` records the value the score used. `ages` reads it as
-the lowest penalty of its solution path.
+`ges`, `gies`, `gnies`, `xges`, `lges`, `ages`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`,
+`gfci`, `boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take `penalty_discount`, the multiplier on the
+BIC penalty per parameter, as in Ramsey et al. (2017): larger values give sparser graphs, and `1.0`,
+the default, with `ebic_gamma=0.0` is the standard BIC. Every score but `"bdeu"` has this penalty,
+and `metadata["penalty_discount"]` records the value the score used. `ages` reads it as the lowest
+penalty of its solution path.
 
 % concept: ebic_gamma
-`ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `boss_fci`,
-`grasp_fci`, `mmhc`, and `rsmax2` take `ebic_gamma`, the weight of the extended BIC, from 0 to 1
-(Chen and Chen 2008): their linear-Gaussian BIC adds `2 * ebic_gamma * log C(n_variables - 1,
-n_parents)` to each variable's score, a penalty that grows with the number of variables. `gfci`,
-`boss_fci`, and `grasp_fci` default to `ebic_gamma=0.0`, the standard BIC, and the others to `1.0`;
-{py:func}`~andrey.ges` describes the choice and {py:func}`~andrey.gfci` says why its default
-differs. Only `score_func="bic"` and `"normal_scores"` add the term, so passing `ebic_gamma` with
-another score, named or picked by `None`, raises a `ValueError`; `metadata["ebic_gamma"]` records the
-value a `"bic"` or `"normal_scores"` fit used. `gnies`, which has one score, always adds it.
+`ges`, `gies`, `gnies`, `xges`, `lges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`,
+`boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take `ebic_gamma`, the weight of the extended BIC,
+from 0 to 1 (Chen and Chen 2008): their linear-Gaussian BIC adds `2 * ebic_gamma * log
+C(n_variables - 1, n_parents)` to each variable's score, a penalty that grows with the number of
+variables. `gfci`, `boss_fci`, `grasp_fci`, and `lges` default to `ebic_gamma=0.0`, the standard
+BIC, and the others to `1.0`; {py:func}`~andrey.ges` describes the choice, and
+{py:func}`~andrey.gfci` and {py:func}`~andrey.lges` say why their defaults differ. Only
+`score_func="bic"` and `"normal_scores"` add the term, so passing `ebic_gamma` with another score,
+named or picked by `None`, raises a `ValueError`; `metadata["ebic_gamma"]` records the value a
+`"bic"` or `"normal_scores"` fit used. `gnies`, which has one score, always adds it.
 
 % concept: equivalent_sample_size
-`ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `boss_fci`,
+`ges`, `gies`, `xges`, `lges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `boss_fci`,
 `grasp_fci`, `mmhc`, and `rsmax2` take `equivalent_sample_size`, the equivalent sample size of the
 BDeu score (Heckerman, Geiger and Chickering 1995; Buntine 1991): the number of rows its uniform
-prior over each variable's conditional distributions is worth, a positive number. `1.0`, the
-default, is what the score used before the argument existed. A larger value weighs the prior more
-against the data, and the learned graph can change with it (Silander, Kontkanen and Myllymaki 2007),
-so compare fits at one value. Only `score_func="bdeu"` reads it, so passing `equivalent_sample_size`
-with another score, named or picked by `None`, raises a `ValueError`;
-`metadata["equivalent_sample_size"]` records the value a `"bdeu"` fit used.
+prior over each variable's conditional distributions is worth, a positive number. The default is
+`1.0`. A larger value weighs the prior more against the data, and the learned graph can change with
+it (Silander, Kontkanen and Myllymaki 2007), so compare fits at one value. Only `score_func="bdeu"`
+reads it, so passing `equivalent_sample_size` with another score, named or picked by `None`, raises
+a `ValueError`; `metadata["equivalent_sample_size"]` records the value a `"bdeu"` fit used.
 
 ```{eval-rst}
 .. currentmodule:: andrey
@@ -524,10 +586,15 @@ variable.
    resit
    score_matching
    nogam
+   das
    camuv
    anm
    pnl
    loci
+   cpcm
+   cpcm_graph
+   skewd
+   skewd_mv
    rcd
    bottom_up_parce_lingam
    gin
@@ -661,6 +728,15 @@ predicts best, and prunes the complete DAG of the order as SCORE does. It return
 order. The [0.17.0](benchmarks/0.17.0.md#score-and-nogam) release card measures it at 10 and 20
 variables against dodiscover.
 
+DAS (Montagna et al. 2023), {py:func}`~andrey.das`, uses SCORE's Stein estimator and causal order to
+find edges: for a leaf, the second derivative of the log density in the leaf and another variable is
+zero at every point unless that variable is a parent. Each leaf keeps the variables before it whose
+derivatives are clearly above zero, at most `max_parents=20` of them by Welch tests at 0.01, and
+CAM's smooth-term tests at `alpha=0.001` prune only those, so pruning does not grow with every
+preceding variable. It returns a DAG and SCORE's causal order. The
+[0.19.0](benchmarks/0.19.0.md#das) release card measures it from 10 to 200 variables against the
+authors' code, and up to 1,000 against the empty graph.
+
 LOCI decides the direction of a variable pair whose noise scale changes with the cause, the
 location-scale noise model of Immer et al. (2023), which the additive noise of `anm` does not
 allow. It fits a Gaussian in each direction, its mean and variance smooth functions of the
@@ -668,6 +744,40 @@ proposed cause, and decides either by an HSIC test of the scaled residual agains
 (`criterion="independence"`, the default) or by the larger likelihood (`criterion="likelihood"`),
 which suits Gaussian noise. The [0.16.0](benchmarks/0.16.0.md#loci) release card measures both
 against the authors' code.
+
+CPCM, conditionally parametric causal models (Bodik and Chavez-Demoulin 2025), models each variable
+given its parents by a parametric family whose parameters are smooth functions of the parents:
+Gaussian with mean and scale (the default), Gaussian with the mean alone, exponential, Pareto,
+Poisson, gamma, Gumbel, or negative binomial, one family for all columns or one per column. Each
+variable's values mapped through its fitted distribution function are independent of its causes only
+in the causal direction. {py:func}`~andrey.cpcm` decides a pair by an HSIC test of that residual in
+each direction; {py:func}`~andrey.cpcm_graph` returns the DAG whose residuals a dHSIC test finds
+most jointly independent, with a penalty of 2 per edge, by exact search up to 4 variables and
+RESIT's order with greedy edge removal above. A column outside its family's support raises
+`ValueError`: a non-integer under `"poisson"`, a value of 0 or less under `"exponential"`, or a
+value of 1 or less under `"pareto"`. The [0.19.0](benchmarks/0.19.0.md#cpcm) release card measures
+both against the authors' code on the paper's pairs and on graphs of 4 to 8 variables.
+
+SkewD (Klippert and Marx 2026), {py:func}`~andrey.skewd`, decides the direction of a variable pair
+whose noise is skewed, in the location-scale model of LOCI with a skew-normal noise. It fits the
+model in each direction, the location and the log scale smooth functions of the proposed cause and
+the shape one number, with penalties chosen by Bayesian optimization of a cross-validated
+likelihood, then decides by the larger likelihood (`criterion="likelihood"`, the default) or by an
+HSIC test of the scaled residual against the cause (`criterion="independence"`). SkewD-MV,
+{py:func}`~andrey.skewd_mv`, is the graph version: it learns the Markov equivalence class with PC
+and returns the DAG of the class whose skew-normal location-scale models, one per variable given its
+parents, have the largest likelihood. It suits a few variables: it fits one model per distinct
+parent set the class allows, and `max_fits` (100 by default, the order up to which the paper expects
+it to apply) makes it refuse a class that needs more, before it fits any. Both favor accuracy on
+skewed location-scale data and give up time: at the defaults a pair took a median of 15 to 22 CPU
+minutes per set and a graph of 6 or 10 variables 18 to 49, by the size, the CPU, and the seeds,
+where LOCI and CAM take a median under a second. `andrey.config(n_jobs)` runs their searches on that
+many threads with the same result bit for bit, which cuts the wall time. `optimizer="lbfgs"` runs
+each search with L-BFGS-B and the analytic gradient instead of the paper's CMA-ES: on the paper's
+simulations it decided worse in no setting by a paired bootstrap, at a median of 5.8 to 14.9 times
+less time per pair and 2.4 times less per graph, and its penalized likelihood was lower in 306 of
+738 fitted models and higher in 233. The [0.19.0](benchmarks/0.19.0.md#skewd) release card measures
+both against the authors' recorded outputs on the paper's pairs and on graphs of 6 and 10 variables.
 
 IAMB, Inter-IAMB, GS, and Fast-IAMB learn a variable's Markov blanket, and MMPC and HITON-PC its
 parents and children, given as `target`; without one, they join a pair when each is in the other's
@@ -843,11 +953,8 @@ in a process.
    :toctree: api
    :nosignatures:
 
-   skewd
-   skewd_mv
-   das
-   cpcm
-   cpcm_graph
+   lges
+   rpcmci
    ldp
    ld3
 ```
@@ -865,41 +972,38 @@ structural direct criterion), with the other parents as the adjustment set for t
 `metadata["effects"]`. Its graph holds the edges into the outcome, and `metadata["partition"]` the
 labels. It is experimental until its comparison with the authors' code is published.
 
-DAS (Montagna et al. 2023), {py:func}`~andrey.das`, finds SCORE's causal order with the same Stein
-estimator and then reads the edges from it: for a leaf, the second derivative of the log density in
-the leaf and another variable is zero at every point unless that variable is a parent. Each leaf
-keeps the variables before it whose derivatives are clearly above zero, at most `max_parents=20`
-of them by Welch tests at 0.01, and CAM's smooth-term tests at `alpha=0.001` prune only those, so
-its pruning does not grow with every variable before a node in the order. It returns a DAG and
-SCORE's causal order. It is experimental until its comparison with the authors' code is published.
+LGES, less greedy equivalence search (Ejaz and Bareinboim 2025), {py:func}`~andrey.lges`, is GES
+with fewer edge additions: it adds no edge between two variables when one graph of the current class
+scores better without it (SafeInsert), and with `insertion="conservative"` also when any valid
+addition of the edge worsens the score (ConservativeInsert). It also deletes and reverses edges as
+GES and GIES do, and returns a CPDAG. `schedule` picks the order of these moves: `"lges"`, the
+default, is the paper's main method, LGES (its Algorithm 1), which deletes and reverses edges before
+each single addition; `"lges0_released"` is its LGES-0 variant (Algorithm 8) with the phases in the
+order of the authors' code: additions, deletions, then reversals, once. With the standard BIC, its
+default, each schedule returns the CPDAGs of the authors' code run in its order on the paper's
+linear-Gaussian simulation when both read the same graph of each class; it is experimental until it
+is benchmarked in that setting.
 
-CPCM, conditionally parametric causal models (Bodik and Chavez-Demoulin 2025), models each
-variable given its parents by a parametric family whose parameters are smooth functions of the
-parents: Gaussian with mean and scale (the default), Gaussian with the mean alone, exponential,
-Pareto, Poisson, gamma, Gumbel, or negative binomial, one family for every column or one per
-column. Each variable's values mapped through its fitted distribution function are independent of
-its causes only in the causal direction. {py:func}`~andrey.cpcm` decides a pair by an HSIC test of
-that residual in each direction; {py:func}`~andrey.cpcm_graph` returns the DAG whose residuals a
-dHSIC test finds most jointly independent, with a penalty of 2 per edge, by exact search up to 4
-variables and RESIT's order with greedy edge removal above. A column outside its family's support,
-such as a non-integer under `"poisson"`, raises `ValueError`. Both are experimental until their
-comparison with the authors' code is published.
+Choosing an option, on that simulation (the authors' generator; 10 to 100 variables at mean degree
+1, 2, 3, 4, and 6; 1,000 and 10,000 rows; 20 graphs per setting). A schedule is better in a setting
+when its mean error is lower and it is lower on more graphs than higher; for the schedules, each
+insertion rule counts as a setting of its own.
 
-SkewD (Klippert and Marx 2026), {py:func}`~andrey.skewd`, decides the direction of a variable pair
-whose noise is skewed, in the location-scale model of LOCI with a skew-normal noise. It fits the
-model in each direction, the location and the log scale smooth functions of the proposed cause and
-the shape one number, with penalties chosen by Bayesian optimization of a cross-validated
-likelihood, then decides by an HSIC test of the scaled residual against the cause
-(`criterion="independence"`, the default) or by the larger likelihood (`criterion="likelihood"`). At
-the defaults a pair takes tens of minutes. It is experimental until its comparison with the authors'
-code is published.
+| Option | Favors | Gives up | Measured |
+|---|---|---|---|
+| `schedule="lges"` (default) | Accuracy on denser graphs | Time | Better in 15 of 16 settings at mean degree 3 and 12 of 16 at degree 4; where both ran in one process (the conservative rule at mean degree 1 and 3; the safe fits there ran first and carry about 0.25 s of start-up), median fits took 1.0 to 1.33 times as long as LGES-0's; at mean degree 2, 4, and 6, timed in separate runs, so small differences are noise, 0.9 to 1.8 times |
+| `schedule="lges0_released"` | Time | Accuracy on denser graphs | Better in 1 of 16 settings at mean degree 3; at mean degree 1 and 2 about as many errors as LGES (mean errors summed over 32 settings, 459 against 457), better in 12, LGES in 5, with 15 ties |
+| `insertion="safe"` (default) | The paper's proof that the search recovers the true class as the rows grow | Accuracy | 9,029 errors over the 480 graphs of mean degree 1 to 3, under `schedule="lges"` |
+| `insertion="conservative"` | Fewer errors | That proof | 6,789 errors on those graphs; the lower mean error in 31 of 38 settings, the higher in 3 |
 
-SkewD-MV, {py:func}`~andrey.skewd_mv`, is the graph version: it learns the Markov equivalence class
-with PC and returns the DAG of the class whose skew-normal location-scale models, one per variable
-given its parents, have the largest likelihood. It suits a few variables: it fits one model per
-distinct parent set the class allows, and `max_fits` (100 by default, the order up to which the
-paper expects it to apply) makes it refuse a class that needs more, before it fits any. It is
-experimental until its comparison with the authors' code is published.
+Regime-PCMCI (Saggioro et al. 2020), {py:func}`~andrey.rpcmci`, takes one time series whose lagged
+links switch between a few persistent regimes. Each start draws random regime weights, then
+alternates PCMCI on each regime's time steps with a linear program that reassigns the steps to the
+regime whose linear model predicts them best, with at most `max_transitions` switches per regime;
+the lowest-objective start returns each step's regime and one lagged graph per regime in a
+{py:class}`~andrey.RegimeOutput`. SciPy's HiGHS solver solves the linear program exactly, so it
+needs no further package. It is experimental until its benchmark in the paper's setting is
+published.
 
 A method becomes supported once it has:
 
@@ -926,6 +1030,9 @@ A method becomes supported once it has:
 | `"rcot"` | Random-feature approximation of the kernel test; time linear in the rows | Supported |
 | `"cmiknn"` | Nearest-neighbor conditional mutual information, with a local permutation null | Supported |
 | `"gpdc"` | Gaussian-process regression, then a distance-correlation test of the residuals | Supported |
+| `"gcm"` | Generalized covariance measure: the normalized covariance of the residuals of boosted-tree regressions | Experimental |
+| `"wgcm"` | Weighted generalized covariance measure: the GCM with weights on the conditioning set, for a covariance that changes sign | Experimental |
+| `"pcm"` | Projected covariance measure: whether one variable improves an additive-model prediction of the other | Experimental |
 
 `normal_scores` ranks each column over every row its test reads, and its model is one distribution.
 Ranked over the rows of several environments, a column mixes their distributions, and its scores
@@ -957,6 +1064,30 @@ cmi = test.statistic(0, 1, [2])  # the estimate itself, in nats
 register_indep_test("cmiknn_k5", partial(make_indep_test, "cmiknn", k_cmi=5))
 andrey.pc(data, indep_test="cmiknn_k5")
 ```
+
+Choosing a setting of `"gcm"` and `"wgcm"`, passed through `make_indep_test`, measured with boosted
+trees at 200 and 400 rows: the level over 12 null designs of the wGCM paper and of Shah and Peters
+and the time per query, both under the shipped tuning, and power on the same 200 draws of each of
+the wGCM paper's 7 alternative cells, under the GCM's tuning only:
+
+| Setting | Favors | Gives up | Measured |
+|---|---|---|---|
+| `"wgcm"`, `variant="est"` (default) | One weight learned from the data, however many conditioning variables | 30% of the rows, time, and, where measured, power | Rejected a true independence at 0.05 in 4 to 13% of draws by design; 21 to 26 s per query; rejected 10.5 to 60.5% of the alternatives' draws |
+| `"wgcm"`, `variant="fix"` | Every row, half the time, power, and a steadier level | A learned weight: 7 fixed weights per conditioning variable | 4 to 8.6% by design; 11 to 15 s per query; rejected 21 to 96.5% of the alternatives' draws, more than `"est"` in all 7 cells, 10 conditioning variables included, and in all 7 at critical values from each variant's own null draws; power not measured as a pair under the shipped tuning |
+| `regression="boosting"` (default) | Nonlinear conditional means of several variables | Time: 51 boosted fits per regression in `"gcm"`, 281 in `"wgcm"` | Not measured against the other two |
+| `regression="linear"` | Time: one fit | The level, where a nonlinear conditional mean leaves a covariance in the residuals | Not measured against the other two |
+| `regression="forest"` | Nonlinear conditional means without tuning | Time: 500 trees per regression | Not measured against the other two |
+
+Choosing the regression of `"pcm"`, on the paper's Section 6.1 null (seven conditioning variables)
+and Section 6.2 null (an interaction in the conditional means), rejections of a true independence
+at 0.05; each of the additive default's cells has 500 draws:
+
+| Setting | Favors | Gives up | Measured |
+|---|---|---|---|
+| `regression="additive"` (default) | The level where the conditional means are additive | Interactions, and time as the rows grow | 0.4% of the 6.1 null at 250 rows and 0.2% at 500; 97.6% of the 6.2 null at 500 rows; about 7 s per query on nine columns at 250 rows, 29 s at 500, and 6 minutes at 1,000 |
+| `regression="forest"` | Interactions | The 6.1 null | 34.4% of the 6.2 null at 500 rows, where no regression measured held the level (additive 97.6%), and 4.0% of 50 draws at 10,000; 99.9% of the 6.1 null at 250 rows and 97.3% at 500 |
+| `regression="boosting"` | Nonlinear conditional means of several variables | The 6.1 null | 97.7% of the 6.1 null at 250 rows |
+| `regression="linear"` | Time: one fit | The level, where a nonlinear conditional mean leaves a covariance in the residuals | Not measured |
 
 {py:meth}`CMIknn.statistic <andrey.core.ci_cmiknn.CMIknn.statistic>` returns the conditional
 mutual information estimate the test's p-value is built on, a dependence measure of its own.
@@ -993,10 +1124,10 @@ On data with a `NaN`, {py:func}`~andrey.core.ci.make_indep_test` returns a
 {py:class}`~andrey.core.ci_missing.TestwiseDeletion` of the test: each query reads the rows observed
 in all of its columns. `fisherz` and `student_t` compute the query's correlations directly from
 those rows, many queries at once, so the p-value is the one the test gives on that block up to
-rounding in its last digits. Every other test is built on that block, its columns in data order,
-and gives that test's p-value exactly; `normal_scores` therefore ranks each column within the rows
-its query reads; a registered test works the same way, built anew for each
-query.
+rounding in its last digits; a query gives the same bits alone or with others, in any order. Every
+other test is built on that block, its columns in data order, and gives that test's p-value exactly;
+`normal_scores` therefore ranks each column within the rows its query reads; a registered test is
+likewise rebuilt for each query.
 
 `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`,
 `cmb`, `mmb_by_mmb`, and `local_optimal_adjustment` record in `metadata["n_tests"]` how many tests
@@ -1021,6 +1152,9 @@ answers. To count the tests in your own code, run it inside
    ci_kernel.RCoT
    ci_cmiknn.CMIknn
    ci_gpdc.GPDC
+   ci_regression.GCM
+   ci_regression.WGCM
+   ci_regression.PCM
    ci.CITest
    ci_missing.TestwiseDeletion
    ci.register_indep_test
@@ -1095,6 +1229,7 @@ DoWhy for effect estimation.
    :toctree: api
 
    GraphStructure
+   RegimeOutput
    Structure
    StructureOutput
    SummaryGraph
@@ -1254,16 +1389,15 @@ warnings.filterwarnings("error", category=andrey.BackendFallbackWarning)
 ```
 
 In a test suite, `pytest -W error::andrey.ExperimentalWarning` fails every test that triggers the
-warning: a warning raised as an error does not count as the message's one warning. A warning that
-an earlier filter ignored or recorded does count, so a later test that triggers the same message
+warning: a warning raised as an error does not count as the message's one warning. A warning that an
+earlier filter ignored or recorded does count, so a later test that triggers the same message
 passes. Python's own `-W` option and `PYTHONWARNINGS` cannot name Andrey's categories: Python reads
 them before it can import `andrey`, and ignores the option as an invalid module name. A module field
 such as `error::UserWarning:andrey` does not match, because a warning is attributed to the calling
-module.
-From the command line, `-W error::UserWarning` escalates Andrey's warnings along with every other
-`UserWarning`; for one category, use `warnings.filterwarnings` or pytest's flag. `andrey run`
+module. From the command line, `-W error::UserWarning` escalates Andrey's warnings along with every
+other `UserWarning`; for one category, use `warnings.filterwarnings` or pytest's flag. `andrey run`
 returns a fit's warnings in the `run.warnings` field of its JSON output, each with its category
-name.
+name; logged notices, such as the default missing-value handling, have category `LogWarning`.
 
 ```{eval-rst}
 .. autosummary::
@@ -1735,14 +1869,13 @@ and `rc_params` return plain data and need no import.
 | `andrey --skill` | The agent guide (`SKILL.md`): methods, settings, how to run and read results |
 
 In `--help --json`, each parameter carries its bounds as JSON Schema's `minimum` and `maximum`, or
-`exclusiveMinimum` and `exclusiveMaximum`, the package-wide `concept` it implements, and the
-former names (`aliases`) and values (`choice_aliases`) it still accepts. `andrey --help --json`
-and `andrey config --help --json` list each concept, such as `alpha` or `max_depth`, with the name
-each method gives it. `andrey run` rejects a value out of range before the fit. A `target` is a
-string or a list of strings, such as `'target=[a,b]'`, and a list returns `multi: true` and
-`results`, one per target, in place of `structure` and `metadata`. Each method's
-contract and its row of `andrey list` give `data_kinds`, the kinds of data it reads, as the
-[methods catalog](methods.md) lists them.
+`exclusiveMinimum` and `exclusiveMaximum`, the package-wide `concept` it implements, and the former
+names (`aliases`) and values (`choice_aliases`) it still accepts. `andrey --help --json` and
+`andrey config --help --json` list each concept, such as `alpha` or `max_depth`, with the name each
+method gives it. `andrey run` rejects a value out of range before the fit. A `target` is a string or
+a list of strings, such as `'target=[a,b]'`, and a list returns `multi: true` and `results`, one per
+target, in place of `structure` and `metadata`. Each method's contract and `andrey list` row give
+`data_kinds`, the data it reads, as listed in the [methods catalog](methods.md).
 
 `--help` selects introspection and `--json` selects the representation: help reads no data or
 configuration file and never executes the method, while `andrey run hc --data data.csv --json` runs

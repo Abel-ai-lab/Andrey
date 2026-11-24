@@ -4,9 +4,11 @@ location-scale models, better than the floors of ``andrey.metrics``."""
 from __future__ import annotations
 
 import numpy as np
+import pytest
 from scipy.stats import binomtest, skewnorm
 
 from andrey import skewd, skewd_mv
+from andrey.fcm.skewd import OPTIMIZERS
 from andrey.metrics import decision_rate, direction_accuracy, shd
 
 PAIRS = 12
@@ -28,13 +30,14 @@ def _pair(seed: int) -> np.ndarray:
     return np.column_stack([x, y])
 
 
-def test_skewd_names_the_direction_of_skew_normal_location_scale_pairs():
+@pytest.mark.parametrize("optimizer", OPTIMIZERS)
+def test_skewd_names_the_direction_of_skew_normal_location_scale_pairs(optimizer):
     # Both criteria read the same two fits of a pair, and the likelihood criterion's edge points
     # from the larger of the reported log-likelihoods (tests/unit/test_skewd.py), so each pair is
     # fitted once.
     by_test, by_likelihood = [], []
     for seed in range(PAIRS):
-        out = skewd(_pair(seed), criterion="independence", seed=seed, **FIT)
+        out = skewd(_pair(seed), criterion="independence", seed=seed, optimizer=optimizer, **FIT)
         edges = out.structure.oriented_edges()
         by_test.append(1 if edges == [(0, 1, "directed")] else -1 if edges else 0)
         fits = out.metadata["log_likelihoods"]
@@ -60,9 +63,10 @@ def _tree(seed: int, n: int = 600) -> tuple[np.ndarray, np.ndarray]:
     return np.column_stack([x0, x1, x2, x3]), truth
 
 
-def test_skewd_mv_beats_the_empty_graph_on_a_skew_normal_tree():
+@pytest.mark.parametrize("optimizer", OPTIMIZERS)
+def test_skewd_mv_beats_the_empty_graph_on_a_skew_normal_tree(optimizer):
     data, truth = _tree(0)
-    out = skewd_mv(data, seed=0, **FIT)
+    out = skewd_mv(data, seed=0, optimizer=optimizer, **FIT)
     assert out.metadata["indep_test"] == "kci"  # PC's test is the default's, not the picked one
     dag = out.structure
     assert shd(dag, truth) < shd(np.zeros((4, 4), dtype=np.int8), truth)

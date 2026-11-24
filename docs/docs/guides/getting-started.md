@@ -591,7 +591,7 @@ Each test and score reads the columns as one kind of data:
 
 | Data | `indep_test` | `score_func` |
 |---|---|---|
-| Continuous | `fisherz` (the default when no column is categorical), `student_t`, `normal_scores` (monotone effects, any marginals); for nonlinear effects, `kci`, `rcot`, `cmiknn`, and `gpdc` | `bic` (the default when no column is categorical), `normal_scores` (experimental: monotone transformations of Gaussian columns) |
+| Continuous | `fisherz` (the default when no column is categorical), `student_t`, `normal_scores` (monotone effects, any marginals); for nonlinear effects, `kci`, `rcot`, `cmiknn`, `gpdc`, `gcm`, `wgcm`, and `pcm` (experimental) | `bic` (the default when no column is categorical), `normal_scores` (experimental: monotone transformations of Gaussian columns) |
 | Categorical | `chisq`, `gsq` (the default when every column is categorical) | `bdeu` (the default when every column is categorical), `discrete_bic` |
 | Mixed | `degen_gauss`, `cond_gauss` (the default when some columns are categorical) | `cond_gauss` (the default when some columns are categorical), `degen_gauss` |
 
@@ -675,13 +675,15 @@ The JSON result lists the categorical columns under `metadata.categorical` and t
 
 Mark a missing value with `NaN` or pandas' `NA`, or, for `andrey run`, leave its field empty or
 write `NA` or `N/A` in the data file. {{ missing_methods }} accept missing values: each
-conditional-independence test reads only the rows where all of its variables are observed
-(test-wise deletion), which is sound when values are missing completely at random. The argument
-`missing` names the handling: `pc` also takes `missing="mvpc"`, a correction for values that are
-missing for a reason, and {{ em_methods }} take `missing="em"`, structural EM. Every other method
-refuses missing values with a message that says what to do instead. The
-[Missing values](missing-values.md) guide has a table from your data and the reason its values are
-missing to the handling to use, and says what each handling assumes.
+conditional-independence test reads only the rows where all of its variables are observed (test-wise
+deletion), which is valid when values are missing completely at random. The argument `missing` names
+the handling: `pc` also takes `missing="mvpc"`, a correction for values that are missing for a
+reason, and {{ em_methods }} take `missing="em"`, structural EM. Every other method refuses missing
+values with a message that says what to do instead. A pair that no test with enough rows could
+decide, as two columns never observed together, is left out of the graph and listed in
+`metadata["undecided_pairs"]`, and an edge that a conditioning set no row could test might have
+removed is listed in `metadata["possibly_separable"]`. The [Missing values](missing-values.md) guide
+maps your data and the reason for its gaps to a handling and its assumptions.
 
 ## Backends and parallelism
 

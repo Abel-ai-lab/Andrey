@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import numpy as np
 
+import andrey
 from andrey.spec import REGISTRY
 
 #: Settings that shorten a slow fit; the facade path stays the same, and the properties the
@@ -19,6 +20,7 @@ SHORT = {
     "varma_lingam": {"max_iter": 1},
     "jpcmciplus": {"time_dummy": False},
     "cpcm_graph": {"family": "gaussian_fixed_scale"},
+    "rpcmci": {"n_starts": 10, "max_transitions": 40},
 }
 
 
@@ -72,3 +74,15 @@ def domains(n: int) -> np.ndarray:
     """Two domains of ``n / 2`` rows each, as a column: a required context, such as CD-NOD's
     domain index."""
     return np.repeat([0.0, 1.0], n // 2).reshape(-1, 1)
+
+
+def results(out) -> list:
+    """The ``StructureOutput``s of a fit: each group's, each regime's, or the one."""
+    if isinstance(out, andrey.RegimeOutput):
+        return list(out.outputs)
+    return out if isinstance(out, list) else [out]
+
+
+def regime_paths(out) -> list[np.ndarray]:
+    """The regime of each step, for a fit that returns regimes; empty for any other."""
+    return [out.regimes] if isinstance(out, andrey.RegimeOutput) else []

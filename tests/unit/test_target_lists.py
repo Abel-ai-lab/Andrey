@@ -102,7 +102,7 @@ def test_kept_chi_square_answers_change_no_result(method):
         _same(out, _fit(method, data, t, indep_test="chisq"), tests=False)
 
 
-@pytest.mark.parametrize("method", ["iamb", "hiton_mb", "cmb"])
+@pytest.mark.parametrize("method", ["iamb", "mmpc", "hiton_mb", "cmb"])
 def test_a_list_of_one_is_the_one_result(method):
     data = _gaussian()
     (out,) = _fit(method, data, ["x3"])
@@ -111,7 +111,9 @@ def test_a_list_of_one_is_the_one_result(method):
     _same(out, one)
 
 
-@pytest.mark.parametrize("method", ["mmpc", "hiton_mb", "pcmb", "mb_by_mb", "mmb_by_mmb"])
+@pytest.mark.parametrize(
+    "method", ["iamb", "inter_iamb", "mmpc", "hiton_mb", "pcmb", "mb_by_mb", "mmb_by_mmb"]
+)
 def test_results_do_not_depend_on_the_workers(method):
     data = _gaussian()
     targets = list(range(8))
@@ -137,21 +139,23 @@ def test_bootstrap_takes_one_target():
         andrey.bootstrap("mmpc", _gaussian(), target=["x1", "x2"], n_resamples=2)
 
 
-@pytest.mark.parametrize("method", ["mmpc", "hiton_mb", "pcmb", "mb_by_mb"])
-def test_rows_tested_is_the_answer_of_its_own_call_with_missing_values(method):
+@pytest.mark.parametrize("n_jobs", [1, 4])
+@pytest.mark.parametrize("method", [*SET_LEARNERS, "mb_by_mb"])
+def test_rows_tested_is_the_answer_of_its_own_call_with_missing_values(method, n_jobs):
     """A step an earlier target made still counts its rows for the later target that reads it."""
     data = _gaussian()
     data.iloc[::7, 2] = np.nan
     data.iloc[3::11, 5] = np.nan
-    outs = _fit(method, data, TARGETS)
+    with andrey.config(n_jobs=n_jobs):
+        outs = _fit(method, data, TARGETS)
     assert "rows_tested" in outs[0].metadata
     for out, t in zip(outs, TARGETS, strict=True):
-        _same(out, _fit(method, data, t), tests=False)
+        _same(out, _fit(method, data, t))
 
 
-def test_any_sequence_of_columns_is_a_list():
+def test_a_tuple_of_columns_is_a_list():
     data = _gaussian()
-    outs = andrey.mmpc(data, target=range(3))
+    outs = andrey.mmpc(data, target=(0, 1, 2))
     assert [out.metadata["target"] for out in outs] == ["x0", "x1", "x2"]
     (out,) = andrey.mmpc(data, target=("x3",))
     _same(out, andrey.mmpc(data, target="x3"))
@@ -173,3 +177,25 @@ def test_unpickled_ranks_compute_under_the_active_thread_limit():
     inherited.use_active_limits()
     with threadpool_limits(limits=1), inherited._threads():
         assert all(pool["num_threads"] == 1 for pool in threadpool_info())
+
+
+@pytest.mark.parametrize("method", ["mmpc", "icp"])
+@pytest.mark.parametrize("target", [np.arange(2), {"x1", "x2"}, pd.Index(["x1", "x2"]), range(2)])
+def test_an_unordered_or_other_collection_raises(method, target):
+    data = _gaussian().assign(env=np.repeat([0, 1], 300))
+    with pytest.raises(TypeError, match="list or tuple"):
+        _fit(method, data, target)
+
+
+@pytest.mark.parametrize("n_jobs", [1, 4])
+def test_a_randomized_test_with_a_seed_answers_as_separate_calls(n_jobs):
+    """GCM draws from the seed, so each listed answer is the one a call with that seed gives."""
+    rng = np.random.default_rng(4)
+    a = rng.standard_normal(100)
+    b = 0.9 * a + rng.standard_normal(100)
+    c = 0.8 * b + rng.standard_normal(100)
+    data = pd.DataFrame({"a": a, "b": b, "c": c, "d": rng.standard_normal(100)})
+    with andrey.config(n_jobs=n_jobs):
+        outs = andrey.mmpc(data, target=["c", "b"], indep_test="gcm", seed=7)
+    for out, t in zip(outs, ["c", "b"], strict=True):
+        _same(out, andrey.mmpc(data, target=t, indep_test="gcm", seed=7))

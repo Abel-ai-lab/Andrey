@@ -40,6 +40,7 @@ from andrey.spec.concepts import (
 )
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.ci_tests import PValueOnly
+from tests.release import release_cases
 from tests.unit.methods import (
     REQUIRED,
     SHORT,
@@ -47,6 +48,7 @@ from tests.unit.methods import (
     environments,
     requires_pair,
     requires_target,
+    results,
 )
 
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
@@ -375,9 +377,9 @@ UNIT_CASES = {
             *("pc", "fci", "gfci", "cdnod", "fci_jci", "iamb", "inter_iamb", "gs", "fast_iamb"),
             *("mmpc", "hiton_pc", "hiton_mb", "mmmb", "pcmb", "mb_by_mb", "mmb_by_mmb", "mmhc"),
             *("cmb", "rsmax2"),
-            *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
-            *("boss_fci", "grasp_fci", "igsp", "ut_igsp", "ldp", "ld3", "ldecc", "locpc_cde"),
-            "local_optimal_adjustment",
+            *("ges", "gies", "gnies", "xges", "lges", "hc", "tabu", "exact_search", "boss"),
+            *("grasp", "boss_fci", "grasp_fci", "igsp", "ut_igsp", "ldp", "ld3", "ldecc"),
+            *("locpc_cde", "local_optimal_adjustment"),
         ),
         "gauss_5v",
     ),
@@ -390,6 +392,7 @@ UNIT_CASES = {
     "pcmciplus": "var_4v_stable",
     "jpcmciplus": "mgdl_2groups",
     "lpcmci": "var_6v_hidden",
+    "rpcmci": "regime_var_2v",
     "granger": "var_4v_stable",
     "gin": "measurement_chain_9v",
     "rcd": "confounded_fork_4v",
@@ -439,10 +442,12 @@ def unit_inputs(method: str, exponents: np.ndarray) -> list:
 
 
 def graphs_and_orders(out) -> list:
-    """The endpoint marks of every graph (each lag, occasion, and group), every causal order, and
-    the claims about pairs."""
+    """The endpoint marks of every graph (each lag, occasion, group, and regime), every causal
+    order, the regime of each step, and the claims about pairs."""
     if isinstance(out, list):
         return [graphs_and_orders(o) for o in out]
+    if isinstance(out, andrey.RegimeOutput):
+        return [out.regimes.tolist(), [graphs_and_orders(o) for o in out.outputs]]
     s = out.structure
     if isinstance(s, andrey.TemporalStructure):
         graphs = [s.at(t, k) for t in s.times for k in s.lags] if s.n_times else map(s.lag, s.lags)
@@ -466,8 +471,8 @@ def unit_free(method: str) -> bool:
 
 def declared_kind(out, method: str) -> bool:
     """Whether a fit's graph has the kind its spec declares, ``None`` for a time-series result."""
-    kind = getattr(out.structure, "kind", None)
-    return kind == REGISTRY[method].output.graph_kind
+    kinds = {getattr(o.structure, "kind", None) for o in results(out)}
+    return kinds == {REGISTRY[method].output.graph_kind}
 
 
 #: Settings that bring out the metadata keys a default fit leaves out.
@@ -485,7 +490,7 @@ def declared_metadata(method: str) -> bool:
     outs = [coded_fit(method)[0]]
     if method in METADATA_FITS:
         outs.append(fit(method, codes=False, **METADATA_FITS[method])[0])
-    keys = {key for out in outs for key in out.metadata}
+    keys = {key for out in outs for o in (out, *results(out)) for key in o.metadata}
     return keys <= set(REGISTRY[method].output.metadata)
 
 
@@ -542,7 +547,7 @@ def spy_on_builds(monkeypatch) -> dict[str, list[str]]:
         spy(ci._CI_REGISTRY, key, "indep_test")
     for key in list(pcmci.PARTIAL_CORRELATION_TESTS):
         spy(pcmci.PARTIAL_CORRELATION_TESTS, key, "indep_test")
-    for module in ("ges", "gies", "xges", "exact", "hc", "boss"):
+    for module in ("ges", "gies", "xges", "lges", "exact", "hc", "boss"):
         engine = importlib.import_module(f"andrey.search.{module}")
 
         def make_score(score_func, *args, _make=engine.make_score, **options):
@@ -722,12 +727,15 @@ def test_every_behavior_has_an_observation():
 
 @pytest.mark.parametrize(
     ("concept", "method"),
-    [
-        pytest.param(c, m, id=f"{c.key}-{m}")
-        for c in BEHAVIORS
-        for m in REGISTRY
-        if m in c.suitable or c.deviation(m) or c.key == "env"
-    ],
+    release_cases(
+        [
+            pytest.param(c, m, id=f"{c.key}-{m}")
+            for c in BEHAVIORS
+            for m in REGISTRY
+            if m in c.suitable or c.deviation(m) or c.key == "env"
+        ],
+        {"units-skewd", "units-skewd_mv"},
+    ),
 )
 def test_behavior_cell(concept, method):
     observe, expected = OBSERVE[concept.key]
@@ -966,6 +974,13 @@ def test_a_fit_the_tie_break_cannot_change_records_none(method):
 # --- randomness -----------------------------------------------------------------------------------
 
 STOCHASTIC = ci.STOCHASTIC_INDEP_TESTS
+#: Least-squares regressions and one split keep the regression tests fast where only the seed
+#: they receive matters.
+FAST_SETTINGS = {
+    "gcm": {"regression": "linear"},
+    "wgcm": {"regression": "linear"},
+    "pcm": {"regression": "linear", "n_splits": 1},
+}
 
 
 def takes_a_seed(test: str) -> bool:
@@ -998,11 +1013,14 @@ def test_the_stochastic_tests_give_other_p_values_for_another_seed():
     data = inputs("pc", codes=False)[0].to_numpy()
     queries = [(0, 2, ()), (0, 1, ()), (0, 2, (1,)), (1, 2, (0,))]
     for name in STOCHASTIC:
+        # The least-squares regressions of GCM draw nothing; its folds draw under boosting.
+        options = {} if name == "gcm" else FAST_SETTINGS.get(name, {})
         draws = {
-            seed: [ci.make_indep_test(name, data, seed=seed)(*q) for q in queries]
+            seed: [ci.make_indep_test(name, data, seed=seed, **options)(*q) for q in queries]
             for seed in (7, 8)
         }
-        assert draws[7] == [ci.make_indep_test(name, data, seed=7)(*q) for q in queries], name
+        again = [ci.make_indep_test(name, data, seed=7, **options)(*q) for q in queries]
+        assert draws[7] == again, name
         assert draws[7] != draws[8], name
 
 
@@ -1068,9 +1086,11 @@ def built_seeds(monkeypatch):
     seeds = []
     for name in STOCHASTIC:
 
-        def build(data, *args, _factory=ci._CI_REGISTRY[name], **options):
+        def build(
+            data, *args, _factory=ci._CI_REGISTRY[name], _fast=FAST_SETTINGS.get(name), **options
+        ):
             seeds.append(options.get("seed"))
-            return _factory(data, *args, **options)
+            return _factory(data, *args, **options, **(_fast or {}))
 
         monkeypatch.setitem(ci._CI_REGISTRY, name, build)
     return seeds

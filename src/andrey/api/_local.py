@@ -1,10 +1,10 @@
 """Columns and answers shared by the methods that answer for one variable or a pair of variables.
 
 A target-centered method answers for one column, ``target``, or for each column of a list of them
-(:func:`target_columns`); a treatment-outcome method for an ordered pair, ``treatment`` and
-``outcome``; a method that answers for every ordered pair of a few columns takes them unordered as
-``variables``. The helpers here turn those arguments into column
-positions with one set of messages, and :func:`target_metadata` writes a target-centered answer's
+(:func:`~andrey.api._adapt.target_columns`); a treatment-outcome method for an ordered pair,
+``treatment`` and ``outcome``; a method that answers for every ordered pair of a few columns takes
+them unordered as ``variables``. The helpers here turn those arguments into column positions with
+one set of messages, and :func:`target_metadata` writes a target-centered answer's
 sets under the keys of :data:`TARGET_SETS`. The pair methods' answer is the ``effects`` record of
 :mod:`andrey.core.effects`.
 """
@@ -12,13 +12,17 @@ sets under the keys of :data:`TARGET_SETS`. The pair methods' answer is the ``ef
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from typing import TypeGuard
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from andrey.api._adapt import categorical_metadata
-from andrey.core.ci_missing import rows_metadata
+from andrey.core import NULL
+from andrey.core.ci_missing import RowCounts, rows_metadata
 from andrey.core.knowledge import as_node, column_position
+
+if TYPE_CHECKING:
+    from andrey.core import GraphStructure
 
 #: The metadata key of each set a target-centered answer lists, and what puts a column in it. A
 #: set learner lists one set (``markov_blanket`` or ``parents_and_children``); a method that
@@ -53,36 +57,6 @@ def target_column(target: object, labels: Sequence[str] | None, d: int, method: 
             "position"
         )
     return column_position(as_node(target, f"{method}: target"), labels, d, f"{method}: target")
-
-
-def is_column_list(target: object) -> TypeGuard[Sequence[object]]:
-    """Whether ``target`` is a list of columns: any sequence but a string."""
-    return isinstance(target, Sequence) and not isinstance(target, str | bytes)
-
-
-def target_columns(
-    target: object, labels: Sequence[str] | None, d: int, method: str
-) -> list[int] | None:
-    """Return the positions of the columns a list of targets names, in its order.
-
-    ``None`` when ``target`` is not a list (:func:`is_column_list`): one column, or none.
-
-    Raises
-    ------
-    ValueError
-        If the list is empty, names a column the data lack, or names one column twice.
-    TypeError
-        If a member is neither a column label nor a position.
-    """
-    if not is_column_list(target):
-        return None
-    what = f"{method}: target"
-    if not target:
-        raise ValueError(f"{what} is an empty list; pass a column or a list of columns")
-    found = [column_position(as_node(t, what), labels, d, what) for t in target]
-    if len(set(found)) != len(found):
-        raise ValueError(f"{what} names a column twice: {list(target)}")
-    return found
 
 
 def pair_columns(
@@ -182,11 +156,23 @@ def target_metadata(
 
 
 def fit_metadata(
-    mask: np.ndarray | None, data: object, rows: Mapping[int, int], n_tests: int
+    mask: np.ndarray | None,
+    data: object,
+    rows: Mapping[int, int],
+    n_tests: int,
+    name: Callable[[int], object] | None = None,
+    graph: GraphStructure | None = None,
 ) -> dict[str, object]:
     """Return the metadata every answer of a local method ends with.
 
-    It names the categorical columns, the rows the tests read
-    (:func:`~andrey.core.ci_missing.rows_metadata`), and ``n_tests``.
+    It names the categorical columns, the rows the tests read and the queries not tested
+    (:func:`~andrey.core.ci_missing.rows_metadata`), and ``n_tests``. With ``name``, which gives
+    each column's label, the pairs no test could decide are listed, and with the answer's ``graph``
+    too, the edges an untested conditioning set might have separated; the graph's adjacency is read
+    only when some query was not tested.
     """
-    return categorical_metadata(mask, data) | rows_metadata(rows) | {"n_tests": n_tests}
+    skipped = isinstance(rows, RowCounts) and rows.total_not_tested() > 0
+    drawn = None if graph is None or not skipped else graph.to_numpy() != NULL
+    return (
+        categorical_metadata(mask, data) | rows_metadata(rows, name, drawn) | {"n_tests": n_tests}
+    )

@@ -18,7 +18,7 @@ unshielded triples of a final skeleton by the conservative or majority collider 
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Collection, Hashable, Iterable, Iterator, Mapping, Sequence
 from contextlib import nullcontext
 from functools import cache, partial
 from itertools import chain, combinations, groupby, islice
@@ -29,7 +29,7 @@ import numpy as np
 
 from andrey.core import NULL, backend
 from andrey.core.ci import CITest, DGTest, FisherZ, NormalScores, StudentT, pins_blas
-from andrey.core.ci_missing import GaussianDeletion
+from andrey.core.ci_missing import GaussianDeletion, TestwiseDeletion, not_tested
 from andrey.core.orient import separating_set
 
 if TYPE_CHECKING:
@@ -99,8 +99,16 @@ def scan_conditioning_sets(
     With ``trace`` given, one record per test is appended (see :func:`record_tests`); the check
     runs once per chunk. With ``visit`` given, it is called with each chunk of subsets, as the rows
     of an ``(N, size)`` int array, and their p-values, so a caller can count the tests or keep a few
-    of them without storing a record per test.
+    of them without storing a record per test. Without ``trace``, a test that deletes rows per test
+    asks no subset holding a candidate that no row observes together with ``a`` or ``b``: such a
+    query keeps no rows, so it is counted as not tested without being built (:func:`kept_apart`),
+    which changes neither the counts nor the return value.
     """
+    if trace is None:
+        kept, _ = kept_apart(test, (a, b), [(candidates, skip_within)], size)
+        if kept is None:
+            return False
+        [(candidates, skip_within)] = kept
     whole = canonical_capable(test)
     # CMIknn's _bounded_pvalue stops its shuffles once the side of alpha is certain; a p-value
     # above alpha that `largest` records comes from every shuffle.
@@ -151,6 +159,8 @@ def subset_rows(
         rows = block_positions(n, block)
         if inside is not None:
             rows = rows[~inside[rows].all(axis=1)]
+            if not len(rows):
+                continue
         held.append(rows)
         count += len(rows)
         while count >= CHUNK:
@@ -159,6 +169,52 @@ def subset_rows(
             held, count = [rows[CHUNK:]], count - CHUNK
     if count:
         yield labels[np.concatenate(held)]
+
+
+def kept_apart(
+    test: CITest,
+    fixed: Sequence[int],
+    sides: list[tuple[list[int], set[int] | None]],
+    size: int,
+) -> tuple[list[tuple[list[int], set[int] | None]] | None, int]:
+    """The ``sides`` of a scan less the candidates no row observes together with a column of
+    ``fixed``, the columns every query of the scan holds, its pair first, and the number of sets
+    left out.
+
+    Each side is ``(candidates, skip_within)``, its sets the size-``size`` subsets of the
+    candidates less those lying inside ``skip_within`` (:func:`subset_rows`). A set holding a
+    dropped candidate keeps no rows under a test that deletes rows per test, so each such set is
+    counted as a query of the pair not tested, without being built, as asking it would count it
+    (:meth:`~andrey.core.ci_missing.TestwiseDeletion.count_not_tested`), and kept by the dropped
+    candidate with the other columns of ``fixed``, which it holds. When no row observes the
+    columns of ``fixed`` together, every set is counted and ``None`` is returned in place of the
+    sides. Another test gets ``sides`` unchanged and none left out.
+    """
+    if not isinstance(test, TestwiseDeletion):
+        return sides, 0
+    together = test.together()
+    columns = list(fixed)
+    met: np.ndarray = np.all(together[columns], axis=0)
+    whole = not met[columns].all()
+    kept = [([c for c in side if met[c]], skip) for side, skip in sides]
+    left = sum(_subset_count(side, size, skip) for side, skip in sides)
+    held = columns[2:]
+    if whole:
+        keeping = [held]
+    else:
+        left -= sum(_subset_count(side, size, skip) for side, skip in kept)
+        dropped = {c for side, _ in sides for c in side if not met[c]}
+        keeping = [[c, *held] for c in sorted(dropped)]
+    test.count_not_tested(columns[0], columns[1], left, keeping)
+    return None if whole else kept, left
+
+
+def _subset_count(candidates: list[int], size: int, skip_within: set[int] | None) -> int:
+    """The number of sets :func:`subset_rows` yields."""
+    count = comb(len(candidates), size)
+    if skip_within is not None and len(skip_within) >= size:
+        count -= comb(len(skip_within.intersection(candidates)), size)
+    return count
 
 
 def canonical_capable(test: CITest) -> bool:
@@ -211,9 +267,8 @@ def _query_arrays(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """The canonical query arrays ``(x, y, conditions)`` of ``queries``, in order.
 
-    Each query is ``(x, y, subsets)`` with ``x < y`` and the pair tested against every subset, a
-    row of the ``(N, size)`` int array ``subsets``, sorted and distinct. The arrays hold one row
-    per subset.
+    Each query is ``(x, y, subsets)`` with ``x < y``; the pair is tested against each row of the
+    ``(N, size)`` int array ``subsets``, a sorted, distinct subset.
     """
     counts = [len(subsets) for _, _, subsets in queries]
     xs = np.repeat(np.array([x for x, _, _ in queries], dtype=np.intp), counts)
@@ -363,7 +418,7 @@ def first_order_removals(
     one stack however many pairs and conditioners it tests. With ``trace`` given, every test is
     recorded, pair by pair.
     """
-    queries = _first_order_queries(pairs, neighbors)
+    queries = _first_order_queries(pairs, neighbors, test if trace is None else None)
     canonical = _canonical_route(test)
     tested = (
         _stacked_first_order(canonical, queries)
@@ -379,19 +434,24 @@ def first_order_removals(
             record_tests(trace, 1, x, y, [(z,) for z in candidates], pvals, alpha)
         passing = np.flatnonzero(pvals > alpha)
         if passing.size:
-            # Some candidate separates, so the largest p-value is a separating one.
-            p = max(pvals.tolist()) if record_pvalues else None
+            # The largest separating p-value: a query not tested (NaN) never separates.
+            p = max(pvals[passing].tolist()) if record_pvalues else None
             removals.append((x, y, tuple(candidates[k] for k in passing.tolist()), p))
     return removals
 
 
 def _first_order_queries(
-    pairs: list[tuple[int, int]], neighbors: list[np.ndarray]
+    pairs: list[tuple[int, int]], neighbors: list[np.ndarray], test: CITest | None = None
 ) -> Iterator[tuple[int, int, list[int]]]:
     """Yield ``(x, y, candidates)`` for each of ``pairs`` with a candidate, in order: the
-    ascending conditioners of :func:`first_order_removals`."""
+    ascending conditioners of :func:`first_order_removals`. With ``test``, a candidate no row
+    observes together with ``x`` or ``y`` is left out and counted as not tested
+    (:func:`kept_apart`)."""
     for x, y in pairs:
         candidates = sorted((set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y})
+        if test is not None and candidates:
+            kept, _ = kept_apart(test, (x, y), [(candidates, None)], 1)
+            candidates = [] if kept is None else kept[0][0]
         if candidates:
             yield x, y, candidates
 
@@ -400,8 +460,8 @@ def _stacked_first_order(
     pvalues: Callable[..., np.ndarray],
     queries: Iterable[tuple[int, int, list[int]]],
 ) -> Iterator[tuple[int, int, list[int], np.ndarray]]:
-    """Yield each query of :func:`_first_order_queries` as ``(x, y, candidates, p-values)``, the
-    p-values those of its candidates in order.
+    """Each query of :func:`_first_order_queries` as ``(x, y, candidates, p-values)``, with p-values
+    in candidate order.
 
     ``pvalues`` takes canonical query arrays. Consecutive queries are stacked, whole, as size-1
     chunks (:func:`_stacks`); the first-order closed form is elementwise, so each p-value is the one
@@ -442,7 +502,8 @@ def scan_pairs(
     """
     stacked = _stacked_route(test)
     if stacked is not None:
-        return stacked_scan(stacked, pairs, neighbors, size, alpha, trace, record_pvalues)
+        apart = test if trace is None else None
+        return stacked_scan(stacked, pairs, neighbors, size, alpha, trace, record_pvalues, apart)
     removals: list[Removal] = []
     for x, y in pairs:
         separating: set[int] = set()
@@ -481,16 +542,20 @@ def stacked_scan(
     alpha: float,
     trace: list[dict] | None,
     record_pvalues: bool,
+    test: CITest | None = None,
 ) -> list[Removal]:
     """:func:`scan_pairs` for a test whose ``pvalues`` take canonical query arrays.
 
     Each chunk is the one :func:`scan_conditioning_sets` evaluates in one call, in the per-pair
     order (:func:`_pair_chunks`); :func:`_stacks` evaluates consecutive chunks together. Every
     p-value is the one its chunk gets alone, and the chunks are read back in order, so the
-    separating sets, the largest p-values, and the trace are those of the per-pair scan.
+    separating sets, the largest p-values, and the trace are those of the per-pair scan. With
+    ``test``, the one ``pvalues`` belongs to, a set holding a candidate no row observes together
+    with the pair is counted as not tested without being asked (:func:`kept_apart`), as
+    :func:`scan_conditioning_sets` counts it.
     """
     separated: dict[int, tuple[set[int], list[float]]] = {}
-    for stack, values in _stacks(pvalues, size, _pair_chunks(pairs, neighbors, size)):
+    for stack, values in _stacks(pvalues, size, _pair_chunks(pairs, neighbors, size, test)):
         bounds = np.cumsum([0, *(len(chunk) for _, _, _, chunk in stack)]).tolist()
         passing = values > alpha
         if trace is not None:
@@ -511,13 +576,22 @@ def stacked_scan(
 
 
 def _pair_chunks(
-    pairs: list[tuple[int, int]], neighbors: list[np.ndarray], size: int
+    pairs: list[tuple[int, int]],
+    neighbors: list[np.ndarray],
+    size: int,
+    test: CITest | None = None,
 ) -> Iterator[_Chunk]:
     """Yield ``(i, x, y, chunk)``, ``x < y``, for each chunk of subsets the per-pair scan of
-    :func:`scan_pairs` evaluates in one call, in its order; ``i`` is the pair's position."""
+    :func:`scan_pairs` evaluates in one call, in its order; ``i`` is the pair's position. With
+    ``test``, each side leaves out the candidates :func:`kept_apart` drops."""
     for i, (a, b) in enumerate(pairs):
         x, y = min(a, b), max(a, b)
-        for _, _, candidates, seen in _sides(neighbors, a, b, size):
+        for side_a, side_b, candidates, seen in _sides(neighbors, a, b, size):
+            if test is not None:
+                kept, _ = kept_apart(test, (side_a, side_b), [(candidates, seen)], size)
+                if kept is None:
+                    continue
+                [(candidates, seen)] = kept
             for chunk in subset_rows(candidates, size, seen):
                 yield i, x, y, chunk
 
@@ -563,6 +637,20 @@ def _evaluated(
         return
     for item in stack:
         yield [item], _canonical_chunk(pvalues, size, *item[1:])
+
+
+def testable_queries(test: CITest, neighbors: list[np.ndarray], x: int, y: int, size: int) -> int:
+    """:func:`pair_queries` excluding sets with a member that keeps no rows with the pair under
+    test-wise deletion (:func:`kept_apart`): the queries the scan builds."""
+    if not isinstance(test, TestwiseDeletion):
+        return pair_queries(neighbors, x, y, size)
+    together = test.together()
+    if not together[x, y]:
+        return 0
+    met = together[x] & together[y]
+    from_x = {c for c in neighbors[x].tolist() if c != y and met[c]}
+    from_y = {c for c in neighbors[y].tolist() if c != x and met[c]}
+    return comb(len(from_x), size) + comb(len(from_y), size) - comb(len(from_x & from_y), size)
 
 
 def pair_queries(neighbors: list[np.ndarray], x: int, y: int, size: int) -> int:
@@ -749,24 +837,53 @@ def unseparated_triples(
     adjacency: np.ndarray,
     sepsets: Mapping[tuple[int, int], object],
     constraints: Constraints | None,
+    undecided: Collection[tuple[int, int]] = (),
 ) -> frozenset[tuple[int, int, int]]:
     """The unshielded triples ``(a, b, c)``, ``a < c``, over a non-adjacent pair with no
     separating set.
 
     ``adjacency`` is the boolean skeleton and ``sepsets`` the separating sets, keyed in either
     order. A pair ``constraints`` make non-adjacent that ``sepsets`` leaves out has no separating
-    set the search found, so whether ``b`` is a collider is unknown: no rule reads the triple as a
-    collider or a non-collider. Without constraints the search tested every pair it left
-    non-adjacent, and there are none.
+    set the search found, and an ``undecided`` pair, keyed ``(a, c)`` with ``a < c``, which the
+    search left out of the skeleton because no test with rows could decide it
+    (:func:`~andrey.constraint.pc.adjacency_search`), may be adjacent or not; so whether ``b`` is a
+    collider is unknown: no rule reads the triple as a collider or a non-collider, and no rule
+    reads its ends as non-adjacent. Without constraints and undecided pairs the search tested
+    every pair it left non-adjacent, and there are none.
     """
-    if constraints is None:
+    if constraints is None and not undecided:
         return frozenset()
-    apart = ~constraints.support()
+    d = len(adjacency)
+    apart = np.zeros((d, d), dtype=bool) if constraints is None else ~constraints.support()
+    for a, c in undecided:
+        apart[a, c] = apart[c, a] = True
     triples = set()
     for b, row in enumerate(adjacency):
         for a, c in combinations(np.flatnonzero(row).tolist(), 2):
             if apart[a, c] and (a, c) not in sepsets and (c, a) not in sepsets:
                 triples.add((a, b, c))
+    return frozenset(triples)
+
+
+def flagged_triples(
+    adjacency: np.ndarray, flagged: Collection[tuple[int, int]]
+) -> frozenset[tuple[int, int, int]]:
+    """The unshielded triples ``(a, b, c)``, ``a < c``, of the boolean ``adjacency`` with a side in
+    ``flagged``, pairs in either order.
+
+    A flagged side might have been separated by an untested conditioning set
+    (:func:`~andrey.core.ci_missing.running_flags`), so the edge and triple may be absent: no rule
+    classifies ``b`` as a collider or non-collider. With no flagged pair, as on complete data, there
+    are none.
+    """
+    if not flagged:
+        return frozenset()
+    triples = set()
+    for u, v in flagged:
+        for end, middle in ((u, v), (v, u)):
+            for c in np.flatnonzero(adjacency[middle]).tolist():
+                if c != end and not adjacency[end, c]:
+                    triples.add((min(end, c), middle, max(end, c)))
     return frozenset(triples)
 
 
@@ -778,15 +895,36 @@ def check_collider_rule(collider_rule: str) -> None:
         )
 
 
-def collider_verdict(separating: Sequence[Iterable[int]], b: int, rule: str) -> str:
+def collider_verdict(
+    separating: Sequence[Collection[Hashable]],
+    b: Hashable,
+    rule: str,
+    skipped: Sequence[Collection[Hashable]] = (),
+) -> str:
     """``"collider"``, ``"non-collider"``, or ``"ambiguous"``: what ``rule`` makes of middle node
     ``b`` from the ``separating`` subsets of its endpoints.
 
     ``"conservative"`` makes ``b`` a collider when no subset contains it and a non-collider when
     every subset does. ``"majority"`` makes it a collider when fewer than half contain it and a
     non-collider when more than half do. Any other share, an exact half under ``"majority"``
-    included, is ambiguous, and so is an empty ``separating``.
+    included, is ambiguous, and so is an empty ``separating``. The ``skipped`` subsets were not
+    tested and might have separated: the verdict stands only when it holds with none of them
+    separating, with those holding ``b``, and with those without it, the least and the most share
+    of subsets holding ``b`` they allow; otherwise the triple is ambiguous.
     """
+    verdict = _verdict(separating, b, rule)
+    if not skipped or verdict == "ambiguous":
+        return verdict
+    holding = [subset for subset in skipped if b in subset]
+    lacking = [subset for subset in skipped if b not in subset]
+    for extra in (holding, lacking):
+        if _verdict([*separating, *extra], b, rule) != verdict:
+            return "ambiguous"
+    return verdict
+
+
+def _verdict(separating: Sequence[Collection[Hashable]], b: Hashable, rule: str) -> str:
+    """:func:`collider_verdict` from the ``separating`` subsets alone."""
     if not separating:
         return "ambiguous"
     share = sum(b in subset for subset in separating) / len(separating)
@@ -813,7 +951,8 @@ def vote_triples(
     ``a``'s neighbors, then every subset of ``c``'s, the empty set included, up to ``max_depth``
     members when one is given: a subset both endpoints offer is tested and counted twice. A subset
     separates the pair when its p-value is at least ``alpha``. :func:`collider_verdict` decides the
-    triple from the separating subsets, and a pair no subset separates leaves its triples ambiguous:
+    triple from the separating subsets and those not tested for want of rows, and a pair no subset
+    separates leaves its triples ambiguous:
     the conservative and majority rules call a triple unambiguous only when at least one subset of
     its ends' neighbors separates them [1]_ (Section 4.2), in PC and, after the
     possible-d-separation step, in FCI (Section 4.4). The separating sets already recorded do not
@@ -833,7 +972,7 @@ def vote_triples(
        structure learning. JMLR 15, 3921-3962.
     """
     neighbors = [np.flatnonzero(row).tolist() for row in marks != NULL]
-    votes: dict[tuple[int, int], list[tuple[int, ...]]] = {}
+    votes: dict[tuple[int, int], tuple[list[tuple[int, ...]], list[tuple[int, ...]]]] = {}
     ambiguous = set()
     for b, adjacent in enumerate(neighbors):
         for a, c in combinations(adjacent, 2):
@@ -841,7 +980,8 @@ def vote_triples(
                 continue
             if (a, c) not in votes:
                 votes[a, c] = _separating_votes(test, a, c, neighbors, alpha, max_depth)
-            verdict = collider_verdict(votes[a, c], b, rule)
+            found, skipped = votes[a, c]
+            verdict = collider_verdict(found, b, rule, skipped)
             if verdict == "ambiguous":
                 ambiguous.add((a, b, c))
                 continue
@@ -859,9 +999,10 @@ def _separating_votes(
     neighbors: list[list[int]],
     alpha: float,
     max_depth: int | None,
-) -> list[tuple[int, ...]]:
+) -> tuple[list[tuple[int, ...]], list[tuple[int, ...]]]:
     """The subsets of ``a``'s neighbors, then of ``c``'s, that separate ``a`` and ``c``
-    (``p >= alpha``), each endpoint's by increasing size, as :func:`vote_triples` counts them."""
+    (``p >= alpha``), each endpoint's by increasing size, as :func:`vote_triples` counts them, and
+    those not tested for want of rows (:data:`~andrey.core.ci_missing.NOT_TESTED`)."""
     subsets = (
         subset
         for endpoint in (a, c)
@@ -874,10 +1015,12 @@ def _separating_votes(
     )
     batched = getattr(test, "batched_call", None)
     found: list[tuple[int, ...]] = []
+    skipped: list[tuple[int, ...]] = []
     while chunk := list(islice(subsets, _VOTE_CHUNK)):
         pvalues = batched(a, c, chunk) if callable(batched) else [test(a, c, s) for s in chunk]
         found.extend(subset for subset, p in zip(chunk, pvalues) if p >= alpha)
-    return found
+        skipped.extend(subset for subset, p in zip(chunk, pvalues) if not_tested(p))
+    return found, skipped
 
 
 def adjacent_pairs(adjacency: np.ndarray) -> list[tuple[int, int]]:

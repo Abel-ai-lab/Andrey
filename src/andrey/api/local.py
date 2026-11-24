@@ -21,8 +21,9 @@ from andrey.api._adapt import (
     fit_inputs,
     label_of,
     structure_output,
+    target_columns,
 )
-from andrey.api._local import fit_metadata, target_column, target_columns, target_metadata
+from andrey.api._local import fit_metadata, target_column, target_metadata
 from andrey.api._method import method_spec
 from andrey.core import ARROW, TAIL, GraphStructure, backend
 from andrey.core.ci import counting_tests
@@ -158,8 +159,15 @@ def mb_by_mb(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -167,7 +175,15 @@ def mb_by_mb(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -282,12 +298,15 @@ def mb_by_mb(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [3]_ [4]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. When values are missing completely at random, the rows a test keeps
-    are a random sample, so each test keeps its level [4]_. When whether a value is missing depends
-    on the variables, the rows a test keeps are a selected sample, and the tests can find dependence
-    where the population has none and keep extra edges [4]_. A test raises ``ValueError`` when it
-    has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
-    other tests, or when a continuous column is constant on its rows.
+    the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
+    ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including sets skipped because no row can test them. A continuous column constant on a
+    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
+    completely at random, which means that whether a value is missing depends on no value in the
+    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
+    selected sample that more rows do not correct.
 
     **Limitations.** At its paper's settings (Alarm and Hailfinder samples at 500 to 5,000 rows, a
     45 x 45 chessboard) it made fewer errors at the target than the empty answer, with a small
@@ -354,7 +373,8 @@ def mb_by_mb(
         return structure_output(_star(edges.marks, t, d, "cpdag"), labels=labels, metadata=metadata)
 
     with copies_named(labels):
-        search = local_search(
+        search_of = partial(
+            local_search,
             X,
             alpha=alpha,
             indep_test=indep_test,
@@ -366,9 +386,9 @@ def mb_by_mb(
         )
         if targets is None:
             with rows_tested() as rows, counting_tests() as tests:
-                edges = answer(search, t)
+                edges = answer(search_of(), t)
             return output(t, edges, tests.n, rows)
-        found = answers(search, answer, targets, backend.worker_count())
+        found = answers(search_of, answer, targets, backend.worker_count())
     return [output(t, *answer_) for t, answer_ in zip(targets, found, strict=True)]
 
 
@@ -456,8 +476,15 @@ def mmb_by_mmb(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -465,7 +492,15 @@ def mmb_by_mmb(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -603,12 +638,15 @@ def mmb_by_mmb(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [5]_ [6]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. When values are missing completely at random, the rows a test keeps
-    are a random sample, so each test keeps its level [6]_. When whether a value is missing depends
-    on the variables, the rows a test keeps are a selected sample, and the tests can find dependence
-    where the population has none and keep extra edges [6]_. A test raises ``ValueError`` when it
-    has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
-    other tests, or when a continuous column is constant on its rows.
+    the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
+    ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including sets skipped because no row can test them. A continuous column constant on a
+    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
+    completely at random, which means that whether a value is missing depends on no value in the
+    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
+    selected sample that more rows do not correct.
 
     **Limitations.** On the paper's four networks with hidden nodes, at 1,000 and 5,000 rows and the
     paper's targets, its edges and marks were better than those of the authors' code in five of
@@ -676,7 +714,8 @@ def mmb_by_mmb(
         return structure_output(_star(edges.marks, t, d, "pag"), labels=labels, metadata=metadata)
 
     with copies_named(labels):
-        search = local_search(
+        search_of = partial(
+            local_search,
             X,
             alpha=alpha,
             total_alpha=alpha / (10 * (d // 10)) if d >= 10 else alpha,
@@ -689,9 +728,9 @@ def mmb_by_mmb(
         )
         if targets is None:
             with rows_tested() as rows, counting_tests() as tests:
-                edges = answer(search, t)
+                edges = answer(search_of(), t)
             return output(t, edges, tests.n, rows)
-        found = answers(search, answer, targets, backend.worker_count())
+        found = answers(search_of, answer, targets, backend.worker_count())
     return [output(t, *answer_) for t, answer_ in zip(targets, found, strict=True)]
 
 
@@ -749,8 +788,15 @@ def cmb(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -758,7 +804,15 @@ def cmb(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -866,12 +920,15 @@ def cmb(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [3]_ [4]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. When values are missing completely at random, the rows a test keeps
-    are a random sample, so each test keeps its level [4]_. When whether a value is missing depends
-    on the variables, the rows a test keeps are a selected sample, and the tests can find dependence
-    where the population has none and keep extra edges [4]_. A test raises ``ValueError`` when it
-    has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
-    other tests, or when a continuous column is constant on its rows.
+    the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
+    ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including sets skipped because no row can test them. A continuous column constant on a
+    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
+    completely at random, which means that whether a value is missing depends on no value in the
+    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
+    selected sample that more rows do not correct.
 
     **Limitations.** Measured on samples of the Alarm network (37 variables) at 1,000 rows with
     G-square tests at alpha 0.02, every variable a target, as its paper ran it: its edges at the
@@ -937,7 +994,8 @@ def cmb(
         return structure_output(_star(marks, t, d, "cpdag"), labels=labels, metadata=metadata)
 
     with copies_named(labels):
-        search = local_search(
+        search_of = partial(
+            local_search,
             X,
             alpha=alpha,
             indep_test=indep_test,
@@ -949,7 +1007,7 @@ def cmb(
         )
         if targets is None:
             with rows_tested() as rows, counting_tests() as tests:
-                result = answer(search, t)
+                result = answer(search_of(), t)
             return output(t, result, tests.n, rows)
-        found = answers(search, answer, targets, backend.worker_count())
+        found = answers(search_of, answer, targets, backend.worker_count())
     return [output(t, *answer_) for t, answer_ in zip(targets, found, strict=True)]

@@ -163,13 +163,16 @@ published measurement is ICA-LiNGAM's, on six BLAS kernels, in the same guide.
 ## Release checks
 
 Before a release merges, `qa/identity.py` fits every supported method on the release and on the
-release before it, on complete data with default arguments, and compares the outputs bit for bit.
-The quality gate and the reference comparisons run on the same code. The tests of the benchmark
+release before it, on complete data with default arguments, apart from the settings the quality gate
+fixes for a few methods, such as the shorter search of SkewD and SkewD-MV (`tuning_iter=2`,
+`max_iter=200`; a fit at the defaults takes minutes), and compares the outputs bit for bit. The
+quality gate and the reference comparisons run on the same code. The tests of the benchmark
 harness that produces the comparisons (`benchmarks/tests`) run on it too, in the harness's own
 environments, since continuous integration runs only some of them.
 
 | Release | Outputs against the release before | Quality gate | Reference comparisons | Harness tests |
 |---|---|---|---|---|
+| 0.19.0 | 50 methods, 2,107 outputs, none changed; 5 methods new (DAS, CPCM, CPCM-graph, SkewD, SkewD-MV), and target lists on IAMB, Inter-IAMB, and MMPC | 152 checks, 0 failed | 3,138 rows, 0 failed | 1,584 passed, 0 failed, 1 skipped |
 | 0.18.0 | 49 methods, 1,963 outputs, 124 changed (6 GIN graphs, a renumbering of latents; 118 p-values and statistics of ANM, PNL, LOCI, PCMCI+, and J-PCMCI+); 1 method new | 146 checks, 0 failed | 3,031 rows, 0 failed | 1,570 passed, 0 failed, 1 skipped |
 | 0.17.1 | 49 methods, 1,963 outputs, none changed | 145 checks, 0 failed | 2,971 rows, 0 failed | 1,519 passed, 0 failed, 20 skipped |
 | 0.17.0 | 45 methods, 1,819 outputs, none changed; 4 methods new | 145 checks, 0 failed | 2,971 rows, 0 failed | 1,519 passed, 0 failed, 20 skipped |

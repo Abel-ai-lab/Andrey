@@ -8,7 +8,8 @@ a fork to a pull request, [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) the websi
 ## Repository layout
 
 - `src/andrey/`: the library and its public API.
-- `tests/`: correctness checks that run on every pull request.
+- `tests/`: correctness checks; the release pull request runs all of them, and other pull
+  requests all but the `release`-marked ones.
 - `qa/`: the pre-release quality gate, the identity check, baseline capture, and calibration.
 - `benchmarks/`: comparisons with other packages and older Andrey builds.
 - `examples/`: the notebooks.
@@ -118,9 +119,10 @@ registry. Every facade docstring has, in order:
 - **Extended summary**: a sentence or two on the method, where it helps.
 - **Parameters**: every argument with its type or shape and, for enums, the `{"a", "b"}` choices,
   named as in the signature (the drift guard checks them).
-- **Returns**: `StructureOutput` (`multi_group_direct_lingam`, one per group), naming the wrapped
-  kind (`cpdag`, `dag`, `pag`, temporal) and the contents of `.metadata`, and of `.ordering` and
-  `.weighted_adjacency` when the method sets them.
+- **Returns**: `StructureOutput` (`multi_group_direct_lingam`, one per group; `rpcmci`, a
+  `RegimeOutput` with one per regime), naming the wrapped kind (`cpdag`, `dag`, `pag`, temporal)
+  and the contents of `.metadata`, and of `.ordering` and `.weighted_adjacency` when the method
+  sets them.
 - **Raises**: the error taxonomy, noting which `ValueError`s enumerate valid options.
 - **Warns**: the warnings the method raises itself, `ExperimentalWarning` when it is experimental,
   the data check's `DataTypeWarning`, and `BoundaryWarning` when a ladder of the method's measured
@@ -151,8 +153,8 @@ in Returns, and the shared Warns entries. To change one, edit the table and run
 hold one and does not; `tests/unit/test_facade_docstrings.py` fails while a copy differs.
 
 `andrey.pc` is the model. The public core classes autodoc renders (`GraphStructure`,
-`TemporalStructure`, `SummaryGraph`, `StructureOutput`) take the same sections on their
-argument-taking methods; `ruff`'s `D` rules are off there, so
+`TemporalStructure`, `SummaryGraph`, `StructureOutput`, `RegimeOutput`) take the same sections on
+their argument-taking methods; `ruff`'s `D` rules are off there, so
 `test_public_core_methods_document_their_parameters` pins their `Parameters` to the signatures.
 
 ## Common changes
@@ -308,6 +310,15 @@ reaching a code path no other test reaches, on the smallest input that reaches i
   leaves no process-wide setting, environment variable, or file outside `tmp_path` for the tests
   of another file.
 - Nothing runs on a schedule: with dependencies locked, an unchanged commit gives the same result.
+- Pull-request CI stays fast. A test that is release evidence rather than a correctness check (a
+  large-input repeat, a campaign-style recovery cell, anything over about 30 seconds on a CI
+  runner) carries `@pytest.mark.release`, on the test or, through `release_cases`
+  (`tests/release.py`), on single cases of a parametrized test. CI deselects it with
+  `-m "not release"` on a pull request into a release or topic branch; the release pull request
+  into `main`, a push to `main`, and a manual run of `ci.yml` run the whole suite, marked tests
+  included. Every method keeps an unmarked recovery test, so a broken
+  method still fails on its pull request: a method's only recovery test stays unmarked however long
+  it takes.
 
 ### 1. Recovery tests
 
@@ -368,8 +379,11 @@ On each dataset the method passes when its median SHD is below the empty graph's
 tolerance of the recorded baseline in either direction. The gate runs once per release, on the
 release pull request into `main`, which `main` requires to pass; a push that changes only `docs/`,
 `site/`, or top-level Markdown files reuses an earlier passing run, and the publish reuses that run
-when the tagged commit has the same tree and runs the gate itself otherwise. `--jobs N` fits N cells
-at a time.
+when the tagged commit has the same tree and runs the gate itself otherwise. The `quality-gate`
+workflow also runs by hand: `gh workflow run quality-gate.yml --ref <branch>`. `--jobs N` fits N
+cells at a time. A pull request into a release branch that changes a method's gate check runs only
+the gate's consistency tests, `tests/recovery/test_quality_gate.py`, which read the ledger without
+fitting the methods; run the method's cells with `qa.quality_gate <NAME>` before asking for review.
 [`qa/README.md`](qa/README.md#quality-gate) lists the datasets and tolerances. Reference parity is a
 soft gate: the quality gate also flags any published benchmark row where Andrey makes more errors
 than the reference package (from 0.8.0, when the paired bootstrap 95% interval of the difference
@@ -422,6 +436,12 @@ any other branch, or from a release branch whose `pyproject.toml` version is not
 `release/<x.y.z>.post<n>`, fixes the site or the docs of the release on `main`: the check also
 fails one that changes anything under `src/` or whose `main` is not at `<x.y.z>`. The release pull
 request runs the quality gate (`qa/README.md`), also required, once for the whole release.
+
+Pull-request CI (`.github/workflows/ci.yml`, [Testing](docs/docs/ci.md)) runs lint, types, the
+unit tests, the cheap recovery checks, and the fast consistency tests; on a pull request into a
+release or topic branch it deselects the heavy accuracy checks with `-m "not release"`. The release
+pull request into `main` runs every test, the `release`-marked ones included, and so do CI's other
+triggers: a push to `main`, a manual run, and the tag's site deploy.
 
 At each release's freeze the benchmark harness's own tests run too, outside CI: CI runs only the two
 endpoint-conversion files of `benchmarks/tests`, and the rest, which need the harness environments,

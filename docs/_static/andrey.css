@@ -1387,6 +1387,12 @@ html:not(:has(.andrey-home)) .bd-header::before {
   }
 }
 
+/* A table set with `:align: center` (the `{table}` directive), which the theme renders with the
+   class `table-center`, sits in the middle of the column. */
+.bd-article .pst-scrollable-table-container:has(> table.table-center) {
+  margin-inline: auto;
+}
+
 /* A table with no header row starts its card at the frame's top padding. */
 .bd-article .pst-scrollable-table-container:not(:has(thead)) {
   padding-top: 0.3rem;
