@@ -10,6 +10,13 @@ names its pull request.
 
 ## [Unreleased]
 
+### Changed
+
+- For contributors, `benchmarks/start_regression_ci_r.sh` builds the GCM and PCM reference library
+  in `ANDREY_BENCH_R_LIBS_GCM`, apart from the R lane's `ANDREY_BENCH_R_LIBS`, and prints the
+  exports of both its libraries, which the `env.sh` of `benchmarks/run_tests.sh` records for
+  `benchmarks/regression_ci_agreement.py`. ([#1214])
+
 ## [0.19.0] - 2026-11-24
 
 ### Highlights
@@ -2933,3 +2940,4 @@ First alpha release.
 [#1058]: https://github.com/Abel-ai-lab/Andrey/pull/1058
 [#1153]: https://github.com/Abel-ai-lab/Andrey/pull/1153
 [#1165]: https://github.com/Abel-ai-lab/Andrey/pull/1165
+[#1214]: https://github.com/Abel-ai-lab/Andrey/pull/1214

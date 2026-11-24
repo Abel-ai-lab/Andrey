@@ -11,15 +11,15 @@ so both sides test the same numbers. PCM is compared in its paper's direction, t
 - end to end: each side with its own regressions (boosted trees, random forests, or the PCM's
   additive models), the sample splits shared, so a difference comes from the regressions.
 
-    ANDREY_BENCH_RSCRIPT=Rscript ANDREY_BENCH_PCM_CODE=<clone of the PCM authors' code> \\
+    ANDREY_BENCH_RSCRIPT=Rscript ANDREY_BENCH_R_LIBS_GCM=<GCM and PCM library> \\
+        ANDREY_BENCH_R_LIBS_WGCM=<wGCM library> \\
+        ANDREY_BENCH_PCM_CODE=<clone of the PCM authors' code> \\
         uv run python benchmarks/regression_ci_agreement.py <empty folder>
 
-`benchmarks/start_regression_ci_r.sh` builds the two R libraries the reference needs, read from
-`ANDREY_BENCH_R_LIBS` (GCM and PCM) and `ANDREY_BENCH_R_LIBS_WGCM` (wGCM) when they are set, and
-clones the PCM authors' code, printing its `ANDREY_BENCH_PCM_CODE`. The R lane's start scripts use
-`ANDREY_BENCH_R_LIBS` for their own library, which the `env.sh` of `benchmarks/run_tests.sh`
-records, so both variables are set here to the libraries the start script built. The script prints
-one Markdown table per test.
+`benchmarks/start_regression_ci_r.sh` builds the two R libraries the reference needs, clones the PCM
+authors' code, and prints the three exports above, which the `env.sh` of `benchmarks/run_tests.sh`
+records. The R lane's `ANDREY_BENCH_R_LIBS` is not read. A library variable that is unset leaves
+`R_LIBS` as the environment has it. The script prints one Markdown table per test.
 """
 
 from __future__ import annotations
@@ -94,7 +94,7 @@ def run_reference(folder: Path, mode: str, names: list[str], seeds: list[int]) -
         f.write("case,seed\n" + "".join(f"{c},{s}\n" for c, s in zip(names, seeds)))
     rscript = os.environ.get("ANDREY_BENCH_RSCRIPT", "Rscript")
     lib = os.environ.get(
-        "ANDREY_BENCH_R_LIBS_WGCM" if mode.startswith("wgcm") else "ANDREY_BENCH_R_LIBS"
+        "ANDREY_BENCH_R_LIBS_WGCM" if mode.startswith("wgcm") else "ANDREY_BENCH_R_LIBS_GCM"
     )
     env = {**os.environ, "R_LIBS": lib} if lib else None
     if not (folder / f"reference_{mode}.csv").exists():  # a rerun reuses the reference's output
