@@ -496,12 +496,33 @@ def _heuristic(
     return _best(run(_searches(design, rows, effect, log_penalties, starts, rng, optimizer)))
 
 
+def search_device(optimizer: str) -> str:
+    """The device the searches of a fit run on: ``"numpy"`` (each search on its own), or the
+    ``"cuda"`` or ``"cpu"`` PyTorch device that :func:`_lockstep` runs CMA-ES searches on together.
+
+    Only a pinned ``backend`` (``andrey.config(backend="cuda")`` or ``ANDREY_BACKEND``) selects a
+    PyTorch device; ``"auto"`` keeps NumPy, as do L-BFGS-B searches. Read it in the thread that
+    calls the method: ``andrey.config`` does not reach threads started inside its block.
+    """
+    from andrey.core import backend
+
+    if optimizer != "cmaes":
+        return "numpy"
+    return backend.select(("numpy", "cpu", "cuda"), ("numpy",), op="skewd")
+
+
 @contextmanager
-def search_pool(workers: int) -> Generator[Run]:
+def search_pool(workers: int, device: str = "numpy") -> Generator[Run]:
     """A ``run`` function for :func:`fit` that spreads searches over ``workers`` threads; with one
     worker, the searches run in this thread. A search spends its time in NumPy and SciPy array
     operations, which release the interpreter lock. Every search draws from its own stream, so the
-    results do not depend on the number of workers."""
+    results do not depend on the number of workers.
+
+    With a PyTorch ``device`` (from :func:`search_device`), the CMA-ES searches of each call run
+    together by :func:`_lockstep` instead, whatever ``workers`` is."""
+    if device != "numpy":
+        yield lambda searches: _lockstep(searches, device)
+        return
     if workers <= 1:
         yield _serial
         return
@@ -509,6 +530,200 @@ def search_pool(workers: int) -> Generator[Run]:
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         yield lambda searches: list(pool.map(_run_search, searches))
+
+
+#: Generations of each search's draws taken from its stream at once by :func:`_lockstep`: one
+#: draw of ``(k, POPULATION, dim)`` gives the numbers of ``k`` draws of ``(POPULATION, dim)``.
+DRAW_BLOCK = 16
+
+
+def _lockstep(searches: list[_Search], device: str) -> list[tuple[np.ndarray, float]]:
+    """Run ``searches`` (CMA-ES) on the PyTorch ``device`` together, in float64, and return their
+    results in order; an L-BFGS-B search runs on its own.
+
+    Searches with the same rows count, design widths, and coordinates form a group that advances
+    one generation at a time: each search keeps its own distribution, draws its candidates from its
+    own stream as :func:`_cma_es` does, and stops on its own rule; a group's candidates are scored
+    by one batched likelihood, and a stopped search leaves the group. A search's arithmetic does not
+    read the other searches, but the device rounds differently from NumPy, so its path can differ
+    from :func:`_cma_es` in the last digits and grow from there.
+    """
+    found: dict[int, tuple[np.ndarray, float]] = {}
+    groups: dict[tuple, list[int]] = {}
+    for i, search in enumerate(searches):
+        if search.optimizer != "cmaes":
+            found[i] = _run_search(search)
+            continue
+        key = (
+            search.rows.size,
+            search.design.location.shape[1],
+            search.design.scale.shape[1],
+            None if search.frame is None else search.frame.shape[1],
+        )
+        groups.setdefault(key, []).append(i)
+    for members in groups.values():
+        for i, result in zip(
+            members, _cma_es_group([searches[i] for i in members], device), strict=True
+        ):
+            found[i] = result
+    return [found[i] for i in range(len(searches))]
+
+
+def _batched_penalized_nll(theta, location, scale, effect, k_alpha, m_kappa, frame):
+    """:func:`_penalized_nll` of each search's candidates, as PyTorch tensors: ``theta`` is
+    ``(b, m, dim)`` in the coordinates of ``frame`` (``None`` for the raw ones), ``location``
+    ``(b, n, q)``, ``scale`` ``(b, n, p)``, ``effect`` ``(b, n)``, and the penalty matrices
+    ``(b, q, q)`` and ``(b, p, p)``; the result is ``(b, m)``."""
+    from andrey.core import backend
+
+    torch = backend.torch()
+    k = location.shape[2] if frame is None else frame.shape[1]
+    p = scale.shape[2]
+    psi = theta[..., :k] if frame is None else theta[..., :k] @ frame.T
+    rho, shape = theta[..., k : k + p], theta[..., -1]
+    log_variance = torch.bmm(scale, rho.transpose(1, 2))  # (b, n, m)
+    r = effect[:, :, None] - torch.bmm(location, psi.transpose(1, 2))
+    r = r * torch.exp(log_variance * -0.5)
+    rows = torch.special.log_ndtr(shape[:, None, :] * r)
+    rows = (_LOG_NORM - log_variance * 0.5) - (r * r) * 0.5 + rows
+    value = -rows.sum(dim=1)
+    value = value + 0.5 * torch.einsum("bmi,bij,bmj->bm", psi, k_alpha, psi)
+    value = value + 0.5 * torch.einsum("bmi,bij,bmj->bm", rho, m_kappa, rho)
+    return torch.where(torch.isfinite(value), value, math.inf)
+
+
+def _cma_es_group(searches: list[_Search], device: str) -> list[tuple[np.ndarray, float]]:
+    """:func:`_cma_es` for searches of one shape, in lockstep on ``device`` (:func:`_lockstep`)."""
+    from andrey.core import backend
+
+    torch = backend.torch()
+    f64 = torch.float64
+
+    def put(a: np.ndarray):
+        return torch.as_tensor(np.ascontiguousarray(a), dtype=f64, device=device)
+
+    first = searches[0]
+    frame = None if first.frame is None else put(first.frame)
+    k = first.design.location.shape[1] if first.frame is None else first.frame.shape[1]
+    dim = first.start.size
+    location = torch.stack([put(s.design.location[s.rows]) for s in searches])  # (B, n, q)
+    scale = torch.stack([put(s.design.scale[s.rows]) for s in searches])  # (B, n, p)
+    effect = torch.stack([put(s.effect[s.rows]) for s in searches])  # (B, n)
+    k_alpha = torch.stack([put(s.k_alpha) for s in searches])
+    m_kappa = torch.stack([put(s.m_kappa) for s in searches])
+    lower, upper = put(first.lower), put(first.upper)
+    streams = [s.stream for s in searches]
+
+    def objective(theta):
+        return _batched_penalized_nll(theta, location, scale, effect, k_alpha, m_kappa, frame)
+
+    mu = POPULATION // 2
+    weights_np = np.log(mu + 0.5) - np.log(np.arange(1, mu + 1))
+    weights_np /= weights_np.sum()
+    mueff = 1.0 / float(weights_np @ weights_np)
+    cc = (4 + mueff / dim) / (dim + 4 + 2 * mueff / dim)
+    cs = (mueff + 2) / (dim + mueff + 5)
+    c1 = 2 / ((dim + 1.3) ** 2 + mueff)
+    cmu = min(1 - c1, 2 * (mueff - 2 + 1 / mueff) / ((dim + 2) ** 2 + mueff))
+    damps = 1 + 2 * max(0.0, math.sqrt((mueff - 1) / (dim + 1)) - 1) + cs
+    chi = math.sqrt(dim) * (1 - 1 / (4 * dim) + 1 / (21 * dim**2))
+    weights = put(weights_np)
+
+    n_searches = len(searches)
+    alive = torch.arange(n_searches, device=device)  # each live row's index into ``searches``
+    mean = torch.clamp(torch.stack([put(s.start) for s in searches]), lower, upper)
+    best = mean.clone()
+    best_value = objective(mean[:, None, :])[:, 0]
+    out_best, out_value = best.clone(), best_value.clone()
+    sigma = torch.full((n_searches,), STEP_SIZE, dtype=f64, device=device)
+    eye = torch.eye(dim, dtype=f64, device=device)
+    cov = eye.repeat(n_searches, 1, 1)
+    basis = cov.clone()
+    scales = torch.ones((n_searches, dim), dtype=f64, device=device)
+    path_c = torch.zeros((n_searches, dim), dtype=f64, device=device)
+    path_s = torch.zeros_like(path_c)
+    history = [mean]  # the means, as in _cma_es; only the last WINDOW + 1 are read
+    draws = torch.empty((n_searches, 0, POPULATION, dim), dtype=f64, device=device)
+    for generation in range(GENERATIONS):
+        if generation % DRAW_BLOCK == 0:
+            block = (DRAW_BLOCK, POPULATION, dim)
+            draws = put(np.stack([stream.standard_normal(block) for stream in streams]))
+        z = draws[:, generation % DRAW_BLOCK]
+        steps = z @ ((basis * scales[:, None, :]) @ basis.transpose(1, 2))
+        candidates = torch.clamp(mean[:, None, :] + sigma[:, None, None] * steps, lower, upper)
+        steps = (candidates - mean[:, None, :]) / sigma[:, None, None]
+        values = objective(candidates)
+        order = torch.argsort(values, dim=1, stable=True)
+        top = values.gather(1, order[:, :1])[:, 0]
+        better = top < best_value
+        lead = candidates.gather(1, order[:, :1, None].expand(-1, 1, dim))[:, 0]
+        best = torch.where(better[:, None], lead, best)
+        best_value = torch.where(better, top, best_value)
+        chosen = steps.gather(1, order[:, :mu, None].expand(-1, mu, dim))  # (b, mu, dim)
+        step = (weights[None, None, :] @ chosen)[:, 0]
+        mean = mean + sigma[:, None] * step
+        inverse_root = (basis / scales[:, None, :]) @ basis.transpose(1, 2)
+        path_s = (1 - cs) * path_s + math.sqrt(cs * (2 - cs) * mueff) * (
+            inverse_root @ step[:, :, None]
+        )[:, :, 0]
+        norm_s = torch.linalg.vector_norm(path_s, dim=1)
+        hsig = (
+            norm_s / math.sqrt(1 - (1 - cs) ** (2 * (generation + 1))) / chi < 1.4 + 2 / (dim + 1)
+        ).to(f64)
+        path_c = (1 - cc) * path_c + (hsig * math.sqrt(cc * (2 - cc) * mueff))[:, None] * step
+        outer = path_c[:, :, None] * path_c[:, None, :]
+        cov = (
+            (1 - c1 - cmu) * cov
+            + c1 * (outer + ((1 - hsig) * cc * (2 - cc))[:, None, None] * cov)
+            + cmu * (chosen.transpose(1, 2) * weights) @ chosen
+        )
+        growth = torch.exp((cs / damps) * (norm_s / chi - 1))
+        overflow = torch.isinf(growth)  # _cma_es stops before it updates the step size
+        sigma = torch.where(overflow, sigma, sigma * growth)
+        cov = (cov + cov.transpose(1, 2)) / 2
+        broken = overflow | ~torch.isfinite(cov).all(dim=(1, 2))
+        eigen, basis = torch.linalg.eigh(torch.where(broken[:, None, None], eye, cov))
+        scales = torch.sqrt(torch.clamp(eigen, min=1e-300))
+        history.append(mean)
+        stop = broken | ~torch.isfinite(sigma) | (sigma * scales.max(dim=1).values < 1e-12)
+        if generation >= WINDOW:
+            moved = torch.linalg.vector_norm(mean - history[-1 - WINDOW], dim=1)
+            stop = stop | (moved < TOLERANCE)
+        history = history[-1 - WINDOW :]
+        if generation == GENERATIONS - 1:
+            stop = torch.ones_like(stop)
+        if not bool(stop.any()):
+            continue
+        out_best[alive[stop]], out_value[alive[stop]] = best[stop], best_value[stop]
+        keep = ~stop
+        if not bool(keep.any()):
+            break
+        kept = torch.nonzero(keep)[:, 0]
+        alive, mean, best, best_value, sigma = (
+            alive[kept],
+            mean[kept],
+            best[kept],
+            best_value[kept],
+            sigma[kept],
+        )
+        cov, basis, scales, path_c, path_s = (
+            cov[kept],
+            basis[kept],
+            scales[kept],
+            path_c[kept],
+            path_s[kept],
+        )
+        location, scale, effect = location[kept], scale[kept], effect[kept]
+        k_alpha, m_kappa, draws = k_alpha[kept], m_kappa[kept], draws[kept]
+        history = [h[kept] for h in history]
+        streams = [streams[i] for i in kept.tolist()]
+    best_np, value_np = backend.to_numpy(out_best), backend.to_numpy(out_value)
+    results = []
+    for search, theta, value in zip(searches, best_np, value_np, strict=True):
+        if search.frame is not None:
+            theta = np.concatenate([search.frame @ theta[:k], theta[k:]])
+        results.append((theta, float(value)))
+    return results
 
 
 def _best(found: list[tuple[np.ndarray, float]]) -> tuple[np.ndarray, float]:
