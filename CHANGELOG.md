@@ -10,6 +10,11 @@ names its pull request.
 
 ## [Unreleased]
 
+### Changed
+
+- For contributors, the `docs` dependency group needs Python 3.11.5 or later, so the lock holds
+  only the fixed soupsieve; the package still supports Python 3.11 and later. ([#1215])
+
 ## [0.19.0] - 2026-11-24
 
 ### Highlights
@@ -2933,3 +2938,4 @@ First alpha release.
 [#1058]: https://github.com/Abel-ai-lab/Andrey/pull/1058
 [#1153]: https://github.com/Abel-ai-lab/Andrey/pull/1153
 [#1165]: https://github.com/Abel-ai-lab/Andrey/pull/1165
+[#1215]: https://github.com/Abel-ai-lab/Andrey/pull/1215
