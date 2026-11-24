@@ -1098,8 +1098,8 @@ def skewd(
     misspecified, and the likelihood criterion assumes Gaussian marginals of the standardized
     variables [1]_. A change of units by a factor that is not a power of two changed no edge in 120
     refits of 20 pairs (80 to 150 rows, ``tuning_iter=3``) and moved 2 of the 240 likelihoods by
-    more than ``1e-6`` (both by 0.014, on a pair with no direction), so an edge can change only where
-    the two directions already lie within what another ``seed`` changes. The numbers are a
+    more than ``1e-6`` (both by 0.014, on a pair with no direction), so an edge can change only
+    where the two directions already lie within what another ``seed`` changes. The numbers are a
     reference, not a hard limit: they change with the data generator, the density, the method's
     settings, and the machine.
 

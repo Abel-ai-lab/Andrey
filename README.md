@@ -26,9 +26,9 @@ banner links the website's homepage. -->
 variables are stacked into one table, a conditional independence test without enough rows is
 skipped, a pair that no test can decide is left out of the graph and listed, and an edge that a
 skipped test might have removed is listed too. On simulated cohorts of 20 to 50 variables, PC's
-graph made fewer errors than the empty graph in every setting. DAS and CPCM are supported, LGES,
-Regime-PCMCI, and the GCM, wGCM, and PCM tests arrive, experimental, and `target` takes a list of
-columns.
+graph made fewer errors than the empty graph in every setting. DAS, CPCM, and SkewD are supported,
+LGES, Regime-PCMCI, and the GCM, wGCM, and PCM tests arrive, experimental, and `target` takes a list
+of columns.
 
 **[0.19.0 release card](https://andrey.abel.ai/docs/benchmarks/0.19.0.html)** · Post:
 **[Datasets with overlapping variables](https://andrey.abel.ai/blog/20261123-andrey-0-19-0.html)**
