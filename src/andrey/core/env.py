@@ -69,7 +69,7 @@ def parse_int(value: str, source: str) -> int:
 
 
 def parse_share(value: str, source: str) -> float:
-    """Return ``value`` as a share: a number from ``0`` to ``1``."""
+    """``value`` as a share from ``0`` to ``1``."""
     try:
         share = float(value)
     except ValueError as exc:
@@ -80,7 +80,7 @@ def parse_share(value: str, source: str) -> float:
 
 
 def parse_factor(value: str, source: str) -> float:
-    """Return ``value`` as a factor: a number of at least ``1``."""
+    """``value`` as a factor of at least ``1``."""
     try:
         factor = float(value)
     except ValueError as exc:

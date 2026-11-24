@@ -95,15 +95,21 @@ def pc(
         column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
         declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
         type, never by its values. See **Categorical data.** and **Mixed data.** in Notes.
-        ``metadata["indep_test"]`` names the test the fit used: the one picked from the declared
-        column types when this is ``None``.
+        ``metadata["indep_test"]`` names the test used, including the choice for ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, which decides between two colliders that would
         orient one edge in opposite directions. ``"p_value"`` orients first the collider whose
@@ -127,11 +133,14 @@ def pc(
         any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
         rule orients through it, when a conditioning set not tested of that side lies within the
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
-        lies within the parents of one end, so that set might be the separating set the search
-        missed. On merged cohorts
-        that no row bridges, ``"ambiguous"`` removes most false colliders and most true
-        arrowheads with them, and the graph can then be farther from the truth than the empty
-        graph.
+        lies within the parents of one end, so the search might have missed that separating set.
+        ``"orient"`` favors arrowheads and accuracy; it gives up protection from false colliders.
+        ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them, and
+        accuracy. On merged cohorts of three graph sizes, with about 29 to 76 true edges, that no
+        row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's false
+        colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found
+        from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty graph in
+        6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -141,12 +150,29 @@ def pc(
         :doc:`getting-started guide </docs/guides/getting-started>`.
     missing : {"testwise", "mvpc"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
-        reads only the rows where all of its variables are observed. ``"mvpc"`` is
-        Missing-Value PC [13]_: after the test-wise skeleton, it finds the parents of each
-        variable's missingness indicator and tests again, on virtual data that correct for them,
-        the edges such an indicator could have kept; it takes ``"fisherz"`` or ``"student_t"``.
-        ``None`` picks the method's default, ``"testwise"``. On data with missing values,
-        ``metadata["missing"]`` records the handling used. See **Missing values.** in Notes.
+        reads only the rows where all of its variables are observed. ``"mvpc"`` is Missing-Value PC
+        [13]_: after the test-wise skeleton, it finds the parents of each variable's missingness
+        indicator and tests again, on virtual data that correct for them, the edges such an
+        indicator could have kept; it takes ``"fisherz"`` or ``"student_t"``. ``None`` picks the
+        method's default, ``"testwise"``. On data with missing values, ``metadata["missing"]``
+        records the handling used. ``"testwise"`` favors every row each test can read and, on large
+        graphs where an indicator has many weak parents or parents with missing values, accuracy; it
+        gives up its guarantee outside values missing completely at random. With 20 variables and
+        1,000 rows, 10 to 30% of the values missing completely at random, it made median errors of
+        6.5 to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows
+        and had no complete row at 30% (complete data: 4.0; 0.11.0 release card); in the 12 settings
+        below where ``"mvpc"`` was behind again on fresh seeds (50 or 100 variables, 20 or 30%
+        missing), it made fewer errors. ``"mvpc"`` favors values missing for a reason that other
+        variables carry; it gives up every test but those two and, where an indicator has many weak
+        parents or parents with missing values, accuracy on large graphs. On Erdos-Renyi graphs of
+        10 to 100 variables (mean degree 2 or 4; 500 to 10,000 rows; 10 to 30% missing), with one
+        observed parent per indicator, ``"mvpc"`` had fewer errors than ``"testwise"`` in 14 of 72
+        settings at ``alpha=0.01`` and 28 at the default 0.05, and more in none. Over both levels
+        together (144 settings), it tied in 136 with values missing completely at random; it was
+        behind in 12 of the 141 judged with many weak parents per indicator (3 again on fresh seeds)
+        and, with one parent that has missing values itself, ahead in 12 of 144 and behind in 24 (9
+        again); the repeated ones all had 50 or 100 variables and 20 or 30% missing (see
+        Limitations). See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -337,22 +363,21 @@ def pc(
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
-    tested, including those the search skipped because no row can test them. A pair no tested query
-    could decide, as a pair never observed together, is undecided: it is left out of the graph and
+    tested, including sets skipped because no row can test them. A pair no tested query could
+    decide, such as one never observed together, is undecided: it is left out of the graph and
     listed in ``metadata["undecided_pairs"]``, and a triple whose ends are undecided is neither a
-    collider nor a non-collider to any rule. A drawn edge that a conditioning set not tested might
-    have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
-    not check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``, a
-    triple with a side it reads (see ``possibly_separable``) is neither a collider nor a
-    non-collider to any rule. On merged cohorts, every pair of variables measured only in different
-    cohorts is therefore undecided, and
-    an edge whose separating set is never observed together with its pair is drawn and flagged. A
-    few rows that observe every column decide such pairs on those rows alone, with little power, so
-    they can remove true edges between variables observed together. A continuous column constant on
-    a test's rows raises ``ValueError``. With missing values, the skeleton search runs in one
-    process. Test-wise deletion is valid when values are missing completely at random, which means
-    that whether a value is missing depends on no value in the data; the rows a test reads are then
-    a random sample of all rows, and otherwise they are a selected sample that more rows do not
+    collider nor a non-collider to any rule. A drawn edge an untested conditioning set might have
+    separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could not
+    check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``, a triple
+    with a side it reads (see ``possibly_separable``) is neither a collider nor a non-collider to
+    any rule. On merged cohorts, pairs measured only in different cohorts are undecided, and an edge
+    whose separating set is never observed together with its pair is drawn and flagged. A few rows
+    that observe every column decide such pairs on those rows alone, with little power, so they can
+    remove true edges between variables observed together. A continuous column constant on a test's
+    rows raises ``ValueError``. With missing values, the skeleton search runs in one process.
+    Test-wise deletion is valid when values are missing completely at random, which means that
+    whether a value is missing depends on no value in the data; the rows a test reads are then a
+    random sample of all rows, and otherwise they are a selected sample that more rows do not
     correct.
 
     **Missing-Value PC.** ``missing="mvpc"`` follows Algorithm 1 of Tu et al. [13]_. The test-wise
@@ -361,32 +386,31 @@ def pc(
     descendant of one (their Proposition 2). Step 2 finds the parents of each indicator: the
     variable's column is replaced by its 0/1 indicator, and the skeleton search tests the indicator
     against each other variable given subsets of the indicator's neighbors, with ``indep_test``,
-    ``alpha``, and ``max_depth``. A test whose rows hold one value of the indicator, which then
-    carry no information on it, or fewer rows than the test needs is not tested; a variable on
-    whose rows the indicator holds one value conditions no test, and one left adjacent with no
-    test of its pair tested is no parent. Step 3 marks as
-    candidates the adjacent pairs that share an adjacent variable or an indicator they both cause.
-    Step 4 runs the skeleton search again over the candidates, every other edge kept, with the
-    permutation-based correction (PermC, their Algorithm 2): a test of
-    ``x`` and ``y`` given ``S`` reads ``W``, the parents of the indicators of ``x``, ``y``, and
-    ``S``, and of the indicators of ``W``'s own variables. On the rows where all of them are
-    observed, each of ``x``, ``y``, and ``S`` is regressed on ``W``; ``W``'s values on as many rows,
-    drawn in random order from the rows where ``W`` is observed, plus each variable's residuals give
-    virtual data distributed as the complete values of ``x``, ``y``, and ``S`` are on the rows where
-    ``W`` is observed (their Eq. (4)), and the test runs on them. A test with an empty ``W`` is the
-    test-wise one. So is a test with fewer than ``max(t, |W| + 2)`` rows where ``x``, ``y``, ``S``,
-    and ``W`` are all observed, ``t`` being the rows the test needs, ``|S| + 4`` for ``"fisherz"``
-    and ``|S| + 3`` for ``"student_t"``, too few for the regressions on ``W`` or for the test: the
-    paper leaves that case open, and as the correction can only remove an edge the test-wise tests
-    kept, the pair keeps its test-wise answer for that ``S`` and is listed in
-    ``metadata["corrected_edges"]["uncorrected"]``. A corrected test reads no more rows than the
-    test-wise test of the same ``x``, ``y``, and ``S``, and fewer when a row misses a value of
-    ``W``: ``metadata["corrected_edges"]["rows_tested"]`` gives the fewest and the median rows the
-    corrected tests read, where ``metadata["rows_tested"]`` counts the tests that delete rows, and
-    is absent when no test was corrected. The colliders follow the corrected separating
-    sets; ``"conservative"`` and ``"majority"`` vote with the test-wise tests, as the correction
-    applies to the skeleton search, and their Algorithm 1 orients the corrected skeleton with PC's
-    rules. Each regression has an intercept, where their Eq. (2) has none and so assumes that every
+    ``alpha``, and ``max_depth``. A test whose rows hold only one indicator value, carrying no
+    information on it, or fewer rows than the test needs is not tested; a variable on whose rows the
+    indicator holds one value conditions no test, and one left adjacent with no test of its pair
+    tested is no parent. Step 3 marks as candidates the adjacent pairs that share an adjacent
+    variable or an indicator they both cause. Step 4 runs the skeleton search again over the
+    candidates, every other edge kept, with the permutation-based correction (PermC, their Algorithm
+    2): a test of ``x`` and ``y`` given ``S`` reads ``W``, the parents of the indicators of ``x``,
+    ``y``, and ``S``, and of the indicators of ``W``'s own variables. On the rows where all of them
+    are observed, each of ``x``, ``y``, and ``S`` is regressed on ``W``; ``W``'s values on as many
+    rows, drawn in random order from the rows where ``W`` is observed, plus each variable's
+    residuals give virtual data distributed as the complete values of ``x``, ``y``, and ``S`` are on
+    the rows where ``W`` is observed (their Eq. (4)), and the test runs on them. A test with an
+    empty ``W`` is the test-wise one. So is a test with fewer than ``max(t, |W| + 2)`` rows where
+    ``x``, ``y``, ``S``, and ``W`` are all observed, ``t`` being the rows the test needs,
+    ``|S| + 4`` for ``"fisherz"`` and ``|S| + 3`` for ``"student_t"``, too few for the regressions
+    on ``W`` or for the test: the paper leaves that case open, and as the correction can only remove
+    an edge the test-wise tests kept, the pair keeps its test-wise answer for that ``S`` and is
+    listed in ``metadata["corrected_edges"]["uncorrected"]``. A corrected test reads no more rows
+    than the test-wise test of the same ``x``, ``y``, and ``S``, and fewer when a row misses a value
+    of ``W``: ``metadata["corrected_edges"]["rows_tested"]`` gives the fewest and the median rows
+    the corrected tests read, where ``metadata["rows_tested"]`` counts the tests that delete rows,
+    and is absent when no test was corrected. The colliders follow the corrected separating sets;
+    ``"conservative"`` and ``"majority"`` vote with the test-wise tests, as the correction applies
+    to the skeleton search, and their Algorithm 1 orients the corrected skeleton with PC's rules.
+    Each regression has an intercept, where their Eq. (2) has none and so assumes that every
     variable has mean 0: with the intercept, the regressions fit data whose means are not 0, and a
     p-value does not change when a column is shifted. The permutations draw from ``seed`` and from
     where the queried columns' values are missing, so a result depends on neither the column order,
@@ -615,11 +639,11 @@ def _drawn(graph: GraphStructure, index_edges: Sequence[int] = ()) -> np.ndarray
 def _mvpc_metadata(found: dict, labels: Sequence[str] | None, seed: int) -> dict:
     """Return MVPC's indicator parents, corrected edges, and ``seed`` as metadata, or ``{}``.
 
-    ``found`` is empty when the correction did not run, on data without missing values, and the
-    fit then drew no random numbers. A column is its label when ``labels`` is given, else its
-    0-based position. The corrected edges hold ``rows_tested``, the fewest and the median rows a
-    corrected test read, and ``p_one_tests``, the corrected tests that returned ``p = 1``, when it
-    is not zero (:func:`~andrey.core.ci_missing.rows_metadata`), when one ran.
+    ``found`` is empty when the correction did not run, on data without missing values, and the fit
+    then drew no random numbers. A column is its label when ``labels`` is given, else its 0-based
+    position. When corrected tests ran, the corrected edges hold ``rows_tested``, their minimum and
+    median row counts, and nonzero ``p_one_tests``, the count of tests returning ``p = 1``
+    (:func:`~andrey.core.ci_missing.rows_metadata`).
     """
     if not found:
         return {}
@@ -703,15 +727,22 @@ def fci(
         residuals. ``None`` picks from the declared column types: ``"gsq"`` when every column is
         categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared
         categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type,
-        never by its values. See Notes. ``metadata["indep_test"]`` names the test the fit used: the
-        one picked from the declared column types when this is ``None``.
+        never by its values. See Notes. ``metadata["indep_test"]`` names the test used, including
+        the choice for ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
         How FCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
@@ -726,12 +757,18 @@ def fci(
         How the orientation rules read a triple ``x - z - y`` with a side listed in
         ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
         any other triple. ``"ambiguous"`` makes every such triple neither a collider nor a
-        non-collider, and no rule orients through it: with latent variables, a set that separates
-        a pair lies within the possible-d-separating set of one end, beyond its adjacencies, so
-        any conditioning set not tested might be the separating set the search missed. On merged
-        cohorts that no row bridges, ``"ambiguous"`` removes most false colliders and most true
-        arrowheads with them. The collider pass before the possible-d-separation step reads it
-        too, so that step's sets, the skeleton, and ``metadata["not_tested"]`` can change.
+        non-collider, and no rule orients through it: with latent variables, a set that separates a
+        pair lies within the possible-d-separating set of one end, beyond its adjacencies, so any
+        untested conditioning set might be a missed separating set. The collider pass before the
+        possible-d-separation step reads it too, so that step's sets, the skeleton, and
+        ``metadata["not_tested"]`` can change. ``"orient"`` favors arrowheads and accuracy; it gives
+        up protection from false colliders. ``"ambiguous"`` favors no false collider; it gives up
+        the true arrowheads beside them, and accuracy. On merged cohorts of three graph sizes, with
+        about 29 to 76 true edges, that no row bridges (20 seeds each, conditioning sets of up to
+        3), ``"ambiguous"`` took FCI's false colliders per fit from 21.5-165.4 to at most 0.1 and
+        the share of true arrowheads it found from 0.61-0.81 to 0, and raised its errors by 0.5 to
+        4.4, still fewer than the empty graph's in 6 of 6 settings; on bridged cohorts and complete
+        data the two gave the same graphs.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -743,7 +780,15 @@ def fci(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With 20 variables and 1,000 rows, 10 to 30% of
+        the values missing completely at random, FCI made median errors of 28.5 to 30.5 where
+        dropping the incomplete rows made 32.5 and 42.0 on 124 and 10 complete rows and had no
+        complete row at 30% (complete data: 28.0; 0.11.0 release card). Where values are missing for
+        a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100 variables with one
+        observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than test-wise deletion
+        in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none; not measured with
+        FCI. See **Missing values.** in Notes.
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of FCI's possible-d-separation step [2]_ [3]_, which removes edges the first step
         kept, one at a time, so each removal changes what the step tests after it.
@@ -906,22 +951,21 @@ def fci(
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
-    tested, including those the search skipped because no row can test them. A pair no tested query
-    could decide, as a pair never observed together, is undecided: it is left out of the graph and
+    tested, including sets skipped because no row can test them. A pair no tested query could
+    decide, such as one never observed together, is undecided: it is left out of the graph and
     listed in ``metadata["undecided_pairs"]``, and a triple whose ends are undecided is neither a
-    collider nor a non-collider to any rule. A drawn edge that a conditioning set not tested might
-    have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
-    not check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``, a
-    triple with a flagged side is neither a collider nor a non-collider to any rule. On merged
-    cohorts, every pair of variables measured only in different cohorts is therefore undecided, and
-    an edge whose separating set is never observed together with its pair is drawn and flagged. A
-    few rows that observe every column decide such pairs on those rows alone, with little power, so
-    they can remove true edges between variables observed together. A continuous column constant on
-    a test's rows raises ``ValueError``. With missing values, the skeleton search runs in one
-    process. Test-wise deletion is valid when values are missing completely at random, which means
-    that whether a value is missing depends on no value in the data; the rows a test reads are then
-    a random sample of all rows, and otherwise they are a selected sample that more rows do not
-    correct.
+    collider nor a non-collider to any rule. A drawn edge an untested conditioning set might have
+    separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could not
+    check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``, a triple
+    with a flagged side is neither a collider nor a non-collider to any rule. On merged cohorts,
+    pairs measured only in different cohorts are undecided, and an edge whose separating set is
+    never observed together with its pair is drawn and flagged. A few rows that observe every column
+    decide such pairs on those rows alone, with little power, so they can remove true edges between
+    variables observed together. A continuous column constant on a test's rows raises
+    ``ValueError``. With missing values, the skeleton search runs in one process. Test-wise deletion
+    is valid when values are missing completely at random, which means that whether a value is
+    missing depends on no value in the data; the rows a test reads are then a random sample of all
+    rows, and otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs with no
     hidden variable, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through which
@@ -1183,15 +1227,22 @@ def gfci(
         :func:`~andrey.pc`. ``None`` picks from the declared column types: ``"gsq"`` when every
         column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
         declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
-        type, never by its values. ``metadata["indep_test"]`` names the test the fit used: the one
-        picked from the declared column types when this is ``None``.
+        type, never by its values. ``metadata["indep_test"]`` names the test used, including the
+        choice for ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test, in ``(0, 1)``. Smaller values give
         sparser graphs.
@@ -1570,15 +1621,21 @@ def cdnod(
         picks from the declared column types: ``"gsq"`` when every column is categorical,
         ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
         ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
-        values. ``metadata["indep_test"]`` names the test the fit used: the one picked from the
-        declared column types when this is ``None``.
+        values. ``metadata["indep_test"]`` names the test used, including the choice for ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, as for :func:`~andrey.pc`: ``"p_value"`` by the
         largest p-value that separated each collider's endpoints, so the colliders do not depend on
@@ -1601,11 +1658,15 @@ def cdnod(
         any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider, and no
         rule orients through it, when a conditioning set not tested of that side lies within the
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
-        lies within the parents of one end, so that set might be the separating set the search
-        missed. On merged cohorts
-        that no row bridges, ``"ambiguous"`` removes most false colliders and most true
-        arrowheads with them, and the graph can then be farther from the truth than the empty
-        graph.
+        lies within the parents of one end, so the search might have missed that separating set.
+        ``"orient"`` favors arrowheads; it gives up protection from false colliders. ``"ambiguous"``
+        favors no false collider; it gives up the true arrowheads beside them. With
+        :func:`~andrey.pc`, on merged cohorts of three graph sizes, with about 29 to 76 true edges,
+        that no row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's
+        false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it
+        found from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty
+        graph in 6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs.
+        With CD-NOD, its effect on accuracy was not measured.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1618,7 +1679,15 @@ def cdnod(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
     dependence_threshold : float or None, default=None
         Runs the independent-change step at this threshold, in ``(0, 1)``, on its module
         dependence measure: two modules, the distributions of a candidate cause and of its effect
@@ -1774,19 +1843,18 @@ def cdnod(
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
-    tested, including those the search skipped because no row can test them. A pair no tested query
-    could decide, as a pair never observed together, is undecided: it is left out of the graph and
+    tested, including sets skipped because no row can test them. A pair no tested query could
+    decide, such as one never observed together, is undecided: it is left out of the graph and
     listed in ``metadata["undecided_pairs"]``, and a triple whose ends are undecided is neither a
     collider nor a non-collider to any rule; a test whose ``env`` is constant on its rows, which
-    come from one environment, is not tested. A drawn edge that a conditioning set not tested might
-    have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
-    not check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``, a
-    triple with a side it reads (see ``possibly_separable``) is neither a collider nor a
-    non-collider to any rule. On merged cohorts, every pair of variables measured only in different
-    cohorts is therefore undecided. A continuous column constant on a test's rows raises
-    ``ValueError``. ``env`` must be complete, and ``dependence_threshold``, whose kernel measures
-    read every row, raises ``ValueError`` on data with missing values. With missing values, the
-    skeleton search runs in one process. Test-wise
+    come from one environment, is not tested. A drawn edge an untested conditioning set might have
+    separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could not
+    check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``, a triple
+    with a side it reads (see ``possibly_separable``) is neither a collider nor a non-collider to
+    any rule. On merged cohorts, pairs measured only in different cohorts are undecided. A
+    continuous column constant on a test's rows raises ``ValueError``. ``env`` must be complete, and
+    ``dependence_threshold``, whose kernel measures read every row, raises ``ValueError`` on data
+    with missing values. With missing values, the skeleton search runs in one process. Test-wise
     deletion is valid when values are missing completely at random, which means that whether a value
     is missing depends on no value in the data; the rows a test reads are then a random sample of
     all rows, and otherwise they are a selected sample that more rows do not correct.
@@ -1999,15 +2067,22 @@ def fci_jci(
         distributions. ``None`` picks from the declared column types: ``"gsq"`` when every column is
         categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared
         categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type,
-        never by its values. ``metadata["indep_test"]`` names the test the fit used: the one picked
-        from the declared column types when this is ``None``.
+        never by its values. ``metadata["indep_test"]`` names the test used, including the choice
+        for ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
         How a collider is decided on a triple ``x - z - y`` where ``x`` and ``y`` are not adjacent,
         as for :func:`~andrey.fci`: by the separating set that removed the edge ``x - y``
@@ -2020,12 +2095,19 @@ def fci_jci(
         How the orientation rules read a triple ``x - z - y`` with a side listed in
         ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
         any other triple. ``"ambiguous"`` makes every such triple neither a collider nor a
-        non-collider, and no rule orients through it: with latent variables, a set that separates
-        a pair lies within the possible-d-separating set of one end, beyond its adjacencies, so
-        any conditioning set not tested might be the separating set the search missed. On merged
-        cohorts that no row bridges, ``"ambiguous"`` removes most false colliders and most true
-        arrowheads with them. The collider pass before the possible-d-separation step reads it
-        too, so that step's sets, the skeleton, and ``metadata["not_tested"]`` can change.
+        non-collider, and no rule orients through it: with latent variables, a set that separates a
+        pair lies within the possible-d-separating set of one end, beyond its adjacencies, so any
+        untested conditioning set might be a missed separating set. The collider pass before the
+        possible-d-separation step reads it too, so that step's sets, the skeleton, and
+        ``metadata["not_tested"]`` can change. ``"orient"`` favors arrowheads; it gives up
+        protection from false colliders. ``"ambiguous"`` favors no false collider; it gives up the
+        true arrowheads beside them. With :func:`~andrey.fci`, on merged cohorts of three graph
+        sizes, with about 29 to 76 true edges, that no row bridges (20 seeds each, conditioning sets
+        of up to 3), ``"ambiguous"`` took FCI's false colliders per fit from 21.5-165.4 to at most
+        0.1 and the share of true arrowheads it found from 0.61-0.81 to 0, and raised its errors by
+        0.5 to 4.4, still fewer than the empty graph's in 6 of 6 settings; on bridged cohorts and
+        complete data the two gave the same graphs. With FCI-JCI, its effect on accuracy was not
+        measured.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -2038,7 +2120,15 @@ def fci_jci(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of the possible-d-separation step, as for :func:`~andrey.fci`: ``"order_free"``
         visits the pairs and nodes by a rank computed from the data, and ``"fast"`` in column
@@ -2175,20 +2265,20 @@ def fci_jci(
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
-    tested, including those the search skipped because no row can test them. A pair no tested query
-    could decide, as a pair never observed together, is undecided: it is left out of the graph and
+    tested, including sets skipped because no row can test them. A pair no tested query could
+    decide, such as one never observed together, is undecided: it is left out of the graph and
     listed in ``metadata["undecided_pairs"]``, and a triple whose ends are undecided is neither a
     collider nor a non-collider to any rule; a test whose ``env`` is constant on its rows, which
-    come from one environment, is not tested. A drawn edge that a conditioning set not tested might
-    have separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could
-    not check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``, a
-    triple with a flagged side is neither a collider nor a non-collider to any rule. On merged
-    cohorts, every pair of variables measured only in different cohorts is therefore undecided. A
-    continuous column constant on a test's rows raises ``ValueError``. With missing values, the
-    skeleton search runs in one process. Test-wise deletion is valid when values are missing
-    completely at random, which means that whether a value is missing depends on no value in the
-    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
-    selected sample that more rows do not correct.
+    come from one environment, is not tested. A drawn edge an untested conditioning set might have
+    separated is listed in ``metadata["possibly_separable"]``: a flag of what the data could not
+    check, not a finding that the edge is false; under ``possibly_separable="ambiguous"``, a triple
+    with a flagged side is neither a collider nor a non-collider to any rule. On merged cohorts,
+    pairs measured only in different cohorts are undecided. A continuous column constant on a test's
+    rows raises ``ValueError``. With missing values, the skeleton search runs in one process.
+    Test-wise deletion is valid when values are missing completely at random, which means that
+    whether a value is missing depends on no value in the data; the rows a test reads are then a
+    random sample of all rows, and otherwise they are a selected sample that more rows do not
+    correct.
 
     **Limitations.** Measured on its authors' simulation [1]_, linear-Gaussian data with hidden
     common causes and one context variable that changes one variable: 4, 10, and 100 variables with
@@ -2377,22 +2467,22 @@ def icp(
     Returns
     -------
     StructureOutput or list of StructureOutput
-        With a list of targets, a list holding each target's result, in its order, as that target
-        alone gives it. Otherwise, wraps a ``dag`` :class:`~andrey.core.GraphStructure` over every
-        column, with an edge
-        ``x -> target`` from each estimated parent ``x`` and no other edge; an absent edge says
-        nothing about the pair. ``metadata["algorithm"]`` is ``"icp"``; ``metadata["target"]``
-        names the target and ``metadata["parents"]`` the estimated parents, the variables in every
-        accepted set, by column label or 0-based position. ``metadata["p_values"]`` gives one value
-        per column, ``None`` at the target: the largest p-value of the tested sets without the
-        column, so a variable is a parent exactly when its value is at most ``alpha``, and every
-        value is 1 when no set is accepted. ``metadata["confidence_intervals"]`` gives
-        ``[low, high]`` per column, ``None`` at the target, for its coefficient in the target's
-        equation; ``None`` when no set is accepted. ``metadata["accepted_sets"]`` lists the
-        accepted sets, by size then by position; ``metadata["best_p_value"]`` is the largest
-        p-value of any tested set; ``metadata["model_rejected"]`` is ``True`` when no set is
-        accepted; and ``metadata["environments_left_out"]`` lists the labels of the environments
-        whose ``targets`` hold ``target``.
+        With a list of targets, a list of each target's result, in list order, each equal to a call
+        for that target alone. Otherwise, wraps a ``dag``
+        :class:`~andrey.core.GraphStructure` over every column, with an edge ``x -> target`` from
+        each estimated parent ``x`` and no other edge; an absent edge says nothing about the pair.
+        ``metadata["algorithm"]`` is ``"icp"``; ``metadata["target"]`` names the target and
+        ``metadata["parents"]`` the estimated parents, the variables in every accepted set, by
+        column label or 0-based position. ``metadata["p_values"]`` gives one value per column,
+        ``None`` at the target: the largest p-value of the tested sets without the column, so a
+        variable is a parent exactly when its value is at most ``alpha``, and every value is 1 when
+        no set is accepted. ``metadata["confidence_intervals"]`` gives ``[low, high]`` per column,
+        ``None`` at the target, for its coefficient in the target's equation; ``None`` when no set
+        is accepted. ``metadata["accepted_sets"]`` lists the accepted sets, by size then by
+        position; ``metadata["best_p_value"]`` is the largest p-value of any tested set;
+        ``metadata["model_rejected"]`` is ``True`` when no set is accepted; and
+        ``metadata["environments_left_out"]`` lists the labels of the environments whose ``targets``
+        hold ``target``.
 
     Raises
     ------

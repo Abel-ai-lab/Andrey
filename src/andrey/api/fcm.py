@@ -594,12 +594,12 @@ def cpcm_graph(
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
         method, the argument, what it accepts, and the value. Also if ``data`` has fewer than 2
-        columns, holds ``NaN`` or ``inf``, or has fewer than ``4 d + 12`` rows for ``d`` columns,
-        if ``family`` names an unknown family or does not give one name per column, or if a column
-        holds a value outside its family's support, such as a non-integer under ``"poisson"`` or
-        a value of at most 1 under ``"pareto"``. Also if a column's residual on a set of parents the
-        search reads is the same on every row, as when the column is an exact function of them,
-        or if a fit ends away from a maximum; the message names the columns.
+        columns, holds ``NaN`` or ``inf``, or has fewer than ``4 d + 12`` rows for ``d`` columns, if
+        ``family`` names an unknown family or does not give one name per column, or if a column
+        holds a value outside its family's support, such as a non-integer under ``"poisson"`` or a
+        value of at most 1 under ``"pareto"``. Also if a column's residual given a parent set the
+        search reads is constant, as when the column is an exact function of them, or if a fit ends
+        away from a maximum; the message names the columns.
 
     Warns
     -----
@@ -1224,17 +1224,17 @@ def das(
     Notes
     -----
     **When to use.** DAS suits i.i.d. continuous observational data whose effects are nonlinear in
-    every parent, with additive Gaussian noise and no unmeasured common causes [1]_, when there
-    are too many variables for :func:`~andrey.score_matching`'s pruning: it finds the same causal
-    order and prunes at most ``max_parents`` candidates per variable instead of every variable
-    before it. The paper shows it on 10 to 1,000 variables and 1,000 rows, with a DAG close to
-    SCORE's and a fit several times faster from 20 variables up. It is the fastest of the methods
-    here for this model. :func:`~andrey.cam` made fewer errors on the same data in every setting
-    measured but dense graphs of 10 variables, where they tied, and took 1.5 to 2.7 times as long,
-    except on sparse graphs of 10 variables, where it was as fast; use it when time allows. With
-    fewer variables :func:`~andrey.score_matching` prunes every edge its order allows; with linear
-    effects and Gaussian noise use :func:`~andrey.pc` or :func:`~andrey.ges`, and for additive
-    noise that is not Gaussian, :func:`~andrey.nogam` or :func:`~andrey.resit`.
+    every parent, with additive Gaussian noise and no unmeasured common causes [1]_, when there are
+    too many variables for :func:`~andrey.score_matching`'s pruning: it finds the same causal order
+    and prunes at most ``max_parents`` candidates per variable instead of every variable before it.
+    The paper shows it on 10 to 1,000 variables and 1,000 rows, with a DAG close to SCORE's and a
+    fit several times faster from 20 variables up. It is the fastest of the methods here for this
+    model. :func:`~andrey.cam` made fewer errors on the same data in all measured settings but dense
+    graphs of 10 variables, where they tied, and took 1.5 to 2.7 times as long, except on sparse
+    graphs of 10 variables, where it was as fast; use it when time allows. With fewer variables
+    :func:`~andrey.score_matching` prunes every edge its order allows; with linear effects and
+    Gaussian noise use :func:`~andrey.pc` or :func:`~andrey.ges`, and for additive noise that is not
+    Gaussian, :func:`~andrey.nogam` or :func:`~andrey.resit`.
 
     **The steps.** The paper's three phases [1]_:
 
@@ -1292,22 +1292,22 @@ def das(
     datasets of 500 variables and on none of 1,000. The order search reads standardized columns, so
     the result does not depend on the columns' units; on raw columns whose variance grows along the
     causal order, code that reads the units can order more edges correctly, and there the code
-    published with the paper made fewer errors on sparse graphs (19 against 28 at 50 variables).
-    This is the likely reason that, on sparse graphs, DAS's errors are above the paper's where they
-    are, since the paper used raw columns; on dense graphs of 500 variables they are above the
-    paper's too, a gap not traced, where the units are not ruled out: on z-scored columns the code
-    published with the paper is above the paper's limit there as well. The `0.19.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#das>`_ has the numbers. Its causal order is
-    SCORE's, so the limits :func:`~andrey.score_matching` states for the order are its own: where
-    links have a strong linear part, it did no better than a random order. The leaf rule is exact
-    only for Gaussian noise; :func:`~andrey.nogam` and :func:`~andrey.resit` drop that assumption.
-    An edge the order reverses cannot be recovered, and the screen can drop a true parent whose
-    entries are small next to the reference's, which the pruning cannot add back. Each step factors
-    a matrix with one row and one column per sample, so the order search's time grows with the cube
-    of ``n_samples`` and its memory with the square. Binary columns, and any column with fewer than
-    3 distinct values, are not supported: the pruning fits a smooth term of each parent, and such a
-    column raises ``ValueError`` before the fit. The numbers are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    published with the paper made fewer errors on sparse graphs (19 against 28 at 50 variables). The
+    paper used raw columns, the likely reason DAS's errors are above the paper's on sparse graphs;
+    on dense graphs of 500 variables they are above it too, a gap not traced, where units are not
+    ruled out: on z-scored columns the code published with the paper is above the paper's limit
+    there as well. The `0.19.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#das>`_ has the numbers.
+    Its SCORE causal order has the limits stated by :func:`~andrey.score_matching`: where links have
+    a strong linear part, it did no better than a random order. The leaf rule is exact only for
+    Gaussian noise; :func:`~andrey.nogam` and :func:`~andrey.resit` drop that assumption. Neither an
+    edge reversed by the order nor a true parent screened out for entries small relative to the
+    reference's can be recovered by pruning. Each step factors a matrix with one row and one column
+    per sample, so the order search's time grows with the cube of ``n_samples`` and its memory with
+    the square. Binary columns, and any column with fewer than 3 distinct values, are not supported:
+    the pruning fits a smooth term of each parent, and such a column raises ``ValueError`` before
+    the fit. The numbers are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------
@@ -1640,6 +1640,7 @@ def skewd_mv(
     tuning_iter: int = 20,
     max_iter: int = 3000,
     max_fits: int | None = 100,
+    optimizer: str = "cmaes",
     seed: int | None = None,
 ) -> StructureOutput:
     """Learn a DAG of a skew-normal location-scale model with SkewD-MV.
@@ -1656,7 +1657,7 @@ def skewd_mv(
     alpha : float, default=0.05
         Significance level of PC's conditional-independence tests, in ``(0, 1)``.
     indep_test : str or None, default="kci"
-        PC's conditional-independence test, a test of continuous data as in :func:`~andrey.pc`:
+        PC's conditional-independence test for continuous data, as in :func:`~andrey.pc`:
         ``"fisherz"``, ``"student_t"``, ``"kci"``, ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``,
         ``"wgcm"``, or ``"pcm"``, but not ``"normal_scores"``: the likelihood stage reads the
         values, which ranks would hide. The default is the kernel test [3]_, the authors' choice.
@@ -1675,6 +1676,16 @@ def skewd_mv(
         While it is set, a group of undirected edges with more than 65,536 orientations is
         refused too, and so are groups that share a cycle and have more than 65,536 acyclic
         combinations.
+    optimizer : {"cmaes", "lbfgs"}, default="cmaes"
+        The optimizer of each search of a conditional model's penalized likelihood, as in
+        :func:`~andrey.skewd`: ``"cmaes"`` is CMA-ES, the paper's heuristic; ``"lbfgs"`` is
+        L-BFGS-B with the analytic gradient, from the same starts within the same bounds.
+        ``"cmaes"`` favors the paper's optimizer; it gives up time. ``"lbfgs"`` favors time; it
+        gives up the paper's optimizer. On the paper's simulated pairs and graphs of 1,000 rows
+        (graphs of 6 and 10 variables; 20 seeds each, one worker), ``"lbfgs"`` decided worse than
+        ``"cmaes"`` in no setting by a paired bootstrap, at a median of 5.8 to 14.9 times less time
+        per pair and 2.4 times less per graph, and its penalized likelihood was lower in 306 of the
+        738 fitted models and higher in 233.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed of PC's randomized tests and of the random
@@ -1714,10 +1725,15 @@ def skewd_mv(
     noise ``n`` independent of its parents, and no hidden common cause; it also assumes the
     faithfulness PC needs, so that the true DAG lies in the estimated class [1]_. It is designed
     for small graphs, 6 to 10 variables in the paper, whose noise scale changes with the parents,
-    which the additive models of :func:`~andrey.cam` and :func:`~andrey.resit` do not allow. On the
-    paper's skew-normal graphs of 6 and 10 variables and 1,000 rows it made as few errors as the
-    code published with the paper, and fewer than :func:`~andrey.pc`, :func:`~andrey.cam`, or the
-    empty graph.
+    which the additive models of :func:`~andrey.cam` and :func:`~andrey.resit` do not allow. It
+    favors accuracy on such graphs and gives up time. On the paper's skew-normal graphs of 6 and 10
+    variables and 1,000 rows it made as few errors as the code published with the paper, and fewer
+    than the empty graph and than :func:`~andrey.pc` (KCI), :func:`~andrey.cam`,
+    :func:`~andrey.nogam`, :func:`~andrey.score_matching`, and :func:`~andrey.resit`, all five
+    faster. A fit took a median of 49 CPU minutes at 6 variables and 37 at 10 on an AMD EPYC 7713,
+    and 28 and 18 on an AMD EPYC 9534, where :func:`~andrey.cam` took under a second;
+    ``andrey.config(n_jobs)`` runs its conditional models and their searches on threads, which cuts
+    the wall time.
 
     Each column is standardized first [1]_. PC, order-independent [2]_, gives the class. Its DAGs
     orient the undirected edges with no directed cycle and no new collider [1]_, and are every
@@ -1742,22 +1758,26 @@ def skewd_mv(
     of the paper's runs. The columns are fitted in the order of their values' ranks, so the DAG does
     not depend on the column order; ties follow ``andrey.config.tie_break``.
 
+    ``n_jobs`` above 1 (``andrey.config`` or ``ANDREY_N_JOBS``) runs the conditional models, and
+    the searches of each, on that many threads. Each search draws from its own random
+    stream, split from ``seed`` in a fixed order, so the DAG and its likelihoods are the same bit
+    for bit with any number of workers. The models are fitted on one BLAS thread with any number of
+    workers, so the result does not depend on the machine's BLAS thread count either.
+
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** It is slow: on those graphs a fit at the defaults took a median of 49 CPU
-    minutes at 6 variables and 37 at 10 on an AMD EPYC 7713, 28 and 18 on an AMD EPYC 9534, and up
-    to 1.8 and 2.4 CPU hours, where :func:`~andrey.cam` takes under a second; the `0.19.0 release
-    card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#skewd-mv>`_ has the numbers. Its cost
-    grows with the number of distinct parent sets the class allows, exponentially in a variable's
-    undirected edges; it refuses a class that needs more than 100 (``max_fits``), where the paper
-    counts parent-child configurations and expects the method to apply while they are in the order
-    of 100. An edge PC misses or misorients stays wrong: the likelihood only chooses among the
-    class's DAGs, and PC's skeleton had an F1 of 0.90 at 6 variables and 0.82 at 10. The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** Its cost grows with the number of distinct parent sets the class allows,
+    exponentially in a variable's undirected edges; it refuses a class that needs more than 100
+    (``max_fits``), where the paper counts parent-child configurations and expects the method to
+    apply while they are in the order of 100. The `0.19.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#skewd-mv>`_ has the measured times, up to
+    1.8 CPU hours at 6 variables and 2.4 at 10. An edge PC misses or misorients stays wrong: the
+    likelihood only chooses among the class's DAGs, and PC's skeleton had an F1 of 0.90 at 6
+    variables and 0.82 at 10. The numbers are a reference, not a hard limit: they change with the
+    data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1782,15 +1802,18 @@ def skewd_mv(
     ('dag', 3)
     """
     from andrey.api.constraint import pc
+    from andrey.core import backend
     from andrey.core.ties import tie_ranks
     from andrey.core.warning_policy import warn_search_limit
     from andrey.fcm.skewd import (
         LISTED_DAGS,
         Budget,
+        Fit,
         class_candidates,
         class_size,
         fit,
         merge_components,
+        search_pool,
     )
 
     X = data_matrix(data, method="skewd_mv", min_rows=MIN_ROWS)
@@ -1810,13 +1833,33 @@ def skewd_mv(
             "skewd_mv: PC's graph leaves no DAG that keeps its directed edges and adds no collider"
         )
     budget = Budget(
-        knots=8, folds=5, tuning_iter=tuning_iter, initial=-(-tuning_iter // 2), max_iter=max_iter
+        knots=8,
+        folds=5,
+        tuning_iter=tuning_iter,
+        initial=-(-tuning_iter // 2),
+        max_iter=max_iter,
+        optimizer=optimizer,
     )
     n = X.shape[0]
     terms: dict[tuple[int, tuple[int, ...]], float] = {}
     converged = True
-    for y, parents in fits:
-        result = fit(X[:, list(parents)], X[:, y], budget, seed)
+    workers = backend.worker_count()
+
+    def model(each: tuple[int, tuple[int, ...]]) -> Fit:
+        y, parents = each
+        return fit(X[:, list(parents)], X[:, y], budget, seed, run)
+
+    # One BLAS thread: a threaded product rounds differently from a serial one, so the result
+    # would depend on the machine's thread count.
+    with one_blas_thread(), search_pool(workers) as run:
+        if workers > 1 and len(fits) > 1:
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ThreadPoolExecutor(max_workers=min(workers, len(fits))) as pool:
+                results = list(pool.map(model, fits))
+        else:
+            results = [model(each) for each in fits]
+    for (y, parents), result in zip(fits, results, strict=True):
         terms[(y, parents)] = n * result.log_likelihood
         converged &= result.converged
     if not converged:

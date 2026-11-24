@@ -207,9 +207,9 @@ make it a target of the change, so `fci_jci` lists no `changing_variables`. With
 `metadata["time_index_edges"]`, stand in for the hidden contexts, and the links of the measured
 contexts are in `metadata["context_links"]`.
 
-`rpcmci` returns a {py:class}`~andrey.RegimeOutput`, not one result: `regimes` holds the regime
-of each time step, `weights` the regime weights it comes from, and `outputs[k]` a `StructureOutput`
-over the `TemporalStructure` of regime `k`, lags 1 to `tau_max`, as `pcmci` returns it.
+`rpcmci` returns a {py:class}`~andrey.RegimeOutput`: `regimes` holds the regime of each time step,
+`weights` the regime weights it comes from, and `outputs[k]` a `StructureOutput` over the
+`TemporalStructure` of regime `k`, lags 1 to `tau_max`, as `pcmci` returns it.
 
 `icp` returns a `dag` whose only edges point into its `target`, from the parents it estimates; an
 absent edge says nothing about the pair.

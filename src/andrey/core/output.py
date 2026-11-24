@@ -482,11 +482,10 @@ class RegimeOutput:
     """The result of a regime-dependent method: the regime of each time step and one graph per
     regime.
 
-    ``rpcmci`` returns one. ``regimes`` holds the regime of every time step, ``weights`` the
-    regime-assigning process it comes from, and ``outputs[k]`` the ``StructureOutput`` of regime
-    ``k``, a temporal result like the one a single-regime method returns. ``metadata`` holds the
-    run's values, such as the algorithm name. ``print(out)`` shows each regime's share of the time
-    steps and its graph. The result is read-only.
+    ``rpcmci`` returns this read-only result: ``regimes`` holds each step's regime, ``weights`` the
+    assigning process, and ``outputs[k]`` the ``StructureOutput`` of regime ``k``, as from a
+    single-regime temporal method. ``metadata`` holds run values such as the algorithm name.
+    ``print(out)`` shows each regime's time-step share and graph.
     """
 
     _outputs: tuple[StructureOutput, ...]
@@ -558,8 +557,8 @@ class RegimeOutput:
     def regimes(self) -> np.ndarray:
         """The regime of each time step, a new ``(n_samples,)`` integer array.
 
-        Step ``t`` is in the regime of the largest weight at ``t``, the first of equal weights;
-        weights equal to ``KEY_DP`` decimals (:mod:`andrey.core.ties`) count as equal.
+        Step ``t`` takes the regime with the largest weight at ``t``, first among ties to ``KEY_DP``
+        decimals (:mod:`andrey.core.ties`).
         """
         from .ties import KEY_DP
 

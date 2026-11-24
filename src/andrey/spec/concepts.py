@@ -456,6 +456,13 @@ _CONCEPTS = (
             "statistic when y is shuffled within each configuration of the conditioning set; "
             "nonempty = (r_x - 1) * (r_y - 1) per configuration over the values of x and y present "
             "in it, the table's empty rows and columns struck. They differ only on sparse tables. "
+            "There mean favors a level near the nominal one: over 35,808 true independences of "
+            "random discrete networks, a test at 0.05 rejected 4.9% (chisq) and 3.8% (gsq). "
+            "With gsq it gives up time, a hypergeometric sum per cell, and rejects below the "
+            "nominal rate in the sparsest tables (0.8% at 3,125 cells). nonempty favors the "
+            "degrees of freedom of Spirtes, Glymour and Scheines (1993), read from the table "
+            "alone; it gives up the level: 11.1% and 21.7% of the same true independences were "
+            "rejected. Their time and their power were not measured against each other. "
             "Only chisq and gsq read it: passing it with another test raises ValueError.",
             choices=DEGREES_OF_FREEDOM,
         ),
@@ -1637,9 +1644,14 @@ _CONCEPTS = (
             "tested of that side lies within the other nodes adjacent to one of its ends or "
             "undecided with it, so it might be the separating set the search missed; in FCI and "
             "FCI-JCI, which allow latent variables, for every listed side, since a separating "
-            "set can lie beyond the adjacencies. On merged cohorts that no row bridges, "
-            "ambiguous removes most false colliders and most true arrowheads with them, and the "
-            "graph can then be farther from the truth than the empty graph.",
+            "set can lie beyond the adjacencies. orient favors arrowheads and gives up protection "
+            "from false colliders; ambiguous favors no false collider and gives up the true "
+            "arrowheads beside them. Measured with PC and FCI only: on merged cohorts that no row "
+            "bridges (three graph sizes, about 29 to 76 true edges), ambiguous took PC's false "
+            "colliders per fit from 12.8-90.0 to at most 0.2 and its true arrowheads found from "
+            "0.54-0.72 to 0, leaving PC farther from the truth than the empty graph in 6 of 6 "
+            "settings and FCI 0.5 to 4.4 errors worse; with the other methods its effect on "
+            "accuracy was not measured.",
             choices=("orient", "ambiguous"),
         ),
         fragment="possibly_separable",

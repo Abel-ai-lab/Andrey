@@ -20,18 +20,18 @@ banner links the website's homepage. -->
 
 ---
 
-## ⭐ What's new in 0.18.0
+## ⭐ What's new in 0.19.0
 
-0.18.0 is a release of new methods and fixes. DAGMA is supported, with its gap stated: like
-NOTEARS, its result depends on the data's scale, and against its authors' package on its paper's
-simulation it made no more errors in any of 42 settings. DAS, SkewD, and CPCM, experimental, extend
-functional causal modeling, for larger graphs, skewed noise, and effects with a chosen distribution
-such as counts. `load_dataset` loads the Tübingen cause-effect pairs. ANM, PNL, and LOCI return the
-same direction under any order of the rows, and PCMCI+ the same p-values under any order of the
-columns. An AI policy holds every change, however it is written, to the same rules and checks.
+0.19.0 is about datasets with overlapping variables. When cohorts that each measure their own
+variables are stacked into one table, a conditional independence test without enough rows is
+skipped, a pair that no test can decide is left out of the graph and listed, and an edge that a
+skipped test might have removed is listed too. On simulated cohorts of 20 to 50 variables, PC's
+graph made fewer errors than the empty graph in every setting. DAS and CPCM are supported, LGES,
+Regime-PCMCI, and the GCM, wGCM, and PCM tests arrive, experimental, and `target` takes a list of
+columns.
 
-**[0.18.0 release card](https://andrey.abel.ai/docs/benchmarks/0.18.0.html)** · Post:
-**[Functional causal models](https://andrey.abel.ai/blog/20261103-andrey-0-13-0.html)**
+**[0.19.0 release card](https://andrey.abel.ai/docs/benchmarks/0.19.0.html)** · Post:
+**[Datasets with overlapping variables](https://andrey.abel.ai/blog/20261123-andrey-0-19-0.html)**
 
 ---
 
@@ -190,7 +190,7 @@ If you use Andrey in your work, please cite it, or use the
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.18.0},
+  version = {0.19.0},
   url = {https://andrey.abel.ai},
 }
 ```

@@ -27,12 +27,11 @@ PERMC_TESTS = {"fisherz": FisherZ, "student_t": StudentT}
 class IndicatorTest:
     """A test of a missingness indicator, column ``indicator`` of the data ``test`` was built on.
 
-    A query whose rows hold one value of the indicator, every value of it observed or every one
-    missing, holds no information on it: it is not tested, returns
-    :data:`~andrey.core.ci_missing.NOT_TESTED`, and counts as such
-    (:func:`~andrey.core.ci_missing.count_answer`), so it never separates the pair. Every other
-    query is ``test``'s, including one on fewer rows than ``test`` needs, which ``test`` answers
-    :data:`~andrey.core.ci_missing.NOT_TESTED` and counts.
+    A query whose rows hold one indicator value, all observed or all missing, has no information on
+    it: it returns :data:`~andrey.core.ci_missing.NOT_TESTED`, counts as not tested
+    (:func:`~andrey.core.ci_missing.count_answer`), and never separates the pair. Every other query
+    is ``test``'s, which answers :data:`~andrey.core.ci_missing.NOT_TESTED` for a query with fewer
+    rows than it needs and counts it.
     """
 
     def __init__(self, test: CITest, data: np.ndarray, indicator: int) -> None:
@@ -70,15 +69,13 @@ class PermutationCorrection:
     value is its regression's prediction at the drawn ``W`` plus its own residual. The query's
     partial-correlation test runs on those virtual rows (Tu et al. 2019, Algorithm 2).
 
-    The regressions and the test need ``max(t, |W| + 2)`` rows in that block, ``t`` being the rows
-    the test needs (its ``least_rows``): ``|S| + 4`` for ``FisherZ`` and ``|S| + 3`` for
-    ``StudentT``, so the test keeps a degree of freedom. A query with fewer is answered by
-    ``deletion``, as a query with an empty ``W`` is, and its pair joins ``uncorrected``: the paper
-    leaves the case open, the correction can only remove an edge the deletion tests kept, and
-    without the rows to compute it the pair keeps the deletion test's answer for that conditioning
-    set. ``rows`` counts the rows of the block of each query PermC
-    answers, which holds no more rows than the deletion test of the same query reads, and the
-    queries it answers ``p = 1``.
+    The regressions and test need ``max(t, |W| + 2)`` rows in the block, with ``t`` the test's
+    ``least_rows``: ``|S| + 4`` for ``FisherZ`` and ``|S| + 3`` for ``StudentT``, leaving a degree
+    of freedom. A query with an empty ``W`` uses ``deletion``. A query with fewer rows also uses
+    ``deletion`` and adds its pair to ``uncorrected``: the paper leaves this case open, the
+    correction can only remove an edge the deletion tests kept, and the pair keeps the deletion
+    test's answer for that conditioning set. ``rows`` counts the rows each PermC query reads, no
+    more than deletion reads for that query, and the queries PermC answers ``p = 1``.
 
     The draw comes from a generator seeded by ``seed`` and by the fingerprints of the queried
     columns, a digest of where each one's values are missing: a p-value then depends on neither the

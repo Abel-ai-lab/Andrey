@@ -19,8 +19,8 @@ The model starts from ``B = 0`` and each column's mean and variance over its obs
 available cases; Little and Rubin 2019), which are the maximum-likelihood parameters of the graph
 with no edge, so the first round is an E-step and a structure step. Each later round runs an
 E-step, then :data:`PARAMETER_STEPS` times a parameter step and an E-step, then a structure step.
-:data:`ITERATIONS` rounds run unless a fit asks for another number (the facades'
-``n_em_iterations``), the number Gao et al. (2022) run.
+:data:`ITERATIONS` rounds run, as in Gao et al. (2022), unless the facades' ``n_em_iterations``
+overrides the count.
 
 Friedman (1997) repeats the parameter steps "until convergence or" a largest count and the rounds
 "until convergence", and leaves the count open. The first search reads the expected covariance
@@ -145,8 +145,8 @@ def expected_moments(
 def shared_rows(X: np.ndarray) -> np.ndarray:
     """The ``(d, d)`` counts of the rows of ``X`` that observe both columns of each pair.
 
-    Two columns that share no row have no covariance in the data: any value EM gave it would come
-    from the model alone, so :func:`~andrey.api._adapt.fit_missing` refuses such data.
+    Columns sharing no row have no observed covariance: EM would derive it entirely from the model,
+    so :func:`~andrey.api._adapt.fit_missing` refuses such data.
     """
     both = (~np.isnan(X)).astype(np.float64)
     return both.T @ both

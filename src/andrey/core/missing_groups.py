@@ -1,11 +1,10 @@
 """Pattern-grouped sums for the partial-correlation tests under test-wise deletion.
 
-A partial-correlation query on data with missing values reads the rows observed in every column of
-its block ``K``. Summing ``K`` over all ``n`` rows, as the per-row path does, costs ``n k^2`` per
-block. Merged data sets, such as cohorts that each measure their own variables, have few
-structural missingness patterns with scattered cells missing on top of them. :class:`GroupedSums`
-splits the rows into groups ``g``, each with an observed set ``O_g`` holding every member's
-observed columns, and keeps per group, once:
+A partial-correlation query with missing values reads rows observed in every column of block ``K``.
+Summing ``K`` over all ``n`` rows costs ``n k^2`` per block on the per-row path. Merged datasets,
+such as cohorts measuring different variables, have few structural missingness patterns plus
+scattered missing cells. :class:`GroupedSums` splits the rows into groups ``g``, with observed set
+``O_g`` containing every member's observed columns, and stores once per group:
 
 - the count, sums, and cross products over all its rows of the values less each column's observed
   mean, zero where unobserved;
@@ -13,11 +12,11 @@ observed columns, and keeps per group, once:
   sums over the group's rows missing ``t``;
 - the rows missing two or more columns of ``O_g``, with their values.
 
-A block ``K`` inside ``O_g`` takes the group's sums, less the sums over its rows missing ``t`` for
-each ``t`` in ``K``, plus ``m - 1`` times the own sums of each row missing ``m >= 2`` columns of
-``K``. Each kept row then counts once and every other row zero times, so the sums are those over
-the block's rows exactly, in exact arithmetic; a block inside no ``O_g`` has no rows. This is the
-per-pattern bookkeeping of EM for normal data [1]_, applied to the rows each test keeps.
+A block ``K`` within ``O_g`` takes the group's sums minus those over rows missing each ``t`` in
+``K``, plus ``m - 1`` times the sums of each row missing ``m >= 2`` columns of ``K``. Kept rows
+count once and others zero times, giving exactly the block's sums in exact arithmetic; a block
+outside every ``O_g`` has no rows. This applies EM's per-pattern bookkeeping for normal data [1]_ to
+each test's rows.
 
 :func:`pattern_groups` chooses the groups by cost. The distinct patterns are taken in a fixed
 order, the most rows first, then the most observed columns, then by their columns' tie ranks
@@ -51,23 +50,20 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
-#: The default of ``ANDREY_TESTWISE_GROUP_BYTES``: the grouped sums are used only when their tables
-#: fit in this many bytes; ``0`` keeps every fit on the per-row path.
+#: Default ``ANDREY_TESTWISE_GROUP_BYTES``: grouped tables must fit this byte budget; ``0`` forces
+#: the per-row path.
 GROUP_BYTES = 1 << 28
 
-#: The default of ``ANDREY_TESTWISE_GROUP_MAX_SCATTER``: the grouped sums are used only when the
-#: scattered cells, the cells of ``O_g`` a member misses, are at most this share of the cells of
-#: ``O_g`` over all rows.
+#: Default ``ANDREY_TESTWISE_GROUP_MAX_SCATTER``: the maximum share of cells of ``O_g`` over all
+#: rows that members may miss for grouped sums.
 GROUP_MAX_SCATTER = 0.15
 
-#: The default of ``ANDREY_TESTWISE_GROUP_MAX_GROUPS``: the most groups :func:`pattern_groups`
-#: forms before it stops, so data with as many patterns as rows, where the grouped sums cannot
-#: help, cost little to rule out.
+#: Default ``ANDREY_TESTWISE_GROUP_MAX_GROUPS``: the group limit for :func:`pattern_groups`, cheaply
+#: ruling out data with as many patterns as rows, where grouping cannot help.
 MAX_GROUPS = 64
 
-#: The default of ``ANDREY_TESTWISE_GROUP_MIN_COLUMNS``: the fewest columns a test's data need for
-#: the grouped sums. A test over fewer columns, such as one built for a single query, asks few
-#: distinct blocks, each summed once, so the groups cannot repay their setup.
+#: Default ``ANDREY_TESTWISE_GROUP_MIN_COLUMNS``: the minimum data columns for grouped sums. Smaller
+#: tests, such as a single query, sum too few distinct blocks, each once, to repay setup.
 MIN_COLUMNS = 8
 
 #: The default of ``ANDREY_TESTWISE_GROUP_MAX_SHARED``: the grouped sums are used only when at
@@ -77,9 +73,8 @@ MIN_COLUMNS = 8
 #: block lies in many of them, and grouping costs more than the blocks save.
 MAX_SHARED = 0.4
 
-#: The share of the pairs of columns that ``ANDREY_TESTWISE_GROUP_MAX_SHARED`` reads: the grouped
-#: sums need this share of the pairs, at least, to be observed together in few rows. Fixed, not a
-#: setting: the setting moves the cutoff, and this names which pairs it is read on.
+#: The fixed share of column pairs that ``ANDREY_TESTWISE_GROUP_MAX_SHARED`` requires, at least, to
+#: be observed together in few rows; the setting changes the cutoff, not which pairs it measures.
 _SHARED_QUANTILE = 0.25
 
 #: The default of ``ANDREY_TESTWISE_GROUP_MIN_GAIN``: a block takes the grouped sums when its
@@ -87,17 +82,16 @@ _SHARED_QUANTILE = 0.25
 #: (:meth:`GroupedSums.cheaper`).
 MIN_GAIN = 2.0
 
-#: A pattern opens its own group when joining any group would add more work than this: the rows
-#: missing two or more columns of the group, which the block step scans, plus the pairs of columns
-#: each such row misses. A group costs the block step about as much as scanning this many rows.
-#: Fixed, not a setting: it is the grouping's unit of cost, which decides how the rows split into
-#: groups, while the settings above decide whether a test or a block uses them.
+#: A pattern opens a group when joining any group costs more than this: scanned rows missing two or
+#: more group columns plus their missing column pairs. A group costs about as much as scanning this
+#: many rows. This fixed cost unit determines grouping; the settings above determine whether tests
+#: or blocks use it.
 _OPEN_COST = 128
 
-#: A tested block whose rows are fewer than its groups' rows over this, or fewer than twice its
-#: columns, is summed per row (:meth:`GroupedSums.exact`). Its grouped sums would subtract nearly
-#: all of the groups' sums, so rounding would grow with the groups' rows over the block's rows.
-#: Fixed, not a setting: it bounds the rounding, which no speed setting should loosen.
+#: Tested blocks with fewer rows than their groups' rows divided by this, or twice their columns,
+#: use per-row sums (:meth:`GroupedSums.exact`). Grouped subtraction would cancel nearly all sums,
+#: amplifying rounding by the group-to-block row ratio. This fixed rounding bound cannot be loosened
+#: by speed settings.
 FEW_ROWS = 16
 
 # Each step of the block computation holds at most about this many bytes of temporaries.
@@ -138,11 +132,10 @@ class Grouping:
     def some_block_cheaper(self, gain: float) -> bool:
         """Whether the blocks that can take the grouped sums hold enough rows to repay the tables.
 
-        A block reads the masks of the rows missing two or more columns of each of its groups, so
-        :meth:`GroupedSums.cheaper` refuses every block in a group with more than ``n / gain``
-        such rows. The other groups must hold at least ``n / gain`` rows: otherwise the blocks the
-        grouped sums can take keep few rows, as when one group holds nearly every row and nearly
-        every row misses two of its columns.
+        A block reads masks of rows missing two or more columns in each group, so
+        :meth:`GroupedSums.cheaper` refuses blocks in groups with more than ``n / gain`` such rows.
+        Other groups must hold at least ``n / gain`` rows; otherwise eligible blocks keep too few,
+        as when one group holds nearly every row and nearly every row misses two columns.
         """
         n = len(self.group)
         twice = np.bincount(self.group[self.missed.sum(axis=1) >= 2], minlength=len(self.observed))
@@ -150,10 +143,9 @@ class Grouping:
         return bool(gain * rows[gain * twice <= n].sum() >= n)
 
     def table_bytes(self) -> int:
-        """The bytes :class:`GroupedSums` allocates for these groups, counted before it does: per
-        group, the count, sums, and cross products over all its rows and over its rows missing
-        each scattered column, the pair counts of the rows missing two or more columns, and those
-        rows' values and masks, and the lookups of each group's columns."""
+        """Bytes :class:`GroupedSums` needs before allocation: per-group counts, sums, and cross
+        products over all rows and those missing each scattered column; pair counts, values, and
+        masks for rows missing two or more columns; and column lookups."""
         d = self.observed.shape[1]
         total = self.observed.nbytes
         for g, columns in enumerate(self.observed):
@@ -225,7 +217,7 @@ def pattern_groups(
         held = sets[best]
         a = (held & ~pattern).bit_count()
         j = (pattern & ~held).bit_count()
-        if j:  # every member now misses the new columns
+        if j:  # every member misses the new columns
             misses[best] += j * rows[best]
             single[best] = lean[best] - single[best] if j == 1 else 0
             lean[best] = single[best]
@@ -307,11 +299,10 @@ def few_rows(count: np.ndarray, bound: np.ndarray, k: int) -> np.ndarray:
 class GroupedSums:
     """The sums over each block's rows from the groups of :func:`pattern_groups`.
 
-    ``values`` holds each column's values less its observed mean, ``0`` where unobserved, one row
-    per column, as :class:`~andrey.core.ci_missing.GaussianDeletion` keeps them. Every sum a block
-    reads runs in a fixed order: the groups in their order, the columns of ``K`` in order, and the
-    rows missing two or more columns of ``K`` in row order, one after another. So a block's sums
-    have the same bits alone or with any other blocks.
+    ``values`` stores columns minus their observed means, ``0`` where unobserved, one row per
+    column, as in :class:`~andrey.core.ci_missing.GaussianDeletion`. Sums follow fixed group order,
+    column order in ``K``, and row order for rows missing two or more columns of ``K``, yielding
+    identical bits regardless of other blocks.
     """
 
     def __init__(self, values: np.ndarray, grouping: Grouping) -> None:
@@ -445,8 +436,8 @@ class GroupedSums:
                 continue
             weight = (m[block, row] - 1).astype(np.int64)
             bounds = np.append(np.flatnonzero(np.diff(block, prepend=-1)), len(block))
-            # A block with more rows than ``most`` is added in parts of ``most``, fixed by k only,
-            # so its bits do not depend on the step.
+            # Blocks exceeding ``most`` rows are added in parts of ``most``, fixed by k alone,
+            # making their bits independent of the step.
             most = max(1, _PART_BYTES // (24 * k * k))
             limit = min(most, max(1, _STEP_BYTES // (24 * k * k)))
             first = 0

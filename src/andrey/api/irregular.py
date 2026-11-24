@@ -158,7 +158,15 @@ def anm(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
 
     Returns
     -------
@@ -236,13 +244,13 @@ def anm(
     result does not depend on the order of the rows, and a table whose rows stay the same when its
     two columns swap gives no edge.
 
-    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both tests read only the rows
-    where both columns are observed, which for a pair are the rows test-wise deletion keeps;
-    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. Fewer than 2 such
-    rows, or a column constant on them, raises ``ValueError``. Test-wise deletion is valid when
-    values are missing completely at random, which means that whether a value is missing depends on
-    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
-    they are a selected sample that more rows do not correct.
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both tests use test-wise
+    deletion, keeping rows where both columns are observed; ``metadata["rows_tested"]`` gives their
+    count as both ``min`` and ``median``. Fewer than 2 such rows, or a column constant on them,
+    raises ``ValueError``. Test-wise deletion is valid when values are missing completely at random,
+    which means that whether a value is missing depends on no value in the data; the rows a test
+    reads are then a random sample of all rows, and otherwise they are a selected sample that more
+    rows do not correct.
 
     **Limitations.** Measured on simulated cause-effect pairs with a nonlinear additive-noise
     mechanism and Gaussian noise, with rows doubling from 1,000, on 4 cores with a cap of 1 h and 28
@@ -310,7 +318,15 @@ def pnl(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
 
     Returns
     -------
@@ -402,13 +418,13 @@ def pnl(
     float64 matrices; when the threads asked for would hold more than 4 GiB, fewer run, with a
     ``PerformanceWarning``.
 
-    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both tests read only the rows
-    where both columns are observed, which for a pair are the rows test-wise deletion keeps;
-    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. Fewer than 2 such
-    rows, or a column constant on them, raises ``ValueError``. Test-wise deletion is valid when
-    values are missing completely at random, which means that whether a value is missing depends on
-    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
-    they are a selected sample that more rows do not correct.
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both tests use test-wise
+    deletion, keeping rows where both columns are observed; ``metadata["rows_tested"]`` gives their
+    count as both ``min`` and ``median``. Fewer than 2 such rows, or a column constant on them,
+    raises ``ValueError``. Test-wise deletion is valid when values are missing completely at random,
+    which means that whether a value is missing depends on no value in the data; the rows a test
+    reads are then a random sample of all rows, and otherwise they are a selected sample that more
+    rows do not correct.
 
     **Limitations.** Measured on simulated cause-effect pairs with a post-nonlinear mechanism, a
     linear inner transform and an invertible nonlinear outer one, and Laplace noise, with rows
@@ -474,8 +490,8 @@ def loci(
         ``float64``. A DataFrame's column names become the structure's ``labels``.
     alpha : float or None, default=None
         Under ``criterion="independence"``: ``None`` chooses the direction with the larger p-value,
-        or with the smaller test statistic when the p-values are equal; a significance level such
-        as ``0.05`` draws an edge only when exactly one p-value exceeds it. Must be ``None`` under
+        breaking p-value ties by the smaller test statistic; a significance level such as ``0.05``
+        draws an edge only when exactly one p-value exceeds it. Must be ``None`` under
         ``criterion="likelihood"``. See Notes.
     criterion : {"independence", "likelihood"}, default="independence"
         ``"independence"`` tests whether each direction's scaled residual is independent of its
@@ -485,7 +501,15 @@ def loci(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
 
     Returns
     -------
@@ -561,13 +585,13 @@ def loci(
     depend on the order of the rows, and a table whose rows stay the same when its two columns swap
     gives no edge.
 
-    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits read only the rows
-    where both columns are observed, which for a pair are the rows test-wise deletion keeps;
-    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. Fewer than 2 such
-    rows, or a column constant on them, raises ``ValueError``. Test-wise deletion is valid when
-    values are missing completely at random, which means that whether a value is missing depends on
-    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
-    they are a selected sample that more rows do not correct.
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits use test-wise
+    deletion, keeping rows where both columns are observed; ``metadata["rows_tested"]`` gives their
+    count as both ``min`` and ``median``. Fewer than 2 such rows, or a column constant on them,
+    raises ``ValueError``. Test-wise deletion is valid when values are missing completely at random,
+    which means that whether a value is missing depends on no value in the data; the rows a test
+    reads are then a random sample of all rows, and otherwise they are a selected sample that more
+    rows do not correct.
 
     **Limitations.** Measured on simulated cause-effect pairs of 500, 1,000, and 2,000 rows, 100
     pairs per setting, on one core: location-scale pairs with Gaussian, Gumbel, or Laplace noise,
@@ -678,11 +702,23 @@ def cpcm(
         The two variables, one per column: column 0 is ``x`` and column 1 is ``y``. Coerced to
         ``float64``. A DataFrame's column names become the structure's ``labels``.
     alpha : float or None, default=None
-        ``None`` chooses the direction with the larger p-value, or with the smaller test statistic
-        when the p-values are equal (the paper's forced estimate). A significance level such as
-        ``0.05`` gives no edge when the two columns test independent at that level, and otherwise
-        draws an edge only when exactly one direction's p-value exceeds it (the paper's
-        conservative estimate). See Notes.
+        ``None`` chooses the direction with the larger p-value, breaking p-value ties by the smaller
+        test statistic (the paper's forced estimate). A significance level such as ``0.05`` gives no
+        edge when the two columns test independent at that level, and otherwise draws an edge only
+        when exactly one direction's p-value exceeds it (the paper's conservative estimate).
+        ``None`` favors a direction for every pair; it gives up the sign that a pair fits both ways
+        or neither. A level favors that sign; it gives up the pairs it leaves undecided. On the
+        paper's pairs at 1,000 and 2,000 rows the forced direction tied with the authors' code after
+        fresh seeds in every setting; on the first seeds it was right less often on Table 2's PARg
+        drawn as the paper's Appendix B.3 describes (wrong on 12 of 99 pairs against 8) and on model
+        (16) at ``gamma = 2`` with 2,000 rows (4 of 99 against 0). On the paper's model (16) at 500
+        rows under ``"pareto"``, the conservative estimate found both directions plausible, the
+        paper's outcome at ``gamma = 0``, on 73% and 78% of the pairs of two seed sets against that
+        code's 82% and 85%, so it is not supported there; at ``gamma = 1`` it named the true
+        direction on 55% and 64% of the pairs of the two seed sets, and both on 39% of the first.
+        The `0.19.0 release card
+        <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#the-conservative-estimate>`_ has the
+        numbers. See Notes.
     family : str or list of str, default="gaussian"
         The family of each variable given the other, one name for both columns or a list of two
         names, one per column: ``"gaussian"`` (mean and scale change with the cause),
@@ -716,12 +752,11 @@ def cpcm(
     ValueError
         If an argument lies outside its range or is not one of its choices; the message names the
         method, the argument, what it accepts, and the value. Also if ``data`` does not have 2
-        columns, holds ``NaN`` or ``inf``, or has fewer than 20 rows, if ``family`` names an
-        unknown family or does not give one name per column, or if a column holds a value outside
-        its family's support, such as a non-integer under ``"poisson"`` or a value of at most 1
-        under ``"pareto"``. Also if a column's residual is the same on every row, as when the
-        column is an exact function of the other, or if a fit ends away from a maximum; the message
-        names the columns.
+        columns, holds ``NaN`` or ``inf``, or has fewer than 20 rows, if ``family`` names an unknown
+        family or does not give one name per column, or if a column holds a value outside its
+        family's support, such as a non-integer under ``"poisson"`` or a value of at most 1 under
+        ``"pareto"``. Also if a column's residual is constant, as when the column is an exact
+        function of the other, or if a fit ends away from a maximum; the message names the columns.
 
     Warns
     -----
@@ -812,29 +847,29 @@ def cpcm(
     **Limitations.** On the paper's pairs of 1,000 and 2,000 rows, CPCM's forced direction was right
     as often as the code published with the paper and more often than a coin flip or the majority
     direction, except on Table 2's Pareto pairs drawn by the authors' generator, whose effect is a
-    Pareto of scale theta and shape 1, which neither family the support rule picks (exponential,
-    or Pareto of scale 1) holds: there it was right on 38% and 47% of the pairs of two seed sets,
-    as often as the authors' code and no better than a coin flip. The `0.19.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm>`_ has the numbers. The family must be
-    chosen: the paper's rule that picks one from each column's support, and its sequential choice
-    between one- and two-parameter families, are not offered, and the benchmark passed the support
-    rule's family. On location-scale and multiplicative pairs that rule picks
-    ``"gaussian_fixed_scale"``, an additive-noise family, which named the true direction
-    on 0% to 58% of them in both implementations, so pass ``"gaussian"`` there. On fresh
-    multiplicative pairs, :func:`~andrey.loci` was right more often, 98% against 84%, and faster.
-    Under ``"pareto"``, when the cause's largest value is thousands of times its median, the test of
-    one direction can reject where the authors' code does not. On the paper's model (16) at
+    Pareto of scale theta and shape 1, which neither family the support rule picks (exponential, or
+    Pareto of scale 1) holds: there it was right on 38% and 47% of the pairs of two seed sets, as
+    often as the authors' code and no better than a coin flip. The
+    `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm>`_ has the
+    numbers. The family must be chosen: the paper's rule that picks a family from each column's
+    support and its sequential choice between one- and two-parameter families are not offered; the
+    benchmark used the support rule's family. On location-scale and multiplicative pairs that rule
+    picks ``"gaussian_fixed_scale"``, an additive-noise family, which named the true direction on 0%
+    to 58% of them in both implementations, so pass ``"gaussian"`` there. On fresh multiplicative
+    pairs, :func:`~andrey.loci` was right more often, 98% against 84%, and faster. Under
+    ``"pareto"``, when the cause's largest value is thousands of times its median, the test of one
+    direction can reject where the authors' code does not. On the paper's model (16) at
     ``gamma = 0`` the conservative estimate found both directions plausible, the paper's claim
     there, on 73% and 78% of the pairs of two seed sets against the reference's 82% and 85%, fewer
-    on both, so the conservative estimate under ``"pareto"`` is not supported until the cause, the
-    rank-10 thin plate spline of the cause on such values, is fixed. At 2,000 rows the forced
-    direction was wrong on 8 of the 199 pairs both fitted against 1 (the authors' code stopped with
-    an error on one). Each HSIC test builds matrices with one row and one column per sample, so time
-    and memory grow with the square of ``n_samples``. Under the count families the rank-10 spline
-    must follow the mean to within the counts' own noise, about ``1 / sqrt(mean)`` of it, which it
-    does for means up to a few hundred: from means of a few thousand that vary strongly with the
-    cause, the true direction's test rejects too. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    on both, so the conservative estimate under ``"pareto"`` is unsupported because of the rank-10
+    thin plate spline of the cause on such values. At 2,000 rows the forced direction was wrong on 8
+    of the 199 pairs both fitted against 1 (the authors' code stopped with an error on one). Each
+    HSIC test builds matrices with one row and one column per sample, so time and memory grow with
+    the square of ``n_samples``. Under the count families the rank-10 spline must follow the mean to
+    within the counts' own noise, about ``1 / sqrt(mean)`` of it, which it does for means up to a
+    few hundred: from means of a few thousand that vary strongly with the cause, the true
+    direction's test rejects too. The numbers are a reference, not a hard limit: they change with
+    the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -902,6 +937,7 @@ def skewd(
     criterion: str = "likelihood",
     tuning_iter: int = 60,
     max_iter: int = 5000,
+    optimizer: str = "cmaes",
     seed: int | None = None,
     missing: str | None = None,
 ) -> StructureOutput:
@@ -919,8 +955,8 @@ def skewd(
         ``float64``. A DataFrame's column names become the structure's ``labels``.
     alpha : float or None, default=None
         Under ``criterion="independence"``: ``None`` chooses the direction with the larger p-value,
-        or with the smaller test statistic when the p-values are equal; a significance level such
-        as ``0.05`` draws an edge only when exactly one p-value exceeds it. Must be ``None`` under
+        breaking p-value ties by the smaller test statistic; a significance level such as ``0.05``
+        draws an edge only when exactly one p-value exceeds it. Must be ``None`` under
         ``criterion="likelihood"``, the default.
     criterion : {"likelihood", "independence"}, default="likelihood"
         ``"likelihood"`` chooses the direction whose model has the larger likelihood (SkewD-LL);
@@ -933,6 +969,16 @@ def skewd(
     max_iter : int, default=5000
         The most iterations, at least 1, of the expectation conditional maximization that refines
         each direction's fit.
+    optimizer : {"cmaes", "lbfgs"}, default="cmaes"
+        The optimizer of each search of the penalized likelihood, in the cross-validation and from
+        the final starts: ``"cmaes"`` is CMA-ES [4]_, the paper's heuristic; ``"lbfgs"`` is
+        L-BFGS-B [5]_ with the analytic gradient, from the same starts within the same bounds. See
+        Notes. ``"cmaes"`` favors the paper's optimizer; it gives up time. ``"lbfgs"`` favors time;
+        it gives up the paper's optimizer. On the paper's simulated pairs and graphs of 1,000 rows
+        (graphs of 6 and 10 variables; 20 seeds each, one worker), ``"lbfgs"`` decided worse than
+        ``"cmaes"`` in no setting by a paired bootstrap, at a median of 5.8 to 14.9 times less time
+        per pair and 2.4 times less per graph, and its penalized likelihood was lower in 306 of the
+        738 fitted models and higher in 233.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed of the random draws of the optimization.
@@ -940,7 +986,15 @@ def skewd(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
 
     Returns
     -------
@@ -977,28 +1031,34 @@ def skewd(
     independent of the cause ``x``, and no hidden common cause of the two [1]_. It is designed for
     pairs whose noise is skewed, where a model with symmetric noise such as :func:`~andrey.loci`
     can misjudge the scale and the direction; with symmetric noise its model reduces to
-    :func:`~andrey.loci`'s Gaussian one. On the paper's skewed additive and location-scale pairs
-    and on Gaussian location-scale pairs, 1,000 rows each, it named the direction as often as the
-    code published with the paper, with either criterion; the likelihood criterion, the default,
-    named it on all 160 pairs measured.
+    :func:`~andrey.loci`'s Gaussian one. It favors accuracy on such pairs and gives up time. On the
+    paper's skewed additive and location-scale pairs and on Gaussian location-scale pairs, 1,000
+    rows each, it named the direction as often as the code published with the paper, with either
+    criterion, and the likelihood criterion, the default, named all 160 right; :func:`~andrey.loci`
+    named as many on most of these sets in under a second, and 15 of 20 against 20 on the most
+    skewed location-scale set. A pair took 15 to 22 CPU minutes on an AMD EPYC 9534 (the median of
+    each set); ``andrey.config(n_jobs)`` runs its searches on threads, which cuts the wall time.
 
-    In each direction, the effect given the cause is skew-normal with location ``f``, scale
-    ``g``, and one shape ``lambda`` for every row; ``f`` is a cubic B-spline of 12 knots (14
-    columns) and ``log g^2`` one of 5 knots (7 columns), each extended linearly past the data's
-    range [1]_. The estimate maximizes the log-likelihood less a second-order difference penalty
-    on each spline's coefficients [3]_, in three steps [1]_: Bayesian optimization chooses the
-    two penalties, each candidate scored by the held-out log-likelihood of an 8-fold
-    cross-validation, ``tuning_iter`` candidates with a Gaussian-process model of the scores and
-    the expected improvement; CMA-ES [4]_, with a population of 100 and fixed learning rates
-    where the paper's runs adapt them, maximizes the penalized likelihood from least squares and
-    from each fold's estimate; and expectation conditional maximization refines the best of them
-    until the parameters move less than ``1e-6`` over 25 iterations, or for ``max_iter``
-    iterations. The defaults, 60 candidates and 5,000 iterations, are those of the paper's runs.
-    Each column is standardized first, as in [1]_, so the model does not depend on the units of
-    either variable; the Gaussian marginals of the two standardized causes are then equal, so
-    the likelihoods compare the two conditional models. A change of units by a power of two
-    gives the identical result, and any other factor changes the standardized values in their
-    last digits (see Limitations).
+    In each direction, the effect given the cause is skew-normal with location ``f``, scale ``g``,
+    and one shape ``lambda`` for every row; ``f`` is a cubic B-spline of 12 knots (14 columns) and
+    ``log g^2`` one of 5 knots (7 columns), each extended linearly past the data's range [1]_. The
+    estimate maximizes the log-likelihood less a second-order difference penalty on each spline's
+    coefficients [3]_, in three steps [1]_: Bayesian optimization chooses the two penalties, each
+    candidate scored by the held-out log-likelihood of an 8-fold cross-validation, ``tuning_iter``
+    candidates with a Gaussian-process model of the scores and the expected improvement; a search
+    maximizes the penalized likelihood from least squares and from each fold's estimate; and
+    expectation conditional maximization refines the best of them until the parameters move less
+    than ``1e-6`` over 25 iterations, or for ``max_iter`` iterations. With ``optimizer="cmaes"``
+    each search, in the folds and from the final starts, is CMA-ES [4]_ with a population of 100 and
+    fixed learning rates where the paper's runs adapt them; with ``optimizer="lbfgs"`` it is
+    L-BFGS-B [5]_ with the gradient of the penalized likelihood, run to the limit of float
+    precision. The penalties are chosen the same way under either, from the same folds and the same
+    first candidates. The defaults, 60 candidates and 5,000 iterations, are those of the paper's
+    runs. Each column is standardized first, as in [1]_, so the model does not depend on the units
+    of either variable; the Gaussian marginals of the two standardized causes are then equal, so the
+    likelihoods compare the two conditional models. A change of units by a power of two gives the
+    identical result, and any other factor changes the standardized values in their last digits (see
+    Limitations).
 
     With ``criterion="likelihood"`` (SkewD-LL), the direction with the larger mean log-likelihood
     decides, and equal ones give no edge. With ``criterion="independence"`` (SkewD-IT), each
@@ -1016,27 +1076,32 @@ def skewd(
     ``alpha``. Both directions draw their random numbers from the same ``seed``, so swapping the
     columns swaps the fits.
 
-    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits read only the rows
-    where both columns are observed, which for a pair are the rows test-wise deletion keeps;
-    ``metadata["rows_tested"]`` gives their count as both ``min`` and ``median``. Fewer than 8 such
-    rows (one for each cross-validation fold), or a column constant on them, raises ``ValueError``.
-    Test-wise deletion is valid when values are missing completely at random, which means that
-    whether a value is missing depends on no value in the data; the rows a test reads are then a
-    random sample of all rows, and otherwise they are a selected sample that more rows do not
-    correct.
+    ``n_jobs`` above 1 (``andrey.config`` or ``ANDREY_N_JOBS``) runs the two directions, and the
+    searches of each, on that many threads. Each search draws from its own random stream,
+    split from ``seed`` in a fixed order, so the result is the same bit for bit with any number of
+    workers. The fits and the tests run on one BLAS thread with any number of workers, so the
+    result does not depend on the machine's BLAS thread count either.
 
-    **Limitations.** A fit at the defaults runs about 490 CMA-ES searches in each direction, 8 folds
-    for each of the ``tuning_iter`` penalty settings and 9 final starts: on pairs of 1,000 rows it
-    took 15 to 22 CPU minutes (the median of each set), where :func:`~andrey.loci` takes under a
-    second; ``tuning_iter`` sets most of that cost. The `0.19.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#skewd>`_ has the numbers. Each HSIC test
-    builds matrices with one row and one column per sample. The skew-normal's skewness lies within
-    about -1 and 1, so noise more skewed than that is misspecified [1]_. A change of units by a
-    factor that is not a power of two changed no edge in 120 refits of 20 pairs (80 to 150 rows,
-    ``tuning_iter=3``) and moved 2 of the 240 likelihoods by more than ``1e-6`` (both by 0.014, on a
-    pair with no direction), so an edge can change only where the two directions already lie within
-    what another ``seed`` changes. The numbers are a reference, not a hard limit: they change with
-    the data generator, the density, the method's settings, and the machine.
+    **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits use test-wise
+    deletion, keeping rows where both columns are observed; ``metadata["rows_tested"]`` gives their
+    count as both ``min`` and ``median``. Fewer than 8 such rows (one for each cross-validation
+    fold), or a column constant on them, raises ``ValueError``. Test-wise deletion is valid when
+    values are missing completely at random, which means that whether a value is missing depends on
+    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
+    they are a selected sample that more rows do not correct.
+
+    **Limitations.** A fit at the defaults runs about 490 searches in each direction, 8 folds for
+    each of the ``tuning_iter`` penalty settings and 9 final starts, so ``tuning_iter`` sets most of
+    its cost; the `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#skewd>`_
+    has the measured times. Each HSIC test builds matrices with one row and one column per sample.
+    The skew-normal's skewness lies within about -1 and 1, so noise more skewed than that is
+    misspecified, and the likelihood criterion assumes Gaussian marginals of the standardized
+    variables [1]_. A change of units by a factor that is not a power of two changed no edge in 120
+    refits of 20 pairs (80 to 150 rows, ``tuning_iter=3``) and moved 2 of the 240 likelihoods by
+    more than ``1e-6`` (both by 0.014, on a pair with no direction), so an edge can change only where
+    the two directions already lie within what another ``seed`` changes. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -1047,6 +1112,8 @@ def skewd(
     .. [3] Eilers, P. H. C., and Marx, B. D. (1996). Flexible smoothing with B-splines and
        penalties. Statistical Science 11(2), 89-121.
     .. [4] Hansen, N. (2016). The CMA evolution strategy: a tutorial. arXiv:1604.00772.
+    .. [5] Byrd, R. H., Lu, P., Nocedal, J., and Zhu, C. (1995). A limited memory algorithm for
+       bound constrained optimization. SIAM Journal on Scientific Computing 16(5), 1190-1208.
 
     Examples
     --------
@@ -1070,7 +1137,7 @@ def skewd(
         )
     from andrey.core.independence import hsic_median_statistic_log_p
     from andrey.core.warning_policy import warn_search_limit
-    from andrey.fcm.skewd import Budget, fit
+    from andrey.fcm.skewd import Budget
 
     assert seed is not None  # method_spec resolves it
     X, labels, rows = _pair_matrix("skewd", data, standardize=True)
@@ -1081,25 +1148,32 @@ def skewd(
         tuning_iter=tuning_iter,
         initial=-(-2 * tuning_iter // 3),
         max_iter=max_iter,
+        optimizer=optimizer,
     )
     if X.shape[0] < budget.folds:
         raise ValueError(
             f"skewd needs at least {budget.folds} rows where both columns are observed, one for "
             f"each cross-validation fold, got {X.shape[0]}"
         )
-    forward, backward = fit(x, y[:, 0], budget, seed), fit(y, x[:, 0], budget, seed)
-    if not (forward.converged and backward.converged):
-        warn_search_limit("skewd", "max_iter", max_iter, "ECM iterations")
-    extra = {
-        "log_likelihoods": {"forward": forward.log_likelihood, "backward": backward.log_likelihood},
-        **rows,
-    }
-    if criterion == "likelihood":
-        return likelihood_output(
-            forward.log_likelihood, backward.log_likelihood, labels=labels, extra=extra
-        )
-    stat_forward, log_p_forward = hsic_median_statistic_log_p(x[:, 0], forward.residual)
-    stat_backward, log_p_backward = hsic_median_statistic_log_p(y[:, 0], backward.residual)
+    # One BLAS thread: a threaded product rounds differently from a serial one, so the result
+    # would depend on the machine's thread count.
+    with one_blas_thread():
+        forward, backward = _skewd_directions(x, y, budget, seed)
+        if not (forward.converged and backward.converged):
+            warn_search_limit("skewd", "max_iter", max_iter, "ECM iterations")
+        extra = {
+            "log_likelihoods": {
+                "forward": forward.log_likelihood,
+                "backward": backward.log_likelihood,
+            },
+            **rows,
+        }
+        if criterion == "likelihood":
+            return likelihood_output(
+                forward.log_likelihood, backward.log_likelihood, labels=labels, extra=extra
+            )
+        stat_forward, log_p_forward = hsic_median_statistic_log_p(x[:, 0], forward.residual)
+        stat_backward, log_p_backward = hsic_median_statistic_log_p(y[:, 0], backward.residual)
     return pairwise_output(
         math.exp(log_p_forward),
         math.exp(log_p_backward),
@@ -1110,6 +1184,26 @@ def skewd(
         labels=labels,
         extra=extra,
     )
+
+
+def _skewd_directions(x: np.ndarray, y: np.ndarray, budget, seed: int):
+    """SkewD's fits of ``y`` on ``x`` and of ``x`` on ``y``, bit for bit the serial ones.
+
+    Both directions and their searches run on ``andrey.config(n_jobs)`` threads when it is above 1.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    from andrey.core import backend
+    from andrey.fcm.skewd import fit, search_pool
+
+    workers = backend.worker_count()
+    with search_pool(workers) as run:
+        if workers <= 1:
+            return fit(x, y[:, 0], budget, seed, run), fit(y, x[:, 0], budget, seed, run)
+        with ThreadPoolExecutor(max_workers=2) as both:
+            forward = both.submit(fit, x, y[:, 0], budget, seed, run)
+            backward = both.submit(fit, y, x[:, 0], budget, seed, run)
+            return forward.result(), backward.result()
 
 
 @method_spec("rcd")

@@ -49,6 +49,9 @@
     three lamps on curved arms from the left, above, and the right, each lighting another facet
     and casting its own shadow across the plinth. The right-hand lamp and the facet it lights are
     amber.
+  - `art-missing-tiles.jpg`: 0.19.0, a table of tiles in perspective in engraved lines, as merged
+    cohorts fill it: each cohort's block of tiles steps down to the right, and the slots no cohort
+    fills are bare outlines. The tiles where two cohorts share a column are amber.
   - `art-methods.jpg`: the homepage's All-in-one, the prism of `bento/methods.jpg`, one beam
     fanning into many rays, the level ray out of the prism drawn amber. It is scaled from that
     crop to the cover's size, so it is softer than the others until the art is drawn again at

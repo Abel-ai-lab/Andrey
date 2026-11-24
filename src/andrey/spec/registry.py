@@ -896,7 +896,10 @@ _add(
                 "graph of the current class scores better without the edge, and the paper proves "
                 "that it recovers the true class as the rows grow; conservative "
                 "(ConservativeInsert) also skips it when any valid addition of the edge worsens "
-                "the score, with fewer errors in the paper's simulations and no such proof.",
+                "the score, with fewer errors in the paper's simulations and no such proof. safe "
+                "favors the proof and gives up accuracy; conservative favors fewer errors (the "
+                "lower mean error in 31 of 38 settings of the paper's simulation) and gives up "
+                "the proof.",
             ),
             ParamSpec(
                 name="schedule",
@@ -907,9 +910,17 @@ _add(
                 "then reversing edges until neither improves the score before each single "
                 "addition; lges0_released is its LGES-0 (Algorithm 8) in the order of the "
                 "authors' code: additions, deletions, then reversals, once. lges is the "
-                "default as the paper's main method; on the paper's linear-Gaussian simulation "
-                "the two made about as many errors on the sparsest graphs and lges fewer on "
-                "denser ones.",
+                "default as the paper's main method. lges favors accuracy on denser graphs and "
+                "gives up time (where both ran in one process, the conservative rule at mean "
+                "degree 1 and 3, where the safe fits ran first and carry about 0.25 s of start-up, "
+                "its median fit took 1.0 to 1.33 times as long as LGES-0's; at mean degree 2, "
+                "4, and 6, timed in separate runs, so small differences are noise, 0.9 to 1.8 "
+                "times); "
+                "lges0_released favors time and gives up accuracy on denser graphs. On the "
+                "paper's linear-Gaussian simulation lges was better in 15 of 16 settings at "
+                "mean degree 3; at mean degree 1 and 2 the two made about as many errors (mean "
+                "errors summed over 32 settings, 457 against 459), lges0_released better in "
+                "12, lges in 5, with 15 ties.",
             ),
             _CATEGORICAL,
         ),
@@ -2112,6 +2123,21 @@ _add(
         ),
     )
 )
+_SKEWD_OPTIMIZER = ParamSpec(
+    name="optimizer",
+    type="str",
+    default="cmaes",
+    choices=("cmaes", "lbfgs"),
+    doc="The optimizer of each search of the penalized likelihood: cmaes = CMA-ES, the paper's "
+    "heuristic; lbfgs = L-BFGS-B with the analytic gradient, from the same starts within the same "
+    "bounds. cmaes favors the paper's optimizer and gives up time; lbfgs favors time and gives up "
+    "the paper's optimizer. On the paper's simulated pairs and graphs of 1,000 rows (graphs of 6 "
+    "and 10 variables; 20 seeds each, one worker), lbfgs decided worse than cmaes in no setting by "
+    "a paired bootstrap, at a median of 5.8 to 14.9 times less time per pair and 2.4 times less "
+    "per graph, and its penalized likelihood was lower in 306 of the 738 fitted models and higher "
+    "in 233.",
+)
+
 _add(
     MethodSpec(
         name="skewd_mv",
@@ -2174,6 +2200,7 @@ _add(
                 "ValueError, raised once they are found, before any is fitted. 100 is the order up "
                 "to which the paper expects the method to apply. null sets no cap.",
             ),
+            _SKEWD_OPTIMIZER,
             concept_param(
                 "seed",
                 doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
@@ -3268,6 +3295,7 @@ _add(
                 "direction, at least 1; 5000 is the value of the paper's runs. Reaching it warns "
                 "with SearchLimitWarning.",
             ),
+            _SKEWD_OPTIMIZER,
             concept_param(
                 "seed",
                 doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "

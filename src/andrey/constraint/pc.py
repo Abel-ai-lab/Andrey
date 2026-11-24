@@ -162,7 +162,7 @@ def pc(
         ambiguous |= vote_triples(
             skeleton, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
         )
-    # The votes ask the same tests as on data where nothing is flagged; a flag then overrides.
+    # The votes run the same tests as on unflagged data; a flag overrides the result.
     ambiguous |= flagged_triples(adjacency, running_flags(adjacency))
     if _ambiguous is not None:
         _ambiguous.update(ambiguous)
@@ -551,14 +551,12 @@ def adjacency_search(
     ``warn_expensive`` emits a :class:`~andrey.PerformanceWarning` before each conditioning-size
     pass requiring at least ten million CI tests. The search still evaluates every conditioning set.
 
-    With the ``undecided`` sink, a pair still adjacent after the last size with no query tested,
-    only queries without the rows their test needs
-    (:meth:`~andrey.core.ci_missing.RowCounts.untested`), as a pair never observed together, is
-    undecided: it leaves the skeleton without a separating set, before the pairs of ``apart`` are
-    searched, and the sink receives it as ``(x, y)``, ``x < y``. A triple over it is neither a
-    collider nor a non-collider (:func:`~andrey.constraint._skeleton.unseparated_triples`). Without
-    the sink, as in a search that refines a skeleton an earlier search decided, every pair no test
-    removed stays. Data without missing values have no undecided pair.
+    With the ``undecided`` sink, a pair still adjacent after the last size whose queries all lacked
+    enough rows (:meth:`~andrey.core.ci_missing.RowCounts.untested`), such as a pair never observed
+    together, leaves the skeleton without a separating set before ``apart`` is searched. The sink
+    receives it as ``(x, y)``, ``x < y``; its triples are neither colliders nor non-colliders
+    (:func:`~andrey.constraint._skeleton.unseparated_triples`). Without the sink, as when refining
+    an earlier skeleton, pairs no test removed stay. Complete data have no undecided pair.
 
     The ``trace`` sink records every test in the order it runs: ``step="test"``, ``depth``, the
     pair ``x < y``, the conditioning set ``S``, the p-value ``p`` (for CMIknn, which stops its

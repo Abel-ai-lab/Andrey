@@ -1,6 +1,6 @@
 [project]
 name = "andrey-core"       # import root is "andrey" (taken on PyPI)
-version = "0.18.0"        # must equal andrey.__version__ (scripts/check_dist.py)
+version = "0.19.0"        # must equal andrey.__version__ (scripts/check_dist.py)
 description = "Andrey: accelerated, accurate, agentic causal discovery. Install andrey-core, import andrey."
 dynamic = ["readme"]  # README.md, its image paths pinned to the release (fancy-pypi-readme below)
 requires-python = ">=3.11"
@@ -116,6 +116,9 @@ only-include = ["src/andrey", "README.md"]  # README.md: the package description
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "."]  # "." for test helpers and QA tools
+markers = [
+    "release: a heavy accuracy check that pull requests into release or topic branches skip",
+]
 
 [tool.ty.environment]
 python-version = "3.11"
