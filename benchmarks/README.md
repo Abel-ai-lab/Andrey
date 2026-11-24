@@ -75,14 +75,15 @@ directory.
 and `library()` run in the adapter's `setup()`, before warm-up fits and outside fit timing. See
 [Where the clock starts](#where-the-clock-starts).
 
-The other R start scripts add their packages to the lane library, `$ANDREY_BENCH_R_LIBS`. The
-agreement check of the GCM, wGCM, and PCM tests (`regression_ci_agreement.py`) needs package
-versions of its own, such as xgboost 1.7.8.1, so `start_regression_ci_r.sh` builds two libraries
-apart from the lane's and never reads or writes `$ANDREY_BENCH_R_LIBS`: the GCM and PCM library in
-`$ANDREY_BENCH_R_LIBS_GCM` (default `benchmarks/.r-lib-regression-ci`) and the wGCM library in
-`$ANDREY_BENCH_R_LIBS_WGCM` (default `benchmarks/.r-lib-regression-ci-wgcm`). It also clones the PCM
-authors' code, and prints the exports of the two libraries and of `ANDREY_BENCH_PCM_CODE` that the
-agreement script reads; `run_tests.sh` applies them and records them in its `env.sh`.
+`start_cam_r.sh`, `start_resit_r.sh`, `start_mvpc_r.sh`, `start_cpcm.sh`, and `start_stein.sh` add
+their packages to the lane library, `$ANDREY_BENCH_R_LIBS`. The agreement check of the GCM, wGCM,
+and PCM tests (`regression_ci_agreement.py`) needs package versions of its own, such as xgboost
+1.7.8.1, so `start_regression_ci_r.sh` builds two libraries apart from the lane's and never reads or
+writes `$ANDREY_BENCH_R_LIBS`: the GCM and PCM library in `$ANDREY_BENCH_R_LIBS_GCM` (default
+`benchmarks/.r-lib-regression-ci`) and the wGCM library in `$ANDREY_BENCH_R_LIBS_WGCM` (default
+`benchmarks/.r-lib-regression-ci-wgcm`). It also clones the PCM authors' code, and prints the
+exports of the two libraries and of `ANDREY_BENCH_PCM_CODE` that the agreement script reads;
+`run_tests.sh` applies them and records them in its `env.sh`.
 
 ### Separate solution environments
 

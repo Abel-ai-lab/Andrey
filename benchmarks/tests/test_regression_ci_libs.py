@@ -95,7 +95,11 @@ def test_run_tests_applies_the_printed_libraries_beside_the_lane_library(start) 
         + "".join(f'echo "{name}=${name}"\n' for name in names)
     )
     run = subprocess.run(
-        [shutil.which("bash"), "-c", shell], capture_output=True, text=True, check=True
+        [shutil.which("bash"), "-c", shell],
+        env={"PATH": "/usr/bin:/bin"},  # a caller's own ANDREY_BENCH_* variables would be kept
+        capture_output=True,
+        text=True,
+        check=True,
     )
     applied = dict(line.split("=", 1) for line in run.stdout.splitlines())
     assert applied == {**start["exports"], "ANDREY_BENCH_R_LIBS": str(start["lane_lib"])}
