@@ -1598,6 +1598,7 @@ def skewd_mv(
         class_size,
         fit,
         merge_components,
+        search_device,
         search_pool,
     )
 
@@ -1636,7 +1637,7 @@ def skewd_mv(
 
     # One BLAS thread: a threaded product rounds differently from a serial one, so the result
     # would depend on the machine's thread count.
-    with one_blas_thread(), search_pool(workers) as run:
+    with one_blas_thread(), search_pool(workers, search_device(optimizer)) as run:
         if workers > 1 and len(fits) > 1:
             from concurrent.futures import ThreadPoolExecutor
 

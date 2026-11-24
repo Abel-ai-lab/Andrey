@@ -1096,10 +1096,10 @@ def _skewd_directions(x: np.ndarray, y: np.ndarray, budget, seed: int):
     from concurrent.futures import ThreadPoolExecutor
 
     from andrey.core import backend
-    from andrey.fcm.skewd import fit, search_pool
+    from andrey.fcm.skewd import fit, search_device, search_pool
 
     workers = backend.worker_count()
-    with search_pool(workers) as run:
+    with search_pool(workers, search_device(budget.optimizer)) as run:
         if workers <= 1:
             return fit(x, y[:, 0], budget, seed, run), fit(y, x[:, 0], budget, seed, run)
         with ThreadPoolExecutor(max_workers=2) as both:
