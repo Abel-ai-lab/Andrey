@@ -126,6 +126,9 @@ A table that compares Andrey with other packages or builds reads one way everywh
 - Rows group by method family, the family's label set on the table's side.
 - A share is a percentage, its denominator in the text or the row's label, not in every cell.
 
+A table that shows example data rather than a comparison, such as a post's mock-up of a dataset, may
+sit in the middle of the column: wrap it in the `{table}` directive with `:align: center`.
+
 The 0.7.0 post's tables come from `table()` in `docs/blog/0.7.0/figures.py`; a Markdown table on a
 post or a release card gets the tint and the bold at build time (`_comparison_tables`,
 `docs/conf.py`).

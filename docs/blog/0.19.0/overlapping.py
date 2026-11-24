@@ -1,4 +1,4 @@
-"""Two studies merged into one table: both measure W and Z, only the first measures X, and only the
+"""Two studies stacked into one table: both measure W and Z, only the first measures X, and only the
 second measures Y, so no row observes X and Y together."""
 
 import logging

@@ -21,28 +21,28 @@ posts of the features it changes. A card keeps the numbers its release published
 :::{card}
 :link: benchmarks/0.19.0
 :link-type: doc
-:link-alt: The 0.19.0 release card: missing values in merged data
+:link-alt: The 0.19.0 release card: datasets with overlapping variables
 :class-card: release-cover release-art release-art-0-19-0
 :shadow: none
 :margin: 0
 
 Release card
 
-Missing values in merged data
+Datasets with overlapping variables
 
 0.19.0
 :::
 
 ::::{div} release-tldr
 
-0.19.0 is here. On data merged from cohorts, a test without enough rows is not tested, a pair no
-test decides is left out of the graph, and an edge that an untested set might have separated is
-flagged. DAS and CPCM are supported, and LGES, Regime-PCMCI, and the GCM, wGCM, and PCM tests
-arrive, experimental.
+0.19.0 is here. On datasets with overlapping variables, a conditional independence test without
+enough rows is skipped, a pair no test can decide is left out of the graph, and an edge that a
+skipped test might have removed is listed. DAS and CPCM are supported, and LGES, Regime-PCMCI, and
+the GCM, wGCM, and PCM tests arrive, experimental.
 
 :::{div} release-actions
 [Read the release card](benchmarks/0.19.0.md)
-[Post: Missing values in merged data](../blog/20261123-andrey-0-19-0.md)
+[Post: Datasets with overlapping variables](../blog/20261123-andrey-0-19-0.md)
 [Post: Functional causal models](../blog/20261103-andrey-0-13-0.md)
 [Post: Pairwise direction](../blog/20261015-andrey-0-4-0.md)
 :::
@@ -615,7 +615,7 @@ The homepage's speed claim and charts come from these release cards.
 ```{toctree}
 :hidden:
 
-0.19.0: missing values in merged data <benchmarks/0.19.0>
+0.19.0: datasets with overlapping variables <benchmarks/0.19.0>
 0.18.0 <benchmarks/0.18.0>
 0.17.0 <benchmarks/0.17.0>
 0.16.0 <benchmarks/0.16.0>
