@@ -10,10 +10,12 @@ PCMCI+ extends PCMCI to links within one time step (lag 0). It works on the copi
    ``(X^i_{t-tau}, X^j_t)`` given each subset ``S`` of ``p`` lag-0 neighbors of ``X^j_t``, with
    ``B(j)`` (without ``X^i_{t-tau}``) and ``B(i)`` shifted ``tau`` steps back added to every
    conditioning set. The first p-value above ``pc_alpha`` removes the link and stores ``S`` as its
-   separating set. A lag-0 pair is tested from both ends, the ordered pairs ``(X^i_t, X^j_t)`` in
-   order of ``(i, j)``. The neighbor sets stay fixed during a round and are re-sorted after it,
-   strongest link first, by the smallest absolute statistic each link has had. The rounds stop
-   when no linked pair has ``p`` neighbors left to condition on.
+   separating set. A lag-0 pair is tested from both ends, first from the end with the higher
+   :func:`~andrey.core.ties.tie_ranks`, given that end's neighbors. The neighbor sets stay fixed
+   during a round and are re-sorted after it, strongest link first, by the smallest absolute
+   statistic each link has had; statistics equal to ``KEY_DP`` decimals are ordered by the
+   neighbors' :func:`~andrey.core.ties.tie_ranks`. The rounds stop when no linked pair has ``p``
+   neighbors left to condition on.
 3. **Colliders.** Each unshielded triple ``X^i_{t-tau} - X^k_t - X^j_t`` with a lag-0 link
    ``X^k_t - X^j_t`` is a collider, ``X^i_{t-tau} -> X^k_t <- X^j_t``, by ``collider_rule``:
    ``"sepsets"`` when ``X^k_t`` is not in the separating set; ``"majority"`` and ``"conservative"``
@@ -32,7 +34,9 @@ PCMCI+ extends PCMCI to links within one time step (lag 0). It works on the copi
 Lagged links always point forward in time. Phases 3 and 4 collect the orientations of a pass from
 the graph as it stood before the pass, then apply them together; a link that gets both orientations
 is marked as a conflict and takes no part in later rules. Every test reads the lagged design of
-:func:`~andrey.temporal.pcmci.lagged_design`, as in PCMCI.
+:func:`~andrey.temporal.pcmci.lagged_design`, as in PCMCI, built from the variables sorted by
+:func:`~andrey.core.ties.tie_ranks` (:func:`~andrey.temporal.pcmci.ranked_design_test`), so a test
+gives the same bits under any order of the variables.
 
 References
 ----------
@@ -43,6 +47,7 @@ Intelligence (UAI), PMLR 124, 1388-1397. https://proceedings.mlr.press/v124/rung
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from itertools import combinations
@@ -53,11 +58,27 @@ import numpy as np
 from andrey.constraint._skeleton import check_collider_rule, collider_verdict
 from andrey.constraint.pc import check_knowledge_cycle
 from andrey.core import backend
+from andrey.core.ci_missing import (
+    NOT_TESTED,
+    counts_its_tests,
+    keeps_no_untested_sets,
+    reads_flags,
+    running_counter,
+)
 from andrey.core.fdr import check_fdr_method, corrected_pvalues
 from andrey.core.knowledge import orient as orient_known
 from andrey.core.structure import ARROW, NULL, TAIL
-from andrey.core.ties import tie_ranks
-from andrey.temporal.pcmci import Link, LinkTest, design_test, pc1
+from andrey.core.ties import KEY_DP, tie_ranks
+from andrey.temporal.pcmci import (
+    Link,
+    LinkTest,
+    conditionable,
+    count_not_tested,
+    deletes_rows,
+    flagged_links,
+    pc1,
+    ranked_design_test,
+)
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import LaggedConstraints
@@ -80,7 +101,10 @@ class PCMCIPlusResult:
     ``marks`` holds the lag-0 endpoint marks: ``marks[i, j]`` is the mark at ``i`` on the link
     ``i - j``, ``TAIL``/``ARROW`` for ``i -> j``, ``TAIL`` at both ends for an unoriented link, and
     ``ARROW`` at both ends for a conflict. ``sepsets[(i, lag, j)]`` is the lag-0 separating set
-    phase 2 stored for a removed link, under both orders at lag 0. ``ambiguous_triples`` lists the
+    phase 2 stored for a removed link, under both orders at lag 0. ``undecided``, shaped as
+    ``adjacency``, marks the links no test with rows decided
+    (:data:`~andrey.core.ci_missing.NOT_TESTED`): ``adjacency`` leaves them out, and they read
+    ``NaN`` in ``p_values``. ``ambiguous_triples`` lists the
     ``(i, lag, k, j)`` triples phase 3 left ambiguous, a lag-0 triple in both orders.
     """
 
@@ -91,6 +115,7 @@ class PCMCIPlusResult:
     statistics: np.ndarray
     sepsets: dict[tuple[int, int, int], tuple[int, ...]]
     ambiguous_triples: tuple[Triple, ...]
+    undecided: np.ndarray | None = None
 
     @property
     def conflicts(self) -> tuple[tuple[int, int], ...]:
@@ -100,11 +125,19 @@ class PCMCIPlusResult:
 
 
 class Recorder:
-    """Passes queries to ``test``; keeps each column pair's largest p-value and its statistic."""
+    """Passes queries to ``test`` and keeps each pair's largest tested p-value and its statistic."""
 
     def __init__(self, test: LinkTest) -> None:
         self.test = test
         self.largest: dict[tuple[int, int], tuple[float, float]] = {}
+
+    def conditionable(self, x: int, y: int, ordered: Iterable[int]) -> list[int]:
+        """:func:`~andrey.temporal.pcmci.conditionable` of ``test``."""
+        return conditionable(self.test, x, y, ordered)
+
+    def count_not_tested(self, x: int, y: int, queries: int) -> None:
+        """:func:`~andrey.temporal.pcmci.count_not_tested` of ``test``."""
+        count_not_tested(self.test, x, y, queries)
 
     def statistic_pvalues(
         self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
@@ -115,10 +148,30 @@ class Recorder:
             statistics.tolist(),
             p_values.tolist(),
         ):
+            if math.isnan(p_value):  # not tested: no p-value to keep
+                continue
             best = self.largest.get(pair)
             if best is None or p_value > best[1]:
                 self.largest[pair] = (statistic, p_value)
         return statistics, p_values
+
+
+def mark_undecided(
+    adjacency: np.ndarray,
+    p_values: np.ndarray,
+    statistics: np.ndarray,
+    undecided: np.ndarray,
+    untested: list[list[Link]],
+) -> None:
+    """Mark in place the untested lagged links in ``untested[j]`` missed by phase 2's ``undecided``,
+    removing every undecided link from ``adjacency`` because none has a tested result. Each gets
+    :data:`~andrey.core.ci_missing.NOT_TESTED` as its p-value and statistic."""
+    for j, links in enumerate(untested):
+        for i, lag in links:
+            undecided[lag, i, j] = True
+    adjacency[undecided] = False
+    p_values[undecided] = NOT_TESTED
+    statistics[np.isnan(p_values)] = NOT_TESTED
 
 
 def lagged_parents(
@@ -129,13 +182,19 @@ def lagged_parents(
     ranks: Sequence[int],
     constraints: LaggedConstraints | None = None,
     max_depth: int | None = None,
+    undecided: list[list[Link]] | None = None,
 ) -> tuple[tuple[Link, ...], ...]:
     """Phase 1: the PC1 lagged parents of every variable, strongest first; ``max_depth`` caps
-    PC1's conditioning sets."""
-    return tuple(
-        pc1(test, n_vars, j, tau_max, pc_alpha, ranks, constraints, max_depth)
+    PC1's conditioning sets. With ``undecided``, entry ``j`` gets the candidates of variable
+    ``j`` with no tested result (:func:`~andrey.temporal.pcmci.pc1`)."""
+    lists: list[list[Link]] = [[] for _ in range(n_vars)]
+    parents = tuple(
+        pc1(test, n_vars, j, tau_max, pc_alpha, ranks, constraints, max_depth, lists[j])
         for j in range(n_vars)
     )
+    if undecided is not None:
+        undecided.extend(lists)
+    return parents
 
 
 def _conditions(
@@ -153,6 +212,29 @@ def _conditions(
     return sorted(columns)
 
 
+def _testable(
+    test: LinkTest, n_vars: int, i: int, lag: int, j: int, pool: Iterable[int]
+) -> list[int]:
+    """Lag-0 variables from ``pool`` individually testable as conditions of ``X^i_{t-lag}`` and
+    ``X^j_t`` (:func:`~andrey.temporal.pcmci.conditionable`): on missing data, a variable leaving
+    too few jointly observed rows is left out; all are kept on complete data."""
+    pool = list(pool)
+    if not deletes_rows(test):
+        return pool
+    x = lag * n_vars + i
+    return [k for k in pool if conditionable(test, x, j, [k])]
+
+
+def _parent_columns(
+    parents: tuple[tuple[Link, ...], ...], n_vars: int, i: int, lag: int, j: int
+) -> list[int]:
+    """Design columns of ``B(j)`` without ``X^i_{t-lag}``, then of ``B(i)`` shifted ``lag``, each
+    strongest first, once each."""
+    columns = [s * n_vars + k for k, s in parents[j] if (k, s) != (i, lag)]
+    shifted = ((s + lag) * n_vars + k for k, s in parents[i])
+    return columns + [c for c in shifted if c not in columns]
+
+
 def _test_subsets(
     test: LinkTest,
     n_vars: int,
@@ -162,11 +244,36 @@ def _test_subsets(
     j: int,
     subsets: list[tuple[int, ...]],
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Test ``X^i_{t-lag}`` against ``X^j_t`` given each subset, all one size, in one call."""
-    rows = [_conditions(parents, n_vars, i, lag, j, subset) for subset in subsets]
-    conditions = np.array(rows, dtype=np.intp).reshape(len(rows), len(rows[0]))
-    x = np.full(len(rows), lag * n_vars + i, dtype=np.intp)
-    return test.statistic_pvalues(x, np.full_like(x, j), conditions)
+    """Test ``X^i_{t-lag}`` against ``X^j_t`` given each subset, all one size, in one call.
+
+    With missing values, each test conditions on its subset and the strongest parents keeping its
+    block testable (:meth:`~andrey.core.ci_missing.TestwiseDeletion.conditionable`), excluding
+    columns never observed together; omitted parents cause the full set to count as untested
+    (:func:`~andrey.temporal.pcmci.count_not_tested`), with one call per condition count.
+    """
+    x_column = lag * n_vars + i
+    if not deletes_rows(test):
+        rows = [_conditions(parents, n_vars, i, lag, j, subset) for subset in subsets]
+    else:
+        defaults = _parent_columns(parents, n_vars, i, lag, j)
+        rows = []
+        for subset in subsets:
+            kept = conditionable(test, x_column, j, [*subset, *defaults])
+            whole = kept[: len(subset)] == list(subset)
+            if whole and len(kept) < len(subset) + len(defaults):
+                count_not_tested(test, x_column, j)
+            rows.append(sorted(kept) if whole else _conditions(parents, n_vars, i, lag, j, subset))
+    statistics = np.empty(len(rows))
+    p_values = np.empty(len(rows))
+    for size in sorted({len(row) for row in rows}):
+        at = [k for k, row in enumerate(rows) if len(row) == size]
+        conditions = np.array([rows[k] for k in at], dtype=np.intp).reshape(len(at), size)
+        x = np.full(len(at), x_column, dtype=np.intp)
+        found = test.statistic_pvalues(x, np.full_like(x, j), conditions)
+        if len(at) == len(rows):
+            return found
+        statistics[at], p_values[at] = found
+    return statistics, p_values
 
 
 def skeleton(
@@ -175,17 +282,28 @@ def skeleton(
     parents: tuple[tuple[Link, ...], ...],
     tau_max: int,
     pc_alpha: float,
+    ranks: Sequence[int],
     constraints: LaggedConstraints | None = None,
     max_p_global: int | None = None,
     pool: np.ndarray | None = None,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[tuple[int, int, int], tuple[int, ...]]]:
-    """Phase 2: return ``(adjacency, largest p-values, their statistics, sepsets)``.
+) -> tuple[
+    np.ndarray, np.ndarray, np.ndarray, dict[tuple[int, int, int], tuple[int, ...]], np.ndarray
+]:
+    """Phase 2: return ``(adjacency, largest p-values, their statistics, sepsets, undecided)``.
 
-    The p-value array holds ``-1`` for a link phase 2 never tested. With ``constraints``, the lag-0
-    links start from the pairs they allow, and no required link is tested or removed. Every test
-    conditions on the entries of ``parents`` for both ends and on a subset of the lag-0 neighbors;
-    ``max_p_global`` caps the size of that subset, the conditions beyond the parents. ``pool``, a
-    mask over the variables, limits the neighbors a subset draws from.
+    ``undecided`` marks adjacent links with untested queries
+    (:data:`~andrey.core.ci_missing.NOT_TESTED`) and none tested; untested queries neither remove
+    links nor set strength or largest p-value, and lag-0 neighbors still undecided after a round are
+    excluded from later conditioning subsets.
+
+    The p-value array holds ``-1`` for a link phase 2 never tested. ``ranks`` holds each
+    variable's :func:`~andrey.core.ties.tie_ranks`: a lag-0 pair is tested first from its end of
+    higher rank, and neighbors of equal strength are ordered by rank, so the tests a link has, and
+    the p-value it reports, do not depend on the order of the variables. With ``constraints``, the
+    lag-0 links start from the pairs they allow, and no required link is tested or removed. Every
+    test conditions on the entries of ``parents`` for both ends and on a subset of the lag-0
+    neighbors; ``max_p_global`` caps the size of that subset, the conditions beyond the parents.
+    ``pool``, a mask over the variables, limits the neighbors a subset draws from.
     """
     shape = (tau_max + 1, n_vars, n_vars)
     adjacency = np.zeros(shape, dtype=bool)
@@ -201,8 +319,10 @@ def skeleton(
     p_values = np.full(shape, -1.0)
     statistics = np.zeros(shape)
     strength = np.full(shape, np.inf)
+    skipped = np.zeros(shape, dtype=bool)
     sepsets: dict[tuple[int, int, int], tuple[int, ...]] = {}
     pool = np.ones(n_vars, dtype=bool) if pool is None else pool
+    order = sorted(range(n_vars), key=lambda k: (ranks[k], k))
     neighbors = [tuple(np.flatnonzero(adjacency[0, :, j] & pool).tolist()) for j in range(n_vars)]
     p = 0
     while max_p_global is None or p <= max_p_global:
@@ -212,9 +332,9 @@ def skeleton(
             for i, lag in parents[j]
             if adjacency[lag, i, j] and not kept[lag, i, j] and len(neighbors[j]) >= p
         ] + [
-            (i, 0, j)  # in order of (i, j): a pair first meets its higher variable's neighbors
-            for i in range(n_vars)
-            for j in range(n_vars)
+            (i, 0, j)  # by rank: a pair first meets the neighbors of its higher-ranked end
+            for i in order
+            for j in order
             if adjacency[0, i, j] and not kept[0, i, j] and len(neighbors[j]) - int(pool[i]) >= p
         ]
         if not pairs:
@@ -222,17 +342,29 @@ def skeleton(
         for i, lag, j in pairs:
             if not adjacency[lag, i, j]:
                 continue  # removed from its other end in this round
-            subsets = list(combinations([k for k in neighbors[j] if lag or k != i], p))
+            full = [k for k in neighbors[j] if lag or k != i]
+            pool_j = _testable(test, n_vars, i, lag, j, full)
+            if lost := math.comb(len(full), p) - math.comb(len(pool_j), p):
+                # The subsets with a neighbor left out for want of rows are not tested.
+                count_not_tested(test, lag * n_vars + i, j, lost)
+            subsets = list(combinations(pool_j, p))
+            if not subsets:
+                continue  # fewer than p neighbors observed with both ends: no test
             tested_statistics, tested_p_values = _test_subsets(
                 test, n_vars, parents, i, lag, j, subsets
             )
             # The subsets count as tested in order up to the first that separates.
             separating = np.flatnonzero(tested_p_values > pc_alpha)
             tested = separating[0] + 1 if separating.size else len(subsets)
-            largest = int(np.argmax(tested_p_values[:tested]))
+            # A subset not tested (NaN) sets neither the strength nor the largest p-value.
+            counted = np.flatnonzero(~np.isnan(tested_p_values[:tested]))
             ends = ((lag, i, j), (0, j, i)) if lag == 0 else ((lag, i, j),)
             for index in ends:
-                strength[index] = min(strength[index], np.abs(tested_statistics[:tested]).min())
+                skipped[index] |= counted.size < tested
+                if not counted.size:
+                    continue
+                largest = int(counted[np.argmax(tested_p_values[counted])])
+                strength[index] = min(strength[index], np.abs(tested_statistics[counted]).min())
                 if tested_p_values[largest] > p_values[index]:
                     p_values[index] = tested_p_values[largest]
                     statistics[index] = tested_statistics[largest]
@@ -243,16 +375,18 @@ def skeleton(
                 if lag == 0:
                     sepsets[(j, 0, i)] = subsets[separating[0]]
         p += 1
+        # A lag-0 neighbor whose link has no tested result conditions no test.
+        conditioning = adjacency[0] & ~(skipped[0] & (p_values[0] < 0))
         neighbors = [
             tuple(
                 sorted(
-                    np.flatnonzero(adjacency[0, :, j] & pool).tolist(),
-                    key=lambda k: -strength[0, k, j],
+                    np.flatnonzero(conditioning[:, j] & pool).tolist(),
+                    key=lambda k: (-round(float(strength[0, k, j]), KEY_DP), ranks[k], k),
                 )
             )
             for j in range(n_vars)
         ]
-    return adjacency, p_values, statistics, sepsets
+    return adjacency, p_values, statistics, sepsets, adjacency & skipped & (p_values < 0)
 
 
 def _neighbors(adjacency: np.ndarray, j: int) -> list[int]:
@@ -271,18 +405,22 @@ def _separating_subsets(
     j: int,
     max_p_global: int | None = None,
     middles: Sequence[int] | None = None,
-) -> list[frozenset[int]]:
-    """Every distinct subset of the lag-0 neighbors of ``j`` (and of ``i`` at lag 0) that separates.
+) -> tuple[list[frozenset[int]], list[frozenset[int]]]:
+    """Every distinct subset of the lag-0 neighbors of ``j`` (and of ``i`` at lag 0) that
+    separates, and every one not tested for want of rows.
 
-    A subset separates ``X^i_{t-lag}`` and ``X^j_t`` when its test, with the phase-2 conditions
-    added, gives a p-value above ``pc_alpha``. ``max_p_global`` caps the subsets' size, and a
-    subset draws only from ``middles`` when it is given.
+    A subset separates ``X^i_{t-lag}`` and ``X^j_t`` when its test with phase-2 conditions gives a
+    p-value above ``pc_alpha``. ``max_p_global`` caps subset size; ``middles``, when given, limits
+    candidates. Subsets with a neighbor individually untestable as a condition (:func:`_testable`)
+    count as untested without being asked.
     """
     families = [_neighbors(adjacency, j)] + ([_neighbors(adjacency, i)] if lag == 0 else [])
     if middles is not None:
         families = [[k for k in family if k in middles] for family in families]
+    testable = set(_testable(test, n_vars, i, lag, j, {k for f in families for k in f}))
     largest = max(len(family) for family in families)
     separating = []
+    skipped = []
     for size in range(largest + 1 if max_p_global is None else min(largest, max_p_global) + 1):
         subsets = list(
             dict.fromkeys(
@@ -291,10 +429,16 @@ def _separating_subsets(
                 for subset in combinations(family, size)
             )
         )
-        if subsets:
-            _, p_values = _test_subsets(test, n_vars, parents, i, lag, j, subsets)
-            separating += [frozenset(subsets[k]) for k in np.flatnonzero(p_values > pc_alpha)]
-    return separating
+        asked = [subset for subset in subsets if testable.issuperset(subset)]
+        left = [frozenset(subset) for subset in subsets if not testable.issuperset(subset)]
+        if left:
+            count_not_tested(test, lag * n_vars + i, j, len(left))
+            skipped += left
+        if asked:
+            _, p_values = _test_subsets(test, n_vars, parents, i, lag, j, asked)
+            separating += [frozenset(asked[k]) for k in np.flatnonzero(p_values > pc_alpha)]
+            skipped += [frozenset(asked[k]) for k in np.flatnonzero(np.isnan(p_values))]
+    return separating, skipped
 
 
 def apply_orientations(marks: np.ndarray, requests: Iterable[tuple[int, int]]) -> bool:
@@ -325,8 +469,15 @@ def colliders(
     constraints: LaggedConstraints | None = None,
     max_p_global: int | None = None,
     middles: Sequence[int] | None = None,
+    undecided: np.ndarray | None = None,
+    flagged: np.ndarray | None = None,
 ) -> tuple[np.ndarray, frozenset[Triple]]:
     """Phase 3: return the lag-0 marks with the colliders oriented, and the ambiguous triples.
+
+    Triples over an ``undecided`` link, shaped as ``adjacency`` and removed in phase 2
+    (:func:`mark_undecided`), are ambiguous under every rule because the link may be absent. So are
+    triples with a side marked by ``flagged``, shaped as ``adjacency``: an untested conditioning set
+    might have separated it (:func:`~andrey.temporal.pcmci.flagged_links`).
 
     With ``constraints``, the lag-0 links they decide are directed first, and no collider reverses
     one. With ``collider_rule="sepsets"``, a triple over a pair they keep apart has no separating
@@ -343,7 +494,7 @@ def colliders(
         check_knowledge_cycle((marks == TAIL) & (marks.T == ARROW))
         apart = constraints.forbidden.copy()
         apart[0] = ~lag0.support()
-    cache: dict[tuple[int, int, int], list[frozenset[int]]] = {}
+    cache: dict[tuple[int, int, int], tuple[list[frozenset[int]], list[frozenset[int]]]] = {}
     requests: list[tuple[int, int]] = []
     ambiguous: set[Triple] = set()
     inner = range(n_vars) if middles is None else middles
@@ -361,7 +512,9 @@ def colliders(
                 if adjacency[lag, i, k] and not adjacency[lag, i, j]
             ]
             for i, lag in far:
-                if collider_rule == "sepsets" and apart[lag, i, j]:
+                if undecided is not None and undecided[lag, i, j]:
+                    verdict = "ambiguous"
+                elif collider_rule == "sepsets" and apart[lag, i, j]:
                     verdict = "ambiguous"
                 elif collider_rule == "sepsets":
                     verdict = "non-collider" if k in sepsets.get((i, lag, j), ()) else "collider"
@@ -371,7 +524,10 @@ def colliders(
                         cache[key] = _separating_subsets(
                             test, n_vars, parents, adjacency, pc_alpha, *key, max_p_global, middles
                         )
-                    verdict = collider_verdict(cache[key], k, collider_rule)
+                    separating, skipped = cache[key]
+                    verdict = collider_verdict(separating, k, collider_rule, skipped)
+                if flagged is not None and (flagged[lag, i, k] or flagged[0, k, j]):
+                    verdict = "ambiguous"  # the votes ask the same tests either way
                 if verdict == "collider":
                     requests.append((j, k))
                     if lag == 0:
@@ -483,23 +639,24 @@ def pcmciplus(
     ``constraints``, background knowledge over lags ``0`` to ``tau_max``, reach every phase
     (:func:`run_phases`). ``max_depth`` caps phase 1's conditioning sets and ``max_p_global`` the
     conditions phases 2 and 3 take beyond the lagged parents. ``categorical``, ``seed``, and
-    ``degrees_of_freedom`` reach
-    :func:`~andrey.temporal.pcmci.design_test`, which raises on an ``indep_test`` it cannot build.
-    Raises :class:`ValueError` when ``collider_rule`` is not one of
+    ``degrees_of_freedom`` reach :func:`~andrey.temporal.pcmci.ranked_design_test`, which raises
+    on an ``indep_test`` it cannot build. Raises :class:`ValueError` when ``collider_rule`` is not
+    one of
     :data:`~andrey.constraint._skeleton.COLLIDER_RULES`.
     """
     check_collider_rule(collider_rule)
     check_fdr_method(fdr_method)
     data = np.asarray(data, dtype=np.float64)
-    test = design_test(
+    ranks = tie_ranks(data, categorical).tolist()
+    test = ranked_design_test(
         indep_test,
         data,
         tau_max,
+        ranks,
         categorical=categorical,
         seed=seed,
         degrees_of_freedom=degrees_of_freedom,
     )
-    ranks = tie_ranks(data, categorical).tolist()
     with backend.one_blas_thread():  # the stacked inversions then give the same bits on any host
         return run_phases(
             test,
@@ -515,6 +672,8 @@ def pcmciplus(
         )
 
 
+@counts_its_tests
+@keeps_no_untested_sets
 def run_phases(
     test: LinkTest,
     n_vars: int,
@@ -530,10 +689,11 @@ def run_phases(
     """Run the four phases with ``test`` over the columns of the lagged design.
 
     ``ranks`` holds each variable's :func:`~andrey.core.ties.tie_ranks`, which orders PC1's equal
-    strengths. With ``constraints``, no phase tests a forbidden or a required link: phase 1 leaves
-    out the forbidden lagged links and keeps the required ones, phase 2 starts the lag-0 links
-    from the allowed pairs and removes no required link, and phase 3 directs the lag-0 links the
-    knowledge decides before the colliders, which do not reverse them. A link no phase tested
+    strengths and the ends and equal neighbors of phase 2 (:func:`skeleton`). With
+    ``constraints``, no phase tests a forbidden or a required link: phase 1 leaves out the
+    forbidden lagged links and keeps the required ones, phase 2 starts the lag-0 links from the
+    allowed pairs and removes no required link, and phase 3 directs the lag-0 links the knowledge
+    decides before the colliders, which do not reverse them. A link no phase tested
     reports p-value 1 and statistic 0, or 0 and 1 when it is required. ``max_depth`` caps phase 1's
     conditioning sets; ``max_p_global`` caps the subsets of lag-0 neighbors that phase 2 conditions
     on beyond the lagged parents of both ends, and the subsets the collider votes of phase 3 read.
@@ -541,10 +701,14 @@ def run_phases(
     them: lag 0 is left as tested, and the corrected values decide no link.
     """
     recorder = Recorder(test)
-    parents = lagged_parents(recorder, n_vars, tau_max, pc_alpha, ranks, constraints, max_depth)
-    adjacency, p_values, statistics, sepsets = skeleton(
-        test, n_vars, parents, tau_max, pc_alpha, constraints, max_p_global
+    untested: list[list[Link]] = []
+    parents = lagged_parents(
+        recorder, n_vars, tau_max, pc_alpha, ranks, constraints, max_depth, untested
     )
+    adjacency, p_values, statistics, sepsets, undecided = skeleton(
+        test, n_vars, parents, tau_max, pc_alpha, ranks, constraints, max_p_global
+    )
+    mark_undecided(adjacency, p_values, statistics, undecided, untested)
     for (x, j), (statistic, p_value) in recorder.largest.items():
         lag, i = divmod(x, n_vars)
         if p_values[lag, i, j] < 0:  # removed in phase 1
@@ -558,6 +722,7 @@ def run_phases(
         p_values[1:] = corrected_pvalues(
             p_values[1:], fdr_method, None if constraints is None else constraints.forbidden[1:]
         )
+    required = None if constraints is None else constraints.required
     marks, ambiguous = colliders(
         test,
         n_vars,
@@ -568,6 +733,10 @@ def run_phases(
         collider_rule,
         constraints,
         max_p_global,
+        undecided=undecided,
+        flagged=flagged_links(running_counter(), adjacency, undecided, required)
+        if reads_flags()
+        else None,
     )
     orient(marks, adjacency, ambiguous)
     return PCMCIPlusResult(
@@ -578,4 +747,5 @@ def run_phases(
         statistics=statistics,
         sepsets=sepsets,
         ambiguous_triples=tuple(sorted(ambiguous)),
+        undecided=undecided,
     )

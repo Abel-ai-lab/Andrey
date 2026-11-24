@@ -15,14 +15,7 @@ from andrey.core.knowledge import EDGE_PARTS, PATH_PARTS, KnowledgePart
 from andrey.core.score import RANK_SCORES, SCORES
 from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 
-from .concepts import (
-    CMB_BLANKETS,
-    CONCEPTS,
-    MMB_BLANKETS,
-    REQUIRED_TARGET,
-    UNRANKED_TESTS,
-    concept_param,
-)
+from .concepts import CONCEPTS, UNRANKED_TESTS, concept_param
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
 
 # Shared inputs and parameters; a parameter that implements a concept comes from its template.
@@ -63,7 +56,9 @@ _OTHER_TESTS = (
     "Gaussian and cond_gauss = conditional Gaussian likelihood ratio. For nonlinear effects in "
     "continuous data, each far slower per test: kci = kernel test; rcot = its random-feature "
     "approximation; cmiknn = nearest-neighbor conditional mutual information; gpdc = "
-    "Gaussian-process regression and distance correlation. These four rank the columns as the "
+    "Gaussian-process regression and distance correlation; gcm, wgcm, pcm = the generalized, "
+    "weighted generalized, and projected covariance measures of regression residuals. These seven "
+    "rank the columns as the "
     "searches do, so ANDREY_TIE_BREAK=position makes their p-values depend on the column order. "
     + _DECLARED.format(every="gsq", fallback="fisherz")
 )
@@ -82,6 +77,14 @@ _POOLED_INDEP_TEST = concept_param(
 _DEGREES_OF_FREEDOM = concept_param("degrees_of_freedom")
 _CATEGORICAL = concept_param("categorical")
 _COLLIDER_RULE = concept_param("collider_rule")
+_POSSIBLY_SEPARABLE = concept_param("possibly_separable")
+_LINKS_POSSIBLY_SEPARABLE = concept_param(
+    "possibly_separable",
+    doc="How a same-step triple with a link listed in metadata['possibly_separable'] is read, on "
+    "data with missing values: orient = as any other triple; ambiguous = no collider vote reads "
+    "it, so it is neither a collider nor a non-collider. On series that no row bridges, ambiguous "
+    "can leave no same-step arrowhead.",
+)
 _POSSIBLE_DSEP = ParamSpec(
     name="possible_dsep",
     type="str",
@@ -142,8 +145,8 @@ _RESTART_DOC = (
 _TEST_SEED = concept_param(
     "seed",
     doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
-    "so a fit repeats. Seed for the random draws of indep_test, which only rcot, cmiknn, and gpdc "
-    "make; the other tests ignore it.",
+    "so a fit repeats. Seed for the random draws of indep_test, which only rcot, cmiknn, gpdc, "
+    "gcm, wgcm, and pcm make; the other tests ignore it.",
 )
 _MATRIX_LAYOUT = "(n_samples, n_variables), row = sample"
 #: The environment index the score searches and their FCI hybrids take for data pooled across
@@ -201,7 +204,9 @@ _add(
             "data with missing values, metadata['missingness_parents'] maps each column whose "
             "missingness indicator has parents to them, and metadata['corrected_edges'] lists the "
             "edges tested again (retested), removed (removed), and left with a test that had too "
-            "few rows to correct (uncorrected), by name or 0-based position",
+            "few rows to correct (uncorrected), by name or 0-based position, the fewest and the "
+            "median rows a corrected test read (rows_tested), and, when it is not zero, the number "
+            "of corrected tests that returned p = 1 (p_one_tests)",
         ),
         accel="numpy",
         status="supported",
@@ -217,6 +222,7 @@ _add(
             _DEGREES_OF_FREEDOM,
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
+            _POSSIBLY_SEPARABLE,
             _CATEGORICAL,
             concept_param(
                 "missing",
@@ -268,6 +274,7 @@ _add(
             _INDEP_TEST,
             _DEGREES_OF_FREEDOM,
             _COLLIDER_RULE,
+            _POSSIBLY_SEPARABLE,
             _CATEGORICAL,
             _POSSIBLE_DSEP,
             _TEST_SEED,
@@ -390,6 +397,7 @@ _add(
             _DEGREES_OF_FREEDOM,
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
+            _POSSIBLY_SEPARABLE,
             _CATEGORICAL,
             ParamSpec(
                 name="dependence_threshold",
@@ -456,6 +464,7 @@ _add(
             _POOLED_INDEP_TEST,
             _DEGREES_OF_FREEDOM,
             _COLLIDER_RULE,
+            _POSSIBLY_SEPARABLE,
             _CATEGORICAL,
             _POSSIBLE_DSEP,
             concept_param("confounded_index"),
@@ -498,18 +507,22 @@ _add(
             graph_kind="dag",
             doc="edges into the target from its estimated parents; metadata['parents'], "
             "metadata['p_values'] and metadata['confidence_intervals'] per column, "
-            "metadata['accepted_sets'], metadata['model_rejected']",
+            "metadata['accepted_sets'], metadata['model_rejected']; with a list of targets, a "
+            "list of those results, one per target in order",
         ),
         accel="numpy",
         status="supported",
         column_order="relabels",
         order_note="The listing order of `metadata['accepted_sets']` follows the column order.",
         params=(
-            concept_param(
-                "target",
+            ParamSpec(
+                name="target",
+                type="str_or_list",
+                default=None,
                 doc="Required: the variable whose parents to find, a column name from the data "
                 "file's header or a 0-based position, or a list of them, such as target=[a,b], "
                 "for one result for each, in order.",
+                nullable=True,
             ),
             ParamSpec(
                 name="targets",
@@ -550,7 +563,16 @@ _add(
 
 # --- local structure: one variable's Markov blanket or parents and children ----------------------
 
-_TARGET = concept_param("target")
+_TARGET = ParamSpec(
+    name="target",
+    type="str_or_list",
+    default=None,
+    doc="The variable whose set to learn: a column name from the data file's header or a 0-based "
+    "position, or a list of them, such as target=[a,b], that learns one set for each with one "
+    "search and returns one result for each, in order. null learns every variable's set and keeps "
+    "a pair when each is in the other's set.",
+    nullable=True,
+)
 _LOCAL_OUTPUT_DOC = (
     "without a target, the graph structure names: the CPDAG, the skeleton, or, for the blankets, "
     "the moral graph; with a target, undirected edges from target to each member, "
@@ -558,64 +580,12 @@ _LOCAL_OUTPUT_DOC = (
     "they joined; with a list of targets, a list of those results, one per target in order"
 )
 _BLANKET_STRUCTURE = concept_param("structure")
-#: A set learner's own max_depth, where its default is not the concept's.
-_OWN_DEPTH = {
-    "hiton_pc": (
-        concept_param(
-            "max_depth",
-            default=3,
-            doc="The maximum conditioning-set size of every conditional-independence test, at "
-            "least 0: 0 runs only unconditional tests, and null sets no limit. Aliferis et al. "
-            "2010 leave the cap open and run HITON-PC with caps 1 to 4; the default 3 is the cap "
-            "of their Markov-blanket experiments. A smaller cap runs fewer tests and can keep "
-            "variables that a larger conditioning set would remove.",
-        ),
-    ),
-    "hiton_mb": (
-        concept_param(
-            "max_depth",
-            default=3,
-            doc="The maximum conditioning-set size of every conditional-independence test, at "
-            "least 0: 0 runs only unconditional tests, and null sets no limit. Aliferis et al. "
-            "2010 leave the cap open and run HITON-MB with a cap of 3, the default. A smaller cap "
-            "runs fewer tests and can keep variables that a larger conditioning set would remove; "
-            "a spouse test conditions on the separating set and the common child, so a candidate "
-            "whose separating set holds max_depth variables does not join.",
-        ),
-    ),
-}
-#: A set learner's own alpha, where its default is not the concept's.
-_OWN_DEGREES_OF_FREEDOM = {
-    "pcmb": concept_param(
-        "degrees_of_freedom",
-        default="nonempty",
-        doc=_DEGREES_OF_FREEDOM.doc
-        + " PCMB defaults to nonempty: its paper runs G-square as Spirtes, Glymour and Scheines do "
-        "(Pena et al. 2007).",
-    ),
-    "mmmb": concept_param(
-        "degrees_of_freedom",
-        default="nonempty",
-        doc=_DEGREES_OF_FREEDOM.doc
-        + " MMMB defaults to nonempty: its paper runs G-square as Spirtes, Glymour and Scheines "
-        "describe it (Tsamardinos, Aliferis & Statnikov 2003).",
-    ),
-}
-_OWN_ALPHA = {
-    "pcmb": concept_param(
-        "alpha",
-        default=0.01,
-        doc="Significance level of the conditional-independence test, in (0, 1). Smaller values "
-        "give smaller sets. Pena et al. 2007 run PCMB at 0.01, the default.",
-    ),
-}
-#: What a set learner's target answer holds beyond its one set.
-_OWN_OUTPUT = {
-    "hiton_mb": "; metadata['parents_and_children'] lists the parents and children alone",
-    "mmmb": "; metadata['parents_and_children'] lists the parents and children alone",
-    "pcmb": "; metadata['parents_and_children'] lists the parents and children alone",
-}
-for _name, _summary, _key, _structure, _kind, _refs, _status in (
+_BLANKET_POSSIBLY_SEPARABLE = concept_param(
+    "possibly_separable",
+    doc=_POSSIBLY_SEPARABLE.doc + " Read under structure=cpdag only; the skeleton and the moral "
+    "graph orient nothing.",
+)
+for _name, _summary, _key, _structure, _kind, _refs in (
     (
         "iamb",
         "One variable's Markov blanket (its parents, children, and children's other parents) by "
@@ -626,7 +596,6 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
         _BLANKET_STRUCTURE,
         "cpdag",
         ("Tsamardinos, Aliferis & Statnikov 2003", "Margaritis 2003"),
-        "supported",
     ),
     (
         "inter_iamb",
@@ -637,33 +606,6 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
         _BLANKET_STRUCTURE,
         "cpdag",
         ("Tsamardinos, Aliferis & Statnikov 2003", "Margaritis 2003"),
-        "supported",
-    ),
-    (
-        "gs",
-        "One variable's Markov blanket by Grow-Shrink: the other variables visited in one fixed "
-        "order, the most dependent first, each added at once when a conditional-independence test "
-        "finds it dependent given the blanket so far, in passes until none joins, then a shrink. "
-        "With target=null, every variable's blanket joined into a CPDAG by the Grow-Shrink "
-        "structure learner, or into the skeleton or the moral graph (structure).",
-        "markov_blanket",
-        _BLANKET_STRUCTURE,
-        "cpdag",
-        ("Margaritis & Thrun 2000", "Margaritis 2003"),
-        "supported",
-    ),
-    (
-        "fast_iamb",
-        "One variable's Markov blanket by Fast-IAMB: each round tests every variable outside the "
-        "blanket given it and adds the dependent ones, the most dependent first, while the data "
-        "hold more than five rows per cell of the next test's table (categorical data), then "
-        "shrinks. With target=null, every variable's blanket joined into a CPDAG by the "
-        "Grow-Shrink structure learner, or into the skeleton or the moral graph (structure).",
-        "markov_blanket",
-        _BLANKET_STRUCTURE,
-        "cpdag",
-        ("Yaramakala & Margaritis 2005", "Margaritis 2003"),
-        "supported",
     ),
     (
         "mmpc",
@@ -683,75 +625,6 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
         ),
         "undirected",
         ("Tsamardinos, Brown & Aliferis 2006", "Margaritis 2003"),
-        "supported",
-    ),
-    (
-        "hiton_pc",
-        "One variable's parents and children, undirected, by semi-interleaved HITON-PC: the "
-        "candidates join in order of their unconditional association, each newcomer tested against "
-        "subsets of the members before it and every member again once all have joined, with a "
-        "symmetry check. With target=null, the skeleton, or, with structure=cpdag, that skeleton "
-        "oriented into a CPDAG by the Grow-Shrink structure learner.",
-        "parents_and_children",
-        concept_param(
-            "structure",
-            default="skeleton",
-            choices=("skeleton", "cpdag"),
-            doc="The graph returned without a target: skeleton = the adjacencies, each variable "
-            "joined to its parents and children; cpdag = the skeleton with its colliders "
-            "oriented and Meek's rules applied (Margaritis 2003), which costs more. With a "
-            "target, the target's set, whatever the value.",
-        ),
-        "undirected",
-        ("Aliferis et al. 2010", "Margaritis 2003"),
-        "supported",
-    ),
-    (
-        "hiton_mb",
-        "One variable's Markov blanket by semi-interleaved HITON-MB: HITON-PC's parents and "
-        "children of the target and of each of them, then each child's other parent admitted by "
-        "one conditional-independence test given the set that separated it from the target and "
-        "the common child. With target=null, every variable's sets joined into a CPDAG by the "
-        "Grow-Shrink structure learner, or into the skeleton or the moral graph (structure).",
-        "markov_blanket",
-        _BLANKET_STRUCTURE,
-        "cpdag",
-        ("Aliferis et al. 2010", "Margaritis 2003"),
-        "supported",
-    ),
-    (
-        "mmmb",
-        "One variable's Markov blanket by MMMB in its authors' corrected form: MMPC's parents and "
-        "children of the target and of each of them, with the symmetry check, then each child's "
-        "other parent admitted by one conditional-independence test given the set that separated "
-        "it from the target and a common neighbor. With target=null, every variable's sets joined "
-        "into a CPDAG by the Grow-Shrink structure learner, or into the skeleton or the moral "
-        "graph (structure).",
-        "markov_blanket",
-        _BLANKET_STRUCTURE,
-        "cpdag",
-        (
-            "Tsamardinos, Aliferis & Statnikov 2003",
-            "Tsamardinos, Brown & Aliferis 2006",
-            "Aliferis et al. 2010",
-            "Margaritis 2003",
-        ),
-        "supported",
-    ),
-    (
-        "pcmb",
-        "One variable's Markov blanket by PCMB: the parents and children of the target and of each "
-        "of them by GetPCD, which after every addition removes each member a subset of the others "
-        "separates from the target, with the symmetry check, then each child's other parent "
-        "admitted by one conditional-independence test given the set that separated it from the "
-        "target and a common neighbor; on categorical data a test runs only with five rows per "
-        "degree of freedom. With target=null, every variable's sets joined into a CPDAG by the "
-        "Grow-Shrink structure learner, or into the skeleton or the moral graph (structure).",
-        "markov_blanket",
-        _BLANKET_STRUCTURE,
-        "cpdag",
-        ("Pena, Nilsson, Bjorkegren & Tegner 2007", "Margaritis 2003"),
-        "supported",
     ),
 ):
     _add(
@@ -763,486 +636,25 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
             output=OutputSpec(
                 structure_type="graph",
                 graph_kind=_kind,
-                doc=_LOCAL_OUTPUT_DOC.format(key=_key) + _OWN_OUTPUT.get(_name, ""),
+                doc=_LOCAL_OUTPUT_DOC.format(key=_key),
             ),
             accel="numpy",
-            status=_status,
+            status="supported",
             column_order="relabels",
             tie_break=True,
             params=(
                 _TARGET,
                 _structure,
-                _OWN_ALPHA.get(_name, _ALPHA),
+                _ALPHA,
                 _INDEP_TEST,
-                _OWN_DEGREES_OF_FREEDOM.get(_name, _DEGREES_OF_FREEDOM),
+                _DEGREES_OF_FREEDOM,
                 _CATEGORICAL,
+                _BLANKET_POSSIBLY_SEPARABLE,
                 _TEST_SEED,
-                *_OWN_DEPTH.get(_name, ()),
             ),
             references=_refs,
         )
     )
-
-# --- target-centered: the edges at one variable ------------------------------------------------
-
-_add(
-    MethodSpec(
-        name="mb_by_mb",
-        family="constraint",
-        summary="The direct causes and direct effects of one variable, the edges at it in the "
-        "CPDAG, by sequential local learning: its Markov blanket and the local structure over it, "
-        "then a neighbor's, one blanket at a time, until no further blanket can direct an edge "
-        "at the target. For one variable of a large graph with small blankets.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
-        output=OutputSpec(
-            structure_type="graph",
-            graph_kind="cpdag",
-            doc="the edges at target alone, with the directions the CPDAG gives them; "
-            "metadata['parents'], metadata['children'], and metadata['undirected'] list the "
-            "columns joined to it, and metadata['blankets_learned'] the variables whose blanket "
-            "the search learned, in order",
-        ),
-        accel="numpy",
-        status="supported",
-        column_order="relabels",
-        tie_break=True,
-        params=(
-            REQUIRED_TARGET,
-            concept_param(
-                "blanket",
-                default="iamb_forward",
-                doc="The Markov blanket learner run for each variable the search visits: "
-                "iamb_forward = IAMB's grow phase without its shrink, the learner of Wang et al. "
-                "2014's runs, which keeps a variable added in error rather than lose a member; "
-                "total_conditioning = each variable the test finds dependent on it given all the "
-                "other variables (Pellet & Elisseeff 2008); the others are the functions of those "
-                "names.",
-            ),
-            _ALPHA,
-            _INDEP_TEST,
-            _DEGREES_OF_FREEDOM,
-            _CATEGORICAL,
-            _TEST_SEED,
-            concept_param("max_depth"),
-            ParamSpec(
-                name="local_max_depth",
-                type="int",
-                default=5,
-                doc="The maximum size of the subsets the local structures test, at least 0 and "
-                "never above max_depth; null sets no limit. Wang et al. 2014 leave the cap open "
-                "and run MB-by-MB with 5, the default, on the local structures alone, as their "
-                "complexity bounds only them by it: the same cap on the blanket learner stops its "
-                "grow phase before the blanket is whole, so the errors rise with the sample.",
-                nullable=True,
-                minimum=0,
-            ),
-        ),
-        references=("Wang, Zhou, Zhao & Geng 2014", "Meek 1995"),
-    )
-)
-
-_add(
-    MethodSpec(
-        name="cmb",
-        family="constraint",
-        summary="The direct causes and direct effects of one variable by Causal Markov Blanket "
-        "discovery: its parents and children labeled from how their dependence changes once the "
-        "variable is conditioned on, inconclusive pairs retested given a neighbor's blanket, and "
-        "undecided neighbors visited in turn. For one variable of a large graph with small "
-        "blankets.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
-        output=OutputSpec(
-            structure_type="graph",
-            graph_kind="cpdag",
-            doc="the edges at target alone, with the directions the tests decide; "
-            "metadata['parents'], metadata['children'], and metadata['undirected'] list the "
-            "columns joined to it, metadata['markov_blanket'] its Markov blanket, and "
-            "metadata['blankets_learned'] the variables whose blanket the fit learned, in order",
-        ),
-        accel="numpy",
-        status="supported",
-        column_order="relabels",
-        tie_break=True,
-        params=(
-            REQUIRED_TARGET,
-            concept_param(
-                "blanket",
-                default="hiton_mb",
-                choices=CMB_BLANKETS,
-                doc="The Markov blanket learner run for each variable CMB visits, one that returns "
-                "the parents and children apart from the spouses: hiton_mb, the learner of Gao & "
-                "Ji 2015's runs, mmmb, or pcmb.",
-            ),
-            concept_param(
-                "alpha",
-                default=0.02,
-                doc="Significance level of the conditional-independence test, in (0, 1). Smaller "
-                "values give smaller sets. Gao & Ji 2015 run CMB at 0.02, the default.",
-            ),
-            _INDEP_TEST,
-            _DEGREES_OF_FREEDOM,
-            _CATEGORICAL,
-            _TEST_SEED,
-            concept_param("max_depth"),
-        ),
-        references=("Gao & Ji 2015", "Meek 1995"),
-    )
-)
-
-_add(
-    MethodSpec(
-        name="mmb_by_mmb",
-        family="constraint",
-        summary="The edges at one variable in the PAG when unmeasured common causes may exist, by "
-        "sequential local learning: its Markov blanket and the local structure over it, then a "
-        "neighbor's, one blanket at a time, until the marks at the target are decided or no "
-        "further blanket can decide them. For one variable of a large graph with small blankets.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
-        output=OutputSpec(
-            structure_type="graph",
-            graph_kind="pag",
-            doc="the edges at target alone, with the marks the PAG gives them; "
-            "metadata['parents'], metadata['children'], metadata['bidirected'], and "
-            "metadata['undetermined'] (a circle at either end) list the columns joined to it, "
-            "metadata['markov_blanket'] its Markov blanket, and metadata['blankets_learned'] the "
-            "variables whose blanket the search learned, in order",
-        ),
-        accel="numpy",
-        status="supported",
-        column_order="relabels",
-        tie_break=True,
-        params=(
-            REQUIRED_TARGET,
-            concept_param(
-                "blanket",
-                default="total_conditioning",
-                choices=MMB_BLANKETS,
-                doc="The Markov blanket learner run for each variable the search visits: "
-                "total_conditioning = each variable the test finds dependent on it given all the "
-                "other variables (Pellet & Elisseeff 2008), the learner of Xie et al. 2024; the "
-                "others are the functions of those names, which find the same blanket with "
-                "hidden variables.",
-            ),
-            concept_param(
-                "alpha",
-                default=0.01,
-                doc="Significance level of the conditional-independence tests, in (0, 1). Xie et "
-                "al. 2024 state none; 0.01 is the level of their code. total_conditioning tests "
-                "at alpha / (10 floor(d / 10)) over d columns, alpha itself below 10 columns, as "
-                "that code does.",
-            ),
-            _INDEP_TEST,
-            _DEGREES_OF_FREEDOM,
-            _CATEGORICAL,
-            _TEST_SEED,
-            concept_param("max_depth"),
-            ParamSpec(
-                name="local_max_depth",
-                type="int",
-                default=10,
-                doc="The maximum size of the subsets the local structures test, at least 0 and "
-                "never above max_depth; null sets no limit. Xie et al. 2024 leave the cap open; "
-                "10 is the cap of their code, which bounds only the local structures by it.",
-                nullable=True,
-                minimum=0,
-            ),
-        ),
-        references=(
-            "Xie, Li, Wu, Zeng, Liu & Geng 2024",
-            "Pellet & Elisseeff 2008",
-            "Zhang 2008",
-        ),
-    )
-)
-
-# --- claims about pairs ---------------------------------------------------------------------------
-
-_add(
-    MethodSpec(
-        name="y_structures",
-        family="constraint",
-        summary="Y-structures: claims that one variable is a causal ancestor of another, each from "
-        "a pattern of four variables in which the first makes a third independent of the second "
-        "and dependent on a fourth. The claims hold when the rows were selected by a mechanism "
-        "the variables affect, with hidden common causes allowed. Returns no edges; the claims "
-        "and their scores are in metadata['effects'].",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
-        output=OutputSpec(
-            structure_type="graph",
-            graph_kind="dag",
-            hidden_causes=True,
-            doc="no edges; metadata['effects'] lists one record per claimed pair, the ancestor as "
-            "treatment, by descending score, each with its score and patterns",
-        ),
-        accel="numpy",
-        status="supported",
-        column_order="relabels",
-        order_note="The listing order of claims with equal scores and of a claim's patterns "
-        "follows the column order.",
-        params=(
-            concept_param(
-                "variables",
-                doc="The variables to answer for, in any order: a list of column names from the "
-                "data file's header or 0-based positions, at least two. Claims are made only about "
-                "ordered pairs of them; the other variables of a pattern may be any column. null "
-                "answers for every ordered pair of columns.",
-            ),
-            ParamSpec(
-                name="extended",
-                type="bool",
-                default=False,
-                doc="false = the Y-structure, in which x makes both other variables independent of "
-                "y; true = the extended Y-structure, which needs this of one of them, so it finds "
-                "more patterns and, in its paper's simulations, less precise claims.",
-            ),
-            concept_param(
-                "alpha",
-                default=0.01,
-                doc="Significance level of every test: a p-value below alpha is a dependence, any "
-                "other an independence. The default is the level of Versteeg, Zhang & Mooij 2022.",
-            ),
-            _INDEP_TEST,
-            _DEGREES_OF_FREEDOM,
-            _CATEGORICAL,
-            _TEST_SEED,
-        ),
-        references=(
-            "Versteeg, Zhang & Mooij 2022",
-            "Mani, Spirtes & Cooper 2006",
-            "Mooij & Cremers 2015",
-        ),
-    )
-)
-
-# --- treatment-outcome pairs ----------------------------------------------------------------------
-
-_TREATMENT = concept_param("treatment")
-_OUTCOME = concept_param("outcome")
-_PAIR_ALPHA_DOC = (
-    "Significance level of every test: a p-value above alpha is an independence, any other a "
-    "dependence. The default is the level of the authors' code; the papers' experiments use "
-)
-
-_add(
-    MethodSpec(
-        name="ldp",
-        family="constraint",
-        summary="Local discovery by partitioning: sorts every other variable by its causal "
-        "relation to a treatment and an outcome (confounder, instrument, cause of the outcome, "
-        "descendant of the treatment, ...) from tests whose conditioning sets are the variables "
-        "already sorted, and returns the confounders as a valid adjustment set for the total "
-        "effect when an instrument checks them; hidden variables allowed. Returns no edges; the "
-        "answer is in metadata['effects'], the labels in metadata['partition'].",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
-        output=OutputSpec(
-            structure_type="graph",
-            graph_kind="dag",
-            hidden_causes=True,
-            doc="no edges; metadata['effects'] holds the pair's record: a valid adjustment set "
-            "for the total effect when the Z5 criterion passes, no answer otherwise",
-        ),
-        accel="numpy",
-        status="experimental",
-        column_order="relabels",
-        order_note="The number of tests can change with the column order: a search stops at the "
-        "first variable that decides it.",
-        params=(
-            _TREATMENT,
-            _OUTCOME,
-            concept_param("alpha", default=0.005, doc=_PAIR_ALPHA_DOC + "0.01, 0.005, or 0.001."),
-            _INDEP_TEST,
-            _DEGREES_OF_FREEDOM,
-            _CATEGORICAL,
-            _TEST_SEED,
-        ),
-        references=("Maasch, Pan, Gupta, Kuleshov, Gan & Wang 2024",),
-    )
-)
-
-_add(
-    MethodSpec(
-        name="ld3",
-        family="constraint",
-        summary="Local discovery for direct discrimination: finds the parents of an outcome that "
-        "has no observed descendants, and whether a treatment is one of them (the structural "
-        "direct criterion), from a number of tests linear in the number of variables; the parents "
-        "are a valid adjustment set for the weighted controlled direct effect. Returns the edges "
-        "into the outcome; the answer is in metadata['effects'], the labels in "
-        "metadata['partition'].",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
-        output=OutputSpec(
-            structure_type="graph",
-            graph_kind="dag",
-            doc="edges into the outcome from each parent found; metadata['effects'] holds the "
-            "pair's record: whether the treatment is a parent, and the other parents as the set "
-            "for the direct effect",
-        ),
-        accel="numpy",
-        status="experimental",
-        column_order="relabels",
-        params=(
-            _TREATMENT,
-            _OUTCOME,
-            concept_param("alpha", default=0.005, doc=_PAIR_ALPHA_DOC + "0.005, 0.01, and 0.05."),
-            _INDEP_TEST,
-            _DEGREES_OF_FREEDOM,
-            _CATEGORICAL,
-            _TEST_SEED,
-        ),
-        references=("Maasch, Gan, Chen, Orfanoudaki, Akpinar & Wang 2025",),
-    )
-)
-
-_add(
-    MethodSpec(
-        name="ldecc",
-        family="constraint",
-        summary="Local discovery using eager collider checks: the edges at a treatment and their "
-        "directions, from its Markov blanket, its neighbors among it, and PC's tests over the "
-        "other pairs, read as they come (an independence that the treatment turns into a "
-        "dependence directs its parents), stopping once every neighbor is directed. Returns the "
-        "edges at the treatment; the locally valid parent sets, one per effect the local "
-        "structure allows, are in metadata['effects'].",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
-        output=OutputSpec(
-            structure_type="graph",
-            graph_kind="cpdag",
-            doc="the edges at the treatment alone, with the directions the method finds; "
-            "metadata['effects'] holds the pair's record: the locally valid parent sets of the "
-            "treatment",
-        ),
-        accel="numpy",
-        status="supported",
-        column_order="relabels",
-        tie_break=True,
-        params=(
-            _TREATMENT,
-            _OUTCOME,
-            concept_param(
-                "blanket",
-                doc="The Markov blanket learner of the first step: iamb, the learner of Gupta et "
-                "al. 2023's runs, or any other by name; a superset of the blanket keeps the answer "
-                "right under exact tests.",
-            ),
-            concept_param("alpha", default=0.05, doc=_PAIR_ALPHA_DOC + "0.01 * 32000 / n."),
-            ParamSpec(
-                name="check",
-                type="bool",
-                default=True,
-                doc="true = LDECC-checks (Gupta et al. 2023, Remark 21): an eager collider check "
-                "between two variables that are not neighbors of the treatment directs parents "
-                "only when their minimal neighbor separators are the same set; false = it directs "
-                "both separators.",
-            ),
-            _INDEP_TEST,
-            _DEGREES_OF_FREEDOM,
-            _CATEGORICAL,
-            _TEST_SEED,
-            concept_param("max_depth"),
-        ),
-        references=("Gupta, Childers & Lipton 2023", "Schubert, Claassen & Magliacane 2026"),
-    )
-)
-
-_add(
-    MethodSpec(
-        name="local_optimal_adjustment",
-        family="constraint",
-        summary="Local optimal adjustments discovery (LOAD): for two variables given unordered, "
-        "learns the edges at each one Markov blanket at a time (MB-by-MB), tests from them whether "
-        "one is an explicit, a possible, or no ancestor of the other, and returns the optimal "
-        "adjustment set for the total effect when it is identifiable, the locally valid parent "
-        "sets of the treatment otherwise. The answer is in metadata['effects'].",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
-        output=OutputSpec(
-            structure_type="graph",
-            graph_kind="cpdag",
-            doc="the edges at the two variables as their own searches directed them, no edge "
-            "away from them; metadata['effects'] holds one record per ordered pair of them",
-        ),
-        accel="numpy",
-        status="supported",
-        column_order="relabels",
-        order_note="The number of tests can change with the column order: the identifiability "
-        "step stops at the first undirected neighbor of the treatment that fails it.",
-        tie_break=True,
-        params=(
-            concept_param(
-                "variables",
-                doc="Required: the two variables to answer for, in any order: a list of column "
-                "names from the data file's header or 0-based positions. The method answers for "
-                "both ordered pairs of them.",
-            ),
-            concept_param(
-                "blanket",
-                default="gs",
-                doc="The Markov blanket learner run for each variable the search visits: gs = "
-                "Grow-Shrink, the learner of Schubert, Claassen & Magliacane 2026; iamb_forward = "
-                "IAMB's grow phase without its shrink; total_conditioning = each variable the test "
-                "finds dependent on it given all the other variables (Pellet & Elisseeff 2008); "
-                "the others are the functions of those names.",
-            ),
-            concept_param(
-                "alpha",
-                default=0.01,
-                doc="Significance level of every test: a p-value above alpha is an independence, "
-                "any other a dependence. The default is the level of the experiments of Schubert, "
-                "Claassen & Magliacane 2026 and of the authors' code.",
-            ),
-            _INDEP_TEST,
-            _DEGREES_OF_FREEDOM,
-            _CATEGORICAL,
-            _TEST_SEED,
-        ),
-        references=(
-            "Schubert, Claassen & Magliacane 2026",
-            "Fang, Liu, Geng, Zhu & He 2022",
-            "Wang, Zhou, Zhao & Geng 2014",
-        ),
-    )
-)
-
-_add(
-    MethodSpec(
-        name="locpc_cde",
-        family="constraint",
-        summary="Local PC-style discovery for the controlled direct effect: learns the graph "
-        "around an outcome one hop at a time with PC's tests, run only near the outcome, until "
-        "every edge at the outcome is oriented, so that its parents are a valid adjustment set, "
-        "or a larger hop adds no variable. Returns the local essential graph; the answer is in "
-        "metadata['effects'].",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT, missing=True),
-        output=OutputSpec(
-            structure_type="graph",
-            graph_kind="cpdag",
-            doc="the local essential graph of the outcome at the last hop learned; "
-            "metadata['effects'] holds the pair's record: whether the effect is identifiable, "
-            "the outcome's other parents as its set, and the paper's reason; metadata['hop'], "
-            "metadata['visited'], and metadata['double_bar'] describe the search",
-        ),
-        accel="numpy",
-        status="supported",
-        column_order="relabels",
-        tie_break=True,
-        params=(
-            _TREATMENT,
-            _OUTCOME,
-            concept_param(
-                "alpha",
-                default=0.05,
-                doc="Significance level of every test: a p-value above alpha is an independence, "
-                "any other a dependence. The default is the level of the paper's experiments and "
-                "of the authors' code.",
-            ),
-            _INDEP_TEST,
-            _DEGREES_OF_FREEDOM,
-            _CATEGORICAL,
-            _TEST_SEED,
-            concept_param("max_depth"),
-        ),
-        references=("Loranchet & Assaad 2026", "Meek 1995"),
-    )
-)
 
 # --- score-based ----------------------------------------------------------------------------------
 
@@ -1444,6 +856,75 @@ _add(
             _CATEGORICAL,
         ),
         references=("Nazaret & Blei 2024",),
+    )
+)
+_add(
+    MethodSpec(
+        name="lges",
+        family="score",
+        summary="Less greedy equivalence search: GES that adds no edge between two variables the "
+        "score already holds independent given one's parents in a graph of the current class, and "
+        "deletes and reverses edges as GES and GIES do. schedule=lges (default) is the paper's "
+        "LGES (Algorithm 1), deleting and reversing before each addition; "
+        "schedule=lges0_released is its LGES-0 in the authors' code's order (additions, "
+        "deletions, then reversals). "
+        "insertion=conservative also skips a pair when any of its additions worsens the score. "
+        "The standard BIC by default, BDeu when every column is categorical, conditional Gaussian "
+        "when some are. Returns a CPDAG + score.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
+            "a mixed-data setting read",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            _SCORE_FUNC,
+            _PENALTY_DISCOUNT,
+            _EBIC_GAMMA_STANDARD,
+            _EQUIVALENT_SAMPLE_SIZE,
+            ParamSpec(
+                name="insertion",
+                type="str",
+                default="safe",
+                choices=("safe", "conservative"),
+                doc="Which pairs an edge addition skips: safe (SafeInsert) skips a pair when one "
+                "graph of the current class scores better without the edge, and the paper proves "
+                "that it recovers the true class as the rows grow; conservative "
+                "(ConservativeInsert) also skips it when any valid addition of the edge worsens "
+                "the score, with fewer errors in the paper's simulations and no such proof. safe "
+                "favors the proof and gives up accuracy; conservative favors fewer errors (the "
+                "lower mean error in 31 of 38 settings of the paper's simulation) and gives up "
+                "the proof.",
+            ),
+            ParamSpec(
+                name="schedule",
+                type="str",
+                default="lges",
+                choices=("lges", "lges0_released"),
+                doc="The order of the phases: lges is the paper's LGES (Algorithm 1), deleting "
+                "then reversing edges until neither improves the score before each single "
+                "addition; lges0_released is its LGES-0 (Algorithm 8) in the order of the "
+                "authors' code: additions, deletions, then reversals, once. lges is the "
+                "default as the paper's main method. lges favors accuracy on denser graphs and "
+                "gives up time (where both ran in one process, the conservative rule at mean "
+                "degree 1 and 3, where the safe fits ran first and carry about 0.25 s of start-up, "
+                "its median fit took 1.0 to 1.33 times as long as LGES-0's; at mean degree 2, "
+                "4, and 6, timed in separate runs, so small differences are noise, 0.9 to 1.8 "
+                "times); "
+                "lges0_released favors time and gives up accuracy on denser graphs. On the "
+                "paper's linear-Gaussian simulation lges was better in 15 of 16 settings at "
+                "mean degree 3; at mean degree 1 and 2 the two made about as many errors (mean "
+                "errors summed over 32 settings, 457 against 459), lges0_released better in "
+                "12, lges in 5, with 15 ties.",
+            ),
+            _CATEGORICAL,
+        ),
+        references=("Ejaz & Bareinboim 2025",),
     )
 )
 _add(
@@ -2151,8 +1632,8 @@ _PERMUTATION_FCI_SEED = concept_param(
     "seed",
     doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
     "so a fit repeats. Seed for the random order in which the BOSS or GRaSP phase visits "
-    "variables, for GRaSP's random starting order, and for the random draws of rcot, cmiknn, and "
-    "gpdc.",
+    "variables, for GRaSP's random starting order, and for the random draws of rcot, cmiknn, "
+    "gpdc, gcm, wgcm, and pcm.",
 )
 for _name, _summary, _own, _refs in (
     (
@@ -2479,58 +1960,6 @@ _add(
 )
 _add(
     MethodSpec(
-        name="local_isa_ling",
-        family="functional",
-        summary="The weighted edges into one variable and its children, in a linear non-Gaussian "
-        "model whose graph may hold cycles: from the variable and its Markov blanket alone, a "
-        "sparse ICA and HSIC tests give the independent subspaces, and every model of the "
-        "equivalence class is read from them, stable models first.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
-        output=OutputSpec(
-            structure_type="graph",
-            graph_kind="digraph",
-            weighted=True,
-            doc="the edges into target and into each of its children in the first model, with "
-            "their weights; metadata['equivalent_models'] lists every model the data allow, "
-            "stable ones first",
-        ),
-        accel="numpy",
-        status="supported",
-        column_order="relabels",
-        order_note=(
-            "The sparse ICA rounds differently under a new column order, which can move an entry "
-            "of the demixing matrix within rounding of w_threshold across it."
-        ),
-        params=(
-            REQUIRED_TARGET,
-            ParamSpec(
-                name="acyclic",
-                type="bool",
-                default=False,
-                doc="Read the edges by peeling sink columns of the demixing matrix (Dai et al. "
-                "2024, App. C), which assumes neither the target nor a child lies on a cycle, "
-                "instead of trying every admissible assignment (Algorithm 1); when no column is "
-                "a sink, the column with the fewest nonzero entries is read as one (the authors' "
-                "rule).",
-            ),
-            concept_param(
-                "w_threshold",
-                default=0.05,
-                doc="Entries of the standardized demixing matrix at most this in magnitude read as "
-                "zero, and a block whose smallest singular value is at most this reads as "
-                "singular; at least 0. Dai et al. 2024's value.",
-            ),
-            concept_param(
-                "alpha",
-                doc="Significance level of the HSIC tests that group the ICA's components into "
-                "independent subspaces: a pair with a p-value at most alpha shares one.",
-            ),
-        ),
-        references=("Dai, Ng, Zheng, Gao & Zhang 2024", "Zhang & Chan 2006", "Lacerda et al. 2008"),
-    )
-)
-_add(
-    MethodSpec(
         name="multi_group_direct_lingam",
         family="functional",
         summary="DirectLiNGAM fit jointly across >= 2 datasets sharing the same variables: one "
@@ -2654,7 +2083,7 @@ _add(
             "residuals, score its score, search exact or greedy, families each column's family.",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         params=(
@@ -2665,8 +2094,9 @@ _add(
                 choices=_CPCM_FAMILIES,
                 doc="The family of each variable given its parents: one name for every column or a "
                 "list of one name per column. gaussian = mean and scale change with the parents; "
-                "gaussian_fixed_scale = the mean alone; exponential; pareto = scale 1, values of "
-                "at least 1; poisson; gamma = mean and shape; gamma_fixed_shape = the mean alone; "
+                "gaussian_fixed_scale = the mean alone; exponential; pareto = scale 1, values "
+                "greater than 1; poisson; gamma = mean and shape; gamma_fixed_shape = the mean "
+                "alone; "
                 "gumbel = location and scale; gumbel_fixed_scale = the location alone; "
                 "negative_binomial = the mean, one size for all rows. A column outside its "
                 "family's support raises ValueError.",
@@ -2693,6 +2123,21 @@ _add(
         ),
     )
 )
+_SKEWD_OPTIMIZER = ParamSpec(
+    name="optimizer",
+    type="str",
+    default="cmaes",
+    choices=("cmaes", "lbfgs"),
+    doc="The optimizer of each search of the penalized likelihood: cmaes = CMA-ES, the paper's "
+    "heuristic; lbfgs = L-BFGS-B with the analytic gradient, from the same starts within the same "
+    "bounds. cmaes favors the paper's optimizer and gives up time; lbfgs favors time and gives up "
+    "the paper's optimizer. On the paper's simulated pairs and graphs of 1,000 rows (graphs of 6 "
+    "and 10 variables; 20 seeds each, one worker), lbfgs decided worse than cmaes in no setting by "
+    "a paired bootstrap, at a median of 5.8 to 14.9 times less time per pair and 2.4 times less "
+    "per graph, and its penalized likelihood was lower in 306 of the 738 fitted models and higher "
+    "in 233.",
+)
+
 _add(
     MethodSpec(
         name="skewd_mv",
@@ -2726,7 +2171,8 @@ _add(
                 "nonlinear effects, each far slower per test: kci = kernel test, the authors' "
                 "choice; rcot = its random-feature approximation; cmiknn = nearest-neighbor "
                 "conditional mutual information; gpdc = Gaussian-process regression and distance "
-                "correlation. null picks fisherz.",
+                "correlation; gcm, wgcm, pcm = the generalized, weighted generalized, and "
+                "projected covariance measures of regression residuals. null picks fisherz.",
             ),
             ParamSpec(
                 name="tuning_iter",
@@ -2754,6 +2200,7 @@ _add(
                 "ValueError, raised once they are found, before any is fitted. 100 is the order up "
                 "to which the paper expects the method to apply. null sets no cap.",
             ),
+            _SKEWD_OPTIMIZER,
             concept_param(
                 "seed",
                 doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
@@ -2853,7 +2300,7 @@ _add(
             "search.",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         params=(
@@ -3096,7 +2543,6 @@ _add(
         status="supported",
         column_order="relabels",
         tie_break=True,
-        order_note='With `collider_rule="sepsets"`, the orientations can follow the column order.',
         params=(
             concept_param(
                 "tau_max",
@@ -3124,6 +2570,7 @@ _add(
                 "the ends and fewer than half (majority) or none (conservative) of them hold the "
                 "middle. The default majority does not depend on the order of the variables.",
             ),
+            _LINKS_POSSIBLY_SEPARABLE,
             _INDEP_TEST,
             _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
@@ -3250,6 +2697,119 @@ _add(
             ),
         ),
         references=("Gunther et al. 2023", "Runge 2020"),
+    )
+)
+_add(
+    MethodSpec(
+        name="rpcmci",
+        family="temporal",
+        summary="Regime-PCMCI for one multivariate time series whose lagged causal links switch "
+        "between a few persistent regimes: the regime of each time step and the lagged links of "
+        "each regime. Returns one temporal structure per regime.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data", kind="matrix", doc="A multivariate time series, row = step."
+                ),
+            ),
+            layout="(n_samples, n_variables), row = time step",
+        ),
+        output=OutputSpec(
+            structure_type="temporal",
+            graph_kind=None,
+            regimes=True,
+            doc="the regime of each time step and the regime weights; per regime, lag graphs "
+            "for lags 1..tau_max with MCI p_values, statistics, and the PC1 parents in metadata.",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            ParamSpec(
+                name="n_regimes",
+                type="int",
+                default=2,
+                doc="The number of regimes, at least 2.",
+                minimum=2,
+            ),
+            ParamSpec(
+                name="max_transitions",
+                type="int",
+                default=1,
+                doc="The most times each regime may switch on or off over the series, at least 1; "
+                "about n_samples / (mean regime length * n_regimes).",
+                minimum=1,
+            ),
+            ParamSpec(
+                name="switch_threshold",
+                type="float",
+                default=0.5,
+                doc="The weight above which a time step joins a regime's PCMCI step and model "
+                "fit, in (0, 1).",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+            ),
+            concept_param(
+                "tau_max",
+                doc="The largest lag tested; links at lags 1 to tau_max are tested.",
+            ),
+            ParamSpec(
+                name="pc1_alpha",
+                type="float",
+                default=0.2,
+                doc="Significance level of each regime's PC1 parent selection; larger keeps more "
+                "parents as conditions.",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+            ),
+            concept_param(
+                "alpha",
+                default=0.01,
+                doc="Significance level of each regime's MCI test, the level that decides the "
+                "returned links; a link is kept when its p-value is at most this.",
+            ),
+            concept_param(
+                "fdr_method",
+                default="none",
+                doc="How each regime's MCI p-values are corrected for the number of links tested: "
+                "none keeps them as tested; fdr_bh replaces them with their Benjamini-Hochberg "
+                "adjusted values over all the regime's links together, and a link is kept when its "
+                "adjusted p-value is at most alpha.",
+            ),
+            concept_param(
+                "indep_test",
+                default="student_t",
+                nullable=False,
+                choices=("student_t", "fisherz"),
+                doc="The partial-correlation test, for linear effects: student_t takes the p-value "
+                "from the Student-t distribution, fisherz from Fisher's z-transform.",
+            ),
+            concept_param(
+                "n_starts",
+                default=50,
+                doc="Number of starts, each from its own random regime assignment drawn from "
+                "seed and its index; returns the start with the lowest objective.",
+            ),
+            concept_param(
+                "max_iter",
+                default=20,
+                nullable=False,
+                doc="The most iterations of each start, at least 1; one iteration learns every "
+                "regime's graph and then reassigns the time steps.",
+            ),
+            concept_param(
+                "seed",
+                doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
+                "random one, so a fit repeats. Start 0 draws its first regime weights from "
+                "seed, start a > 0 from SeedSequence(seed, spawn_key=(a,)).",
+            ),
+        ),
+        references=("Saggioro et al. 2020", "Runge et al. 2019"),
     )
 )
 _add(
@@ -3641,8 +3201,9 @@ _add(
                 choices=_CPCM_FAMILIES,
                 doc="The family of each variable given its parents: one name for every column or a "
                 "list of one name per column. gaussian = mean and scale change with the parents; "
-                "gaussian_fixed_scale = the mean alone; exponential; pareto = scale 1, values of "
-                "at least 1; poisson; gamma = mean and shape; gamma_fixed_shape = the mean alone; "
+                "gaussian_fixed_scale = the mean alone; exponential; pareto = scale 1, values "
+                "greater than 1; poisson; gamma = mean and shape; gamma_fixed_shape = the mean "
+                "alone; "
                 "gumbel = location and scale; gumbel_fixed_scale = the location alone; "
                 "negative_binomial = the mean, one size for all rows. A column outside its "
                 "family's support raises ValueError.",
@@ -3663,7 +3224,7 @@ _add(
             "p-value of the test that x and y are independent; families is each column's family.",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         references=("Bodik & Chavez-Demoulin 2025", "Gretton et al. 2008", "Pfister et al. 2018"),
     )
@@ -3730,6 +3291,7 @@ _add(
                 "direction, at least 1; 5000 is the value of the paper's runs. Reaching it warns "
                 "with SearchLimitWarning.",
             ),
+            _SKEWD_OPTIMIZER,
             concept_param(
                 "seed",
                 doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
@@ -4025,45 +3587,9 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "exact_search": _PARENT_RULE,
     "iamb": _BLANKET_RULE,
     "inter_iamb": _BLANKET_RULE,
-    "gs": _BLANKET_RULE,
-    "fast_iamb": _BLANKET_RULE,
     "mmpc": _MEMBER_RULE
     + "A pair the knowledge makes non-adjacent is never a candidate. "
     + _BLANKET_ORIENT_RULE,
-    "hiton_pc": _MEMBER_RULE
-    + "A pair the knowledge makes non-adjacent is never a candidate. "
-    + _BLANKET_ORIENT_RULE,
-    "hiton_mb": _MEMBER_RULE
-    + "A pair the knowledge makes non-adjacent is never a candidate, as a parent or child or as a "
-    "spouse, and is left out of the result. " + _BLANKET_ORIENT_RULE,
-    "mmmb": _MEMBER_RULE
-    + "A pair the knowledge makes non-adjacent is never a candidate, as a parent or child or as a "
-    "spouse, and is left out of the result. " + _BLANKET_ORIENT_RULE,
-    "pcmb": _MEMBER_RULE
-    + "A pair the knowledge makes non-adjacent is never a candidate, as a parent or child or as a "
-    "spouse, and is left out of the result. " + _BLANKET_ORIENT_RULE,
-    "mb_by_mb": _MEMBER_RULE
-    + "A pair the knowledge makes non-adjacent never shares an edge. Every edge a tier or an edge "
-    "forbidden one way directs is directed as each local structure joins the growing graph, over "
-    "any v-structure's arrowhead, and Meek's rules R1-R4 follow. required_paths and "
-    "forbidden_paths raise NotImplementedError.",
-    "locpc_cde": "A required edge is joined and never tested; a pair the knowledge makes "
-    "non-adjacent never shares an edge. Every edge a tier or an edge "
-    "forbidden one way directs is directed before the colliders, and Meek's rules R1-R4 follow. "
-    "A variable a tier or a required edge places before another is not its descendant, so their "
-    "edge is not tested again when the later one is visited. required_paths and forbidden_paths "
-    "raise NotImplementedError.",
-    "cmb": _MEMBER_RULE
-    + "A pair the knowledge makes non-adjacent never shares an edge. At each variable CMB visits, "
-    "the direction a tier, a required edge, or an edge forbidden one way gives an edge is fixed "
-    "before any test, and the tests label the rest from it. required_paths and forbidden_paths "
-    "raise NotImplementedError.",
-    "mmb_by_mmb": _MEMBER_RULE
-    + "A pair the knowledge makes non-adjacent never shares an edge. As each local structure joins "
-    "the growing graph, a tier or an edge forbidden one way puts an arrowhead at the variable it "
-    "keeps from being a cause, and a required edge a tail at its cause, over any v-structure's "
-    "arrowhead; the FCI rules keep those marks. required_paths and forbidden_paths raise "
-    "NotImplementedError.",
     "calm": _GATE_RULE,
     "notears": _MASK_RULE,
     "dagma": _MASK_RULE,
@@ -4152,13 +3678,7 @@ _PATH_METHODS = (
     "exact_search",
     "iamb",
     "inter_iamb",
-    "gs",
-    "fast_iamb",
     "mmpc",
-    "hiton_pc",
-    "hiton_mb",
-    "mmmb",
-    "pcmb",
 )
 _PATH_RULE = (
     " With required_paths and forbidden_paths, the result is the MPDAG of the DAGs in the class "
@@ -4235,24 +3755,26 @@ for _name in CONCEPTS["missing"].conforming:
 
 #: Structural EM on the searches whose fit reads only a covariance and the row count, after their
 #: categorical columns where they have them: supported in EM_SUPPORTED, experimental in the others.
+#: The number of its rounds follows it.
 _MISSING_EM = {
     supported: concept_param(
         "missing",
         choices=(EM,),
         doc=f"How missing values (NaN) are handled: em = {status}structural EM, which alternates "
         "the search on the expected covariance of the data with linear-Gaussian fits of the "
-        "graph it returns: 10 searches, with 5 parameter-only EM steps on the current graph "
-        "before each after the first; it assumes values missing completely at random or at "
-        "random given observed values. null refuses missing values.",
+        "graph it returns: n_em_iterations searches, with 5 parameter-only EM steps on the "
+        "current graph before each after the first; it assumes values missing completely at "
+        "random or at random given observed values. null refuses missing values.",
     )
     for supported, status in ((True, ""), (False, "experimental "))
 }
+_N_EM_ITERATIONS = concept_param("n_em_iterations")
 for _name in EM_METHODS:
     _params = REGISTRY[_name].params
     _cut = next((i + 1 for i, p in enumerate(_params) if p.name == "categorical"), len(_params))
     _missing_em = _MISSING_EM[_name in EM_SUPPORTED]
     REGISTRY[_name] = REGISTRY[_name].model_copy(
-        update={"params": (*_params[:_cut], _missing_em, *_params[_cut:])}
+        update={"params": (*_params[:_cut], _missing_em, _N_EM_ITERATIONS, *_params[_cut:])}
     )
 
 #: The path and confounder parts a method honors as supported: the method ran in the lanes of
@@ -4350,21 +3872,8 @@ _METADATA: dict[str, tuple[str, ...]] = {
     ),
     "iamb": ("target", "markov_blanket"),
     "inter_iamb": ("target", "markov_blanket"),
-    "gs": ("target", "markov_blanket"),
-    "fast_iamb": ("target", "markov_blanket"),
     "mmpc": ("target", "parents_and_children"),
-    "hiton_pc": ("target", "parents_and_children"),
-    "hiton_mb": ("target", "markov_blanket", "parents_and_children"),
-    "mmmb": ("target", "markov_blanket", "parents_and_children"),
-    "pcmb": ("target", "markov_blanket", "parents_and_children"),
-    "mb_by_mb": ("target", "parents", "children", "undirected"),
-    "cmb": ("target", "markov_blanket", "parents", "children", "undirected"),
-    "mmb_by_mmb": (
-        *("target", "markov_blanket", "parents", "children", "bidirected", "undetermined"),
-    ),
-    **dict.fromkeys(("ldp", "ld3"), ("partition",)),
-    "locpc_cde": ("hop", "visited", "double_bar"),
-    **dict.fromkeys(("gies", "xges", "mmhc", "rsmax2"), ("score",)),
+    **dict.fromkeys(("gies", "xges", "lges", "mmhc", "rsmax2"), ("score",)),
     **dict.fromkeys(
         ("ges", "hc", "tabu", "boss", "grasp"), ("score", "index_edges", "changing_variables")
     ),
@@ -4387,6 +3896,11 @@ _METADATA: dict[str, tuple[str, ...]] = {
         *("context_links", "index_edges", "time_index_edges", "time_dummy"),
     ),
     "lpcmci": ("links", "p_values", "statistics", "parents", "conflicts"),
+    # The run's keys, then each regime's.
+    "rpcmci": (
+        *("objective", "start", "n_iterations", "converged", "failed_starts"),
+        *("p_values", "statistics", "parents"),
+    ),
     **dict.fromkeys(("anm", "pnl"), ("p_values", "statistics")),
     "loci": ("log_likelihoods", "p_values", "statistics"),
     "cpcm": ("p_values", "statistics", "independence_p_value", "families"),
@@ -4397,17 +3911,17 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "rcd": ("confounded_pairs",),
     "bottom_up_parce_lingam": ("partial_order",),
     "camuv": ("latent_pairs", "cycle_edges"),
-    "local_isa_ling": (
-        *("target", "markov_blanket", "parents", "children", "equivalent_models", "subspaces"),
-    ),
 }
 # The shared keys: the name, the seed of a seeded fit, the changes before each later start, the
 # test and the score it used with the score's penalties, the configuration's tie-break rule, the
 # column types a mixed-data setting read, the fewest rows a test used and how missing values were
 # handled, the record of a structural EM, the triples a collider vote left ambiguous, the clauses
-# the path parts of knowledge leave, the claims a causal order search does not meet, the tests a
-# fit evaluated, the blankets a sequential search learned, and the answer for each
-# treatment-outcome pair.
+# the path parts of knowledge leave, and the claims a causal order search does not meet.
+# The methods with missing values whose searches remove pairs by conditioning sets, which list the
+# drawn edges a set not tested might have removed.
+_SEPARATING_SEARCHES = frozenset(
+    ("pc", "fci", "cdnod", "fci_jci", "iamb", "inter_iamb", "mmpc", "pcmci", "pcmciplus", "lpcmci")
+)
 for _name, _spec in REGISTRY.items():
     _concepts = {p.concept for p in _spec.params}
     _shared = (
@@ -4423,17 +3937,23 @@ for _name, _spec in REGISTRY.items():
         ),
         *(("tie_break",) if _spec.tie_break else ()),
         *(("categorical",) if "categorical" in _concepts else ()),
-        *(("rows_tested",) if _spec.data.missing else ()),
+        *(
+            (
+                "rows_tested",
+                "p_one_tests",
+                "not_tested",
+                "undecided_pairs",
+                *(("possibly_separable",) if _name in _SEPARATING_SEARCHES else ()),
+                "never_observed_together",
+            )
+            if _spec.data.missing
+            else ()
+        ),
         *(("missing",) if "missing" in _concepts else ()),
         *(("em",) if _name in EM_METHODS else ()),
         *(("ambiguous_triples",) if "collider_rule" in _concepts else ()),
         *(("ancestor_clauses", "edge_claims") if _spec.restricts_paths else ()),
         *(("unmet_knowledge",) if "required_paths" in _spec.knowledge else ()),
-        *(
-            key
-            for key in ("n_tests", "blankets_learned", "effects")
-            if _name in CONCEPTS[key].suitable
-        ),
     )
     _output = _spec.output.model_copy(update={"metadata": (*_shared, *_METADATA.get(_name, ()))})
     REGISTRY[_name] = _spec.model_copy(update={"output": _output})

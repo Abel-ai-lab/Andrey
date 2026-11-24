@@ -11,11 +11,13 @@ warns for every fit that drops a claim (:func:`warn_each`).
 
 from __future__ import annotations
 
+import contextlib
+import logging
 import os
 import sys
 import threading
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from typing import TypeVar
 
 _T = TypeVar("_T")
@@ -24,8 +26,12 @@ _PACKAGE_DIR = os.path.dirname(os.path.dirname(__file__)) + os.sep
 _PACKAGE = __name__.partition(".")[0]
 
 _warned: set[tuple[type[Warning], str]] = set()
+#: The keys :func:`log_once` has logged in this process.
+_logged: set[str] = set()
 # Reentrant: a warning handler that warns again from the same thread must not deadlock.
 _lock = threading.RLock()
+#: Held for the whole of a :func:`held_records` block, which changes the one ``andrey`` logger.
+_holding = threading.RLock()
 
 
 class AndreyWarning(UserWarning):
@@ -106,6 +112,96 @@ def warn_once(message: str, category: type[AndreyWarning], *, key: str | None = 
         _warned.add(seen)
 
 
+def log_once(logger: logging.Logger, key: str, message: str) -> None:
+    """Log ``message`` at warning level through ``logger`` the first time this process sees ``key``.
+
+    For a default-handling notice that changes no result and needs no filter: :mod:`logging` sends
+    it to standard error unless the caller configures otherwise.
+    """
+    with _lock:
+        if key in _logged:
+            return
+        _logged.add(key)
+    logger.warning(message)
+
+
+def mark_logged(key: str) -> None:
+    """Record ``key`` as logged, so :func:`log_once` stays silent for it in this process.
+
+    A worker process calls it for a notice that its parent logs, once for all of its workers.
+    """
+    with _lock:
+        _logged.add(key)
+
+
+@contextlib.contextmanager
+def logged_later(key: str) -> Generator[None]:
+    """Silence :func:`log_once` for ``key`` inside the block, restoring normal logging afterward so
+    the caller can log one notice for all its fits."""
+    with _lock:
+        fresh = key not in _logged
+        _logged.add(key)
+    try:
+        yield
+    finally:
+        if fresh:
+            with _lock:
+                _logged.discard(key)
+
+
+class _Held(logging.Handler):
+    """Holds the records it is handed, in order."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.records: list[logging.LogRecord] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.records.append(record)
+
+
+@contextlib.contextmanager
+def held_records() -> Generator[list[logging.LogRecord]]:
+    """Hold the records of the ``andrey`` loggers inside the block, in order.
+
+    The block holds records permitted by the logger levels, including more at lower caller-set
+    levels, and all warning-level records regardless of level.
+
+    During the block, ``andrey`` has only the holding handler and does not propagate, so no record
+    reaches standard error through root or embedding-application handlers; its effective level is
+    lowered to ``WARNING`` if higher. Descendant ``andrey.`` loggers have no handlers, propagate to
+    the holding handler, and have any level above ``WARNING`` lowered to it, so no record escapes.
+    Handlers, propagation, and levels are restored afterward. Blocks in other threads wait so each
+    restores the state it found; nested blocks in this thread hold their own records. Since loggers
+    are process-wide, records from other threads during the block are held too.
+    """
+    with _holding:
+        handler = _Held()
+        logger = logging.getLogger(_PACKAGE)
+        handlers, propagate, level = logger.handlers[:], logger.propagate, logger.level
+        held: list[logging.Handler] = [handler]
+        logger.handlers, logger.propagate = held, False
+        logger.setLevel(min(logger.getEffectiveLevel(), logging.WARNING))
+        children = [
+            (child, child.handlers[:], child.propagate, child.level)
+            for name, child in list(logging.Logger.manager.loggerDict.items())
+            if name.startswith(f"{_PACKAGE}.")
+            and isinstance(child, logging.Logger)
+            and (child.handlers or not child.propagate or child.level > logging.WARNING)
+        ]
+        for child, _, _, before in children:
+            child.handlers, child.propagate = [], True
+            child.setLevel(min(before, logging.WARNING))
+        try:
+            yield handler.records
+        finally:
+            logger.handlers, logger.propagate = handlers, propagate
+            logger.setLevel(level)
+            for child, own, passes, before in children:
+                child.handlers, child.propagate = own, passes
+                child.setLevel(before)
+
+
 def warn_each(message: str, category: type[AndreyWarning]) -> None:
     """Warn with ``message`` every time, at the caller's line, for a warning about one fit."""
     warnings.warn(message, category, stacklevel=_caller_stacklevel())
@@ -141,13 +237,14 @@ def convergence_as_search_limit(source: str, fit: Callable[[], _T]) -> _T:
 
 
 def _reset_after_fork() -> None:
-    """Replace the inherited lock in a forked child.
+    """Replace the inherited locks in a forked child.
 
-    A child forked while another thread is warning inherits the lock held, with no thread left to
-    release it. The warned messages are kept: the child does not repeat what the parent showed.
+    A child forked while another thread warns or holds records inherits a held lock with no thread
+    to release it. Warned messages are retained so the child does not repeat the parent's notices.
     """
-    global _lock
+    global _lock, _holding
     _lock = threading.RLock()
+    _holding = threading.RLock()
 
 
 if hasattr(os, "register_at_fork"):

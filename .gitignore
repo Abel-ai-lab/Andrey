@@ -15,6 +15,11 @@ venv/
 benchmarks/uv.lock
 # The R package library benchmarks/start_r.sh builds for the R lane, beside the venv.
 benchmarks/.r-lib-bench/
+benchmarks/.r-lib-regression-ci/
+benchmarks/.r-lib-regression-ci-wgcm/
+# The PCM authors' code that benchmarks/start_regression_ci_r.sh fetches, read from disk and never
+# committed.
+benchmarks/.pcm-code/
 # The authors' RESIT code that benchmarks/start_resit_r.sh fetches, read from disk and never committed.
 benchmarks/.resit-r/
 # The authors' CPCM code that benchmarks/start_cpcm.sh fetches, read from disk and never committed.
@@ -29,22 +34,18 @@ benchmarks/.tetrad-missing/
 benchmarks/.loci/
 # The authors' SkewD code that benchmarks/start_skewd.sh fetches, read from disk and never committed.
 benchmarks/.skewd/
+# The authors' bQCD code that benchmarks/start_qccd.sh fetches, read from disk and never committed.
+benchmarks/.qccd/
+# The authors' HECI code that benchmarks/start_heci.sh fetches, read from disk and never committed.
+benchmarks/.heci/
+# The authors' GRCI code (CC BY-NC 4.0) that benchmarks/start_grci.sh fetches, read from disk and
+# never committed.
+benchmarks/.grci/
 # The authors' NOTEARS code that benchmarks/start_notears.sh fetches, read from disk and never
 # committed.
 benchmarks/.notears/
 # The authors' SCORE code that benchmarks/start_stein.sh fetches, read from disk and never committed.
 benchmarks/.score/
-# The authors' LDECC code that benchmarks/start_ldecc.sh fetches, read from disk and never committed.
-benchmarks/.ldecc/
-# The authors' LDP and LD3 code that benchmarks/start_maasch.sh fetches, read from disk and never
-# committed.
-benchmarks/.maasch/
-# The authors' SNAP and LOAD code that benchmarks/start_schubert.sh fetches, read from disk and never
-# committed.
-benchmarks/.schubert/
-# The authors' LocPC-CDE code that benchmarks/start_ciphod.sh fetches, read from disk and never
-# committed.
-benchmarks/.ciphod/
 env/
 
 .vscode/
@@ -88,17 +89,5 @@ docs/_static/graph-types-*.html
 .ipynb_checkpoints/
 apps/live-discovery/brand/
 apps/live-discovery/data/
-# The authors' MMB-by-MMB code that benchmarks/start_mmb.sh fetches, read from disk and never
-# committed.
-benchmarks/.mmb/
-# The authors' sbcd R code that benchmarks/start_sbcd_r.sh fetches, read from disk and never
-# committed.
-benchmarks/.sbcd-r/
-# The authors' Causal Explorer toolbox that benchmarks/start_causal_explorer.sh fetches, run from
-# disk and never committed.
-benchmarks/.causal-explorer/
-# The authors' Local-LiNG-Discovery clone that benchmarks/start_local_ling.sh checks out, run from
-# disk and never committed.
-benchmarks/.local-ling/
-# The published networks' files that the network lanes fetch, read from disk and never committed.
-benchmarks/.networks/
+# The logs and summary benchmarks/run_tests.sh writes, one run's worth.
+benchmarks/.test-logs/

@@ -2,9 +2,10 @@
 
 Fitted models are read by attribute name.
 
-* **ANM, PNL, LOCI** (``(pval_forward, pval_backward, stat_forward, stat_backward)``): a two-node
-  ``dag`` with the edge :func:`_direction` picks, or none; the p-values and statistics go in
-  metadata as ``float``. LOCI's likelihood criterion picks the edge from two log-likelihoods
+* **ANM, PNL, LOCI** (``(pval_forward, pval_backward, stat_forward, stat_backward)``): each
+  direction is fitted on its rows in one canonical order (:func:`direction_tables`), and a
+  two-node ``dag`` holds the edge :func:`_direction` picks, or none; the p-values and statistics go
+  in metadata as ``float``. LOCI's likelihood criterion picks the edge from two log-likelihoods
   (:func:`likelihood_output`).
 * **RCD** (``adjacency_matrix_``): a finite nonzero ``B[i, j]`` is ``j -> i`` and a ``NaN`` cell
   is ``<->``, in a ``pag``; ``weighted_adjacency`` holds ``B`` with ``NaN`` as ``0``.
@@ -22,7 +23,7 @@ from typing import Any
 import numpy as np
 
 from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput
-from andrey.core.ties import tie_key
+from andrey.core.ties import tied
 
 from ._adapt import structure_output
 from ._marks import marks_from_signed
@@ -62,6 +63,20 @@ def _nan_pairs(B: np.ndarray) -> list[list[int]]:
     return [[int(i), int(j)] for i, j in zip(rows, cols, strict=True) if i < j]
 
 
+def direction_tables(
+    X: np.ndarray,
+) -> tuple[tuple[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray]]:
+    """Return the ``(cause, effect)`` columns of ``x -> y`` and of ``y -> x`` from the pair ``X``.
+
+    Each direction's rows are sorted by its cause, then by its effect, so a fit reads the same
+    arrays in any row order of ``X``. A table whose rows stay the same when its two columns swap
+    then gives both directions the same arrays bit for bit, and the two directions tie exactly.
+    """
+    x, y = X[:, 0], X[:, 1]
+    forward, backward = np.lexsort((y, x)), np.lexsort((x, y))
+    return (x[forward], y[forward]), (y[backward], x[backward])
+
+
 def _direction(
     pval_forward: float,
     pval_backward: float,
@@ -73,19 +88,23 @@ def _direction(
     """Return ``1`` for ``x -> y``, ``-1`` for ``y -> x``, or ``0`` for no edge.
 
     With ``alpha=None``, ``pval_*`` are the p-values' logarithms (or two log-likelihoods), and the
-    direction with the larger one is chosen. Equal ones, given both test statistics, choose the
-    direction with the smaller statistic, the weaker dependence; equal or missing statistics give
-    no edge. Values that round to the same number at nine decimal places are equal
-    (:func:`andrey.core.ties.tie_key`); values that differ by more, or that lie on either side of a
-    rounding step, still choose a direction. Otherwise, choose a direction only when its p-value
-    exceeds ``alpha`` and the other does not.
+    direction with the larger one is chosen. Values that agree within
+    :data:`andrey.core.ties.PAIR_RTOL` are equal (:func:`andrey.core.ties.tied`); equal ones, given
+    both test statistics, choose the direction with the smaller statistic, the weaker dependence,
+    compared by the same rule, and equal or missing statistics give no edge. Otherwise, choose a
+    direction only when its p-value exceeds ``alpha`` and the other does not.
     """
     if alpha is None:
-        p_forward, p_backward = tie_key(pval_forward), tie_key(pval_backward)
-        forward, backward = p_forward > p_backward, p_backward > p_forward
-        if p_forward == p_backward and stat_forward is not None and stat_backward is not None:
-            s_forward, s_backward = tie_key(stat_forward), tie_key(stat_backward)
-            forward, backward = s_forward < s_backward, s_backward < s_forward
+        if not tied(pval_forward, pval_backward):
+            forward, backward = pval_forward > pval_backward, pval_backward > pval_forward
+        elif (
+            stat_forward is not None
+            and stat_backward is not None
+            and not tied(stat_forward, stat_backward)
+        ):
+            forward, backward = stat_forward < stat_backward, stat_backward < stat_forward
+        else:
+            return 0
     else:
         forward, backward = pval_forward > alpha, pval_backward > alpha
     return 1 if forward and not backward else -1 if backward and not forward else 0
@@ -141,14 +160,14 @@ def pairwise_output(
     """Return ANM's or PNL's two-node ``dag`` with the chosen edge and ``float`` p-value metadata.
 
     ``metadata["p_values"]`` maps ``"forward"`` (``x -> y``) and ``"backward"`` to the p-values.
-    With ``alpha=None`` the p-values are compared through their natural logarithms, so the tie
-    rule of :func:`_direction` holds to nine digits at any size of p-value; ``log_p``, when given,
-    holds those logarithms, which keep their order where both p-values underflow to ``0``. Each
-    test statistic, when given, is an HSIC statistic divided by its mean under independence: with
-    ``alpha=None`` the statistics decide a p-value tie, the smaller one winning, and without them a
-    tie gives no edge (:func:`_direction`). They go in ``metadata["statistics"]`` under the same
-    keys. A p-value or statistic may be a shape-``(1,)`` array
-    (:func:`_coerce_float`). ``extra`` adds metadata entries after them, such as ``rows_tested``.
+    With ``alpha=None`` the p-values are compared through their natural logarithms: ``log_p`` when
+    given, which keeps their order where both p-values underflow to ``0``, and otherwise the
+    logarithms of the p-values. Each test statistic, when given, is an HSIC statistic divided by
+    its mean under independence: with ``alpha=None`` the statistics decide a p-value tie, the
+    smaller one winning, and without them a tie gives no edge (:func:`_direction`). They go in
+    ``metadata["statistics"]`` under the same keys. A p-value or statistic may be a shape-``(1,)``
+    array (:func:`_coerce_float`). ``extra`` adds metadata entries after them, such as
+    ``rows_tested``.
     """
     forward, backward = _coerce_float(pval_forward), _coerce_float(pval_backward)
     stats: dict[str, float] = {}
@@ -157,8 +176,9 @@ def pairwise_output(
             "stat_forward": _coerce_float(stat_forward),
             "stat_backward": _coerce_float(stat_backward),
         }
-    compared = (forward, backward)
-    if alpha is None:
+    if alpha is not None:
+        compared = (forward, backward)
+    else:
         compared = log_p if log_p is not None else (_log(forward), _log(backward))
     return structure_output(
         _pair_dag(_direction(*compared, alpha, **stats)),

@@ -183,22 +183,25 @@ continuous non-Gaussian noise.
 ### Does it handle missing values?
 
 Yes, in {{ missing_methods }}. Mark a missing value with `NaN` or pandas' `NA`, or leave its field
-empty in a CSV file. Each conditional-independence test then reads only the samples where all of its
-variables are observed (test-wise deletion), so the fit keeps the samples that dropping every
-incomplete one would lose; `missing="testwise"` names this handling, the default, and PC also takes
-`missing="mvpc"`, a correction for values whose missingness depends on the variables.
-Test-wise deletion is sound when values are missing completely at random; when whether a value is
-missing depends on the variables, a test can be biased. The [release cards](benchmarks.md) measure
-it against dropping incomplete samples. The searches whose fit reads the data only through their
-covariance, {{ em_methods }}, take `missing="em"`: structural EM over the expected covariance of
-the data, sound when values are missing completely at random or at random given observed values. It
-is supported in GES, hill climbing, Tabu search, BOSS, GRaSP, and NOTEARS, where it runs Friedman's
-alternating scheme: 10 searches, with 5 parameter-only EM steps before each after the first. It is
-experimental in the others, which have no reference implementation to compare with; the
+empty in a CSV file. Each conditional-independence test reads only the samples where all its
+variables are observed (test-wise deletion), keeping samples that dropping incomplete ones would
+lose; `missing="testwise"` names this handling, the default, and PC also takes `missing="mvpc"`, a
+correction for missingness that depends on the variables. Test-wise deletion is valid when values
+are missing completely at random; when whether a value is missing depends on the variables, a test
+can be biased. A test with too few rows, as for two columns never observed together in merged
+cohorts, is not tested and decides nothing; a pair it leaves undecided is not drawn and is listed in
+`metadata["undecided_pairs"]`, and a drawn edge that a conditioning set no row could test might have
+removed is listed in `metadata["possibly_separable"]`. The [release cards](benchmarks.md) measure it
+against dropping incomplete samples. Searches that read the data only through their covariance,
+{{ em_methods }}, take `missing="em"`: structural EM over the expected covariance of the data, which
+suits linear-Gaussian data whose missing values depend at most on columns that have none; this is
+measured, not proved. It is supported in GES, hill climbing, Tabu search, BOSS, GRaSP, and NOTEARS,
+where it runs Friedman's alternating scheme: 10 searches unless you pass `n_em_iterations`, with 5
+parameter-only EM steps before each after the first. It is experimental in the others, which have no
+reference implementation to compare with; the
 [missing-data comparison](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/missing-data.md)
-has what we measured.
-The other methods refuse missing values with an error that says what to do
-instead, and [Missing values](guides/getting-started.md#missing-values) explains each handling.
+reports the measurements. The other methods refuse missing values with an error that says what to do
+instead, and the [Missing values](guides/missing-values.md) guide explains each handling.
 
 ### Can I tell it what I already know?
 
@@ -208,11 +211,10 @@ takes it except {{ no_knowledge_methods }}. It can also say that one variable ca
 directly or not (`required_paths`), that it does not (`forbidden_paths`), or that two variables
 share a hidden common cause (`confounded`). PC, GES, BOSS, and most searches that return a CPDAG
 honor the paths, the FCI family and LPCMCI honor all three, and DirectLiNGAM honors the paths. They
-are supported in every method that honors them except twelve: required paths are experimental in
-Tabu search, MMHC, and RSMAX2, forbidden paths in IAMB, Inter-IAMB, and MMPC, where our measurements
-did not pass, and both in GS, Fast-IAMB, HITON-PC, HITON-MB, MMMB, and PCMB, which they did not
-cover; a method given a part it does not honor raises an error naming the methods that do. A path
-claim says less than an edge, so when you know the edge itself, state it as `required`.
+are supported in every method that honors them except six: required paths are experimental in Tabu
+search, MMHC, and RSMAX2, and forbidden paths in IAMB, Inter-IAMB, and MMPC, where our measurements
+did not pass; a method given a part it does not honor raises an error naming the methods that do. A
+path claim says less than an edge, so when you know the edge itself, state it as `required`.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows each part.
 
 ### How sure is each edge?
@@ -318,7 +320,7 @@ citation.
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.17.1},
+  version = {0.19.0},
   url = {https://andrey.abel.ai},
 }
 ```

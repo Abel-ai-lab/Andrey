@@ -31,24 +31,28 @@ def head_tags(
     post: dict | None = None,
     parents: Sequence[dict] = (),
 ) -> str:
-    """The page's Twitter card fields, its robots rule (``noindex`` when ``page["indexable"]`` is
-    false), a post's article tags, and one JSON-LD graph: the organization (its name, address,
-    logo's address, and the profiles in ``organization_same_as``), the website (also named
-    ``site_alternate_name``), the
-    software, the page (a ``BlogPosting`` too for a post), and its breadcrumbs. A post or a release
-    card describes the software at its own version (``post["version"]`` or
-    ``page["software_version"]``); every other page, at ``software["version"]``. No element is
-    visible."""
+    """The page's Twitter card fields (with ``page["image_alt"]`` when given), its robots rule
+    (``noindex`` when ``page["indexable"]`` is false), a post's article tags, and one JSON-LD graph:
+    the organization (its name, address, logo's address, and the profiles in
+    ``organization_same_as``), the website (also named ``site_alternate_name``), the software, the
+    page (a ``BlogPosting`` too for a post), and its breadcrumbs. Every page, a post or a release
+    card too, is about the one software node, ``#software``, at the current release. A post's
+    ``post["modified"]``, when given, is its ``dateModified`` and ``article:modified_time``. No
+    element is visible."""
     tags = {
         "twitter:title": page["title"],
         "twitter:description": page["description"],
         "twitter:image": page["image"],
     }
+    if page.get("image_alt"):
+        tags["twitter:image:alt"] = page["image_alt"]
     if not page.get("indexable", True):
         tags["robots"] = "noindex, follow"
     if post:
         if post.get("date"):
             tags["article:published_time"] = post["date"]
+        if post.get("modified"):
+            tags["article:modified_time"] = post["modified"]
         if post.get("authors"):
             tags["article:author"] = post["authors"][0]["url"]
     meta = "".join(
@@ -59,14 +63,7 @@ def head_tags(
 
     organization_id = site_url + "#organization"
     website_id = site_url + "#website"
-    software = dict(software)
-    written_for = (post or {}).get("version") or page.get("software_version")
-    # One release is one software node: the current release's keeps the plain id on every page.
-    if written_for and written_for != software["version"]:
-        software["version"] = written_for
-        software_id = site_url + f"#software-{written_for}"
-    else:
-        software_id = site_url + "#software"
+    software_id = site_url + "#software"
     graph = [
         {
             "@type": "Organization",
@@ -116,6 +113,8 @@ def head_tags(
         current["mainEntity"] = {"@id": article["@id"]}
         if post.get("date"):
             article["datePublished"] = post["date"]
+        if post.get("modified"):
+            article["dateModified"] = post["modified"]
         if post.get("authors"):
             article["author"] = [{"@type": "Person", **person} for person in post["authors"]]
         graph.append(article)
@@ -165,11 +164,12 @@ def llms_index(
     project: str,
     version: str,
     facts: Sequence[str] = (),
+    cite: str | None = None,
 ) -> str:
-    """``llms.txt``: the project's name and summary, the current release, then each section's
-    pages as links under its heading, each with the title and description its page carries
-    (``entries``, from ``read_pages``). A page that is missing, private, or ``noindex`` raises
-    ``ValueError``."""
+    """``llms.txt``: the project's name and summary, the current release, how to install and cite
+    it (``cite``), the ``facts`` at a glance, then each section's pages as links under its heading,
+    each with the title and description its page carries (``entries``, from ``read_pages``). A
+    page that is missing, private, or ``noindex`` raises ``ValueError``."""
     lines = [
         f"# {project}",
         "",
@@ -182,6 +182,8 @@ def llms_index(
         "`andrey run <method> --help --json` returns a method's JSON contract, and",
         "`andrey --skill` prints Andrey's agent skill.",
     ]
+    if cite:
+        lines += ["", "Cite: " + " ".join(cite.split())]
     if facts:
         lines += ["", "## At a glance", "", *(f"- {fact}" for fact in facts)]
     listed = set()
@@ -255,10 +257,12 @@ def read_pages(outdir: Path, documents: Sequence[str]) -> dict[str, dict]:
     return entries
 
 
-def sitemap_urls(outdir: Path) -> list[str]:
-    """The address (``og:url``) of every built page a search engine should index, sorted: not a
+def sitemap_urls(outdir: Path) -> list[tuple[str, str | None]]:
+    """The address (``og:url``) of every built page a search engine should index, sorted, each with
+    the day it last changed for a post (its ``article:modified_time``, else its
+    ``article:published_time``) and ``None`` for any other page, which has no such date: not a
     redirect, not ``noindex``, not in ``UNLISTED``, and outside the build's ``_`` folders."""
-    urls = set()
+    urls = {}
     for target in outdir.rglob("*.html"):
         relative = target.relative_to(outdir)
         if any(part.startswith("_") or part == "PR" for part in relative.parts):
@@ -269,13 +273,19 @@ def sitemap_urls(outdir: Path) -> list[str]:
         if head.redirects or "noindex" in head.meta.get("robots", "").lower():
             continue
         if url := head.meta.get("og:url"):
-            urls.add(url)
-    return sorted(urls)
+            meta = head.meta
+            urls[url] = meta.get("article:modified_time") or meta.get("article:published_time")
+    return sorted(urls.items())
 
 
-def sitemap_xml(urls: Sequence[str]) -> str:
-    """``sitemap.xml`` listing ``urls``."""
-    entries = "".join(f"  <url><loc>{html.escape(url)}</loc></url>\n" for url in urls)
+def sitemap_xml(urls: Sequence[tuple[str, str | None]]) -> str:
+    """``sitemap.xml`` listing each address in ``urls``, with its ``lastmod`` when it has a date."""
+    entries = "".join(
+        f"  <url><loc>{html.escape(url)}</loc>"
+        + (f"<lastmod>{html.escape(day)}</lastmod>" if day else "")
+        + "</url>\n"
+        for url, day in urls
+    )
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'

@@ -18,9 +18,9 @@ queries a CI test or a local score also records two deterministic counts (:class
 compare names every row where one changed and fails on any change, a fall as well as a rise, unless
 ``--allow-fewer-queries`` accepts a fall.
 
-``--shuffle K`` refits each draw but CMB's, MMB-by-MMB's, and local ISA-LiNG's (:class:`Fit`) on
-``K`` seeded column orders, moving the targets of ICP and IGSP and the contexts of J-PCMCI+ with the
-columns, and maps each answer back to the original columns before hashing it;
+``--shuffle K`` refits each draw (:class:`Fit`) on ``K`` seeded column orders, moving the targets
+of ICP and IGSP and the contexts of J-PCMCI+ with the columns, and maps each answer back to the
+original columns before hashing it;
 ``--workers N`` refits the methods that run worker processes or threads (:data:`WORKER_METHODS`) on
 ``N`` workers, with every GES pass, every skeleton pass of conditioning size two or more, and every
 possible-d-sep search sent to the pool. Both report each refit whose answer differs from the first
@@ -87,12 +87,8 @@ class Fit:
     IGSP, FCI-JCI, and J-PCMCI+: ``refit(x, rng)`` draws a column order from ``rng``, fits the draw
     with its columns in that order, moving the targets and contexts the call names along with them
     while each row's environment stays, and returns the answer mapped back to the original columns
-    (:func:`unpermute`). ``shuffled`` is ``False`` for
-    MB-by-MB, CMB, MMB-by-MMB, local ISA-LiNG, LDECC, LOAD, and LocPC-CDE, whose draws a column
-    order does not apply to: the target of MB-by-MB, CMB, MMB-by-MMB, and local ISA-LiNG is the last
-    variable, LDECC's treatment and outcome and LOAD's two variables are the last and the first, and
-    LocPC-CDE's treatment and outcome are the first and the last. ``alpha`` is the significance
-    level of a CI-test method.
+    (:func:`unpermute`). ``shuffled`` is ``False`` for a method whose draws a column order does not
+    apply to. ``alpha`` is the significance level of a CI-test method.
     """
 
     call: Callable[[np.ndarray], Any]
@@ -128,28 +124,6 @@ def _environments(x: np.ndarray) -> tuple[np.ndarray, np.ndarray, int]:
 def _fci_jci(x: np.ndarray) -> StructureOutput:
     """FCI-JCI with the draw's last column as the environment, as the gate fits it."""
     return andrey.fci_jci(x[:, :-1], x[:, -1], alpha=ALPHA)
-
-
-def _last_column(name: str) -> Callable[[np.ndarray], StructureOutput]:
-    """A target-centered method at the draw's last column, as the gate fits it."""
-    return lambda x: getattr(andrey, name)(x, target=x.shape[1] - 1, alpha=ALPHA)
-
-
-def _ldecc(x: np.ndarray) -> StructureOutput:
-    """LDECC with the draw's last column as the treatment and its first as the outcome, the columns
-    the gate fits it at."""
-    return andrey.ldecc(x, treatment=x.shape[1] - 1, outcome=0, alpha=ALPHA)
-
-
-def _local_optimal_adjustment(x: np.ndarray) -> StructureOutput:
-    """LOAD for the draw's last and first columns, the columns the gate fits it at."""
-    return andrey.local_optimal_adjustment(x, variables=[x.shape[1] - 1, 0], alpha=ALPHA)
-
-
-def _locpc_cde(x: np.ndarray) -> StructureOutput:
-    """LocPC-CDE with the draw's first column as the treatment and its last as the outcome, the
-    columns the gate fits it at."""
-    return andrey.locpc_cde(x, treatment=0, outcome=x.shape[1] - 1, alpha=ALPHA)
 
 
 def _ut_igsp(x: np.ndarray) -> StructureOutput:
@@ -257,19 +231,7 @@ FITS: dict[str, Fit] = {
     "Tabu": Fit(andrey.tabu),
     "IAMB": Fit(functools.partial(andrey.iamb, alpha=ALPHA), alpha=ALPHA),
     "InterIAMB": Fit(functools.partial(andrey.inter_iamb, alpha=ALPHA), alpha=ALPHA),
-    "GS": Fit(functools.partial(andrey.gs, alpha=ALPHA), alpha=ALPHA),
-    "FastIAMB": Fit(functools.partial(andrey.fast_iamb, alpha=ALPHA), alpha=ALPHA),
     "MMPC": Fit(functools.partial(andrey.mmpc, alpha=ALPHA), alpha=ALPHA),
-    "HITONPC": Fit(functools.partial(andrey.hiton_pc, alpha=ALPHA), alpha=ALPHA),
-    "PCMB": Fit(functools.partial(andrey.pcmb, alpha=ALPHA), alpha=ALPHA),
-    "MB-by-MB": Fit(_last_column("mb_by_mb"), shuffled=False, alpha=ALPHA),
-    "HITONMB": Fit(functools.partial(andrey.hiton_mb, alpha=ALPHA), alpha=ALPHA),
-    "MMMB": Fit(functools.partial(andrey.mmmb, alpha=ALPHA), alpha=ALPHA),
-    "Y-structures": Fit(functools.partial(andrey.y_structures, alpha=ALPHA), alpha=ALPHA),
-    "CMB": Fit(_last_column("cmb"), shuffled=False, alpha=ALPHA),
-    "LDECC": Fit(_ldecc, shuffled=False, alpha=ALPHA),
-    "LocalOptimalAdjustment": Fit(_local_optimal_adjustment, shuffled=False, alpha=ALPHA),
-    "LocPCCDE": Fit(_locpc_cde, shuffled=False, alpha=ALPHA),
     "MMHC": Fit(functools.partial(andrey.mmhc, alpha=ALPHA), alpha=ALPHA),
     "RSMAX2": Fit(
         functools.partial(andrey.rsmax2, restrict="pc", maximize="tabu", alpha=ALPHA), alpha=ALPHA
@@ -278,6 +240,7 @@ FITS: dict[str, Fit] = {
     "RESIT": Fit(andrey.resit),
     "ScoreMatching": Fit(andrey.score_matching),
     "NoGAM": Fit(andrey.nogam),
+    "DAS": Fit(andrey.das),
     "ExactSearch": Fit(andrey.exact_search),
     "CALM": Fit(functools.partial(andrey.calm, seed=0)),
     "NOTEARS": Fit(andrey.notears),
@@ -286,10 +249,8 @@ FITS: dict[str, Fit] = {
     "GRaSP": Fit(functools.partial(andrey.grasp, seed=0)),
     "BOSS-FCI": Fit(functools.partial(andrey.boss_fci, seed=0, alpha=ALPHA), alpha=ALPHA),
     "GRaSP-FCI": Fit(functools.partial(andrey.grasp_fci, seed=0, alpha=ALPHA), alpha=ALPHA),
-    "MMB-by-MMB": Fit(_last_column("mmb_by_mmb"), shuffled=False, alpha=ALPHA),
     "DirectLiNGAM": Fit(andrey.direct_lingam),
     "ICA-LiNGAM": Fit(functools.partial(andrey.ica_lingam, seed=0)),
-    "LocalISALiNG": Fit(lambda x: andrey.local_isa_ling(x, target=x.shape[1] - 1), shuffled=False),
     "MultiGroupDirectLiNGAM": Fit(
         lambda x: andrey.multi_group_direct_lingam(qg.regime_models.split_groups(x, _GROUPS)),
         blocks=_GROUPS,
@@ -300,6 +261,8 @@ FITS: dict[str, Fit] = {
     "ANM": Fit(andrey.anm),
     "PNL": Fit(andrey.pnl),
     "LOCI": Fit(andrey.loci),
+    "CPCM": Fit(functools.partial(andrey.cpcm, family="gaussian")),
+    "CPCMGraph": Fit(functools.partial(andrey.cpcm_graph, family="gaussian_fixed_scale")),
     "PCMCI": Fit(_pcmci),
     "PCMCIplus": Fit(lambda x: andrey.pcmciplus(x, **qg.andrey_pcmciplus_adapter(5).params())),
     "LPCMCI": Fit(lambda x: andrey.lpcmci(x, **qg.andrey_lpcmci_adapter(3).params())),
@@ -320,42 +283,22 @@ FITS: dict[str, Fit] = {
 }
 
 
-def _target_list(name: str, every: int) -> Fit:
-    """``name`` with a list of targets, every ``every``-th variable from the first, in one call."""
+def _target_list(name: str) -> Fit:
+    """``name`` with every variable a target, in one call."""
     method = getattr(andrey, name)
     return Fit(
-        lambda x: method(x, alpha=ALPHA, target=list(range(0, x.shape[1], every))),
+        lambda x: method(x, alpha=ALPHA, target=list(range(x.shape[1]))),
         shuffled=False,
         alpha=ALPHA,
     )
 
 
 #: The set learners, by their names here and in the package.
-SET_LEARNERS = {
-    **{"IAMB": "iamb", "InterIAMB": "inter_iamb", "GS": "gs", "FastIAMB": "fast_iamb"},
-    **{
-        "MMPC": "mmpc",
-        "HITONPC": "hiton_pc",
-        "HITONMB": "hiton_mb",
-        "MMMB": "mmmb",
-        "PCMB": "pcmb",
-    },
-}
-#: The target-centered methods with a shared search, fitted with a list of targets, each on the
-#: datasets of the method it names: the set learners with every variable a target, the sequential
-#: methods with every fifth.
-TARGET_LISTS: dict[str, str] = {
-    **{f"{name}-targets": name for name in SET_LEARNERS},
-    "MB-by-MB-targets": "MB-by-MB",
-    "CMB-targets": "CMB",
-    "MMB-by-MMB-targets": "MMB-by-MMB",
-}
-FITS |= {
-    **{f"{name}-targets": _target_list(SET_LEARNERS[name], 1) for name in SET_LEARNERS},
-    "MB-by-MB-targets": _target_list("mb_by_mb", 5),
-    "CMB-targets": _target_list("cmb", 5),
-    "MMB-by-MMB-targets": _target_list("mmb_by_mmb", 5),
-}
+SET_LEARNERS = {"IAMB": "iamb", "InterIAMB": "inter_iamb", "MMPC": "mmpc"}
+#: The set learners, each fitted with a list of targets that one search answers, on the datasets
+#: of the method it names, with every variable a target.
+TARGET_LISTS: dict[str, str] = {f"{name}-targets": name for name in SET_LEARNERS}
+FITS |= {f"{name}-targets": _target_list(SET_LEARNERS[name]) for name in SET_LEARNERS}
 
 #: The methods that run on ``andrey.config(n_jobs=...)``: GES, GFCI's GES phase, the skeleton
 #: searches of PC, FCI, FCI-JCI, GFCI, CD-NOD, and RSMAX2's PC phase, and the possible-d-sep
@@ -379,6 +322,7 @@ LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
     "linear_gauss_er_d16": functools.partial(qg.regime_draws, "linear_gauss_er", 16, 800),
     "anm_er_n1000_d30": functools.partial(qg.regime_draws, "anm_er_n1000", 30, 1000),
     "anm_er_n1000_d12": functools.partial(qg.regime_draws, "anm_er_n1000", 12, 1000),
+    "anm_er_n1000_d6": functools.partial(qg.regime_draws, "anm_er_n1000", 6, 1000),
     "score_paper_standardized_d15_er1": functools.partial(
         qg.order_draws, "score_paper_standardized", 15, "er1"
     ),
@@ -424,19 +368,7 @@ LARGER: dict[str, str] = {
             "Tabu",
             "IAMB",
             "InterIAMB",
-            "GS",
-            "FastIAMB",
             "MMPC",
-            "HITONPC",
-            "PCMB",
-            "MB-by-MB",
-            "HITONMB",
-            "MMMB",
-            "Y-structures",
-            "CMB",
-            "LDECC",
-            "LocalOptimalAdjustment",
-            "LocPCCDE",
             "MMHC",
             "RSMAX2",
             "BOSS",
@@ -444,14 +376,15 @@ LARGER: dict[str, str] = {
         ),
         "linear_gauss_er_d100",
     ),
-    **dict.fromkeys(("FCI", "GFCI", "BOSS-FCI", "GRaSP-FCI", "MMB-by-MMB"), "latent_gauss_er_d100"),
-    **dict.fromkeys(("DirectLiNGAM", "ICA-LiNGAM", "LocalISALiNG"), "lingam_sf_d70"),
+    **dict.fromkeys(("FCI", "GFCI", "BOSS-FCI", "GRaSP-FCI"), "latent_gauss_er_d100"),
+    **dict.fromkeys(("DirectLiNGAM", "ICA-LiNGAM"), "lingam_sf_d70"),
     **dict.fromkeys(("RCD", "BottomUpParceLiNGAM"), "latent_lingam_er_d17"),
     "ExactSearch": "linear_gauss_er_d16",
     "CAM": "anm_er_n1000_d30",
     "RESIT": "anm_er_n1000_d12",
     "ScoreMatching": "score_paper_standardized_d15_er1",
     "NoGAM": "score_paper_laplace_standardized_d12_er1",
+    "DAS": "score_paper_standardized_d15_er1",
     "CALM": "linear_gauss_er_d15",
     "NOTEARS": "notears_paper_standardized_d60",
     "DAGMA": "notears_paper_raw_d40",
@@ -464,6 +397,8 @@ LARGER: dict[str, str] = {
     "ANM": "anm_pair_n1500",
     "PNL": "pnl_pair_n1500",
     "LOCI": "lsnm_pair_n1500",
+    "CPCM": "lsnm_pair_n1500",
+    "CPCMGraph": "anm_er_n1000_d6",
     "PCMCI": "pcmci_paper_d20_n1000",
     "PCMCIplus": "pcmciplus_paper_d40_n1000",
     "LPCMCI": "lpcmci_paper_d20_n1000",
@@ -642,7 +577,8 @@ def unpermute(out: Any, order: np.ndarray) -> Any:
     original column: the graphs, the time series's weights, the causal order, the edge weights,
     and the metadata in :data:`LAG_MATRICES`. Hidden nodes after the observed ones keep their
     places, a swapped pair's :data:`DIRECTIONS` trade places, ICP's target and its metadata in
-    :data:`PER_VARIABLE` move back, and the metadata in :data:`NODE_LISTS` is left out."""
+    :data:`PER_VARIABLE` move back, UT-IGSP's targets move back with each setting's list sorted
+    again, and the metadata in :data:`NODE_LISTS` is left out."""
     if isinstance(out, list):
         return [unpermute(o, order) for o in out]
     order = np.concatenate([order, np.arange(len(order), out.structure.n_nodes)])
@@ -651,6 +587,7 @@ def unpermute(out: Any, order: np.ndarray) -> Any:
     swapped = len(order) == 2 and order[0] == 1
     metadata = {}
     icp = out.metadata.get("algorithm") == "icp"
+    ut_igsp = out.metadata.get("algorithm") == "ut_igsp"
     for key, value in out.metadata.items():
         if key in NODE_LISTS:
             continue
@@ -658,6 +595,8 @@ def unpermute(out: Any, order: np.ndarray) -> Any:
             value = int(order[value])
         elif icp and key in PER_VARIABLE:
             value = None if value is None else [value[i] for i in back]
+        elif ut_igsp and key == "targets":
+            value = {label: sorted(int(order[t]) for t in found) for label, found in value.items()}
         elif isinstance(value, Mapping) and set(value) == set(DIRECTIONS):
             forward, backward = DIRECTIONS
             value = {forward: value[backward], backward: value[forward]} if swapped else value
@@ -754,12 +693,22 @@ def _moves(base: Iterable[int], moves: Iterable[tuple[str, int]]) -> list[list[i
     return [base, *([*base, u] if op == "add" else [p for p in base if p != u] for op, u in moves)]
 
 
+def _rows(x: Any, y: Any, conditions: Any, p_values: Any) -> list[tuple[int, int, Any, float]]:
+    """The queries of a call that answers many, one per p-value: query ``i`` asks ``x[i]`` and
+    ``y[i]`` given row ``i`` of the ``(N, m)`` array ``conditions``."""
+    sets = np.asarray(conditions).reshape(len(x), -1) if len(x) else []
+    return list(zip(x, y, sets, p_values))
+
+
 #: The CI tests' query methods, each with the ``(x, y, conditioning set, p-value)`` of every test
 #: one call makes, read from the call's result, the test, and the call's arguments.
 CI_QUERIES: dict[str, Callable[..., Iterable[tuple[int, int, Any, float]]]] = {
     "__call__": lambda p, test, x, y, conditions=(): [(x, y, conditions, p)],
-    "statistic_pvalue": lambda rp, test, x, y, conditions=(): [(x, y, conditions, rp[1])],
-    "statistic_pvalues": lambda rp, test, xs, ys, sets: list(zip(xs, ys, sets, rp[1])),
+    "statistic_pvalue": lambda rp, test, x, y, condition_set=(): [(x, y, condition_set, rp[1])],
+    "statistic_pvalues": lambda rp, test, x, y, conditions: _rows(x, y, conditions, rp[1]),
+    "residual_statistic_pvalues": lambda rp, test, data, x, y, conditions: _rows(
+        x, y, conditions, rp[1]
+    ),
     "_bounded_pvalue": lambda p, test, x, y, conditions, *settings, **options: [
         (x, y, conditions, p)
     ],
@@ -897,7 +846,8 @@ def _counted(
 # The run and the manifest
 # ==================================================================================================
 
-#: The environment variables that set thread and worker counts, recorded in the header.
+#: The environment variables that set thread and worker counts, recorded in the header, and
+#: ``ANDREY_SHARED_SCAN_MIN_WORK``, which picks between two paths whose p-values agree to rounding.
 THREAD_VARIABLES = (
     "OMP_NUM_THREADS",
     "OPENBLAS_NUM_THREADS",
@@ -905,6 +855,7 @@ THREAD_VARIABLES = (
     "VECLIB_MAXIMUM_THREADS",
     "ANDREY_N_JOBS",
     "ANDREY_GES_PARALLEL_MIN_WORK",
+    "ANDREY_SHARED_SCAN_MIN_WORK",
 )
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -1004,8 +955,18 @@ STRUCTURE = ("graph", "kind", "edges", "ordering")
 #: marks, or causal order; ``"bits"``, only different bits in a refit on workers; ``"values"``,
 #: edge weights or metadata values of a column-order refit that differ by more than rounding;
 #: ``"digits"``, edge weights or metadata values of a column-order refit that differ by rounding
-#: only. The last does not fail the check.
+#: only; ``"documented"``, a column-order difference the column-order guide documents
+#: (:data:`DOCUMENTED`). The last two do not fail the check.
 FAILING = ("graph", "structure", "bits", "values")
+#: The column-order differences the column-order guide documents, by method: the parts of an output
+#: (:func:`parts`) a column order may change, and why. A column-order refit that differs only in
+#: those parts is expected.
+DOCUMENTED: dict[str, tuple[frozenset[str], str]] = {
+    "ICA-LiNGAM": (
+        frozenset({"graph", "edges", "structure", "ordering", "weights"}),
+        "FastICA can reach another solution under a new column order",
+    ),
+}
 #: The relative and absolute differences that count as rounding between two values.
 RTOL, ATOL = 1e-6, 1e-12
 
@@ -1077,6 +1038,13 @@ def classify(first: Any, refit: Any, *, column_order: bool) -> tuple[str, list[s
     return ("digits" if _rounded(first, refit) else "values"), changed
 
 
+def documented(method: str, changed: list[str]) -> str | None:
+    """Return why a column-order refit of ``method`` that differs in the parts ``changed`` is
+    expected (:data:`DOCUMENTED`), or ``None`` when it is not."""
+    allowed, reason = DOCUMENTED.get(method, (frozenset(), ""))
+    return reason if changed and set(changed) <= allowed else None
+
+
 def run(
     methods: list[str], seeds: int, shuffle: int = 0, workers: int = 1
 ) -> tuple[list[dict], list[tuple[str, str]]]:
@@ -1125,7 +1093,10 @@ def run(
                 rows.append(row(method, dataset, seed, permutation, n_workers, refit))
                 if found := classify(first, refit, column_order=permutation > 0):
                     kind, changed = found
-                    findings.append((kind, f"{_label(rows[-1])}: {', '.join(changed)}"))
+                    line = f"{_label(rows[-1])}: {', '.join(changed)}"
+                    if kind in FAILING and permutation > 0 and (why := documented(method, changed)):
+                        kind, line = "documented", f"{line} ({why})"
+                    findings.append((kind, line))
     return rows, findings
 
 
@@ -1259,6 +1230,7 @@ LABELS = {
     "bits": "only bits differ",
     "values": "weights or metadata differ by more than rounding",
     "digits": "weights or metadata differ by rounding only (not a failure)",
+    "documented": "differs as the column-order guide documents (not a failure)",
 }
 
 
@@ -1293,7 +1265,8 @@ def main(argv: list[str] | None = None) -> int:
         f"\n{len(rows)} fits hashed. Of {refits} refits, {count['graph']} have a different graph, "
         f"{count['structure']} a different structure, {count['values']} different values, and "
         f"{count['bits']} only different bits; {count['digits']} differ only by rounding in their "
-        "weights or metadata under a column order, which does not fail the check."
+        "weights or metadata under a column order, which does not fail the check. Differences the "
+        f"column-order guide documents, which do not fail it either: {count['documented']}."
     )
     return 1 if any(kind in FAILING for kind, _ in findings) else 0
 

@@ -22,9 +22,6 @@ import pytest
 
 from andrey import GraphStructure
 from andrey_bench.adapters import tetrad_pag
-from andrey_bench.adapters.andrey_adjustment import AndreyAdjustment, AndreyPCAdjustment
-from andrey_bench.adapters.andrey_blanket import LEARNERS as BLANKET_LEARNERS
-from andrey_bench.adapters.andrey_blanket import AndreyBlanket
 from andrey_bench.adapters.andrey_boss import AndreyBOSS
 from andrey_bench.adapters.andrey_calm import AndreyCALM
 from andrey_bench.adapters.andrey_direct_lingam import andrey_direct_lingam_adapters
@@ -41,10 +38,7 @@ from andrey_bench.adapters.andrey_jpcmciplus import AndreyJPCMCIPlus, AndreyPool
 from andrey_bench.adapters.andrey_pc import AndreyPC
 from andrey_bench.adapters.andrey_tabu import andrey_tabu_adapters
 from andrey_bench.adapters.andrey_xges import AndreyXGES
-from andrey_bench.adapters.baseline_adjustment import AdjustForEverything, AdjustForNothing
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
-from andrey_bench.adapters.bnlearn_blanket import FUNCTIONS as BNLEARN_BLANKET_FUNCTIONS
-from andrey_bench.adapters.bnlearn_blanket import BnlearnBlanket
 from andrey_bench.adapters.bnlearn_hc import BnlearnHC
 from andrey_bench.adapters.bnlearn_pc_stable import BnlearnPCStable
 from andrey_bench.adapters.bnlearn_structural_em import BnlearnStructuralEM
@@ -94,10 +88,6 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     AndreyExactSearch(),
     AndreyJPCMCIPlus(),
     AndreyPooledPCMCIPlus(),
-    # The set learners answer a whole graph or targets, so their fit cases are in
-    # test_blanket_lane.py and test_adapters_bnlearn_blanket.py; one whole-graph adapter of each
-    # learner and function is listed here for the checks that do not fit.
-    *[AndreyBlanket(n, indep_test="fisherz", structure="skeleton") for n in BLANKET_LEARNERS],
     CausalLearnGES(),
     CausalLearnPC(),
     CausalLearnPC("kci"),
@@ -125,24 +115,11 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     BnlearnTabu(),
     *[BnlearnStructuralEM(m, i) for m in ("hc", "tabu") for i in (5, 10)],
     BnlearnPCStable(),
-    *[
-        BnlearnBlanket(f, indep_test="fisherz", structure=known.structures[0])
-        for f, known in BNLEARN_BLANKET_FUNCTIONS.items()
-    ],
     TigramitePC("cmiknn"),
     TigramitePC("gpdc"),
     TigramiteJPCMCIPlus(),
     OracleGES(),
     BaselineEmpty(),
-    # The pair lane's arms; the Andrey methods of its table join as they ship.
-    AdjustForNothing(),
-    AdjustForEverything(),
-    AndreyPCAdjustment(),
-    AndreyAdjustment("ldecc"),
-    AndreyAdjustment("ldp"),
-    AndreyAdjustment("ld3"),
-    AndreyAdjustment("local_optimal_adjustment"),
-    AndreyAdjustment("locpc_cde"),
 ]
 
 
@@ -190,13 +167,6 @@ DEFERRED_MODULES = {
     "andrey.hc.numpy.serial": "andrey.search.hc",
     "andrey.tabu.numpy.serial": "andrey.search.tabu",
     "andrey.pc.numpy": "andrey.constraint.pc",
-    "andrey.pc.adjustment": "andrey.core.adjustment",
-    "andrey.ldecc": "andrey.constraint.ldecc",
-    "andrey.ldp": "andrey.constraint.partition",
-    "andrey.ld3": "andrey.constraint.partition",
-    "andrey.local_optimal_adjustment": "andrey.constraint.local_optimal_adjustment",
-    "andrey.locpc_cde": "andrey.constraint.locpc",
-    **{f"andrey.{name}": "andrey.constraint.blanket" for name in BLANKET_LEARNERS},
     "andrey.pc.kci.numpy": "andrey.core.ci_kernel",
     "andrey.pc.rcot.numpy": "andrey.core.ci_kernel",
     "andrey.pc.cmiknn.numpy": "andrey.core.ci_cmiknn",

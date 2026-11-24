@@ -118,7 +118,7 @@ def gin(data: npt.ArrayLike, *, alpha: float = 0.05) -> StructureOutput:
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: its tests compare clusters of
     variables over the same rows, so a row with a missing value has no place in them. Drop the
-    incomplete rows first, which suits values missing completely at random, or use
+    incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear data with uniform noise from latent variables in a

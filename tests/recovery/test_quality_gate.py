@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from andrey import GraphStructure, data
-from andrey.core import ARROW, CIRCLE, LATENT, TAIL
+from andrey.core import LATENT
 from andrey.data import real
 from andrey.data.sortability import causal_depth, index_correlation
 from qa import quality_gate as qg
@@ -32,7 +32,7 @@ def empty_answer(draw: qg.Draw, target: qg.Target) -> object:
 def shifted_truth(draw: qg.Draw, target: qg.Target) -> object:
     """The true graph with each variable moved one column: an off-by-one in column handling. A
     measurement model moves its indicators and keeps its latents last; learned targets move to
-    the next variable; claimed ancestral pairs are the shifted graph's."""
+    the next variable."""
     if target == "targets":
         p = draw.truth.n_nodes
         return [sorted((v + 1) % p for v in t) for t in draw.targets]
@@ -44,10 +44,7 @@ def shifted_truth(draw: qg.Draw, target: qg.Target) -> object:
     types = None if target != "clusters" else np.asarray(truth.node_types)
     observed = shift if types is None else np.flatnonzero(types != LATENT)
     shift[observed] = np.roll(observed, 1)
-    shifted = GraphStructure.from_numpy(
-        marks[np.ix_(shift, shift)], kind=truth.kind, node_types=types
-    )
-    return qg.ancestral_pairs(shifted) if target == "ancestors" else shifted
+    return GraphStructure.from_numpy(marks[np.ix_(shift, shift)], kind=truth.kind, node_types=types)
 
 
 def shifted_series_truth(truth: object, target: qg.Target) -> object:
@@ -84,76 +81,6 @@ def test_gate_rejects_a_broken_result(method: str) -> None:
     for dataset in qg.CHECKS[method].datasets:
         result = qg.evaluate(method, dataset, fit=lambda draw: shifted_truth(draw, target))
         assert not result.passed, f"{method} on {dataset} accepted SHD {result.shd}"
-
-
-def test_target_cpdag_counts_the_edges_at_the_last_variable_alone() -> None:
-    def graph(*edges: tuple[int, int, int, int], kind: str = "cpdag") -> GraphStructure:
-        """A graph over four variables; each edge is ``(i, j, mark at i, mark at j)``."""
-        marks = np.zeros((4, 4), dtype=np.int8)
-        for i, j, at_i, at_j in edges:
-            marks[i, j], marks[j, i] = at_i, at_j
-        return GraphStructure.from_numpy(marks, kind=kind)
-
-    # The DAG 0 -> 3 <- 1, 0 -> 2: its CPDAG keeps the collider at 3 and leaves 0 - 2 undirected.
-    dag = graph((0, 3, TAIL, ARROW), (1, 3, TAIL, ARROW), (0, 2, TAIL, ARROW), kind="dag")
-    truth = qg.target_truth(dag, "target_cpdag")
-    right = graph((0, 3, TAIL, ARROW), (1, 3, TAIL, ARROW))
-    # One edge at the last variable with a mark that differs and one the truth lacks; an edge the
-    # answer has between two other variables and the edge the truth has there count nothing.
-    wrong = graph((0, 3, TAIL, ARROW), (1, 3, TAIL, TAIL), (2, 3, TAIL, ARROW), (1, 2, TAIL, TAIL))
-    missing = graph((0, 3, TAIL, ARROW))
-    assert qg.shd(truth, truth, "target_cpdag") == qg.shd(right, truth, "target_cpdag") == 0
-    assert qg.shd(wrong, truth, "target_cpdag") == 2
-    assert qg.shd(missing, truth, "target_cpdag") == 1
-    assert qg.shd(qg.empty_graph(4, "target_cpdag"), truth, "target_cpdag") == 2
-
-
-def test_target_pag_counts_the_edges_at_the_last_variable_alone() -> None:
-    def pag(*edges: tuple[int, int, int, int]) -> GraphStructure:
-        """A PAG over four variables; each edge is ``(i, j, mark at i, mark at j)``."""
-        marks = np.zeros((4, 4), dtype=np.int8)
-        for i, j, at_i, at_j in edges:
-            marks[i, j], marks[j, i] = at_i, at_j
-        return GraphStructure.from_numpy(marks, kind="pag")
-
-    truth = pag((0, 3, TAIL, ARROW), (1, 3, CIRCLE, ARROW), (0, 1, TAIL, ARROW))
-    right = pag((0, 3, TAIL, ARROW), (1, 3, CIRCLE, ARROW))
-    # One edge at the last variable with a mark that differs and one the truth lacks; an edge the
-    # answer has between two other variables and the edge the truth has there count nothing.
-    wrong = pag(
-        (0, 3, TAIL, ARROW), (1, 3, CIRCLE, CIRCLE), (2, 3, TAIL, ARROW), (1, 2, ARROW, ARROW)
-    )
-    missing = pag((0, 3, TAIL, ARROW))
-    assert qg.shd(truth, truth, "target_pag") == qg.shd(right, truth, "target_pag") == 0
-    assert qg.shd(wrong, truth, "target_pag") == 2
-    assert qg.shd(missing, truth, "target_pag") == 1
-    assert qg.shd(qg.empty_graph(4, "target_pag"), truth, "target_pag") == 2
-
-
-def test_local_dag_counts_the_local_structure_at_the_last_variable() -> None:
-    def graph(*edges: tuple[int, int], kind: str = "digraph") -> GraphStructure:
-        """A graph over five variables with the edges ``(i, j)``, ``i -> j``; a pair listed both
-        ways is a 2-cycle."""
-        marks = np.zeros((5, 5), dtype=np.int8)
-        for i, j in edges:
-            marks[i, j] = ARROW if (j, i) in edges else TAIL
-            marks[j, i] = ARROW
-        return GraphStructure.from_numpy(marks, kind=kind)
-
-    # The local structure at 4: 0 -> 4 into it, 4 -> 1 out of it, and 2 -> 1 into its child; the
-    # truth's 3 -> 2 and the answer's 3 -> 0 lie outside it and count nothing.
-    truth = qg.target_truth(graph((0, 4), (4, 1), (2, 1), (3, 2), kind="dag"), "local_dag")
-    right = graph((0, 4), (4, 1), (2, 1), (3, 0))
-    flipped = graph((4, 0), (4, 1), (2, 1))
-    two_cycle = graph((0, 4), (4, 1), (1, 4), (2, 1))
-    extra = graph((0, 4), (4, 1), (2, 1), (3, 4))
-    missing = graph((0, 4))
-    assert qg.shd(truth, truth, "local_dag") == qg.shd(right, truth, "local_dag") == 0
-    assert qg.shd(flipped, truth, "local_dag") == 1
-    assert qg.shd(two_cycle, truth, "local_dag") == 1
-    assert qg.shd(extra, truth, "local_dag") == 1
-    assert qg.shd(missing, truth, "local_dag") == 2  # 4 has no child, so 2 -> 1 is missed too
-    assert qg.shd(qg.empty_graph(5, "local_dag"), truth, "local_dag") == 3
 
 
 def test_tolerance_is_two_sided() -> None:

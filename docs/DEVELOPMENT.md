@@ -189,9 +189,10 @@ leaves out; a dated post is published in every build, even before its date.
 The blog's front page lists the dated posts from their front matter (the `blog-index` directive in
 `blog/index.md`, filled by `_blog_index` in `conf.py`): the newest post with its cover, title,
 date, tags, and description, then the earlier ones, newest first, each with a small copy of its art
-(`thumb_jpeg` in `site/cards.py`). Newest means the latest date, a later version breaking a tie,
-and then the later file name, which starts with the date the post first appeared: of the posts a
-release updates, the one first published last leads. A new post needs no change to the page.
+(`thumb_jpeg` in `site/cards.py`). Newest means the latest date, a post's last update counting as
+its date, a later version breaking a tie, and then the later file name, which starts with the date
+the post first appeared: of the posts a release updates, the one first published last leads. A new
+post needs no change to the page.
 
 A post's cover is its art alone; an art with a centered version (`CENTERED` in `site/cards.py`)
 shows the version on its cover and thumbnail. Its link preview is the banner, the art with the
@@ -200,18 +201,50 @@ its `version` front matter, and later builds leave it as that release rendered i
 typed text, and every file it includes is stored under `blog/<version>/`.
 
 When a later release makes a feature post wrong or incomplete, the post is rewritten to describe
-that release, and its `version` and `date` move to it (the release PR sets the final date). Its
-file name and address stay. Its files move to the new release's folder, named apart from any other
-post's files there, and an example is run again on the new release. A number the new release did
-not measure names the release that did, such as "in the 0.4.0 benchmarks".
+that release, and its `version` moves to it. Its `date` stays the day it first appeared, and a
+fenced `{update}` block under the introduction, above the earlier ones, gives the release's date and
+one or two plain sentences on what it added (the release PR sets the final date). ABlog takes the
+post's update date from its latest block, which the byline, the blog's front page, the homepage's
+latest post, the navbar's dot, and the feed read. Its file name and address stay. Its files move to
+the new release's folder, named apart from any other post's files there, and an example is run again
+on the new release. A number the new release did not measure names the release that did, such as "in
+the 0.4.0 benchmarks".
+
+Every post states how AI tools were used to write it. Its front matter sets `ai`, and `ai_tools`
+(each tool, and its model or version when the author knows it) unless `ai` is `none`; each value
+stays on its key's line. `_ai_statement` in `conf.py` writes the statement as the post's last
+paragraph, under the closing links, on its page and in the feed's full text, and the build fails
+on any other value:
+
+| `ai` | The author sets it when | The post ends with |
+|---|---|---|
+| `none` | no AI tool wrote, reworded, or drew any part of it; a spelling or grammar check does not count | No AI tools were used to write this post. |
+| `edited` | the author wrote it, and a tool reworded, shortened, or translated the text | The author wrote this post; its wording was edited with `<ai_tools>`. The author reviewed every change and is responsible for the content. |
+| `drafted` | a tool wrote a first draft of any part: text, code, or a figure | Parts of this post were drafted with `<ai_tools>`. The author checked every statement, number, and reference and is responsible for the content. |
+
+The statement covers what is on the page: its text, the code it shows, and its figures, with the
+code that drew them. It does not cover spelling or grammar checks, code completion, search, the
+research the post reports, or the cover art, which [the brand page](docs/brand.md) covers.
+`ai_tools` may say what a tool did, such as `<tool> (the code of figure 2)`. The author sets the
+highest value that applies to the post as published, a maintainer's edits included, and a guest
+author's value changes only with the guest's agreement. A post set to `none` is edited by hand: an
+agent changes only its front matter and markup, and proposes any change of wording to the author.
+With several authors the sentence reads "The authors ... are". The sentences never change, since
+later builds render earlier posts again; a new kind of use takes a new value.
 
 ## The release cards
 
 Each release has a release card, `docs/benchmarks/<release>.md`: its benchmarks, the methods it adds
 or promotes, their known limits, and how to rerun the measurements, from the summary it links,
-`benchmarks/published/<label>/summary.json`. Like a post, a released card and its summary never
-change; new measurements go into the next release's card. A card's figures are finished HTML files
-in `docs/benchmarks/<release>/`, included with `{raw} html`, so later code never redraws them.
+`benchmarks/published/<label>/summary.json`. Like a post, a released card's text and its summary
+never change; new measurements go into the next release's card. A card's figures are finished HTML
+files in `docs/benchmarks/<release>/`, included with `{raw} html`, so later code never redraws
+them.
+
+Every card sets `ai` and `ai_tools` as a post does ("The blog"). Its last paragraph opens with one
+fixed sentence on its numbers, "Every number we measured for this card comes from a recorded run of
+the benchmark harness; no AI tool wrote or estimated any of them.", and continues with the post's
+sentence for its value, with "card" for "post" and "We" for "The author".
 
 [`docs/benchmarks.md`](docs/benchmarks.md), the Release cards page, leads with the latest release as
 a cover beside its TL;DR (the abstract, three numbers, and a button to the card), then lists the
@@ -345,21 +378,31 @@ On a remote machine, keep the server on `127.0.0.1` and forward the port:
 ## Search and answer engines
 
 [`discovery.py`](discovery.py) writes what search and AI answer engines read. Each page's head
-carries its Twitter card fields and one JSON-LD graph: the organization (Abel's logomark,
-`site/brand/abel-symbol-night.svg`, drawn as `_static/abel-symbol.png`), the website, the software
-(Andrey's icon) at the page's release, the page, a `BlogPosting` for a post, and the breadcrumbs.
-The search and 404 pages (`UNINDEXED`) and the blog's generated pages (All Posts, the years, the
-archive, the tags, and the authors; `_blog_collection`) are `noindex` and name no canonical
-address, so the sitemap leaves them out: they only list the posts again. Every title but the
-homepage's ends with `html_title`, "Andrey causal discovery", so a page matches what Andrey does and
-not only a name that is also a person's. In the structured data, `alternateName` and `sameAs` tie
-the website, the package, the repository, and Abel's GitHub profile to one product. After the
-build, `_write_discovery` in `conf.py` writes `llms.txt` (the pages in `LLMS_SECTIONS`, then every
-release card and post) and `sitemap.xml` (every indexable page); `robots.txt` is a plain file
-(`_extra/robots.txt`). A page in `LLMS_SECTIONS` that is renamed or removed fails the build until
-the list is updated. Once a tagged release is live, `.github/workflows/indexnow.yml` submits every
-address in the sitemap to IndexNow for Bing and other participating engines. Its public key is
-served at `_extra/<key>.txt`. Google reads the sitemap directly.
+carries its Twitter card fields, its preview image's text alternative, and one JSON-LD graph: the
+organization (Abel's logomark, `site/brand/abel-symbol-night.svg`, drawn as
+`_static/abel-symbol.png`), the website, the software, the page, a `BlogPosting` for a post, and the
+breadcrumbs, which pass through Docs or Blog. Every page, a post or a release card too, is about one
+software node, `#software`, at the current release, with its PyPI download address, Andrey's icon as
+a PNG (`SOFTWARE_ICON`), and the homepage's description (`PAGE_DESCRIPTION` in `site/build.py`),
+which opens with the speed claim and gives no number. A post that a later release updated carries
+the day of its latest update (`dateModified`, `article:modified_time`). The search, 404, and general
+index pages (`UNINDEXED`), the source-code pages (`UNINDEXED_FOLDER`), and the blog's generated
+pages (All Posts, the years, the archive, the tags, and the authors; `_blog_collection`) are
+`noindex` and name no canonical address, so the sitemap leaves them out: they have no content of
+their own. Every title but the homepage's ends with `html_title`, "Andrey causal discovery", so a
+page matches what Andrey does and not only a name that is also a person's, and no two indexable
+pages share a title. In the structured data, `alternateName` and `sameAs` tie the website, the
+package, the repository, and Abel's GitHub profile to one product. After the build,
+`_write_discovery` in `conf.py` writes `llms.txt` (a summary that opens with the speed claim and
+counts the supported methods from the registry, `_llms_summary`; how to cite Andrey, from
+`CITATION.cff`; the facts at a glance, with the method counts by status from the registry; the pages
+in `LLMS_SECTIONS`, then every release card and post) and `sitemap.xml` (every indexable page, a
+post with its latest day as `lastmod`); `robots.txt` is a plain file (`_extra/robots.txt`). A page
+in `LLMS_SECTIONS` that is renamed or removed fails the build until the list is updated. Once a
+tagged release is live, `.github/workflows/indexnow.yml` submits every address in the sitemap to
+IndexNow for Bing and other participating engines; when the production deploy still waits for
+approval after two hours, it ends with a notice, and a manual run submits the site. Its public key
+is served at `_extra/<key>.txt`. Google reads the sitemap directly.
 
 ## Validation
 
@@ -375,11 +418,11 @@ It checks a strict `-W` build; API coverage (every public symbol of
 `andrey`, `andrey.metrics`, and `andrey.viz`, and every loader of `andrey.data`, documented, no
 private symbol exposed); KaTeX-ready math; one description per page, the same as its link preview's,
 at most 160 characters; the navbar's links; the favicon and the link-preview cards; the blog's front
-page and each post's cover and byline; every site address in the README, the project URLs, and the
-citation; each page's structured data against its link preview and each post's front matter;
-`llms.txt`, `sitemap.xml`, and `robots.txt`; that only the search page, the 404 page, and the blog's
-generated pages are `noindex`; each title's ending; and that the 404 page's links resolve from the
-site's root. External links: `uv run --group docs
+page and each post's cover and byline; each post's and card's AI statement; every site address in
+the README, the project URLs, and the citation; each page's structured data against its link
+preview and each post's front matter; `llms.txt`, `sitemap.xml`, and `robots.txt`; that only the
+pages with no content of their own are `noindex`; each title's ending and that no two titles match;
+and that the 404 page's links resolve from the site's root. External links: `uv run --group docs
 sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 
 ## How the site is wired

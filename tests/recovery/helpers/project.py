@@ -10,7 +10,7 @@ from andrey.core import ARROW, TAIL
 from andrey.core.structure import GraphStructure
 
 # A graph candidate also carries the scalar objective score (from metadata).
-_SCORE_GRAPH = frozenset({"GES", "GIES", "XGES", "HC", "Tabu", "MMHC", "RSMAX2"})
+_SCORE_GRAPH = frozenset({"GES", "GIES", "XGES", "LGES", "HC", "Tabu", "MMHC", "RSMAX2"})
 # Graph-output algorithms: candidate = {"graph"[, "score"]}.
 _GRAPH = (
     frozenset(
@@ -22,16 +22,7 @@ _GRAPH = (
             "CDNOD",
             "IAMB",
             "InterIAMB",
-            "GS",
-            "FastIAMB",
             "MMPC",
-            "HITONPC",
-            "PCMB",
-            "MBbyMB",
-            "HITONMB",
-            "MMMB",
-            "CMB",
-            "MMBbyMMB",
             "ExactSearch",
             "BOSS",
             "BOSSFCI",
@@ -70,21 +61,12 @@ _PCMCI = frozenset({"PCMCI", "PCMCIplus", "LPCMCI"})
 # ICP: candidate = the DAG into the target, the accepted sets, and each column's p-value, ``None``
 # at the target.
 _INVARIANT = frozenset({"ICP"})
-# Treatment-outcome methods: candidate = the graph and the ``effects`` records.
-_EFFECTS = frozenset({"LDECC", "LocalOptimalAdjustment", "LocPCCDE"})
 # Weighted temporal fits: candidate = the per-lag graphs and their weights.
 _WEIGHTED_LAGS = frozenset({"DYNOTEARS", "Granger"})
-# Weighted graphs: candidate = the graph and its weights, ``weighted_adjacency[i, j]`` for
-# ``i -> j``: the DAGs of NOTEARS and DAGMA, and local ISA-LiNG's digraph of the edges at its
-# target.
-_WEIGHTED_GRAPH = frozenset({"NOTEARS", "DAGMA", "LocalISALiNG"})
+# Weighted DAGs: candidate = the DAG and its weights, ``weighted_adjacency[i, j]`` for ``i -> j``.
+_WEIGHTED_DAG = frozenset({"NOTEARS", "DAGMA"})
 # VARMA-LiNGAM: candidate = the causal order and both coefficient stacks in the native B layout.
 _VARMA = frozenset({"VARMALiNGAM", "VARMALiNGAMPruned"})
-
-
-# Y-structures: candidate = the edgeless graph, the claimed ``[treatment, outcome]`` pairs by
-# descending score, and their scores.
-_CLAIMS = frozenset({"YStructures"})
 
 
 def found_dag(out: Any) -> GraphStructure:
@@ -138,21 +120,12 @@ def project_output(out: Any, algorithm: str) -> dict:
         return {"graph": out.structure.to_numpy(), "latent_pairs": pairs}
     if algorithm in _ORDERED_DAG:
         return {"graph": out.structure.to_numpy(), "causal_order": np.asarray(out.ordering)}
-    if algorithm in _CLAIMS:
-        claims = out.metadata["effects"]
-        return {
-            "graph": out.structure.to_numpy(),
-            "claims": [[c["treatment"], c["outcome"]] for c in claims],
-            "scores": [c["score"] for c in claims],
-        }
     if algorithm in _INVARIANT:
         return {
             "graph": out.structure.to_numpy(),
             "accepted_sets": out.metadata["accepted_sets"],
             "p_values": out.metadata["p_values"],
         }
-    if algorithm in _EFFECTS:
-        return {"graph": out.structure.to_numpy(), "effects": out.metadata["effects"]}
     if algorithm == "CPCMGraph":  # the DAG of lowest score and its residuals' p-value
         return {"graph": out.structure.to_numpy(), "p_value": out.metadata["p_value"]}
     if algorithm in _PAIRWISE:
@@ -169,6 +142,17 @@ def project_output(out: Any, algorithm: str) -> dict:
             "graph": out.structure.to_numpy(),
             "score": out.metadata["score"],
             "targets": [targets[key] for key in sorted(targets)],
+        }
+    if algorithm == "RPCMCI":  # the regime of each step, each regime's lag graphs, the objective
+        return {
+            "regimes": np.asarray(out.regimes),
+            "graph": np.stack(
+                [
+                    np.stack([o.structure.lag(lag).to_numpy() for lag in o.structure.lags])
+                    for o in out.outputs
+                ]
+            ),
+            "objective": out.metadata["objective"],
         }
     if algorithm == "JPCMCIplus":  # PCMCI+'s fields, and the context and dummy links
         s, md = out.structure, out.metadata
@@ -200,7 +184,7 @@ def project_output(out: Any, algorithm: str) -> dict:
             "graph": np.stack([s.lag(lag).to_numpy() for lag in s.lags]),
             "lag_weights": np.asarray(s.lag_weights),
         }
-    if algorithm in _WEIGHTED_GRAPH:
+    if algorithm in _WEIGHTED_DAG:
         return {
             "graph": out.structure.to_numpy(),
             "weighted_adjacency": np.asarray(out.weighted_adjacency),

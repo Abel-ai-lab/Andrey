@@ -50,7 +50,7 @@ eaau4996. https://doi.org/10.1126/sciadv.aau4996
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, cast
 
@@ -65,9 +65,16 @@ from andrey.core.ci import (
     StudentT,
     make_indep_test,
 )
-from andrey.core.ci_missing import PartialCorrelationDeletion, testwise_deletion
+from andrey.core.ci_missing import (
+    NOT_TESTED,
+    PartialCorrelationDeletion,
+    RowCounts,
+    TestwiseDeletion,
+    not_tested,
+    testwise_deletion,
+)
 from andrey.core.fdr import check_fdr_method, corrected_pvalues
-from andrey.core.score import copies_error
+from andrey.core.score import CopiedColumnsError, copies_error
 from andrey.core.ties import KEY_DP, tie_ranks
 
 if TYPE_CHECKING:
@@ -157,6 +164,14 @@ class DesignTest:
             statistics[k], p_values[k] = statistic[0], p_value[0]
         return statistics, p_values
 
+    def conditionable(self, x: int, y: int, ordered: Iterable[int]) -> list[int]:
+        """:func:`conditionable` of ``test``."""
+        return conditionable(self.test, x, y, ordered)
+
+    def count_not_tested(self, x: int, y: int, queries: int) -> None:
+        """:func:`count_not_tested` of ``test``."""
+        count_not_tested(self.test, x, y, queries)
+
 
 def design_test(
     indep_test: str,
@@ -166,6 +181,7 @@ def design_test(
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     degrees_of_freedom: str = "mean",
+    rows: np.ndarray | None = None,
 ) -> LinkTest:
     """The ``indep_test`` test over the lagged design of ``data``.
 
@@ -186,9 +202,14 @@ def design_test(
     the test deletes rows per test (:mod:`andrey.core.ci_missing`): each query reads the design
     rows observed in all of its columns. Two columns are then copies when they repeat each other on
     the rows where both are observed.
+
+    ``rows`` masks design rows (time steps ``2 * tau_max`` to ``T - 1``): tests read marked effect
+    steps with lagged values from every earlier step.
     """
     mask = None if categorical is None else np.tile(categorical, 2 * tau_max + 1)
     design = lagged_design(data, 2 * tau_max)
+    if rows is not None:
+        design = design[rows]
     return column_test(
         indep_test,
         design,
@@ -197,6 +218,86 @@ def design_test(
         seed=seed,
         degrees_of_freedom=degrees_of_freedom,
     )
+
+
+class RankedDesignTest:
+    """A test over the lagged design of the data's columns in rank order, asked in data columns.
+
+    ``by_rank[k]`` is the data column at position ``k`` of the test's data. A query's design column
+    ``lag * n + i`` reaches ``test`` as ``lag * n + back[i]``, where ``back`` inverts ``by_rank``,
+    each conditioning set sorted, so every column order of the data asks ``test`` the same queries
+    over the same matrix and gets the same bits back.
+    """
+
+    def __init__(self, test: LinkTest, by_rank: np.ndarray) -> None:
+        self.test = test
+        self.n_vars = len(by_rank)
+        self.back = np.argsort(by_rank)
+
+    def _moved(self, columns: np.ndarray) -> np.ndarray:
+        lag, i = np.divmod(np.asarray(columns, dtype=np.intp), self.n_vars)
+        return lag * self.n_vars + self.back[i]
+
+    def statistic_pvalues(
+        self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Test ``x[i]`` against ``y[i]`` given the columns ``conditions[i]``, for every row."""
+        moved = np.sort(self._moved(conditions), axis=1)
+        return self.test.statistic_pvalues(self._moved(x), self._moved(y), moved)
+
+    def conditionable(self, x: int, y: int, ordered: Iterable[int]) -> list[int]:
+        """:func:`conditionable` of ``test``, asked and answered in data columns."""
+        ordered = list(ordered)
+        moved = self._moved(np.array([x, y, *ordered], dtype=np.intp)).tolist()
+        back = dict(zip(moved[2:], ordered))
+        return [back[c] for c in conditionable(self.test, moved[0], moved[1], moved[2:])]
+
+    def count_not_tested(self, x: int, y: int, queries: int) -> None:
+        """:func:`count_not_tested` of ``test``, asked in data columns."""
+        moved = self._moved(np.array([x, y], dtype=np.intp)).tolist()
+        count_not_tested(self.test, moved[0], moved[1], queries)
+
+
+def ranked_design_test(
+    indep_test: str,
+    data: np.ndarray,
+    tau_max: int,
+    ranks: Sequence[int],
+    *,
+    categorical: np.ndarray | None = None,
+    seed: int | None = None,
+    degrees_of_freedom: str = "mean",
+) -> RankedDesignTest:
+    """:func:`design_test` over ``data``'s columns sorted by ``ranks``, their
+    :func:`~andrey.core.ties.tie_ranks`, asked in ``data``'s columns (:class:`RankedDesignTest`).
+    ``categorical``, ``seed``, and ``degrees_of_freedom`` are :func:`design_test`'s.
+
+    The copies error names ``data``'s design columns. On data with missing values, the queries
+    count in :func:`~andrey.core.ci_missing.rows_tested` by the pairs of ``data``'s design columns
+    (:meth:`~andrey.core.ci_missing.TestwiseDeletion.from_columns`).
+    """
+    by_rank = np.argsort(np.asarray(ranks), kind="stable")
+    mask = None if categorical is None else np.asarray(categorical)[by_rank]
+    n_vars = len(by_rank)
+    try:
+        test = design_test(
+            indep_test,
+            np.ascontiguousarray(data[:, by_rank]),
+            tau_max,
+            categorical=mask,
+            seed=seed,
+            degrees_of_freedom=degrees_of_freedom,
+        )
+    except CopiedColumnsError as error:
+        moved = [
+            sorted((c // n_vars) * n_vars + int(by_rank[c % n_vars]) for c in group)
+            for group in error.groups
+        ]
+        raise copies_error(sorted(moved), design_column_name(n_vars)) from None
+    if (deletion := _deletion(test)) is not None:
+        lags, ranked = np.divmod(np.arange(n_vars * (2 * tau_max + 1)), n_vars)
+        deletion.from_columns(lags * n_vars + by_rank[ranked])
+    return RankedDesignTest(test, by_rank)
 
 
 def column_test(
@@ -285,6 +386,102 @@ def _strongest_others(columns: np.ndarray, p: int) -> np.ndarray:
     return others
 
 
+def _deletion(test: object) -> TestwiseDeletion | None:
+    """The :class:`~andrey.core.ci_missing.TestwiseDeletion` that ``test`` is or wraps through
+    wrapper ``test`` attributes, or ``None``."""
+    while not isinstance(test, TestwiseDeletion):
+        test = getattr(test, "test", None)
+        if test is None:
+            return None
+    return test
+
+
+def flagged_links(
+    rows: RowCounts | None,
+    drawn: np.ndarray,
+    undecided: np.ndarray | None,
+    required: np.ndarray | None = None,
+) -> np.ndarray:
+    """The links of ``drawn[lag, i, j]`` a conditioning set not tested might have separated, as a
+    boolean array shaped as ``drawn``, a lag-0 link at both ``[0, i, j]`` and ``[0, j, i]``.
+
+    A drawn link is flagged when a query of its ends, the design columns ``lag * n + i`` and ``j``,
+    was not tested in ``rows`` and another was
+    (:meth:`~andrey.core.ci_missing.RowCounts.possibly_separable`), or when an end shares its
+    variable with an end of a link ``undecided[lag, i, j]`` marks: no test conditions on a node an
+    undecided link joins, and a test of the link can shift that node next to its end. A link
+    ``required`` marks is never tested, so no set could separate it, and it is not flagged. None is
+    flagged without ``rows`` or when every query was tested, as on complete data.
+    """
+    flagged = np.zeros(drawn.shape, dtype=bool)
+    if rows is None or not rows.total_not_tested():
+        return flagged
+    n = drawn.shape[1]
+    joined: set[int] = set()
+    if undecided is not None and undecided.any():
+        _, sources, targets = np.nonzero(undecided)
+        joined = set(sources.tolist()) | set(targets.tolist())
+    for lag, i, j in zip(*np.nonzero(drawn)):
+        lag, i, j = int(lag), int(i), int(j)
+        a, b = sorted((lag * n + i, j))
+        if (a, b) in rows.not_tested and (a, b) in rows.largest:
+            flagged[lag, i, j] = True
+        elif (i in joined or j in joined) and not (
+            required is not None and (required[lag, i, j] or (lag == 0 and required[0, j, i]))
+        ):
+            flagged[lag, i, j] = True
+    flagged[0] |= flagged[0].T
+    return flagged
+
+
+def deletes_rows(test: object) -> bool:
+    """Whether ``test`` is or wraps a test that deletes rows per test (:func:`_deletion`)."""
+    return _deletion(test) is not None
+
+
+def count_not_tested(test: object, x: int, y: int, queries: int = 1) -> None:
+    """Count ``queries`` unasked conditioning sets of ``x`` and ``y`` as untested for lack of rows
+    (:meth:`~andrey.core.ci_missing.TestwiseDeletion.count_not_tested`); wrappers use their own
+    ``count_not_tested`` in their columns."""
+    method = getattr(test, "count_not_tested", None)
+    if method is not None:
+        method(x, y, queries)
+    elif (inner := getattr(test, "test", None)) is not None:
+        count_not_tested(inner, x, y, queries)
+
+
+def conditionable(test: object, x: int, y: int, ordered: Iterable[int]) -> list[int]:
+    """Columns from ``ordered``, strongest first, for conditioning ``x`` and ``y``: on missing data,
+    those keeping the block testable
+    (:meth:`~andrey.core.ci_missing.TestwiseDeletion.conditionable`), excluding columns never
+    observed together; all on complete data. Wrappers use their own ``conditionable`` in their
+    columns."""
+    method = getattr(test, "conditionable", None)
+    return list(ordered) if method is None else method(x, y, ordered)
+
+
+def _conditionable_others(
+    test: LinkTest, columns: np.ndarray, p: int, target: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Row ``k`` holds the first ``p`` entries of ``columns`` without ``columns[k]`` that a test of
+    ``columns[k]`` and ``target`` conditions on (:func:`conditionable`), and the mask of the rows
+    that have ``p`` of them; a row without them holds zeros. A row whose entries are not the first
+    ``p`` of the others counts their set as not tested (:func:`count_not_tested`)."""
+    others = np.zeros((len(columns), p), dtype=np.intp)
+    has = np.ones(len(columns), dtype=bool)
+    listed = columns.tolist()
+    for k, column in enumerate(listed):
+        ordered = [c for c in listed if c != column]
+        kept = conditionable(test, column, target, ordered)[:p]
+        if kept != ordered[:p]:
+            count_not_tested(test, column, target)
+        if len(kept) < p:
+            has[k] = False
+        else:
+            others[k] = kept
+    return others, has
+
+
 def pc1(
     test: LinkTest,
     n_vars: int,
@@ -294,6 +491,7 @@ def pc1(
     ranks: Sequence[int],
     constraints: LaggedConstraints | None = None,
     max_depth: int | None = None,
+    undecided: list[Link] | None = None,
 ) -> tuple[Link, ...]:
     """Select the lagged parents of variable ``target`` with the PC1 rounds; strongest first.
 
@@ -301,9 +499,18 @@ def pc1(
     re-sorts the survivors by strength rounded to ``KEY_DP`` decimals, strongest first, and equal
     ones by ``ranks[i]``, then by lag, for the candidate ``(i, lag)``; ``ranks`` holds each
     variable's :func:`~andrey.core.ties.tie_ranks`. Each round is one ``test`` call over all
-    remaining candidates. With ``constraints``, a forbidden link is no candidate, and a required one
-    is never tested: it stays, with the strength of a partial correlation of ``1``. With
-    ``max_depth``, the rounds stop after ``p = max_depth``, so no test conditions on more.
+    remaining candidates. A test that was not tested
+    (:data:`~andrey.core.ci_missing.NOT_TESTED`) neither removes its candidate nor sets its
+    strength. A candidate whose first test, given no condition, was not tested has no tested
+    result, as no later test, given more, can run on more rows: it leaves the candidates after
+    that round, so no test conditions on it, and is no parent; with ``undecided``, it is appended
+    there. On data with missing values, the ``p`` others of a candidate are the strongest that
+    keep the test's block testable (:func:`conditionable`), so the block does not mix columns no
+    row observes together; a candidate with fewer than ``p`` such others has no test in that
+    round, and one whose others are not the ``p`` strongest counts that set as not tested
+    (:func:`count_not_tested`). With ``constraints``, a forbidden link is no candidate, and a
+    required one is never tested: it stays, with the strength of a partial correlation of ``1``.
+    With ``max_depth``, the rounds stop after ``p = max_depth``, so no test conditions on more.
     """
     columns = np.array(
         [_column((i, lag), n_vars) for i in range(n_vars) for lag in range(1, tau_max + 1)],
@@ -313,22 +520,40 @@ def pc1(
         columns = columns[~constraints.forbidden[columns // n_vars, columns % n_vars, target]]
     tie = np.asarray(ranks, dtype=np.intp)[columns % n_vars] * (tau_max + 1) + columns // n_vars
     strength = np.full(len(columns), math.inf)
+    deleting = deletes_rows(test)
     p = 0
     while len(columns) - 1 >= p and (max_depth is None or p <= max_depth):
         y = np.full_like(columns, target)
-        conditions = _strongest_others(columns, p)
-        if constraints is None:
-            statistics, p_values = test.statistic_pvalues(columns, y, conditions)
+        if deleting:
+            conditions, has = _conditionable_others(test, columns, p, target)
         else:
-            statistics, p_values = _known_links_pvalues(
+            conditions, has = _strongest_others(columns, p), None
+        asked = slice(None) if has is None or has.all() else has
+        statistics = np.full(len(columns), NOT_TESTED)
+        p_values = np.full(len(columns), NOT_TESTED)
+        if has is not None and not has.any():
+            pass  # no candidate has p others to condition on: no test this round
+        elif constraints is None:
+            statistics[asked], p_values[asked] = test.statistic_pvalues(
+                columns[asked], y[asked], conditions[asked]
+            )
+        else:
+            statistics[asked], p_values[asked] = _known_links_pvalues(
                 test,
-                constraints.required[columns // n_vars, columns % n_vars, target],
-                columns,
-                y,
-                conditions,
+                constraints.required[columns // n_vars, columns % n_vars, target][asked],
+                columns[asked],
+                y[asked],
+                conditions[asked],
             )
         strength = np.fmin(strength, np.abs(statistics))
         kept = np.flatnonzero(~(p_values > pc_alpha))
+        if p == 0:  # a candidate with no tested result conditions no test
+            untested = not_tested(p_values[kept])
+            if undecided is not None:
+                undecided.extend(
+                    (int(c) % n_vars, int(c) // n_vars) for c in columns[kept[untested]]
+                )
+            kept = kept[~untested]
         kept = kept[np.lexsort((tie[kept], -np.round(strength[kept], KEY_DP)))]
         columns, strength, tie = columns[kept], strength[kept], tie[kept]
         p += 1
@@ -359,7 +584,10 @@ def mci(
     """Run the MCI test on every link; return ``(statistics, p_values)``, each ``(tau_max, n, n)``.
 
     The link ``X^i_{t-lag} -> X^j_t`` is tested given ``parents[j]`` without ``(i, lag)`` and
-    ``parents[i]`` shifted ``lag`` steps back. The links into each ``X^j_t`` are tested together,
+    ``parents[i]`` shifted ``lag`` steps back; on data with missing values, only those, strongest
+    first, that keep the test's block testable (:func:`conditionable`), and a test that leaves
+    some out counts its whole set as not tested (:func:`count_not_tested`). The links into each
+    ``X^j_t`` are tested together,
     one ``test`` call per conditioning-set size. With ``constraints``, no test runs on a forbidden
     link, which reads statistic 0 and p-value 1, or on a required one, which reads 1 and 0.
     """
@@ -376,9 +604,14 @@ def mci(
                     constraints.forbidden[lag, i, j] or constraints.required[lag, i, j]
                 ):
                     continue
-                conditions = {c for c in parents[j] if c != (i, lag)}
-                conditions.update((k, s + lag) for k, s in parents[i])
-                columns = sorted(_column(c, n_vars) for c in conditions)
+                ordered = [c for c in parents[j] if c != (i, lag)]
+                ordered += [(k, s + lag) for k, s in parents[i] if (k, s + lag) not in ordered]
+                cause = _column((i, lag), n_vars)
+                columns = sorted(
+                    conditionable(test, cause, j, [_column(c, n_vars) for c in ordered])
+                )
+                if len(columns) < len(ordered):
+                    count_not_tested(test, cause, j)
                 groups.setdefault(len(columns), []).append((i, lag, columns))
         for size, group in groups.items():
             causes = np.array([i for i, _, _ in group], dtype=np.intp)
@@ -406,6 +639,7 @@ def pcmci(
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     degrees_of_freedom: str = "mean",
+    rows: np.ndarray | None = None,
 ) -> PCMCIResult:
     """Run PC1 and MCI on a ``(T, n)`` series with the ``indep_test`` test.
 
@@ -418,7 +652,8 @@ def pcmci(
     a required one is. ``max_depth`` caps PC1's conditioning sets. ``categorical``, the mask of the
     categorical columns for a mixed-data test, ``seed``, and ``degrees_of_freedom`` reach
     :func:`design_test`, which raises
-    on an ``indep_test`` it cannot build.
+    on an ``indep_test`` it cannot build. ``rows`` keeps only the marked design rows
+    (:func:`design_test`).
     """
     check_fdr_method(fdr_method)
     data = np.asarray(data, dtype=np.float64)
@@ -430,6 +665,7 @@ def pcmci(
         categorical=categorical,
         seed=seed,
         degrees_of_freedom=degrees_of_freedom,
+        rows=rows,
     )
     ranks = tie_ranks(data, categorical).tolist()
     with backend.one_blas_thread():  # the stacked inversions then give the same bits on any host

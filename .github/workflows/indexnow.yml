@@ -18,7 +18,7 @@ jobs:
   indexnow:
     if: github.repository == 'Abel-ai-lab/Andrey'
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 130
     steps:
       - name: Wait for the release on the live site, then submit every address in its sitemap
         env:
@@ -30,9 +30,11 @@ jobs:
           set -euo pipefail
           # A tag is live when the production deploy check ("<build server> / PROD") succeeds on the
           # tagged commit (a post release keeps the package's version, so llms.txt cannot tell);
-          # manual runs submit the live site.
+          # manual runs submit the live site. The deploy waits for the owner's approval, which can
+          # take hours: after two hours the run ends without submitting, and a manual run submits
+          # the site once it is live.
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            for _ in $(seq 100); do
+            for _ in $(seq 240); do
               state=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs" \
                 --jq '[.check_runs[] | select(.name | endswith(" / PROD"))][0] | "\(.status) \(.conclusion)"')
               case "$state" in
@@ -41,7 +43,12 @@ jobs:
               esac
               sleep 30
             done
-            : "${live:?The deploy check did not succeed within 50 minutes}"
+            if [[ -z "${live:-}" ]]; then
+              message="The production deploy is not live after two hours, so nothing was submitted; run this workflow by hand once it is."
+              echo "::notice::$message"
+              echo "$message" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
           fi
           curl -fsS "https://$SITE/sitemap.xml" | grep -o '<loc>[^<]*' | sed 's/<loc>//' \
             | jq -R . | jq -s --arg host "$SITE" --arg key "$KEY" \

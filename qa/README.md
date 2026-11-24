@@ -47,17 +47,17 @@ whose answer differs from the first fit, with the parts that differ. `--workers`
 difference and `--shuffle` on a difference beyond rounding:
 
 - `--shuffle K` refits on `K` seeded column orders and maps each answer back to the original
-  columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out. ICP's
-  target, IGSP's targets, and J-PCMCI+'s contexts move with the columns, and each row's environment
-  stays with its row. MB-by-MB, CMB, MMB-by-MMB, local ISA-LiNG, LDECC, LOAD, and LocPC-CDE are not
-  refit: the target of MB-by-MB, CMB, MMB-by-MMB, and local ISA-LiNG is the last variable, LDECC's
-  treatment and outcome and LOAD's two variables are the last and the first, and LocPC-CDE's
-  treatment and outcome are the first and the last. A column order fails the check when a graph, a
-  graph's kind, or the causal order differs, or when an edge weight or metadata value differs by
-  more than rounding (a relative `1e-6`, or an absolute `1e-12` near zero); a boolean that becomes a
-  number or an integer that becomes a float differs. A difference of rounding alone, such as the
-  p-values of ICP and J-PCMCI+, which differ by about `1e-14` because their regressions sum in the
-  order of the columns, is listed as information and does not change the exit status.
+  columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out, and
+  UT-IGSP's learned targets map back with the columns. ICP's target, IGSP's targets, and
+  J-PCMCI+'s contexts move with the columns, and each row's environment stays with its row. A
+  column order fails the check when a graph, a graph's kind, or the causal order differs, or when an
+  edge weight or metadata value differs by more than rounding (a relative `1e-6`, or an absolute
+  `1e-12` near zero); a boolean that becomes a number or an integer that becomes a float differs.
+  A difference of rounding alone, such as the p-values of ICP and J-PCMCI+, which differ by about
+  `1e-14` because their regressions sum in the order of the columns, is listed as information and
+  does not change the exit status. So is a difference that the column-order guide documents,
+  listed in `DOCUMENTED` with its reason: a difference of ICA-LiNGAM's graph, causal order, or
+  weights, whose FastICA can reach another solution.
 - `--workers N` refits PC, FCI, FCI-JCI, GFCI, CD-NOD, RSMAX2 (with PC's skeleton), GES, and PNL
   on `N` workers, with every GES pass, every skeleton pass of conditioning size two or more, and
   every possible-d-sep search sent to the worker pool.
@@ -145,7 +145,8 @@ uv run python -m qa.quality_gate
 ```
 
 The `quality-gate` workflow runs the same command once per release, on the head of the release pull
-request into `main`, and `main`'s ruleset requires it. The publish workflow skips its own run when a
+request into `main`, and `main`'s ruleset requires it; it also runs by hand, as
+`gh workflow run quality-gate.yml --ref <branch>`. The publish workflow skips its own run when a
 passing run has the tree of the commit it publishes (`scripts/gate_reuse.py`; a squash merge keeps
 the tree), so the published files are the ones the gate passed. A change after the gate, or a lookup
 that fails, runs the gate again. Every job that publishes to PyPI must need a job that calls the
@@ -163,22 +164,21 @@ name the run and its commit. A run reused this way was itself a pass on its own 
 such pushes traces back to a run that fitted the methods. A path outside those paths, a lookup that
 fails, or no such run, runs the gate.
 
-The gate checks PC, FCI, GFCI, CD-NOD, FCI-JCI, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, HITON-PC,
-HITON-MB, MMMB, PCMB, MB-by-MB, Y-structures, CMB, LDECC, LOAD, LocPC-CDE, GES, GIES, GnIES, IGSP,
-ICP, XGES, AGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, NOTEARS, DAGMA, BOSS, GRaSP, BOSS-FCI,
-GRaSP-FCI, MMB-by-MMB, UT-IGSP, DirectLiNGAM, ICA-LiNGAM, local ISA-LiNG, MultiGroupDirectLiNGAM,
-RCD, BottomUpParceLiNGAM, SCORE, NoGAM, CAM-UV, GIN, ANM, PNL, LOCI, PCMCI, PCMCI+, LPCMCI,
+The gate checks PC, FCI, GFCI, CD-NOD, FCI-JCI, IAMB, Inter-IAMB, MMPC, GES, GIES, GnIES, IGSP, ICP,
+XGES, AGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, NOTEARS, DAGMA, BOSS, GRaSP, BOSS-FCI,
+GRaSP-FCI, UT-IGSP, DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM,
+SCORE, NoGAM, DAS, CAM-UV, GIN, ANM, PNL, LOCI, CPCM, CPCM's graph search, PCMCI, PCMCI+, LPCMCI,
 J-PCMCI+, VARMA-LiNGAM, LongitudinalLiNGAM, Granger, and DYNOTEARS on the datasets whose assumptions
 each method needs, PC with each supported nonlinear conditional-independence test, KCI, RCoT,
 CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 
 | Dataset | Draws | Methods |
 |---|---|---|
-| `linear_gauss_er` at `d = 20, 50` | 10 seeds each | PC, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, HITON-PC, HITON-MB, MMMB, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP; Y-structures at `d = 20, 50`; MB-by-MB, CMB, LDECC, LOAD, and LocPC-CDE at the last column |
+| `linear_gauss_er` at `d = 20, 50` | 10 seeds each | PC, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP |
 | `linear_gauss_er` at `d = 10, 15` | 10 seeds each | exact search; CALM at `d = 10` |
 | `notears_paper_standardized` at `d = 50`, `notears_paper_raw` at `d = 10`, `n = 1000` | 10 seeds each | NOTEARS; DAGMA on the raw cell |
 | `ages_paper` with strong and weak shares `(0.1, 0.3)` and `(0.3, 0.3)`, `d = 10`, `n = 10000` | 10 seeds each | AGES |
-| `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI, GFCI, BOSS-FCI, GRaSP-FCI, MMB-by-MMB |
+| `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI, GFCI, BOSS-FCI, GRaSP-FCI |
 | `anm_er`, `nonmonotone_er` at `d = 5, 10`, `n = 50d` | 10 seeds each | PC with KCI; with RCoT at `d = 10`; with CMIknn and GPDC at `d = 5` |
 | `interventional_gauss_er` at `d = 20, 50` | 10 seeds each | GIES |
 | `noise_interventional_gauss_er` at `d = 10, 20`, four environments of `n = 1000` | 10 seeds each | GnIES |
@@ -189,14 +189,15 @@ CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 | `fci_jci_s4`, `fci_jci_l10`: 4 and 10 variables, two regimes of `n = 500` | 10 seeds each | FCI-JCI |
 | `multi_group_er` at `d = 10, 20`, three groups of `n = 1000` | 10 seeds each | MultiGroupDirectLiNGAM |
 | `latent_measurement` at `d = 8, 12`, `n = 1000` | 10 seeds each | GIN |
-| `lingam_sf` at `d = 20, 50` | 10 seeds each | DirectLiNGAM, ICA-LiNGAM; local ISA-LiNG at the last column |
+| `lingam_sf` at `d = 20, 50` | 10 seeds each | DirectLiNGAM, ICA-LiNGAM |
 | `latent_lingam_er` at `d = 10, 15` | 10 seeds each | RCD, BottomUpParceLiNGAM |
-| `score_paper_standardized` at `d = 10` with `d` edges and at `d = 20` with `4 d`, `n = 1000` | 10 seeds each | SCORE |
+| `score_paper_standardized` at `d = 10` with `d` edges and at `d = 20` with `4 d`, `n = 1000` | 10 seeds each | SCORE, DAS |
 | `score_paper_laplace_standardized` at `d = 10` with `d` edges, `score_paper_gumbel_standardized` at `d = 10` with `4 d`, `n = 1000` | 10 seeds each | NoGAM |
 | `camuv_paper` at `d = 14`, `latent_anm_er_tenth` at `d = 22`, `n = 1000` | 10 seeds each | CAM-UV |
 | `anm_pair` at `n = 1000` | 10 seeds | ANM |
 | `pnl_pair` at `n = 1000` | 10 seeds | PNL |
-| `lsnm_pair` at `n = 1000` | 10 seeds | LOCI |
+| `lsnm_pair` at `n = 1000` | 10 seeds | LOCI, CPCM (`family="gaussian"`) |
+| `anm_er_n1000` at `d = 5` | 10 seeds | CPCM's graph search (`family="gaussian_fixed_scale"`) |
 | `pcmci_paper` at `d = 10`, `n = 500, 1000` | 10 seeds each | PCMCI |
 | `pcmciplus_paper` at `(d, n) = (10, 500), (20, 1000)` | 10 seeds each | PCMCI+ |
 | `lpcmci_paper` at `(d, n) = (5, 500), (10, 1000)` | 10 seeds each | LPCMCI |
@@ -205,9 +206,9 @@ CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 | `longitudinal_lingam_paper` at `(d, n, m) = (3, 20, 200), (5, 20, 500)` | 10 seeds each | LongitudinalLiNGAM |
 | `var2_lagged` at `d = 5`, `n = 1000, 2000` | 10 seeds each | Granger |
 | `dynotears_paper` at `d = 10, 20`, `n = 500` | 10 seeds each | DYNOTEARS |
-| ASIA, linear-Gaussian | 10 seeds | PC, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, HITON-PC, HITON-MB, MMMB, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, CALM, FCI, GFCI, BOSS-FCI, GRaSP-FCI; Y-structures; MB-by-MB, CMB, MMB-by-MMB, LDECC, LOAD, and LocPC-CDE at the last column |
-| ASIA, linear with uniform noise | 10 seeds | DirectLiNGAM, ICA-LiNGAM; local ISA-LiNG at the last column |
-| Sachs, measured | 1 | PC, FCI, GFCI, BOSS-FCI, GRaSP-FCI, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC, HITON-PC, HITON-MB, MMMB, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, DirectLiNGAM, ICA-LiNGAM |
+| ASIA, linear-Gaussian | 10 seeds | PC, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, CALM, FCI, GFCI, BOSS-FCI, GRaSP-FCI |
+| ASIA, linear with uniform noise | 10 seeds | DirectLiNGAM, ICA-LiNGAM |
+| Sachs, measured | 1 | PC, FCI, GFCI, BOSS-FCI, GRaSP-FCI, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu, MMHC, RSMAX2, BOSS, GRaSP, exact search, DirectLiNGAM, ICA-LiNGAM |
 
 - **Regimes.** `andrey.data` generates the published benchmark regimes with the benchmarks'
   arguments, at `n = 50d`; a test keeps the two in step. At the benchmarks' `n = 10d`, ICA-LiNGAM
@@ -224,7 +225,8 @@ CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
   `d = 20` with `4 d`. NoGAM's is additive noise of any distribution, run with Laplace noise
   (`score_paper_laplace_standardized`) at `d = 10` with `d` edges and with Gumbel noise
   (`score_paper_gumbel_standardized`) at `d = 10` with `4 d`; its fit time grows with `d`, so
-  `d = 20` is left out. Both run at their defaults.
+  `d = 20` is left out. DAS fits SCORE's model and runs on SCORE's cells. All three run at their
+  defaults.
 - **Hidden variables, nonlinear.** CAM-UV's published regimes, drawn by its benchmark driver
   (`benchmarks/camuv_cpu.py`) at two cells in its claim where its errors are below the empty
   graph's: `camuv_paper`, the paper's simulation, 10 observed variables, two hidden common causes,
@@ -307,7 +309,9 @@ CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 - **Pairs.** `anm_pair`, `pnl_pair`, and `lsnm_pair` are the published cause-effect pairs: two
   variables and one edge, in a direction the seed draws, at the benchmarks' 1,000-row size; a test
   keeps them in step with the benchmark drivers. The empty graph's SHD on a pair is 1, so ANM, PNL,
-  and LOCI pass only when they name the true direction on most draws.
+  LOCI, and CPCM pass only when they name the true direction on most draws. CPCM runs with the
+  Gaussian location-scale family, the family its benchmark gives it on location-scale pairs, and
+  its graph search with the fixed-scale Gaussian family, an additive-noise model.
 - **Time series.** The published time-series regimes, drawn by the benchmark harness
   (`benchmarks/andrey_bench`), which the gate imports; each method runs through its benchmark
   adapter with the published settings. The sizes are published sizes at which the method's median
@@ -326,13 +330,6 @@ CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
   every variable but the target, which identifies the target's parents (Peters, Buhlmann and
   Meinshausen 2016, Theorem 2), so the check has power. Each seed draws its target among the
   variables with parents, and ICP runs at its defaults.
-- **One variable's edges.** MMB-by-MMB answers the edges at one variable, so the gate fits it at the
-  last column of each draw and scores the edges at that column alone. It runs on the draws of FCI's
-  `latent_gauss_er` cells and on ASIA's. Sachs is left out: its one draw has two edges at its last
-  column, jnk, and the fit finds one of them with a wrong mark, as FCI does, so it makes as many
-  errors as the empty answer. The empty answer's median errors are the last column's median
-  number of edges in the PAG, 1.5 on the `latent_gauss_er` cells and 2 on ASIA. Identity fits the
-  same column, so it skips the column-order refits.
 - **ASIA.** The 8-arc network of Lauritzen and Spiegelhalter (1988), sampled as a linear SCM with
   1,000 rows per seed. Its arcs are bnlearn's (`andrey.data.load_dataset("asia")`); the gate lists
   them in its own order, which fixes each seed's weights, and a test checks the two agree.
@@ -340,30 +337,13 @@ CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
   network, from `andrey.data.load_dataset("sachs")`. It downloads
   [`sachs.2005.continuous.txt`](https://github.com/cmu-phil/example-causal-datasets/blob/4ba0565b8164b46063daf0f6fba6b94e5a99baf6/real/sachs/data/sachs.2005.continuous.txt)
   from `cmu-phil/example-causal-datasets` (CC0-1.0) at a pinned commit once, checks its SHA-256,
-  and caches it, so the first run needs network access. MB-by-MB, CMB, LDECC, and LOAD leave it
-  out: at its last column, jnk, each finds at most one of the two edges, as PC does, so none scores
-  below the empty answer there. Local ISA-LiNG leaves it out too: at jnk its local structure makes
-  4 errors against the empty answer's 2; at its paper's Sachs targets it matches the authors' code
-  on the 0.18.0 release card.
+  and caches it, so the first run needs network access.
 
-SHD follows the published summaries: PC, with any test, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC,
-HITON-PC, HITON-MB, MMMB, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, BOSS, and
-GRaSP against the truth's CPDAG, the LiNGAM methods, NOTEARS, DAGMA, AGES, ANM, PNL, SCORE, and
-NoGAM against the DAG, MultiGroupDirectLiNGAM summed over its groups, and FCI, GFCI, BOSS-FCI, and
-GRaSP-FCI by endpoint SHD against the PAG of the observed variables. MB-by-MB and CMB answer the
-last column, and count the missing, extra, and mismarked edges there against the truth's CPDAG.
-MMB-by-MMB answers the last column too and counts the same edges there against the PAG: the true
-edges the answer lacks, the answer's edges the PAG lacks, and the edges in both with a mark that
-differs. The empty answer makes as many errors as the target has edges. Y-structures claim ancestral
-pairs, so their errors are the false claims plus the true ancestral pairs not claimed, against the
-empty answer's, the number of true pairs. LDECC, with the last column as the treatment and the first
-as the outcome, LOAD, for the last and first columns, and LocPC-CDE, with the last column as the
-outcome and the column most correlated with it as the treatment, are scored as MB-by-MB and CMB are,
-by their edges at the last column against the truth's CPDAG: the graph, not the `effects` records.
-Local ISA-LiNG answers the last column and counts the errors in its local structure, the edges into
-and out of it and into each of its children, against the DAG's: an adjacency in one local structure
-and not the other counts one, and so does a reversed edge. The empty answer makes as many errors as
-the true local structure has edges.
+SHD follows the published summaries: PC, with any test, IAMB, Inter-IAMB, MMPC, GES, XGES, HC, Tabu,
+MMHC, RSMAX2, exact search, CALM, BOSS, and GRaSP against the truth's CPDAG, the LiNGAM methods,
+NOTEARS, DAGMA, AGES, ANM, PNL, CPCM and its graph search, SCORE, NoGAM, and DAS against the DAG,
+MultiGroupDirectLiNGAM summed over its groups, and FCI, GFCI, BOSS-FCI, and GRaSP-FCI by endpoint
+SHD against the PAG of the observed variables.
 GIES is scored against the interventional essential graph of the true DAG under the rows' targets,
 IGSP against the one under the settings' targets, GnIES and UT-IGSP against the one under the true
 targets, and CD-NOD against the CPDAG in which the domain index orients the edges it reaches.
@@ -475,7 +455,10 @@ A summary without `parity_rule` (0.1.0 to 0.7.0) keeps the count rule, which fai
 
 A row where either side has no result is skipped. A released summary never changes, so a method
 re-measured against the same reference in a later summary is judged by the later rows only. Where
-a summary has one entry per regime for a method and reference, a row's key names its `regime`.
+a summary has one entry per regime for a method and reference, a row's key names its `regime`. A
+row's key also names its size and its scenario (`ROW_KEYS`: the network, the effect, the hidden
+nodes, and the like), and two failing rows of one comparison with the same key fail whatever the
+allowlist holds.
 
 A row of a reference whose result depends on the column order (`reference_order_dependent`) may
 also hold Andrey's column-order mode on the same datasets (`andrey_column_shd_by_seed`,

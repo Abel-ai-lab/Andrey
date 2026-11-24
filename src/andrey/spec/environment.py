@@ -16,6 +16,14 @@ from andrey.constraint._parallel_skeleton import (
 from andrey.core.backend import GPU_THRESHOLDS
 from andrey.core.ci import MIN_SHARED_FACTOR_WORK
 from andrey.core.env import SEED_MAX
+from andrey.core.missing_groups import (
+    GROUP_BYTES,
+    GROUP_MAX_SCATTER,
+    MAX_GROUPS,
+    MAX_SHARED,
+    MIN_COLUMNS,
+    MIN_GAIN,
+)
 from andrey.lingam.pwling import MIN_PRUNE_WORK
 from andrey.search._parallel_ges import MIN_POOL_GES_WORK
 
@@ -61,7 +69,8 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             '(`restrict="pc"`) with `fisherz`, `student_t`, `normal_scores`, or `rcot`, and the '
             "possible-d-separation searches of FCI and GFCI with `fisherz`, `student_t`, or "
             "`normal_scores` and of FCI-JCI with `fisherz` or `student_t`, and worker threads for "
-            "the two directions of `pnl`; `0` or `1` runs serially. "
+            "the two directions of `pnl` and the searches of `skewd` and `skewd_mv`; `0` or `1` "
+            "runs serially. "
             "Separate from `ANDREY_BACKEND`, which picks the numeric code."
         ),
         group="backend",
@@ -131,43 +140,6 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         group="backend",
     ),
     EnvVarSpec(
-        name="ANDREY_LAZY_CORRELATION",
-        values="1/true/yes/on or 0/false/no/off",
-        default="1",
-        effect=(
-            "Lazy correlation for the local methods (the blanket learners, MB-by-MB, MMB-by-MMB, "
-            "CMB, LDECC, LOAD, LocPC-CDE, LDP, LD3, Y-structures, and the restrict phase of MMHC "
-            "and RSMAX2) with `fisherz`, `student_t`, or "
-            "`normal_scores` on complete data: the rows of the correlation matrix are computed, "
-            "256 at a time, when a test first reads one and kept, instead of the whole matrix up "
-            "front. The rows equal the whole matrix's bit for bit, so the answers do not change. "
-            "A backend that puts the matrix on a GPU computes the whole matrix there. The check "
-            "for copied columns then runs on the rows computed: a copy raises when a computed row "
-            "shows it, "
-            "and copies among columns whose rows are never computed do not raise. `0` computes "
-            "the whole matrix and checks it for copies before the search."
-        ),
-        group="backend",
-    ),
-    EnvVarSpec(
-        name="ANDREY_SHARED_SCAN_MIN_WORK",
-        values="integer (candidates times block size per scan)",
-        default=str(MIN_SHARED_FACTOR_WORK),
-        effect=(
-            "Per-scan gate for the blanket learners' scans with `fisherz`, `student_t`, or "
-            "`normal_scores` on complete data: a scan of two or more candidates against one "
-            "conditioning set of two or more variables is answered from one Cholesky factor of "
-            "the set's correlation block only when its candidates times the block size (the set "
-            "plus two) reach this value, else each candidate inverts its own submatrix. The "
-            "factor's p-values agree with the per-query ones to about 1e-10 relative, not bit "
-            "for bit; the per-query path is the exact one. `0` factors every such scan. The "
-            "default was measured on an AMD EPYC 7713 server running Linux on one core, where the "
-            "factor was slower below a value of about 64 and faster from 128 for every set size "
-            "sampled."
-        ),
-        group="backend",
-    ),
-    EnvVarSpec(
         name="ANDREY_LINGAM_PRUNE_MIN_WORK",
         values="integer (rows times ordered pairs of candidates per step)",
         default=str(MIN_PRUNE_WORK),
@@ -179,6 +151,103 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "candidate in full. Both give the same order bit for bit. `0` prunes every step. The "
             "default was measured on an AMD EPYC 7713 server running Linux on one core, where "
             "pruning broke even at 60,000 to 80,000."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_TESTWISE_GROUP_BYTES",
+        values="integer (bytes)",
+        default=str(GROUP_BYTES),
+        effect=(
+            "Path gate for test-wise deletion with `fisherz` or `student_t` on data with missing "
+            "values: the rows are grouped by their missingness patterns, and each block's sums "
+            "come from the groups' tables, only when those tables fit in this many bytes and the "
+            "other test-wise grouping variables below allow it; otherwise each block is summed "
+            "over every row. The path is chosen once per test from the data. The two paths count "
+            "the same rows for every tested query and agree up to rounding. `0` keeps every test "
+            "on the per-row path."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_TESTWISE_GROUP_MAX_SCATTER",
+        values="number from 0 to 1 (share of cells)",
+        default=str(GROUP_MAX_SCATTER),
+        effect=(
+            "Path gate for test-wise deletion with `fisherz` or `student_t` (see "
+            "`ANDREY_TESTWISE_GROUP_BYTES`): the grouped path is used only when the cells a row "
+            "misses within its group's columns are at most this share of those columns' cells. "
+            "Above it, the corrections for rows missing several columns of a block cost more "
+            "than summing every row."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_TESTWISE_GROUP_MAX_GROUPS",
+        values="integer",
+        default=str(MAX_GROUPS),
+        effect=(
+            "Path gate for test-wise deletion with `fisherz` or `student_t` (see "
+            "`ANDREY_TESTWISE_GROUP_BYTES`): the grouped path is used only when the missingness "
+            "patterns form at most this many groups. Data with as many patterns as rows stop "
+            "early, at little cost. `0` keeps every test on the per-row path."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_TESTWISE_GROUP_MAX_SHARED",
+        values="number from 0 to 1 (share of rows)",
+        default=str(MAX_SHARED),
+        effect=(
+            "Path gate for test-wise deletion with `fisherz` or `student_t` (see "
+            "`ANDREY_TESTWISE_GROUP_BYTES`): the grouped path is used only when at least a "
+            "quarter of the pairs of columns are observed together in at most this share of the "
+            "rows. When nearly every pair shares more, as with outages or cells missing at "
+            "random, each block lies in many groups and grouping costs more than it saves. `0` "
+            "keeps every test on the per-row path unless a quarter of the pairs are never "
+            "observed together."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_TESTWISE_GROUP_MIN_COLUMNS",
+        values="integer",
+        default=str(MIN_COLUMNS),
+        effect=(
+            "Path gate for test-wise deletion with `fisherz` or `student_t` (see "
+            "`ANDREY_TESTWISE_GROUP_BYTES`): the grouped path is used only for a test over at "
+            "least this many columns. A test over fewer, such as one built for a single query, "
+            "asks too few distinct blocks to repay the grouping."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_TESTWISE_GROUP_MIN_GAIN",
+        values="number of at least 1",
+        default=str(MIN_GAIN),
+        effect=(
+            "Block gate for test-wise deletion with `fisherz` or `student_t` on the grouped path "
+            "(see `ANDREY_TESTWISE_GROUP_BYTES`): a block takes the groups' sums only when its "
+            "estimated per-row cost is at least this many times its grouped cost; any other "
+            "block is summed over every row."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_SHARED_SCAN_MIN_WORK",
+        values="integer (candidates times block size per scan)",
+        default=str(MIN_SHARED_FACTOR_WORK),
+        effect=(
+            "Per-scan gate for the grow scans of IAMB and Inter-IAMB (also in RSMAX2's restrict "
+            'phase with `restrict="iamb"` or `"inter_iamb"`) with `fisherz`, `student_t`, or '
+            "`normal_scores` on complete data: a scan of two or more candidates against one "
+            "conditioning set of two or more variables is answered from one Cholesky factor of the "
+            "set's correlation block only when its candidates times the block size (the set plus "
+            "two) reach this value, else each candidate inverts its own submatrix. The factor's "
+            "p-values agree with the per-query ones to about 1e-10 relative, not bit for bit; the "
+            "per-query path is the exact one. `0` factors every such scan. The default was "
+            "measured on an AMD EPYC 7713 server running Linux on one core, where the factor was "
+            "slower below a value of about 64 and faster from 128 for every set size sampled."
         ),
         group="backend",
     ),
@@ -257,7 +326,7 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "Global default seed for every method that draws random numbers: BOSS, GRaSP, "
             "ICA-LiNGAM, CALM, IGSP and UT-IGSP with n_starts above 1 (the default), HC and tabu "
             "search with n_starts above 1, and the searches that test independence, with the "
-            "rcot, cmiknn, and gpdc tests. An explicit `seed=` "
+            "rcot, cmiknn, gpdc, gcm, wgcm, and pcm tests. An explicit `seed=` "
             "overrides it. Deterministic methods (GES, DirectLiNGAM, ...) and the other tests "
             "ignore it."
         ),

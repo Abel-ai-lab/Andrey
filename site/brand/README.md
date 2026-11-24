@@ -2,7 +2,8 @@
 
 - `art-<cover>.jpg`: each blog post's art, 1600 x 640, its subject on the right where the banner
   leaves room for the text, stored after `brand_tones` in `site/cards.py` recolors it to the
-  brand's tones (a site test checks). The build adds the wordmark, the title, and the release.
+  brand's tones (a site test checks). The build adds the wordmark, the title, and the release. The
+  cover art is generated with the help of AI.
   - `art-pair.jpg`: the launch post's, portraits of Andrey Markov and Andrey Kolmogorov drawn as
     navy line screens, overlapping, Kolmogorov mirrored to face left and scaled so both heads read
     the same size (Markov from his 1886 portrait, public domain, Wikimedia Commons
@@ -48,6 +49,9 @@
     three lamps on curved arms from the left, above, and the right, each lighting another facet
     and casting its own shadow across the plinth. The right-hand lamp and the facet it lights are
     amber.
+  - `art-missing-tiles.jpg`: 0.19.0, a table of tiles in perspective in engraved lines, as merged
+    cohorts fill it: each cohort's block of tiles steps down to the right, and the slots no cohort
+    fills are bare outlines. The tiles where two cohorts share a column are amber.
   - `art-methods.jpg`: the homepage's All-in-one, the prism of `bento/methods.jpg`, one beam
     fanning into many rays, the level ray out of the prism drawn amber. It is scaled from that
     crop to the cover's size, so it is softer than the others until the art is drawn again at

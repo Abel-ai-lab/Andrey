@@ -105,6 +105,9 @@ If two release branches are listed, use the one with the higher version, or ask 
   and may change without notice; do not import them from outside the package.
 - Code, data, and assets copied from another project keep their license notice, as
   `site/brand/fonts/OFL.txt` does for the site's fonts.
+- AI tools are welcome. A change written with one meets the same rules and checks as any other.
+  Review it yourself, be ready to explain it, and say under **How it was checked** which tool you
+  used ([AI tools](https://github.com/Abel-ai-lab/Andrey/blob/main/DEVELOPMENT.md#ai-tools)).
 
 [`DEVELOPMENT.md`](https://github.com/Abel-ai-lab/Andrey/blob/main/DEVELOPMENT.md#common-changes)
 has a recipe for each common change.
@@ -118,17 +121,20 @@ uv sync --all-extras                      # the optional methods' tests need the
 uv run --no-sync ruff format --check .    # formatting (`ruff format .` fixes it)
 uv run --no-sync ruff check .             # lint
 uv run --no-sync ty check                 # types
-uv run --no-sync pytest tests             # every test
+uv run --no-sync pytest tests -m "not release"   # the tests a pull request runs
 ```
 
-The suite takes about 25 minutes on one core. `-n auto --dist loadfile` runs it on every core,
-as CI does, with the same tests and results; `--dist loadfile` keeps the tests of one file on one
-worker, so they share its fixtures. `-n 0` runs without workers, one test at a time, to debug a
-failure. `--shard 1/2` runs the first of two disjoint halves of the tests, as one of CI's two jobs
-per Python version does. Run `tests/gpu` without `-n`: the workers would share one GPU.
+`-n auto --dist loadfile` runs the tests on every core, as CI does, with the same tests and results;
+`--dist loadfile` keeps the tests of one file on one worker, so they share its fixtures. `-n 0` runs
+without workers, one test at a time, to debug a failure. `--shard 1/2` runs the first of two
+disjoint halves of the tests, as one of CI's two jobs per Python version does. Run `tests/gpu`
+without `-n`: the workers would share one GPU. Tests marked `release` are heavy accuracy checks that
+your pull request skips and the release pull request into `main` runs; drop `-m "not release"` to
+run them too.
 
 For a change to one page or one function, the tests next to it are enough to start with, for
-example `uv run pytest tests/unit -k <name>`; CI runs everything.
+example `uv run pytest tests/unit -k <name>`; a pull request's CI runs every test not marked
+`release`.
 
 `prek install` (or `pre-commit install`) adds the hooks in `.pre-commit-config.yaml` to your
 checkout, so formatting, lint, and a scan for secrets run on every commit.

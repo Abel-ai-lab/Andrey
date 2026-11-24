@@ -38,10 +38,10 @@ time.
 
 The registry at the end maps each ``indep_test`` name to a factory. The nonlinear tests live in
 their own modules (KCI and RCoT in :mod:`andrey.core.ci_kernel`, CMIknn in
-:mod:`andrey.core.ci_cmiknn`, GPDC in :mod:`andrey.core.ci_gpdc`) and are imported when first
-built. On data with ``NaN``, :func:`make_indep_test` wraps the registered test in the test-wise
-deletion of :mod:`andrey.core.ci_missing`, which answers each query on the rows observed in all of
-its columns.
+:mod:`andrey.core.ci_cmiknn`, GPDC in :mod:`andrey.core.ci_gpdc`, and GCM, wGCM, and PCM in
+:mod:`andrey.core.ci_regression`) and are imported when first built. On data with ``NaN``,
+:func:`make_indep_test` wraps the registered test in the test-wise deletion of
+:mod:`andrey.core.ci_missing`, which answers each query on the rows observed in all of its columns.
 
 References
 ----------
@@ -78,12 +78,9 @@ graphs with mixed data-types. Proceedings of Machine Learning Research 104, 4-21
 
 from __future__ import annotations
 
-import contextlib
 import importlib
 import math
-from collections.abc import Callable, Generator, Iterable, Sequence
-from contextvars import ContextVar
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable, Sequence
 from functools import lru_cache, partial
 from typing import Any, Protocol, Self, cast, runtime_checkable
 
@@ -94,7 +91,6 @@ from scipy.special import chdtrc, gammaln, ndtr, stdtr
 
 from . import categorical, env, stats
 from .categorical import BATCH_CELLS, DENSE_MIN, DENSE_ROWS
-from .correlation import LazyCorrelation
 from .mixed import ConditionalGaussian, DegenerateGaussian
 from .score import copies_error, copies_message, copy_groups
 
@@ -106,8 +102,6 @@ __all__ = [
     "register_indep_test",
     "available_indep_tests",
     "make_indep_test",
-    "counting_tests",
-    "count_tests",
 ]
 
 # Partial correlations are clamped just inside (-1, 1) so Fisher's z-transform stays finite on
@@ -125,57 +119,12 @@ BOUND_MARGIN = 1e4
 # On one core the factor is slower than the per-query inversions below a work of about 64 and faster
 # from 128 at every set size sampled (2 to 12).
 MIN_SHARED_FACTOR_WORK = 128
+# The most submatrix entries statistic_pvalues_given hands statistic_pvalues in one call when it
+# does not factor, 8 MB of float64, so a large scan whose factor is declined runs in chunks.
+FALLBACK_STACK_ENTRIES = 1 << 20
 # The LAPACK Cholesky factor and triangular solve of statistic_pvalues_given, called directly: on
 # the small scans it serves, the checks of scipy.linalg's wrappers would take most of the time.
 _POTRF, _TRTRS = get_lapack_funcs(("potrf", "trtrs"), (np.empty((1, 1)),))
-
-
-@dataclass(slots=True)
-class CountedTests:
-    """The running count of a :func:`counting_tests` block: ``n`` tests evaluated so far."""
-
-    n: int = 0
-
-    def add(self, k: int) -> None:
-        """Add ``k`` tests evaluated elsewhere, such as the count a worker process returns."""
-        self.n += k
-
-
-#: The count of the innermost :func:`counting_tests` block, or ``None`` outside every block.
-_TESTS: ContextVar[CountedTests | None] = ContextVar("andrey_counting_tests", default=None)
-
-
-@contextlib.contextmanager
-def counting_tests() -> Generator[CountedTests]:
-    """Count the conditional-independence tests evaluated inside the block.
-
-    One test is one query, ``x`` and ``y`` given a conditioning set, whose p-value a test computes.
-    A many-query call counts each of its queries, and a query a batch computes past the point where
-    the search stops reading, such as the sets after the first separating one, counts too. A query
-    answered from a kept answer, as the chi-square tests keep their marginal answers, counts
-    nothing, and so does a search step that reuses a run made before. A test-wise deletion test
-    counts each query once, as the test it runs on the query's rows counts it. The shipped tests
-    count themselves; a test added with :func:`register_indep_test` counts what it reports through
-    :func:`count_tests`. When the block ends, its count is added to the enclosing block's, so a
-    search run inside another counts in both. The count is the calling process's: tests run in
-    another process reach it only through :meth:`CountedTests.add`.
-    """
-    counter = CountedTests()
-    token = _TESTS.set(counter)
-    try:
-        yield counter
-    finally:
-        _TESTS.reset(token)
-        outer = _TESTS.get()
-        if outer is not None:
-            outer.n += counter.n
-
-
-def count_tests(k: int = 1) -> None:
-    """Add ``k`` evaluated tests to the running :func:`counting_tests` count, if one is running."""
-    counter = _TESTS.get()
-    if counter is not None:
-        counter.n += k
 
 
 class SingularCorrelationError(ValueError):
@@ -207,21 +156,7 @@ class CITest(Protocol):
 class PartialCorrelationTest:
     """Base of the partial-correlation tests; a subclass maps ``(r, df)`` to a p-value.
 
-    ``__init__`` records the sample size and computes the column correlation matrix once
-    (:func:`~andrey.core.correlation.correlation_matrix`). With ``lazy``, it computes none up front:
-    a row of the matrix is computed when a query first reads it and kept
-    (:class:`~andrey.core.correlation.LazyCorrelation`), equal bit for bit to the row of the whole
-    matrix, so every query answers as it does without ``lazy``. A query given ``S`` reads the rows
-    of ``S`` and of one of ``x`` and ``y``, and a search that tests a target against many
-    candidates reads the target's row, not theirs. The queries that read every pair
-    (:meth:`marginal_pvalues`, :meth:`statistic_pvalues_given_rest`, :meth:`to_seed`) compute the
-    whole matrix and keep it. A lazy test checks each row it computes
-    for copied columns instead of the whole matrix up front: a computed row that shows a column
-    repeating another up to scale and shift raises
-    :class:`~andrey.core.score.CopiedColumnsError`; copies among columns whose rows are never
-    computed do not raise. Rows are computed on NumPy: when the backend selection
-    (:func:`~andrey.core.stats.corrcoef_device`) picks a GPU for the data, ``lazy`` is ignored and
-    the whole matrix is computed there.
+    ``__init__`` records the sample size and precomputes the full column correlation matrix once.
     Each call forms the partial correlation ``r`` of ``x`` and ``y`` given the conditioning set --
     directly (``|S| == 0``), by the first-order closed form (``|S| == 1``), or by inverting the
     ``[x, y, *S]`` correlation submatrix (``|S| >= 2``) -- clamps it just inside ``(-1, 1)``, and
@@ -240,50 +175,17 @@ class PartialCorrelationTest:
     separating-set search, and :meth:`batched_call` call with queries canonical as built, use
     identical partial-correlation, clip, and p-value arithmetic. Their p-values match exactly, so
     repeated queries take the same ``p > alpha`` decision across call paths, including at the
-    threshold. :meth:`statistic_pvalues_given_rest` and :meth:`statistic_pvalues_given`, which
-    answer the blanket learners' scans from one inverse or one factor, agree with them up to
-    rounding.
+    threshold. :meth:`statistic_pvalues_given`, which answers the grow scans of IAMB and
+    Inter-IAMB from one factor, agrees with them up to rounding.
     """
 
     # The data's groups of copies, set by the first singular inversion.
     _copies: tuple[tuple[int, ...], ...]
-    # The inverse of the whole correlation matrix, None when it is singular, set by the first
-    # statistic_pvalues_given_rest call.
-    _inverse: np.ndarray | None
-    # The correlation matrix, or the rows computed so far while lazy; set by __init__ or from_corr.
-    _corr: np.ndarray
-    _lazy: LazyCorrelation | None = None
 
-    def __init__(self, data: np.ndarray, *, lazy: bool = False) -> None:
+    def __init__(self, data: np.ndarray) -> None:
         arr = stats.checked_matrix(data, "run a partial-correlation test")
         self._n: int = arr.shape[0]
-        if lazy and stats.corrcoef_device(arr.size, record=False) == "numpy":
-            self._lazy = LazyCorrelation(arr)
-        else:
-            self._corr = np.asarray(stats.corrcoef(arr, rowvar=False), dtype=np.float64)
-
-    def _matrix(self) -> np.ndarray:
-        """The whole correlation matrix; a lazy test computes it here, checked for copies, and
-        keeps it, so later queries read it."""
-        lazy = self._lazy
-        if lazy is not None:
-            self._corr = lazy.matrix()
-            self._lazy = None
-        return self._corr
-
-    def _still_lazy(self) -> LazyCorrelation | None:
-        """The lazy correlation while some row is not computed, else ``None``: once every row is,
-        the test keeps them as the whole matrix and reads it as a test built without ``lazy``."""
-        lazy = self._lazy
-        if lazy is not None and lazy.computed == lazy.d:
-            self._matrix()
-            return None
-        return lazy
-
-    def correlation_rows(self) -> int:
-        """The number of rows of the correlation matrix computed so far: every row unless lazy."""
-        lazy = self._lazy
-        return np.atleast_2d(self._corr).shape[0] if lazy is None else lazy.computed
+        self._corr: np.ndarray = np.asarray(stats.corrcoef(arr, rowvar=False), dtype=np.float64)
 
     def _degrees_of_freedom(self, size: int) -> int:
         """The degrees of freedom of a test given ``size`` conditioners; raises when unusable."""
@@ -313,9 +215,7 @@ class PartialCorrelationTest:
         x_int, y_int, cond = _canonical(x, y, condition_set)
         df = self._degrees_of_freedom(len(cond))
         r = self._partial_correlation(x_int, y_int, cond)
-        p = float(self._pvalue(r, df))
-        count_tests()
-        return r, p
+        return r, float(self._pvalue(r, df))
 
     def _partial_correlation(self, x_int: int, y_int: int, cond: list[int]) -> float:
         """Partial correlation of columns ``x_int`` and ``y_int`` given ``cond``, clamped.
@@ -323,11 +223,6 @@ class PartialCorrelationTest:
         The arguments are canonical (see :func:`_canonical`). The result lies just inside
         ``(-1, 1)``.
         """
-        if self._still_lazy() is not None:
-            r = self._lazy_partial_correlation(x_int, y_int, cond)
-            return (
-                -ONE_MINUS_EPS if r < -ONE_MINUS_EPS else ONE_MINUS_EPS if r > ONE_MINUS_EPS else r
-            )
         corr = self._corr
         if not cond:
             r = float(corr[x_int, y_int])  # marginal correlation; no inversion
@@ -343,32 +238,12 @@ class PartialCorrelationTest:
             r = -inv.item(0, 1) / math.sqrt(abs(inv.item(0, 0) * inv.item(1, 1)))
         return -ONE_MINUS_EPS if r < -ONE_MINUS_EPS else ONE_MINUS_EPS if r > ONE_MINUS_EPS else r
 
-    def _lazy_partial_correlation(self, x: int, y: int, cond: list[int]) -> float:
-        """:meth:`_partial_correlation`, unclamped, from the rows of ``cond`` and of ``x`` or
-        ``y``, with the same values and arithmetic."""
-        lazy = cast("LazyCorrelation", self._lazy)
-        if not cond:
-            return lazy.entry(x, y)
-        lazy.need(cond)
-        if len(cond) == 1:
-            z_idx = cond[0]
-            rxy = lazy.entry(x, y)
-            rxz = lazy.entry(x, z_idx)
-            ryz = lazy.entry(y, z_idx)
-            return (rxy - rxz * ryz) / math.sqrt((1.0 - rxz * rxz) * (1.0 - ryz * ryz))
-        inv = self._invert_one(lazy.square(x, y, cond))
-        return -inv.item(0, 1) / math.sqrt(abs(inv.item(0, 0) * inv.item(1, 1)))
-
     def copies(self) -> tuple[tuple[int, ...], ...]:
         """The groups of data columns that repeat one another up to scale and shift.
 
         :func:`~andrey.core.score.copy_groups` of the test's correlation matrix, found once per
-        test; a single column's correlation is a scalar and has none. A lazy test finds none: a
-        row it computes that shows a copy raises :class:`~andrey.core.score.CopiedColumnsError`
-        instead, and copies among columns whose rows it never computes are not looked for.
+        test; a single column's correlation is a scalar and has none.
         """
-        if self._lazy is not None:
-            return ()
         if not hasattr(self, "_copies"):
             self._copies = copy_groups(np.atleast_2d(self._corr), self._n)
         return self._copies
@@ -508,79 +383,23 @@ class PartialCorrelationTest:
         """:meth:`statistic_pvalues` of canonical queries, ``lo[i] < hi[i]`` and each row of
         ``conds`` sorted."""
         df = self._degrees_of_freedom(conds.shape[1])
-        lazy = self._still_lazy()
-        if lazy is None:
-            corr = self._corr
-
-            def pair(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-                return corr[a, b]
-
-            def given(a: np.ndarray, z: np.ndarray) -> np.ndarray:
-                return corr[a, z]
-
-            def stack(var: np.ndarray) -> np.ndarray:
-                return corr[var[:, :, None], var[:, None, :]]
-        else:
-            lazy.load(np.unique(conds))
-            lazy.cover(lo, hi)
-            pair, stack = lazy.pairs, lazy.squares
-
-            def given(a: np.ndarray, z: np.ndarray) -> np.ndarray:
-                return lazy.read(z, a)  # the rows of the conditioning set are computed
-
+        corr = self._corr
         if conds.shape[1] == 0:
-            r = pair(lo, hi)
+            r = corr[lo, hi]
         elif conds.shape[1] == 1:
             z_idx = conds[:, 0]
-            rxz = given(lo, z_idx)
-            ryz = given(hi, z_idx)
-            r = (pair(lo, hi) - rxz * ryz) / np.sqrt((1.0 - rxz * rxz) * (1.0 - ryz * ryz))
+            rxz = corr[lo, z_idx]
+            ryz = corr[hi, z_idx]
+            r = (corr[lo, hi] - rxz * ryz) / np.sqrt((1.0 - rxz * rxz) * (1.0 - ryz * ryz))
         else:
             var = np.empty((len(lo), 2 + conds.shape[1]), dtype=np.intp)
             var[:, 0] = lo
             var[:, 1] = hi
             var[:, 2:] = conds
-            inv = self._invert(stack(var))
+            inv = self._invert(corr[var[:, :, None], var[:, None, :]])
             r = -inv[:, 0, 1] / np.sqrt(np.abs(inv[:, 0, 0] * inv[:, 1, 1]))
         r = np.clip(r, -ONE_MINUS_EPS, ONE_MINUS_EPS)
-        p = np.asarray(self._pvalue(r, df))
-        count_tests(len(lo))
-        return r, p
-
-    def statistic_pvalues_given_rest(
-        self, x: int, ys: Sequence[int]
-    ) -> tuple[np.ndarray, np.ndarray]:
-        """Partial correlations and p-values of ``x`` and each of ``ys`` given every other column.
-
-        Entry ``i`` is :meth:`statistic_pvalue` of ``x`` and ``ys[i]`` given all the columns but
-        those two, up to rounding: its partial correlation is ``-P[x, y] / sqrt(P[x, x] P[y, y])``
-        with ``P`` the inverse of the whole correlation matrix, which the first call computes and
-        the test keeps, so every later ``x`` reads the same inverse. Each query counts as one test.
-        When that matrix is singular, each query takes :meth:`statistic_pvalue`, which raises
-        where it raises.
-        """
-        ys = [int(y) for y in ys]
-        corr = np.atleast_2d(self._matrix())
-        d = corr.shape[0]
-        df = self._degrees_of_freedom(d - 2)
-        if not hasattr(self, "_inverse"):
-            try:
-                self._inverse = _invert_nonsingular(corr[None])[0]
-            except (ValueError, np.linalg.LinAlgError):
-                self._inverse = None
-        inv = self._inverse
-        if inv is None:
-            answers = [
-                self.statistic_pvalue(x, y, [z for z in range(d) if z not in (x, y)]) for y in ys
-            ]
-            r, p = np.array(answers, dtype=np.float64).reshape(-1, 2).T
-            return r, p
-        lo, hi = np.minimum(x, ys), np.maximum(x, ys)
-        r = -inv[lo, hi] / np.sqrt(np.abs(inv[lo, lo] * inv[hi, hi]))
-        r = np.clip(r, -ONE_MINUS_EPS, ONE_MINUS_EPS)
-        p = np.asarray(self._pvalue(r, df), dtype=np.float64)
-        count_tests(len(ys))
-        return r, p
+        return r, np.asarray(self._pvalue(r, df))
 
     def statistic_pvalues_given(
         self, x: int, ys: Sequence[int], condition_set: Iterable[int]
@@ -599,13 +418,13 @@ class PartialCorrelationTest:
         significant digit, and a candidate's last bits can change with the other candidates of the
         call. Every entry of the correlation matrix is read as ``corr[min, max]`` of its two
         columns, so a matrix that is not exactly symmetric gives each pair one answer whichever
-        column is ``x``. Each query counts as one test.
+        column is ``x``.
 
-        The other calls take :meth:`statistic_pvalues`, which answers or raises as it does: a
-        smaller set, fewer candidates, and any call with a block that the factor does not show to
-        be well inside the nonsingular range of :func:`_invert_nonsingular`, so that every block
-        the current rule calls singular, such as a candidate that copies ``x`` or a member of the
-        set, raises the same error. ``ys`` excludes ``x`` and the members of the set.
+        Other calls use :meth:`statistic_pvalues` in chunks of at most ``FALLBACK_STACK_ENTRIES``
+        submatrix entries: smaller sets, fewer candidates, or any block not demonstrably well inside
+        the nonsingular range of :func:`_invert_nonsingular`; they return or raise as that method
+        does, so blocks classified as singular, such as a candidate copying ``x`` or a set member,
+        raise the same error. ``ys`` excludes ``x`` and set members.
         """
         cols = np.asarray(ys, dtype=np.intp).reshape(-1)
         cond = np.unique(np.fromiter(condition_set, dtype=np.intp))
@@ -618,10 +437,17 @@ class PartialCorrelationTest:
             if r is not None:
                 r = np.clip(r, -ONE_MINUS_EPS, ONE_MINUS_EPS)
                 p = np.asarray(self._pvalue(r, df), dtype=np.float64)
-                count_tests(len(cols))
                 return r, p
         xs = np.full(len(cols), x, dtype=np.intp)
-        return self.statistic_pvalues(xs, cols, np.tile(cond, (len(cols), 1)))
+        sets = np.tile(cond, (len(cols), 1))
+        step = max(1, FALLBACK_STACK_ENTRIES // (len(cond) + 2) ** 2)
+        if len(cols) <= step:
+            return self.statistic_pvalues(xs, cols, sets)
+        parts = [
+            self.statistic_pvalues(xs[i : i + step], cols[i : i + step], sets[i : i + step])
+            for i in range(0, len(cols), step)
+        ]
+        return np.concatenate([r for r, _ in parts]), np.concatenate([p for _, p in parts])
 
     def _schur_partial_correlations(
         self, x: int, ys: np.ndarray, cond: np.ndarray
@@ -637,31 +463,25 @@ class PartialCorrelationTest:
         k)``, with ``k = |S| + 2 >= lambda_max(A)``, every block has ``lambda_min > BOUND_MARGIN *
         SINGULAR_RTOL * lambda_max`` and the eigenvalue test passes; a NaN fails the comparison.
         """
-        lazy = self._still_lazy()
-        if lazy is None:
-            corr = self._corr
-
-            def at(a: npt.ArrayLike, b: npt.ArrayLike) -> np.ndarray:
-                return corr[np.minimum(a, b), np.maximum(a, b)]
-        else:
-            lazy.load(np.append(cond, x))
-            at = lazy.read  # every first argument below is x or in cond, whose rows are computed
+        corr = self._corr
         size, n = len(cond), len(ys)
-        factor, info = _POTRF(at(cond[:, None], cond), lower=0)  # the upper triangle; cond sorted
+        factor, info = _POTRF(corr[cond[:, None], cond], lower=0)  # the upper triangle; cond sorted
         if info != 0:
             return None
         rhs = np.empty((size, n + 1 + size))
-        rhs[:, 0] = at(cond, x)
-        rhs[:, 1 : n + 1] = at(cond[:, None], ys)
+        rhs[:, 0] = corr[np.minimum(cond, x), np.maximum(cond, x)]
+        rhs[:, 1 : n + 1] = corr[np.minimum(cond[:, None], ys), np.maximum(cond[:, None], ys)]
         rhs[:, n + 1 :] = np.eye(size)
         w, info = _TRTRS(factor, rhs, lower=0, trans=1)
         if info != 0:
             return None
         g = np.einsum("ij,ij->", w[:, n + 1 :], w[:, n + 1 :])
         squares = np.einsum("ij,ij->j", w[:, : n + 1], w[:, : n + 1])
-        pxx = at(x, x) - squares[0]
-        pyy = (corr[ys, ys] if lazy is None else lazy.unit[ys]) - squares[1:]
-        pxy = at(x, ys) - np.einsum("i,ij->j", w[:, 0], w[:, 1 : n + 1])
+        pxx = corr[x, x] - squares[0]
+        pyy = corr[ys, ys] - squares[1:]
+        pxy = corr[np.minimum(x, ys), np.maximum(x, ys)] - np.einsum(
+            "i,ij->j", w[:, 0], w[:, 1 : n + 1]
+        )
         smallest = 0.5 * (pxx + pyy) - np.hypot(0.5 * (pxx - pyy), pxy)  # lambda_min(M) per y
         if not (smallest > 0.0).all():
             return None
@@ -712,9 +532,7 @@ class PartialCorrelationTest:
                 )
             r[k] = (residual[:, 0] @ residual[:, 1]) / math.sqrt(spread[0] * spread[1])
         r = np.clip(r, -ONE_MINUS_EPS, ONE_MINUS_EPS)
-        p = np.asarray(self._pvalue(r, df))
-        count_tests(len(x))
-        return r, p
+        return r, np.asarray(self._pvalue(r, df))
 
     def marginal_pvalues(self) -> np.ndarray:
         """All-pairs marginal (``|S| == 0``) p-values as a ``(d, d)`` matrix.
@@ -725,11 +543,8 @@ class PartialCorrelationTest:
         correlation matrix. The diagonal is self-correlation and is not meaningful.
         """
         df = self._degrees_of_freedom(0)
-        r = np.clip(self._matrix(), -ONE_MINUS_EPS, ONE_MINUS_EPS)
-        p = np.asarray(self._pvalue(r, df))
-        d = p.shape[0] if p.ndim else 1
-        count_tests(d * (d - 1) // 2)
-        return p
+        r = np.clip(self._corr, -ONE_MINUS_EPS, ONE_MINUS_EPS)
+        return np.asarray(self._pvalue(r, df))
 
     def first_order_pvalues(self, x: int, y: int, zs: Iterable[int]) -> np.ndarray:
         """First-order (``|S| == 1``) p-values for pair ``(x, y)`` over single conditioners ``zs``.
@@ -763,7 +578,7 @@ class PartialCorrelationTest:
         The parallel skeleton search seeds workers with this rather than pickling the whole test:
         a worker rebuilds an equivalent test over the parent's exact correlation bytes.
         """
-        return self._matrix(), self._n
+        return self._corr, self._n
 
 
 class FisherZ(PartialCorrelationTest):
@@ -784,6 +599,12 @@ class FisherZ(PartialCorrelationTest):
                 "need n > |S| + 3"
             )
         return df
+
+    @staticmethod
+    def least_rows(size: int, **options: object) -> int:
+        """The fewest rows given ``size`` conditioning variables: ``size + 4``, so
+        ``n - size - 3 >= 1`` leaves degrees of freedom."""
+        return size + 4
 
     @staticmethod
     def _pvalue(r: np.ndarray | float, df: int) -> np.ndarray | float:
@@ -809,6 +630,12 @@ class StudentT(PartialCorrelationTest):
                 "need n > |S| + 2"
             )
         return df
+
+    @staticmethod
+    def least_rows(size: int, **options: object) -> int:
+        """The fewest rows given ``size`` conditioning variables: ``size + 3``, so
+        ``n - size - 2 >= 1`` leaves degrees of freedom."""
+        return size + 3
 
     @staticmethod
     def _pvalue(r: np.ndarray | float, df: int) -> np.ndarray | float:
@@ -857,12 +684,11 @@ def _null_means_batch(margins: Sequence[_Margins], g_square: bool) -> list[np.nd
 def _nonempty_dofs(n_sx: np.ndarray, n_sy: np.ndarray, n_s: np.ndarray) -> np.ndarray:
     """The degrees of freedom of each configuration's table with its empty rows and columns struck.
 
-    That is ``(r_x - 1) * (r_y - 1)``, with ``r_x`` and ``r_y`` the values of ``x`` and ``y``
-    present in the configuration, and ``0`` for a configuration with one value of either. A cell
-    of a row or a column with no rows has no expected count, and striking it with the margin it
-    would fit is the exact reduction of the degrees of freedom for such cells [Spirtes et al. 1993,
-    Section 5.5; Bishop, Fienberg and Holland 1975]. ``n_s`` is unused; it keeps the margins'
-    shape of :func:`_null_means`.
+    ``(r_x - 1) * (r_y - 1)``, with ``r_x`` and ``r_y`` the values of ``x`` and ``y`` present in the
+    configuration; ``0`` when either has one value. Cells in empty rows or columns have no expected
+    counts; removing them and their fitted margins exactly reduces the degrees of freedom [Spirtes
+    et al. 1993, Section 5.5; Bishop, Fienberg and Holland 1975]. Unused ``n_s`` preserves the
+    margins' shape of :func:`_null_means`.
     """
     present_x, present_y, informative = _informative(n_sx, n_sy)
     return np.where(informative, (present_x - 1) * (present_y - 1), 0).astype(np.float64)
@@ -1091,12 +917,12 @@ class NormalScores(FisherZ):
     refuse it with an ``env``, as they refuse the rank-based score.
     """
 
-    def __init__(self, data: np.ndarray, *, lazy: bool = False) -> None:
+    def __init__(self, data: np.ndarray) -> None:
         arr = np.asarray(data, dtype=np.float64)
         scores = arr
         if arr.ndim == 2 and np.isfinite(arr).all():
             scores = stats.normal_scores(arr)
-        super().__init__(scores, lazy=lazy)
+        super().__init__(scores)
 
 
 #: The degrees-of-freedom rules of :class:`ChiSquare`: ``"mean"``, the null mean of the statistic,
@@ -1160,7 +986,12 @@ class ChiSquare:
     the configurations, each table's empty rows and columns struck: the degrees of freedom of
     Spirtes et al. [1]_, less one for each cell with no expected count, in the exact form for cells
     of an empty row or column [6]_. The two rules differ only on sparse tables, and the statistic
-    is the same under both. With zero degrees of freedom the p-value is ``1``.
+    is the same under both: ``"mean"`` favors a level near the nominal one and, for G-square,
+    gives up time and rejects below the nominal rate in the sparsest tables; ``"nonempty"`` favors
+    the degrees of freedom of Spirtes et al. [1]_, read from the table alone, and gives up the
+    level (see Limitations; their time and their power were not measured against each other).
+    With zero degrees of freedom the p-value is :attr:`zero_dof_pvalue`, ``1`` by default: the rows
+    hold no evidence for or against independence, and the answer reads as independence.
 
     **Limitations.** Referring the statistic to ``(r_x - 1) * (r_y - 1)`` degrees of freedom
     over-rejects a true independence once the table is sparse, G-square more than Pearson [5]_.
@@ -1233,6 +1064,10 @@ class ChiSquare:
     .. [6] Bishop, Y. M. M., Fienberg, S. E., and Holland, P. W. (1975). Discrete Multivariate
        Analysis: Theory and Practice. MIT Press.
     """
+
+    #: The p-value of a query with zero degrees of freedom. Test-wise deletion sets it to
+    #: :data:`~andrey.core.ci_missing.NOT_TESTED` on the test of each block.
+    zero_dof_pvalue: float = 1.0
 
     def __init__(
         self, data: np.ndarray, *, g_square: bool = False, degrees_of_freedom: str = "mean"
@@ -1403,7 +1238,6 @@ class ChiSquare:
                 statistic,
                 self._table_pvalue(statistic, bounds, per_table),
             )
-        count_tests(sum(len(block[0]) for block in counted))
 
     def _statistic_pvalue(
         self, x: int, y: int, condition_set: Iterable[int]
@@ -1452,9 +1286,8 @@ class ChiSquare:
             statistic = float(np.sum(observed * (observed / expected))) - float(self._n)
         per_table = self._dofs([(n_sx, n_sy, n_s)])[0]
         dof = float(np.sum(per_table))
-        count_tests()
         if dof == 0.0:
-            return statistic, 1.0
+            return statistic, self.zero_dof_pvalue
         return statistic, float(chdtrc(dof, max(statistic, 0.0)))
 
     def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
@@ -1654,13 +1487,11 @@ class ChiSquare:
         """
         statistic, margins = self._table_sums(tables, bounds)
         per_table = self._dofs([margins])[0]
-        p_values = self._table_pvalue(statistic, bounds, per_table)
-        count_tests(len(bounds) - 1)
-        return statistic, p_values
+        return statistic, self._table_pvalue(statistic, bounds, per_table)
 
     def _table_sums(self, tables: np.ndarray, bounds: np.ndarray) -> tuple[np.ndarray, _Margins]:
-        """The statistics of the tests of :meth:`_table_statistics`, and the margins of their
-        tables, from which :meth:`_dofs` gives the degrees of freedom."""
+        """The test statistics and table margins of :meth:`_table_statistics`; :meth:`_dofs` derives
+        the degrees of freedom from the margins."""
         m, kx, ky = tables.shape
         n_sx = np.einsum("sxy->sx", tables)
         n_sy = np.einsum("sxy->sy", tables)
@@ -1679,14 +1510,13 @@ class ChiSquare:
         statistic = 2.0 * sums if self._g_square else sums - float(self._n)
         return statistic, (n_sx, n_sy, n_s)
 
-    @staticmethod
     def _table_pvalue(
-        statistic: np.ndarray, bounds: np.ndarray, per_table: np.ndarray
+        self, statistic: np.ndarray, bounds: np.ndarray, per_table: np.ndarray
     ) -> np.ndarray:
         """The p-values of tests with ``statistic`` and the null means ``per_table`` of their
         tables, test ``i`` owning ``per_table[bounds[i]:bounds[i + 1]]``."""
         dof = _segment_sums(per_table, bounds)
-        out = np.ones(len(dof))
+        out = np.full(len(dof), self.zero_dof_pvalue)
         live = dof != 0
         out[live] = chdtrc(dof[live], np.maximum(statistic[live], 0.0))
         return out
@@ -1712,9 +1542,9 @@ class DGTest:
     correlations of ``x``'s and ``y``'s columns after the linear regression on ``S``'s. Its degrees
     of freedom are the product of the two variables' numbers of columns, and its p-value is the
     chi-square survival function. A direction of ``x`` or ``y`` that ``S`` determines exactly
-    carries no information and adds no degree of freedom; with none left, the p-value is ``1``. On
-    continuous columns only, the statistic is ``-n log(1 - r**2)`` with ``r`` the partial
-    correlation.
+    carries no information and adds no degree of freedom; with none left, the p-value is ``1``,
+    which reads as independence without evidence. On continuous columns only, the statistic is
+    ``-n log(1 - r**2)`` with ``r`` the partial correlation.
 
     The statistic does not depend on the columns' units, and queries are canonicalized as
     :class:`FisherZ`'s are, so the p-value does not depend on the argument order.
@@ -1743,6 +1573,11 @@ class DGTest:
     .. [2] Andrews, B., Ramsey, J., and Cooper, G. F. (2018). Scoring Bayesian networks of mixed
        variables. International Journal of Data Science and Analytics 6(1), 3-18.
     """
+
+    #: The p-value of a query with zero degrees of freedom, ``1``: the rows hold no evidence for or
+    #: against independence. Test-wise deletion sets it to
+    #: :data:`~andrey.core.ci_missing.NOT_TESTED` on the test of each block.
+    zero_dof_pvalue: float = 1.0
 
     def __init__(self, data: np.ndarray, categorical: npt.ArrayLike | None = None) -> None:
         self._dg = DegenerateGaussian(data, categorical)
@@ -1784,9 +1619,7 @@ class DGTest:
             cs, basis, scale = regression
             cross = self._corr[both[:, None], cs] @ basis
             block = block - (cross / scale) @ cross.T
-        out = self._block_statistic_pvalue(block, groups[x_int].size)
-        count_tests()
-        return out
+        return self._block_statistic_pvalue(block, groups[x_int].size)
 
     def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
         """Return p-values for one ``(x, y)`` pair over many conditioning sets.
@@ -1891,7 +1724,6 @@ class DGTest:
         full = (values_x > _RANK_TOL).all(axis=1) & (values_y > _RANK_TOL).all(axis=1)
         for i in np.flatnonzero(~full).tolist():
             out[i] = self._block_pvalue(block[i], px)
-        count_tests(len(xs))
         if not full.any():
             return out
         # wx.T row-major and wy column-major, as _whitener's column-major whiteners give them.
@@ -1931,7 +1763,7 @@ class DGTest:
         wy = _whitener(block[px:, px:])
         dof = wx.shape[1] * wy.shape[1]
         if dof == 0:
-            return 0.0, 1.0
+            return 0.0, self.zero_dof_pvalue
         rho = np.linalg.svd(wx.T @ block[:px, px:] @ wy, compute_uv=False)
         rho = np.minimum(rho, ONE_MINUS_EPS)
         statistic = -self._dg.n * float(np.sum(np.log1p(-(rho * rho))))
@@ -1987,6 +1819,17 @@ class CGTest:
        variables. International Journal of Data Science and Analytics 6(1), 3-18.
     """
 
+    #: The p-value of a query with zero degrees of freedom, ``1``: the rows hold no evidence for or
+    #: against independence. Test-wise deletion sets it to
+    #: :data:`~andrey.core.ci_missing.NOT_TESTED` on the test of each block.
+    zero_dof_pvalue: float = 1.0
+
+    @staticmethod
+    def least_rows(size: int, **options: object) -> int:
+        """The fewest rows a query given ``size`` conditioning variables is tested on, ``size + 3``:
+        the rows that fit ``x``, ``y``, and the set when all are continuous."""
+        return size + 3
+
     def __init__(self, data: np.ndarray, categorical: npt.ArrayLike | None = None) -> None:
         self._cg = ConditionalGaussian(data, categorical)
         self._d: int = np.shape(data)[1]
@@ -2020,7 +1863,8 @@ class CGTest:
         k = [cg.dof(s) for s in sets]
         statistic = 2.0 * (ll[0] - ll[1] - ll[2] + ll[3])
         dof = k[0] - k[1] - k[2] + k[3]
-        count_tests()
+        if dof == 0:
+            return statistic, self.zero_dof_pvalue
         return statistic, float(chdtrc(dof, max(statistic, 0.0)))
 
     def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
@@ -2077,9 +1921,9 @@ class CGTest:
         k = [cg.dof(s) for s in sets]
         quads = range(0, len(sets), 4)
         statistic = [2.0 * (ll[i] - ll[i + 1] - ll[i + 2] + ll[i + 3]) for i in quads]
-        dof = [k[i] - k[i + 1] - k[i + 2] + k[i + 3] for i in quads]
-        count_tests(len(statistic))
-        return np.asarray(chdtrc(dof, np.maximum(statistic, 0.0)), dtype=np.float64).reshape(-1)
+        dof = np.array([k[i] - k[i + 1] - k[i + 2] + k[i + 3] for i in quads], dtype=np.float64)
+        p = np.asarray(chdtrc(dof, np.maximum(statistic, 0.0)), dtype=np.float64).reshape(-1)
+        return np.where(dof == 0, self.zero_dof_pvalue, p)
 
 
 # The module and class of each nonlinear test. Building one imports only its own module: GPDC's
@@ -2089,11 +1933,15 @@ NONLINEAR_CLASSES: dict[str, tuple[str, str]] = {
     "rcot": ("ci_kernel", "RCoT"),
     "cmiknn": ("ci_cmiknn", "CMIknn"),
     "gpdc": ("ci_gpdc", "GPDC"),
+    "gcm": ("ci_regression", "GCM"),
+    "wgcm": ("ci_regression", "WGCM"),
+    "pcm": ("ci_regression", "PCM"),
 }
 NONLINEAR_INDEP_TESTS: tuple[str, ...] = tuple(NONLINEAR_CLASSES)
-#: The tests that draw random numbers, which ``seed`` fixes: RCoT's random features, and the random
-#: tie keys and permutations of CMIknn and GPDC. The other tests draw none.
-STOCHASTIC_INDEP_TESTS: tuple[str, ...] = ("rcot", "cmiknn", "gpdc")
+#: The tests that draw random numbers, which ``seed`` fixes: RCoT's random features, the random
+#: tie keys and permutations of CMIknn and GPDC, and the cross-validation folds, forests, sample
+#: splits, and multipliers of GCM, wGCM, and PCM. The other tests draw none.
+STOCHASTIC_INDEP_TESTS: tuple[str, ...] = ("rcot", "cmiknn", "gpdc", "gcm", "wgcm", "pcm")
 
 
 def _nonlinear(name: str, data: np.ndarray, **options: Any) -> CITest:
@@ -2123,6 +1971,16 @@ DISCRETE_INDEP_TESTS: tuple[str, ...] = ("chisq", "gsq")
 #: always read several environments does not offer them, as the ranks would mix the environments.
 RANK_INDEP_TESTS: tuple[str, ...] = ("normal_scores",)
 MIXED_INDEP_TESTS: tuple[str, ...] = ("degen_gauss", "cond_gauss")
+#: The tests not yet supported, as the status column of the API reference marks them; the quality
+#: gate checks the other nonlinear tests.
+EXPERIMENTAL_INDEP_TESTS: tuple[str, ...] = (
+    "normal_scores",
+    "degen_gauss",
+    "cond_gauss",
+    "gcm",
+    "wgcm",
+    "pcm",
+)
 #: The shipped tests of continuous data: the partial-correlation and the nonlinear tests.
 CONTINUOUS_INDEP_TESTS: tuple[str, ...] = tuple(
     name
@@ -2172,9 +2030,6 @@ def register_indep_test(name: str, factory: Callable[[np.ndarray], CITest]) -> N
             return DSepOracle(dag, nodes=nodes)
 
     With ``possible_dsep="fast"`` the step keeps the columns in data order.
-
-    A fit's ``metadata["n_tests"]`` counts a registered test's queries only as the test reports
-    them, by calling :func:`count_tests` once per query it computes (:func:`counting_tests`).
     """
     _CI_REGISTRY[name] = factory
 
@@ -2191,7 +2046,6 @@ def make_indep_test(
     categorical: npt.ArrayLike | None = None,
     seed: int | None = None,
     degrees_of_freedom: str = "mean",
-    lazy: bool = False,
     **options: Any,
 ) -> CITest:
     """Construct the registered ``indep_test`` ``name`` over ``data``.
@@ -2207,13 +2061,6 @@ def make_indep_test(
     :class:`PartialCorrelationTest` raises :class:`~andrey.core.score.CopiedColumnsError`, naming
     every group of :meth:`~PartialCorrelationTest.copies`, when ``data`` holds columns that repeat
     others up to scale and shift: its tests cannot tell such columns apart.
-
-    ``lazy`` builds a shipped partial-correlation test (``"fisherz"``, ``"student_t"``,
-    ``"normal_scores"``) on complete data with lazy correlation, unless ``ANDREY_LAZY_CORRELATION``
-    is ``0``: each row of its correlation matrix is computed when a query first reads it, with the
-    same values as the whole matrix, and the copied-column check runs on the rows computed, so it
-    raises when a query reads one, not here. The other tests ignore it, and so does a backend
-    selection that puts the correlation matrix on a GPU (:func:`~andrey.core.stats.corrcoef`).
 
     ``data`` holding ``NaN`` gives a :class:`~andrey.core.ci_missing.TestwiseDeletion` of the test
     instead: each query reads only the rows observed in all of its columns, and raises where a
@@ -2238,12 +2085,7 @@ def make_indep_test(
         return testwise_deletion(name, factory, data, categorical, options, mixed=mixed)
     if mixed:
         return factory(data, categorical, **options)
-    lazily = (
-        lazy
-        and factory in (FisherZ, StudentT, NormalScores)
-        and env.LAZY_CORRELATION.read() is not False
-    )
-    test = factory(data, lazy=True, **options) if lazily else factory(data, **options)
+    test = factory(data, **options)
     if isinstance(test, PartialCorrelationTest) and test.copies():
         raise copies_error(test.copies())
     return test
@@ -2263,7 +2105,8 @@ def pins_blas(test: CITest) -> bool:
     same bits whatever the host's thread count, and the partial-correlation tests match the
     one-thread parallel skeleton workers; the chi-square tests call no BLAS. The nonlinear tests set
     it: KCI is unpinned from 2,000 rows, where its kernel products run faster on every BLAS thread
-    and its p-values are reproducible for a fixed thread count; RCoT, CMIknn, and GPDC are pinned.
+    and its p-values are reproducible for a fixed thread count; RCoT, CMIknn, GPDC, GCM, wGCM, and
+    PCM are pinned.
     """
     pin = getattr(test, "pin_blas", None)
     if pin is not None:

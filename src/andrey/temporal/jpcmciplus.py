@@ -70,7 +70,14 @@ from andrey.core.knowledge import LaggedConstraints
 from andrey.core.stats import normal_scores
 from andrey.core.ties import tie_ranks
 from andrey.temporal.pcmci import DesignTest, Link, LinkTest, column_test, lagged_design, pc1
-from andrey.temporal.pcmciplus import PCMCIPlusResult, Recorder, colliders, orient, skeleton
+from andrey.temporal.pcmciplus import (
+    PCMCIPlusResult,
+    Recorder,
+    colliders,
+    mark_undecided,
+    orient,
+    skeleton,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -448,8 +455,9 @@ def run_phases(
     known = _embedded(constraints, nodes, tau_max)
     recorder = Recorder(test)
     lagged = _lagged_knowledge(known, nodes)
+    untested: list[list[Link]] = [[] for _ in range(n_nodes)]
     parents = tuple(
-        pc1(recorder, n_nodes, j, tau_max, pc_alpha, ranks, lagged, max_depth)
+        pc1(recorder, n_nodes, j, tau_max, pc_alpha, ranks, lagged, max_depth, untested[j])
         if j < nodes.n_series
         else ()
         for j in range(n_nodes)
@@ -469,12 +477,13 @@ def run_phases(
     free = tested(np.outer(contexts, system), contexts)
     kept = _linked(parents, n_nodes, tau_max) & ~free
     kept[0] = between_system
-    links, _, _, sepsets = skeleton(
+    links, _, _, sepsets, context_undecided = skeleton(
         test,
         n_nodes,
         parents,
         tau_max,
         pc_alpha,
+        ranks,
         _pass_constraints(free, kept, known),
         max_p_global,
     )
@@ -484,12 +493,13 @@ def run_phases(
     free = tested(np.outer(dummies, system), np.zeros(n_nodes, dtype=bool))
     kept = _linked(parents, n_nodes, tau_max) & ~free
     kept[0] |= between_system
-    links, _, _, dummy_sepsets = skeleton(
+    links, _, _, dummy_sepsets, dummy_undecided = skeleton(
         test,
         n_nodes,
         parents,
         tau_max,
         pc_alpha,
+        ranks,
         _pass_constraints(free, kept, known),
         max_p_global,
         pool=system,
@@ -499,18 +509,22 @@ def run_phases(
     # The system pass.
     free = tested(between_system, system)
     kept = _linked(parents, n_nodes, tau_max) & ~free
-    adjacency, p_values, statistics, system_sepsets = skeleton(
+    adjacency, p_values, statistics, system_sepsets, undecided = skeleton(
         test,
         n_nodes,
         parents,
         tau_max,
         pc_alpha,
+        ranks,
         _pass_constraints(free, kept, known),
         max_p_global,
         pool=system,
     )
 
     sepsets = {**sepsets, **dummy_sepsets, **system_sepsets}
+    # Links undecided in their own pass stay undecided and are omitted from the system pass.
+    undecided |= context_undecided | dummy_undecided
+    mark_undecided(adjacency, p_values, statistics, undecided, untested)
     for (x, j), (statistic, p_value) in recorder.largest.items():
         lag, i = divmod(x, n_nodes)
         if p_values[lag, i, j] < 0:  # removed in the lagged phase
@@ -525,6 +539,8 @@ def run_phases(
     directions[0] = np.outer(system, ~system)
     orientation = LaggedConstraints(directions | known.forbidden, known.required, known.tier)
     middles = range(a)
+    either_order = undecided.copy()  # a lag-0 link undecided from one end is undecided both ways
+    either_order[0] |= either_order[0].T
     marks, ambiguous = colliders(
         test,
         n_nodes,
@@ -536,6 +552,7 @@ def run_phases(
         orientation,
         max_p_global,
         middles,
+        undecided=either_order,
     )
     orient(marks, adjacency, ambiguous)
 
@@ -556,6 +573,7 @@ def run_phases(
         ambiguous_triples=tuple(
             sorted(triple for triple in ambiguous if max(triple[0], triple[2], triple[3]) < a)
         ),
+        undecided=undecided[:, :a, :a],
     )
     time_node = nodes.time_dummy_node
     return JPCMCIPlusResult(

@@ -10,7 +10,9 @@ position, and :func:`resolve_collider_order`, :func:`resolve_in_column_order`, a
 
 Scores and p-values that differ only in their last bits count as equal: a method compares them
 rounded to :data:`KEY_DP` decimal places (:func:`tie_key`, :func:`stable_key`), and a greedy search
-counts a move as improving only when it lowers the score by more than :data:`EPS_IMPROVE`.
+counts a move as improving only when it lowers the score by more than :data:`EPS_IMPROVE`. A
+pairwise direction test counts its two directions' values as equal when they agree within
+:data:`PAIR_RTOL` (:func:`tied`).
 """
 
 from __future__ import annotations
@@ -18,7 +20,6 @@ from __future__ import annotations
 import hashlib
 import math
 from collections import Counter
-from collections.abc import Iterable, Iterator
 from functools import cmp_to_key
 from itertools import groupby
 
@@ -70,6 +71,29 @@ def stable_key(delta: float, n: int) -> float:
 def tie_key(value: float) -> float:
     """``value``, such as a log p-value, rounded to :data:`KEY_DP` decimal places."""
     return round(value, KEY_DP)
+
+
+#: Tolerance under which the two directions of a pairwise direction test (``anm``, ``pnl``,
+#: ``loci``, ``cpcm``) count as equal: two log p-values, two test statistics, or two
+#: log-likelihoods ``a`` and ``b`` tie when ``|a - b| <= PAIR_RTOL * max(1, |a|, |b|)``. For
+#: ``anm``, ``pnl`` and ``loci`` each direction's fit reads its rows in one canonical order, so a
+#: table whose two columns hold the same values swapped gives both directions the same numbers bit
+#: for bit, and they tie. ``cpcm`` fits both directions on the rows as given; on such tables in
+#: other row orders and units its two directions differed by at most ``1e-13``. The tolerance
+#: covers rounding carried through a fit: with such a table's columns in different units, which
+#: changes the last bits of its standardized values, the largest relative gap over 1,840 fits with
+#: 100 to 300 rows was ``1e-13`` for ``anm`` and ``0`` for ``pnl``, while for ``anm`` the two
+#: directions of 50 unrelated pairs, which nearly mirror each other, differ by ``2e-8`` and more.
+#: ``loci``'s solver stops when the mean log-likelihood changes by less than ``1e-6``, so its gap on
+#: such a table can reach ``6e-4``, and there the direction follows that difference.
+PAIR_RTOL = 1e-9
+
+
+def tied(a: float, b: float) -> bool:
+    """Whether ``a`` and ``b`` agree within :data:`PAIR_RTOL`; an infinity ties only with itself."""
+    if not (math.isfinite(a) and math.isfinite(b)):
+        return a == b
+    return abs(a - b) <= PAIR_RTOL * max(1.0, abs(a), abs(b))
 
 
 def tie_mask(name: str, categorical: npt.ArrayLike | None, d: int) -> np.ndarray:
@@ -194,197 +218,25 @@ def tie_ranks(x: np.ndarray, categorical: np.ndarray | None = None) -> np.ndarra
     mask = (
         np.zeros(x.shape[1], dtype=bool) if categorical is None else np.asarray(categorical, bool)
     )
-    digests = [_digest_of(key) for key in _extended(_relation_keys(x, mask), x, mask)]
-    by_digest = sorted(range(len(digests)), key=digests.__getitem__)
-    order = []
-    for _, run in groupby(by_digest, digests.__getitem__):
-        tied = list(run)
-        order.extend(_tied_order(tied, x, bool(mask[tied[0]])))
-    ranks = np.empty(len(order), dtype=np.intp)
-    ranks[order] = np.arange(len(order))
-    return ranks
-
-
-class TieKeys(dict[int, int]):
-    """Integers that order the columns of ``x``, all continuous, as :func:`tie_ranks` ranks them,
-    computed for the columns read.
-
-    ``keys[j]`` is the 8-byte hash by which :func:`tie_ranks` orders column ``j``, read as an
-    integer, times ``2**32``, plus ``j``'s place among the columns that share that hash, so
-    ``keys[i] < keys[j]`` exactly when :func:`tie_ranks` ranks column ``i`` before column ``j``. A
-    column's hash reads its relations to every other column, one pass over the data, and depends on
-    whether another column has the same relations. The first read settles that for every column at
-    once by the sum of each column's squared relations modulo a prime, which equal relations share,
-    in ``O(n**2 d)`` time and ``O(n**2 + n d)`` memory for ``n`` rows and ``d`` columns, where
-    :func:`tie_ranks` takes ``O(n d**2)`` time and ``O(d**2)`` memory; columns whose sums agree are
-    then compared in full. After 256 columns read one at a time, or one eighth of the columns where
-    that is more, a read computes every column, 128 at a time, in :func:`tie_ranks`' time and
-    ``O(n d)`` memory, since a column in a block costs under a third of one read alone. Computing
-    every column at once (:meth:`fill`) compares their hashes instead of their sums.
-    :meth:`applies` says where the keys are cheaper than :func:`tie_ranks`.
-
-    The one difference from :func:`tie_ranks`: two columns whose relations differ but whose 8-byte
-    hashes agree, about once in ``2**65 / d**2`` data sets, get equal keys here, where
-    :func:`tie_ranks` orders them by their standardized values.
-    """
-
-    def __init__(self, x: np.ndarray) -> None:
-        super().__init__()
-        self._x = np.asarray(x, dtype=np.float64)
-        self._ranks: np.ndarray | None = None
-        # Columns with equal relations share a class: their sum of squared relations or, where
-        # every column is computed at once, their hash. ``_unique`` marks a class of one column.
-        self._classes: np.ndarray | None = None
-        self._unique: np.ndarray | None = None
-        self._singles = 0
-        self._single_reads = max(256, self._x.shape[1] // 8)
-
-    @staticmethod
-    def applies(x: np.ndarray, categorical: np.ndarray) -> bool:
-        """Whether :class:`TieKeys` orders the columns of ``x``: under ``tie_break="rank"``, with no
-        column that ``categorical`` marks, more columns than rows, and 2 to 4,096 rows."""
-        n, d = x.shape
-        return (
-            backend.config.tie_break == "rank"
-            and not np.any(categorical)
-            and 1 < n <= 4096
-            and n < d
-        )
-
-    def __missing__(self, j: int) -> int:
-        if not 0 <= j < self._x.shape[1]:
-            raise IndexError(j)
-        if self._singles < self._single_reads:
-            self._singles += 1
-            self.fill([j])
-        else:
-            self.fill(range(self._x.shape[1]))
-        return dict.__getitem__(self, j)
-
-    def fill(self, columns: Iterable[int]) -> None:
-        """Compute the keys of ``columns`` not computed yet, 128 columns at a time."""
-        todo = [j for j in columns if j not in self]
-        if not todo:
-            return
-        if self._ranks is None:
-            self._ranks = _centered_ranks(self._x)
-        every = len(todo) == self._x.shape[1]
-        digests = [_digest_of(key) for key in self._relations(todo)] if every else None
-        if self._classes is None:
-            self._classes = (
-                _square_sums(self._ranks)
-                if digests is None
-                else np.array([int.from_bytes(h, "big") for h in digests], dtype=np.uint64)
-            )
-            _, inverse, counts = np.unique(self._classes, return_inverse=True, return_counts=True)
-            self._unique = counts[inverse.reshape(-1)] == 1
-        assert self._unique is not None
-        if digests is None:
-            digests = [_digest_of(key) for key in self._relations(todo)]
-        for j, digest in zip(todo, digests, strict=True):
-            if j in self:  # set with an earlier column of equal relations
-                continue
-            if self._unique[j]:
-                self[j] = int.from_bytes(digest, "big") << 32
-            else:
-                self._fill_alike(j)
-
-    def _relations(self, columns: list[int]) -> Iterator[bytes]:
-        """The relation keys of ``columns`` (:func:`_relation_keys`), computed 128 columns at a
-        time: with at most 4,096 rows, the products of centered ranks sum exactly in float64
-        (:func:`_abs_products`)."""
-        assert self._ranks is not None
-        for lo in range(0, len(columns), 128):
-            block = columns[lo : lo + 128]
-            products = np.abs(self._ranks[:, block].T @ self._ranks)
-            products[np.arange(len(block)), block] = np.inf  # a column's own product sorts last
-            products.sort(axis=1)
-            yield from (b"C" + row.tobytes() for row in products[:, :-1].astype("<u8"))
-
-    def _fill_alike(self, j: int) -> None:
-        """Set the keys of ``j`` and of every column with the same relations, all in ``j``'s class,
-        in the order of :func:`tie_ranks`."""
-        assert self._classes is not None
-        candidates = np.flatnonzero(self._classes == self._classes[j]).tolist()
-        relations = dict(zip(candidates, self._relations(candidates), strict=True))
-        alike = [k for k in candidates if relations[k] == relations[j]]
-        x, continuous = self._x[:, alike], np.zeros(len(alike), dtype=bool)
-        digests = [_digest_of(key) for key in _extended([relations[j]] * len(alike), x, continuous)]
-        by_digest = sorted(range(len(alike)), key=digests.__getitem__)
-        for digest, run in groupby(by_digest, digests.__getitem__):
-            head = int.from_bytes(digest, "big") << 32
-            for place, k in enumerate(_tied_order(list(run), x, False)):
-                self[alike[k]] = head + place
-
-
-def _square_sums(ranks: np.ndarray) -> np.ndarray:
-    """Each column's sum of squared products of centered ranks with the other columns,
-    ``sum((ranks[:, j] @ ranks[:, k]) ** 2 for k != j)``, modulo a prime (:class:`TieKeys`).
-
-    The sum is ``ranks[:, j] @ G @ ranks[:, j]`` less the column's own term, where ``G = ranks @
-    ranks.T`` is the rows' ``n x n`` Gram matrix. Every product and partial sum is a whole number
-    below ``2**53``, so float64 arithmetic is exact: ``G`` sums over blocks of columns small enough
-    for that, and the prime is small enough that ``G``, reduced to residues of at most half of it,
-    times a column of ranks stays below that bound.
-    """
-    n, d = ranks.shape
-    top = max(int(np.abs(ranks).max(initial=0)), 1)
-    prime = _prime_at_most(min(2**31 - 1, 2**54 // (n * top)))
-    step = max(1, 2**53 // (top * top))
-    gram = np.zeros((n, n))
-    for lo in range(0, d, step):
-        part = ranks[:, lo : lo + step]
-        gram = _residues(gram + _residues(part @ part.T, prime), prime)
-    sums = np.empty(d, dtype=np.int64)
-    for lo in range(0, d, 1024):
-        part = ranks[:, lo : lo + 1024]
-        sums[lo : lo + 1024] = np.mod((_residues(gram @ part, prime) * part).sum(axis=0), prime)
-    own = np.mod((ranks * ranks).sum(axis=0), prime).astype(np.int64)
-    return (sums - own * own % prime) % prime
-
-
-def _residues(a: np.ndarray, prime: int) -> np.ndarray:
-    """Whole numbers ``a`` modulo ``prime``, from ``-prime // 2`` to ``prime // 2``."""
-    a = np.mod(a, prime)
-    a[a > prime // 2] -= prime
-    return a
-
-
-def _prime_at_most(bound: int) -> int:
-    """The largest prime at most ``bound``, for ``bound`` of 9 or more."""
-    divisors = np.arange(3, math.isqrt(bound) + 1, 2)
-    m = bound - (bound % 2 == 0)
-    while (m % divisors == 0).any():
-        m -= 2
-    return m
-
-
-def _extended(keys: list[bytes], x: np.ndarray, mask: np.ndarray) -> list[bytes]:
-    """``keys``, the keys of the columns of ``x``, each extended where it is equal to another's:
-    by the column's marginal, then by its pattern in row order, then by its values
-    (:func:`tie_ranks`)."""
-    for extend in (_marginal_key, _row_pattern, _values):
+    keys = _relation_keys(x, mask)
+    for extend in (_marginal_key, _row_pattern, _values):  # only where the keys so far are equal
         shared = {key for key, count in Counter(keys).items() if count > 1}
         keys = [
             key + extend(col, is_categorical) if key in shared else key
             for key, col, is_categorical in zip(keys, x.T, mask.tolist(), strict=True)
         ]
-    return keys
-
-
-def _tied_order(tied: list[int], x: np.ndarray, categorical: bool) -> list[int]:
-    """Columns ``tied`` of ``x``, in position order, whose keys hash alike, in the order of
-    :func:`tie_ranks`: continuous columns by their standardized values at the first row where these
-    differ by more than ``_Z_TOL``, the lower first, and others by position."""
-    if len(tied) > 1 and not categorical:
-        z = {j: _standardized(x[:, j]) for j in tied}
-        tied = sorted(tied, key=cmp_to_key(lambda i, j: _first_difference(z[i], z[j])))
-    return tied
-
-
-def _digest_of(key: bytes) -> bytes:
-    """The 8-byte hash of a column's key by which :func:`tie_ranks` orders the columns."""
-    return hashlib.blake2b(key, digest_size=8).digest()
+    digests = [hashlib.blake2b(key, digest_size=8).digest() for key in keys]
+    by_digest = sorted(range(len(digests)), key=digests.__getitem__)
+    order = []
+    for _, run in groupby(by_digest, digests.__getitem__):
+        tied = list(run)
+        if len(tied) > 1 and not mask[tied[0]]:  # equal digests: the standardized values decide
+            z = {j: _standardized(x[:, j]) for j in tied}
+            tied.sort(key=cmp_to_key(lambda i, j: _first_difference(z[i], z[j])))
+        order.extend(tied)
+    ranks = np.empty(len(order), dtype=np.intp)
+    ranks[order] = np.arange(len(order))
+    return ranks
 
 
 def _relation_keys(x: np.ndarray, mask: np.ndarray) -> list[bytes]:

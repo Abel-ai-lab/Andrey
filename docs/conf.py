@@ -9,6 +9,7 @@ surface) and MyST-NB notebooks. Every page shares the pydata-sphinx-theme navbar
 
 from __future__ import annotations
 
+import datetime
 import html
 import importlib.util
 import inspect
@@ -24,6 +25,7 @@ import tomllib
 from urllib.parse import urljoin
 
 import ablog.blog
+import yaml
 from ablog.blog import Blog
 from ablog.post import register_posts
 from docutils import nodes
@@ -33,6 +35,7 @@ from sphinx.errors import ConfigError
 
 import andrey
 import andrey.viz
+from andrey.core.ci_missing import EM_SUPPORTED
 from andrey.data import benchmarks
 from andrey.spec import list_specs
 
@@ -231,10 +234,15 @@ ABEL_LOGO_WIDTH = 600
 AVIF_QUALITY = 50
 # The icon's PNGs at the site's root, by name, each its side in pixels (_write_discovery).
 FAVICONS = {"favicon-96.png": 96, "apple-touch-icon.png": 180}
-# Pages a search engine should not list: the search page, and the page the server shows for a
-# missing address (404.md). The blog's generated pages (All Posts, the years, the archive, the tags,
-# and the authors) only list the posts again, so they are not listed either (`_blog_collection`).
-UNINDEXED = {"search", "404"}
+# The software's image in the structured data: the home-screen icon, a raster search results show.
+SOFTWARE_ICON = "apple-touch-icon.png"
+# Pages a search engine should not list: the search page, the page the server shows for a missing
+# address (404.md), and the general index, which only lists the API's names again. The blog's
+# generated pages (All Posts, the years, the archive, the tags, and the authors) only list the
+# posts again (`_blog_collection`), and the source-code pages under `_modules/`
+# (`UNINDEXED_FOLDER`) repeat the API reference's code, so they are not listed either.
+UNINDEXED = {"search", "404", "genindex"}
+UNINDEXED_FOLDER = "_modules/"
 # The pages llms.txt lists, by section; each release card and published post follows its section's
 # pages, newest first.
 LLMS_SECTIONS = (
@@ -245,6 +253,8 @@ LLMS_SECTIONS = (
             "docs/guides/getting-started",
             "docs/guides/concepts",
             "docs/faq",
+            "docs/methods",
+            "docs/comparison",
             "docs/api",
             "docs/configuration",
             "docs/guides/graph-types",
@@ -257,6 +267,9 @@ LLMS_SECTIONS = (
     ("Blog", ("blog/index",)),
 )
 PACKAGE = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+# How to cite Andrey, from the repository's citation file, which the FAQ's BibTeX entry repeats.
+CITATION = ROOT / "CITATION.cff"
+CITE_ANCHOR = "docs/faq.html#how-do-i-cite-it"
 html_theme_options = {
     # One header on every page (_templates/site-*.html): the wordmark to the homepage and the
     # release to the changelog, then the site's sections, then search, theme, and GitHub.
@@ -329,8 +342,8 @@ html_additional_pages = {
     "docs/demos/benchmark-explorer": "benchmark-explorer-redirect.html",
 }
 # The pages that moved, each old address with the page, and the section where it names one, that
-# holds its content now. The old address redirects there (_moved_pages), and a released post that
-# links the old page keeps its link (_moved_links).
+# holds its content now. The old address redirects there (_moved_pages), and a released post's link
+# to the old page leads to the new one (_moved_links).
 EXAMPLES_DEMOS = "docs/examples/index#interactive-demos"
 MOVED = {
     "demo/index": EXAMPLES_DEMOS,
@@ -361,7 +374,8 @@ def _moved_pages(app):  # noqa: ANN001, ANN202 -- Sphinx event arguments
 
 
 def _moved_links(app, doctree) -> None:  # noqa: ANN001 -- Sphinx event arguments
-    """Point a post's link to a page in ``MOVED`` at the page's old address, which redirects.
+    """Point a post's link to a page in ``MOVED`` at the page that holds its content now, and the
+    section ``MOVED`` names, else the link's own, so a reader and a crawler skip the redirect.
 
     A released post is not edited, so its link names a source file that is gone; left alone, the
     link would not resolve and the build would stop.
@@ -374,7 +388,9 @@ def _moved_links(app, doctree) -> None:  # noqa: ANN001 -- Sphinx event argument
         path, _, section = node["reftarget"].partition("#")
         old = posixpath.normpath(posixpath.join(here, path)).removesuffix(".md")
         if node.get("reftype") == "myst" and old in MOVED:
-            address = posixpath.relpath(old, here) + ".html" + (f"#{section}" if section else "")
+            doc, _, moved_section = MOVED[old].partition("#")
+            section = moved_section or section
+            address = posixpath.relpath(doc, here) + ".html" + (f"#{section}" if section else "")
             node.replace_self(nodes.reference("", "", *node.children, refuri=address))
 
 
@@ -459,14 +475,20 @@ def _load_summary(app) -> dict:  # noqa: ANN001
 
 def _facts() -> list[str]:
     """What Andrey covers, one plain sentence each, for llms.txt and the structured data: the kinds
-    of data, every registry family with its methods, and where the measurements are."""
+    of data, the methods by status, every registry family with its methods (an experimental one
+    marked), and where the measurements are."""
+    specs = list_specs()
     families: dict[str, list[str]] = {}
-    for spec in list_specs():
-        families.setdefault(spec.family, []).append(f"`{spec.name}`")
+    for spec in specs:
+        marked = "" if spec.status == "supported" else f" ({spec.status})"
+        families.setdefault(spec.family, []).append(f"`{spec.name}`{marked}")
+    supported = sum(spec.status == "supported" for spec in specs)
     return [
         "Data: continuous, categorical, and mixed columns; independent samples and time series; "
         "linear and nonlinear relationships; hidden common causes; interventions and several "
         "domains.",
+        f"Methods: {len(specs)} in all, {supported} supported and {len(specs) - supported} "
+        "experimental.",
         *(
             f"{label}: {', '.join(families[family])}."
             for family, label in site.SPEC_FAMILIES.items()
@@ -474,13 +496,37 @@ def _facts() -> list[str]:
         ),
         "Background knowledge: required and forbidden edges and tiers in time, through "
         "`knowledge=`.",
-        "Speed: batched array operations, CPU cores, and a GPU for some methods; every method is "
-        f"timed against the packages that implement it in the release cards, {SITE_URL}docs/"
-        "benchmarks.html.",
+        "Speed: batched array operations, CPU cores, and a GPU for some methods; the release "
+        f"cards at {SITE_URL}docs/benchmarks.html time every method against the packages that "
+        "implement it.",
         "Open source: the code under the Apache License 2.0, and the benchmark scripts and "
         "summaries behind every published number, so anyone can rerun them; "
         "`pip install andrey-core`.",
     ]
+
+
+def _llms_summary() -> str:
+    """``llms.txt``'s opening summary, the first lines an answer engine reads: the speed claim with
+    no number, then accuracy, agents, and the kinds of data, with the count of supported methods
+    from the registry."""
+    supported = sum(spec.status == "supported" for spec in list_specs())
+    return (
+        "Andrey is the fastest open-source Python package for causal discovery. It is accurate "
+        "(each method checked against its authors' code), built for agents (a CLI with JSON "
+        "output and introspection), and covers observational, interventional, time-series, "
+        f"hidden-variable and two-variable data with {supported} supported methods."
+    )
+
+
+def _cite() -> str:
+    """How to cite Andrey, in one line: the authors, title, version, and address of
+    ``CITATION.cff``, and the FAQ's answer that gives the BibTeX entry."""
+    citation = yaml.safe_load(CITATION.read_text(encoding="utf-8"))
+    authors = ", ".join(author["name"] for author in citation["authors"])
+    return (
+        f"{authors}, {citation['title']}, version {citation['version']}, {citation['url']}; "
+        f"the BibTeX entry is at {SITE_URL}{CITE_ANCHOR}"
+    )
 
 
 # Each method's name in prose. A method missing here, or a name no method has, stops the build.
@@ -495,26 +541,12 @@ PROSE_NAMES = {
     "icp": "ICP",
     "iamb": "IAMB",
     "inter_iamb": "Inter-IAMB",
-    "gs": "GS",
-    "fast_iamb": "Fast-IAMB",
     "mmpc": "MMPC",
-    "hiton_pc": "HITON-PC",
-    "hiton_mb": "HITON-MB",
-    "mmmb": "MMMB",
-    "pcmb": "PCMB",
-    "mb_by_mb": "MB-by-MB",
-    "cmb": "CMB",
-    "mmb_by_mmb": "MMB-by-MMB",
-    "y_structures": "Y-structures",
-    "ldp": "LDP",
-    "ld3": "LD3",
-    "ldecc": "LDECC",
-    "local_optimal_adjustment": "LOAD",
-    "locpc_cde": "LocPC-CDE",
     "ges": "GES",
     "gies": "GIES",
     "gnies": "GnIES",
     "xges": "XGES",
+    "lges": "LGES",
     "ages": "AGES",
     "hc": "hill climbing",
     "tabu": "tabu search",
@@ -530,7 +562,6 @@ PROSE_NAMES = {
     "ut_igsp": "UT-IGSP",
     "direct_lingam": "DirectLiNGAM",
     "ica_lingam": "ICA-LiNGAM",
-    "local_isa_ling": "Local ISA-LiNG",
     "multi_group_direct_lingam": "Multi-group DirectLiNGAM",
     "cam": "CAM",
     "resit": "RESIT",
@@ -543,6 +574,7 @@ PROSE_NAMES = {
     "pcmciplus": "PCMCI+",
     "jpcmciplus": "J-PCMCI+",
     "lpcmci": "LPCMCI",
+    "rpcmci": "Regime-PCMCI",
     "granger": "Granger",
     "dynotears": "DYNOTEARS",
     "anm": "ANM",
@@ -589,7 +621,9 @@ METHOD_LISTS = {
         any(p.type == "targets" for p in s.params) and s.output.graph_kind == "cpdag"
     ),
     "missing": lambda s: s.data.missing,
-    "em": lambda s: any(p.name == "missing" and "em" in (p.choices or ()) for p in s.params),
+    "em": lambda s: _takes(s, "missing", "em"),
+    "em_supported": lambda s: s.name in EM_SUPPORTED,
+    "em_experimental": lambda s: _takes(s, "missing", "em") and s.name not in EM_SUPPORTED,
     # The rows of the concepts guide's table, by the assumptions and the graph returned.
     "class_cpdag": lambda s: (
         s.output.graph_kind in ("cpdag", "undirected")
@@ -783,22 +817,30 @@ def _description(app, context: dict, doctree: nodes.document | None) -> str:  # 
 
 def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: ANN001
     """The page's description, its Open Graph and Twitter card tags (title, summary, address, and
-    image), its canonical address, and its structured data (``discovery.head_tags``): the
-    organization, the website, the software at the release the page belongs to, the page or post,
-    and its breadcrumbs. The pages in ``UNINDEXED`` and the blog's generated pages are ``noindex``
-    and name no canonical address. The description and ``og:description`` are one value, as are
-    ``og:url`` and the canonical address."""
-    unindexed = pagename in UNINDEXED or _blog_collection(context, doctree)
+    image with its text alternative), its canonical address, and its structured data
+    (``discovery.head_tags``): the organization, the website, the software at the current release,
+    the page or post (with its update's date once a release has updated it), and its breadcrumbs,
+    which pass through Docs or Blog. The pages in ``UNINDEXED``, those under ``UNINDEXED_FOLDER``,
+    and the blog's generated pages are ``noindex`` and name no canonical address. The description
+    and ``og:description`` are one value, as are ``og:url`` and the canonical address."""
+    unindexed = (
+        pagename in UNINDEXED
+        or pagename.startswith(UNINDEXED_FOLDER)
+        or _blog_collection(context, doctree)
+    )
     home = context.get("home")
     heading = re.sub(r"<[^>]+>", "", context.get("title") or app.config.project)
     title = home["title"] if home else html.unescape(heading)
     description = _description(app, context, doctree)
     url = SITE_URL + ("" if pagename == "index" else f"{pagename}.html")
     image, size = HOME_PREVIEW, (cards.SOCIAL_W, cards.SOCIAL_H)
+    alt = f"Andrey wordmark with the tagline: {cards.TAGLINE}"
     if pagename in _blog(app):  # each post's preview is its banner: its art, title, and release
         image, size = f"assets/preview/{pagename.removeprefix('blog/')}.jpg", (cards.W, cards.H)
-        preview = cards.preview_jpeg(_cover_kind(app, pagename), title, _cover_line(app, pagename))
+        line = _cover_line(app, pagename)
+        preview = cards.preview_jpeg(_cover_kind(app, pagename), title, line)
         _write_bytes(pathlib.Path(app.outdir) / image, preview)
+        alt = f"Andrey blog banner: {title}" + (f" ({line})" if line else "")
     image = SITE_URL + image
     tags = {
         "description": description,
@@ -811,6 +853,7 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         "og:image:type": "image/jpeg",
         "og:image:width": str(size[0]),
         "og:image:height": str(size[1]),
+        "og:image:alt": alt,
         "twitter:card": "summary_large_image",
     }
     preview = "".join(
@@ -825,15 +868,16 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         markdown = html.escape(f"{SITE_URL}_sources/{source}", quote=True)
         preview += f'<link rel="alternate" type="text/markdown" href="{markdown}">\n'
     page = {"title": title, "description": description, "url": url, "image": image}
+    page["image_alt"] = alt
     if unindexed:
         page["indexable"] = False
-    if match := re.fullmatch(r"docs/benchmarks/(\d+\.\d+\.\d+)", pagename):
-        page["software_version"] = match[1]
     post = None
     if pagename in Blog(app):
         article = Blog(app)[pagename]
+        updated = article.date and article.update and article.update != article.date
         post = {
             "date": article.date.strftime("%Y-%m-%d") if article.date else None,
+            "modified": article.update.strftime("%Y-%m-%d") if updated else None,
             "authors": [
                 {
                     "name": str(person),
@@ -841,9 +885,15 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
                 }
                 for person in article.author or ()
             ],
-            "version": app.env.metadata.get(pagename, {}).get("version"),
         }
-    parents = [
+    # The site's section first: the docs' root and the blog's front page are no page's toctree
+    # parent, so Sphinx names neither.
+    section = [
+        {"title": name, "url": SITE_URL + f"{doc}.html"}
+        for name, doc in (("Docs", root_doc), ("Blog", "blog/index"))
+        if pagename.startswith(doc.split("/")[0] + "/") and pagename != doc
+    ]
+    parents = section + [
         {
             "title": html.unescape(re.sub(r"<[^>]+>", "", parent["title"])),
             "url": urljoin(url, parent["link"]),
@@ -852,7 +902,8 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
     ]
     software = {
         "name": app.config.project,
-        "description": PACKAGE["description"],
+        # The homepage's summary, which opens with the speed claim.
+        "description": app.andrey_home["description"],
         "version": release,
         "license": {
             "@type": "CreativeWork",
@@ -862,8 +913,11 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         "programmingLanguage": "Python",
         "runtimePlatform": f"Python {PACKAGE['requires-python']}",
         "codeRepository": PACKAGE["urls"]["Source"],
-        # Andrey's own icon, the favicon; the organization's node carries Abel's logo.
-        "image": SITE_URL + "_static/favicon.svg",
+        "softwareVersion": release,
+        "downloadUrl": PYPI_URL,
+        # Andrey's own icon, as a PNG (_write_discovery); the organization's node carries Abel's
+        # logo.
+        "image": SITE_URL + SOFTWARE_ICON,
         "alternateName": PACKAGE["name"],
         # A software application too, for its category, platforms, price, and features.
         "@type": ["SoftwareSourceCode", "SoftwareApplication"],
@@ -872,7 +926,7 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
         "keywords": ", ".join(PACKAGE["keywords"]),
         "featureList": [fact.replace("`", "") for fact in _facts()],
-        "sameAs": [f"https://pypi.org/project/{PACKAGE['name']}/", PACKAGE["urls"]["Source"]],
+        "sameAs": [PYPI_URL, PACKAGE["urls"]["Source"]],
     }
     return preview + discovery.head_tags(
         page,
@@ -989,13 +1043,14 @@ def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event ar
     try:
         entries = discovery.read_pages(outdir, [n for _, documents in sections for n in documents])
         text = discovery.llms_index(
-            app.andrey_home["description"],
+            _llms_summary(),
             entries,
             sections,
             site_url=SITE_URL,
             project=app.config.project,
             version=release,
             facts=_facts(),
+            cite=_cite(),
         )
     except ValueError as error:
         raise ConfigError(str(error)) from None
@@ -1038,10 +1093,11 @@ WHY_FAST_PAGES = {"blog/20261008-why-andrey-is-fast"}
 
 
 def _post_key(post: tuple[str, str, str]) -> tuple[str, tuple[int, ...], str]:
-    """When a post, (docname, ISO date, version), was published: its date, then its version, so a
-    later version breaks a tie in date, then its docname. A post without a version ("") comes
-    before one with. A post's file name starts with the date it first appeared, so of the posts a
-    release updates, which share its date and version, the one first published last leads."""
+    """When a post, (docname, ISO date, version), was last published: its date, which is its latest
+    update's (``_dated_posts``), then its version, so a later version breaks a tie in date, then
+    its docname. A post without a version ("") comes before one with. A post's file name starts
+    with the date it first appeared, so of the posts a release updates, which share its date and
+    version, the one first published last leads."""
     return post[1], tuple(int(part) for part in post[2].split(".") if part), post[0]
 
 
@@ -1071,11 +1127,13 @@ def _newest_first(posts: list[tuple[str, str, str]]) -> list[str]:
 
 
 def _dated_posts(app) -> list[tuple[str, str, str]]:  # noqa: ANN001
-    """Every dated blog post as (docname, ISO date, version), the version "" where it has none."""
+    """Every dated blog post as (docname, ISO date, version), the version "" where it has none. The
+    date is the post's latest update, which ABlog reads from its ``update`` notes and which is the
+    post's own date until one is later, so the listings lead with a post a release has updated."""
     return [
         (
             post.docname,
-            f"{post.date:%Y-%m-%d}",
+            f"{post.update:%Y-%m-%d}",
             str(app.env.metadata[post.docname].get("version") or ""),
         )
         for post in _blog(app).posts
@@ -1102,11 +1160,11 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
     Page styles load after the shared ones (priority 900), so they win a tie.
     """
     # The navbar's dot on Release cards (_templates/site-nav.html) names the latest release and the
-    # date of its post, which opens the dot's week.
+    # date of its post, its latest update, which opens the dot's week.
     context["release_version"] = _newest_card()
     posts = _dated_posts(app)
-    release_doc = next((doc for doc, _, v in posts if v == context["release_version"]), None)
-    release_doc = release_doc or _release_post(app)[0]
+    at_version = [post for post in posts if post[2] == context["release_version"]]
+    release_doc = (_newest_post(at_version) if at_version else _release_post(app))[0]
     context["release_date"] = next(d for doc, d, _ in posts if doc == release_doc)
     css, js = [], []
     if pagename == "index":
@@ -1390,11 +1448,29 @@ def _summary_headers(app, doctree, docname) -> None:  # noqa: ANN001 -- Sphinx e
         tgroup.insert(tgroup.index(tbody), nodes.thead("", row))
 
 
+def _post_days(app, post) -> str:  # noqa: ANN001
+    """A post's date and, when an ``update`` note dates it later, "Updated" and that date, each date
+    in a ``<time>`` element."""
+
+    def day(when: datetime.datetime) -> str:
+        return (
+            f'<time datetime="{when:%Y-%m-%d}">{when.strftime(app.config.post_date_format)}</time>'
+        )
+
+    updated = (
+        f' · <span class="post-updated">Updated {day(post.update)}</span>'
+        if post.update != post.date
+        else ""
+    )
+    return day(post.date) + updated
+
+
 def _post_byline(app, doctree, docname) -> None:  # noqa: ANN001
     """Put a post's cover and then its authors, date, the Andrey version it was written for, and its
-    tags under its title, where a reader looks for them and where they stay on a narrow screen. A
-    post describes the release its version names, so the version dates what it says. ABlog has read
-    the posts' front matter by now."""
+    tags under its title, where a reader looks for them and where they stay on a narrow screen. The
+    date is the post's first release, and "Updated" and a date follow it once a later release has
+    updated the post (``_post_days``). A post describes the release its version names, so the
+    version dates what it says. ABlog has read the posts' front matter by now."""
     blog = _blog(app)
     if app.builder.format != "html" or docname not in blog:
         return
@@ -1407,12 +1483,7 @@ def _post_byline(app, doctree, docname) -> None:  # noqa: ANN001
         f"{html.escape(str(author))}</a>"
         for author in post.author or ()
     )
-    day = (
-        f'<time datetime="{post.date:%Y-%m-%d}">'
-        f"{post.date.strftime(app.config.post_date_format)}</time>"
-        if post.date
-        else "Draft"
-    )
+    day = _post_days(app, post) if post.date else "Draft"
     version = app.env.metadata.get(docname, {}).get("version")
     written_for = f" · Andrey {html.escape(str(version))}" if version else ""
     byline = (
@@ -1422,6 +1493,60 @@ def _post_byline(app, doctree, docname) -> None:  # noqa: ANN001
     at = title.parent.index(title)
     title.parent.insert(at + 1, nodes.raw("", _post_cover(app, docname), format="html"))
     title.parent.insert(at + 2, nodes.raw("", byline, format="html"))
+
+
+AI_POLICY = "https://github.com/Abel-ai-lab/Andrey/blob/main/DEVELOPMENT.md#ai-tools"
+AI_NUMBERS = (
+    "Every number we measured for this card comes from a recorded run of the benchmark harness; "
+    "no AI tool wrote or estimated any of them. "
+)
+AI_USE = {
+    "none": "No AI tools were used to write this {page}.",
+    "edited": (
+        "{who} wrote this {page}; its wording was edited with {tools}. "
+        "{who} reviewed every change and {be} responsible for the content."
+    ),
+    "drafted": (
+        "Parts of this {page} were drafted with {tools}. "
+        "{who} checked every statement, number, and reference and {be} responsible for the content."
+    ),
+}
+
+
+def _ai_statement(app, doctree) -> None:  # noqa: ANN001
+    """End a post or a release card with its AI statement, written from the ``ai`` and ``ai_tools``
+    of its front matter, so that every page words it the same way. A card's statement opens with
+    where its numbers come from. A page without ``ai`` gets no statement.
+
+    The statement is added when the page is read, before ABlog keeps its copy of a post, so the
+    feed's full text ends with it too. Sphinx has not collected the front matter by then, so it is
+    read from the page, where ``author`` is a node of its own.
+    """
+    docname = app.env.docname
+    card = re.fullmatch(r"docs/benchmarks/\d+\.\d+\.\d+", docname)
+    info = next(doctree.findall(nodes.docinfo), nodes.docinfo())
+    meta = {field[0].astext(): field[1].astext() for field in info.findall(nodes.field)}
+    if "ai" not in meta or not (card or "blogpost" in meta):
+        return
+    use, tools = meta["ai"], meta.get("ai_tools", "").strip()
+    if use not in AI_USE or bool(tools) != (use != "none"):
+        raise ConfigError(
+            f"{docname}: `ai` is none, edited, or drafted, and `ai_tools` names the tools unless "
+            "it is none"
+        )
+    several = bool(card) or any("," in author.astext() for author in info.findall(nodes.author))
+    who = "We" if card else "The authors" if several else "The author"
+    text = AI_USE[use].format(
+        page="card" if card else "post",
+        who=who,
+        be="are" if several else "is",
+        tools=html.escape(tools),
+    )
+    statement = (
+        f'<p class="ai-statement"><a href="{AI_POLICY}">AI statement.</a> '
+        f"{AI_NUMBERS if card else ''}{text}</p>"
+    )
+    next(doctree.findall(nodes.section), doctree).append(nodes.raw("", statement, format="html"))
 
 
 def _cover_kind(app, docname: str) -> str:  # noqa: ANN001
@@ -1481,9 +1606,8 @@ def _newest_post_card(app) -> str:  # noqa: ANN001
         f'<img src="{image}" alt="{html.escape(cards.cover_alt(_cover_kind(app, docname)))}" '
         f'width="{cards.COVER_W}" height="{cards.COVER_H}" '
         'loading="lazy"><span class="band-post-body"><span class="band-post-kicker">Latest post · '
-        f'<time datetime="{post.date:%Y-%m-%d}">{post.date.strftime(app.config.post_date_format)}'
-        f'</time></span><span class="band-post-title">{html.escape(post.title)}</span>'
-        f"<span>{description}</span></span></a>"
+        f'{_post_days(app, post)}</span><span class="band-post-title">'
+        f"{html.escape(post.title)}</span><span>{description}</span></span></a>"
     )
 
 
@@ -1546,10 +1670,7 @@ def _blog_index(app, doctree, docname) -> None:  # noqa: ANN001
             raise ValueError(f"{name} sets no description, which the blog's front page shows")
         href = app.builder.get_relative_uri(docname, name)
         title = html.escape(post.title)
-        day = (
-            f'<time datetime="{post.date:%Y-%m-%d}">'
-            f"{post.date.strftime(app.config.post_date_format)}</time>"
-        )
+        day = _post_days(app, post)
         read = f'<a href="{href}">Read the post<span class="visually-hidden">: {title}</span></a>'
         tags = _tag_list(app, docname, post)
         # The title links to the post, so the cover's link is for the pointer only.
@@ -1729,6 +1850,7 @@ def setup(app) -> None:  # noqa: ANN001 -- Sphinx extension entry point
     app.connect("doctree-read", _notebook_thumbnail)
     # Before ABlog keeps its copy of a post for the feed (the default priority, 500).
     app.connect("doctree-read", _moved_links, priority=400)
+    app.connect("doctree-read", _ai_statement, priority=400)
     app.connect("html-page-context", _page_assets)
     app.connect("html-page-context", _docs_sidebar)
     app.connect("html-collect-pages", _moved_pages)

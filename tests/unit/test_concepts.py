@@ -20,11 +20,9 @@ import pytest
 
 import andrey
 from andrey.api import _method as method_wrapper
-from andrey.api._local import TARGET_SETS
 from andrey.api._method import PENALTIES, SCORE_ONLY
 from andrey.core import ci, warning_policy
 from andrey.core import score as score_module
-from andrey.core.effects import check_effects
 from andrey.core.removed import REMOVED, removal_hint
 from andrey.core.score import BDeuScore
 from andrey.spec import REGISTRY
@@ -34,20 +32,12 @@ from andrey.spec.concepts import (
     CONCEPTS,
     CONTINUOUS_TESTED,
     PCMCI_FAMILY,
-    STARTS,
-    TESTED,
     Concept,
 )
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.ci_tests import PValueOnly
-from tests.unit.methods import (
-    REQUIRED,
-    SHORT,
-    domains,
-    environments,
-    requires_pair,
-    requires_target,
-)
+from tests.release import release_cases
+from tests.unit.methods import REQUIRED, SHORT, domains, environments, results
 
 API_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "docs" / "api.md"
 CHANGELOG = API_MD.parents[2] / "CHANGELOG.md"
@@ -261,23 +251,14 @@ def test_returns_names_the_categorical_columns_a_fit_records(method):
 N = 200
 
 
-#: The methods whose answer needs a pattern of four variables: their data add a second cause w of
-#: y, so that x -> y <- w, y -> z is a Y-structure.
-FOUR_VARIABLES = ("y_structures",)
-
-
-def frame(seed: int, *, codes: bool, gaps: bool = False, w: bool = False) -> pd.DataFrame:
+def frame(seed: int, *, codes: bool, gaps: bool = False) -> pd.DataFrame:
     """A chain x -> y -> z; with ``codes``, x holds four whole numbers that look like categories,
-    with ``gaps``, a few values of x and y are missing, and with ``w``, a fourth column w is a
-    second cause of y."""
+    and with ``gaps``, a few values of x and y are missing."""
     rng = np.random.default_rng(seed)
     u = rng.uniform(-1, 1, size=(N, 3)) ** 3
     x = rng.integers(0, 4, N).astype(float) if codes else u[:, 0]
-    cause = rng.uniform(-1, 1, size=N) ** 3 if w else np.zeros(N)
-    y = 0.8 * x + u[:, 1] + cause
+    y = 0.8 * x + u[:, 1]
     data = pd.DataFrame({"x": x, "y": y, "z": 0.7 * y + u[:, 2]})
-    if w:
-        data["w"] = cause
     if gaps:
         data.iloc[::13, 0] = np.nan
         data.iloc[5::11, 1] = np.nan
@@ -308,7 +289,7 @@ def needed(method: str, inp) -> bool:
 
 def inputs(method: str, *, codes: bool, gaps: bool = False) -> list:
     spec = REGISTRY[method]
-    frames = [frame(seed, codes=codes, gaps=gaps, w=method in FOUR_VARIABLES) for seed in range(3)]
+    frames = [frame(seed, codes=codes, gaps=gaps) for seed in range(3)]
     args = []
     for inp in spec.data.inputs:
         if not needed(method, inp):
@@ -372,17 +353,14 @@ def non_value_errors(method: str) -> str:
 UNIT_CASES = {
     **dict.fromkeys(
         (
-            *("pc", "fci", "gfci", "cdnod", "fci_jci", "iamb", "inter_iamb", "gs", "fast_iamb"),
-            *("mmpc", "hiton_pc", "hiton_mb", "mmmb", "pcmb", "mb_by_mb", "mmb_by_mmb", "mmhc"),
-            *("cmb", "rsmax2"),
-            *("ges", "gies", "gnies", "xges", "hc", "tabu", "exact_search", "boss", "grasp"),
-            *("boss_fci", "grasp_fci", "igsp", "ut_igsp", "ldp", "ld3", "ldecc", "locpc_cde"),
-            "local_optimal_adjustment",
+            *("pc", "fci", "gfci", "cdnod", "fci_jci", "iamb", "inter_iamb", "mmpc", "mmhc"),
+            "rsmax2",
+            *("ges", "gies", "gnies", "xges", "lges", "hc", "tabu", "exact_search", "boss"),
+            *("grasp", "boss_fci", "grasp_fci", "igsp", "ut_igsp"),
         ),
         "gauss_5v",
     ),
     "direct_lingam": "lingam_5v_uniform",
-    "local_isa_ling": "lingam_5v_uniform",
     "multi_group_direct_lingam": "mgdl_2groups",
     "varma_lingam": "varma_3v",
     "longitudinal_lingam": "panel_4v",
@@ -390,6 +368,7 @@ UNIT_CASES = {
     "pcmciplus": "var_4v_stable",
     "jpcmciplus": "mgdl_2groups",
     "lpcmci": "var_6v_hidden",
+    "rpcmci": "regime_var_2v",
     "granger": "var_4v_stable",
     "gin": "measurement_chain_9v",
     "rcd": "confounded_fork_4v",
@@ -409,7 +388,6 @@ UNIT_CASES = {
     "das": "rational_chain_4v",
     "camuv": "nonmonotone_4v",
     "icp": "gauss_5v",
-    "y_structures": "gauss_7v",
 }
 UNIT_ROWS = 1000
 #: Two draws of units: variable ``j`` of every case is multiplied by ``2**k[j]``, an exact product.
@@ -439,16 +417,18 @@ def unit_inputs(method: str, exponents: np.ndarray) -> list:
 
 
 def graphs_and_orders(out) -> list:
-    """The endpoint marks of every graph (each lag, occasion, and group), every causal order, and
-    the claims about pairs."""
+    """The endpoint marks of every graph (each lag, occasion, group, and regime), every causal
+    order, and the regime of each step."""
     if isinstance(out, list):
         return [graphs_and_orders(o) for o in out]
+    if isinstance(out, andrey.RegimeOutput):
+        return [out.regimes.tolist(), [graphs_and_orders(o) for o in out.outputs]]
     s = out.structure
     if isinstance(s, andrey.TemporalStructure):
         graphs = [s.at(t, k) for t in s.times for k in s.lags] if s.n_times else map(s.lag, s.lags)
     else:
         graphs = [s]
-    keys = ("partial_order", "cluster_order", "causal_orders", "unordered", "effects")
+    keys = ("partial_order", "cluster_order", "causal_orders", "unordered")
     orders = {k: out.metadata.get(k) for k in keys}
     return [[g.to_numpy().tolist() for g in graphs], out.ordering, orders]
 
@@ -466,8 +446,8 @@ def unit_free(method: str) -> bool:
 
 def declared_kind(out, method: str) -> bool:
     """Whether a fit's graph has the kind its spec declares, ``None`` for a time-series result."""
-    kind = getattr(out.structure, "kind", None)
-    return kind == REGISTRY[method].output.graph_kind
+    kinds = {getattr(o.structure, "kind", None) for o in results(out)}
+    return kinds == {REGISTRY[method].output.graph_kind}
 
 
 #: Settings that bring out the metadata keys a default fit leaves out.
@@ -485,7 +465,7 @@ def declared_metadata(method: str) -> bool:
     outs = [coded_fit(method)[0]]
     if method in METADATA_FITS:
         outs.append(fit(method, codes=False, **METADATA_FITS[method])[0])
-    keys = {key for out in outs for key in out.metadata}
+    keys = {key for out in outs for o in (out, *results(out)) for key in o.metadata}
     return keys <= set(REGISTRY[method].output.metadata)
 
 
@@ -542,7 +522,7 @@ def spy_on_builds(monkeypatch) -> dict[str, list[str]]:
         spy(ci._CI_REGISTRY, key, "indep_test")
     for key in list(pcmci.PARTIAL_CORRELATION_TESTS):
         spy(pcmci.PARTIAL_CORRELATION_TESTS, key, "indep_test")
-    for module in ("ges", "gies", "xges", "exact", "hc", "boss"):
+    for module in ("ges", "gies", "xges", "lges", "exact", "hc", "boss"):
         engine = importlib.import_module(f"andrey.search.{module}")
 
         def make_score(score_func, *args, _make=engine.make_score, **options):
@@ -611,14 +591,6 @@ def unsupported_data(kind: str, rng: np.random.Generator) -> pd.DataFrame:
     return table
 
 
-#: A target-centered method answers for the edges at its target, so the target is the edge's end;
-#: a pair method learns the edges around its outcome, so the edge is its pair.
-EDGE_TARGET = {
-    **{m: {"target": "y"} for m in REGISTRY if requires_target(m)},
-    **{m: {"treatment": "x", "outcome": "y"} for m in REGISTRY if requires_pair(m)},
-}
-
-
 def required_edge_is_kept(method: str, kind: str) -> bool:
     """Whether a fit with the required edge x -> y keeps it on data that do not support it."""
     spec = REGISTRY[method]
@@ -629,10 +601,7 @@ def required_edge_is_kept(method: str, kind: str) -> bool:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         out = facade(method)(
-            *args_for(method, tables),
-            knowledge=knowledge,
-            **SERIES_SETTINGS.get(method, {}),
-            **EDGE_TARGET.get(method, {}),
+            *args_for(method, tables), knowledge=knowledge, **SERIES_SETTINGS.get(method, {})
         )
     out = out[0] if isinstance(out, list) else out
     s = out.structure
@@ -653,50 +622,8 @@ def keeps_the_required_edge(method: str) -> bool:
     return all(required_edge_is_kept(method, kind) for kind in ("noise", *flat))
 
 
-def answers_for_the_target(method: str) -> bool:
-    """Whether a fit with a target holds only edges at it and lists its sets as columns."""
-    out = fit(method, codes=False, **REQUIRED.get(method, {"target": "y"}))[0]
-    labels = list(out.structure.labels or ())
-    target = out.metadata["target"]
-    target = labels[target] if isinstance(target, int) else target
-    marks = out.structure.to_numpy()
-    others = [i for i in range(len(labels)) if labels[i] != target]
-    sets = {key: out.metadata[key] for key in TARGET_SETS if key in out.metadata}
-    return (
-        bool(sets)
-        and not marks[np.ix_(others, others)].any()
-        and all(isinstance(v, list) and set(v) <= set(labels) - {target} for v in sets.values())
-    )
-
-
-def counts_its_tests(method: str) -> bool:
-    """Whether a fit records a positive count of the tests it evaluated."""
-    n_tests = coded_fit(method)[0].metadata.get("n_tests")
-    return isinstance(n_tests, int) and n_tests > 0
-
-
-def lists_its_effects(method: str) -> bool:
-    """Whether a fit lists one effects record or more, each as the record's rules say."""
-    out = coded_fit(method)[0]
-    records = out.metadata.get("effects")
-    check_effects(records, out.structure.labels)
-    return bool(records)
-
-
-def lists_the_blankets_it_learned(method: str) -> bool:
-    """Whether a fit lists one learned blanket or more, each by its column."""
-    out = coded_fit(method)[0]
-    learned = out.metadata.get("blankets_learned")
-    labels = list(out.structure.labels or ())
-    return isinstance(learned, list) and bool(learned) and set(learned) <= set(labels)
-
-
 #: How each behavior is observed, and the value a conforming method shows.
 OBSERVE = {
-    "blankets_learned": (lists_the_blankets_it_learned, True),
-    "target_answer": (answers_for_the_target, True),
-    "n_tests": (counts_its_tests, True),
-    "effects": (lists_its_effects, True),
     "env": (lambda m: env_kind(m) or False, "context"),
     "data": (lambda m: REGISTRY[m].data.inputs[0].name, "data"),
     "graph_kind": (lambda m: declared_kind(coded_fit(m)[0], m), True),
@@ -722,12 +649,15 @@ def test_every_behavior_has_an_observation():
 
 @pytest.mark.parametrize(
     ("concept", "method"),
-    [
-        pytest.param(c, m, id=f"{c.key}-{m}")
-        for c in BEHAVIORS
-        for m in REGISTRY
-        if m in c.suitable or c.deviation(m) or c.key == "env"
-    ],
+    release_cases(
+        [
+            pytest.param(c, m, id=f"{c.key}-{m}")
+            for c in BEHAVIORS
+            for m in REGISTRY
+            if m in c.suitable or c.deviation(m) or c.key == "env"
+        ],
+        {"units-skewd", "units-skewd_mv"},
+    ),
 )
 def test_behavior_cell(concept, method):
     observe, expected = OBSERVE[concept.key]
@@ -787,10 +717,7 @@ SEEDED = [m for m, spec in REGISTRY.items() if spec.seeded]
 #: The settings that make a fit draw random numbers: a randomized test, or a later start of a search
 #: that changes the best DAG at random.
 RANDOMIZED = {
-    **{
-        m: {"indep_test": "rcot"}
-        for m in (*CI_SEARCHES, *PCMCI_FAMILY, *(m for m in TESTED if m not in STARTS))
-    },
+    **{m: {"indep_test": "rcot"} for m in (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus")},
     **{m: {"n_starts": 2} for m in CONCEPTS["n_perturbations"].suitable},
 }
 
@@ -966,6 +893,13 @@ def test_a_fit_the_tie_break_cannot_change_records_none(method):
 # --- randomness -----------------------------------------------------------------------------------
 
 STOCHASTIC = ci.STOCHASTIC_INDEP_TESTS
+#: Least-squares regressions and one split keep the regression tests fast where only the seed
+#: they receive matters.
+FAST_SETTINGS = {
+    "gcm": {"regression": "linear"},
+    "wgcm": {"regression": "linear"},
+    "pcm": {"regression": "linear", "n_splits": 1},
+}
 
 
 def takes_a_seed(test: str) -> bool:
@@ -998,11 +932,14 @@ def test_the_stochastic_tests_give_other_p_values_for_another_seed():
     data = inputs("pc", codes=False)[0].to_numpy()
     queries = [(0, 2, ()), (0, 1, ()), (0, 2, (1,)), (1, 2, (0,))]
     for name in STOCHASTIC:
+        # The least-squares regressions of GCM draw nothing; its folds draw under boosting.
+        options = {} if name == "gcm" else FAST_SETTINGS.get(name, {})
         draws = {
-            seed: [ci.make_indep_test(name, data, seed=seed)(*q) for q in queries]
+            seed: [ci.make_indep_test(name, data, seed=seed, **options)(*q) for q in queries]
             for seed in (7, 8)
         }
-        assert draws[7] == [ci.make_indep_test(name, data, seed=7)(*q) for q in queries], name
+        again = [ci.make_indep_test(name, data, seed=7, **options)(*q) for q in queries]
+        assert draws[7] == again, name
         assert draws[7] != draws[8], name
 
 
@@ -1018,16 +955,7 @@ CI_CASES = {
     "fci_jci": [{}, {"possible_dsep": "fast", "collider_rule": "majority"}],
     "iamb": [{}, {"target": 0}],
     "inter_iamb": [{}],
-    "gs": [{}, {"target": 0}],
-    "fast_iamb": [{}, {"target": 0}],
     "mmpc": [{}, {"target": 0}],
-    "hiton_pc": [{}, {"target": 0}],
-    "hiton_mb": [{}, {"target": 0}],
-    "mmmb": [{}, {"target": 0}],
-    "pcmb": [{}, {"target": 0}],
-    "mb_by_mb": [{"target": 0}],
-    "cmb": [{"target": 0}, {"target": 0, "blanket": "mmmb"}],
-    "mmb_by_mmb": [{"target": 0}, {"target": 0, "blanket": "iamb"}],
     "mmhc": [{}],
     "rsmax2": [{"restrict": "pc"}, {"restrict": "iamb"}],
     "pcmci": [{}],
@@ -1068,9 +996,11 @@ def built_seeds(monkeypatch):
     seeds = []
     for name in STOCHASTIC:
 
-        def build(data, *args, _factory=ci._CI_REGISTRY[name], **options):
+        def build(
+            data, *args, _factory=ci._CI_REGISTRY[name], _fast=FAST_SETTINGS.get(name), **options
+        ):
             seeds.append(options.get("seed"))
-            return _factory(data, *args, **options)
+            return _factory(data, *args, **options, **(_fast or {}))
 
         monkeypatch.setitem(ci._CI_REGISTRY, name, build)
     return seeds

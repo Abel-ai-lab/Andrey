@@ -27,7 +27,7 @@ from andrey.temporal import lpcmci as lpcmci_engine
 from andrey.temporal import pcmci as pcmci_engine
 from andrey.temporal import pcmciplus as pcmciplus_engine
 from andrey.temporal import varma as varma_engine
-from tests.unit.methods import REQUIRED, domains
+from tests.unit.methods import domains
 
 CAPS = (0, 1, 2)
 
@@ -74,9 +74,7 @@ def ci_search_sizes(method: str, cap: int | None, monkeypatch) -> list[int]:
     monkeypatch.setitem(ci._CI_REGISTRY, "recorded", Recorded)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        getattr(andrey, method)(
-            *inputs(method), indep_test="recorded", max_depth=cap, **REQUIRED.get(method, {})
-        )
+        getattr(andrey, method)(*inputs(method), indep_test="recorded", max_depth=cap)
     return sizes
 
 

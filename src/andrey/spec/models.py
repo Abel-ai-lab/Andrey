@@ -36,7 +36,7 @@ InputKind = Literal[
     "context",  # an auxiliary input aligned to the data rows: one value per row (env)
 ]
 # Hyperparameter value types -- map to a JSON-schema type and a CLI option.
-# str_or_list: one column, or a list of them (``target``): a list asks for one answer per column.
+# str_or_list: one string, or a list of them.
 # knowledge: an object with required/forbidden/allowed edge lists and tiers (andrey.Knowledge).
 # targets: an object mapping each environment's label to its intervened variables (gies).
 ParamType = Literal[
@@ -120,6 +120,9 @@ class ParamSpec(Spec):
     def _check_aliases(self) -> ParamSpec:
         if self.name in self.aliases:
             raise ValueError(f"{self.name}: a parameter is not its own alias")
+        if self.type == "str_or_list" and self.choice_aliases:
+            # A former value is mapped for one string; nothing maps the items of a list.
+            raise ValueError(f"{self.name}: a str_or_list parameter takes no choice aliases")
         for old, new in self.choice_aliases:
             if not self.choices or new not in self.choices or old in self.choices:
                 raise ValueError(f"{self.name}: choice alias {old!r} -> {new!r} is not a rename")
@@ -148,15 +151,24 @@ class ParamSpec(Spec):
         Checks the type, the bounds, and the choices: an int is an ``int`` or a NumPy integer, not
         a ``bool``; a float is any real number but ``NaN`` and infinity; a bool is ``True`` or
         ``False``. ``None`` passes when the parameter is nullable. Column labels or positions,
-        which only the data can check, pass unchanged: a ``str_list``, a ``str_or_list``, a
-        ``knowledge``, a ``targets``, and a ``str`` without choices. ``choices`` replaces the
-        spec's choices when the accepted values change at run time. The message names ``method``,
-        the parameter, what it accepts (:meth:`accepted`), and the value.
+        which only the data can check, pass unchanged: a ``str_list``, a ``knowledge``, a
+        ``targets``, and a ``str`` or ``str_or_list`` without choices. A ``str_or_list`` with
+        choices is one of them or a list of at least one, each one of them. ``choices`` replaces
+        the spec's choices when the accepted values change at run time. The message names
+        ``method``, the parameter, what it accepts (:meth:`accepted`), and the value.
         """
         if choices is not None:
             return self.model_copy(update={"choices": choices}).check(value, method)
         if value is None and self.nullable:
             return None
+        if self.type == "str_or_list" and self.choices:
+            names = [value] if isinstance(value, str) else value
+            message = f"{method}: {self.name} must be {self.accepted()}, got {reprlib.repr(value)}"
+            if not isinstance(names, (list, tuple)) or not all(isinstance(n, str) for n in names):
+                raise TypeError(message)
+            if not names or any(n not in self.choices for n in names):
+                raise ValueError(message)
+            return value
         if self.type in ("str_list", "str_or_list", "knowledge", "targets") or (
             self.type == "str" and not self.choices
         ):
@@ -183,6 +195,8 @@ class ParamSpec(Spec):
         """What the parameter accepts, in words: ``one of 'a', 'b'``, ``an int at least 1``."""
         if self.choices:
             text = "one of " + ", ".join(repr(c) for c in self.choices)
+            if self.type == "str_or_list":
+                text += ", or a list of them"
         else:
             bounded = self.minimum is not None or self.maximum is not None
             kind = {
@@ -242,15 +256,12 @@ class OutputSpec(Spec):
     """The shape of the returned ``StructureOutput`` (what the result envelope carries)."""
 
     structure_type: Literal["graph", "temporal"]
-    graph_kind: (
-        Literal["dag", "cpdag", "pag", "mag", "digraph", "undirected"] | None
-    )  # None: temporal
+    graph_kind: Literal["dag", "cpdag", "pag", "mag", "undirected"] | None  # None for temporal
     weighted: bool = False  # carries a weighted_adjacency
     has_ordering: bool = False  # carries a discovered causal order
     has_latents: bool = False  # flags latent nodes via node_types (GIN)
-    # Its claims hold with hidden common causes, which a graph of its kind does not show.
-    hidden_causes: bool = False
     multi: bool = False  # returns list[StructureOutput], one per group
+    regimes: bool = False  # returns a RegimeOutput: a regime per time step, a StructureOutput each
     # Every key a fit's metadata can hold; a fit holds a subset (some keys depend on the settings).
     metadata: tuple[str, ...] = ()
     doc: str = ""
@@ -307,9 +318,8 @@ class MethodSpec(Spec):
           (``data.missing``) or by structural EM where EM is supported for it.
         - ``environments``: it takes ``env``, the environment of each row; ``datasets``: it takes
           a list of datasets over the same variables (a panel input).
-        - ``hidden_causes``: its answer allows hidden common causes: a PAG or a MAG, latent nodes,
-          the ``confounded`` part of background knowledge, or claims that hold with them
-          (``output.hidden_causes``).
+        - ``hidden_causes``: its graph allows hidden common causes: a PAG or a MAG, latent nodes,
+          or the ``confounded`` part of background knowledge.
         - ``time_series``: it returns a graph over time; ``two_variables``: it decides the
           direction between two variables (the pairwise family).
         """
@@ -326,7 +336,6 @@ class MethodSpec(Spec):
             "datasets": any(i.kind == "panel" for i in self.data.inputs),
             "hidden_causes": self.output.graph_kind in ("pag", "mag")
             or self.output.has_latents
-            or self.output.hidden_causes
             or "confounded" in self.knowledge,
             "time_series": self.output.structure_type == "temporal",
             "two_variables": self.family == "pairwise",

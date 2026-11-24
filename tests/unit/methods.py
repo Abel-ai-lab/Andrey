@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from andrey.spec import REGISTRY
+import andrey
 
 #: Settings that shorten a slow fit; the facade path stays the same, and the properties the
 #: package-wide tests check do not depend on the fit converging.
@@ -19,41 +19,10 @@ SHORT = {
     "varma_lingam": {"max_iter": 1},
     "jpcmciplus": {"time_dummy": False},
     "cpcm_graph": {"family": "gaussian_fixed_scale"},
+    "rpcmci": {"n_starts": 10, "max_transitions": 40},
 }
-
-
-def requires_target(method: str) -> bool:
-    """Whether ``method`` answers for one variable only: its ``target`` entry opens "Required:",
-    as ``REQUIRED_TARGET`` and ICP's own entry do."""
-    return any(
-        p.concept == "target" and p.doc.startswith("Required:") for p in REGISTRY[method].params
-    )
-
-
-def requires_pair(method: str) -> bool:
-    """Whether ``method`` answers for one treatment-outcome pair: its ``treatment`` entry opens
-    "Required:"."""
-    return any(
-        p.concept == "treatment" and p.doc.startswith("Required:") for p in REGISTRY[method].params
-    )
-
-
-def requires_variables(method: str) -> bool:
-    """Whether ``method`` answers for the pairs of variables it must be given: its ``variables``
-    entry opens "Required:"."""
-    return any(
-        p.concept == "variables" and p.doc.startswith("Required:") for p in REGISTRY[method].params
-    )
-
-
-#: The arguments a method needs beyond its inputs: a target, by position, for each method that
-#: requires one, a treatment and an outcome for each method that answers for a pair, and two
-#: variables for each method that answers for the pairs of the variables it is given.
-REQUIRED = {
-    **{method: {"target": 2} for method in REGISTRY if requires_target(method)},
-    **{method: {"treatment": 1, "outcome": 2} for method in REGISTRY if requires_pair(method)},
-    **{method: {"variables": [1, 2]} for method in REGISTRY if requires_variables(method)},
-}
+#: The arguments a method needs beyond its inputs: ICP's target, by position.
+REQUIRED = {"icp": {"target": 2}}
 
 
 def fit_settings(method: str) -> dict:
@@ -72,3 +41,15 @@ def domains(n: int) -> np.ndarray:
     """Two domains of ``n / 2`` rows each, as a column: a required context, such as CD-NOD's
     domain index."""
     return np.repeat([0.0, 1.0], n // 2).reshape(-1, 1)
+
+
+def results(out) -> list:
+    """The ``StructureOutput``s of a fit: each group's, each regime's, or the one."""
+    if isinstance(out, andrey.RegimeOutput):
+        return list(out.outputs)
+    return out if isinstance(out, list) else [out]
+
+
+def regime_paths(out) -> list[np.ndarray]:
+    """The regime of each step, for a fit that returns regimes; empty for any other."""
+    return [out.regimes] if isinstance(out, andrey.RegimeOutput) else []

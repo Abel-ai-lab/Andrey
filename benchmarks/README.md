@@ -30,15 +30,6 @@ Packages:
   [CAM and RESIT](comparisons/cam-resit.md)
 - the authors' R code for RESIT, read from disk and never copied - see
   [CAM and RESIT](comparisons/cam-resit.md)
-- the authors' code for MMB-by-MMB, read from disk and never copied - see
-  [MMB-by-MMB](comparisons/mmb-by-mmb.md)
-- the authors' Causal Explorer (MATLAB) for HITON-PC, HITON-MB, and MMMB, run from disk and never
-  copied - see [Markov blankets](comparisons/blankets.md)
-- the authors' R code for Y-structures under selection bias
-  ([sbcd](https://github.com/philipversteeg/sbcd)), read from disk and never copied - see
-  [Y-structures](comparisons/y-structures.md)
-- the authors' code for LDECC, LDP, LD3, SNAP, LOAD, and LocPC-CDE, read from disk and never
-  copied - see [Treatment-outcome methods](comparisons/adjustment.md)
 - [pgmpy](https://github.com/pgmpy/pgmpy) - see [Categorical data](comparisons/categorical.md)
 - [Tetrad](https://github.com/cmu-phil/tetrad), through its causal-cmd jar and tetrad-lib's - see
   [Mixed data](comparisons/mixed.md), [GFCI](comparisons/gfci.md),
@@ -84,11 +75,6 @@ directory.
 and `library()` run in the adapter's `setup()`, before warm-up fits and outside fit timing. See
 [Where the clock starts](#where-the-clock-starts).
 
-The set-learner lane ([Markov blankets](comparisons/blankets.md)) is written against bnlearn 5.2.1,
-and `blanket_cpu.py` stops when the library holds another version. `start_r.sh` installs the current
-CRAN release into a new library, so once CRAN moves past 5.2.1, install 5.2.1 from the CRAN archive
-into `$ANDREY_BENCH_R_LIBS` first.
-
 ### Separate solution environments
 
 xges pins `numpy<2` and `numba<0.60`, which bench-env cannot satisfy. Its fits use a second
@@ -99,8 +85,9 @@ benchmarks/start_xges.sh
 export ANDREY_BENCH_XGES_PYTHON=$PWD/benchmarks/.venv-xges/bin/python
 ```
 
-tigramite (GPL-3.0), the reference for the CMIknn and GPDC conditional-independence tests, also
-fits in an environment of its own, so it and its dependencies stay out of bench-env:
+tigramite (GPL-3.0), the reference for the CMIknn and GPDC conditional-independence tests and for
+Regime-PCMCI (`rpcmci_agreement.py`), also fits in an environment of its own, so it and its
+dependencies stay out of bench-env:
 
 ```shell
 benchmarks/start_tigramite.sh
@@ -200,6 +187,19 @@ export ANDREY_BENCH_SKEWD_PYTHON=$PWD/benchmarks/.venv-skewd/bin/python
 export ANDREY_BENCH_SKEWD=$PWD/benchmarks/.skewd
 ```
 
+The Tübingen lane (`tuebingen_pairs.py`) runs the authors' code of QCCD, HECI, and GRCI beside
+Andrey's pairwise methods, each unmodified and read from a folder outside the repository.
+`start_qccd.sh`, `start_heci.sh`, and `start_grci.sh` download a pinned copy, check its checksum,
+build its environment, and print the exports the adapters read. GRCI's license, CC BY-NC 4.0, allows
+benchmark runs from a local download and no redistribution, so its files never enter the repository.
+QCCD runs at the paper's setting, `m = 3`, and, as a sensitivity row, at the wrapper's default
+`m = 7`.
+`load_dataset("tuebingen")` downloads the pairs from their original server, and
+`tuebingen_summary.py` turns the records of the runs into the weighted accuracy with a paired
+bootstrap interval, the coverage, and the time per pair. The `resit` arm reads its interpreter from
+`$ANDREY_BENCH_RESIT_PYTHON`; set it to `$ANDREY_BENCH_PYTHON` to measure the bench environment's
+build, as the other Andrey arms do.
+
 The missing-value lanes (`missing_cpu.py`) run two authors' codes that carry no license, unmodified
 and outside the package. Each script downloads its pinned commit, checks the archive's SHA-256, and
 extracts it into a git-ignored folder the adapters read from. MissDAG, the reference for
@@ -213,70 +213,6 @@ export ANDREY_BENCH_MISSDAG_PYTHON=$PWD/benchmarks/.venv-missdag/bin/python
 benchmarks/start_mvpc_r.sh     # after start_r.sh; prints the export below
 export ANDREY_BENCH_MVPC_R=$PWD/benchmarks/.mvpc-r/MVPC-<commit>/src
 ```
-
-The authors' MMB-by-MMB code, the reference for the hidden-variable lane (`mmb_by_mmb_cpu.py`),
-has no license, so the harness runs it unmodified and keeps it out of the repository:
-`start_mmb.sh` downloads the files of a pinned commit, checks each one's SHA-256, writes them to
-`benchmarks/.mmb`, and builds an environment of NumPy and SciPy from the lock file
-`requirements-mmb.txt` (see [MMB-by-MMB](comparisons/mmb-by-mmb.md)):
-
-```shell
-benchmarks/start_mmb.sh
-export ANDREY_BENCH_MMB_PYTHON=$PWD/benchmarks/.venv-mmb/bin/python
-export ANDREY_BENCH_MMB=$PWD/benchmarks/.mmb
-```
-
-The authors' Causal Explorer, the reference of the HITON-PC, HITON-MB, and MMMB rows of
-`blanket_cpu.py`, is MATLAB code under a non-commercial license, run the same way:
-`start_causal_explorer.sh` clones the public repository at a pinned commit into
-`benchmarks/.causal-explorer`, and the lane calls it through `matlab` when that is on the `PATH`
-(see [Markov blankets](comparisons/blankets.md)):
-
-```shell
-benchmarks/start_causal_explorer.sh
-export ANDREY_BENCH_CAUSAL_EXPLORER=$PWD/benchmarks/.causal-explorer
-```
-
-The authors' R code for Y-structures, the reference of `y_structures_cpu.py`, is read from disk the
-same way: `start_sbcd_r.sh` downloads the repository at a pinned commit, checks the archive's
-SHA-256, extracts it into `benchmarks/.sbcd-r`, and adds the packages it lists to the R lane's
-library (see [Y-structures](comparisons/y-structures.md)):
-
-```shell
-benchmarks/start_sbcd_r.sh     # after start_r.sh; prints the export below
-export ANDREY_BENCH_SBCD_R=$PWD/benchmarks/.sbcd-r/sbcd-<commit>
-```
-
-The authors' code for LDECC, LDP, LD3, SNAP, LOAD, and LocPC-CDE, the references of the
-treatment-outcome lane (`adjustment_cpu.py`), is run unmodified the same way: each start script
-downloads the archive of a pinned commit, checks its SHA-256, extracts it under a git-ignored
-folder, and builds a pinned environment (see
-[Treatment-outcome methods](comparisons/adjustment.md)):
-
-```shell
-benchmarks/start_ldecc.sh      # prints the two exports below
-export ANDREY_BENCH_LDECC_PYTHON=$PWD/benchmarks/.venv-ldecc/bin/python
-export ANDREY_BENCH_LDECC=$PWD/benchmarks/.ldecc/local-causal-discovery-<commit>
-benchmarks/start_maasch.sh     # LDP and LD3: prints the three exports below
-export ANDREY_BENCH_MAASCH_PYTHON=$PWD/benchmarks/.venv-maasch/bin/python
-export ANDREY_BENCH_LDP=$PWD/benchmarks/.maasch/ldp-<commit>
-export ANDREY_BENCH_LD3=$PWD/benchmarks/.maasch/LD3-<commit>
-benchmarks/start_schubert.sh   # SNAP and LOAD: prints the three exports below
-export ANDREY_BENCH_SCHUBERT_PYTHON=$PWD/benchmarks/.venv-schubert/bin/python
-export ANDREY_BENCH_SNAP=$PWD/benchmarks/.schubert/snap-<commit>
-export ANDREY_BENCH_LOAD=$PWD/benchmarks/.schubert/load-<commit>
-benchmarks/start_ciphod.sh     # LocPC-CDE: prints the three exports below
-export ANDREY_BENCH_CIPHOD_PYTHON=$PWD/benchmarks/.venv-ciphod/bin/python
-export ANDREY_BENCH_CIPHOD=$PWD/benchmarks/.ciphod/pyCIPHOD-<commit>
-export PYTHONHASHSEED=0
-```
-
-The networks of these lanes that `andrey.data` does not ship (`mildew`, `win95pts`, `hailfinder`,
-and `pigs`) are fetched from the bnlearn repository on first use, checked against a SHA-256, and
-kept in the git-ignored `benchmarks/.networks`, or in `$ANDREY_BENCH_NETWORKS`.
-The fitted Gaussian networks of the treatment-outcome lane (`magic-niab` and `sangiovese`) are
-bnlearn's R objects: the R lane reads each once, and the structure and parameters are kept as JSON
-beside the download, so later runs need no R.
 
 The `m2-tetrad` lane runs Tetrad's FGES, BOSS, and GRaSP under its EM covariance policy, with its
 effective sample size at the number of rows and at the mean pairwise count, which tetrad-lib has
@@ -328,6 +264,12 @@ cd benchmarks && .venv-bench/bin/python -m pytest tests/ -q
 
 The first command should end with `table: 4 rows` and `errors: 0`. The second checks the harness
 against known answers.
+
+`benchmarks/run_tests.sh` runs the whole suite as a release does: it builds every environment the
+`start*.sh` scripts make, requires R, and runs `benchmarks/tests` in them. It reads the Tetrad jars
+and a JDK from `ANDREY_BENCH_TETRAD_JAR`, `ANDREY_BENCH_TETRAD_GIN_JAR`, and `ANDREY_BENCH_JAVA`,
+and writes a summary of the builds, the variables, the failures, and every skip to
+`benchmarks/.test-logs/summary.txt` (`$ANDREY_BENCH_TEST_LOGS` names another folder).
 
 ## Writing a benchmark
 
@@ -396,31 +338,6 @@ Every estimate is scored against the observed PAG, including the empty graph's C
 built untimed in the parent, once per dataset. Its cost grows about 8x per doubling of `d`. A DAG or
 CPDAG estimate is scored as a PAG without canonicalization. Its tails and undirected edges count
 against the PAG's circles. Use PAG methods and the empty graph on these datasets.
-
-### Local answers
-
-A local method answers questions: whether a variable is in a target's set, which mark an edge has
-at the target, whether a pair's effect is nonzero or identifiable, which set to adjust for. Score
-each answer against the oracle answer, the method's own definition applied to the true graph:
-`andrey.metrics.target_oracle` for a target, `effect_oracle` for a pair (or the method run with a
-d-separation oracle in place of its test, for a method whose answer its procedure defines).
-
-- **Outcomes.** Each query is correct, wrong, incomplete, or abstained
-  (`andrey.metrics.answer_scores`). "Cannot tell" is incomplete where the oracle decides and correct
-  where the oracle cannot either; an undirected edge or a circle where the oracle directs the edge
-  is incomplete, never wrong. A decided answer where the oracle cannot tell is wrong. A set answer
-  answers every candidate, so its wrong answers are its missing and extra members.
-- **Net score and floor.** The net score is correct minus wrong. Its floor is the better of always
-  abstaining (0) and always giving the most common oracle answer on the same queries: the empty set
-  for a set, and abstaining for ancestor claims, whose base rate is at most 1/2 in any DAG.
-- **Gate.** `andrey_bench.local_eval.gate` pairs each dataset's net rate with the floor policy's and
-  passes when the bootstrap 95% interval of the mean difference lies above 0, with the release
-  cards' rule (`andrey_bench.pairing.compare`): 10,000 resamples, at least 10 datasets. A timeout or
-  an error fails the gate; it is never an abstention.
-- **Two methods.** `local_eval.paired_risk` compares their risk only on the queries both answered,
-  paired by dataset, so a method that abstains on hard queries does not buy a lower risk.
-  `local_eval.risk_coverage` traces the risk as a ranked answer is cut by confidence, and
-  `local_eval.wilson_95` gives the interval of a claim precision.
 
 ### Where the clock starts
 
@@ -688,20 +605,8 @@ Read `params` before comparing solutions because their defaults may optimize dif
   bytes.
 - `andrey_bench/regime_models.py` - the data of the domain, group, and latent-indicator regimes.
 - `andrey_bench/pair_models.py` - the synthetic cause-effect pair sets of Tagasovska et al. (2020).
-- `andrey_bench/networks.py` - the published networks the target and latent lanes read.
-- `andrey_bench/latent_networks.py` - the linear-Gaussian simulation with hidden nodes on them.
-- `andrey_bench/selection_models.py` - the simulation under selection bias.
-- `andrey_bench/local_lane.py` - how an adapter answers at a target or claims pairs, the scores of
-  both, and the contract of a local method's adapter ([MMB-by-MMB](comparisons/mmb-by-mmb.md)).
-- `andrey_bench/adjustment_lane.py` - how an adapter answers for a treatment and an outcome (the
-  `effects` records, packed), the contract of such an adapter, and the scorer of the answers, the
-  sets, and the effect estimates ([Treatment-outcome methods](comparisons/adjustment.md)).
-- `andrey_bench/adjustment_models.py`, `network_models.py`, `gaussian_networks.py` - the planted
-  models of that lane, one generator per paper, and the fitted networks it replays.
 - `andrey_bench/integration.py` - runs dataset key -> data -> fit -> structure -> score -> record.
 - `andrey_bench/scoring.py` - computes metrics and the cross-package structure hash.
-- `andrey_bench/blanket_lane.py` - the answers of the set-learner lane (a target's set or a graph,
-  with its test counts), the true sets, and the scorers of both.
 - `andrey_bench/oracle.py` - a solution returning the true graph; a correct pipeline scores SHD 0.
 - `andrey_bench/provenance.py` - reads versions, BLAS, CPU, and GPU from the benchmark environment.
 - `tests/test_validation.py`, `tests/test_memory_cap.py` - the validation suite.

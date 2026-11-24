@@ -7,6 +7,7 @@ import importlib
 import pkgutil
 import struct
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -237,6 +238,26 @@ def test_a_rejected_icp_fit_keeps_its_missing_intervals() -> None:
     assert back.metadata["target"] == 0
 
 
+def test_ut_igsps_targets_map_back_to_the_original_columns() -> None:
+    original = {0: [], 1: [2], 2: [0, 3]}
+    order = np.array([2, 3, 1, 0])  # permuted column k is original column order[k]
+    back = np.argsort(order)
+    fitted = {label: sorted(int(back[t]) for t in found) for label, found in original.items()}
+    assert fitted == {0: [], 1: [0], 2: [1, 3]}
+
+    def output(targets: dict[int, list[int]]) -> StructureOutput:
+        return StructureOutput.new(
+            GraphStructure.from_numpy(np.zeros((4, 4), dtype=np.int8), kind="cpdag"),
+            metadata={"algorithm": "ut_igsp", "targets": targets},
+        )
+
+    mapped = identity.unpermute(output(fitted), order)
+    assert mapped.metadata["targets"] == original
+    assert identity.digest(mapped) == identity.digest(
+        identity.unpermute(output(original), np.arange(4))
+    )
+
+
 def _output(p_value: float, *, ordering: list[int] | None = None, edge: bool = True):
     marks = np.zeros((3, 3), dtype=np.int8)
     if edge:
@@ -312,9 +333,45 @@ def test_a_different_graph_or_causal_order_fails_under_a_column_order() -> None:
     assert {"graph", "structure"} <= set(identity.FAILING)
 
 
+def test_a_documented_exception_is_expected_only_in_the_parts_it_names() -> None:
+    # FastICA's solution decides the graph, the causal order, and the weights, not the stamps
+    assert identity.documented("ICA-LiNGAM", ["graph", "ordering", "weights"])
+    assert identity.documented("ICA-LiNGAM", ["ordering"])
+    assert identity.documented("ICA-LiNGAM", []) is None
+    assert identity.documented("PC", ["graph", "ordering"]) is None
+    assert identity.documented("ICA-LiNGAM", ["metadata.seed"]) is None
+    assert identity.documented("ICA-LiNGAM", ["ordering", "metadata.tie_break"]) is None
+    assert "documented" not in identity.FAILING
+    assert set(identity.DOCUMENTED) <= set(identity.FITS)
+
+
+def test_a_documented_exception_is_not_a_failure_under_a_column_order(monkeypatch) -> None:
+    graph = GraphStructure.from_numpy(np.zeros((2, 2), dtype=np.int8), kind="dag")
+    outputs = {
+        False: StructureOutput.new(graph, metadata={"p_values": [[[1.0, 0.5], [0.5, 1.0]]]}),
+        True: StructureOutput.new(graph, metadata={"p_values": [[[1.0, 0.9], [0.9, 1.0]]]}),
+    }
+    calls = []
+
+    def call(x):
+        calls.append(x)
+        return outputs[len(calls) > 1]  # the first fit, then the column-order refit
+
+    monkeypatch.setitem(identity.FITS, "PCMCIplus", identity.Fit(call))
+    monkeypatch.setitem(
+        identity.DOCUMENTED, "PCMCIplus", (frozenset({"metadata.p_values"}), "a documented reason")
+    )
+    draw = iter([("PCMCIplus", "d", 0, np.zeros((3, 2)))])
+    monkeypatch.setattr(identity, "corpus", lambda methods, seeds: draw)
+    _, findings = identity.run(["PCMCIplus"], 1, shuffle=1)
+    assert [kind for kind, _ in findings] == ["documented"]
+    assert "a documented reason" in findings[0][1]
+    assert not any(kind in identity.FAILING for kind, _ in findings)
+
+
 @pytest.mark.parametrize(
     ("kind", "code"),
-    [("digits", 0), ("bits", 1), ("values", 1), ("structure", 1), ("graph", 1)],
+    [("digits", 0), ("documented", 0), ("bits", 1), ("values", 1), ("structure", 1), ("graph", 1)],
 )
 def test_the_exit_status_fails_on_a_structural_difference_and_reports_the_rest(
     kind, code, monkeypatch, capsys
@@ -346,13 +403,51 @@ def test_counting_records_each_outermost_query_and_restores_the_methods(x: np.nd
     test = make_indep_test("fisherz", x)
     original = ci.PartialCorrelationTest.__dict__["batched_call"]
     with identity.counting(alpha=0.05) as counts:
-        test(0, 2, (1,))
+        test(0, 2, (1,))  # one query, though it calls statistic_pvalue
+        test.statistic_pvalue(0, 3, (1,))
         test.batched_call(0, 2, iter([(), (1, 3)]))
         test.first_order_pvalues(0, 1, [2, 3])
         test._canonical_pvalues(np.array([0, 2]), np.array([3, 3]), np.array([[1, 2], [0, 1]]))
     assert ci.PartialCorrelationTest.__dict__["batched_call"] is original
-    assert counts.summary()["ci_queries"] == 7
+    assert counts.summary()["ci_queries"] == 8
     assert counts.summary()["ci_sets"] == {"0": 1, "1": 3, "2": 3}
+
+
+@pytest.mark.parametrize(
+    ("name", "ask", "conditions"),
+    [
+        ("fisherz", lambda test, data, *q: test.statistic_pvalues(*q), [[1], [0], [2]]),
+        ("fisherz", lambda test, data, *q: test.statistic_pvalues(*q), np.empty((3, 0), int)),
+        (
+            "fisherz",
+            lambda test, data, *q: test.residual_statistic_pvalues(data, *q),
+            [[1], [0], [2]],
+        ),
+        ("chisq", lambda test, data, *q: test.statistic_pvalues(*q), [[1], [0], [2]]),
+    ],
+    ids=["statistic_pvalues", "empty_sets", "residual_statistic_pvalues", "chisq"],
+)
+def test_counting_records_one_query_per_pvalue_of_a_batched_call(
+    x: np.ndarray, name: str, ask: Callable[..., tuple[np.ndarray, np.ndarray]], conditions: object
+) -> None:
+    data = np.digitize(x, [-1.0, 1.0]) if name == "chisq" else x
+    test = make_indep_test(name, data)
+    with identity.counting(alpha=0.0) as counts:  # every p > 0 separates its pair
+        _, p_values = ask(test, data, np.array([0, 1, 0]), np.array([2, 3, 3]), conditions)
+    assert counts.summary()["ci_queries"] == len(p_values) == 3
+    assert counts.separated == {(0, 2), (1, 3), (0, 3)}
+    assert counts.summary()["ci_sets"] == ({"1": 3} if np.size(conditions) else {"0": 1})
+
+
+def test_counting_wraps_every_public_pvalue_method_of_the_ci_tests() -> None:
+    public = {
+        name
+        for cls in identity.CI_CLASSES
+        for owner in cls.__mro__
+        for name, value in vars(owner).items()
+        if callable(value) and "pvalue" in name and not name.startswith("_")
+    }
+    assert public <= set(identity.CI_QUERIES)
 
 
 def test_counting_wraps_every_name_of_the_score_delta_functions() -> None:

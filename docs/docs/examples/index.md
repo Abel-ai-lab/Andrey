@@ -41,7 +41,7 @@ New to Andrey? Work through the notebooks in this order; each part adds one step
 - **Part 13.** {doc}`Markov check <markov_check>`: test whether the data contradict the graph you
   learned.
 - **Part 14.** {doc}`Missing values <missing_values>`: fit data whose gaps depend on other
-  variables, and correct for them.
+  variables, and correct for them; then FCI, categorical data, and a time series with gaps.
 
 {doc}`Speed on your machine <speed_on_your_machine>` times PC on your own hardware at any point.
 
@@ -92,12 +92,9 @@ quick_start
 :img-top: /_generated/thumbs/constraint_based.svg
 :img-alt: The graph PC or FCI recovers in this notebook
 
-PC's CPDAG and FCI's and GFCI's PAGs from conditional-independence tests; IAMB, Inter-IAMB, GS,
-Fast-IAMB, MMPC, HITON-PC, HITON-MB, MMMB, and PCMB, which join each variable's local structure into
-a graph; MB-by-MB's and CMB's edges at one variable and MMB-by-MMB's under hidden common causes;
-Y-structures' ancestor claims from rows that may have been selected; LDECC's, LOAD's, and
-LocPC-CDE's adjustment sets for a treatment and an outcome; CD-NOD and FCI-JCI on data from several
-domains; and ICP's parents of one variable from several environments.
+PC's CPDAG and FCI's and GFCI's PAGs from conditional-independence tests; IAMB, Inter-IAMB, and
+MMPC, which join each variable's local structure into a graph; CD-NOD and FCI-JCI on data from
+several domains; and ICP's parents of one variable from several environments.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -149,8 +146,7 @@ on settings whose changed variables it is told in part or not at all.
 :img-alt: The DAG DirectLiNGAM or ICA-LiNGAM recovers in this notebook
 
 DirectLiNGAM and ICA-LiNGAM orient every edge when the noise is non-Gaussian; MultiGroupDirectLiNGAM
-fits several datasets, GIN finds latent variables, and local ISA-LiNG learns the weighted edges at
-one variable, with cycles allowed.
+fits several datasets, and GIN finds latent variables.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -161,9 +157,9 @@ one variable, with cycles allowed.
 :img-top: /_generated/thumbs/functional.svg
 :img-alt: The DAG CAM recovers in this notebook
 
-CAM, RESIT, SCORE, and NoGAM learn a DAG, with every edge oriented, when each variable is a
-nonlinear function of its parents plus independent noise; CAM-UV allows hidden causes and marks the
-pairs they join.
+CAM, RESIT, SCORE, NoGAM, and DAS learn a fully oriented DAG when each variable is a nonlinear
+function of its parents plus independent noise; CAM-UV allows hidden causes and marks the pairs they
+join, and CPCM's graph search lets each variable follow a family you choose.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -208,7 +204,7 @@ BottomUpParceLiNGAM orders the variables and leaves those a hidden cause confoun
 :img-top: /_generated/thumbs/pairwise.svg
 :img-alt: The true graph of this notebook's pair
 
-ANM, PNL, and LOCI test which of two variables causes the other.
+ANM, PNL, LOCI, and CPCM test which of two variables causes the other.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -279,6 +275,7 @@ Pass what you already know to a search: tiers in time, and required or forbidden
 
 Remove values so that whether one is missing depends on another variable, then fit PC with its
 default handling and with `missing="mvpc"` and GES with `missing="em"`, and count each one's errors.
+Then values missing not at random, FCI, categorical data, and a time series.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::

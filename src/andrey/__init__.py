@@ -8,10 +8,10 @@ DataFrame or a NumPy array of one row per sample and one column per variable::
     out = andrey.pc(data)  # a StructureOutput; the graph is out.structure
     print(out)
 
-Every algorithm (``andrey.ges``, ``andrey.fci``, ...) returns a ``StructureOutput``
-(``multi_group_direct_lingam``, one per group) wrapping a first-class ``Structure`` (a
-``GraphStructure`` or ``TemporalStructure``). The public graph types are re-exported here
-(``andrey.GraphStructure``) alongside ``andrey.core.*``.
+Algorithms (``andrey.ges``, ``andrey.fci``, ...) return a ``StructureOutput`` wrapping a first-class
+``Structure`` (``GraphStructure`` or ``TemporalStructure``): ``multi_group_direct_lingam`` returns
+one per group; ``rpcmci`` returns a ``RegimeOutput`` with one per regime. Public types
+(``andrey.GraphStructure``) are re-exported here alongside ``andrey.core.*``.
 
 For a coding agent, the command line carries the same methods: ``andrey --skill`` prints the guide
 to save as its ``SKILL.md``, and ``andrey --help --json`` prints every method's contract as JSON.
@@ -27,7 +27,6 @@ from .api import (
     cam,
     camuv,
     cdnod,
-    cmb,
     cpcm,
     cpcm_graph,
     dagma,
@@ -35,7 +34,6 @@ from .api import (
     direct_lingam,
     dynotears,
     exact_search,
-    fast_iamb,
     fci,
     fci_jci,
     ges,
@@ -46,40 +44,29 @@ from .api import (
     granger,
     grasp,
     grasp_fci,
-    gs,
     hc,
-    hiton_mb,
-    hiton_pc,
     iamb,
     ica_lingam,
     icp,
     igsp,
     inter_iamb,
     jpcmciplus,
-    ld3,
-    ldecc,
-    ldp,
-    local_isa_ling,
-    local_optimal_adjustment,
+    lges,
     loci,
-    locpc_cde,
     longitudinal_lingam,
     lpcmci,
-    mb_by_mb,
-    mmb_by_mmb,
     mmhc,
-    mmmb,
     mmpc,
     multi_group_direct_lingam,
     nogam,
     notears,
     pc,
-    pcmb,
     pcmci,
     pcmciplus,
     pnl,
     rcd,
     resit,
+    rpcmci,
     rsmax2,
     score_matching,
     skewd,
@@ -88,9 +75,15 @@ from .api import (
     ut_igsp,
     varma_lingam,
     xges,
-    y_structures,
 )
-from .core import GraphStructure, Structure, StructureOutput, SummaryGraph, TemporalStructure
+from .core import (
+    GraphStructure,
+    RegimeOutput,
+    Structure,
+    StructureOutput,
+    SummaryGraph,
+    TemporalStructure,
+)
 from .core.backend import config, describe
 from .core.knowledge import Knowledge
 from .core.seeding import seed_all
@@ -109,7 +102,7 @@ from .core.warning_policy import (
 from .markov import MarkovCheckOutput, markov_check
 from .resample import BootstrapOutput, bootstrap
 
-__version__ = "0.17.1"
+__version__ = "0.19.0"
 
 __all__ = [
     "__version__",
@@ -118,6 +111,7 @@ __all__ = [
     "TemporalStructure",
     "SummaryGraph",
     "StructureOutput",
+    "RegimeOutput",
     # Background knowledge every search takes as knowledge=.
     "Knowledge",
     # Refit a method on resamples of the rows: edge frequencies and an averaged graph.
@@ -149,29 +143,15 @@ __all__ = [
     "cdnod",
     "fci_jci",
     "icp",
-    "y_structures",
-    "ldp",
-    "ld3",
-    "ldecc",
-    "local_optimal_adjustment",
-    "locpc_cde",
     "iamb",
     "inter_iamb",
-    "gs",
-    "fast_iamb",
     "mmpc",
-    "hiton_mb",
-    "hiton_pc",
-    "mmmb",
-    "pcmb",
-    "mb_by_mb",
-    "cmb",
-    "mmb_by_mmb",
     "ges",
     "ages",
     "gies",
     "gnies",
     "xges",
+    "lges",
     "hc",
     "tabu",
     "exact_search",
@@ -188,7 +168,6 @@ __all__ = [
     "ut_igsp",
     "direct_lingam",
     "ica_lingam",
-    "local_isa_ling",
     "cam",
     "resit",
     "cpcm_graph",
@@ -207,6 +186,7 @@ __all__ = [
     "pcmciplus",
     "jpcmciplus",
     "lpcmci",
+    "rpcmci",
     "granger",
     "dynotears",
     # Pairwise direction tests.

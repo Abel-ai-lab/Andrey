@@ -10,8 +10,6 @@ from __future__ import annotations
 GRAPH_ONLY = {"structural": ["graph"], "numeric": {}}
 #: The graph exactly and the objective score within rounding.
 GRAPH_SCORE = {"structural": ["graph"], "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}}}
-#: The graph and the ``effects`` records, exactly.
-GRAPH_EFFECTS = {"structural": ["graph", "effects"], "numeric": {}}
 
 SPEC: dict[str, dict] = {
     "DirectLiNGAM": {
@@ -31,29 +29,13 @@ SPEC: dict[str, dict] = {
         "numeric": {},
     },
     "XGES": GRAPH_SCORE,
+    "LGES": GRAPH_SCORE,
     "AGES": GRAPH_ONLY,
     "HC": GRAPH_SCORE,
     "Tabu": GRAPH_SCORE,
     "IAMB": GRAPH_ONLY,
     "InterIAMB": GRAPH_ONLY,
-    "GS": GRAPH_ONLY,
-    "FastIAMB": GRAPH_ONLY,
     "MMPC": GRAPH_ONLY,
-    "HITONPC": GRAPH_ONLY,
-    "PCMB": GRAPH_ONLY,
-    "MBbyMB": GRAPH_ONLY,
-    "HITONMB": GRAPH_ONLY,
-    "MMMB": GRAPH_ONLY,
-    # Y-structures: the claimed pairs in their listed order, and the scores within rounding.
-    "YStructures": {
-        "structural": ["graph", "claims"],
-        "numeric": {"scores": {"atol": 1e-6, "rtol": 1e-6}},
-    },
-    "CMB": GRAPH_ONLY,
-    "LDECC": GRAPH_EFFECTS,
-    "LocalOptimalAdjustment": GRAPH_EFFECTS,
-    "LocPCCDE": GRAPH_EFFECTS,
-    "MMBbyMMB": GRAPH_ONLY,
     "MMHC": GRAPH_SCORE,
     "RSMAX2": GRAPH_SCORE,
     "ExactSearch": GRAPH_ONLY,
@@ -87,13 +69,6 @@ SPEC: dict[str, dict] = {
         "structural": ["causal_order"],
         "numeric": {"weighted_adjacency": {"atol": 1e-6, "rtol": 1e-5}},
     },
-    # Local ISA-LiNG: the digraph exactly; the weights within what its sparse ICA leaves open: the
-    # ICA stops at its step cap before it settles, and a relative 1e-12 change of the inputs moves
-    # the weights by up to 2e-3.
-    "LocalISALiNG": {
-        "structural": ["graph"],
-        "numeric": {"weighted_adjacency": {"atol": 1e-2, "rtol": 0.0}},
-    },
     # Multi-group: one shared causal order (structural) + a stack of per-group weighted matrices
     # (numeric, shape (n_groups, d, d) -- compared element-wise within tolerance).
     "MultiGroupDirectLiNGAM": {
@@ -116,6 +91,12 @@ SPEC: dict[str, dict] = {
             "p_values": {"atol": 1e-8, "rtol": 1e-6},
             "statistics": {"atol": 1e-8, "rtol": 1e-6},
         },
+    },
+    # Regime-PCMCI: the regime of each step and every regime's lag graphs, exactly; the linear
+    # program's objective within rounding.
+    "RPCMCI": {
+        "structural": ["regimes", "graph"],
+        "numeric": {"objective": {"atol": 1e-6, "rtol": 1e-8}},
     },
     "PCMCIplus": {
         "structural": ["graph", "conflicts"],
@@ -242,7 +223,9 @@ SPEC: dict[str, dict] = {
         },
     },
     # CPCM: the decided graph and both tests' p-values and statistics. The smoothing parameters
-    # stop on a projected LAML gradient of 1e-4, so p-values are compared relatively at 1e-3.
+    # come from a compass search on a fixed lattice that takes a point only if it lowers the LAML
+    # by more than 1e-6 of its value, so rounding can tip a near-tie between two lattice points;
+    # p-values are compared relatively at 1e-3.
     "CPCM": {
         "structural": ["graph"],
         "numeric": {
@@ -267,4 +250,9 @@ SPEC: dict[str, dict] = {
     "RCoT": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
     "CMIknn": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
     "GPDC": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
+    "GCM": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
+    "WGCM": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
+    "WGCM_FIX": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
+    "PCM": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
+    "PCM6": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
 }

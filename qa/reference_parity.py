@@ -22,25 +22,8 @@ summary's ``parity_rule`` sets how its rows are judged:
   field overrides its entry's.
 - ``metric``, on an entry: the error its rows pair, ``"shd"`` (the default when absent),
   ``"target_error"`` (the size of the symmetric difference of the learned and true intervention
-  targets), ``"direct_errors"`` (the directed edges against the edges between observed variables
-  that no unobserved causal or backdoor path joins), ``"set_distance"`` (a set learned at every
-  target, such as a Markov blanket: the mean over the targets of the distance of the set's precision
-  and recall from (1, 1)), ``"set_f1_loss"`` (1 minus the mean over the targets of the set's F1, so
-  that fewer is better as for the others), ``"edge_distance"`` and ``"edge_f1_loss"`` (the same two
-  over the edges a method answers at a target, an edge right only with both endpoint marks right),
-  ``"claim_error"`` (claims of ancestral pairs: the mean over the datasets of the false claims plus
-  the true pairs not claimed), ``"claim_ap_loss"`` (1 minus the mean over the datasets of the
-  average precision of the claims' scores), ``"weight_distance"`` (a weighted answer at a target:
-  the mean over the datasets of the Euclidean distance between its weights and the true ones over
-  the edges it answers), and for an answer about one treatment and outcome, ``"effect_error"``
-  (the mean absolute error, on a fresh sample, of the effects estimated with the answer's
-  adjustment sets), ``"family_error"`` (1 when the answer's parent sets are not the family the true
-  CPDAG allows, else 0), ``"recall_loss"`` (1 when the treatment's true parents are not among
-  them), ``"hausdorff_mse"`` (the squared Hausdorff distance of the estimated effects from the
-  effects the family gives in the population, in standard deviations), ``"verdict_error"`` (1 when
-  the answer's ``identifiable`` is not the truth's, an undecided answer included), or
-  ``"parents_error"`` (1 unless the answer is identifiable with the outcome's true parents other
-  than the treatment as its set). A row's means are
+  targets), or ``"direct_errors"`` (the directed edges against the edges between observed
+  variables that no unobserved causal or backdoor path joins). A row's means are
   ``andrey_<metric>_mean`` and ``comparator_<metric>_mean``, or the ``*_shd_mean`` fields, which
   then hold that error's means. A method with a gated metric beside SHD has one entry per metric,
   and a row's key names the ``metric``.
@@ -77,7 +60,9 @@ reversed for a method whose result does not depend on the column order, where th
 An entry that matches no failing row also fails. A released summary never changes, so a method
 re-measured against the same reference in a later summary is judged by the later rows only. Where a
 summary has two entries of one method against one reference, one per regime, a row's key also names
-its ``regime``.
+its ``regime``. A row's key is also the fields of ``ROW_KEYS`` it has: its size and its scenario,
+such as the network, the effect, or the hidden nodes. Two failing rows of one comparison with the
+same key fail whatever the allowlist holds, since one entry could not tell them apart.
 
     uv run python -m qa.reference_parity              # exit 1 if any row fails
 """
@@ -108,8 +93,13 @@ SERIES_COUNTS: tuple[tuple[str, str], ...] = (
 COLUMN_SERIES: tuple[str, str] = ("andrey_column_shd_by_seed", "comparator_shd_by_seed")
 #: Error fields recorded as ``andrey_<field>`` and ``comparator_<field>``: the row's mean or median.
 ERRORS: tuple[str, ...] = ("shd", "directed_errors")
-#: Row fields that name a row within its method's table.
-ROW_KEYS: tuple[str, ...] = ("mean_degree", "d", "observed", "n")
+#: Row fields that name a row within its method's table: its size, then the scenario fields that
+#: tell apart rows of one size (the network, the effect planted or not, the hidden nodes, the
+#: number of nodes of a random graph, and the number of series).
+ROW_KEYS: tuple[str, ...] = (
+    *("mean_degree", "d", "observed", "n"),
+    *("network", "effect", "hide", "nodes", "M"),
+)
 #: The ``claim`` values: a row in the setting its method claims, and one outside it.
 IN_CLAIM, OUT_OF_CLAIM = "in", "out"
 #: The ``role`` of an entry whose comparator is reported and never judged.
@@ -125,19 +115,6 @@ METRICS: dict[str, str] = {
     "shd": "SHD",
     "target_error": "target error",
     "direct_errors": "direct-edge errors",
-    "set_distance": "set distance",
-    "set_f1_loss": "set F1 loss",
-    "effect_error": "effect error",
-    "family_error": "parent-set family error",
-    "recall_loss": "parent-set recall loss",
-    "hausdorff_mse": "effect-set Hausdorff MSE",
-    "verdict_error": "identifiability verdict error",
-    "parents_error": "outcome-parents error",
-    "edge_distance": "edge distance",
-    "edge_f1_loss": "edge F1 loss",
-    "claim_error": "claim errors",
-    "claim_ap_loss": "claim AP loss",
-    "weight_distance": "weight distance",
 }
 #: The causes an allowlist entry may name.
 CAUSES: frozenset[str] = frozenset(
@@ -529,6 +506,11 @@ def published_rows(root: Path = PUBLISHED) -> list[Row]:
     return [row for _, rows in sorted(newest.values(), key=lambda v: v[0]) for row in rows]
 
 
+def _identity(row: Row) -> tuple[str, str, str, str]:
+    """Return what an allowlist entry names a row by: its summary, method, reference, and key."""
+    return row.summary, row.method, row.comparator, json.dumps(row.key, sort_keys=True)
+
+
 def _matches(entry: dict, row: Row) -> bool:
     return (
         entry.get("summary") == row.summary
@@ -541,8 +523,16 @@ def _matches(entry: dict, row: Row) -> bool:
 def check(rows: list[Row], allowlist: list[dict]) -> tuple[list[str], list[str]]:
     """Return ``(failures, exemptions)``, one line each, for ``rows`` under ``allowlist``."""
     failed = [r for r in rows if r.failed]
+    shared = Counter(_identity(r) for r in failed)
     failures, exemptions = [], []
     for row in failed:
+        if shared[_identity(row)] > 1:
+            failures.append(
+                f"FAIL {row.label()}: {row.numbers()}; {shared[_identity(row)]} failing rows share "
+                f"this key, so an allowlist entry cannot name one of them: add the field that "
+                f"tells them apart to ROW_KEYS"
+            )
+            continue
         entries = [e for e in allowlist if _matches(e, row)]
         entry = entries[0] if len(entries) == 1 else None
         problem = _entry_problem(entry, row) if entry else None

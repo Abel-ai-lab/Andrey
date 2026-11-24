@@ -30,7 +30,8 @@ import andrey
 from andrey.core import TemporalStructure
 from andrey.core.stats import normal_scores
 from andrey.spec import list_specs
-from tests.unit.methods import fit_settings
+from tests.release import release_cases
+from tests.unit.methods import fit_settings, regime_paths, results
 
 N = 300
 P = 6
@@ -60,15 +61,8 @@ ENV_SETTINGS = {
 }
 #: CALM's schedule here: the package-wide one finds no edge on these data.
 CALM = {"max_iter": 3, "subproblem_iter": 300}
-#: A method whose answer is claims about pairs, ``metadata["effects"]``, returns a graph with no
-#: edge: no comparison of graphs can fail for it, and the data here hold no pattern of four
-#: variables for it to claim from. ``test_y_structures.py`` checks its claims under the same
-#: changes.
 TABLE_SPECS = [
-    spec
-    for spec in list_specs()
-    if {i.kind for i in spec.data.inputs} & {"matrix", "panel"}
-    and "effects" not in spec.output.metadata
+    spec for spec in list_specs() if {i.kind for i in spec.data.inputs} & {"matrix", "panel"}
 ]
 
 
@@ -133,9 +127,7 @@ def graphs(structure) -> list[np.ndarray]:
 
 
 def marks(out) -> list[np.ndarray]:
-    return [
-        m for result in (out if isinstance(out, list) else [out]) for m in graphs(result.structure)
-    ]
+    return [m for result in results(out) for m in graphs(result.structure)] + regime_paths(out)
 
 
 def always_env(spec) -> bool:
@@ -188,7 +180,9 @@ def rescale(x: np.ndarray) -> np.ndarray:
     return x * FACTORS[: x.shape[1]]
 
 
-@pytest.mark.parametrize("spec", TABLE_SPECS, ids=lambda spec: spec.name)
+@pytest.mark.parametrize(
+    "spec", release_cases(TABLE_SPECS, {"skewd_mv"}, id=lambda spec: spec.name)
+)
 def test_rescaling_each_column_keeps_the_graph_unless_the_method_reads_units(spec):
     if spec.name == "calm":
         pytest.importorskip("torch")
@@ -310,7 +304,11 @@ def test_reordering_the_columns_relabels_the_rank_based_score_graph(spec):
     np.testing.assert_array_equal(got, want[np.ix_(ORDER, ORDER)])
 
 
-@pytest.mark.parametrize("spec", RANK_SCORED, ids=lambda spec: spec.name)
+@pytest.mark.parametrize(
+    "spec",
+    [spec for spec in RANK_SCORED if any(p.name == "knowledge" for p in spec.params)],
+    ids=lambda spec: spec.name,
+)
 def test_the_rank_based_score_honors_a_required_edge(spec):
     knowledge = andrey.Knowledge(required=[(0, 5)])
     assert not fit(spec, lambda x: x, **rank_settings(spec)).structure.to_numpy()[0, 5]

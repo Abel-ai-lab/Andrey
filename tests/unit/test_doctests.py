@@ -42,7 +42,6 @@ DOCUMENTED = [
     "andrey.data.scm",
     "andrey.data.sortability",
     "andrey.markov",
-    "andrey.metrics.effects",
     "andrey.metrics.graph",
     "andrey.metrics.latent",
     "andrey.metrics.order",

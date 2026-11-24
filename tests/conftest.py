@@ -58,10 +58,12 @@ def _reset_backend_state():
     a warning raised outside a test, in a module fixture, does not hide a test's first warning.
     """
     warning_policy._warned.clear()
+    warning_policy._logged.clear()
     yield
     backend.config._backend = None
     backend.config._n_jobs = None
     backend.config._tie_break = None
     warning_policy._warned.clear()
+    warning_policy._logged.clear()
     backend._dispatch_counts.clear()
     stats._CALIBRATED.clear()

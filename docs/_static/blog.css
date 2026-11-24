@@ -165,6 +165,11 @@
   }
 }
 
+/* A row's date, and the date of its latest update, wrap onto two lines on a narrow screen. */
+.blog-row .release-meta > p {
+  white-space: normal;
+}
+
 /* A post's tags, each a link to the posts that share it. */
 .blog-tags {
   display: flex;

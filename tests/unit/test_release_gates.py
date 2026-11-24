@@ -11,6 +11,7 @@ import subprocess
 import tarfile
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -167,7 +168,23 @@ def _evaluate(condition: str, needs: str | list[str], **context: dict) -> bool:
 def test_the_quality_gate_runs_on_pull_requests_into_main():
     triggers = _workflow("quality-gate.yml")["on"]
     assert triggers["pull_request"]["branches"] == ["main"]
-    assert "workflow_call" in triggers
+    assert set(triggers) == {"pull_request", "workflow_dispatch", "workflow_call"}
+
+
+@pytest.mark.parametrize(
+    ("event", "base", "marks"),
+    [
+        ("pull_request", "release/0.19.0", "not release"),
+        ("pull_request", "lcd", "not release"),
+        ("pull_request", "main", ""),  # the release pull request runs every test
+        ("push", "", ""),
+        ("workflow_dispatch", "", ""),
+    ],
+)
+def test_only_pull_requests_outside_main_deselect_the_release_tests(event, base, marks):
+    condition = _workflow("ci.yml")["env"]["TEST_MARKS"]
+    github = SimpleNamespace(event_name=event, base_ref=base)
+    assert _evaluate(condition, [], github=github) == marks
 
 
 def test_the_publish_gate_runs_unless_the_lookup_found_a_run():
@@ -578,6 +595,52 @@ def test_parity_allowlist_exempts_only_a_cited_cause_with_the_row_numbers():
     assert len(_failures(row, allowlist=(_entry(), _entry()))) == 1
 
 
+def test_parity_rows_of_one_size_are_keyed_by_their_scenario():
+    from qa import reference_parity
+
+    base = {"d": 18, "n": 5000, "network": "g", "andrey_shd": 5.0, "comparator_shd": 4.0}
+    scenarios = (
+        {},
+        {"effect": "both"},
+        {"hide": "B1"},
+        {"hide": "B1+Z4a"},
+        {"nodes": 50},
+        {"M": 3},
+    )
+    rows = reference_parity.paired_rows("s", _summary(*({**base, **s} for s in scenarios)))
+    assert len({tuple(sorted(r.key.items())) for r in rows}) == len(scenarios)
+    assert rows[2].key == {"d": 18, "n": 5000, "network": "g", "hide": "B1"}
+
+
+def test_parity_allowlist_names_each_scenario_of_one_size_apart():
+    rows = [
+        {"d": 50, "hide": hide, "andrey_shd": 5.0, "comparator_shd": 4.0} for hide in ("B1", "Z1")
+    ]
+    entries = tuple(_entry(row={"d": 50, "hide": hide}) for hide in ("B1", "Z1"))
+    assert _failures(*rows, allowlist=entries) == []
+    assert len(_failures(*rows, allowlist=entries[:1])) == 1
+
+
+def test_two_failing_parity_rows_with_one_key_fail_whatever_the_allowlist_holds():
+    row = {"d": 50, "andrey_shd": 5.0, "comparator_shd": 4.0}
+    failures = _failures(row, row, allowlist=(_entry(),))
+    assert len(failures) == 2
+    assert all("2 failing rows share this key" in line for line in failures)
+
+
+def test_no_two_gated_published_rows_share_a_parity_key():
+    from collections import Counter
+
+    from qa import reference_parity
+
+    seen = Counter(
+        reference_parity._identity(row)
+        for row in reference_parity.published_rows()
+        if not row.reported
+    )
+    assert [key for key, rows in seen.items() if rows > 1] == []
+
+
 def test_parity_allowlist_exempts_a_tie_break_only_when_the_reversed_order_passes():
     # Series counts: the reference has fewer errors on 4 series, Andrey on 0.
     row = {"d": 50, "andrey_fewer_errors": 0, "comparator_fewer_errors": 4}
@@ -928,36 +991,6 @@ def test_parity_judges_the_metric_an_entry_names():
     # The entry's metric decides which means the row must hold.
     with pytest.raises(ValueError, match="andrey_shd_mean"):
         _entry_rows(row)
-
-
-@pytest.mark.parametrize(
-    ("metric", "text"),
-    [
-        ("set_distance", "set distance"),
-        ("set_f1_loss", "set F1 loss"),
-        ("edge_distance", "edge distance"),
-        ("edge_f1_loss", "edge F1 loss"),
-        ("claim_error", "claim errors"),
-        ("claim_ap_loss", "claim AP loss"),
-        ("weight_distance", "weight distance"),
-    ],
-)
-def test_parity_judges_an_answer_at_every_target(metric, text):
-    from qa import reference_parity
-
-    row = {
-        "d": 37,
-        "n": 1000,
-        "paired": 20,
-        f"andrey_{metric}_mean": 0.3,
-        f"comparator_{metric}_mean": 0.2,
-        "mean_D": 0.1,
-        "bootstrap_95": [0.05, 0.15],
-        "above_zero": True,
-    }
-    [parsed] = _entry_rows(row, metric=metric)
-    [failure] = reference_parity.check([parsed], [])[0]
-    assert f"metric={metric}" in failure and f"mean {text} Andrey 0.30" in failure
 
 
 def test_parity_fails_a_row_where_andrey_timed_out_on_a_dataset_the_reference_finished():

@@ -360,12 +360,10 @@ which graph each one returns.
 
 ### Answers for a few variables
 
-When you need the neighborhood of a few variables rather than the whole graph, a local method
-answers for each `target` alone and tests far fewer pairs. `mmpc` and `hiton_pc` return a target's
-parents and children, `iamb`, `hiton_mb`, and the other blanket learners its Markov blanket, and
-`mb_by_mb`, `cmb`, and `mmb_by_mmb` the directions of its edges. Pass a list to answer for several
-targets in one call: you get one result per target, each equal to a call for that target alone, and
-the work two targets share is done once.
+When you need the neighborhood of a few variables rather than the whole graph, `mmpc` returns a
+`target`'s parents and children and `iamb` and `inter_iamb` its Markov blanket, testing far fewer
+pairs than a whole-graph fit. Pass a list for several targets: each result equals a call for that
+target alone, and shared work is done once.
 
 ```python
 outs = andrey.mmpc(data, target=["pkc", "raf"])
@@ -471,20 +469,19 @@ of those four methods' tests, the cap pcalg names `m.max` and causal-learn's FCI
 The result honors every part: a required edge is there and directed, a forbidden one is not, and a
 pair outside `allowed` is not adjacent. In a CPDAG, the edges the knowledge decides are directed and
 Meek's rules direct the edges that follow, which gives the maximally oriented PDAG (MPDAG): the DAGs
-of the equivalence class that satisfy the knowledge. IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC,
-HITON-PC, HITON-MB, MMMB, and PCMB return undirected graphs with a `target`, with
-`structure="skeleton"`, the default of `mmpc` and `hiton_pc`, and with `structure="moral"`, a choice
-of `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `hiton_mb`, `mmmb`, and `pcmb`: a required edge is there
-without a direction, and tiers and edges forbidden one way, which constrain orientation, do not
-change them. With `structure="cpdag"`, the default of `iamb`, `inter_iamb`, `gs`, `fast_iamb`,
-`hiton_mb`, `mmmb`, and `pcmb`, they direct the edges the knowledge decides, as in any CPDAG. In a
-PAG, a forbidden `a -> b` puts an arrowhead at `a` and can leave a circle at `b`. Knowledge that
-contradicts itself, such as a required edge into an earlier tier, raises a `ValueError` before the
-search runs. In PC, CD-NOD, and FCI, knowledge whose directions close a cycle over the edges the
-search kept raises one after the adjacency search. Labels stay attached to their columns, so the
-same knowledge fits the table in any column order. A label is the column name as text: name a column
-called `1` with `"1"`, as the integer `1` is the second column. On the command line, give a JSON
-object inline or as a file: `andrey run pc --data data.csv knowledge=knowledge.json`.
+of the equivalence class that satisfy the knowledge. IAMB, Inter-IAMB, and MMPC return undirected
+graphs with a `target`, with `structure="skeleton"`, the default of `mmpc`, and with
+`structure="moral"`, a choice of `iamb` and `inter_iamb`: a required edge is there without a
+direction, and tiers and edges forbidden one way, which constrain orientation, do not change them.
+With `structure="cpdag"`, the default of `iamb` and `inter_iamb`, they direct the edges the
+knowledge decides, as in any CPDAG. In a PAG, a forbidden `a -> b` puts an arrowhead at `a`
+and can leave a circle at `b`. Knowledge that contradicts itself, such as a required edge into an
+earlier tier, raises a `ValueError` before the search runs. In PC, CD-NOD, and FCI, knowledge whose
+directions close a cycle over the edges the search kept raises one after the adjacency search.
+Labels stay attached to their columns, so the same knowledge fits the table in any column order. A
+label is the column name as text: name a column called `1` with `"1"`, as the integer `1` is the
+second column. On the command line, give a JSON object inline or as a file:
+`andrey run pc --data data.csv knowledge=knowledge.json`.
 
 Knowledge can also state causal paths rather than edges. `required_paths` lists the pairs `(a, b)`
 in which `a` causes `b`, directly or through other variables, and `forbidden_paths` the pairs in
@@ -536,15 +533,14 @@ narrow the causal order, as their paper describes (Shimizu et al., 2011). Every 
 supported wherever true claims [measured no
 worse](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
 than the same fit without them and than a reference package given the same knowledge, which is every
-method that honors them except twelve. Required paths are experimental in Tabu search, MMHC, and
+method that honors them except six. Required paths are experimental in Tabu search, MMHC, and
 RSMAX2, where a reference package given the edges those paths imply made fewer errors. Forbidden
 paths are experimental in IAMB, Inter-IAMB, and MMPC, where the graph found at 50 variables often
 has no consistent extension: a claim there acts only on an edge, the fits we measured dropped about
-96% of the forbidden paths on such a graph, and with forbidden paths alone the CPDAG was 0.65 to
-1.95 edges farther from the class the claims define. Both are experimental in GS, Fast-IAMB,
-HITON-PC, HITON-MB, MMMB, and PCMB, which that measurement did not cover. A path claim says less
-than an edge and so directs less: a required path cannot restore an edge the search left out. When
-you know the edge itself, state it as `required`.
+96% of the forbidden paths on such a graph, and with forbidden paths alone the CPDAG was 0.65 to 1.95
+edges farther from the class the claims define. A path claim says less than an edge and so directs
+less: a required path cannot restore an edge the search left out. When you know the edge itself,
+state it as `required`.
 
 Knowledge that no graph meets, such as `required_paths` that lead in a cycle, raises a `ValueError`
 before the search. A true claim can still be one the graph a fit finds does not meet: on finite
@@ -591,7 +587,7 @@ Each test and score reads the columns as one kind of data:
 
 | Data | `indep_test` | `score_func` |
 |---|---|---|
-| Continuous | `fisherz` (the default when no column is categorical), `student_t`, `normal_scores` (monotone effects, any marginals); for nonlinear effects, `kci`, `rcot`, `cmiknn`, and `gpdc` | `bic` (the default when no column is categorical), `normal_scores` (experimental: monotone transformations of Gaussian columns) |
+| Continuous | `fisherz` (the default when no column is categorical), `student_t`, `normal_scores` (monotone effects, any marginals); for nonlinear effects, `kci`, `rcot`, `cmiknn`, `gpdc`, `gcm`, `wgcm`, and `pcm` (experimental) | `bic` (the default when no column is categorical), `normal_scores` (experimental: monotone transformations of Gaussian columns) |
 | Categorical | `chisq`, `gsq` (the default when every column is categorical) | `bdeu` (the default when every column is categorical), `discrete_bic` |
 | Mixed | `degen_gauss`, `cond_gauss` (the default when some columns are categorical) | `cond_gauss` (the default when some columns are categorical), `degen_gauss` |
 
@@ -675,127 +671,15 @@ The JSON result lists the categorical columns under `metadata.categorical` and t
 
 Mark a missing value with `NaN` or pandas' `NA`, or, for `andrey run`, leave its field empty or
 write `NA` or `N/A` in the data file. {{ missing_methods }} accept missing values: each
-conditional-independence test reads only the rows where all of its variables are observed
-(test-wise deletion). This keeps rows that would be dropped if every incomplete row were deleted
-first. The pair tests of ANM and PNL read the rows where both columns are observed, which for a pair
-is the same deletion. Here a tenth of the Sachs measurements go missing at random:
-
-```{code-cell} ipython3
-gappy = sachs.data.mask(np.random.default_rng(0).random(sachs.data.shape) < 0.1)
-out = andrey.pc(gappy)
-out.metadata["rows_tested"]
-```
-
-`metadata["rows_tested"]` gives the minimum (`min`) and median number of rows read by a test.
-`metadata["missing"]` names the handling the fit used; a fit on complete data has neither entry.
-The argument `missing` names the handling. `missing="testwise"` is test-wise deletion.
-`None`, the default, picks the method's default handling, which is `"testwise"` for every method
-that takes the argument. A value a method does not list raises a `ValueError` that names the values
-it takes:
-
-```{code-cell} ipython3
-andrey.pc(gappy, missing="testwise").structure == out.structure
-```
-
-With `fisherz` and `student_t`, each test computes its correlations directly from its rows, for many
-tests at once. The other tests are built anew on each test's rows, which costs more. A time series
-keeps every step: each row of the lagged design that reads a missing value holds it. Each test of
-PCMCI, PCMCI+, or LPCMCI reads the design rows where all of its lagged variables are observed.
-
-Deleting rows per test is sound when values are missing completely at random: the rows a test keeps
-are then a random sample of all rows. When whether a value is missing depends on the variables, as
-when high incomes go unreported, the rows a test keeps are a selected sample. PC's tests can then
-find dependence where the population has none and keep extra edges ([Tu et al., 2019][tu]); FCI
-allows for selection and stays sound when no missingness mechanism causally affects another
-([Strobl, Visweswaran, and Spirtes, 2018][strobl]).
-
-`andrey.pc(data, missing="mvpc")` corrects PC for those extra edges with Missing-Value PC
-([Tu et al., 2019][tu]). It finds the variables each missingness indicator depends on, then tests
-again the edges such an indicator could have kept. These tests use virtual data rebuilt from the
-rows where those variables are observed. It takes `fisherz` or `student_t`;
-`metadata["missingness_parents"]` names the parents it found and `metadata["corrected_edges"]` the
-edges it tested again and removed. A corrected test reads the rows where its pair, its conditioning
-set, and those parents are all observed. When too few rows are available, it uses the test-wise
-test instead. The pair then keeps its test-wise result for that conditioning set, and
-`metadata["corrected_edges"]["uncorrected"]` lists the pair. On complete data, MVPC gives the
-test-wise result.
-
-The correction holds when no indicator causes a variable, every independence in the observed rows
-also holds in the missing ones, no indicator is a deterministic function of others, and no value
-causes its own missingness. The data cannot check these conditions. The permutation correction also
-needs linear-Gaussian variables and the paper's two conditions: given `W`, the parents of the
-indicators involved, those indicators are independent of the tested variables, and conditioning on
-the indicators of `W` leaves the tested relation unchanged. The second requires the rows used to
-rebuild the data to preserve the independence of each pair tested. When a variable used to rebuild
-the data goes missing because of a common effect of that pair, the extra edge can stay. This occurs
-in the paper's Figure 1c and when two effects of the same causes each cause the other's missingness.
-The paper's density-ratio correction for those cases is not implemented. `andrey.data.missingness`
-simulates data whose missingness graph you know, to see where the correction helps. The
-[missing values notebook](../examples/missing_values) runs that comparison on one simulated dataset.
-
-On simulated data in the paper's setting, MVPC made fewer errors than test-wise deletion in 10 of
-16 settings where values go missing for a reason and tied in the rest. It also tied where values
-are missing completely at random. At 50 variables and 10,000 rows it made 5.1 errors against 14.3.
-It does not help when every missingness indicator depends weakly on many variables. In that case,
-its search for those variables can take a long time; `max_depth` bounds it. On larger graphs, 50 or
-100 variables with 20 or 30% of the values missing, it made 0.7 to 3.6 more errors than test-wise
-deletion in 12 settings, on two sets of datasets each. The
-[0.16.0 release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data) has the numbers.
-
-A test needs enough rows where its variables are observed: `|S| + 3` for `fisherz` and `student_t`,
-with `|S|` the size of its conditioning set, and 2 for the other tests. A test with fewer rows
-raises a `ValueError` that says so. Drop the columns with the most missing values, or cap the
-conditioning sets with `max_depth` (`max_p_global` in LPCMCI and the same-step phases of PCMCI+). A
-column with no observed value, or with one value throughout, raises before the fit, and so does
-infinity, which is not a missing value. CD-NOD needs a complete `env`.
-
-The searches whose fit reads the data only through their covariance, {{ em_methods }}, cannot delete
-rows per test. They refuse missing values by default, with a message that names `missing="em"`.
-They take `missing="em"` instead: structural EM (Friedman, 1997; [Gao et al., 2022][missdag])
-alternates two steps. Under a linear-Gaussian model of the current graph, it replaces each row's
-missing values by their expected values given the row's observed ones and adds their uncertainty.
-This gives the expected covariance of the data. The search then runs on that covariance over every
-row, and the model is fit again to the graph it returns. It runs 10 rounds. Before each search after
-the first, 5 more steps refit the model on the graph it has, so the search reads a covariance that
-graph's fit has settled on (Friedman's alternating scheme). `metadata["em"]` records whether each
-round changed the graph (`graph_changed`; when the last round still did, the fit logs a warning) and
-the observed-data log-likelihood after each round:
-
-```{code-cell} ipython3
-em = andrey.ges(gappy, missing="em")
-em.metadata["em"]["log_likelihood"][-1]
-```
-
-EM is sound when values are missing completely at random or at random given observed values. When
-whether a value is missing depends on the missing value itself, it has no guarantee. Each fit runs
-the search 10 times, and `missing="em"` takes only `score_func="bic"` and no `env`.
-
-`missing="em"` is supported in `ges`, `hc`, `tabu`, `boss`, `grasp`, and `notears`, where no setting
-we measured was less accurate than a reference implementation on the first datasets and again on
-fresh ones. With about 100 rows, `hc` and `tabu` are often no better than the empty graph, both with
-EM and on complete data. From 500 rows on they were better in every setting. We measured `ges`,
-`boss`, and `grasp` at `ebic_gamma=0.0`, up to 50 variables, against a reference that estimates one
-covariance by EM before its search, a simpler method than structural EM, at two settings of the
-sample size its score counts. `boss` and `grasp` were better than the empty graph in 102 and 103 of
-108 settings. On denser graphs (mean degree 4) `ges` at that penalty was rarely better than the
-empty graph, with EM and on complete data alike.
-
-EM does not always settle within its 10 rounds. In our benchmark the last round still changed the
-graph in 2 to 6% of the fits, and in 20% of `grasp`'s, most often with 50 variables and 100 rows.
-Such a fit logs a warning, and more rows help. EM also costs time: a fit runs the search 10 times
-and the E-step 56 times, and it took 2 to 72 times as long as the same search on complete data. The
-[missing-data
-comparison](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/missing-data.md)
-has every number. In `xges`, `exact_search`, `dagma`, and `calm`, `missing="em"` is experimental: no
-reference implementation exists to compare them with, so the [release
-card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data) reports them beside test-wise
-deletion, dropping rows, and mean imputation.
-
-Every other method raises a `ValueError` that names it: its score or loss reads every variable over
-the same rows, so it cannot delete rows per test. Drop the incomplete rows yourself, with
-`data.dropna()` for a DataFrame, which suits values missing completely at random, or use one of the
-methods above. A time series cannot lose a step without joining the steps around it, so for
-VARMA-LiNGAM, Granger, DYNOTEARS, and J-PCMCI+, fill in the missing steps first.
+conditional-independence test reads only the rows where all of its variables are observed (test-wise
+deletion), which is valid when values are missing completely at random. The argument `missing` names
+the handling: `pc` also takes `missing="mvpc"`, a correction for values that are missing for a
+reason, and {{ em_methods }} take `missing="em"`, structural EM. Every other method refuses missing
+values with a message that says what to do instead. A pair that no test with enough rows could
+decide, as two columns never observed together, is left out of the graph and listed in
+`metadata["undecided_pairs"]`, and an edge that a conditioning set no row could test might have
+removed is listed in `metadata["possibly_separable"]`. The [Missing values](missing-values.md) guide
+maps your data and the reason for its gaps to a handling and its assumptions.
 
 ## Backends and parallelism
 
@@ -850,10 +734,6 @@ graph's, and what ended each measurement. See [Known limits](../benchmarks/0.1.0
   rules with background knowledge.
 - [Perkovic, Kalisch, and Maathuis (2017), Interpreting and Using CPDAGs with Background
   Knowledge][mpdag]: the MPDAG.
-- [Strobl, Visweswaran, and Spirtes (2018), Fast Causal Inference with Non-Random Missingness by
-  Test-Wise Deletion][strobl]: FCI with test-wise deletion.
-- [Tu et al. (2019), Causal Discovery in the Presence of Missing Data][tu]: PC with test-wise
-  deletion.
 - Shimizu et al. (2011), DirectLiNGAM: A Direct Method for Learning a Linear Non-Gaussian
   Structural Equation Model, Journal of Machine Learning Research 12: DirectLiNGAM with prior
   knowledge.
@@ -862,10 +742,6 @@ graph's, and what ended each measurement. See [Known limits](../benchmarks/0.1.0
   claims in a CPDAG.
 - Fang and He (2020), IDA with Background Knowledge, Proceedings of the 36th Conference on
   Uncertainty in Artificial Intelligence, PMLR 124: a path claim on an adjacent pair.
-- Friedman (1997), Learning Belief Networks in the Presence of Missing Values and Hidden
-  Variables, Proceedings of the 14th International Conference on Machine Learning: structural EM.
-- [Gao et al. (2022), MissDAG: Causal Discovery in the Presence of Missing Data with Continuous
-  Additive Noise Models][missdag]: structural EM with a continuous search.
 
 [sachs]: https://doi.org/10.1126/science.1105809
 [pc]: https://doi.org/10.7551/mitpress/1754.001.0001
@@ -873,6 +749,3 @@ graph's, and what ended each measurement. See [Known limits](../benchmarks/0.1.0
 [lingam]: https://www.jmlr.org/papers/v7/shimizu06a.html
 [meek]: https://arxiv.org/abs/1302.4972
 [mpdag]: https://arxiv.org/abs/1707.02171
-[strobl]: https://doi.org/10.1007/s41060-017-0094-6
-[tu]: https://proceedings.mlr.press/v89/tu19a.html
-[missdag]: https://arxiv.org/abs/2205.13869

@@ -85,13 +85,13 @@ assumptions. The circle at `X` leaves that endpoint unresolved. This does not es
 effect from `X` to `Y`. A bidirected edge `X <-> Y` indicates a relation through hidden causes;
 it is not a directed feedback loop and does not identify a particular hidden variable.
 
-FCI, GFCI, BOSS-FCI, GRaSP-FCI, and FCI-JCI return `kind="pag"`, and MMB-by-MMB returns the edges at
-its target as the PAG holds them. RCD, BottomUpParceLiNGAM, and CAM-UV use the same marks without
-the equivalence-class reading: `X -> Y` is an edge they found, `X <-> Y` a pair that RCD links
-through a hidden variable, and `X o-o Y` a pair in the block BottomUpParceLiNGAM leaves unordered,
-which holds the variables a hidden common cause confounds and their observed ancestors, or a pair
-that CAM-UV finds joined through a hidden variable, a common cause or a causal path, whose relation
-it cannot determine. A circle is `CIRCLE=3`, so `X o-> Y` has marks `(3, 2)`:
+FCI, GFCI, BOSS-FCI, GRaSP-FCI, and FCI-JCI return `kind="pag"`. RCD, BottomUpParceLiNGAM, and
+CAM-UV use the same marks without the equivalence-class reading: `X -> Y` is an edge they found, `X
+<-> Y` a pair that RCD links through a hidden variable, and `X o-o Y` a pair in the block
+BottomUpParceLiNGAM leaves unordered, which holds the variables a hidden common cause confounds and
+their observed ancestors, or a pair that CAM-UV finds joined through a hidden variable, a common
+cause or a causal path, whose relation it cannot determine. A circle is `CIRCLE=3`, so `X o-> Y` has
+marks `(3, 2)`:
 
 ```python
 pag = GraphStructure.from_numpy(
@@ -119,20 +119,17 @@ In the PAG fragment, one edge has two arrowheads. In the directed graph, `X -> Y
 are separate directed edges. The endpoint matrix alone cannot distinguish them; retain `kind`
 when saving or converting a graph.
 
-`local_isa_ling` returns a `digraph`: the edges into one variable and into each of its children in
-a linear model whose graph may hold cycles, where a 2-cycle at the variable is two directed edges.
-
 ## Undirected graphs: adjacency without direction
 
 `kind="undirected"` holds `(TAIL, TAIL)` pairs only. Its edges claim no direction, and a moral
-graph's edges also join spouses, two parents of one child that need not be adjacent. `mmpc` and
-`hiton_pc` return the skeleton of their parents-and-children sets by default, an undirected graph,
-and a CPDAG with `structure="cpdag"`. `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `hiton_mb`, `mmmb`,
-and `pcmb` return a CPDAG by default; with `structure="skeleton"` they return its adjacencies as an
-undirected graph, and with `structure="moral"` the moral graph of their Markov blankets. With a
-`target`, the nine return that variable's set as undirected edges. An undirected graph has no CPDAG
-or DAG, so `andrey.metrics.score` scores it on its skeleton alone: `shd` counts the pairs adjacent
-in one graph and not in the other, and no arrowhead metric is reported.
+graph's edges also join spouses, two parents of one child that need not be adjacent. `mmpc` returns
+the skeleton of its parents-and-children sets by default, an undirected graph, and a CPDAG with
+`structure="cpdag"`. `iamb` and `inter_iamb` return a CPDAG by default; with `structure="skeleton"`
+they return its adjacencies as an undirected graph, and with `structure="moral"` the moral graph of
+their Markov blankets. With a `target`, the three return that variable's set as undirected edges. An
+undirected graph has no CPDAG or DAG, so `andrey.metrics.score` scores it on its skeleton alone:
+`shd` counts the pairs adjacent in one graph and not in the other, and no arrowhead metric is
+reported.
 
 ## Temporal graphs
 
@@ -174,12 +171,11 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 
 | Structure | Methods |
 |---|---|
-| `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`, `nogam`, `das`, `gin`, `anm`, `pnl`, `loci`, `skewd`, `skewd_mv`, `icp`, `y_structures`, `ldp`, `ld3`, `cpcm`, `cpcm_graph` |
-| `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `gnies`, `xges`, `ages`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `ldecc`, `local_optimal_adjustment`, `locpc_cde` |
-| `undirected` | `mmpc`, `hiton_pc` |
-| `pag` | `fci`, `gfci`, `boss_fci`, `grasp_fci`, `fci_jci`, `mmb_by_mmb`, `rcd`, `bottom_up_parce_lingam`, `camuv` |
-| `digraph` | `local_isa_ling` |
-| `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `dynotears` |
+| `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`, `nogam`, `das`, `gin`, `anm`, `pnl`, `loci`, `icp`, `cpcm`, `cpcm_graph`, `skewd`, `skewd_mv` |
+| `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `gnies`, `xges`, `lges`, `ages`, `hc`, `tabu`, `exact_search`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`, `iamb`, `inter_iamb` |
+| `undirected` | `mmpc` |
+| `pag` | `fci`, `gfci`, `boss_fci`, `grasp_fci`, `fci_jci`, `rcd`, `bottom_up_parce_lingam`, `camuv` |
+| `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `rpcmci`, `granger`, `dynotears` |
 
 `cdnod` returns kind `cpdag`, but its graph is only partially directed: the domain index orients
 edges that the CPDAG of observational data leaves undirected, so score it against the graph CD-NOD
@@ -198,25 +194,6 @@ sparser CPDAGs that GES returns at higher penalties, so score it against the gra
 identify rather than the true DAG's CPDAG. `metadata["path_penalties"]` lists the penalties of
 those CPDAGs and `metadata["path_aggregated"]` whether each one's directions were taken.
 
-`y_structures` returns a `dag` with no edges: it claims that one variable is a causal ancestor of
-another, which is not an edge, so its claims are records in `metadata["effects"]`, and a pair
-without a record is not claimed either way.
-
-`ldp` returns a `dag` with no edges: its labels say how each column relates to the pair, which is
-not an edge, so its answer, an adjustment set or none, is a record in `metadata["effects"]`. `ld3`
-returns a `dag` whose only edges point into its `outcome`, from the parents it finds, the
-`treatment` among them when the structural direct criterion holds. `locpc_cde` returns a `cpdag`,
-the local essential graph it learned around its `outcome`: the edges at the variables it visited,
-directed where its tests decide, and its answer is a record in `metadata["effects"]`.
-
-`ldecc` returns a `cpdag` that holds only the edges at its `treatment`, as `mb_by_mb`'s does at its
-`target`: an absent edge away from the treatment means nothing. Its answer, the locally valid parent
-sets for the effect on its `outcome`, is a record in `metadata["effects"]`.
-
-`local_optimal_adjustment` returns a `cpdag` over every column with only the edges at its two
-`variables`, as their own searches directed them: an absent edge away from the two means nothing.
-Its answers, one per direction, are two records in `metadata["effects"]`.
-
 `fci_jci` returns a `pag` over the data variables alone. The environment index is not a node:
 `metadata["index_edges"]` lists its edges as `[variable, kind]` pairs, `"directed"` for
 `index -> variable`, `"partially_directed"` for `index o-> variable`, and `"bidirected"` for
@@ -229,6 +206,10 @@ make it a target of the change, so `fci_jci` lists no `changing_variables`. With
 `changing_variables` either: the links of its dummies, in `metadata["index_edges"]` and
 `metadata["time_index_edges"]`, stand in for the hidden contexts, and the links of the measured
 contexts are in `metadata["context_links"]`.
+
+`rpcmci` returns a {py:class}`~andrey.RegimeOutput`: `regimes` holds the regime of each time step,
+`weights` the regime weights it comes from, and `outputs[k]` a `StructureOutput` over the
+`TemporalStructure` of regime `k`, lags 1 to `tau_max`, as `pcmci` returns it.
 
 `icp` returns a `dag` whose only edges point into its `target`, from the parents it estimates; an
 absent edge says nothing about the pair.

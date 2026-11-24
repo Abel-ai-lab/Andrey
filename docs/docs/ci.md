@@ -9,21 +9,25 @@ meta:
 
 # Testing
 
-Every pull request, from a fork too, runs the full test suite on Linux with every extra, on Python
-3.11 and 3.14, and the recovery tests without the extras. Each job uses all of the runner's cores
-with pytest-xdist, and the full suite is split into two jobs per Python version, which together run
-every test once with the same results as one core. One that changes the code also builds and
+Every pull request, from a fork too, runs the test suite on Linux with every extra, on Python 3.11
+and 3.14, and the recovery tests without the extras. That suite holds the unit tests, at least one
+cheap recovery check per method, and the fast consistency tests. The heavy accuracy checks, such as
+large-input repeats and campaign-style recovery cells, are marked `release`: a pull request into a
+release or topic branch skips them, and the release pull request into `main`, a push to `main`, a
+manual run, and the tag's site deploy run them. Each job uses all of the runner's cores with
+pytest-xdist, and the suite is split into two jobs per Python version, which together run every test
+once with the same results as one core. A pull request that changes the code also builds and
 installs the wheel, and one that changes the code, the documentation, or the notebooks builds this
 website and reruns every notebook, which must reproduce the outputs the website shows. NumPy in
 float64 is the reference: the PyTorch paths must match its results and repeat exactly.
 
-Each release's pull request into `main` runs a quality gate that fits every supported method
-({{ n_supported }}) and the supported nonlinear tests to data with known graphs, and many of them
-to the Sachs data too, and the release merges only when every method passes. A push that changes
-only the documentation, the website's files, or a top-level Markdown file such as the CHANGELOG
-reuses the last passing run instead of fitting the methods again. The publish reuses a run when the
-tagged commit has the same files as the commit the gate checked, and runs the gate again when it
-does not.
+Each release's pull request into `main` runs every test, the `release`-marked checks included, and
+a quality gate that fits every supported method ({{ n_supported }}) and the supported nonlinear
+tests to data with known graphs, and many of them to the Sachs data too, and the release merges only
+when every method passes. A push that changes only the documentation, the website's files, or a
+top-level Markdown file such as the CHANGELOG reuses the last passing run instead of fitting the
+methods again. The publish reuses a run when the tagged commit has the same files as the commit the
+gate checked, and runs the gate again when it does not.
 
 The quality gate also reads the published benchmarks and flags any row where the reference package
 makes significantly fewer errors: the paired 95% interval of the difference in errors, over at

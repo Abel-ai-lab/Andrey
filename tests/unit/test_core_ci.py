@@ -275,16 +275,14 @@ def _shared_set_cases(seed: int, d: int = 60):
 def test_a_shared_set_agrees_with_each_query_to_rounding(test_class, seed):
     """From one factor of the set's block, every candidate's partial correlation agrees with the
     per-query inversion to 1e-12, every p-value above 1e-300 to 1e-9 relative and on the same side
-    of 0.05, and the call counts one test per candidate."""
+    of 0.05."""
     x = sample_scm(graph="erdos_renyi", d=60, n=300, seed=seed, density=3.0).data
     test = test_class(x)
     for target, ys, cond in _shared_set_cases(seed):
-        with ci.counting_tests() as counted:
-            r, p = test.statistic_pvalues_given(target, ys.tolist(), cond.tolist())
+        r, p = test.statistic_pvalues_given(target, ys.tolist(), cond.tolist())
         want_r, want_p = test.statistic_pvalues(
             np.full(len(ys), target), ys, np.tile(cond, (len(ys), 1))
         )
-        assert counted.n == len(ys)
         np.testing.assert_allclose(r, want_r, rtol=0.0, atol=1e-12)
         above = want_p > 1e-300
         np.testing.assert_allclose(p[above], want_p[above], rtol=1e-9, atol=0.0)
@@ -391,6 +389,30 @@ def test_the_shared_scan_setting_moves_the_cutoff_in_both_directions(monkeypatch
             monkeypatch.setenv("ANDREY_SHARED_SCAN_MIN_WORK", setting)
         test.statistic_pvalues_given(0, scan, cond)
         assert factored == expected, (setting, len(scan))
+
+
+def test_a_declined_factor_runs_the_per_query_path_in_chunks(monkeypatch):
+    """A large scan whose factor is declined is answered by ``statistic_pvalues`` in chunks of at
+    most ``FALLBACK_STACK_ENTRIES`` submatrix entries, with the bits of one call over the whole
+    scan."""
+    test = FisherZ(_forty_columns())
+    cond = [3, 4, 5]
+    ys = [y for y in range(1, 40) if y not in cond]
+    monkeypatch.setattr(ci.PartialCorrelationTest, "_schur_partial_correlations", lambda *a: None)
+    monkeypatch.setattr(ci, "FALLBACK_STACK_ENTRIES", 5 * 25)  # five candidates of block size 5
+    calls = []
+    real = ci.PartialCorrelationTest.statistic_pvalues
+    monkeypatch.setattr(
+        ci.PartialCorrelationTest,
+        "statistic_pvalues",
+        lambda self, x, y, c: calls.append(len(y)) or real(self, x, y, c),
+    )
+    r, p = test.statistic_pvalues_given(0, ys, cond)
+    assert calls == [5] * (len(ys) // 5) + ([len(ys) % 5] if len(ys) % 5 else [])
+    want_r, want_p = real(
+        test, np.zeros(len(ys), dtype=np.intp), np.array(ys), np.tile(cond, (len(ys), 1))
+    )
+    assert r.tobytes() == want_r.tobytes() and p.tobytes() == want_p.tobytes()
 
 
 def test_a_bad_shared_scan_setting_raises_naming_the_variable(monkeypatch):

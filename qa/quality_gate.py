@@ -8,9 +8,7 @@ scored by the benchmark harness, and environments for a method that names one va
 PC runs with each supported nonlinear conditional-independence test on the published nonlinear
 regimes. On each dataset, the median SHD over the draws must be below the empty graph's and within
 the tolerance of its recorded baseline; a method that estimates a set of variables, such as one
-variable's parents, counts its false and missed members instead (:func:`set_errors`), and one that
-answers the edges at a single variable counts the errors at that variable alone, or in its local
-structure (:func:`local_errors`).
+variable's parents, counts its false and missed members instead (:func:`set_errors`).
 ``quality_baselines.json`` holds the baselines and, in one block, every tolerance with the reason
 for its size. Before any fit, the gate runs :mod:`qa.reference_parity` over the published
 benchmark summaries as a soft gate: it prints the rows where Andrey makes more errors than the
@@ -42,7 +40,7 @@ import numpy as np
 from threadpoolctl import threadpool_limits
 
 import andrey
-from andrey import GraphStructure, StructureOutput, data, metrics
+from andrey import GraphStructure, data, metrics
 from andrey.core import ARROW, LATENT, OBSERVED, TAIL
 from andrey.data.interventions import hard
 from andrey.data.latent import marginal
@@ -67,7 +65,6 @@ import ut_igsp_cpu  # noqa: E402
 from andrey_bench import (  # noqa: E402
     datasets,
     lingam_models,
-    local_ling_models,
     regime_models,
     scoring,
     svar_models,
@@ -758,14 +755,7 @@ def draws(dataset: str) -> tuple[Draw, ...]:
 #: domain index orients the edges it reaches. ``clusters`` counts the latents missed
 #: (:func:`latents_missed`). ``parents`` scores the parents of the last variable as a set
 #: (:func:`set_errors`), and ``targets`` each setting's learned targets (:func:`target_errors`).
-#: ``target_cpdag`` and ``target_pag`` score the edges at the last variable against the CPDAG's
-#: and the PAG's, as the missing, extra, and mismarked edges there
-#: (:func:`~andrey.metrics.target_edge_scores`). ``ancestors`` scores a set of claimed
-#: ancestral pairs against the truth's ancestral pairs, the false claims plus the true pairs
-#: not claimed (:func:`set_errors`). ``local_dag`` scores the edges into and out of the last
-#: variable and into each of its children, each graph's own, against the DAG's
-#: (:func:`local_errors`). ``direct``
-#: scores the directed edges against those between observed variables that no hidden
+#: ``direct`` scores the directed edges against those between observed variables that no hidden
 #: path joins (:func:`direct`). ``index_pag`` scores the PAG over the variables and the environment
 #: index by its endpoints against the one the draw records. A time-series estimate is scored in its
 #: published summary's unit (:func:`series_error`).
@@ -777,9 +767,6 @@ Target = Literal[
     "essential",
     "clusters",
     "parents",
-    "target_cpdag",
-    "target_pag",
-    "local_dag",
     "direct",
     "index_pag",
     "lagged",
@@ -788,7 +775,6 @@ Target = Literal[
     "cross_links",
     "lagged_edges",
     "targets",
-    "ancestors",
 ]
 SERIES_TARGETS = ("lagged", "window", "window_edges", "cross_links", "lagged_edges")
 
@@ -810,10 +796,13 @@ def _sizes(regime: str) -> tuple[str, ...]:
 # approximately. RCD and BottomUpParceLiNGAM run on their benchmark regime only: on ASIA's 1,000
 # rows RCD marks most pairs <-> and scores worse than the empty graph, and on Sachs
 # BottomUpParceLiNGAM does. ANM and PNL take one pair of variables, so each runs on its benchmark's
-# pairs only. GIES, GnIES, CD-NOD, MultiGroupDirectLiNGAM, and GIN need what only their regimes
-# have: interventions, environments that change noise variances, domains, groups, or latents
-# measured by indicators. CAM-UV runs on its benchmark's nonlinear regimes with hidden variables.
-# SCORE and NoGAM run on their papers' simulation: Gaussian-process links with additive noise.
+# pairs only. CPCM's pair test runs with the Gaussian location-scale family on the location-scale
+# pairs, and its graph search with the fixed-scale Gaussian family, an additive-noise model, on
+# CAM's and RESIT's additive-noise regime at 5 variables, the size of its benchmark's additive-noise
+# graphs. GIES, GnIES, CD-NOD, MultiGroupDirectLiNGAM, and GIN need what only their regimes have:
+# interventions, environments that change noise variances, domains, groups, or latents measured by
+# indicators. CAM-UV runs on its benchmark's nonlinear regimes with hidden variables.
+# SCORE, NoGAM, and DAS run on their papers' simulation: Gaussian-process links with additive noise.
 # NOTEARS runs on its benchmark's cells, the simulation its claim is measured in: its least-squares
 # fit reads the columns' units, so one cell has standardized columns and one raw. DAGMA runs on the
 # raw cell only: on standardized columns its median SHD is not below the empty graph's by a clear
@@ -823,27 +812,15 @@ def _sizes(regime: str) -> tuple[str, ...]:
 CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss", "sachs")
 SMALL_DATA = (*(f"linear_gauss_er_d{d}" for d, _ in SMALL_SIZES), "asia_gauss", "sachs")
 CALM_DATA = (SMALL_DATA[0], "asia_gauss")
-#: Y-structures claim ancestors from the patterns the data show, on linear-Gaussian data from a
-#: DAG without selection, which keeps its claims valid.
-ANCESTOR_DATA = (*_sizes("linear_gauss_er"), "asia_gauss")
 PAG_DATA = (*_sizes("latent_gauss_er"), "asia_gauss", "sachs")
-#: MB-by-MB, CMB, LDECC, LOAD, and LocPC-CDE are scored at one variable, the last column. Sachs has
-#: one draw, and at its last column, jnk, MB-by-MB, CMB, LDECC, and LOAD each find at most one of
-#: the two edges, as PC does: none scores below the empty answer there.
-TARGET_CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss")
-#: MMB-by-MMB answers one variable, the last column. Sachs has one draw, and at its last column,
-#: jnk, the fit finds one of the two edges, as FCI does, and gets its marks wrong: its SHD there
-#: equals the empty answer's.
-TARGET_PAG_DATA = (*_sizes("latent_gauss_er"), "asia_gauss")
 LINGAM_DATA = (*_sizes("lingam_sf"), "asia_lingam", "sachs")
-#: Local ISA-LiNG answers one variable, the last column; Sachs is left out (qa/README.md).
-LOCAL_LINGAM_DATA = (*_sizes("lingam_sf"), "asia_lingam")
 CONFOUNDED_DATA = _sizes("latent_lingam_er")
 INTERVENTION_DATA = tuple(f"interventional_gauss_er_d{d}" for d, _ in INTERVENTION_SIZES)
 NOISE_INTERVENTION_DATA = tuple(NOISE_INTERVENTION_CELLS)
 #: CAM-UV needs nonlinear additive-noise data with hidden variables.
 HIDDEN_CAUSE_DATA = tuple(HIDDEN_CAUSE_CELLS)
-#: SCORE and NoGAM need additive-noise data; each runs on the cells of its claim.
+#: SCORE, NoGAM, and DAS need additive-noise data; each runs on the cells of its claim, DAS on
+#: SCORE's, since it fits the same model.
 SCORE_DATA = ("score_paper_standardized_d10_er1", "score_paper_standardized_d20_er4")
 NOGAM_DATA = (
     "score_paper_laplace_standardized_d10_er1",
@@ -943,36 +920,18 @@ def ut_igsp_fit(x: np.ndarray) -> Any:
     return andrey.ut_igsp(samples, env, targets={0: [], **known})
 
 
-def y_structures_claims(x: np.ndarray) -> set[tuple[int, int]]:
-    """Return the ancestral pairs ``(cause, effect)`` ``andrey.y_structures`` claims on ``x``."""
-    effects = andrey.y_structures(x).metadata["effects"]
-    return {(e["treatment"], e["outcome"]) for e in effects}
-
-
 def ut_igsp_targets(x: np.ndarray) -> list[list[int]]:
     """The targets :func:`ut_igsp_fit` returns for each setting, given and learned."""
     learned = ut_igsp_fit(x).metadata["targets"]
     return [learned[k] for k in range(1, len(unknown_target_unstack(x)[2]) + 1)]
 
 
-def locpc_cde_at_last(x: np.ndarray) -> StructureOutput:
-    """LocPC-CDE with the last column as the outcome and the column most correlated with it as the
-    treatment, which is then usually adjacent to it, so the search runs past its early stop and
-    orients the edges at the outcome."""
-    strength = np.abs(np.corrcoef(x, rowvar=False)[-1, :-1])
-    return andrey.locpc_cde(x, treatment=int(np.argmax(strength)), outcome=x.shape[1] - 1)
-
-
-#: Public defaults, except MMPC, HITON-PC, and RSMAX2: MMPC and HITON-PC return a skeleton by
-#: default, so the gate fits their CPDAG, and RSMAX2's default restrict phase is MMHC's, so the gate
-#: fits its IAMB restrict phase. MB-by-MB, CMB, MMB-by-MMB, and local ISA-LiNG answer one variable,
-#: the last column; LDECC takes it as the treatment and the first column as the outcome, LOAD takes
-#: the two as its variables, LocPC-CDE takes it as the outcome (:func:`locpc_cde_at_last`), and each
-#: is scored by its edges at the last column. A fixed seed pins the search orders of BOSS, GRaSP,
-#: BOSS-FCI, and GRaSP-FCI, FastICA's start, and CALM's optimizer. CD-NOD and
-#: MultiGroupDirectLiNGAM run through their benchmark adapters, which call the public functions with
-#: the published settings: the domain index of four equal blocks of rows, and three groups of
-#: columns.
+#: Public defaults, except MMPC and RSMAX2: MMPC returns a skeleton by default, so the gate fits its
+#: CPDAG, and RSMAX2's default restrict phase is MMHC's, so the gate fits its IAMB restrict phase. A
+#: fixed seed pins the search orders of BOSS, GRaSP, BOSS-FCI, and GRaSP-FCI, FastICA's start, and
+#: CALM's optimizer. CD-NOD and MultiGroupDirectLiNGAM run through their benchmark adapters, which
+#: call the public functions with the published settings: the domain index of four equal blocks of
+#: rows, and three groups of columns.
 SUPPORTED: dict[str, Method] = {
     "PC": Method(lambda x: andrey.pc(x), "cpdag", CPDAG_DATA),
     "FCI": Method(lambda x: andrey.fci(x), "pag", PAG_DATA),
@@ -981,8 +940,6 @@ SUPPORTED: dict[str, Method] = {
     "FCI-JCI": Method(fci_jci_fit, "index_pag", INDEX_PAG_DATA),
     "IAMB": Method(lambda x: andrey.iamb(x), "cpdag", CPDAG_DATA),
     "InterIAMB": Method(lambda x: andrey.inter_iamb(x), "cpdag", CPDAG_DATA),
-    "GS": Method(lambda x: andrey.gs(x), "cpdag", CPDAG_DATA),
-    "FastIAMB": Method(lambda x: andrey.fast_iamb(x), "cpdag", CPDAG_DATA),
     "GES": Method(lambda x: andrey.ges(x), "cpdag", CPDAG_DATA),
     "GIES": Method(gies_fit, "essential", INTERVENTION_DATA),
     "GnIES": Method(gnies_fit, "essential", NOISE_INTERVENTION_DATA),
@@ -993,34 +950,13 @@ SUPPORTED: dict[str, Method] = {
     "HC": Method(lambda x: andrey.hc(x), "cpdag", CPDAG_DATA),
     "Tabu": Method(lambda x: andrey.tabu(x), "cpdag", CPDAG_DATA),
     "MMPC": Method(lambda x: andrey.mmpc(x, structure="cpdag"), "cpdag", CPDAG_DATA),
-    "HITONPC": Method(lambda x: andrey.hiton_pc(x, structure="cpdag"), "cpdag", CPDAG_DATA),
-    "PCMB": Method(lambda x: andrey.pcmb(x), "cpdag", CPDAG_DATA),
-    "MB-by-MB": Method(
-        lambda x: andrey.mb_by_mb(x, target=x.shape[1] - 1), "target_cpdag", TARGET_CPDAG_DATA
-    ),
-    "HITONMB": Method(lambda x: andrey.hiton_mb(x), "cpdag", CPDAG_DATA),
-    "MMMB": Method(lambda x: andrey.mmmb(x), "cpdag", CPDAG_DATA),
-    "Y-structures": Method(y_structures_claims, "ancestors", ANCESTOR_DATA),
-    "CMB": Method(
-        lambda x: andrey.cmb(x, target=x.shape[1] - 1), "target_cpdag", TARGET_CPDAG_DATA
-    ),
-    "LDECC": Method(
-        lambda x: andrey.ldecc(x, treatment=x.shape[1] - 1, outcome=0),
-        "target_cpdag",
-        TARGET_CPDAG_DATA,
-    ),
-    "LocalOptimalAdjustment": Method(
-        lambda x: andrey.local_optimal_adjustment(x, variables=[x.shape[1] - 1, 0]),
-        "target_cpdag",
-        TARGET_CPDAG_DATA,
-    ),
-    "LocPCCDE": Method(locpc_cde_at_last, "target_cpdag", TARGET_CPDAG_DATA),
     "MMHC": Method(lambda x: andrey.mmhc(x), "cpdag", CPDAG_DATA),
     "RSMAX2": Method(lambda x: andrey.rsmax2(x, restrict="iamb"), "cpdag", CPDAG_DATA),
     "CAM": Method(lambda x: andrey.cam(x), "dag", ("anm_er_n1000_d20", "anm_er_n1000_d50")),
     "RESIT": Method(lambda x: andrey.resit(x), "dag", ("anm_er_n1000_d5", "anm_er_n1000_d10")),
     "ScoreMatching": Method(lambda x: andrey.score_matching(x), "dag", SCORE_DATA),
     "NoGAM": Method(lambda x: andrey.nogam(x), "dag", NOGAM_DATA),
+    "DAS": Method(lambda x: andrey.das(x), "dag", SCORE_DATA),
     "ExactSearch": Method(lambda x: andrey.exact_search(x), "cpdag", SMALL_DATA),
     "CALM": Method(lambda x: andrey.calm(x, seed=0), "cpdag", CALM_DATA),
     "NOTEARS": Method(lambda x: andrey.notears(x), "dag", tuple(LINEAR_SEM_CELLS)),
@@ -1029,15 +965,9 @@ SUPPORTED: dict[str, Method] = {
     "GRaSP": Method(lambda x: andrey.grasp(x, seed=0), "cpdag", CPDAG_DATA),
     "BOSS-FCI": Method(lambda x: andrey.boss_fci(x, seed=0), "pag", PAG_DATA),
     "GRaSP-FCI": Method(lambda x: andrey.grasp_fci(x, seed=0), "pag", PAG_DATA),
-    "MMB-by-MMB": Method(
-        lambda x: andrey.mmb_by_mmb(x, target=x.shape[1] - 1), "target_pag", TARGET_PAG_DATA
-    ),
     "UT-IGSP": Method(ut_igsp_fit, "essential", UNKNOWN_TARGET_DATA),
     "DirectLiNGAM": Method(lambda x: andrey.direct_lingam(x), "dag", LINGAM_DATA),
     "ICA-LiNGAM": Method(lambda x: andrey.ica_lingam(x, seed=0), "dag", LINGAM_DATA),
-    "LocalISALiNG": Method(
-        lambda x: andrey.local_isa_ling(x, target=x.shape[1] - 1), "local_dag", LOCAL_LINGAM_DATA
-    ),
     "MultiGroupDirectLiNGAM": Method(
         _adapted(AndreyMultiGroupDirectLiNGAM()), "dag", _models("multi_group_er")
     ),
@@ -1050,6 +980,10 @@ SUPPORTED: dict[str, Method] = {
     "ANM": Method(lambda x: andrey.anm(x), "dag", (f"anm_pair_n{PAIR_N}",)),
     "PNL": Method(lambda x: andrey.pnl(x), "dag", (f"pnl_pair_n{PAIR_N}",)),
     "LOCI": Method(lambda x: andrey.loci(x), "dag", (f"lsnm_pair_n{PAIR_N}",)),
+    "CPCM": Method(lambda x: andrey.cpcm(x, family="gaussian"), "dag", (f"lsnm_pair_n{PAIR_N}",)),
+    "CPCMGraph": Method(
+        lambda x: andrey.cpcm_graph(x, family="gaussian_fixed_scale"), "dag", ("anm_er_n1000_d5",)
+    ),
     # Time series: the published settings (lags, levels, and order), on the published regimes.
     "PCMCI": Method(
         _adapted(AndreyPCMCI(name="pcmci", indep_test="student_t", tau_max=2)),
@@ -1156,27 +1090,24 @@ def direct(truth: GraphStructure) -> GraphStructure:
 def target_truth(truth: GraphStructure, target: Target) -> GraphStructure:
     """Return what an estimate scored as ``target`` is compared with, as in the published summary.
 
-    A CPDAG, or the CPDAG's edges at one variable, is scored against the truth's CPDAG, a DAG
-    against the DAG, a PAG, or the PAG's edges at one variable, against the PAG of the observed
-    variables, a ``projection`` estimate against :func:`projection`, and a ``direct`` one
-    against :func:`direct`.
+    A CPDAG is scored against the truth's CPDAG, a DAG against the DAG, a PAG against the PAG of
+    the observed variables, a ``projection`` estimate against :func:`projection`, and a ``direct``
+    one against :func:`direct`.
     """
     if target == "direct":
         return direct(truth)
-    if target in ("pag", "target_pag"):
+    if target == "pag":
         return marginal(truth, "pag", max_nodes=truth.n_nodes)
     if target == "projection":
         return projection(truth)
-    if target in ("cpdag", "target_cpdag"):
+    if target == "cpdag":
         return metrics.to_cpdag(truth)
     return truth
 
 
 def shd(estimate: object, truth: GraphStructure, target: Target) -> int:
     """Return the SHD of ``estimate`` against ``target_truth``; PAG-like targets count endpoints,
-    ``clusters`` the latents missed, ``parents`` the errors in the last variable's parents,
-    ``target_cpdag`` and ``target_pag`` the missing, extra, and mismarked edges at the last
-    variable, ``local_dag`` the errors in its local structure (:func:`local_errors`), and
+    ``clusters`` the latents missed, ``parents`` the errors in the last variable's parents, and
     ``direct`` the directed edges in one graph and not the other, a reversed edge twice."""
     if target == "direct":
         return len(directed(estimate) ^ directed(truth))
@@ -1185,45 +1116,12 @@ def shd(estimate: object, truth: GraphStructure, target: Target) -> int:
     if target == "parents":
         last = truth.n_nodes - 1
         return set_errors(parents_of(estimate, last), parents_of(truth, last))
-    if target == "ancestors":
-        return set_errors(estimate, ancestral_pairs(truth))
-    if target in ("target_cpdag", "target_pag"):
-        return int(metrics.target_edge_scores(estimate, truth, truth.n_nodes - 1)["shd"])
-    if target == "local_dag":
-        return local_errors(estimate, truth)
     if target == "cpdag":
         estimate = metrics.to_cpdag(estimate)
     return metrics.shd(estimate, truth, endpoint_aware=target in ("pag", "projection", "index_pag"))
 
 
-def edge_matrix(graph: Any) -> np.ndarray:
-    """Return ``m`` with ``m[i, j]`` true for each edge ``i -> j`` of ``graph``, a structure or an
-    output; a ``digraph``'s 2-cycle, two arrowheads, is both of its edges."""
-    marks = getattr(graph, "structure", graph).to_numpy()
-    return (marks.T == ARROW) & ((marks == TAIL) | (marks == ARROW))
-
-
-def local_errors(estimate: Any, truth: GraphStructure) -> int:
-    """Return the SHD between the local structures of ``estimate`` and ``truth`` at the last
-    variable: the edges into and out of it and into each of its children, each graph's own.
-
-    An adjacency in one local structure and not the other counts one, and so does an edge of the
-    estimate whose reverse alone is true, as the published local LiNG lane counts them
-    (``andrey_bench.local_ling_models.local_scores``). The empty answer makes as many errors as
-    the true local structure has edges.
-    """
-    local = local_ling_models.local_scores(
-        edge_matrix(estimate), edge_matrix(truth), truth.n_nodes - 1
-    )
-    return int(local["shd"])
-
-
-def ancestral_pairs(truth: GraphStructure) -> set[tuple[int, int]]:
-    """Return the pairs ``(i, j)`` for which ``i`` is a proper ancestor of ``j`` in ``truth``."""
-    return {(i, j) for j in range(truth.n_nodes) for i in truth.ancestors(j, index=True)}
-
-
-def set_errors(estimate: set, truth: set) -> int:
+def set_errors(estimate: set[int], truth: set[int]) -> int:
     """Return the members of ``estimate`` not in ``truth`` plus those of ``truth`` it misses.
 
     It scores a method that estimates a set of variables, such as one variable's parents, as SHD
@@ -1242,13 +1140,7 @@ def latents_missed(estimate: Any, truth: GraphStructure) -> int:
 
 
 def empty_graph(n_nodes: int, target: Target) -> GraphStructure:
-    kind = {
-        "projection": "pag",
-        "index_pag": "pag",
-        "target_cpdag": "cpdag",
-        "target_pag": "pag",
-        "local_dag": "digraph",
-    }.get(target, target)
+    kind = "pag" if target in ("projection", "index_pag") else target
     return GraphStructure.from_numpy(np.zeros((n_nodes, n_nodes), dtype=np.int8), kind=kind)
 
 
@@ -1297,8 +1189,6 @@ def empty_estimate(draw: Draw, target: Target) -> Any:
         return np.zeros_like(truth)
     if target == "essential":  # GIES's and GnIES's data hold the targets or environments too
         return empty_graph(truth.n_nodes, "cpdag")
-    if target == "ancestors":
-        return set()
     if target == "parents":  # the data hold each row's environment beside the variables
         return empty_graph(truth.n_nodes, "dag")
     if target == "clusters":
@@ -1422,6 +1312,7 @@ def cells(methods: list[str] | None = None) -> list[tuple[str, str]]:
 SLOWEST_FIRST: tuple[tuple[str, str], ...] = (
     ("NOTEARS", "notears_paper_standardized_d50"),
     ("CMIknn", "anm_er_d5"),
+    ("CPCMGraph", "anm_er_n1000_d5"),
     ("CALM", "linear_gauss_er_d10"),
     ("BottomUpParceLiNGAM", "latent_lingam_er_d15"),
     ("CAM-UV", "latent_anm_er_tenth_d22_n1000"),
@@ -1448,6 +1339,8 @@ SLOWEST_FIRST: tuple[tuple[str, str], ...] = (
     ("GPDC", "nonmonotone_er_d5"),
     ("ExactSearch", "linear_gauss_er_d15"),
     ("ScoreMatching", "score_paper_standardized_d10_er1"),
+    ("DAS", "score_paper_standardized_d20_er4"),
+    ("DAS", "score_paper_standardized_d10_er1"),
     ("DAGMA", "notears_paper_raw_d10"),
     ("NOTEARS", "notears_paper_raw_d10"),
 )

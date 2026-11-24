@@ -127,26 +127,27 @@ def _regress_residual(cause: np.ndarray, effect: np.ndarray) -> np.ndarray:
     return effect - prediction
 
 
-def anm(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float, float]:
-    """Return ``(log_p_forward, log_p_backward, stat_forward, stat_backward)`` for ``x, y``.
+def anm(
+    forward: tuple[np.ndarray, np.ndarray], backward: tuple[np.ndarray, np.ndarray]
+) -> tuple[float, float, float, float]:
+    """Return ``(log_p_forward, log_p_backward, stat_forward, stat_backward)`` for a pair.
 
-    ``log_p_forward`` is the natural logarithm of the HSIC independence p-value between ``x`` and
-    the residual of the Gaussian process regressing ``y`` on ``x`` (the ``x -> y`` hypothesis);
-    ``log_p_backward`` is the same quantity with the roles swapped (the ``y -> x`` hypothesis). A
-    larger p-value means the input and residual are more independent, so it favors that direction;
-    the logarithms keep their order where the p-values underflow (:mod:`andrey.core.independence`).
-    ``stat_forward`` and ``stat_backward`` are the HSIC statistics of the same two tests, each
-    divided by its mean under independence; a smaller value means weaker dependence. ``x`` and
-    ``y`` are 1-D arrays of equal length.
+    ``forward`` holds the ``(cause, effect)`` columns of the ``x -> y`` hypothesis and ``backward``
+    those of ``y -> x``, each a pair of 1-D arrays of equal length; the caller orders each
+    direction's rows (:func:`andrey.api._irregular.direction_tables`). ``log_p_forward`` is the
+    natural logarithm of the HSIC independence p-value between ``x`` and the residual of the
+    Gaussian process regressing ``y`` on ``x``; ``log_p_backward`` is the same quantity with the
+    roles swapped. A larger p-value means the input and residual are more independent, so it favors
+    that direction; the logarithms keep their order where the p-values underflow
+    (:mod:`andrey.core.independence`). ``stat_forward`` and ``stat_backward`` are the HSIC
+    statistics of the same two tests, each divided by its mean under independence; a smaller value
+    means weaker dependence.
     """
-    # Contiguous, as the regressor stores its training data, so the objective's sums run alike.
-    cause = np.ascontiguousarray(x, dtype=np.float64).reshape(-1, 1)
-    effect = np.ascontiguousarray(y, dtype=np.float64).reshape(-1, 1)
-
-    residual_effect = _regress_residual(cause, effect)
-    stat_forward, log_p_forward = hsic_statistic_log_p(cause, residual_effect)
-
-    residual_cause = _regress_residual(effect, cause)
-    stat_backward, log_p_backward = hsic_statistic_log_p(effect, residual_cause)
-
+    results = []
+    for cause, effect in (forward, backward):
+        # Contiguous, as the regressor stores its training data, so the objective's sums run alike.
+        cause = np.ascontiguousarray(cause, dtype=np.float64).reshape(-1, 1)
+        effect = np.ascontiguousarray(effect, dtype=np.float64).reshape(-1, 1)
+        results.append(hsic_statistic_log_p(cause, _regress_residual(cause, effect)))
+    (stat_forward, log_p_forward), (stat_backward, log_p_backward) = results
     return log_p_forward, log_p_backward, stat_forward, stat_backward

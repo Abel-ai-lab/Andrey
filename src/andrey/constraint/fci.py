@@ -23,6 +23,7 @@ from andrey.constraint._skeleton import (
     canonical_capable,
     check_collider_rule,
     first_separating_subset,
+    flagged_triples,
     unseparated_triples,
     vote_triples,
 )
@@ -35,6 +36,12 @@ from andrey.constraint.pc import (
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
 from andrey.core._bitset import row_masks, semidirected_reach_set
 from andrey.core.ci import CITest, make_indep_test, pins_blas
+from andrey.core.ci_missing import (
+    TestwiseDeletion,
+    counts_its_tests,
+    keeps_no_untested_sets,
+    running_flags,
+)
 from andrey.core.orient import separating_set
 from andrey.core.ties import tie_mask, tie_ranks
 
@@ -47,6 +54,8 @@ _R4_PARTIAL_PATHS = 10_000
 _R5_PARTIAL_PATHS = 10_000
 
 
+@counts_its_tests
+@keeps_no_untested_sets
 def fci(
     data: np.ndarray,
     *,
@@ -84,9 +93,13 @@ def fci(
     (:func:`~andrey.constraint.pc.adjacency_search`), and :func:`knowledge_marks` sets their
     endpoints before the orientation rules, which change circles only. A triple over a
     non-adjacent pair with no separating set is neither a collider nor a non-collider to any rule
-    (:func:`~andrey.constraint._skeleton.unseparated_triples`). An
-    arrowhead the knowledge puts at ``x`` on an edge ``x - y`` while its required edges lead from
-    ``x`` to ``y`` raises ``ValueError`` (:func:`possible_dsep_step`). ``workers`` worker processes
+    (:func:`~andrey.constraint._skeleton.unseparated_triples`), and so, inside a
+    :func:`~andrey.core.ci_missing.reading_flags` block, is a triple with a side a conditioning set
+    no row could test might have separated
+    (:func:`~andrey.constraint._skeleton.flagged_triples`), in the collider pass before the
+    possible-d-sep step (:func:`flagged_sides`), after it, and in R4. An arrowhead the knowledge
+    puts at ``x`` on an edge ``x - y`` while its required edges lead from ``x`` to ``y`` raises
+    ``ValueError`` (:func:`possible_dsep_step`). ``workers`` worker processes
     share the adjacency search's larger conditioning-size passes
     (:func:`~andrey.constraint.pc.adjacency_search`) and the larger possible-d-sep searches
     (:func:`possible_dsep_step`); ``None`` reads ``andrey.config.n_jobs``. ``seed`` fixes the draws
@@ -105,6 +118,7 @@ def fci(
         indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
     )
     allowed, keep, apart = knowledge_masks(constraints)
+    undecided: set[tuple[int, int]] = set()
     skeleton, sepsets, _ = adjacency_search(
         test,
         X.shape[1],
@@ -114,11 +128,13 @@ def fci(
         apart=apart,
         max_depth=max_depth,
         workers=workers,
+        undecided=undecided,
     )
 
-    marks = circle_pag(skeleton)
+    shielded, kept = shield_undecided(skeleton, undecided)
+    marks = circle_pag(shielded)
     knowledge_marks(marks, constraints)
-    orient_colliders(marks, sepsets)
+    orient_colliders(marks, sepsets, undecided_sides(marks, kept) | flagged_sides(marks))
     marks = possible_dsep_step(
         marks,
         X,
@@ -132,18 +148,31 @@ def fci(
         seed=seed,
         max_depth=max_depth,
         constraints=constraints,
+        keep=kept,
         workers=workers,
     )
-    ambiguous = unseparated_triples(marks != NULL, sepsets, constraints)
+    if kept is not None:
+        marks[kept] = NULL
+    adjacency = marks != NULL
+    flagged = running_flags(adjacency, latent=True)
+    ambiguous = unseparated_triples(adjacency, sepsets, constraints, undecided)
     if collider_rule != "sepsets":
         ambiguous |= vote_triples(
             marks, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
         )
+    ambiguous |= flagged_triples(adjacency, flagged)
     if _ambiguous is not None:
         _ambiguous.update(ambiguous)
     orient_colliders(marks, sepsets, ambiguous)
     fci_orient(
-        marks, test, alpha, sepsets, ambiguous, max_depth=max_depth, in_column_order=in_column_order
+        marks,
+        test,
+        alpha,
+        sepsets,
+        ambiguous,
+        max_depth=max_depth,
+        in_column_order=in_column_order,
+        flagged=flagged,
     )
 
     return GraphStructure.from_numpy(marks, kind="pag")
@@ -151,6 +180,45 @@ def fci(
 
 # ---- mark-matrix helpers ------------------------------------------------------------------------
 # ``marks[i, j]`` is the mark at node ``i`` on edge ``i-j``, as in :mod:`andrey.core.structure`.
+
+
+def shield_undecided(
+    skeleton: np.ndarray, undecided: Collection[tuple[int, int]]
+) -> tuple[np.ndarray, np.ndarray | None]:
+    """``skeleton`` with the ``undecided`` pairs joined again, and their boolean mask, both ways;
+    ``None`` in place of the mask when there are none.
+
+    The possible-d-sep step keeps the masked pairs without testing them: undecided pairs may be
+    adjacent, so their paths reach nodes beyond them; the caller removes these pairs from the marks
+    after the step.
+    """
+    if not undecided:
+        return skeleton, None
+    mask = np.zeros(skeleton.shape, dtype=bool)
+    for a, c in undecided:
+        mask[a, c] = mask[c, a] = True
+    return np.where(mask, np.int8(TAIL), skeleton), mask
+
+
+def undecided_sides(marks: np.ndarray, kept: np.ndarray | None) -> frozenset[tuple[int, int, int]]:
+    """The triples ``(a, b, c)``, ``a < c``, of ``marks`` with a side in the boolean ``kept``, the
+    undecided pairs :func:`shield_undecided` joined: no collider is read from them."""
+    if kept is None:
+        return frozenset()
+    adjacent = marks != NULL
+    triples = set()
+    for a, b in zip(*np.nonzero(kept)):
+        for c in np.flatnonzero(adjacent[b]).tolist():
+            if c != a:
+                triples.add(_triple(int(a), int(b), c))
+    return frozenset(triples)
+
+
+def flagged_sides(marks: np.ndarray) -> frozenset[tuple[int, int, int]]:
+    """The unshielded triples of ``marks`` with a side the tests so far flag as possibly separable
+    (:func:`~andrey.constraint._skeleton.flagged_triples`): no collider is read from them."""
+    adjacency = marks != NULL
+    return flagged_triples(adjacency, running_flags(adjacency, latent=True))
 
 
 def circle_pag(support: np.ndarray) -> np.ndarray:
@@ -546,7 +614,23 @@ def _first_separating(
     tuples (:func:`_separating_choice`). Every path tests the subsets in the same order and stops
     at the first that separates the pair; on the pool, tests after it may run, but the subset found
     is the serial one.
+
+    A test-wise deletion test skips subsets holding a member never observed with ``x`` and ``y``, or
+    every member when the pair is never observed together: these queries keep no rows and separate
+    nothing. Skipped subsets the search would have reached count as not tested (:func:`_left_out`),
+    so the subset found and the counts are those of asking every subset.
     """
+    if isinstance(test, TestwiseDeletion):
+        together = test.together()
+        met = together[x] & together[y] if together[x, y] else np.zeros(len(together), dtype=bool)
+        kept = [v for v in dsep if met[v]]
+        if len(kept) < len(dsep):
+            found = _first_separating(
+                test, x, y, kept, adj_a, adj_b, alpha, max_depth, tested, pool
+            )
+            within = (adj_a, adj_b, tested)
+            test.count_not_tested(x, y, _left_out(dsep, kept, within, max_depth, found))
+            return found
     sizes = range(1, _largest_size(len(dsep), max_depth) + 1)
     if canonical_capable(test) and len(dsep) <= MASK_BITS:
         subsets = sum(comb(len(dsep), size) for size in sizes)
@@ -561,6 +645,68 @@ def _first_separating(
             return first_separating_subset(test, x, y, dsep, within, order, alpha)
     choices = _iter_dsep_choices(dsep, adj_a, adj_b, max_depth, tested)
     return _separating_choice(test, x, y, choices, alpha)
+
+
+def _left_out(
+    dsep: list[int],
+    kept: list[int],
+    within: Iterable[Collection[int]],
+    max_depth: int | None,
+    found: tuple[int, ...] | None,
+) -> int:
+    """The subsets of ``dsep`` holding a member outside ``kept`` that a search of
+    :func:`_iter_dsep_choices` order, less the subsets inside one of ``within``, reaches before
+    ``found``, or reaches at all when ``found`` is ``None``.
+
+    Counts come from positions in ``dsep`` (:func:`_outside_count`): subsets of ``dsep`` outside
+    ``kept``, at every size below ``found``'s and at its size up to ``found``.
+    """
+    position = {v: i for i, v in enumerate(dsep)}
+    every = list(range(len(dsep)))
+    inner = [position[v] for v in kept]
+    groups = [{position[v] for v in nodes if v in position} for nodes in within]
+    last = _largest_size(len(dsep), max_depth) if found is None else len(found)
+    before = None if found is None else sorted(position[v] for v in found)
+    total = 0
+    for size in range(1, last + 1):
+        bound = before if size == last else None
+        total += _outside_count(every, size, groups, bound)
+        total -= _outside_count(inner, size, groups, bound)
+    return total
+
+
+def _outside_count(
+    universe: list[int], size: int, groups: list[set[int]], before: list[int] | None
+) -> int:
+    """The size-``size`` subsets of the ascending ``universe`` inside none of ``groups``, of those
+    that come before ``before`` in ``combinations`` order when it is given, by
+    inclusion-exclusion over the groups (:func:`_count_before`)."""
+    total = 0
+    for r in range(len(groups) + 1):
+        for chosen in combinations(groups, r):
+            members = [p for p in universe if all(p in g for g in chosen)]
+            total += (-1) ** r * _count_before(members, size, before)
+    return total
+
+
+def _count_before(members: list[int], size: int, before: list[int] | None) -> int:
+    """The size-``size`` subsets of the ascending ``members`` that come before the ascending
+    ``before`` in ``combinations`` order, or all of them when it is ``None``: a subset comes
+    before it when, at the first place they differ, its member is the smaller."""
+    if before is None:
+        return comb(len(members), size)
+    held = set(members)
+    count, low = 0, -1
+    for j, bound in enumerate(before):
+        count += sum(
+            comb(len(members) - i - 1, size - j - 1)
+            for i, u in enumerate(members)
+            if low < u < bound
+        )
+        if bound not in held:
+            break
+        low = bound
+    return count
 
 
 def _separating_choice(
@@ -638,6 +784,8 @@ def possible_dsep_step(
         by_rank, ranked_test = _test_in_rank_order(
             X, indep_test, categorical, seed, degrees_of_freedom
         )
+        if isinstance(test, TestwiseDeletion) and isinstance(ranked_test, TestwiseDeletion):
+            ranked_test.mark_environments(np.flatnonzero(np.isin(by_rank, test.environments)))
         _remove_by_possible_dsep(
             marks,
             ranked_test,
@@ -731,13 +879,16 @@ def _test_in_rank_order(
     """
     by_rank = np.argsort(tie_ranks(X, tie_mask(indep_test, categorical, X.shape[1])))
     mask = None if categorical is None else np.asarray(categorical)[by_rank]
-    return by_rank, make_indep_test(
+    test = make_indep_test(
         indep_test,
         np.ascontiguousarray(X[:, by_rank]),
         categorical=mask,
         seed=seed,
         degrees_of_freedom=degrees_of_freedom,
     )
+    if isinstance(test, TestwiseDeletion):
+        test.from_columns(by_rank)  # its queries count as pairs of X's columns
+    return by_rank, test
 
 
 def _remove_in_node_order(
@@ -805,7 +956,7 @@ def fci_orient(
     max_depth: int | None = None,
     in_column_order: bool = False,
     selection_bias: bool = True,
-    apart: np.ndarray | None = None,
+    flagged: Collection[tuple[int, int]] = (),
 ) -> None:
     """Apply the FCI orientation rules R1-R10 to a fixed point, in place over ``marks``.
 
@@ -831,12 +982,11 @@ def fci_orient(
     ``selection_bias=False`` skips R5-R7, the rules for selection bias, leaving R1-R4 and R8-R10,
     Zhang's complete set for PAGs without selection bias.
 
-    ``apart``, a boolean matrix, holds the pairs known to be non-adjacent, for a graph in which a
-    missing edge may be one not yet learned; by default every pair without an edge is. R4 ends a
-    discriminating path, and R9 starts its path, only at a pair ``apart`` holds; the rules that read
-    an unshielded triple read the caller's ``ambiguous``, which then holds the triples whose
-    endpoints ``apart`` does not.
+    The rules skip ``ambiguous`` triples, keyed ``(a, b, c)`` with ``a < c``; R4 decides no triple
+    ``a, b, c`` with a side in ``flagged``, pairs in either order: an untested conditioning set
+    might have separated that edge.
     """
+    flagged = frozenset((min(a, b), max(a, b)) for a, b in flagged)
     if not in_column_order:
         test = _memoized(test)  # R4 repeats its tests in every round
         while True:
@@ -844,14 +994,21 @@ def fci_orient(
             _rule_r1r2_cycle(marks, False, ambiguous, out=implied)
             _rule_r3(marks, sepsets, False, ambiguous, out=implied)
             _rule_r4(
-                marks, test, alpha, sepsets, False, max_depth=max_depth, out=implied, apart=apart
+                marks,
+                test,
+                alpha,
+                sepsets,
+                False,
+                max_depth=max_depth,
+                out=implied,
+                flagged=flagged,
             )
             if selection_bias:
                 _rule_r5(marks, False, ambiguous, out=implied)
                 _rule_r6(marks, False, out=implied)
                 _rule_r7(marks, False, ambiguous, out=implied)
             _rule_r8(marks, False, out=implied)
-            _rule_r9(marks, False, ambiguous, out=implied, apart=apart)
+            _rule_r9(marks, False, ambiguous, out=implied)
             _rule_r10(marks, False, ambiguous, out=implied)
             if not implied.apply(marks):
                 return
@@ -861,13 +1018,13 @@ def fci_orient(
         change = _rule_r1r2_cycle(marks, change, ambiguous)
         change = _rule_r3(marks, sepsets, change, ambiguous)
         # R4 runs every sweep because a discriminating path can orient an otherwise unchanged graph.
-        change = _rule_r4(marks, test, alpha, sepsets, change, max_depth=max_depth, apart=apart)
+        change = _rule_r4(marks, test, alpha, sepsets, change, max_depth=max_depth, flagged=flagged)
         if selection_bias:
             change = _rule_r5(marks, change, ambiguous)
             change = _rule_r6(marks, change)
             change = _rule_r7(marks, change, ambiguous)
         change = _rule_r8(marks, change)
-        change = _rule_r9(marks, change, ambiguous, apart=apart)
+        change = _rule_r9(marks, change, ambiguous)
         change = _rule_r10(marks, change, ambiguous)
 
 
@@ -985,9 +1142,10 @@ def _rule_r4(
     *,
     max_depth: int | None = None,
     out: _Implied | None = None,
-    apart: np.ndarray | None = None,
+    flagged: frozenset[tuple[int, int]] = frozenset(),
 ) -> bool:
-    """R4: orient the endpoints closing a definite discriminating path into ``b``.
+    """R4: orient the endpoints closing a definite discriminating path into ``b``, unless a side
+    of ``a, b, c`` is in ``flagged``, keyed ``(x, y)`` with ``x < y``.
 
     Without ``out``, the first discriminating path found that decides (:func:`_ddp_orient`) sets
     the marks in ``marks``. With ``out``, every shortest discriminating path that decides records
@@ -1004,21 +1162,16 @@ def _rule_r4(
                     continue
                 if marks[c, b] != ARROW:
                     continue
+                if flagged and (
+                    (min(a, b), max(a, b)) in flagged or (min(b, c), max(b, c)) in flagged
+                ):
+                    continue
                 if out is None:
                     change = _ddp_orient(
-                        marks,
-                        a,
-                        b,
-                        c,
-                        test,
-                        alpha,
-                        sepsets,
-                        change,
-                        max_depth=max_depth,
-                        apart=apart,
+                        marks, a, b, c, test, alpha, sepsets, change, max_depth=max_depth
                     )
                     continue
-                for paths in _discriminating_paths(marks, a, b, c, apart):
+                for paths in _discriminating_paths(marks, a, b, c):
                     decided = False
                     for path in paths:
                         previous = dict(zip(path, path[1:]))
@@ -1043,16 +1196,14 @@ def _rule_r4(
     return change
 
 
-def _discriminating_paths(
-    marks: np.ndarray, a: int, b: int, c: int, apart: np.ndarray | None = None
-) -> Iterator[list[list[int]]]:
+def _discriminating_paths(marks: np.ndarray, a: int, b: int, c: int) -> Iterator[list[list[int]]]:
     """The discriminating paths ``d, ..., a, b`` for ``b`` toward ``c``, shortest first.
 
     The paths grow backward from ``a`` one node at a time, every inner node a collider on the path
     and a parent of ``c``, as :func:`_ddp_orient` grows them, and end at a node ``d`` non-adjacent
-    to ``c``, one ``apart`` holds when it is given. Each yield lists every path of one length, from
-    ``d`` to ``b``. The search stops at ``_UNBOUNDED_PATH`` nodes, or when one length holds more
-    than ``_R4_PARTIAL_PATHS`` partial paths.
+    to ``c``. Each yield lists every path of one length, from ``d`` to ``b``. The search stops at
+    ``_UNBOUNDED_PATH`` nodes, or when one length holds more than ``_R4_PARTIAL_PATHS`` partial
+    paths.
     """
     c_parents = _parents(marks, c)
     layer = [[b, a]]  # each partial path read from b backward
@@ -1064,8 +1215,7 @@ def _discriminating_paths(
                 if d in path or d == c or not _is_def_collider(marks, d, t, p):
                     continue
                 if not _adjacent(marks, d, c):
-                    if apart is None or apart[d, c]:
-                        found.append([*path, d][::-1])
+                    found.append([*path, d][::-1])
                 elif d in c_parents:
                     extended.append([*path, d])
         if found:
@@ -1096,10 +1246,8 @@ def _ddp_orient(
     change: bool,
     *,
     max_depth: int | None = None,
-    apart: np.ndarray | None = None,
 ) -> bool:
-    """Search back from ``a`` for a definite discriminating path ending at ``c`` and orient it;
-    with ``apart``, only a path whose ends it holds as non-adjacent."""
+    """Search back from ``a`` for a definite discriminating path ending at ``c`` and orient it."""
     queue: deque[int] = deque([a])
     visited: set[int] = {a, b}
     previous: dict[int, int] = {a: b}
@@ -1121,7 +1269,7 @@ def _ddp_orient(
             p = previous[t]
             if not _is_def_collider(marks, d, t, p):
                 continue
-            if not _adjacent(marks, d, c) and d != c and (apart is None or apart[d, c]):
+            if not _adjacent(marks, d, c) and d != c:
                 oriented, change = _do_ddp(
                     marks, d, a, b, c, previous, test, alpha, sepsets, change, max_depth=max_depth
                 )
@@ -1461,12 +1609,10 @@ def _rule_r9(
     ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
     *,
     out: np.ndarray | _Implied | None = None,
-    apart: np.ndarray | None = None,
 ) -> bool:
     """R9: ``a o-> c`` with an uncovered possibly-directed path ``a .. b .. c``  =>  ``a -> c``.
 
-    One reverse reachability set from ``c`` avoiding ``a`` serves every ``b``; with ``apart``, only
-    a ``b`` it holds as non-adjacent to ``c``.
+    One reverse reachability set from ``c`` avoiding ``a`` serves every ``b``.
     """
     out = marks if out is None else out
     neighbors = _neighbor_lists(marks)
@@ -1477,7 +1623,7 @@ def _rule_r9(
             candidates = [v for v in neighbors[a] if v != c and _is_possible_child(marks, a, v)]
             reaching: dict[tuple[int, int], set[int]] = {}
             for b in candidates:
-                if _adjacent(marks, b, c) or (apart is not None and not apart[b, c]):
+                if _adjacent(marks, b, c):
                     continue
                 if _exists_uncovered_pd_path(
                     marks, a, b, c, neighbors, ambiguous, reaching=reaching

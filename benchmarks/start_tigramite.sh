@@ -10,9 +10,11 @@
 #
 # joblib is installed although tigramite lists it only under an extra: `from tigramite.pcmci import
 # PCMCI` fails with ModuleNotFoundError without it. scikit-learn (the Gaussian processes) and dcor
-# (the distance correlation) are the dependencies of its GPDC test, numba of its CMIknn test. The
-# final checks run PCMCI with ParCorr on a planted lag-1 link and PC with CMIknn and GPDC, and they
-# apply the J-PCMCI+ lane's patch to the installed JPCMCIplus.
+# (the distance correlation) are the dependencies of its GPDC test, numba of its CMIknn test, and
+# ortools (the linear-program solver) and networkx (through tigramite.models) of its Regime-PCMCI,
+# which imports both at import time. The final checks run PCMCI with ParCorr on a planted lag-1 link
+# and PC with CMIknn and GPDC, apply the J-PCMCI+ lane's patch to the installed JPCMCIplus, and
+# import RPCMCI.
 #
 # Nothing else goes in: the child runs `python -m andrey_bench._worker`, which imports numpy and the
 # adapter module and nothing more. andrey, pandas and pyarrow stay in bench-env, where the parent
@@ -26,7 +28,7 @@ VENV="$REPO/benchmarks/.venv-tigramite"
 echo ">> tigramite-env"
 uv venv "$VENV" --python 3.13 --clear
 uv pip install --python "$VENV/bin/python" "tigramite==5.2.10.1" numpy scipy joblib \
-    scikit-learn dcor numba
+    scikit-learn dcor numba networkx "ortools==9.15.6755"
 
 REPO="$REPO" "$VENV/bin/python" - <<'PY'
 import importlib.metadata as m
@@ -39,6 +41,7 @@ from tigramite.independence_tests.cmiknn import CMIknn
 from tigramite.independence_tests.gpdc import GPDC
 from tigramite.independence_tests.parcorr import ParCorr
 from tigramite.pcmci import PCMCI
+from tigramite.rpcmci import RPCMCI
 
 rng = np.random.default_rng(0)
 data = rng.standard_normal((300, 3))
@@ -63,9 +66,10 @@ sys.path.insert(0, os.path.join(os.environ["REPO"], "benchmarks"))
 from andrey_bench.adapters.tigramite_jpcmciplus import jpcmciplus_class
 
 assert jpcmciplus_class(patched=True).__name__ == "JPCMCIplus"
+assert RPCMCI.__name__ == "RPCMCI"
 print(
     f"tigramite-env OK tigramite {m.version('tigramite')} numpy {np.__version__} "
-    f"scipy {m.version('scipy')}"
+    f"scipy {m.version('scipy')} ortools {m.version('ortools')}"
 )
 PY
 

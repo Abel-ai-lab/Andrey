@@ -18,7 +18,7 @@ from scipy.special import digamma
 from andrey.core.ties import tie_ranks
 
 from . import backend, env, stats
-from .ci import _canonical_ranked, count_tests, per_query
+from .ci import _canonical_ranked, per_query
 from .seeding import resolve_seed
 
 __all__ = ["CMIknn"]
@@ -259,6 +259,13 @@ class CMIknn:
 
     pin_blas = True  # read by pins_blas: the skeleton scans run it on one BLAS thread
 
+    @staticmethod
+    def least_rows(size: int, *, k_cmi: float = 0.1, **options: object) -> int:
+        """The fewest rows tested given ``size`` conditioning variables: ``k_cmi + 1`` for an int
+        ``k_cmi``, providing enough neighbors per row; otherwise ``2``."""
+        count = isinstance(k_cmi, Integral) and not isinstance(k_cmi, bool)
+        return int(k_cmi) + 1 if count else 2
+
     def __init__(
         self,
         data: np.ndarray,
@@ -322,7 +329,6 @@ class CMIknn:
         """
         x_int, y_int, cond = _canonical_ranked(x, y, condition_set, self._tie_rank)
         cond = tuple(cond)
-        count_tests()
         dev = backend.select_by_size(
             "cmiknn", env.CMIKNN_GPU_THRESHOLD, self._n * self._n, amortized=True
         )

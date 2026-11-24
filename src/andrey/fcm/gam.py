@@ -85,6 +85,23 @@ class SmoothBasis:
     S: np.ndarray
     root: np.ndarray
     scale: float
+    #: The covariate's center and width, the knots, the kernel's map to the basis, and the
+    #: constraint's reflection, which :meth:`design` applies to new values.
+    _map: tuple[float, float, np.ndarray, np.ndarray, np.ndarray] | None = field(
+        default=None, repr=False
+    )
+
+    def design(self, x: np.ndarray) -> np.ndarray:
+        """Return the ``(m, k - 1)`` design at new covariate values ``x``, columns as ``X``'s."""
+        if self._map is None:
+            raise ValueError("this basis keeps no map to new values")
+        center, width, knots, kernel, reflection = self._map
+        u = (np.asarray(x, dtype=np.float64) - center) / width
+        raw = np.empty((u.size, kernel.shape[1] + 2))
+        raw[:, :-2] = _cubic_cross(u, knots, kernel) / 12.0
+        raw[:, -2] = 1.0
+        raw[:, -1] = u
+        return raw @ reflection
 
 
 def tp_basis(x: np.ndarray, k: int = 10, *, max_knots: int = MAX_KNOTS) -> SmoothBasis:
@@ -123,7 +140,8 @@ def tp_basis(x: np.ndarray, k: int = 10, *, max_knots: int = MAX_KNOTS) -> Smoot
     x = np.asarray(x, dtype=np.float64)
     if k < 3:
         raise ValueError(f"a thin plate spline basis needs k >= 3, got {k}")
-    xc = x - x.mean()
+    center = float(x.mean())
+    xc = x - center
     knots = np.unique(xc)
     if knots.size < k:
         raise ValueError(f"k = {k} needs at least {k} distinct values, got {knots.size}")
@@ -138,8 +156,9 @@ def tp_basis(x: np.ndarray, k: int = 10, *, max_knots: int = MAX_KNOTS) -> Smoot
     polynomial = np.column_stack([np.ones(knots.size), knots])
     Q, _ = np.linalg.qr(vectors.T @ polynomial, mode="complete")
     Z = Q[:, 2:]
+    kernel = vectors @ Z
     X = np.empty((x.size, k))
-    X[:, : k - 2] = _cubic_cross(u, knots, vectors @ Z) / 12.0
+    X[:, : k - 2] = _cubic_cross(u, knots, kernel) / 12.0
     X[:, k - 2] = 1.0
     X[:, k - 1] = u
     S = np.zeros((k, k))
@@ -154,7 +173,9 @@ def tp_basis(x: np.ndarray, k: int = 10, *, max_knots: int = MAX_KNOTS) -> Smoot
     eig, vec = np.linalg.eigh(S)
     keep = np.argsort(eig)[1:]
     root = np.sqrt(np.clip(eig[keep], 0.0, None))[:, None] * vec[:, keep].T
-    return SmoothBasis(X=X, S=S, root=root, scale=scale)
+    return SmoothBasis(
+        X=X, S=S, root=root, scale=scale, _map=(center, width, knots, kernel, H[:, 1:])
+    )
 
 
 def _top_eigen(t: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
