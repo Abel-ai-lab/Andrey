@@ -10,7 +10,7 @@ names its pull request.
 
 ## [Unreleased]
 
-## [0.19.0] - 2026-11-23
+## [0.19.0] - 2026-11-24
 
 ### Highlights
 
@@ -27,7 +27,7 @@ names its pull request.
   p = 1 found 0.21 to 0.34. With `possibly_separable="ambiguous"`, a listed edge never creates a
   collider; test-wise deletion sums each missingness pattern's rows once when that costs less; and
   `missing="em"` refuses two columns that share no row. The
-  [release post](https://andrey.abel.ai/blog/20261123-andrey-0-19-0.html) tells the story, and the
+  [release post](https://andrey.abel.ai/blog/20261124-andrey-0-19-0.html) tells the story, and the
   [0.19.0 release card][card-0190-missing] has the numbers. ([#1102], [#1148], [#1151], [#1156],
   [#1167], [#1171])
 - `das` is supported. On its paper's simulation with z-scored or rescaled columns it made no more

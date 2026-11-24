@@ -31,7 +31,7 @@ LGES, Regime-PCMCI, and the GCM, wGCM, and PCM tests arrive, experimental, and `
 of columns.
 
 **[0.19.0 release card](https://andrey.abel.ai/docs/benchmarks/0.19.0.html)** · Post:
-**[Datasets with overlapping variables](https://andrey.abel.ai/blog/20261123-andrey-0-19-0.html)**
+**[Datasets with overlapping variables](https://andrey.abel.ai/blog/20261124-andrey-0-19-0.html)**
 
 ---
 
