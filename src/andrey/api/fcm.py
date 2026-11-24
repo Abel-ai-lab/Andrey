@@ -1777,8 +1777,9 @@ def skewd_mv(
     <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#skewd-mv>`_ has the measured times, up to
     1.8 CPU hours at 6 variables and 2.4 at 10. An edge PC misses or misorients stays wrong: the
     likelihood only chooses among the class's DAGs, and PC's skeleton had an F1 of 0.88 and 0.92 at
-    6 variables and 0.84 and 0.80 at 10, on two sets of 20 seeds. The numbers are a reference, not a hard limit: they change with the
-    data generator, the density, the method's settings, and the machine.
+    6 variables and 0.84 and 0.80 at 10, on two sets of 20 seeds. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------

@@ -1029,15 +1029,16 @@ def skewd(
     **When to use.** SkewD decides the direction between two continuous variables observed i.i.d.,
     under the location-scale noise model ``y = f(x) + g(x) n`` with ``g > 0``, the noise ``n``
     independent of the cause ``x``, and no hidden common cause of the two [1]_. It is designed for
-    pairs whose noise is skewed, where a model with symmetric noise such as :func:`~andrey.loci`
-    can misjudge the scale and the direction; with symmetric noise its model reduces to
+    pairs whose noise is skewed, where a model with symmetric noise such as :func:`~andrey.loci` can
+    misjudge the scale and the direction; with symmetric noise its model reduces to
     :func:`~andrey.loci`'s Gaussian one. It favors accuracy on such pairs and gives up time. On the
     paper's skewed additive and location-scale pairs and on Gaussian location-scale pairs, 1,000
     rows each, it named the direction as often as the code published with the paper, with either
     criterion, and the likelihood criterion, the default, named all 160 right; :func:`~andrey.loci`
     was as accurate by the paired interval on every set but the most skewed location-scale one, 15
     of 20 against 20, in under a second. A pair took 15 to 22 CPU minutes on an AMD EPYC 9534 (the
-    median of each set); ``andrey.config(n_jobs)`` runs its searches on threads, which cuts the wall time.
+    median of each set); ``andrey.config(n_jobs)`` runs its searches on threads, which cuts the wall
+    time.
 
     In each direction, the effect given the cause is skew-normal with location ``f``, scale ``g``,
     and one shape ``lambda`` for every row; ``f`` is a cubic B-spline of 12 knots (14 columns) and
@@ -1095,8 +1096,8 @@ def skewd(
     its cost; the `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#skewd>`_
     has the measured times. Each HSIC test builds matrices with one row and one column per sample.
     The skew-normal's skewness lies within about -1 and 1, so noise more skewed than that is
-    misspecified [1]_. A change of units by a factor that is not a power of two changed no edge in 120
-    refits of 20 pairs (80 to 150 rows, ``tuning_iter=3``) and moved 2 of the 240 likelihoods by
+    misspecified [1]_. A change of units by a factor that is not a power of two changed no edge in
+    120 refits of 20 pairs (80 to 150 rows, ``tuning_iter=3``) and moved 2 of the 240 likelihoods by
     more than ``1e-6`` (both by 0.014, on a pair with no direction), so an edge can change only
     where the two directions already lie within what another ``seed`` changes. The numbers are a
     reference, not a hard limit: they change with the data generator, the density, the method's
