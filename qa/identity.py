@@ -240,6 +240,7 @@ FITS: dict[str, Fit] = {
     "RESIT": Fit(andrey.resit),
     "ScoreMatching": Fit(andrey.score_matching),
     "NoGAM": Fit(andrey.nogam),
+    "DAS": Fit(andrey.das),
     "ExactSearch": Fit(andrey.exact_search),
     "CALM": Fit(functools.partial(andrey.calm, seed=0)),
     "NOTEARS": Fit(andrey.notears),
@@ -260,6 +261,10 @@ FITS: dict[str, Fit] = {
     "ANM": Fit(andrey.anm),
     "PNL": Fit(andrey.pnl),
     "LOCI": Fit(andrey.loci),
+    "CPCM": Fit(functools.partial(andrey.cpcm, family="gaussian")),
+    "CPCMGraph": Fit(functools.partial(andrey.cpcm_graph, family="gaussian_fixed_scale")),
+    "SkewD": Fit(functools.partial(andrey.skewd, **qg.SKEWD_BUDGET)),
+    "SkewDMV": Fit(functools.partial(andrey.skewd_mv, **qg.SKEWD_BUDGET)),
     "PCMCI": Fit(_pcmci),
     "PCMCIplus": Fit(lambda x: andrey.pcmciplus(x, **qg.andrey_pcmciplus_adapter(5).params())),
     "LPCMCI": Fit(lambda x: andrey.lpcmci(x, **qg.andrey_lpcmci_adapter(3).params())),
@@ -279,10 +284,29 @@ FITS: dict[str, Fit] = {
     "DYNOTEARS": Fit(lambda x: andrey.dynotears(x, **_DYNOTEARS)),
 }
 
+
+def _target_list(name: str) -> Fit:
+    """``name`` with every variable a target, in one call."""
+    method = getattr(andrey, name)
+    return Fit(
+        lambda x: method(x, alpha=ALPHA, target=list(range(x.shape[1]))),
+        shuffled=False,
+        alpha=ALPHA,
+    )
+
+
+#: The set learners, by their names here and in the package.
+SET_LEARNERS = {"IAMB": "iamb", "InterIAMB": "inter_iamb", "MMPC": "mmpc"}
+#: The set learners, each fitted with a list of targets that one search answers, on the datasets
+#: of the method it names, with every variable a target.
+TARGET_LISTS: dict[str, str] = {f"{name}-targets": name for name in SET_LEARNERS}
+FITS |= {f"{name}-targets": _target_list(SET_LEARNERS[name]) for name in SET_LEARNERS}
+
 #: The methods that run on ``andrey.config(n_jobs=...)``: GES, GFCI's GES phase, the skeleton
 #: searches of PC, FCI, FCI-JCI, GFCI, CD-NOD, and RSMAX2's PC phase, and the possible-d-sep
-#: searches of FCI, FCI-JCI, and GFCI in worker processes, and PNL's two directions on threads.
-WORKER_METHODS = ("PC", "FCI", "FCI-JCI", "GFCI", "CDNOD", "RSMAX2", "GES", "PNL")
+#: searches of FCI, FCI-JCI, and GFCI in worker processes, PNL's two directions on threads, and the
+#: lists of targets of :data:`TARGET_LISTS`.
+WORKER_METHODS = ("PC", "FCI", "FCI-JCI", "GFCI", "CDNOD", "RSMAX2", "GES", "PNL", *TARGET_LISTS)
 
 #: The factor on the longitudinal LiNGAM panel's coefficients at ``d = 10``. At the published
 #: ranges the panel grows several-fold per time point; at this factor the spectral radius of every
@@ -300,6 +324,7 @@ LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
     "linear_gauss_er_d16": functools.partial(qg.regime_draws, "linear_gauss_er", 16, 800),
     "anm_er_n1000_d30": functools.partial(qg.regime_draws, "anm_er_n1000", 30, 1000),
     "anm_er_n1000_d12": functools.partial(qg.regime_draws, "anm_er_n1000", 12, 1000),
+    "anm_er_n1000_d6": functools.partial(qg.regime_draws, "anm_er_n1000", 6, 1000),
     "score_paper_standardized_d15_er1": functools.partial(
         qg.order_draws, "score_paper_standardized", 15, "er1"
     ),
@@ -361,6 +386,7 @@ LARGER: dict[str, str] = {
     "RESIT": "anm_er_n1000_d12",
     "ScoreMatching": "score_paper_standardized_d15_er1",
     "NoGAM": "score_paper_laplace_standardized_d12_er1",
+    "DAS": "score_paper_standardized_d15_er1",
     "CALM": "linear_gauss_er_d15",
     "NOTEARS": "notears_paper_standardized_d60",
     "DAGMA": "notears_paper_raw_d40",
@@ -373,6 +399,10 @@ LARGER: dict[str, str] = {
     "ANM": "anm_pair_n1500",
     "PNL": "pnl_pair_n1500",
     "LOCI": "lsnm_pair_n1500",
+    "CPCM": "lsnm_pair_n1500",
+    "CPCMGraph": "anm_er_n1000_d6",
+    "SkewD": "lsnm_pair_n1500",
+    "SkewDMV": "anm_er_n1000_d6",
     "PCMCI": "pcmci_paper_d20_n1000",
     "PCMCIplus": "pcmciplus_paper_d40_n1000",
     "LPCMCI": "lpcmci_paper_d20_n1000",
@@ -396,6 +426,7 @@ UNKNOWN_TARGETS: dict[str, tuple[str, ...]] = dict.fromkeys(
 
 def datasets(method: str) -> tuple[str, ...]:
     """Return the datasets ``method`` is fitted on: its gate datasets, then its larger dataset."""
+    method = TARGET_LISTS.get(method, method)
     if method in UNKNOWN_TARGETS:
         return UNKNOWN_TARGETS[method]
     return (*qg.SUPPORTED[method].datasets, LARGER[method])
@@ -666,10 +697,22 @@ def _moves(base: Iterable[int], moves: Iterable[tuple[str, int]]) -> list[list[i
     return [base, *([*base, u] if op == "add" else [p for p in base if p != u] for op, u in moves)]
 
 
+def _rows(x: Any, y: Any, conditions: Any, p_values: Any) -> list[tuple[int, int, Any, float]]:
+    """The queries of a call that answers many, one per p-value: query ``i`` asks ``x[i]`` and
+    ``y[i]`` given row ``i`` of the ``(N, m)`` array ``conditions``."""
+    sets = np.asarray(conditions).reshape(len(x), -1) if len(x) else []
+    return list(zip(x, y, sets, p_values))
+
+
 #: The CI tests' query methods, each with the ``(x, y, conditioning set, p-value)`` of every test
 #: one call makes, read from the call's result, the test, and the call's arguments.
 CI_QUERIES: dict[str, Callable[..., Iterable[tuple[int, int, Any, float]]]] = {
     "__call__": lambda p, test, x, y, conditions=(): [(x, y, conditions, p)],
+    "statistic_pvalue": lambda rp, test, x, y, condition_set=(): [(x, y, condition_set, rp[1])],
+    "statistic_pvalues": lambda rp, test, x, y, conditions: _rows(x, y, conditions, rp[1]),
+    "residual_statistic_pvalues": lambda rp, test, data, x, y, conditions: _rows(
+        x, y, conditions, rp[1]
+    ),
     "_bounded_pvalue": lambda p, test, x, y, conditions, *settings, **options: [
         (x, y, conditions, p)
     ],
@@ -679,6 +722,9 @@ CI_QUERIES: dict[str, Callable[..., Iterable[tuple[int, int, Any, float]]]] = {
         (x, y, s, p) for s, p in zip(sets, ps)
     ],
     "first_order_pvalues": lambda ps, test, x, y, zs: [(x, y, (z,), p) for z, p in zip(zs, ps)],
+    "statistic_pvalues_given": lambda rp, test, x, ys, condition_set: [
+        (x, y, condition_set, p) for y, p in zip(ys, rp[1])
+    ],
     "pvalues_given": lambda ps, test, target, xs, condition_set=(): [
         (target, x, condition_set, p) for x, p in zip(xs, ps)
     ],
@@ -804,7 +850,8 @@ def _counted(
 # The run and the manifest
 # ==================================================================================================
 
-#: The environment variables that set thread and worker counts, recorded in the header.
+#: The environment variables that set thread and worker counts, recorded in the header, and
+#: ``ANDREY_SHARED_SCAN_MIN_WORK``, which picks between two paths whose p-values agree to rounding.
 THREAD_VARIABLES = (
     "OMP_NUM_THREADS",
     "OPENBLAS_NUM_THREADS",
@@ -812,6 +859,7 @@ THREAD_VARIABLES = (
     "VECLIB_MAXIMUM_THREADS",
     "ANDREY_N_JOBS",
     "ANDREY_GES_PARALLEL_MIN_WORK",
+    "ANDREY_SHARED_SCAN_MIN_WORK",
 )
 ROOT = Path(__file__).resolve().parents[1]
 

@@ -37,6 +37,7 @@ def fit_hybrid(
     maximize: str,
     alpha: float,
     indep_test: str | None,
+    degrees_of_freedom: str,
     score_func: str | None,
     penalty_discount: float,
     ebic_gamma: float,
@@ -67,6 +68,7 @@ def fit_hybrid(
             maximize=maximize,
             alpha=alpha,
             indep_test=indep_test,
+            degrees_of_freedom=degrees_of_freedom,
             score_func=score_func,
             penalty_discount=penalty_discount,
             ebic_gamma=ebic_gamma,
@@ -93,6 +95,7 @@ def mmhc(
     *,
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
@@ -127,6 +130,20 @@ def mmhc(
         column types, as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     score_func : str or None, default=None
         Local score of the hill-climbing phase, any of :func:`~andrey.hc`'s: ``"bic"`` (Gaussian
         BIC) for continuous data, ``"bdeu"`` or ``"discrete_bic"`` for categorical data,
@@ -161,8 +178,8 @@ def mmhc(
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
-        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
-        tests, ``metadata["seed"]`` records the seed used.
+        only ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"`` make; the
+        other tests ignore it. With those tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test in the MMPC phase,
         at least ``0``: ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller
@@ -258,8 +275,8 @@ def mmhc(
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: its hill-climbing phase scores
     every variable over the same rows, and score terms over different rows do not add up to the
-    score of one dataset. Drop the incomplete rows first, which suits values missing completely at
-    random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    score of one dataset. Drop the incomplete rows yourself, which suits values missing completely
+    at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear-Gaussian data with 20, 50, and 100 variables,
     1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05 and the BIC, on
@@ -308,6 +325,7 @@ def mmhc(
         maximize="hc",
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         score_func=score_func,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,
@@ -331,6 +349,7 @@ def rsmax2(
     maximize: str = "hc",
     alpha: float = 0.05,
     indep_test: str | None = None,
+    degrees_of_freedom: str = "mean",
     score_func: str | None = None,
     penalty_discount: float = 1.0,
     ebic_gamma: float = 1.0,
@@ -358,12 +377,19 @@ def rsmax2(
     restrict : {"mmpc", "iamb", "inter_iamb", "pc"}, default="mmpc"
         The restrict phase. ``"mmpc"`` keeps a pair when each variable is in the other's MMPC
         parents and children [2]_, as :func:`~andrey.mmhc` does. ``"iamb"`` and ``"inter_iamb"``
-        keep a pair when each variable is in the other's Markov blanket from IAMB or Inter-IAMB
-        [3]_ and no subset of the smaller blanket separates the two, the skeleton of
-        ``iamb(structure="skeleton")``, which drops the pairs of parents of a common child.
-        ``"pc"`` keeps the skeleton of :func:`~andrey.pc`'s adjacency search [4]_. With
-        ``knowledge``, ``"mmpc"`` and ``"pc"`` read it in the restrict phase, and ``"iamb"`` and
-        ``"inter_iamb"`` read the data alone; ``knowledge`` below says why. See Notes.
+        keep a pair when each variable is in the other's Markov blanket from IAMB or Inter-IAMB [3]_
+        and no subset of the smaller blanket separates the two, the skeleton of
+        ``iamb(structure="skeleton")``, which drops the pairs of parents of a common child. ``"pc"``
+        keeps the skeleton of :func:`~andrey.pc`'s adjacency search [4]_. With ``knowledge``,
+        ``"mmpc"`` and ``"pc"`` read it in the restrict phase, and ``"iamb"`` and ``"inter_iamb"``
+        read the data alone; ``knowledge`` below says why. ``"mmpc"`` favors time; it gives up
+        accuracy. ``"iamb"`` favors accuracy; it gives up time. On the linear-Gaussian graphs of
+        Limitations, with ``maximize="hc"``, ``"iamb"`` had lower mean CPDAG errors than ``"mmpc"``
+        in all 12 settings (20, 50, and 100 variables; 1,000 and 5,000 rows; mean degree 2 and 4),
+        by 0.7 to 39.7. The means are not paired: in two settings ``"iamb"`` was scored on 14
+        datasets where ``"mmpc"`` was on 15 and 20. Its fits took about 0.05 to 8.8 s against 0.02
+        to 3.5 s, timed in separate runs on mixed nodes, so the times do not pair. ``"inter_iamb"``
+        and ``"pc"`` were not measured against them. See Notes.
     maximize : {"hc", "tabu"}, default="hc"
         The maximize phase: :func:`~andrey.hc` or :func:`~andrey.tabu`.
     alpha : float, default=0.05
@@ -375,6 +401,20 @@ def rsmax2(
         as for :func:`~andrey.pc`.
         ``metadata["indep_test"]`` names the test the fit used: the one picked from the
         declared column types when this is ``None``.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
+        mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
+        set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
+        and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     score_func : str or None, default=None
         Local score of the maximize phase, any of :func:`~andrey.hc`'s. ``"normal_scores"``,
         experimental, is ``"bic"`` on each column's normal scores, for continuous data that are
@@ -413,8 +453,8 @@ def rsmax2(
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
-        only ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` make; the other tests ignore it. With those
-        tests, ``metadata["seed"]`` records the seed used.
+        only ``"rcot"``, ``"cmiknn"``, ``"gpdc"``, ``"gcm"``, ``"wgcm"``, and ``"pcm"`` make; the
+        other tests ignore it. With those tests, ``metadata["seed"]`` records the seed used.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test in the restrict
         phase, at least ``0``: ``0`` runs only unconditional tests, and ``None`` sets no limit. A
@@ -530,18 +570,18 @@ def rsmax2(
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: its score phase scores every
     variable over the same rows, and score terms over different rows do not add up to the score of
-    one dataset. Drop the incomplete rows first, which suits values missing completely at random, or
-    use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    one dataset. Drop the incomplete rows yourself, which suits values missing completely at random,
+    or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear-Gaussian data with 20, 50, and 100 variables,
     1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05 and the BIC, on
     one core, with ``restrict="mmpc"`` and ``"iamb"`` and ``maximize="hc"``. In every setting the
     mean CPDAG errors stay below the empty graph's; the closest is at 20 variables and mean degree
     4, with 29 to 31 pairs wrong for ``"mmpc"`` and 21 to 24 for ``"iamb"``, against 40 for the
-    empty graph. A fit took 0.04 to 3.5 s with ``"mmpc"`` and 0.07 to 8.8 s with ``"iamb"``, the
-    longest at 100 variables, 5,000 rows, and mean degree 4. An edge the restrict phase misses is
-    never added, and the maximize phase stops at a local optimum. MMPC tests each candidate against
-    every subset of the current members, so its cost grows exponentially with the size of a
+    empty graph. A fit took about 0.02 to 3.5 s with ``"mmpc"`` and 0.05 to 8.8 s with ``"iamb"``,
+    the longest at 100 variables, 5,000 rows, and mean degree 4. An edge the restrict phase misses
+    is never added, and the maximize phase stops at a local optimum. MMPC tests each candidate
+    against every subset of the current members, so its cost grows exponentially with the size of a
     variable's parents-and-children set. IAMB and Inter-IAMB condition on the whole current blanket,
     so each of their tests needs more rows as the blankets grow. With true ``required_paths`` or
     ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated linear-Gaussian data (10 to
@@ -590,6 +630,7 @@ def rsmax2(
         maximize=maximize,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         score_func=score_func,
         penalty_discount=penalty_discount,
         ebic_gamma=ebic_gamma,

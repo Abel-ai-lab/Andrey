@@ -19,30 +19,30 @@ posts of the features it changes. A card keeps the numbers its release published
 :::::{div} release-latest
 
 :::{card}
-:link: benchmarks/0.18.0
+:link: benchmarks/0.19.0
 :link-type: doc
-:link-alt: The 0.18.0 release card
-:class-card: release-cover release-default
+:link-alt: The 0.19.0 release card: datasets with overlapping variables
+:class-card: release-cover release-art release-art-0-19-0
 :shadow: none
 :margin: 0
 
 Release card
 
-<p class="sd-card-text"><img class="dark-light" src="../_static/wordmark-dark.svg" alt="Andrey"
-width="190" height="40"></p>
+Datasets with overlapping variables
 
-0.18.0
+0.19.0
 :::
 
 ::::{div} release-tldr
 
-0.18.0 is here. DAGMA is supported, with its gap stated: its result depends on the data's scale. Its
-`robust=True` path and that of NOTEARS follow the authors' code. DAS, SkewD, and CPCM, experimental,
-extend functional causal modeling, `load_dataset` loads the Tübingen cause-effect pairs, and ANM,
-PNL, and LOCI return the same direction under any order of the rows.
+0.19.0 is here. On datasets with overlapping variables, a conditional independence test without
+enough rows is skipped, a pair no test can decide is left out of the graph, and an edge that a
+skipped test might have removed is listed. DAS, CPCM, and SkewD are supported, and LGES,
+Regime-PCMCI, and the GCM, wGCM, and PCM tests arrive, experimental.
 
 :::{div} release-actions
-[Read the release card](benchmarks/0.18.0.md)
+[Read the release card](benchmarks/0.19.0.md)
+[Post: Datasets with overlapping variables](../blog/20261124-andrey-0-19-0.md)
 [Post: Functional causal models](../blog/20261103-andrey-0-13-0.md)
 [Post: Pairwise direction](../blog/20261015-andrey-0-4-0.md)
 :::
@@ -50,6 +50,38 @@ PNL, and LOCI return the same direction under any order of the rows.
 :::::
 
 ## Earlier releases
+
+::::{div} release-row
+
+:::{card}
+:link: benchmarks/0.18.0
+:link-type: doc
+:link-alt: The 0.18.0 release card: DAGMA, DAS, SkewD, and CPCM
+:class-card: release-tile release-default
+:shadow: none
+:margin: 0
+
+0.18.0
+:::
+
+:::{div} release-body
+<h3>DAGMA, DAS, SkewD, and CPCM</h3>
+
+DAGMA against its authors' package on raw, rescaled, and z-scored columns, DAGMA and NOTEARS on
+measured protein data, and three experimental functional causal models.
+
+- DAGMA made no more errors than its authors' package in **42 of 42** raw and z-scored settings
+- On raw columns, DAGMA made fewer errors than the empty graph in **18 of 18** settings
+:::
+
+:::{div} release-meta
+Released November 19, 2026
+
+- [Release card<span class="visually-hidden"> 0.18.0</span>](benchmarks/0.18.0.md)
+- [Post: Functional causal models](../blog/20261103-andrey-0-13-0.md)
+- [Post: Pairwise direction](../blog/20261015-andrey-0-4-0.md)
+:::
+::::
 
 ::::{div} release-row
 
@@ -583,6 +615,7 @@ The homepage's speed claim and charts come from these release cards.
 ```{toctree}
 :hidden:
 
+0.19.0: datasets with overlapping variables <benchmarks/0.19.0>
 0.18.0 <benchmarks/0.18.0>
 0.17.0 <benchmarks/0.17.0>
 0.16.0 <benchmarks/0.16.0>

@@ -16,9 +16,11 @@ import pytest
 import andrey
 import scripts.docstring_text as shared
 from andrey.api._method import draws_random_numbers
+from andrey.core.ci_missing import TESTWISE_CLAIM
 from andrey.spec import REGISTRY
 from andrey.spec.concepts import CONCEPTS
 from tests.unit.test_concepts import docstring_section as section
+from tests.unit.test_missing_values import assert_floors_match_the_tests
 
 #: The sections of a method's docstring, in order.
 SECTIONS = ["Parameters", "Returns", "Raises", "Warns", "Notes", "References", "Examples"]
@@ -50,6 +52,30 @@ def test_notes_say_how_missing_values_are_read_and_end_with_limitations(method):
     paragraphs = section(docstring(method), "Notes").strip().split("\n\n")
     assert any(p.startswith("**Missing values.**") for p in paragraphs)
     assert paragraphs[-1].startswith("**Limitations.**")
+
+
+@pytest.mark.parametrize("method", list(REGISTRY))
+def test_a_method_that_deletes_rows_per_test_states_when_that_is_valid_in_the_shared_sentence(
+    method,
+):
+    deletes = shared.deletes_testwise(method)
+    assert deletes is REGISTRY[method].data.missing
+    notes = " ".join(section(docstring(method), "Notes").split())
+    assert notes.count(TESTWISE_CLAIM) == int(deletes)
+    assert ("stays sound" in notes) is False
+
+
+@pytest.mark.parametrize("method", [m for m in REGISTRY if REGISTRY[m].data.missing])
+def test_the_rows_a_test_needs_are_given_for_every_partial_correlation_test(method):
+    """Where Notes give ``|S| + k`` rows to tests by name, each named test needs that many, and
+    every partial-correlation test is named with its floor."""
+    notes = " ".join(section(docstring(method), "Notes").split())
+    if "|S| + " in notes:
+        assert_floors_match_the_tests(notes)
+
+
+def test_the_missing_concept_states_the_shared_sentence():
+    assert TESTWISE_CLAIM in CONCEPTS["missing"].summary
 
 
 @pytest.mark.parametrize("method", list(REGISTRY))

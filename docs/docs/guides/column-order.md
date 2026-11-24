@@ -50,11 +50,10 @@ the rank order of their possible-d-separation step.
 ```{include} ../../_generated/column-order.md
 ```
 
-The CI tests `kci`, `rcot`, `cmiknn`, and `gpdc` are not methods, so the table leaves them out.
-They seed their random draws and order their variables by the same rank, so a p-value depends on
-neither the argument order nor the column order, and `tie_break="position"` ranks their columns by
-position instead. Every method that takes `indep_test` follows the setting through them when
-`indep_test` names one.
+The table omits the CI tests `kci`, `rcot`, `cmiknn`, `gpdc`, `gcm`, `wgcm`, and `pcm`, which are
+not methods. They seed their random draws and order their variables by the same rank, so a p-value
+depends on neither the argument order nor the column order, and `tie_break="position"` ranks their
+columns by position instead. Every method using one through `indep_test` follows the setting.
 
 `bootstrap` is not a method either. Its resamples draw the same rows whatever the column order, so
 its edge frequencies relabel like the method's. The averaged graph of a DAG method relabels too:
@@ -78,15 +77,15 @@ these differences, and a column's rank comes from exact sums over the ranks of i
 they change only when they reorder two values. So a tie goes the same way on every machine, unless
 two tied scores round to different values.
 
-The thread count is fixed where it could matter. The skeleton searches of `pc`, `cdnod`, and `fci`,
-and the tests of `iamb`, `inter_iamb`, `mmpc`, and the restrict phases of `mmhc` and `rsmax2`, with
-the partial-correlation, mixed-data, RCoT, CMIknn, and GPDC tests, and with KCI below 2,000 rows,
-the scores of `ges` (and so of `gfci`'s first phase), `gies`, `gnies`, `xges`, `ages`, `hc`, `tabu`,
-`mmhc`, and `rsmax2`, the fits of `notears`, `dagma`, `dynotears`, `cam`, `resit`, `score_matching`,
-`nogam`, `das`, and `camuv`, and the tests of `pcmci`, `pcmciplus`, `jpcmciplus`, and `lpcmci` run
-on one BLAS thread, and so do their worker processes, so the host's thread count cannot change
-their results. From 2,000 rows, KCI runs on every BLAS thread, where its kernel products run
-faster; its p-values then repeat for a fixed thread count.
+The skeleton searches of `pc`, `cdnod`, and `fci`, and the tests of `iamb`, `inter_iamb`, `mmpc`,
+and the restrict phases of `mmhc` and `rsmax2`, with the partial-correlation, mixed-data, RCoT,
+CMIknn, and GPDC tests, and with KCI below 2,000 rows, the scores of `ges` (and so of `gfci`'s first
+phase), `gies`, `gnies`, `xges`, `lges`, `ages`, `hc`, `tabu`, `mmhc`, and `rsmax2`, the fits of
+`notears`, `dagma`, `dynotears`, `cam`, `resit`, `score_matching`, `nogam`, `das`, `camuv`, `cpcm`,
+`cpcm_graph`, `skewd`, and `skewd_mv`, and the tests of `pcmci`, `pcmciplus`, `jpcmciplus`, and
+`lpcmci` and their worker processes run on one BLAS thread, so the host's thread count cannot change
+their results. From 2,000 rows, KCI runs on every BLAS thread, where its kernel products run faster;
+its p-values then repeat for a fixed thread count.
 
 Two methods depend on more than ties. `calm` trains with PyTorch: its results repeat on one machine
 with one torch version, and another platform can give another graph. When the likelihood fit of

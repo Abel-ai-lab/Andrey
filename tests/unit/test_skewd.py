@@ -5,12 +5,15 @@ from __future__ import annotations
 import itertools
 import time
 import warnings
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import pandas as pd
 import pytest
 from scipy.stats import skewnorm
+from threadpoolctl import threadpool_info, threadpool_limits
 
+import andrey
 from andrey import skewd, skewd_mv
 from andrey.api.irregular import _pair_matrix
 from andrey.core.orient import ARROW, NULL, TAIL, dag2cpdag
@@ -232,6 +235,15 @@ def test_the_likelihood_criterion_points_from_the_larger_likelihood_of_the_same_
     assert reverse.structure.oriented_edges() == [(1 - cause, cause, "directed")]
 
 
+def test_skewd_decides_by_the_likelihood_by_default():
+    data = _pair()
+    default = skewd(data, **SHORT_PAIR)
+    assert default.metadata == skewd(data, criterion="likelihood", **SHORT_PAIR).metadata
+    assert "p_values" not in default.metadata
+    with pytest.raises(ValueError, match="criterion='independence'"):
+        skewd(data, alpha=0.05, **SHORT_PAIR)
+
+
 def test_skewd_swapped_columns_swap_the_directions():
     data = pd.DataFrame(_pair(), columns=["x", "y"])
     first = skewd(data, criterion="likelihood", **SHORT_PAIR)
@@ -270,7 +282,7 @@ def test_skewd_mv_returns_the_most_likely_dag_of_the_class(monkeypatch, root):
     def column(values: np.ndarray) -> int:
         return int(np.argmax([abs(np.corrcoef(values, data[:, j])[0, 1]) for j in range(3)]))
 
-    def fit(parents, effect, budget, seed):
+    def fit(parents, effect, budget, seed, run):
         edge = (column(parents[:, 0]), column(effect))
         return native.Fit(0.0 if edge in edges[root] else -1.0, effect, True)
 
@@ -319,9 +331,10 @@ def test_a_column_that_spans_the_float_range_is_read_without_overflow(missing_ce
         data[3, 1] = huge[3, 1] = np.nan
     with warnings.catch_warnings():
         warnings.simplefilter("error", RuntimeWarning)
-        pair = skewd(huge, **SHORT_PAIR)
+        pair = skewd(huge, criterion="independence", **SHORT_PAIR)
         graph = skewd_mv(huge[~np.isnan(huge).any(axis=1)], **SHORT_GRAPH)
-    assert pair.structure.oriented_edges() == skewd(data, **SHORT_PAIR).structure.oriented_edges()
+    plain = skewd(data, criterion="independence", **SHORT_PAIR)
+    assert pair.structure.oriented_edges() == plain.structure.oriented_edges()
     assert len(graph.structure.oriented_edges()) == 1
 
 
@@ -445,12 +458,15 @@ def test_the_joint_search_matches_exhaustive_search_on_random_conflicting_graphs
     assert conflicts > 20  # the draw reaches the cycle case often
 
 
-def test_a_constant_cross_validation_fold_starts_from_a_symmetric_shape():
+@pytest.mark.parametrize("optimizer", native.OPTIMIZERS)
+def test_a_constant_cross_validation_fold_starts_from_a_symmetric_shape(optimizer):
     # Eight folds of eight rows: the fold that holds out the one row that differs trains on a
     # constant effect, whose skewness is 0 / 0.
     parents = np.random.default_rng(0).standard_normal((8, 1))
     effect = np.array([0.0] * 7 + [1.0])
-    budget = native.Budget(knots=8, folds=8, tuning_iter=1, initial=1, max_iter=5)
+    budget = native.Budget(
+        knots=8, folds=8, tuning_iter=1, initial=1, max_iter=5, optimizer=optimizer
+    )
     with warnings.catch_warnings():
         warnings.simplefilter("error")  # a division by zero is a RuntimeWarning
         result = native.fit(parents, effect, budget, 0)
@@ -463,7 +479,8 @@ def test_a_constant_cross_validation_fold_starts_from_a_symmetric_shape():
     assert nearly[-1] == 0.0  # rounding in the mean leaves no skewness either
 
 
-def test_a_fit_with_two_parents_stops_on_the_rule():
+@pytest.mark.parametrize("optimizer", native.OPTIMIZERS)
+def test_a_fit_with_two_parents_stops_on_the_rule(optimizer):
     # Each parent's basis sums to one, so a constant can move between the parents' coefficients
     # and change no fitted value; the refinement must not read that as movement.
     rng = np.random.default_rng(1)
@@ -472,7 +489,7 @@ def test_a_fit_with_two_parents_stops_on_the_rule():
     effect = np.sin(parents[:, 0]) + 0.5 * parents[:, 1] ** 2 + np.exp(0.3 * parents[:, 0]) * noise
     effect = (effect - effect.mean()) / effect.std()
     design = native._design(parents, 8)
-    theta, _ = native._heuristic(design, np.arange(200), effect, np.zeros(4), [], rng)
+    theta, _ = native._heuristic(design, np.arange(200), effect, np.zeros(4), [], rng, optimizer)
     refined, converged = native._ecm(design, effect, theta, np.zeros(4), 3000)
     assert converged
     blocks = refined[: design.location.shape[1]].reshape(2, -1)
@@ -503,7 +520,9 @@ def test_the_searches_of_a_fit_with_two_parents_stop_on_their_rule(monkeypatch):
         return found
 
     monkeypatch.setattr(native, "_cma_es", counted)
-    budget = native.Budget(knots=8, folds=5, tuning_iter=1, initial=1, max_iter=5)
+    budget = native.Budget(
+        knots=8, folds=5, tuning_iter=1, initial=1, max_iter=5, optimizer="cmaes"
+    )
     native.fit(parents, effect, budget, 0)
     assert len(generations) == 11
     assert max(generations) < 0.8 * native.GENERATIONS
@@ -522,11 +541,119 @@ def test_a_search_started_near_an_optimum_moves_to_it():
     assert value < 0.01 * float(objective(start[None, :])[0])
 
 
+def _skewed_design(parents: int, n: int = 150, seed: int = 3):
+    """A design and effect of ``parents`` standardized parents with skewed location-scale noise."""
+    rng = np.random.default_rng(seed)
+    parents = rng.standard_normal((n, parents))
+    noise = skewnorm.rvs(-4, size=n, random_state=rng)
+    effect = np.tanh(parents).sum(axis=1) + (0.5 + 0.2 * np.tanh(parents[:, 0])) * noise
+    parents = (parents - parents.mean(axis=0)) / parents.std(axis=0)
+    effect = (effect - effect.mean()) / effect.std()
+    return native._design(parents, 8), effect
+
+
+@pytest.mark.parametrize("parents", [1, 2])
+def test_the_gradient_is_the_derivative_of_the_penalized_likelihood(parents):
+    design, effect = _skewed_design(parents)
+    k_alpha, m_kappa = design.penalties(np.full(2 * parents, 0.5))
+    rng = np.random.default_rng(6)
+    q, p = design.location.shape[1], design.scale.shape[1]
+    for _ in range(3):
+        theta = np.concatenate([rng.normal(0, 0.5, q), rng.normal(0, 0.3, p), [rng.normal(0, 3)]])
+        args = (design.location, design.scale, effect, k_alpha, m_kappa)
+        gradient = native._penalized_nll_gradient(theta, *args)
+        steps = np.eye(theta.size) * 1e-6
+        central = (
+            native._penalized_nll(theta + steps, *args)
+            - native._penalized_nll(theta - steps, *args)
+        ) / 2e-6
+        np.testing.assert_allclose(gradient, central, rtol=1e-5, atol=1e-5)
+
+
+@pytest.mark.parametrize("u", [-1e10, -1e9, -1e8, -1e6, -1e3, -30.0, -1.0, 0.0, 1.0, 30.0, 1e3])
+@pytest.mark.parametrize("shape", [-4.0, 3.0])
+def test_the_gradient_keeps_its_precision_far_into_the_tails(u, shape):
+    # One row at u = lambda r, an intercept for the location and the log scale, against a
+    # finite difference of the same penalized likelihood at 60 digits.
+    mp = pytest.importorskip("mpmath")
+    psi, rho = 0.3, 0.4
+    effect = np.array([psi + u / shape * np.exp(rho / 2)])
+    theta = np.array([psi, rho, shape])
+    ones, k_alpha, m_kappa = np.ones((1, 1)), np.array([[0.7]]), np.array([[0.2]])
+    gradient = native._penalized_nll_gradient(theta, ones, ones, effect, k_alpha, m_kappa)
+
+    def penalized_nll(psi, rho, shape):
+        r = (mp.mpf(effect[0]) - psi) * mp.exp(-rho / 2)
+        log_density = -rho / 2 - r**2 / 2 + mp.log(mp.ncdf(shape * r))
+        return -log_density + mp.mpf(0.7) * psi**2 / 2 + mp.mpf(0.2) * rho**2 / 2
+
+    with mp.workdps(60):
+        point = [mp.mpf(v) for v in theta]
+        reference = [
+            float(mp.diff(lambda x, k=k: penalized_nll(*point[:k], x, *point[k + 1 :]), point[k]))
+            for k in range(3)
+        ]
+    np.testing.assert_allclose(gradient, reference, rtol=1e-12, atol=1e-12)
+
+
+@pytest.mark.parametrize("u", [-1e10, -1e9, -1e8, -1e6, -1e3, -30.0, -1.0, 1.0, 30.0, 1e3])
+@pytest.mark.parametrize("shape", [-4.0, 3.0])
+def test_the_ecm_location_step_keeps_its_precision_far_into_the_tails(u, shape):
+    # One row at u = lambda r (u = 0 leaves one row's shape step undefined) and intercepts for
+    # the location and the log scale: the location after one ECM step against the same step at
+    # 60 digits. The step reads phi(u) / Phi(u) through v = lambda e + sd w, which is small beside
+    # the effect, so the location keeps the ratio's precision.
+    mp = pytest.importorskip("mpmath")
+    psi, rho = 0.3, 0.4
+    effect = np.array([psi + u / shape * np.exp(rho / 2)])
+    ones = np.ones((1, 1))
+    design = native._Design(ones, ones, np.array([[0.7]]), np.array([[0.2]]), 1)
+    theta = np.array([psi, rho, shape])
+    step, _ = native._ecm(design, effect, theta, np.zeros(2), 1)
+
+    with mp.workdps(60):
+        lam, sd = mp.mpf(shape), mp.exp(mp.mpf(rho) / 2)
+        e = mp.mpf(effect[0]) - mp.mpf(psi)
+        w = mp.npdf(lam * e / sd) / mp.ncdf(lam * e / sd)
+        shrink = 1 + lam**2
+        rhs = (mp.mpf(effect[0]) - lam / shrink * (lam * e + sd * w)) / sd**2
+        reference = float(rhs / (1 / sd**2 + mp.mpf(0.7) / shrink))
+    np.testing.assert_allclose(step[0], reference, rtol=1e-12, atol=1e-12)
+
+
+@pytest.mark.parametrize("parents", [1, 2])
+def test_an_lbfgs_search_ends_at_a_stationary_point_no_worse_than_its_start(parents):
+    # With two parents the search moves in the coordinates of the identified frame, so its
+    # gradient there must be the raw gradient carried through the frame.
+    design, effect = _skewed_design(parents)
+    rows = np.arange(effect.size)
+    log_penalties = np.zeros(2 * parents)
+    (search,) = native._searches(
+        design, rows, effect, log_penalties, [], np.random.default_rng(0), "lbfgs"
+    )
+    best, value = native._run_search(search)
+    k_alpha, m_kappa = design.penalties(log_penalties)
+    args = (design.location, design.scale, effect, k_alpha, m_kappa)
+    start = native._start(design.location, design.scale, effect)
+    assert value <= float(native._penalized_nll(start[None, :], *args)[0])
+    assert value == float(native._penalized_nll(best[None, :], *args)[0])
+    gradient = native._penalized_nll_gradient(best, *args)
+    q, p = design.location.shape[1], design.scale.shape[1]
+    inside = np.ones(best.size, dtype=bool)  # a coordinate at its bound may keep a gradient
+    inside[q : q + p] = (best[q : q + p] > native.RHO_BOUNDS[0]) & (
+        best[q : q + p] < native.RHO_BOUNDS[1]
+    )
+    inside[-1] = abs(best[-1]) < native.SHAPE_BOUND
+    assert np.abs(gradient[inside]).max() < 1e-4
+
+
 def test_a_search_draws_the_same_numbers_however_long_the_searches_before_it_ran(monkeypatch):
     # A table in other units differs in its last digits, which can end one search a generation
     # sooner; the next search's random numbers must not shift with that.
     data = _pair_matrix("skewd", _pair(60), standardize=True)[0]
-    budget = native.Budget(knots=12, folds=8, tuning_iter=3, initial=2, max_iter=5)
+    budget = native.Budget(
+        knots=12, folds=8, tuning_iter=3, initial=2, max_iter=5, optimizer="cmaes"
+    )
 
     def fit_with_searches_of(generations: int) -> tuple[list[float], native.Fit]:
         draws: list[float] = []
@@ -568,3 +695,120 @@ def test_a_search_does_not_read_the_signs_of_the_eigenvectors(monkeypatch):
     again = search()
     np.testing.assert_array_equal(again[0], first[0])
     assert again[1] == first[1]
+
+
+_SIXTEEN_BLAS_THREADS = """
+import pickle, sys
+from threadpoolctl import threadpool_info
+import andrey
+from andrey.fcm import skewd as native
+
+method, data, kwargs, counts = pickle.load(sys.stdin.buffer)
+outside = [lib["num_threads"] for lib in threadpool_info() if lib["user_api"] == "blas"]
+inside, fit = [], native.fit
+
+def recording(*args):
+    inside.extend(lib["num_threads"] for lib in threadpool_info() if lib["user_api"] == "blas")
+    return fit(*args)
+
+native.fit = recording
+outs = []
+for n_jobs in counts:
+    with andrey.config(n_jobs=n_jobs):
+        out = getattr(andrey, method)(data, **kwargs)
+    outs.append((repr(out.metadata), out.structure.oriented_edges()))
+pickle.dump((outside, inside, outs), sys.stdout.buffer)
+"""
+
+
+def _under_sixteen_blas_threads(method: str, data, kwargs: dict, counts: tuple[int, ...]):
+    """``method``'s metadata (as its ``repr``) and edges at each worker count, in a process started
+    with 16 BLAS threads, after checking that every fit there saw one BLAS thread."""
+    import os
+    import pickle
+    import subprocess
+    import sys
+
+    names = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
+    threads = dict.fromkeys(names, "16")
+    proc = subprocess.run(
+        [sys.executable, "-c", _SIXTEEN_BLAS_THREADS],
+        input=pickle.dumps((method, data, kwargs, counts)),
+        capture_output=True,
+        env={**os.environ, **threads},
+        timeout=600,
+    )
+    assert proc.returncode == 0, proc.stderr.decode()
+    outside, inside, outs = pickle.loads(proc.stdout)
+    if not outside or max(outside) == 1:
+        pytest.skip("no BLAS here runs on 16 threads")
+    assert inside and set(inside) == {1}
+    return outs
+
+
+@pytest.mark.parametrize("optimizer", native.OPTIMIZERS)
+@pytest.mark.parametrize("workers", [4, 8])
+def test_a_fit_on_workers_gives_the_serial_fit_bit_for_bit(workers, optimizer):
+    # Every search draws from its own stream, spawned in a fixed order, so where the searches
+    # run cannot change a bit of the fit. Two fits with two parents run at once, each with a
+    # candidate chosen by the Gaussian process, so two threads change the warning filters.
+    rng = np.random.default_rng(4)
+    parents = rng.standard_normal((120, 2))
+    effect = np.tanh(parents).sum(axis=1) + skewnorm.rvs(4, size=120, random_state=rng)
+    parents = (parents - parents.mean(axis=0)) / parents.std(axis=0)
+    effect = (effect - effect.mean()) / effect.std()
+    budget = native.Budget(
+        knots=6, folds=3, tuning_iter=3, initial=2, max_iter=50, optimizer=optimizer
+    )
+    serial = native.fit(parents, effect, budget, 0)
+    filters = list(warnings.filters)
+    with native.search_pool(workers) as run, ThreadPoolExecutor(max_workers=2) as both:
+        spread = [both.submit(native.fit, parents, effect, budget, 0, run) for _ in range(2)]
+    assert warnings.filters == filters
+    for each in spread:
+        assert each.result().log_likelihood == serial.log_likelihood
+        assert np.array_equal(each.result().residual, serial.residual)
+
+
+@pytest.mark.parametrize("optimizer", native.OPTIMIZERS)
+def test_skewd_gives_the_same_bits_on_any_number_of_workers(optimizer):
+    data = pd.DataFrame(_pair(), columns=["x", "y"])
+    kwargs = {**SHORT_PAIR, "optimizer": optimizer}
+    first = skewd(data, **kwargs)
+    for workers in (4, 8):
+        with threadpool_limits(limits=2), andrey.config(n_jobs=workers):
+            before = threadpool_info()
+            out = skewd(data, **kwargs)
+            assert threadpool_info() == before  # the fit's one BLAS thread is restored
+        assert out.metadata == first.metadata
+        assert out.structure.oriented_edges() == first.structure.oriented_edges()
+    assert (
+        _under_sixteen_blas_threads("skewd", data, kwargs, (1, 4))
+        == [(repr(first.metadata), first.structure.oriented_edges())] * 2
+    )
+    with andrey.config(n_jobs=4):
+        swapped = skewd(data[["y", "x"]], **kwargs)
+    assert swapped.structure.oriented_edges() == first.structure.oriented_edges()
+    fits = first.metadata["log_likelihoods"]
+    assert swapped.metadata["log_likelihoods"] == {
+        "forward": fits["backward"],
+        "backward": fits["forward"],
+    }
+
+
+@pytest.mark.parametrize("optimizer", native.OPTIMIZERS)
+def test_skewd_mv_gives_the_same_bits_on_any_number_of_workers(optimizer):
+    data = pd.DataFrame(_chain(), columns=["x", "y", "z"])
+    kwargs = {**SHORT_GRAPH, "optimizer": optimizer}
+    first = skewd_mv(data, **kwargs)
+    for workers in (4, 8):
+        with andrey.config(n_jobs=workers):
+            out = skewd_mv(data, **kwargs)
+        assert out.metadata == first.metadata
+        assert out.structure.oriented_edges() == first.structure.oriented_edges()
+    assert _under_sixteen_blas_threads("skewd_mv", data, kwargs, (4,)) == [
+        (repr(first.metadata), first.structure.oriented_edges())
+    ]
+    with andrey.config(n_jobs=4):
+        reordered = skewd_mv(data[["z", "x", "y"]], **kwargs)
+    assert sorted(reordered.structure.oriented_edges()) == sorted(first.structure.oriented_edges())

@@ -48,7 +48,12 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._skeleton import check_collider_rule, unseparated_triples, vote_triples
+from andrey.constraint._skeleton import (
+    check_collider_rule,
+    flagged_triples,
+    unseparated_triples,
+    vote_triples,
+)
 from andrey.constraint.pc import (
     adjacency_search,
     check_collider_order,
@@ -60,6 +65,7 @@ from andrey.constraint.pc import (
 )
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import make_indep_test
+from andrey.core.ci_missing import counts_its_tests, mark_environment, running_flags
 from andrey.core.independence import _center_kernel, _gaussian_kernel
 from andrey.core.knowledge import orient
 from andrey.core.orient import _is_directed, _reaches_directed, meek, to_structure
@@ -71,6 +77,7 @@ if TYPE_CHECKING:
 _RIDGE = 0.1
 
 
+@counts_its_tests
 def cdnod(
     data: np.ndarray,
     env: np.ndarray,
@@ -86,6 +93,7 @@ def cdnod(
     in_column_order: bool = False,
     workers: int | None = None,
     seed: int | None = None,
+    degrees_of_freedom: str = "mean",
     _ambiguous: set[tuple[int, int, int]] | None = None,
     _conflicts: set[tuple[int, int]] | None = None,
     _index_edges: list[int] | None = None,
@@ -114,15 +122,16 @@ def cdnod(
     worker processes share the skeleton search's larger conditioning-size passes
     (:func:`~andrey.constraint.pc.adjacency_search`); ``None`` reads
     ``andrey.config.n_jobs``. ``seed`` fixes the draws of a stochastic ``indep_test``
-    (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses ``ANDREY_SEED``. Returns a
-    ``GraphStructure`` tagged ``"cpdag"``: its directions
-    include those the index identifies, so it is not an observational CPDAG. The private
+    (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`); ``None`` uses ``ANDREY_SEED``.
+    ``degrees_of_freedom`` reaches a categorical ``indep_test``
+    (:class:`~andrey.core.ci.ChiSquare`). Returns a ``GraphStructure`` tagged ``"cpdag"``: its
+    directions include those the index identifies, so it is not an observational CPDAG. The private
     ``_ambiguous`` sink receives the triples no rule reads as a collider or a non-collider, keyed
     ``(a, b, c)`` with ``a < c``, the context numbered ``n_features``, and the private
     ``_conflicts`` sink the edges between variables that colliders ask to orient both ways
     (:func:`~andrey.constraint.pc.collider_conflicts`), and the private ``_index_edges`` sink the
-    data variables the context keeps an edge to, in column order: each such edge is
-    ``context -> variable``, and with a single domain there are none.
+    data variables the context keeps an edge to, in column order: each such edge is ``context ->
+    variable``, and with a single domain there are none.
     """
     check_collider_order(collider_order)
     check_collider_rule(collider_rule)
@@ -141,12 +150,19 @@ def cdnod(
     ranked = collider_order == "p_value"
     rule4 = constraints is not None
     workers = backend.worker_count(workers)
+    undecided: set[tuple[int, int]] = set()
     if np.ptp(context) == 0:
         # One domain: no change to detect, and a constant has no correlation to test, so the
         # search runs on ``data`` alone and gives PC's graph.
         allowed, keep, apart = knowledge_masks(constraints)
         skeleton, sepsets, pvalues = adjacency_search(
-            make_indep_test(indep_test, X, categorical=categorical, seed=seed),
+            make_indep_test(
+                indep_test,
+                X,
+                categorical=categorical,
+                seed=seed,
+                degrees_of_freedom=degrees_of_freedom,
+            ),
             d,
             alpha,
             support=allowed,
@@ -155,13 +171,22 @@ def cdnod(
             max_depth=max_depth,
             workers=workers,
             record_pvalues=ranked,
+            undecided=undecided,
         )
-        ambiguous = unseparated_triples(skeleton != NULL, sepsets, constraints)
+        adjacency = skeleton != NULL
+        ambiguous = unseparated_triples(adjacency, sepsets, constraints, undecided)
         if collider_rule != "sepsets":
-            test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
+            test = make_indep_test(
+                indep_test,
+                X,
+                categorical=categorical,
+                seed=seed,
+                degrees_of_freedom=degrees_of_freedom,
+            )
             ambiguous |= vote_triples(
                 skeleton, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
             )
+        ambiguous |= flagged_triples(adjacency, running_flags(adjacency))
         pdag = _orient_with_context(
             skeleton,
             sepsets,
@@ -177,7 +202,16 @@ def cdnod(
         padded = None if constraints is None else constraints.padded(d + 1)
         allowed, keep, apart = knowledge_masks(padded)
         skeleton, sepsets, pvalues = adjacency_search(
-            make_indep_test(indep_test, augmented, categorical=mask, seed=seed),
+            mark_environment(
+                make_indep_test(
+                    indep_test,
+                    augmented,
+                    categorical=mask,
+                    seed=seed,
+                    degrees_of_freedom=degrees_of_freedom,
+                ),
+                d,
+            ),
             d + 1,
             alpha,
             support=allowed,
@@ -186,12 +220,23 @@ def cdnod(
             max_depth=max_depth,
             workers=workers,
             record_pvalues=ranked,
+            undecided=undecided,
         )
-        ambiguous = unseparated_triples(skeleton != NULL, sepsets, padded)
+        adjacency = skeleton != NULL
+        ambiguous = unseparated_triples(adjacency, sepsets, padded, undecided)
         if _index_edges is not None:
             _index_edges.extend(np.flatnonzero(skeleton[d] != NULL).tolist())
         if collider_rule != "sepsets":
-            test = make_indep_test(indep_test, augmented, categorical=mask, seed=seed)
+            test = mark_environment(
+                make_indep_test(
+                    indep_test,
+                    augmented,
+                    categorical=mask,
+                    seed=seed,
+                    degrees_of_freedom=degrees_of_freedom,
+                ),
+                d,
+            )
             sources = np.flatnonzero(skeleton[d] != NULL).tolist()
             through_context = {(a, d, c) for a, c in combinations(sources, 2)}
             ambiguous |= vote_triples(
@@ -203,6 +248,7 @@ def cdnod(
                 max_depth=max_depth,
                 skip=ambiguous | through_context,
             )
+        ambiguous |= flagged_triples(adjacency, running_flags(adjacency))
         pdag = _orient_with_context(
             skeleton,
             sepsets,

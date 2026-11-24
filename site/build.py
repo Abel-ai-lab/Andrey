@@ -7,7 +7,7 @@ Every number on the homepage comes from a release's published benchmark summary 
 from the method registry. A method measured against the same package in two summaries shows the
 newer summary's rows (:func:`newest`). The speed and accuracy sections show one method per
 registry family, the one :func:`featured_methods` picks, beside every package compared with it. The
-README, the live demo, and the homepage's description state ``CLAIM``, which carries no number;
+README and the live demo state ``CLAIM``, and the homepage's description its words, with no number;
 :func:`claim_sentence` words the first summary's headline. The method counts come from the method
 registry. A summary outside ``benchmarks/published/`` loads only as a placeholder, which marks
 the page as not for release. Links are relative to the site root.
@@ -70,6 +70,7 @@ RELEASES = (
     "0.16.0",
     "0.17.0",
     "0.18.0",
+    "0.19.0",
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 
@@ -476,6 +477,39 @@ REGIMES |= {
         )
     },
 }
+# The 0.19.0 summary's CPCM cells: the pairs of the CPCM paper's Table 1 by the family fitted, its
+# Table 2 (the Tagasovska et al. sets and its Poisson and Pareto setups) by family arm, its model
+# (16), and its graphs of Section 6.4 and Appendix B.1.1.
+CPCM_PAPER = "the CPCM paper's"
+REGIMES |= {
+    **{
+        f"cpcm_table1_{family}": f"{CPCM_PAPER} Table 1 pairs with exponential effects, fitted "
+        f"with the {name} family"
+        for family, name in (
+            ("exponential", "exponential"),
+            ("gamma_fixed_shape", "gamma, fixed shape,"),
+            ("pareto", "Pareto"),
+            ("gamma", "gamma"),
+            ("gumbel", "Gumbel"),
+            ("gumbel_fixed_scale", "Gumbel, fixed scale,"),
+            ("gaussian", "Gaussian location-scale"),
+            ("gaussian_fixed_scale", "Gaussian, fixed scale,"),
+        )
+    },
+    "cpcm_table2": f"{CPCM_PAPER} Table 2 pairs: the Tagasovska et al. (2020) sets and its Poisson "
+    "and Pareto setups",
+    "cpcm_table2_other_arm": f"{CPCM_PAPER} Table 2 pairs, fitted with the other family",
+    "cpcm_pareto16": f"{CPCM_PAPER} Pareto pairs of model (16)",
+    "cpcm_graph_paper": f"{CPCM_PAPER} graphs of 5 variables",
+    "cpcm_graph_paper_lambda1": f"{CPCM_PAPER} graphs of 5 variables, edge penalty 1",
+    "cpcm_graph_greedy": f"{CPCM_PAPER} exponential graphs of 4 to 8 variables",
+}
+# The 0.19.0 summary's SkewD cells: the SkewD paper's skewed pairs with the Tagasovska et al.
+# location-scale sets, and its skew-normal graphs of 6 and 10 variables.
+REGIMES |= {
+    "skewd_pairs": "the SkewD paper's skewed pairs and two Gaussian location-scale pair sets",
+    "skewd_mv_graphs": "the SkewD paper's skew-normal location-scale graphs of 6 and 10 variables",
+}
 # The 0.17.0 summary's cells: SCORE and NoGAM on the simulation of their papers, with Gaussian,
 # Laplace, or Gumbel noise, every column z-scored, or each variable rescaled to unit variance
 # before its children read it.
@@ -556,11 +590,14 @@ NOT_SHOWN = {("nonlinear", "anm_er"), ("boss-grasp", "diabetes")}
 # paper's 0.05, and omits the default 0.01, its context-link errors, the draws that break the
 # paper's Assumption 3, and its nonlinear cells with GPDC, whose reference reads one column of the
 # dummies. LOCI shows its default criterion, independence, and omits the likelihood criterion.
-# SCORE and NoGAM show their z-scored and rescaled cells and omit the cells in the simulation's
-# own units, where the references read those units and Andrey standardizes. NOTEARS omits its
-# cells in the simulation's own units and its rescaled cells, which its release card reports and
-# does not judge; its z-scored cells are at mean degrees 4 and 8, the paper's, so ``MEAN_DEGREE``
-# leaves them to the card too.
+# CPCM shows its claimed family arms and omits Table 1's misspecified families, the other family
+# arm of Table 2, and the graphs' edge penalty 1. SkewD shows its default criterion, the
+# likelihood, and omits the independence criterion.
+# SCORE, NoGAM, and DAS show their z-scored and rescaled cells and omit the cells in the
+# simulation's own units, where the references read those units and Andrey standardizes. NOTEARS
+# omits its cells in the simulation's own units and its rescaled cells, which its release card
+# reports and does not judge; its z-scored cells are at mean degrees 4 and 8, the paper's, so
+# ``MEAN_DEGREE`` leaves them to the card too.
 NOT_SHOWN_LANES = {
     "igsp.alpha_1e-2_starts_5",
     "igsp.alpha_1e-2_starts_10",
@@ -575,8 +612,13 @@ NOT_SHOWN_LANES = {
     "jpcmciplus.assumption_3_broken",
     "jpcmciplus.gpdc",
     "loci.likelihood",
+    "cpcm.misspecified",
+    "cpcm.other_arm",
+    "cpcm_graph.lambda1",
+    "skewd.independence",
     "score_matching.raw",
     "nogam.raw",
+    "das.raw",
     "notears.raw",
     "notears.rescaled",
 }
@@ -976,7 +1018,7 @@ def speed_claim(summaries: list[dict]) -> tuple[str, str]:
     return lead, rest
 
 
-# The speed claim the README, the live demo, and the homepage's description state.
+# The speed claim the README and the live demo state; the homepage's description opens with it.
 CLAIM = "The fastest causal discovery package."
 
 
@@ -2656,20 +2698,12 @@ def homepage_code_css() -> str:
     return code_css("", "light") + "\n" + code_css('html[data-theme="dark"] ', "dark")
 
 
-# The methods the homepage's description names; every other registered method counts as "more".
-DESCRIPTION_METHODS = ("PC", "GES", "FCI")
-
-
-def page_description(summaries: list[dict]) -> str:
-    """The homepage's summary for search results and link previews, as plain text."""
-    registered = {spec.name for spec in list_specs()}
-    if missing := [m for m in DESCRIPTION_METHODS if m.lower() not in registered]:
-        raise ValueError(f"the description names unregistered methods: {', '.join(missing)}")
-    named, more = ", ".join(DESCRIPTION_METHODS), len(registered) - len(DESCRIPTION_METHODS)
-    return (
-        f"Causal discovery for Python and AI agents. Learn causal graphs with {named} and "
-        f"{more} more methods, on CPU or GPU. {CLAIM}"
-    )
+# The homepage's summary for search results, link previews, and the software's structured data,
+# under 160 characters: the speed claim with no number, then what else Andrey is.
+PAGE_DESCRIPTION = (
+    "The fastest causal discovery package for Python: accurate, built for agents, one API for "
+    "observational, interventional, time-series and hidden-variable data."
+)
 
 
 def abel_mark() -> str:
@@ -2701,7 +2735,7 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
     return {
         "title": escape(SEARCH_TITLE),
         # Plain text: docs/conf.py escapes it into the page's description and link-preview tags.
-        "description": page_description(summaries),
+        "description": PAGE_DESCRIPTION,
         "robots": '<meta name="robots" content="noindex">' if placeholder else "",
         "banner": banner if placeholder else "",
         "agent_pill": agent_pill(),
@@ -2741,6 +2775,8 @@ RESEARCH_CODE = {
     "SCORE authors' code",
     "NOTEARS authors' code",
     "authors' R RESIT",
+    "CPCM authors' R code",
+    "SkewD authors' recorded outputs",
 }
 # Families whose graphs beat the empty graph by link F1 (cross-variable links in the window graph,
 # or adjacencies for LPCMCI), not by errors: a lag window can hold far more errors than the empty

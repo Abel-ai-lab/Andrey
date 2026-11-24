@@ -38,10 +38,10 @@ time.
 
 The registry at the end maps each ``indep_test`` name to a factory. The nonlinear tests live in
 their own modules (KCI and RCoT in :mod:`andrey.core.ci_kernel`, CMIknn in
-:mod:`andrey.core.ci_cmiknn`, GPDC in :mod:`andrey.core.ci_gpdc`) and are imported when first
-built. On data with ``NaN``, :func:`make_indep_test` wraps the registered test in the test-wise
-deletion of :mod:`andrey.core.ci_missing`, which answers each query on the rows observed in all of
-its columns.
+:mod:`andrey.core.ci_cmiknn`, GPDC in :mod:`andrey.core.ci_gpdc`, and GCM, wGCM, and PCM in
+:mod:`andrey.core.ci_regression`) and are imported when first built. On data with ``NaN``,
+:func:`make_indep_test` wraps the registered test in the test-wise deletion of
+:mod:`andrey.core.ci_missing`, which answers each query on the rows observed in all of its columns.
 
 References
 ----------
@@ -86,9 +86,10 @@ from typing import Any, Protocol, Self, cast, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
+from scipy.linalg import get_lapack_funcs
 from scipy.special import chdtrc, gammaln, ndtr, stdtr
 
-from . import categorical, stats
+from . import categorical, env, stats
 from .categorical import BATCH_CELLS, DENSE_MIN, DENSE_ROWS
 from .mixed import ConditionalGaussian, DegenerateGaussian
 from .score import copies_error, copies_message, copy_groups
@@ -113,6 +114,17 @@ SINGULAR_RTOL = 1e-12
 # How far the inverse bound in _invert_nonsingular stays above that threshold; the factor absorbs
 # the rounding of the computed inverse and of the eigenvalues.
 BOUND_MARGIN = 1e4
+# The smallest number of candidates times the block size, len(ys) * (|S| + 2), that
+# statistic_pvalues_given answers from one factor, unless ANDREY_SHARED_SCAN_MIN_WORK sets another.
+# On one core the factor is slower than the per-query inversions below a work of about 64 and faster
+# from 128 at every set size sampled (2 to 12).
+MIN_SHARED_FACTOR_WORK = 128
+# The most submatrix entries statistic_pvalues_given hands statistic_pvalues in one call when it
+# does not factor, 8 MB of float64, so a large scan whose factor is declined runs in chunks.
+FALLBACK_STACK_ENTRIES = 1 << 20
+# The LAPACK Cholesky factor and triangular solve of statistic_pvalues_given, called directly: on
+# the small scans it serves, the checks of scipy.linalg's wrappers would take most of the time.
+_POTRF, _TRTRS = get_lapack_funcs(("potrf", "trtrs"), (np.empty((1, 1)),))
 
 
 class SingularCorrelationError(ValueError):
@@ -163,7 +175,8 @@ class PartialCorrelationTest:
     separating-set search, and :meth:`batched_call` call with queries canonical as built, use
     identical partial-correlation, clip, and p-value arithmetic. Their p-values match exactly, so
     repeated queries take the same ``p > alpha`` decision across call paths, including at the
-    threshold.
+    threshold. :meth:`statistic_pvalues_given`, which answers the grow scans of IAMB and
+    Inter-IAMB from one factor, agrees with them up to rounding.
     """
 
     # The data's groups of copies, set by the first singular inversion.
@@ -388,6 +401,95 @@ class PartialCorrelationTest:
         r = np.clip(r, -ONE_MINUS_EPS, ONE_MINUS_EPS)
         return r, np.asarray(self._pvalue(r, df))
 
+    def statistic_pvalues_given(
+        self, x: int, ys: Sequence[int], condition_set: Iterable[int]
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Partial correlations and p-values of ``x`` and each of ``ys`` given one conditioning set.
+
+        Entry ``i`` is :meth:`statistic_pvalue` of ``x`` and ``ys[i]`` given ``condition_set``, up
+        to rounding; a repeated column of the set counts once. For a set ``S`` of two or more
+        columns and two or more candidates whose ``len(ys) * (|S| + 2)`` reaches
+        ``MIN_SHARED_FACTOR_WORK`` (128, or the ``ANDREY_SHARED_SCAN_MIN_WORK`` that overrides it;
+        ``0`` factors every such scan), one Cholesky factor ``L`` of the set's correlation block
+        ``R_SS`` serves every candidate: with ``w_a = L^-1 R_Sa``, the Schur complement
+        ``P_ab = R_ab - w_a . w_b`` gives the partial correlation ``P_xy / sqrt(P_xx P_yy)``, where
+        :meth:`statistic_pvalue` inverts each ``[x, y, *S]`` block. The two agree to about ``1e-10``
+        relative in the p-value, so a p-value on a rounding boundary can differ in its ninth
+        significant digit, and a candidate's last bits can change with the other candidates of the
+        call. Every entry of the correlation matrix is read as ``corr[min, max]`` of its two
+        columns, so a matrix that is not exactly symmetric gives each pair one answer whichever
+        column is ``x``.
+
+        Other calls use :meth:`statistic_pvalues` in chunks of at most ``FALLBACK_STACK_ENTRIES``
+        submatrix entries: smaller sets, fewer candidates, or any block not demonstrably well inside
+        the nonsingular range of :func:`_invert_nonsingular`; they return or raise as that method
+        does, so blocks classified as singular, such as a candidate copying ``x`` or a set member,
+        raise the same error. ``ys`` excludes ``x`` and set members.
+        """
+        cols = np.asarray(ys, dtype=np.intp).reshape(-1)
+        cond = np.unique(np.fromiter(condition_set, dtype=np.intp))
+        min_work = env.SHARED_SCAN_MIN_WORK.read()
+        if min_work is None:
+            min_work = MIN_SHARED_FACTOR_WORK
+        if len(cond) >= 2 and len(cols) >= 2 and len(cols) * (len(cond) + 2) >= min_work:
+            df = self._degrees_of_freedom(len(cond))
+            r = self._schur_partial_correlations(int(x), cols, cond)
+            if r is not None:
+                r = np.clip(r, -ONE_MINUS_EPS, ONE_MINUS_EPS)
+                p = np.asarray(self._pvalue(r, df), dtype=np.float64)
+                return r, p
+        xs = np.full(len(cols), x, dtype=np.intp)
+        sets = np.tile(cond, (len(cols), 1))
+        step = max(1, FALLBACK_STACK_ENTRIES // (len(cond) + 2) ** 2)
+        if len(cols) <= step:
+            return self.statistic_pvalues(xs, cols, sets)
+        parts = [
+            self.statistic_pvalues(xs[i : i + step], cols[i : i + step], sets[i : i + step])
+            for i in range(0, len(cols), step)
+        ]
+        return np.concatenate([r for r, _ in parts]), np.concatenate([p for _, p in parts])
+
+    def _schur_partial_correlations(
+        self, x: int, ys: np.ndarray, cond: np.ndarray
+    ) -> np.ndarray | None:
+        """The unclamped partial correlations of :meth:`statistic_pvalues_given` from the Schur
+        complements of the block ``R_SS`` of the sorted distinct set ``cond``, or ``None`` when a
+        block ``A = [x, y, *S]`` may not pass :func:`_invert_nonsingular`.
+
+        The inverse of ``A`` is ``diag(R_SS^-1, 0) + [V; -I] M^-1 [V; -I]^T``, with ``M`` the 2 x 2
+        Schur complement of ``x`` and ``y`` and ``V = R_SS^-1 R_S[x, y]``, whose squared norm is at
+        most ``2 g`` on a unit diagonal, where ``g = ||L^-1||_F^2 >= ||R_SS^-1||_2``. So
+        ``||A^-1||_2 <= g + (1 + 2 g) / lambda_min(M)``. Below ``1 / (BOUND_MARGIN * SINGULAR_RTOL *
+        k)``, with ``k = |S| + 2 >= lambda_max(A)``, every block has ``lambda_min > BOUND_MARGIN *
+        SINGULAR_RTOL * lambda_max`` and the eigenvalue test passes; a NaN fails the comparison.
+        """
+        corr = self._corr
+        size, n = len(cond), len(ys)
+        factor, info = _POTRF(corr[cond[:, None], cond], lower=0)  # the upper triangle; cond sorted
+        if info != 0:
+            return None
+        rhs = np.empty((size, n + 1 + size))
+        rhs[:, 0] = corr[np.minimum(cond, x), np.maximum(cond, x)]
+        rhs[:, 1 : n + 1] = corr[np.minimum(cond[:, None], ys), np.maximum(cond[:, None], ys)]
+        rhs[:, n + 1 :] = np.eye(size)
+        w, info = _TRTRS(factor, rhs, lower=0, trans=1)
+        if info != 0:
+            return None
+        g = np.einsum("ij,ij->", w[:, n + 1 :], w[:, n + 1 :])
+        squares = np.einsum("ij,ij->j", w[:, : n + 1], w[:, : n + 1])
+        pxx = corr[x, x] - squares[0]
+        pyy = corr[ys, ys] - squares[1:]
+        pxy = corr[np.minimum(x, ys), np.maximum(x, ys)] - np.einsum(
+            "i,ij->j", w[:, 0], w[:, 1 : n + 1]
+        )
+        smallest = 0.5 * (pxx + pyy) - np.hypot(0.5 * (pxx - pyy), pxy)  # lambda_min(M) per y
+        if not (smallest > 0.0).all():
+            return None
+        bound = g + (1.0 + 2.0 * g) / smallest
+        if not (bound < 1.0 / (BOUND_MARGIN * SINGULAR_RTOL * (size + 2))).all():
+            return None
+        return pxy / np.sqrt(pxx * pyy)
+
     def residual_statistic_pvalues(
         self, data: np.ndarray, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
     ) -> tuple[np.ndarray, np.ndarray]:
@@ -499,6 +601,12 @@ class FisherZ(PartialCorrelationTest):
         return df
 
     @staticmethod
+    def least_rows(size: int, **options: object) -> int:
+        """The fewest rows given ``size`` conditioning variables: ``size + 4``, so
+        ``n - size - 3 >= 1`` leaves degrees of freedom."""
+        return size + 4
+
+    @staticmethod
     def _pvalue(r: np.ndarray | float, df: int) -> np.ndarray | float:
         z = 0.5 * np.log((1.0 + r) / (1.0 - r))
         return 2.0 * ndtr(-np.sqrt(df) * np.abs(z))
@@ -522,6 +630,12 @@ class StudentT(PartialCorrelationTest):
                 "need n > |S| + 2"
             )
         return df
+
+    @staticmethod
+    def least_rows(size: int, **options: object) -> int:
+        """The fewest rows given ``size`` conditioning variables: ``size + 3``, so
+        ``n - size - 2 >= 1`` leaves degrees of freedom."""
+        return size + 3
 
     @staticmethod
     def _pvalue(r: np.ndarray | float, df: int) -> np.ndarray | float:
@@ -565,6 +679,19 @@ def _null_means_batch(margins: Sequence[_Margins], g_square: bool) -> list[np.nd
     n, r, c = (np.concatenate([cells[part] for cells in found]) for part in (1, 2, 3))
     total = np.bincount(table, weights=_g_means(n, r, c), minlength=int(start[-1]))
     return [total[a:b] for a, b in zip(start[:-1], start[1:], strict=True)]
+
+
+def _nonempty_dofs(n_sx: np.ndarray, n_sy: np.ndarray, n_s: np.ndarray) -> np.ndarray:
+    """The degrees of freedom of each configuration's table with its empty rows and columns struck.
+
+    ``(r_x - 1) * (r_y - 1)``, with ``r_x`` and ``r_y`` the values of ``x`` and ``y`` present in the
+    configuration; ``0`` when either has one value. Cells in empty rows or columns have no expected
+    counts; removing them and their fitted margins exactly reduces the degrees of freedom [Spirtes
+    et al. 1993, Section 5.5; Bishop, Fienberg and Holland 1975]. Unused ``n_s`` preserves the
+    margins' shape of :func:`_null_means`.
+    """
+    present_x, present_y, informative = _informative(n_sx, n_sy)
+    return np.where(informative, (present_x - 1) * (present_y - 1), 0).astype(np.float64)
 
 
 def _informative(n_sx: np.ndarray, n_sy: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -798,6 +925,9 @@ class NormalScores(FisherZ):
         super().__init__(scores)
 
 
+#: The degrees-of-freedom rules of :class:`ChiSquare`: ``"mean"``, the null mean of the statistic,
+#: and ``"nonempty"``, each configuration's table with its empty rows and columns struck.
+DEGREES_OF_FREEDOM: tuple[str, ...] = ("mean", "nonempty")
 # A joint table of at most this many cells is counted densely; a larger one counts only the cells
 # that occur, so memory stays proportional to the rows whatever the cardinalities.
 _DENSE_CELLS = 1 << 20
@@ -852,7 +982,16 @@ class ChiSquare:
     support when the cell's expected count is below 10, and expanded about it through the fourth
     central moment above, which is within ``2e-3`` per cell. This is the semiparametric test of
     Tsamardinos and Borboudakis [4]_ with the mean worked out where they estimate it by shuffling.
-    With zero degrees of freedom the p-value is ``1``.
+    With ``degrees_of_freedom="nonempty"``, ``dof`` is instead ``(r_x - 1) * (r_y - 1)`` summed over
+    the configurations, each table's empty rows and columns struck: the degrees of freedom of
+    Spirtes et al. [1]_, less one for each cell with no expected count, in the exact form for cells
+    of an empty row or column [6]_. The two rules differ only on sparse tables, and the statistic
+    is the same under both: ``"mean"`` favors a level near the nominal one and, for G-square,
+    gives up time and rejects below the nominal rate in the sparsest tables; ``"nonempty"`` favors
+    the degrees of freedom of Spirtes et al. [1]_, read from the table alone, and gives up the
+    level (see Limitations; their time and their power were not measured against each other).
+    With zero degrees of freedom the p-value is :attr:`zero_dof_pvalue`, ``1`` by default: the rows
+    hold no evidence for or against independence, and the answer reads as independence.
 
     **Limitations.** Referring the statistic to ``(r_x - 1) * (r_y - 1)`` degrees of freedom
     over-rejects a true independence once the table is sparse, G-square more than Pearson [5]_.
@@ -899,6 +1038,15 @@ class ChiSquare:
         Finite values; each distinct value of a column is one category.
     g_square : bool, default=False
         Use the G-square (likelihood-ratio) statistic instead of Pearson's chi-square.
+    degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+        The degrees of freedom the p-value uses: ``"mean"``, the mean of the statistic when ``y``
+        is shuffled within each configuration; ``"nonempty"``, ``(r_x - 1) * (r_y - 1)`` per
+        configuration over the values present.
+
+    Raises
+    ------
+    ValueError
+        If ``degrees_of_freedom`` is not one of :data:`DEGREES_OF_FREEDOM`.
 
     References
     ----------
@@ -913,9 +1061,22 @@ class ChiSquare:
     .. [5] Koehler, K. J., and Larntz, K. (1980). An empirical investigation of goodness-of-fit
        statistics for sparse multinomials. Journal of the American Statistical Association
        75(370), 336-344.
+    .. [6] Bishop, Y. M. M., Fienberg, S. E., and Holland, P. W. (1975). Discrete Multivariate
+       Analysis: Theory and Practice. MIT Press.
     """
 
-    def __init__(self, data: np.ndarray, *, g_square: bool = False) -> None:
+    #: The p-value of a query with zero degrees of freedom. Test-wise deletion sets it to
+    #: :data:`~andrey.core.ci_missing.NOT_TESTED` on the test of each block.
+    zero_dof_pvalue: float = 1.0
+
+    def __init__(
+        self, data: np.ndarray, *, g_square: bool = False, degrees_of_freedom: str = "mean"
+    ) -> None:
+        if degrees_of_freedom not in DEGREES_OF_FREEDOM:
+            raise ValueError(
+                f"degrees_of_freedom must be one of {DEGREES_OF_FREEDOM}, "
+                f"got {degrees_of_freedom!r}"
+            )
         arr = stats.checked_matrix(data, "run a chi-square test", dtype=None)
         self._n: int = arr.shape[0]
         self._codes, self._cardinalities = categorical.encode(arr)
@@ -924,6 +1085,7 @@ class ChiSquare:
         # stream through.
         self._rows = self._codes.T.astype(np.int32 if self._n < 2**31 else np.int64, order="C")
         self._g_square = bool(g_square)
+        self._nonempty = degrees_of_freedom == "nonempty"
         # The marginal queries' statistics and p-values, by pair, and which pairs are known.
         self._marginals: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
 
@@ -1054,6 +1216,14 @@ class ChiSquare:
         self._refer(counted, statistics, p_values)
         return statistics, p_values
 
+    def _dofs(self, margins: Sequence[_Margins]) -> list[np.ndarray]:
+        """The degrees of freedom of each configuration's table, per entry of ``margins``: the null
+        means (:func:`_null_means_batch`) or the nonempty rows and columns
+        (:func:`_nonempty_dofs`)."""
+        if self._nonempty:
+            return [_nonempty_dofs(*entry) for entry in margins]
+        return _null_means_batch(margins, self._g_square)
+
     def _refer(
         self,
         counted: list[_Counted],
@@ -1062,7 +1232,7 @@ class ChiSquare:
     ) -> None:
         """Store the statistics and p-values of the counted blocks of :meth:`_given` at their
         ``part``, the degrees of freedom of all the blocks evaluated together."""
-        means = _null_means_batch([block[3] for block in counted], self._g_square)
+        means = self._dofs([block[3] for block in counted])
         for (part, bounds, statistic, _), per_table in zip(counted, means, strict=True):
             statistics[part], p_values[part] = (
                 statistic,
@@ -1114,10 +1284,10 @@ class ChiSquare:
             # Each configuration's expected counts sum to its observed ones, so Pearson's sum over
             # every cell, empty ones included, equals this sum over the occupied cells.
             statistic = float(np.sum(observed * (observed / expected))) - float(self._n)
-        per_table = _null_means(n_sx, n_sy, n_s, self._g_square)
+        per_table = self._dofs([(n_sx, n_sy, n_s)])[0]
         dof = float(np.sum(per_table))
         if dof == 0.0:
-            return statistic, 1.0
+            return statistic, self.zero_dof_pvalue
         return statistic, float(chdtrc(dof, max(statistic, 0.0)))
 
     def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
@@ -1316,12 +1486,12 @@ class ChiSquare:
         :meth:`__call__` visits them, so every p-value equals :meth:`__call__`'s.
         """
         statistic, margins = self._table_sums(tables, bounds)
-        per_table = _null_means(*margins, self._g_square)
+        per_table = self._dofs([margins])[0]
         return statistic, self._table_pvalue(statistic, bounds, per_table)
 
     def _table_sums(self, tables: np.ndarray, bounds: np.ndarray) -> tuple[np.ndarray, _Margins]:
-        """The statistics of the tests of :meth:`_table_statistics`, and the margins of their
-        tables, from which :func:`_null_means` gives the degrees of freedom."""
+        """The test statistics and table margins of :meth:`_table_statistics`; :meth:`_dofs` derives
+        the degrees of freedom from the margins."""
         m, kx, ky = tables.shape
         n_sx = np.einsum("sxy->sx", tables)
         n_sy = np.einsum("sxy->sy", tables)
@@ -1340,14 +1510,13 @@ class ChiSquare:
         statistic = 2.0 * sums if self._g_square else sums - float(self._n)
         return statistic, (n_sx, n_sy, n_s)
 
-    @staticmethod
     def _table_pvalue(
-        statistic: np.ndarray, bounds: np.ndarray, per_table: np.ndarray
+        self, statistic: np.ndarray, bounds: np.ndarray, per_table: np.ndarray
     ) -> np.ndarray:
         """The p-values of tests with ``statistic`` and the null means ``per_table`` of their
         tables, test ``i`` owning ``per_table[bounds[i]:bounds[i + 1]]``."""
         dof = _segment_sums(per_table, bounds)
-        out = np.ones(len(dof))
+        out = np.full(len(dof), self.zero_dof_pvalue)
         live = dof != 0
         out[live] = chdtrc(dof[live], np.maximum(statistic[live], 0.0))
         return out
@@ -1373,9 +1542,9 @@ class DGTest:
     correlations of ``x``'s and ``y``'s columns after the linear regression on ``S``'s. Its degrees
     of freedom are the product of the two variables' numbers of columns, and its p-value is the
     chi-square survival function. A direction of ``x`` or ``y`` that ``S`` determines exactly
-    carries no information and adds no degree of freedom; with none left, the p-value is ``1``. On
-    continuous columns only, the statistic is ``-n log(1 - r**2)`` with ``r`` the partial
-    correlation.
+    carries no information and adds no degree of freedom; with none left, the p-value is ``1``,
+    which reads as independence without evidence. On continuous columns only, the statistic is
+    ``-n log(1 - r**2)`` with ``r`` the partial correlation.
 
     The statistic does not depend on the columns' units, and queries are canonicalized as
     :class:`FisherZ`'s are, so the p-value does not depend on the argument order.
@@ -1404,6 +1573,11 @@ class DGTest:
     .. [2] Andrews, B., Ramsey, J., and Cooper, G. F. (2018). Scoring Bayesian networks of mixed
        variables. International Journal of Data Science and Analytics 6(1), 3-18.
     """
+
+    #: The p-value of a query with zero degrees of freedom, ``1``: the rows hold no evidence for or
+    #: against independence. Test-wise deletion sets it to
+    #: :data:`~andrey.core.ci_missing.NOT_TESTED` on the test of each block.
+    zero_dof_pvalue: float = 1.0
 
     def __init__(self, data: np.ndarray, categorical: npt.ArrayLike | None = None) -> None:
         self._dg = DegenerateGaussian(data, categorical)
@@ -1589,7 +1763,7 @@ class DGTest:
         wy = _whitener(block[px:, px:])
         dof = wx.shape[1] * wy.shape[1]
         if dof == 0:
-            return 0.0, 1.0
+            return 0.0, self.zero_dof_pvalue
         rho = np.linalg.svd(wx.T @ block[:px, px:] @ wy, compute_uv=False)
         rho = np.minimum(rho, ONE_MINUS_EPS)
         statistic = -self._dg.n * float(np.sum(np.log1p(-(rho * rho))))
@@ -1645,6 +1819,17 @@ class CGTest:
        variables. International Journal of Data Science and Analytics 6(1), 3-18.
     """
 
+    #: The p-value of a query with zero degrees of freedom, ``1``: the rows hold no evidence for or
+    #: against independence. Test-wise deletion sets it to
+    #: :data:`~andrey.core.ci_missing.NOT_TESTED` on the test of each block.
+    zero_dof_pvalue: float = 1.0
+
+    @staticmethod
+    def least_rows(size: int, **options: object) -> int:
+        """The fewest rows a query given ``size`` conditioning variables is tested on, ``size + 3``:
+        the rows that fit ``x``, ``y``, and the set when all are continuous."""
+        return size + 3
+
     def __init__(self, data: np.ndarray, categorical: npt.ArrayLike | None = None) -> None:
         self._cg = ConditionalGaussian(data, categorical)
         self._d: int = np.shape(data)[1]
@@ -1678,6 +1863,8 @@ class CGTest:
         k = [cg.dof(s) for s in sets]
         statistic = 2.0 * (ll[0] - ll[1] - ll[2] + ll[3])
         dof = k[0] - k[1] - k[2] + k[3]
+        if dof == 0:
+            return statistic, self.zero_dof_pvalue
         return statistic, float(chdtrc(dof, max(statistic, 0.0)))
 
     def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
@@ -1734,8 +1921,9 @@ class CGTest:
         k = [cg.dof(s) for s in sets]
         quads = range(0, len(sets), 4)
         statistic = [2.0 * (ll[i] - ll[i + 1] - ll[i + 2] + ll[i + 3]) for i in quads]
-        dof = [k[i] - k[i + 1] - k[i + 2] + k[i + 3] for i in quads]
-        return np.asarray(chdtrc(dof, np.maximum(statistic, 0.0)), dtype=np.float64).reshape(-1)
+        dof = np.array([k[i] - k[i + 1] - k[i + 2] + k[i + 3] for i in quads], dtype=np.float64)
+        p = np.asarray(chdtrc(dof, np.maximum(statistic, 0.0)), dtype=np.float64).reshape(-1)
+        return np.where(dof == 0, self.zero_dof_pvalue, p)
 
 
 # The module and class of each nonlinear test. Building one imports only its own module: GPDC's
@@ -1745,11 +1933,15 @@ NONLINEAR_CLASSES: dict[str, tuple[str, str]] = {
     "rcot": ("ci_kernel", "RCoT"),
     "cmiknn": ("ci_cmiknn", "CMIknn"),
     "gpdc": ("ci_gpdc", "GPDC"),
+    "gcm": ("ci_regression", "GCM"),
+    "wgcm": ("ci_regression", "WGCM"),
+    "pcm": ("ci_regression", "PCM"),
 }
 NONLINEAR_INDEP_TESTS: tuple[str, ...] = tuple(NONLINEAR_CLASSES)
-#: The tests that draw random numbers, which ``seed`` fixes: RCoT's random features, and the random
-#: tie keys and permutations of CMIknn and GPDC. The other tests draw none.
-STOCHASTIC_INDEP_TESTS: tuple[str, ...] = ("rcot", "cmiknn", "gpdc")
+#: The tests that draw random numbers, which ``seed`` fixes: RCoT's random features, the random
+#: tie keys and permutations of CMIknn and GPDC, and the cross-validation folds, forests, sample
+#: splits, and multipliers of GCM, wGCM, and PCM. The other tests draw none.
+STOCHASTIC_INDEP_TESTS: tuple[str, ...] = ("rcot", "cmiknn", "gpdc", "gcm", "wgcm", "pcm")
 
 
 def _nonlinear(name: str, data: np.ndarray, **options: Any) -> CITest:
@@ -1779,6 +1971,16 @@ DISCRETE_INDEP_TESTS: tuple[str, ...] = ("chisq", "gsq")
 #: always read several environments does not offer them, as the ranks would mix the environments.
 RANK_INDEP_TESTS: tuple[str, ...] = ("normal_scores",)
 MIXED_INDEP_TESTS: tuple[str, ...] = ("degen_gauss", "cond_gauss")
+#: The tests not yet supported, as the status column of the API reference marks them; the quality
+#: gate checks the other nonlinear tests.
+EXPERIMENTAL_INDEP_TESTS: tuple[str, ...] = (
+    "normal_scores",
+    "degen_gauss",
+    "cond_gauss",
+    "gcm",
+    "wgcm",
+    "pcm",
+)
 #: The shipped tests of continuous data: the partial-correlation and the nonlinear tests.
 CONTINUOUS_INDEP_TESTS: tuple[str, ...] = tuple(
     name
@@ -1843,6 +2045,7 @@ def make_indep_test(
     *,
     categorical: npt.ArrayLike | None = None,
     seed: int | None = None,
+    degrees_of_freedom: str = "mean",
     **options: Any,
 ) -> CITest:
     """Construct the registered ``indep_test`` ``name`` over ``data``.
@@ -1850,7 +2053,8 @@ def make_indep_test(
     ``options`` are keyword settings for the test's class, such as
     ``make_indep_test("cmiknn", data, k_cmi=5)``; a setting the test lacks raises ``TypeError``.
     ``seed`` reaches the tests that draw random numbers (:data:`STOCHASTIC_INDEP_TESTS`), which
-    otherwise use ``ANDREY_SEED``; the other tests ignore it.
+    otherwise use ``ANDREY_SEED``; the other tests ignore it. ``degrees_of_freedom`` reaches the
+    categorical tests (:data:`DISCRETE_INDEP_TESTS`, :class:`ChiSquare`); the other tests ignore it.
     ``categorical``, a boolean mask of the categorical columns, reaches the mixed tests
     (:data:`MIXED_INDEP_TESTS`) only; another test given one raises ``ValueError``. Raises
     :class:`NotImplementedError` when ``name`` is not registered, listing what is available. A
@@ -1870,6 +2074,8 @@ def make_indep_test(
         ) from None
     if seed is not None and name in STOCHASTIC_INDEP_TESTS:
         options["seed"] = seed
+    if name in DISCRETE_INDEP_TESTS:
+        options["degrees_of_freedom"] = degrees_of_freedom
     mixed = name in MIXED_INDEP_TESTS
     if not mixed and categorical is not None:
         raise ValueError(f"indep_test {name!r} reads no column types; categorical must be None")
@@ -1899,7 +2105,8 @@ def pins_blas(test: CITest) -> bool:
     same bits whatever the host's thread count, and the partial-correlation tests match the
     one-thread parallel skeleton workers; the chi-square tests call no BLAS. The nonlinear tests set
     it: KCI is unpinned from 2,000 rows, where its kernel products run faster on every BLAS thread
-    and its p-values are reproducible for a fixed thread count; RCoT, CMIknn, and GPDC are pinned.
+    and its p-values are reproducible for a fixed thread count; RCoT, CMIknn, GPDC, GCM, wGCM, and
+    PCM are pinned.
     """
     pin = getattr(test, "pin_blas", None)
     if pin is not None:

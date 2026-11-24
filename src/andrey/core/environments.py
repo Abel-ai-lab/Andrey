@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from andrey.core.ci_missing import MISSING_GUIDE
 from andrey.core.knowledge import column_position
 from andrey.core.structure import column_labels
 
@@ -263,13 +264,14 @@ def pool_environments(
             bad = bad | cells.isna().to_numpy()
         if bad.any():
             row, j = (int(i) for i in np.argwhere(bad)[0])
-            where = f"{prefix}environment {k!r} of data, at row {row}, column {cells.columns[j]!r},"
+            where = f"environment {k!r} of data, at row {row}, column {cells.columns[j]!r},"
             if not pd.isna(cells.iat[row, j]):
-                raise ValueError(f"{where} holds inf; drop or replace it before the fit")
+                raise ValueError(f"{prefix}{where} holds inf; drop or replace it before the fit")
             raise ValueError(
-                f"{where} holds NaN, and {method or 'this method'} does not accept missing "
-                "values; drop the rows that hold one (see Missing values in the getting-started "
-                "guide)"
+                f"{prefix}drop the rows that hold a missing value yourself, which suits values "
+                f"missing completely at random; {method or 'this method'} does not accept missing "
+                f"values, and {where} holds NaN (see the Missing values guide, "
+                f"{MISSING_GUIDE})"
             )
     if all(frames):
         repeated = [

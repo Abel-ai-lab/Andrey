@@ -11,6 +11,8 @@ way and prepares its queries only as the stacks need them.
 
 from __future__ import annotations
 
+from itertools import combinations
+
 import numpy as np
 import pytest
 
@@ -20,6 +22,7 @@ from andrey.constraint._skeleton import (
     first_order_removals,
     pair_queries,
     scan_pairs,
+    subset_rows,
 )
 from andrey.core.ci import DGTest, FisherZ, SingularCorrelationError, StudentT
 from andrey.core.ci_kernel import RCoT
@@ -31,6 +34,22 @@ ALPHA = 0.2
 def _force_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
     """numpy is the exact float64 oracle for the correlation matrix and every p-value."""
     monkeypatch.setenv("ANDREY_DEVICE", "numpy")
+
+
+@pytest.mark.parametrize("size", [1, 2, 3, 4])
+@pytest.mark.parametrize("skip_within", [None, {2, 5, 9}, {2, 5, 9, 11, 12}, {2}])
+def test_subset_rows_are_the_combinations_in_order_in_full_chunks(
+    monkeypatch: pytest.MonkeyPatch, size: int, skip_within: set[int] | None
+) -> None:
+    monkeypatch.setattr(_skeleton, "CHUNK", 7)
+    candidates = [2, 3, 5, 8, 9, 11, 12, 15]
+    want = list(combinations(candidates, size))
+    if skip_within is not None and len(skip_within) >= size:
+        want = [s for s in want if not skip_within.issuperset(s)]
+    chunks = list(subset_rows(candidates, size, skip_within))
+    assert all(c.shape == (7, size) for c in chunks[:-1])
+    assert all(len(c) > 0 for c in chunks)
+    assert [tuple(row) for c in chunks for row in c.tolist()] == want
 
 
 class _PerPairFisherZ(FisherZ):
@@ -206,9 +225,9 @@ def test_first_order_queries_are_prepared_as_they_are_evaluated(
     prepared = 0
     real = _skeleton._first_order_queries
 
-    def counting(pairs, neighbors):
+    def counting(pairs, neighbors, test=None):
         nonlocal prepared
-        for query in real(pairs, neighbors):
+        for query in real(pairs, neighbors, test):
             prepared += len(query[2])
             yield query
 

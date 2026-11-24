@@ -179,3 +179,23 @@ def test_a_str_or_list_default_reads_back_in_the_parameter_grammar():
     several = ParamSpec(name="names", type="str_or_list", default=("a", "b"), doc="")
     assert (grammar_default(one), _example_token(one)) == ("a", "names=a")
     assert (grammar_default(several), _example_token(several)) == ("[a,b]", "'names=[a,b]'")
+
+
+TARGET_METHODS = [n for n, spec in REGISTRY.items() if any(p.name == "target" for p in spec.params)]
+
+
+@pytest.mark.parametrize("name", TARGET_METHODS)
+def test_target_is_a_column_or_a_list_of_columns_in_the_schema(name):
+    """One column, or a list of at least one that returns a list of results; null where optional."""
+    spec = get_spec(name)
+    entry = to_json_schema(spec)["params"]["properties"]["target"]
+    optional = next(p for p in spec.params if p.name == "target").nullable
+    assert types_of(entry) == {"string", "array", *(["null"] if optional else [])}
+    assert entry["items"] == {"type": "string"} and entry["minItems"] == 1
+    assert "target=[a,b]" in entry["description"]
+
+
+def test_the_contract_says_where_a_list_of_targets_answers_go():
+    envelope = help_schema()["cli"]["result_envelope"]
+    assert "target=[a,b]" in envelope["results"] and "multi: true" in envelope["results"]
+    assert "target=[a,b]" in render_skill()

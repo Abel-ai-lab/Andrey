@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Collection, Iterable, Mapping
-from contextlib import nullcontext
+from contextlib import closing, nullcontext
 from itertools import combinations, groupby
 from typing import TYPE_CHECKING
 
@@ -19,17 +19,24 @@ from andrey.constraint._skeleton import (
     adjacent_pairs,
     check_collider_rule,
     first_order_removals,
+    flagged_triples,
     marginal_removals,
-    pair_queries,
     prescreen_capable,
     scan_pairs,
     separate_apart,
+    testable_queries,
     unseparated_triples,
     vote_triples,
 )
 from andrey.constraint.mvpc import IndicatorTest, PermutationCorrection, candidate_edges
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
+from andrey.core.ci_missing import (
+    counts_its_tests,
+    rows_tested_elsewhere,
+    running_flags,
+    search_outcomes,
+)
 from andrey.core.knowledge import KnowledgeError, orient
 from andrey.core.orient import meek, separating_set, to_structure
 from andrey.core.seeding import resolve_seed
@@ -44,6 +51,7 @@ _EXPENSIVE_PASS_TESTS = 10_000_000
 COLLIDER_ORDERS = ("p_value", "column")
 
 
+@counts_its_tests
 def pc(
     data: np.ndarray,
     *,
@@ -57,6 +65,7 @@ def pc(
     in_column_order: bool = False,
     workers: int | None = None,
     seed: int | None = None,
+    degrees_of_freedom: str = "mean",
     missing: str = "testwise",
     _trace: list[dict] | None = None,
     _ambiguous: set[tuple[int, int, int]] | None = None,
@@ -77,17 +86,21 @@ def pc(
     colliders, and Meek's rules run with R4, so the result is the maximally oriented PDAG (MPDAG)
     of the class under the knowledge (Meek 1995; Perkovic, Kalisch, and Maathuis 2017). A triple
     over a non-adjacent pair with no separating set is neither a collider nor a non-collider to any
-    rule (:func:`~andrey.constraint._skeleton.unseparated_triples`). Edges they decide that close a
-    directed cycle raise ``ValueError`` (:func:`check_knowledge_cycle`). ``in_column_order`` fires
-    Meek's rules one at a time in column order instead of in order-free rounds
+    rule (:func:`~andrey.constraint._skeleton.unseparated_triples`), and so, inside a
+    :func:`~andrey.core.ci_missing.reading_flags` block, is a triple with a side a conditioning set
+    no row could test might have separated (:func:`~andrey.constraint._skeleton.flagged_triples`).
+    Edges they decide that close a directed cycle raise ``ValueError``
+    (:func:`check_knowledge_cycle`). ``in_column_order`` fires Meek's rules one at a time in
+    column order instead of in order-free rounds
     (:func:`~andrey.core.orient.meek`). ``workers`` worker processes share the skeleton search's
     larger conditioning-size passes (:func:`adjacency_search`); ``None`` reads
     ``andrey.config.n_jobs``. ``seed`` fixes the draws of a stochastic ``indep_test``
     (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`) and of MVPC's permutations; ``None`` uses
-    ``ANDREY_SEED``. ``missing="mvpc"`` corrects the skeleton of data with ``NaN`` before the
-    orientation (:func:`correct_skeleton`); every other value, and data without ``NaN``, keep the
-    test-wise deletion skeleton. Returns the CPDAG, or the MPDAG with ``constraints``, as a
-    ``GraphStructure`` of kind ``"cpdag"``.
+    ``ANDREY_SEED``. ``degrees_of_freedom`` reaches a categorical ``indep_test``
+    (:class:`~andrey.core.ci.ChiSquare`). ``missing="mvpc"`` corrects the skeleton of data with
+    ``NaN`` before the orientation (:func:`correct_skeleton`); every other value, and data without
+    ``NaN``, keep the test-wise deletion skeleton. Returns the CPDAG, or the MPDAG with
+    ``constraints``, as a ``GraphStructure`` of kind ``"cpdag"``.
 
     The private ``_trace`` sink receives one record per step, in the order the steps run: each
     independence test (``step="test"``, from :func:`adjacency_search`), each unshielded triple
@@ -104,7 +117,10 @@ def pc(
     check_collider_rule(collider_rule)
     X = np.asarray(data, dtype=np.float64)
     allowed, keep, apart = knowledge_masks(constraints)
-    deletion = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
+    undecided: set[tuple[int, int]] = set()
+    deletion = make_indep_test(
+        indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
+    )
     skeleton, sepsets, pvalues = adjacency_search(
         deletion,
         X.shape[1],
@@ -117,6 +133,7 @@ def pc(
         record_pvalues=collider_order == "p_value",
         warn_expensive=True,
         trace=_trace,
+        undecided=undecided,
     )
     if missing == "mvpc" and np.isnan(X).any():
         skeleton, sepsets, pvalues = correct_skeleton(
@@ -135,13 +152,18 @@ def pc(
             sink=_mvpc,
         )
     rule4 = constraints is not None
-    ambiguous = unseparated_triples(skeleton != NULL, sepsets, constraints)
+    adjacency = skeleton != NULL
+    ambiguous = unseparated_triples(adjacency, sepsets, constraints, undecided)
     if collider_rule != "sepsets":
         # Under missing="mvpc" too, the votes read the test-wise tests, as the authors' code does.
-        test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
+        test = make_indep_test(
+            indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
+        )
         ambiguous |= vote_triples(
             skeleton, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
         )
+    # The votes run the same tests as on unflagged data; a flag overrides the result.
+    ambiguous |= flagged_triples(adjacency, running_flags(adjacency))
     if _ambiguous is not None:
         _ambiguous.update(ambiguous)
     if _conflicts is not None:
@@ -192,8 +214,8 @@ def correct_skeleton(
     the first search removed keep theirs. The ``sink`` receives ``parents``, the parents of each
     indicator that has any, ``retested``, the candidates, ``removed``, those Step 4 removed, and
     ``uncorrected``, those with a test too short of rows to correct, as ``(x, y)`` pairs with
-    ``x < y`` in ascending order. Returns the skeleton, the separating sets,
-    and the p-values.
+    ``x < y`` in ascending order, and ``rows``, the counter of the rows the corrected tests read.
+    Returns the skeleton, the separating sets, and the p-values.
     """
     d = X.shape[1]
     adjacent = skeleton != NULL
@@ -219,6 +241,7 @@ def correct_skeleton(
         sink["retested"] = adjacent_pairs(retested)
         sink["removed"] = adjacent_pairs(retested & (corrected == NULL))
         sink["uncorrected"] = sorted(correction.uncorrected)
+        sink["rows"] = correction.rows
     return corrected, {**sepsets, **more_sepsets}, {**pvalues, **more_pvalues}
 
 
@@ -232,7 +255,12 @@ def indicator_parents(
     tested against it given subsets of the indicator's neighbors, with ``indep_test`` on test-wise
     deletion, at ``alpha`` and ``max_depth``. The columns left adjacent are its parents, in
     ascending order, and an indicator with none is left out. A query whose rows hold one value of
-    the indicator separates its pair (:class:`~andrey.constraint.mvpc.IndicatorTest`).
+    the indicator, or that has fewer rows than the test needs, is not tested
+    (:class:`~andrey.constraint.mvpc.IndicatorTest`). A column on whose observed rows the
+    indicator holds one value has no query tested: it is no parent and conditions no test. A column
+    left adjacent with no query of its pair tested
+    (:meth:`~andrey.core.ci_missing.RowCounts.untested`) is not a parent: no test with rows found
+    it. The tests count in the fit's rows, without their pairs, which are the indicator's.
     """
     d = X.shape[1]
     parents: dict[int, list[int]] = {}
@@ -242,9 +270,15 @@ def indicator_parents(
         pairs = np.zeros((d, d), dtype=bool)
         pairs[column, :] = pairs[:, column] = True
         test = IndicatorTest(make_indep_test(indep_test, R, seed=seed), R, int(column))
-        found, _, _ = adjacency_search(test, d, alpha, support=pairs, max_depth=max_depth)
-        adjacent = np.flatnonzero(found[column] != NULL)
-        if adjacent.size:
+        with rows_tested_elsewhere() as rows:
+            for other in range(d):  # no query of such a column is tested: it conditions none
+                if other != column and test.constant_on(other):
+                    pairs[column, other] = pairs[other, column] = False
+                    test(column, other)
+            found, _, _ = adjacency_search(test, d, alpha, support=pairs, max_depth=max_depth)
+        undecided = {a if b == column else b for a, b in rows.untested()}
+        adjacent = [c for c in np.flatnonzero(found[column] != NULL) if c not in undecided]
+        if adjacent:
             parents[int(column)] = [int(c) for c in adjacent]
     return parents
 
@@ -475,6 +509,7 @@ def adjacency_search(
     record_pvalues: bool = False,
     warn_expensive: bool = False,
     trace: list[dict] | None = None,
+    undecided: set[tuple[int, int]] | None = None,
 ) -> tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]], dict[tuple[int, int], float]]:
     """The stable adjacency search of PC, CD-NOD, RSMAX2's PC restrict, FCI, FCI-JCI, and GFCI:
     the skeleton, and for every removed pair its separating set and p-value.
@@ -516,6 +551,13 @@ def adjacency_search(
     ``warn_expensive`` emits a :class:`~andrey.PerformanceWarning` before each conditioning-size
     pass requiring at least ten million CI tests. The search still evaluates every conditioning set.
 
+    With the ``undecided`` sink, a pair still adjacent after the last size whose queries all lacked
+    enough rows (:meth:`~andrey.core.ci_missing.RowCounts.untested`), such as a pair never observed
+    together, leaves the skeleton without a separating set before ``apart`` is searched. The sink
+    receives it as ``(x, y)``, ``x < y``; its triples are neither colliders nor non-colliders
+    (:func:`~andrey.constraint._skeleton.unseparated_triples`). Without the sink, as when refining
+    an earlier skeleton, pairs no test removed stay. Complete data have no undecided pair.
+
     The ``trace`` sink records every test in the order it runs: ``step="test"``, ``depth``, the
     pair ``x < y``, the conditioning set ``S``, the p-value ``p`` (for CMIknn, which stops its
     shuffles once the side of ``alpha`` is certain, a bound on that side), and ``removed``
@@ -534,7 +576,8 @@ def adjacency_search(
 
     can_prescreen = prescreen_capable(test)
     pool = skeleton_pool(test, workers) if trace is None else None
-    try:
+    closed = nullcontext() if pool is None else closing(pool)
+    with search_outcomes() as counted, closed:
         size = 0
         while True:
             neighbors = [np.flatnonzero(row) for row in support]
@@ -557,7 +600,7 @@ def adjacency_search(
                 pairs = adjacent_pairs(testable)
                 # Each pair's test count, taken once: the warning and the pool's cutoff read it.
                 weights = (
-                    [pair_queries(neighbors, x, y, size) for x, y in pairs]
+                    [testable_queries(test, neighbors, x, y, size) for x, y in pairs]
                     if pool is not None or (warn_expensive and size >= 2)
                     else []
                 )
@@ -591,10 +634,12 @@ def adjacency_search(
                 if p is not None:
                     pvalues[(x, y)] = p
             size += 1
-    finally:
-        if pool is not None:
-            pool.close()
 
+    if undecided is not None:
+        for x, y in counted.untested():
+            if x < n_vars and y < n_vars and support[x, y]:
+                support[x, y] = support[y, x] = False
+                undecided.add((x, y))
     if apart is not None:
         for x, y, separating, p in separate_apart(
             test,

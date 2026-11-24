@@ -25,16 +25,18 @@ from andrey import api
 from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.core.ci import (
     CONTINUOUS_INDEP_TESTS,
+    DEGREES_OF_FREEDOM,
     RANK_INDEP_TESTS,
     SHIPPED_INDEP_TESTS,
     STOCHASTIC_INDEP_TESTS,
 )
-from andrey.core.ci_missing import EM, EM_METHODS, MISSING_HANDLING, MVPC
+from andrey.core.ci_missing import EM, EM_METHODS, MISSING_HANDLING, MVPC, TESTWISE_CLAIM
 from andrey.core.env import SEED_MAX
 from andrey.core.fdr import FDR_METHODS
 from andrey.core.invariance import TWO_GROUP_INVARIANCE_TESTS
 from andrey.core.score import RANK_SCORES, SCORES
 from andrey.core.structure import Kind
+from andrey.search.em import ITERATIONS
 from andrey.search.gfci import EDGE_REMOVALS
 
 from .models import ParamSpec, ParamType, Spec
@@ -131,7 +133,7 @@ SCORE_SEARCHES = (
     "boss_fci",
     "grasp_fci",
 )
-PURE_SCORE = ("ges", "gies", "xges", "hc", "tabu", "exact_search", "boss", "grasp")
+PURE_SCORE = ("ges", "gies", "xges", "lges", "hc", "tabu", "exact_search", "boss", "grasp")
 CONTINUOUS = ("notears", "dagma")
 LINGAM = (
     "direct_lingam",
@@ -142,7 +144,7 @@ LINGAM = (
 )
 RESIDUAL = ("gin", "rcd", "bottom_up_parce_lingam", "anm", "pnl", "loci")
 #: The searches that take n_starts.
-STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_igsp")
+STARTS = ("boss", "grasp", "boss_fci", "grasp_fci", "hc", "tabu", "igsp", "ut_igsp", "rpcmci")
 #: The tests of a method whose tests always read several environments: all but the rank-based
 #: ones, which rank each column over the rows of every environment.
 UNRANKED_TESTS = tuple(t for t in SHIPPED_INDEP_TESTS if t not in RANK_INDEP_TESTS)
@@ -151,9 +153,9 @@ _POOLED_RANKS = (
     "distributions"
 )
 #: The methods that take a conditional-independence test.
-TESTED = (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "igsp", "ut_igsp", "skewd_mv")
+TESTED = (*CI_SEARCHES, *PCMCI_FAMILY, "jpcmciplus", "rpcmci", "igsp", "ut_igsp", "skewd_mv")
 #: The tested methods that read continuous data only, so take the tests of continuous data.
-CONTINUOUS_TESTED = ("jpcmciplus", "skewd_mv")
+CONTINUOUS_TESTED = ("jpcmciplus", "rpcmci", "skewd_mv")
 #: The methods with no edge to name in knowledge, ICP, whose tests take none, and the methods that
 #: take none yet.
 NO_KNOWLEDGE = (
@@ -163,10 +165,12 @@ NO_KNOWLEDGE = (
     "loci",
     "icp",
     "ages",
+    "lges",
     "cpcm",
     "cpcm_graph",
     "skewd",
     "skewd_mv",
+    "rpcmci",
 )
 #: The methods whose main loop a cap can stop early.
 CAPPED_LOOPS = (
@@ -181,6 +185,7 @@ CAPPED_LOOPS = (
     "dynotears",
     "skewd",
     "skewd_mv",
+    "rpcmci",
 )
 #: Every method, in ``andrey.api.__all__`` order.
 ALL_METHODS: tuple[str, ...] = tuple(api.__all__)
@@ -205,6 +210,7 @@ _CONCEPTS = (
             *CI_SEARCHES,
             *PCMCI_FAMILY,
             "jpcmciplus",
+            "rpcmci",
             "granger",
             *RESIDUAL,
             "cam",
@@ -253,6 +259,13 @@ _CONCEPTS = (
                 default=0.01,
                 reason="It matches pcmciplus's default, as J-PCMCI+ runs the phases of PCMCI+; "
                 "the experiments of Gunther, Ninad and Runge (2023) use 0.05.",
+            ),
+            Deviation(
+                method="rpcmci",
+                name="alpha",
+                default=0.01,
+                reason="0.01 is the level of the method's published experiments (Saggioro et al. "
+                "2020, Tables 2 and 5).",
             ),
             Deviation(
                 method="rcd",
@@ -408,6 +421,16 @@ _CONCEPTS = (
                 "rows of every dataset and so mixes their distributions.",
             ),
             Deviation(
+                method="rpcmci",
+                name="indep_test",
+                default="student_t",
+                choices=("student_t", "fisherz"),
+                reason="Its regime step fits linear regressions, so it takes the "
+                "partial-correlation tests of the linear setting the paper restricts it to "
+                "(Saggioro et al. 2020, Section 3.5); the default is the test of its published "
+                "experiments, partial correlation with the Student-t distribution.",
+            ),
+            Deviation(
                 method="skewd_mv",
                 name="indep_test",
                 default="kci",
@@ -417,6 +440,35 @@ _CONCEPTS = (
                 "monotone changes the likelihood stage reads; the authors' code runs PC with kci.",
             ),
         ),
+    ),
+    Concept(
+        key="degrees_of_freedom",
+        summary="The degrees of freedom of the categorical tests, chisq and gsq: mean = the mean "
+        "of the statistic when y is shuffled within each configuration of the conditioning set; "
+        "nonempty = (r_x - 1)(r_y - 1) per configuration over the values present, its table's "
+        "empty rows and columns struck (Spirtes, Glymour and Scheines 1993, Section 5.5). The two "
+        "differ only on sparse tables. A call that passes it with another test raises ValueError.",
+        param=_template(
+            "degrees_of_freedom",
+            "str",
+            "mean",
+            "Degrees of freedom of the categorical tests, chisq and gsq: mean = the mean of the "
+            "statistic when y is shuffled within each configuration of the conditioning set; "
+            "nonempty = (r_x - 1) * (r_y - 1) per configuration over the values of x and y present "
+            "in it, the table's empty rows and columns struck. They differ only on sparse tables. "
+            "There mean favors a level near the nominal one: over 35,808 true independences of "
+            "random discrete networks, a test at 0.05 rejected 4.9% (chisq) and 3.8% (gsq). "
+            "With gsq it gives up time, a hypergeometric sum per cell, and rejects below the "
+            "nominal rate in the sparsest tables (0.8% at 3,125 cells). nonempty favors the "
+            "degrees of freedom of Spirtes, Glymour and Scheines (1993), read from the table "
+            "alone; it gives up the level: 11.1% and 21.7% of the same true independences were "
+            "rejected. Their time and their power were not measured against each other. "
+            "Only chisq and gsq read it: passing it with another test raises ValueError.",
+            choices=DEGREES_OF_FREEDOM,
+        ),
+        fragment="degrees of freedom",
+        suitable=tuple(m for m in TESTED if m not in CONTINUOUS_TESTED),
+        others_exempt="Takes no categorical conditional-independence test.",
     ),
     Concept(
         key="invariance_test",
@@ -460,7 +512,7 @@ _CONCEPTS = (
             nullable=True,
         ),
         fragment="score",
-        suitable=SCORE_SEARCHES,
+        suitable=(*SCORE_SEARCHES, "lges"),
         exempt=_exempt(
             "Its score is the method: the noise-intervention likelihood has no other local score.",
             "gnies",
@@ -489,7 +541,7 @@ _CONCEPTS = (
             minimum=0,
         ),
         fragment="BIC penalty",
-        suitable=(*SCORE_SEARCHES, "gnies", "ages"),
+        suitable=(*SCORE_SEARCHES, "lges", "gnies", "ages"),
         others_exempt="Does not score with BIC.",
     ),
     Concept(
@@ -509,7 +561,7 @@ _CONCEPTS = (
             maximum=1,
         ),
         fragment="extended-BIC term",
-        suitable=(*SCORE_SEARCHES, "gnies"),
+        suitable=(*SCORE_SEARCHES, "lges", "gnies"),
         others_exempt="Does not score with BIC.",
         deviations=(
             Deviation(
@@ -528,6 +580,12 @@ _CONCEPTS = (
                     "published method.",
                 )
                 for m in ("boss_fci", "grasp_fci")
+            ),
+            Deviation(
+                method="lges",
+                name="ebic_gamma",
+                default=0.0,
+                reason="The standard BIC of the published method.",
             ),
         ),
     ),
@@ -548,7 +606,7 @@ _CONCEPTS = (
             exclusive_minimum=True,
         ),
         fragment="equivalent sample size",
-        suitable=SCORE_SEARCHES,
+        suitable=(*SCORE_SEARCHES, "lges"),
         others_exempt="Does not score with BDeu.",
     ),
     Concept(
@@ -614,13 +672,23 @@ _CONCEPTS = (
             choices=FDR_METHODS,
         ),
         fragment="benjamini-hochberg",
-        suitable=("pcmci", "pcmciplus", "jpcmciplus", "granger"),
+        suitable=("pcmci", "pcmciplus", "jpcmciplus", "rpcmci", "granger"),
         exempt=_exempt(
             "The marks come from the removal phases and the orientation rules at alpha, not from "
             "a threshold on the p-values the method reports.",
             "lpcmci",
         ),
         others_exempt="Reports no p-values of a family of lagged links.",
+        deviations=(
+            Deviation(
+                method="rpcmci",
+                name="fdr_method",
+                default="none",
+                choices=FDR_METHODS,
+                reason="The method's published experiments threshold each regime's MCI p-values "
+                "as tested (Saggioro et al. 2020, Section 4.1).",
+            ),
+        ),
     ),
     Concept(
         key="max_depth",
@@ -668,6 +736,9 @@ _CONCEPTS = (
                 "skewd",
             ),
             *_exempt("Runs PC at no depth limit, as its paper does.", "skewd_mv"),
+            *_exempt(
+                "Each regime runs PCMCI at no depth limit, as the method's paper does.", "rpcmci"
+            ),
             *_exempt(
                 "No conditional-independence tests; max_parents caps the sets it tests.", "icp"
             ),
@@ -767,11 +838,17 @@ _CONCEPTS = (
                 "beyond a cap its CPDAGs keep.",
                 "ages",
             ),
+            *_exempt(
+                "Not taken yet: the paper defines no cap, and the turning phase would need one "
+                "that holds after each reversal.",
+                "lges",
+            ),
             *_exempt("Parents come from the adaptive Lasso on the order.", *LINGAM),
             *_exempt(
                 "No search over parent sets.",
                 *PCMCI_FAMILY,
                 "jpcmciplus",
+                "rpcmci",
                 "granger",
                 *RESIDUAL,
                 "resit",
@@ -840,7 +917,10 @@ _CONCEPTS = (
         summary="The largest lag; the smallest follows the method's theory.",
         param=_template("tau_max", "int", 1, "The largest lag, at least 1.", minimum=1),
         fragment="largest lag",
-        suitable=(*PCMCI_FAMILY, "jpcmciplus", "granger", "longitudinal_lingam", "dynotears"),
+        suitable=(
+            *PCMCI_FAMILY,
+            *("jpcmciplus", "rpcmci", "granger", "longitudinal_lingam", "dynotears"),
+        ),
         exempt=_exempt("order=(p, q) is the ARMA order, a different concept.", "varma_lingam"),
         others_exempt="i.i.d. data.",
     ),
@@ -928,6 +1008,15 @@ _CONCEPTS = (
                 "order (Yang, Katcoff and Uhler 2018). On one set of simulated datasets in its "
                 "papers' settings, the SHD of 10 searches was lower than one search's in 21 of 87 "
                 "groups, that of 5 in 19, and neither was higher than the other's anywhere.",
+            ),
+            Deviation(
+                method="rpcmci",
+                name="n_starts",
+                default=50,
+                fragment="lowest objective",
+                reason="Every start draws a random regime assignment, and the start with the "
+                "lowest objective is returned, the paper's annealing; 50 is the number of its "
+                "published experiments (Saggioro et al. 2020, Tables 2 and 5).",
             ),
             Deviation(
                 method="ut_igsp",
@@ -1073,7 +1162,7 @@ _CONCEPTS = (
                 "or removes edges from the complete DAG of a causal order.",
                 "cpcm_graph",
             ),
-            *_exempt("Its paper gives no rule for background knowledge.", "skewd_mv"),
+            *_exempt("Its paper gives no rule for background knowledge.", "skewd_mv", "rpcmci"),
             *_exempt(
                 "Its tests read each set of the target's predictors as the data give it; no "
                 "knowledge of edges enters an invariance test.",
@@ -1083,6 +1172,12 @@ _CONCEPTS = (
                 "The paper defines the solution path and its aggregation without background "
                 "knowledge; ges takes knowledge.",
                 "ages",
+            ),
+            *_exempt(
+                "Not taken yet: its paper's prior knowledge orders the edge additions and lets the "
+                "data overrule a required or forbidden edge, unlike the knowledge every part of "
+                "which a search honors.",
+                "lges",
             ),
         ),
     ),
@@ -1095,9 +1190,20 @@ _CONCEPTS = (
         exempt=(
             *_exempt(
                 "Has no edge for knowledge to name (the knowledge concept).",
-                *(m for m in NO_KNOWLEDGE if m not in ("icp", "ages", "cpcm_graph")),
+                *(
+                    m
+                    for m in NO_KNOWLEDGE
+                    if m not in ("icp", "ages", "lges", "cpcm_graph", "rpcmci")
+                ),
             ),
-            *_exempt("Takes no knowledge (the knowledge concept).", "icp", "ages", "cpcm_graph"),
+            *_exempt(
+                "Takes no knowledge (the knowledge concept).",
+                "icp",
+                "ages",
+                "lges",
+                "cpcm_graph",
+                "rpcmci",
+            ),
         ),
     ),
     Concept(
@@ -1127,6 +1233,7 @@ _CONCEPTS = (
             "tabu",
             "gies",
             "xges",
+            "lges",
             *PCMCI_FAMILY,
             "igsp",
             "ut_igsp",
@@ -1142,10 +1249,11 @@ _CONCEPTS = (
         key="missing",
         summary="How a fit handles missing values: a NaN cell, pandas' NA, or an empty, NA, or N/A "
         "field of a CSV file. testwise deletes rows per test, each test reading the rows that "
-        "observe its variables; em fits a search that reads only a covariance by structural EM "
-        "over the expected covariance. None picks the method's default handling: testwise for the "
-        "methods that delete rows per test, and a refusal for those that take only em; each method "
-        "lists the values it accepts.",
+        f"observe its variables. {TESTWISE_CLAIM} em fits a search that reads only a covariance "
+        "by structural EM over the expected covariance. None picks the method's default handling: "
+        "testwise for the methods that delete rows per test, with one logged notice per process "
+        "that names it, and a refusal for those that take only em; each method lists the values "
+        "it accepts.",
         param=_template(
             "missing",
             "str",
@@ -1188,6 +1296,11 @@ _CONCEPTS = (
                 "ages",
             ),
             *_exempt(
+                "Not taken yet: the paper defines the search for complete data; structural EM "
+                "would suit it as it suits ges.",
+                "lges",
+            ),
+            *_exempt(
                 "A score or a regression reads every column.",
                 "cam",
                 "resit",
@@ -1206,7 +1319,7 @@ _CONCEPTS = (
                 "igsp",
                 "ut_igsp",
             ),
-            *_exempt("A series cannot drop a step.", "granger", "dynotears"),
+            *_exempt("A series cannot drop a step.", "granger", "dynotears", "rpcmci"),
             *_exempt("Its stacked design reads every step of every dataset.", "jpcmciplus"),
         ),
         deviations=(
@@ -1227,15 +1340,37 @@ _CONCEPTS = (
                     reason="em, structural EM over the expected covariance (Friedman 1997; Gao "
                     "et al. 2022), suits a fit that reads only a covariance and the row count; "
                     "None refuses missing values. It is Friedman's alternating scheme with two "
-                    "constants: 10 rounds of one search each, the number Gao et al. run, and 5 "
-                    "parameter-only EM steps on the current graph before each search after the "
-                    "first, a count Friedman leaves open (until convergence or a largest count); "
-                    "with 5, the graph settled within the 10 rounds in most measured fits, and "
-                    "with none it was still changing.",
+                    "constants: 10 rounds of one search each, the number Gao et al. run and the "
+                    "default of n_em_iterations, and 5 parameter-only EM steps on the current "
+                    "graph before each search after the first, a count Friedman leaves open "
+                    "(until convergence or a largest count); with 5, the graph settled within the "
+                    "10 rounds in most measured fits, and with none it was still changing.",
                 )
                 for m in EM_METHODS
             ),
         ),
+    ),
+    Concept(
+        key="n_em_iterations",
+        summary="The number of rounds structural EM runs under missing=em, each with one search. "
+        "The default, 10, is the number Gao et al. (2022) run; another value is an option their "
+        "paper does not measure. EM runs every round, as no rule ends it earlier, so the name is "
+        "a count (n_, as n_starts and n_preliminary_iterations) and not a cap (max_iter, "
+        "warm_iter, subproblem_iter), and it differs from the max_iter that hc, tabu, notears, "
+        "dagma, and calm take for the loop of one search.",
+        param=_template(
+            "n_em_iterations",
+            "int",
+            ITERATIONS,
+            "The rounds of structural EM that missing=em runs on data with missing values, at "
+            "least 1, each with one search; more rounds let some fits whose last round still "
+            "changed the graph settle on one. Changes nothing on complete data or without "
+            "missing=em.",
+            minimum=1,
+        ),
+        fragment="rounds of structural EM",
+        suitable=EM_METHODS,
+        others_exempt="Does not fit by structural EM.",
     ),
     Concept(
         key="units",
@@ -1339,7 +1474,7 @@ _CONCEPTS = (
                 "A time-series method: its rows are the steps of a series, read in order through "
                 "its lags, and it takes no context variable here.",
                 *PCMCI_FAMILY,
-                *("granger", "varma_lingam", "dynotears"),
+                *("rpcmci", "granger", "varma_lingam", "dynotears"),
             ),
             *_exempt(
                 "Continuous optimization of a least-squares or Gaussian likelihood loss, which "
@@ -1356,6 +1491,11 @@ _CONCEPTS = (
                 "The paper defines the aggregation for data from one environment; ges is the "
                 "score search that takes env.",
                 "ages",
+            ),
+            *_exempt(
+                "Not taken yet: the paper defines the search for data from one environment; ges "
+                "is the score search that takes env.",
+                "lges",
             ),
             *_exempt(
                 "Its model reads the noise of continuous variables, which an environment label "
@@ -1491,6 +1631,45 @@ _CONCEPTS = (
         ),
     ),
     Concept(
+        key="possibly_separable",
+        summary="How the orientation rules read a triple with a side in "
+        "metadata['possibly_separable'], on data with missing values.",
+        param=_template(
+            "possibly_separable",
+            "str",
+            "orient",
+            "How a triple x - z - y with a side listed in metadata['possibly_separable'] is read, "
+            "on data with missing values: orient = as any other triple; ambiguous = neither a "
+            "collider nor a non-collider, never oriented through, when a conditioning set not "
+            "tested of that side lies within the other nodes adjacent to one of its ends or "
+            "undecided with it, so it might be the separating set the search missed; in FCI and "
+            "FCI-JCI, which allow latent variables, for every listed side, since a separating "
+            "set can lie beyond the adjacencies. orient favors arrowheads and gives up protection "
+            "from false colliders; ambiguous favors no false collider and gives up the true "
+            "arrowheads beside them. Measured with PC and FCI only: on merged cohorts that no row "
+            "bridges (three graph sizes, about 29 to 76 true edges), ambiguous took PC's false "
+            "colliders per fit from 12.8-90.0 to at most 0.2 and its true arrowheads found from "
+            "0.54-0.72 to 0, leaving PC farther from the truth than the empty graph in 6 of 6 "
+            "settings and FCI 0.5 to 4.4 errors worse; with the other methods its effect on "
+            "accuracy was not measured.",
+            choices=("orient", "ambiguous"),
+        ),
+        fragment="possibly_separable",
+        suitable=(*("pc", "fci", "cdnod", "fci_jci", "iamb", "inter_iamb", "mmpc", "pcmciplus"),),
+        exempt=(
+            *_exempt(
+                "It lists possibly separable links but does not read them: the flags are found "
+                "from its final links, after the search, and its collider votes run during the "
+                "search, while those links still change.",
+                "lpcmci",
+            ),
+            *_exempt(
+                "It refuses missing values, so it lists no possibly separable link.", "jpcmciplus"
+            ),
+        ),
+        others_exempt="No separating-set orientation reads a possibly separable edge.",
+    ),
+    Concept(
         key="edge_removal",
         summary="Which edges of a score search's CPDAG the tests of an FCI hybrid may remove: "
         "every edge (all), or only those in a triangle of the CPDAG (triangles), as Section 5 of "
@@ -1544,7 +1723,7 @@ _CONCEPTS = (
         "registered test records its registered name. A score search records the penalties its "
         "score used: penalty_discount for every score but bdeu, ebic_gamma for bic, and "
         "equivalent_sample_size for bdeu.",
-        suitable=tuple(m for m in ALL_METHODS if m in (*TESTED, *SCORE_SEARCHES)),
+        suitable=tuple(m for m in ALL_METHODS if m in (*TESTED, *SCORE_SEARCHES, "lges")),
         others_exempt="Neither a conditional-independence test nor a score to choose.",
     ),
     Concept(

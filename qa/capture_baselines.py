@@ -117,6 +117,7 @@ ALGORITHMS = {
     "GnIES": (_run_gnies, "gauss_5v_noise_shift"),
     "IGSP": (_run_igsp, "gauss_5v_noise_shift"),
     "XGES": (_facade("xges"), "gauss_5v"),
+    "LGES": (_facade("lges"), "gauss_5v"),
     "AGES": (_facade("ages"), "weak_triangle_3v"),
     "HC": (_facade("hc"), "gauss_5v"),
     "Tabu": (_facade("tabu"), "gauss_5v"),
@@ -144,6 +145,13 @@ ALGORITHMS = {
     "LOCI": (_facade("loci"), "lsnm_pair"),
     "CPCM": (_facade("cpcm"), "lsnm_pair"),
     "CPCMGraph": (_facade("cpcm_graph"), "nonmonotone_4v"),
+    # SkewD and SkewD-MV at the shortest search, the unit tests' budgets: at the defaults one fit
+    # takes minutes.
+    "SkewD": (_facade("skewd", tuning_iter=1, max_iter=5), "lsnm_pair"),
+    "SkewDMV": (
+        _facade("skewd_mv", tuning_iter=1, max_iter=5, indep_test="fisherz"),
+        "nonmonotone_4v",
+    ),
     "GIN": (_facade("gin"), "measurement_6v"),
     "RESIT": (_facade("resit"), "nonmonotone_4v"),
     "ScoreMatching": (_facade("score_matching"), "rational_chain_4v"),
@@ -153,10 +161,16 @@ ALGORITHMS = {
     "PCMCI": (_facade("pcmci", tau_max=2, indep_test="student_t"), "var_3v_lag2"),
     "PCMCIplus": (_facade("pcmciplus", tau_max=2, indep_test="student_t"), "var_4v_stable"),
     "LPCMCI": (_facade("lpcmci", tau_max=2, indep_test="student_t"), "var_6v_hidden"),
+    "RPCMCI": (_facade("rpcmci", max_transitions=7, n_starts=4, seed=0), "regime_var_2v"),
     "KCI": (_run_ci_test, "nonmonotone_4v"),
     "RCoT": (_run_ci_test, "nonmonotone_4v"),
     "CMIknn": (_run_ci_test, "nonmonotone_4v"),
     "GPDC": (_run_ci_test, "nonmonotone_4v"),
+    "GCM": (_run_ci_test, "nonmonotone_4v"),
+    "WGCM": (_run_ci_test, "nonmonotone_4v"),
+    "WGCM_FIX": (_run_ci_test, "nonmonotone_4v"),
+    "PCM": (_run_ci_test, "nonmonotone_4v"),
+    "PCM6": (_run_ci_test, "nonmonotone_4v"),
 }
 
 # Multi-group, panel, and multi-dataset methods take a list of matrices (runner receives

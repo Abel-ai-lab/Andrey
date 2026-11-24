@@ -28,7 +28,7 @@ from typing import NamedTuple
 
 from andrey.api._adapt import MAX_CATEGORIES
 from andrey.api._boundary import CAP_STOPS, measured
-from andrey.core.ci_missing import EM_METHODS, EM_SUPPORTED
+from andrey.core.ci_missing import EM_METHODS, EM_SUPPORTED, TESTWISE, TESTWISE_CLAIM
 from andrey.spec import REGISTRY
 from andrey.spec.concepts import CONCEPTS
 
@@ -41,6 +41,8 @@ SENTENCE_END = re.compile(r"\.\s+(?=[A-Z`:])")
 PENALTIES = ("penalty_discount", "ebic_gamma", "equivalent_sample_size")
 #: The score searches followed by FCI's tests and rules, which refuse missing values.
 FCI_SEARCHES = ("gfci", "boss_fci", "grasp_fci")
+# The refusing temporal methods that read units or datasets, not one series.
+PANELS = ("longitudinal_lingam", "jpcmciplus")
 
 
 class Shared(NamedTuple):
@@ -72,6 +74,13 @@ def can_pass_boundary(method: str) -> bool:
 def records_penalties(method: str) -> bool:
     """Whether a fit of ``method`` records the penalties its score used."""
     return any(key in REGISTRY[method].output.metadata for key in PENALTIES)
+
+
+def deletes_testwise(method: str) -> bool:
+    """Whether ``method``'s ``missing`` takes ``"testwise"``."""
+    return any(
+        p.concept == "missing" and TESTWISE in (p.choices or ()) for p in REGISTRY[method].params
+    )
 
 
 def refuses_missing(method: str, *, series: bool) -> bool:
@@ -162,8 +171,9 @@ SHARED = {
         "next, and a forbidden path is no parent, as :class:`~andrey.Knowledge` describes; a claim "
         "the DAG does not meet is dropped with a :class:`~andrey.KnowledgeWarning` and listed in "
         '``metadata["unmet_knowledge"]``.',
-        lambda m: "required_paths" in REGISTRY[m].knowledge
-        and REGISTRY[m].output.graph_kind == "dag",
+        lambda m: (
+            "required_paths" in REGISTRY[m].knowledge and REGISTRY[m].output.graph_kind == "dag"
+        ),
     ),
     # cdnod and fci_jci read env as a variable, coerced to numbers.
     "env": Shared(
@@ -184,8 +194,55 @@ SHARED = {
         'How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test '
         "reads only the rows where all of its variables are observed. ``None`` picks the method's "
         'default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the '
-        "handling used. See **Missing values.** in Notes.",
-        lambda m: m in CONCEPTS["missing"].conforming,
+        'handling used. ``"testwise"`` favors every row each test can read; it gives up its '
+        "guarantee outside values missing completely at random. With PC at 20 variables and 1,000 "
+        "rows, 10 to 30% of the values missing completely at random, test-wise deletion made median "
+        "errors of 6.5 to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 "
+        "complete rows and had no complete row at 30% (complete data: 4.0; 0.11.0 release card). "
+        "Where values are missing for a reason that other variables carry, on Erdos-Renyi graphs of "
+        '10 to 100 variables with one observed parent per indicator, ``pc``\'s ``"mvpc"`` made fewer '
+        "errors than test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none. Not "
+        "measured with this method. See **Missing values.** in Notes.",
+        lambda m: m in CONCEPTS["missing"].conforming and m != "fci",
+    ),
+    "missing_fci": Shared(
+        "Parameters",
+        "missing",
+        "entry",
+        'How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test '
+        "reads only the rows where all of its variables are observed. ``None`` picks the method's "
+        'default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the '
+        'handling used. ``"testwise"`` favors every row each test can read; it gives up its '
+        "guarantee outside values missing completely at random. With 20 variables and 1,000 rows, "
+        "10 to 30% of the values missing completely at random, FCI made median errors of 28.5 to "
+        "30.5 where dropping the incomplete rows made 32.5 and 42.0 on 124 and 10 complete rows and "
+        "had no complete row at 30% (complete data: 28.0; 0.11.0 release card). Where values are "
+        "missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100 "
+        'variables with one observed parent per indicator, ``pc``\'s ``"mvpc"`` made fewer errors '
+        "than test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none; not measured with "
+        "FCI. See **Missing values.** in Notes.",
+        lambda m: m == "fci" and m in CONCEPTS["missing"].conforming,
+    ),
+    # A method whose default follows its paper words its own entry.
+    "degrees_of_freedom": Shared(
+        "Parameters",
+        "degrees_of_freedom",
+        "entry",
+        'Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the '
+        "mean of the statistic when ``y`` is shuffled within each configuration of the conditioning "
+        'set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x`` '
+        "and ``y`` present in it, the table's empty rows and columns struck. The two differ only on "
+        'sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true '
+        "independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning "
+        'variables, 500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% '
+        '(``"gsq"``). With ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and '
+        "rejects below the nominal rate in the sparsest tables (0.8% at 3,125 cells). "
+        '``"nonempty"`` favors the degrees of freedom of Spirtes, Glymour and Scheines (1993), read '
+        "from the table alone, with no hypergeometric sum; it gives up the level: 11.1% and 21.7% "
+        "of the same true independences were rejected. Their time and their power were not "
+        "measured against each other. "
+        'Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.',
+        lambda m: m in CONCEPTS["degrees_of_freedom"].conforming,
     ),
     # "em" is supported where a reference implementation exists and the comparison with it passed.
     "missing_em": Shared(
@@ -196,7 +253,18 @@ SHARED = {
         "expectation-maximization (EM) over the expected covariance of the data, which assumes "
         "values missing completely at random or at random given observed values. ``None`` refuses "
         'missing values. On data with missing values, ``metadata["missing"]`` records the handling '
-        'used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.',
+        'used and ``metadata["em"]`` the EM record, with the rows dropped for observing no value and '
+        "the fewest rows two columns share; two columns that share no observed row raise "
+        "``ValueError``. "
+        '``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it '
+        "gives up time: each round runs the search again. In the 0.17.0 missing-data benchmark "
+        "(linear-Gaussian data, 10 to 50 variables, 100 to 2,000 rows, 10 to 50% missing; the "
+        'searches at ``ebic_gamma=0``), against dropping the incomplete rows, ``"em"`` made fewer '
+        "errors in 186 of the 225 settings judged with GES, BOSS, GRaSP, and NOTEARS, as many in "
+        "39, and more in none, and in 204 more dropping the rows left too few to fit most "
+        "datasets; HC and Tabu were not compared with it. With the default 10 rounds, a setting's "
+        "median fit in the six searches took 2 to 72 times as long as the same search on the "
+        "complete data. See **Missing values.** in Notes.",
         lambda m: m in EM_SUPPORTED,
     ),
     "missing_em_experimental": Shared(
@@ -207,15 +275,25 @@ SHARED = {
         "structural expectation-maximization (EM) over the expected covariance of the data, which "
         "assumes values missing completely at random or at random given observed values. ``None`` "
         'refuses missing values. On data with missing values, ``metadata["missing"]`` records the '
-        'handling used and ``metadata["em"]`` the EM record. See **Missing values.** in Notes.',
+        'handling used and ``metadata["em"]`` the EM record, with the rows dropped for observing no '
+        "value and the fewest rows two columns share; two columns that share no observed row raise "
+        "``ValueError``. "
+        '``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it '
+        "gives up time: each round runs the search again, so the default 10 rounds run it 10 "
+        "times. Its time against complete data was not measured with this search. See **Missing "
+        "values.** in Notes.",
         lambda m: m in EM_METHODS and m not in EM_SUPPORTED,
+    ),
+    # One sentence for every method that deletes rows per test, the pair methods included.
+    "testwise_claim": Shared(
+        "Notes", "**Missing values.**", "last", TESTWISE_CLAIM, deletes_testwise
     ),
     # icp, igsp, and ut_igsp end on "Drop the incomplete rows first."
     "drop_rows": Shared(
         "Notes",
         "**Missing values.**",
         "last",
-        "Drop the incomplete rows first, which suits values missing completely at random, or use "
+        "Drop the incomplete rows yourself, which suits values missing completely at random, or use "
         ":func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.",
         lambda m: (
             refuses_missing(m, series=False)
@@ -226,27 +304,37 @@ SHARED = {
         "Notes",
         "**Missing values.**",
         "last",
-        'Without ``"em"``, drop the incomplete rows first, which suits values missing completely at '
-        "random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.",
+        'Without ``"em"``, drop the incomplete rows yourself, which suits values missing completely '
+        "at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.",
         lambda m: m in EM_METHODS,
     ),
     "drop_rows_fci": Shared(
         "Notes",
         "**Missing values.**",
         "last",
-        "Drop the incomplete rows first, which suits values missing completely at random, or use "
+        "Drop the incomplete rows yourself, which suits values missing completely at random, or use "
         ":func:`~andrey.fci`, whose tests delete rows per test.",
         lambda m: m in FCI_SEARCHES,
     ),
-    # longitudinal_lingam reads units at each time point, not one series.
-    "fill_steps": Shared(
+    # longitudinal_lingam and jpcmciplus read units or datasets, not one series.
+    "keep_steps": Shared(
         "Notes",
         "**Missing values.**",
         "last",
-        "Fill in the missing steps first, as dropping one would join the steps around it, or use "
-        ":func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests "
-        "delete rows per test.",
-        lambda m: refuses_missing(m, series=True) and m != "longitudinal_lingam",
+        "Use :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose "
+        "tests delete rows per test and keep every time step, as dropping a step would join the "
+        "steps around it.",
+        lambda m: refuses_missing(m, series=True) and m not in PANELS,
+    ),
+    # jpcmciplus reads several series with their contexts, which the three methods above do not.
+    "drop_datasets": Shared(
+        "Notes",
+        "**Missing values.**",
+        "last",
+        "No method that accepts missing values reads several datasets with their contexts, as "
+        ":func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, and :func:`~andrey.lpcmci` read one "
+        "series, so drop the datasets that hold one.",
+        lambda m: m == "jpcmciplus",
     ),
     "limits": Shared(
         "Notes",

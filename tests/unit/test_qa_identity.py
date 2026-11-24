@@ -7,6 +7,7 @@ import importlib
 import pkgutil
 import struct
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -402,13 +403,51 @@ def test_counting_records_each_outermost_query_and_restores_the_methods(x: np.nd
     test = make_indep_test("fisherz", x)
     original = ci.PartialCorrelationTest.__dict__["batched_call"]
     with identity.counting(alpha=0.05) as counts:
-        test(0, 2, (1,))
+        test(0, 2, (1,))  # one query, though it calls statistic_pvalue
+        test.statistic_pvalue(0, 3, (1,))
         test.batched_call(0, 2, iter([(), (1, 3)]))
         test.first_order_pvalues(0, 1, [2, 3])
         test._canonical_pvalues(np.array([0, 2]), np.array([3, 3]), np.array([[1, 2], [0, 1]]))
     assert ci.PartialCorrelationTest.__dict__["batched_call"] is original
-    assert counts.summary()["ci_queries"] == 7
+    assert counts.summary()["ci_queries"] == 8
     assert counts.summary()["ci_sets"] == {"0": 1, "1": 3, "2": 3}
+
+
+@pytest.mark.parametrize(
+    ("name", "ask", "conditions"),
+    [
+        ("fisherz", lambda test, data, *q: test.statistic_pvalues(*q), [[1], [0], [2]]),
+        ("fisherz", lambda test, data, *q: test.statistic_pvalues(*q), np.empty((3, 0), int)),
+        (
+            "fisherz",
+            lambda test, data, *q: test.residual_statistic_pvalues(data, *q),
+            [[1], [0], [2]],
+        ),
+        ("chisq", lambda test, data, *q: test.statistic_pvalues(*q), [[1], [0], [2]]),
+    ],
+    ids=["statistic_pvalues", "empty_sets", "residual_statistic_pvalues", "chisq"],
+)
+def test_counting_records_one_query_per_pvalue_of_a_batched_call(
+    x: np.ndarray, name: str, ask: Callable[..., tuple[np.ndarray, np.ndarray]], conditions: object
+) -> None:
+    data = np.digitize(x, [-1.0, 1.0]) if name == "chisq" else x
+    test = make_indep_test(name, data)
+    with identity.counting(alpha=0.0) as counts:  # every p > 0 separates its pair
+        _, p_values = ask(test, data, np.array([0, 1, 0]), np.array([2, 3, 3]), conditions)
+    assert counts.summary()["ci_queries"] == len(p_values) == 3
+    assert counts.separated == {(0, 2), (1, 3), (0, 3)}
+    assert counts.summary()["ci_sets"] == ({"1": 3} if np.size(conditions) else {"0": 1})
+
+
+def test_counting_wraps_every_public_pvalue_method_of_the_ci_tests() -> None:
+    public = {
+        name
+        for cls in identity.CI_CLASSES
+        for owner in cls.__mro__
+        for name, value in vars(owner).items()
+        if callable(value) and "pvalue" in name and not name.startswith("_")
+    }
+    assert public <= set(identity.CI_QUERIES)
 
 
 def test_counting_wraps_every_name_of_the_score_delta_functions() -> None:
@@ -508,8 +547,11 @@ def test_counting_records_the_exact_search_scores(x: np.ndarray) -> None:
 
 
 def test_every_supported_method_is_fitted_on_its_datasets() -> None:
-    assert set(identity.FITS) == set(qg.SUPPORTED)
-    assert all(m in identity.LARGER or m in identity.UNKNOWN_TARGETS for m in identity.FITS)
+    assert set(identity.FITS) - set(identity.TARGET_LISTS) == set(qg.SUPPORTED)
+    assert set(identity.TARGET_LISTS.values()) <= set(qg.SUPPORTED)
+    assert set(identity.TARGET_LISTS) <= set(identity.WORKER_METHODS)
+    fitted = [identity.TARGET_LISTS.get(m, m) for m in identity.FITS]
+    assert all(m in identity.LARGER or m in identity.UNKNOWN_TARGETS for m in fitted)
 
 
 def test_pnl_is_refitted_on_workers_and_gives_the_same_bits() -> None:

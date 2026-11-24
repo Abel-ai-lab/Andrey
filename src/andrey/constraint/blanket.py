@@ -28,8 +28,10 @@ completes the result by Meek's rules.
 
 Candidates are compared by the strength of their dependence on the target: the absolute partial
 correlation for a test that reports one (``statistic_pvalue``), else the p-value. Strengths that
-agree to ``KEY_DP`` decimals go to the candidate with the lower rank, from
-:func:`~andrey.core.ties.tie_ranks`, so the sets do not depend on the column order.
+agree go to the candidate with the lower rank, from :func:`~andrey.core.ties.tie_ranks`, so the
+sets do not depend on the column order. A partial correlation is compared to ``KEY_DP`` decimals.
+A p-value is compared to ``KEY_DP`` decimals in MMPC and to ``KEY_DP`` significant digits in every
+grow step of IAMB and Inter-IAMB (:func:`markov_blanket`).
 """
 
 from __future__ import annotations
@@ -44,10 +46,22 @@ from typing import Literal
 
 import numpy as np
 
-from andrey.constraint._skeleton import CHUNK, adjacent_pairs, scan_conditioning_sets
+from andrey.constraint._skeleton import (
+    CHUNK,
+    adjacent_pairs,
+    flagged_triples,
+    kept_apart,
+    scan_conditioning_sets,
+)
 from andrey.core import ARROW, NULL, TAIL, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
-from andrey.core.ci_missing import TestwiseDeletion
+from andrey.core.ci_missing import (
+    NOT_TESTED,
+    TestwiseDeletion,
+    counts_its_tests,
+    not_tested,
+    running_flags,
+)
 from andrey.core.knowledge import Constraints, orient
 from andrey.core.orient import meek
 from andrey.core.ties import (
@@ -74,8 +88,16 @@ def _tests_every_set(test: CITest) -> bool:
     return isinstance(test, TestwiseDeletion)
 
 
-def _dependence(test: CITest) -> _Dependence:
-    """The p-value and strength key of a query, read from ``statistic_pvalue`` where it exists."""
+def _pvalue_key(p: float, significant: bool) -> float:
+    """A p-value's strength key: ``p`` to ``KEY_DP`` significant digits when ``significant``,
+    preserving the order far below ``10**-KEY_DP``, common for strong dependence on many rows;
+    otherwise, to ``KEY_DP`` decimals."""
+    return float(f"{p:.{KEY_DP}g}") if significant else round(p, KEY_DP)
+
+
+def _dependence(test: CITest, *, significant: bool = False) -> _Dependence:
+    """The p-value and strength key of a query, read from ``statistic_pvalue`` where it exists; a
+    p-value key is :func:`_pvalue_key`'s."""
     statistic_pvalue = getattr(test, "statistic_pvalue", None)
     if statistic_pvalue is not None:
 
@@ -87,29 +109,48 @@ def _dependence(test: CITest) -> _Dependence:
 
     def by_pvalue(target: int, x: int, cond: Sequence[int]) -> tuple[float, float]:
         p = test(target, x, cond)
-        return p, round(p, KEY_DP)
+        return p, _pvalue_key(p, significant)
 
     return by_pvalue
 
 
 def _dependences(
-    test: CITest,
+    test: CITest, *, significant: bool = False
 ) -> Callable[[int, Sequence[int], Sequence[int]], list[tuple[float, float]]]:
     """:func:`_dependence` of every candidate in ``xs`` against one conditioning set.
 
-    A test with ``pvalues_given`` and no ``statistic_pvalue`` scans the candidates together, which
-    gives the p-values of the calls one by one and the key :func:`_dependence` derives from them.
+    A partial-correlation test on complete data (``statistic_pvalue`` and
+    ``statistic_pvalues_given``) answers two or more candidates from one factor of the set's
+    correlation block, matching separate calls up to rounding. A test with ``pvalues_given`` but no
+    ``statistic_pvalue`` scans candidates together, giving the same p-values as separate calls and
+    the key :func:`_dependence` derives from them. Other tests answer one call at a time.
     """
+    given = getattr(test, "statistic_pvalues_given", None)
+    if given is not None and getattr(test, "statistic_pvalue", None) is not None:
+        one = _dependence(test, significant=significant)
+
+        def by_factor(
+            target: int, xs: Sequence[int], cond: Sequence[int]
+        ) -> list[tuple[float, float]]:
+            if len(xs) < 2:
+                return [one(target, x, cond) for x in xs]
+            r, p = given(target, xs, cond)
+            return [
+                (q, -round(abs(s), KEY_DP))
+                for s, q in zip(np.asarray(r).tolist(), np.asarray(p).tolist(), strict=True)
+            ]
+
+        return by_factor
     scan = getattr(test, "pvalues_given", None)
     if scan is not None and getattr(test, "statistic_pvalue", None) is None:
 
         def by_scan(
             target: int, xs: Sequence[int], cond: Sequence[int]
         ) -> list[tuple[float, float]]:
-            return [(p, round(p, KEY_DP)) for p in scan(target, xs, cond).tolist()]
+            return [(p, _pvalue_key(p, significant)) for p in scan(target, xs, cond).tolist()]
 
         return by_scan
-    dependence = _dependence(test)
+    dependence = _dependence(test, significant=significant)
 
     def one_by_one(
         target: int, xs: Sequence[int], cond: Sequence[int]
@@ -143,11 +184,17 @@ def markov_blanket(
     """Estimate ``target``'s Markov blanket with IAMB, or with Inter-IAMB when ``interleaved``.
 
     Grow: add the candidate most dependent on ``target`` given the current blanket, among those
-    whose p-value is at or below ``alpha``, until none is. Shrink: visit the members in the order
-    they joined and drop each one the test finds independent of ``target`` (a p-value above
-    ``alpha``) given the other current members. IAMB grows to the end and then shrinks once;
-    Inter-IAMB shrinks after every addition and stops when no candidate qualifies or the blanket
-    repeats one it held after an earlier shrink, so it always ends. Every grow test conditions on
+    whose p-value is at or below ``alpha``, until none is; a p-value strength is compared to
+    ``KEY_DP`` significant digits; then add, in rank order, each candidate whose test given the
+    blanket was not tested and that no earlier test separated, since a test without rows separates
+    no pair; a candidate with no test that had rows, as one never observed with ``target``, is
+    undecided and left out (:func:`_count_beside_undecided`).
+    Shrink: visit the members in the order they joined and drop each one
+    the test finds independent of ``target`` (a p-value above ``alpha``) given the other current
+    members. IAMB
+    grows to the end and then shrinks once; Inter-IAMB shrinks after every addition and stops when
+    no candidate qualifies or the blanket repeats one it held after an earlier shrink, so it always
+    ends. Every grow test conditions on
     the whole blanket, so with ``max_depth`` the grow phase also stops once the blanket holds more
     than ``max_depth`` members, and every test conditions on at most ``max_depth`` variables.
     Returns the members in the order they joined.
@@ -161,23 +208,39 @@ def markov_blanket(
     ``target`` is set in it, in place, to the conditioning set of the last such test: the blanket
     of the grow step that left it out, or the other members when the shrink dropped it.
     """
-    dependences = _dependences(test)
+    dependences = _dependences(test, significant=True)
     required = _required(constraints, target, ranks)
     blanket: list[int] = list(required)
     seen: set[frozenset[int]] = set()
+    separated: set[int] = set()
+    decided: set[int] = set()  # the candidates with a test that had rows
     while max_depth is None or len(blanket) <= max_depth:
         best_key, best_x = None, None
         candidates = [x for x in range(d) if x != target and x not in blanket]
         given = tuple(sorted(blanket))
+        untested = []
         for x, (p, strength) in zip(
             candidates, dependences(target, candidates, blanket), strict=True
         ):
             key = (strength, ranks[x])
             if p <= alpha and (best_key is None or key < best_key):
                 best_key, best_x = key, x
-            if sepsets is not None and p > alpha:
-                sepsets[x] = given
+            if p > alpha:
+                separated.add(x)
+                if sepsets is not None:
+                    sepsets[x] = given
+            if not not_tested(p):
+                decided.add(x)
+            elif x not in separated:
+                untested.append(x)
         if best_x is None:
+            # A candidate whose blanket test was not tested stays if no earlier test separated it: a
+            # test without rows separates no pair. One with no tested query, such as a variable
+            # never observed with the target, is undecided and left out.
+            untested = [x for x in untested if x in decided]
+            blanket.extend(sorted(untested, key=lambda x: ranks[x]))
+            if interleaved and untested:
+                _shrink(test, target, alpha, blanket, required, sepsets)
             break
         blanket.append(best_x)
         if interleaved:
@@ -191,10 +254,33 @@ def markov_blanket(
     if sepsets is not None:
         for x in blanket:
             sepsets.pop(x, None)
-    if constraints is None:
-        return blanket
-    support = constraints.support()[target]
-    return [x for x in blanket if support[x]]
+    undecided = [x for x in range(d) if x != target and x not in decided and x not in blanket]
+    if constraints is not None:
+        support = constraints.support()[target]
+        blanket = [x for x in blanket if support[x]]
+    if undecided:
+        _count_beside_undecided(test, target, blanket, required, max_depth, undecided)
+    return blanket
+
+
+def _count_beside_undecided(
+    test: CITest,
+    target: int,
+    members: list[int],
+    required: Sequence[int],
+    max_depth: int | None,
+    undecided: list[int],
+) -> None:
+    """For each of ``members`` outside ``required``, count one untested conditioning set with
+    ``target`` when a search omits ``undecided`` candidates: a set holding one of them was never
+    tested and might separate the member from ``target``. Required members are never tested, and
+    ``max_depth`` 0 permits no set, so neither counts one."""
+    if max_depth == 0 or not isinstance(test, TestwiseDeletion):
+        return
+    held = [[u] for u in undecided]
+    for x in members:
+        if x not in required:
+            test.count_not_tested(target, x, 1, held)
 
 
 def _shrink(
@@ -256,10 +342,15 @@ def _weakest(
     conds: list[tuple[int, ...]],
     sets: list[tuple[int, ...]] | None = None,
     ranks: Sequence[int] = (),
+    alpha: float | None = None,
 ) -> list[tuple[float, float]]:
     """Each candidate's weakest association with ``target`` over the conditioning sets ``conds``.
 
-    Returns ``(largest p-value, smallest strength)`` per entry of ``xs``. The strength is the
+    Returns ``(largest p-value, smallest strength)`` per entry of ``xs``, over the sets that were
+    tested; :data:`~andrey.core.ci_missing.NOT_TESTED` when none was. With ``alpha``, a candidate
+    with a set not tested and no tested p-value above ``alpha`` answers
+    :data:`~andrey.core.ci_missing.NOT_TESTED` too: that set might have separated it, so a verdict
+    that needs every set is unknown (:func:`_weaker`). The strength is the
     absolute partial correlation for a test with ``statistic_pvalues``, evaluated for every query
     of one conditioning-set size in one call, else the negated p-value from ``batched_call`` or the
     scalar test. With ``sets``, each candidate's set with the largest p-value is appended to it
@@ -277,13 +368,17 @@ def _weakest(
                 if batched is not None
                 else [test(target, x, c) for c in conds]
             )
-            top = float(max(ps))
+            values = np.asarray(ps, dtype=np.float64)
+            top = float(np.fmax.reduce(values))
+            if alpha is not None:
+                top = _weaker(top, bool(not_tested(values).any()), alpha)
             out.append((top, -top))
             if sets is not None:
                 sets.extend(_largest_sets(np.asarray(ps, dtype=np.float64)[None], conds, ranks))
         return out
     pmax = np.full(len(xs), -np.inf)
     rmin = np.full(len(xs), np.inf)
+    skipped = np.zeros(len(xs), dtype=bool)
     by_size: dict[int, list[tuple[int, ...]]] = {}
     for cond in conds:
         by_size.setdefault(len(cond), []).append(cond)
@@ -294,13 +389,25 @@ def _weakest(
         r, p = batch(np.full(x.size, target, dtype=np.intp), x, np.tile(cols, (len(xs), 1)))
         if sets is not None:
             pvalues.append(np.asarray(p, dtype=np.float64).reshape(len(xs), len(group)))
-        pmax = np.maximum(pmax, np.asarray(p).reshape(len(xs), len(group)).max(axis=1))
-        rmin = np.minimum(rmin, np.abs(np.asarray(r)).reshape(len(xs), len(group)).min(axis=1))
+        p = np.asarray(p, dtype=np.float64).reshape(len(xs), len(group))
+        pmax = np.fmax(pmax, np.fmax.reduce(p, axis=1))
+        rmin = np.fmin(rmin, np.fmin.reduce(np.abs(np.asarray(r)).reshape(p.shape), axis=1))
+        skipped |= not_tested(p).any(axis=1)
     if sets is not None:
         sets.extend(
             _largest_sets(np.hstack(pvalues), [c for g in by_size.values() for c in g], ranks)
         )
+    pmax[np.isinf(pmax)] = NOT_TESTED
+    if alpha is not None:
+        pmax[skipped & ~(pmax > alpha)] = NOT_TESTED
     return list(zip(pmax.tolist(), rmin.tolist(), strict=True))
+
+
+def _weaker(p: float, skipped: bool, alpha: float) -> float:
+    """The largest tested p-value ``p``, or :data:`~andrey.core.ci_missing.NOT_TESTED` when a set
+    was not tested (``skipped``) and ``p`` does not exceed ``alpha``: a tested separating set
+    decides; otherwise, the untested set might have separated."""
+    return NOT_TESTED if skipped and not p > alpha else p
 
 
 def _largest_sets(
@@ -310,8 +417,9 @@ def _largest_sets(
     p-value at ``KEY_DP`` decimals; of sets that agree, the smaller, then the one whose ascending
     ranks come first, so the choice does not depend on the column order."""
     rounded = np.round(pvalues, KEY_DP)
-    tied = rounded == rounded.max(axis=1, keepdims=True)
-    # A row of NaN ties nothing and takes its first set; NaN is not above alpha, so none reads it.
+    tied = rounded == np.fmax.reduce(rounded, axis=1, keepdims=True)
+    # A set not tested (NaN) ties nothing. A row of NaN takes its first set; NaN is not above
+    # alpha, so none reads it.
     out = [conds[j] for j in tied.argmax(axis=1).tolist()]
     for i in np.flatnonzero(tied.sum(axis=1) > 1).tolist():
         out[i] = min(
@@ -338,9 +446,13 @@ def parents_children(
     largest p-values agree to ``KEY_DP`` decimals, the smallest strength, then the rank. Forward:
     add the candidate whose weakest association is the strongest, until every candidate has a
     conditioning set with a p-value above ``alpha``; such a candidate is dropped for good, since
-    adding members only weakens an association. Each addition tests every remaining candidate
-    against the conditioning sets that hold the new member, by increasing size, and stops testing
-    a candidate after the first size at which a set separates it. Backward: visit the members in the
+    adding members only weakens an association. A set that was not tested is left out of a
+    candidate's association, and a candidate whose test with ``target`` alone was not tested, as
+    one never observed with it, has no test with rows, since no test given more can run on more
+    rows: it is undecided and left out (:func:`_count_beside_undecided`). Each addition tests every
+    remaining candidate against the conditioning sets that hold the new member, by increasing size,
+    and stops testing a candidate after the first size at which a set separates it. Backward: visit
+    the members in the
     order they joined and drop each one some subset of the other current members separates; the
     subsets of the members that joined before it were tested in the forward phase. With
     ``max_depth``, both phases test only the conditioning sets of at most ``max_depth`` variables;
@@ -367,6 +479,7 @@ def parents_children(
         x for x in range(d) if x != target and x not in required and (allowed is None or allowed[x])
     ]
     weakest = dict(zip(others, _weakest(test, target, others, [()]), strict=True))
+    undecided = [x for x, (p, _) in weakest.items() if not_tested(p)]
     if sepsets is not None:
         sepsets.update({x: () for x, (p, _) in weakest.items() if p > alpha})
     members: list[int] = []
@@ -384,7 +497,8 @@ def parents_children(
                 test, target, xs, conds, None if sepsets is None else largest, ranks
             )
             for i, (x, (p, strength)) in enumerate(zip(xs, weakened, strict=True)):
-                pool[x] = (max(pool[x][0], p), min(pool[x][1], strength))
+                # A set not tested is left out: it separates no candidate.
+                pool[x] = (float(np.fmax(pool[x][0], p)), float(np.fmin(pool[x][1], strength)))
                 if sepsets is not None and pool[x][0] > alpha:
                     sepsets.setdefault(x, largest[i])
             if not every:
@@ -412,15 +526,48 @@ def parents_children(
         rest = sorted(z for z in members if z != x)
         top = len(rest) if max_depth is None else min(len(rest), max_depth)
         for size in range(1, top + 1):
-            trace: list[dict] | None = None if sepsets is None else []
-            if scan_conditioning_sets(test, target, x, rest, size, alpha, set(), before, trace):
+            found = _separating(test, target, x, rest, size, alpha, before, ranks)
+            if found is not None:
                 members.remove(x)
-                if sepsets is not None and trace is not None:
-                    found = [t for t in trace if t["removed"]]
-                    p = np.array([[t["p"] for t in found]])
-                    [sepsets[x]] = _largest_sets(p, [t["S"] for t in found], ranks)
+                if sepsets is not None:
+                    sepsets[x] = found
                 break
+    if undecided:
+        _count_beside_undecided(test, target, members, required, max_depth, undecided)
     return members
+
+
+def _separating(
+    test: CITest,
+    target: int,
+    x: int,
+    among: list[int],
+    size: int,
+    alpha: float,
+    skip_within: set[int],
+    ranks: Sequence[int],
+) -> tuple[int, ...] | None:
+    """The set of ``size`` members of ``among`` that separates ``x`` from ``target`` (a p-value
+    above ``alpha``) with the largest p-value, ties as :func:`_largest_sets` breaks them, or
+    ``None`` when no set does.
+
+    Every such set outside ``skip_within`` is tested
+    (:func:`~andrey.constraint._skeleton.scan_conditioning_sets`). Keeping only the best separating
+    set so far makes memory independent of the number of sets.
+    """
+    best: list[tuple[tuple[int, ...], float]] = []
+
+    def visit(chunk: np.ndarray, pvalues: Sequence[float]) -> None:
+        p = np.asarray(pvalues, dtype=np.float64)
+        hits = [(tuple(chunk[j].tolist()), float(p[j])) for j in np.flatnonzero(p > alpha).tolist()]
+        if hits:
+            found = best + hits
+            sets = [s for s, _ in found]
+            [pick] = _largest_sets(np.array([[q for _, q in found]]), sets, ranks)
+            best[:] = [found[sets.index(pick)]]
+
+    scan_conditioning_sets(test, target, x, among, size, alpha, set(), skip_within, visit=visit)
+    return best[0][0] if best else None
 
 
 def mmpc_sets(
@@ -472,12 +619,15 @@ def prune_spouses(
     For each pair ``x``, ``y`` of ``moral``, the candidates are the smaller of ``moral[x]`` less
     ``y`` and ``moral[y]`` less ``x``, or both when they hold as many members; the pair leaves when
     ``x`` and ``y`` test independent (a p-value above ``alpha``) given some subset of them, the
-    empty set included, by increasing size up to ``max_depth``. The blankets are the moral graph
-    the search starts from, so each pair's verdict does not depend on another's. A pair a required
-    edge of ``constraints`` joins is not tested. Returns a new symmetric boolean matrix.
+    empty set included, by increasing size up to ``max_depth``. A test that deletes rows per test
+    (:func:`_tests_every_set`) tests both candidate sets of a size before the pair's verdict at
+    that size, so the tests it counts do not depend on the column order. The blankets are the moral
+    graph the search starts from, so each pair's verdict does not depend on another's. A pair a
+    required edge of ``constraints`` joins is not tested. Returns a new symmetric boolean matrix.
     """
     skeleton = moral.copy()
     required = None if constraints is None else constraints.required | constraints.required.T
+    every = _tests_every_set(test)
     for x, y in adjacent_pairs(moral):
         if required is not None and required[x, y]:
             continue
@@ -491,12 +641,19 @@ def prune_spouses(
                     test, x, y, side, size, alpha, set(), seen
                 ):
                     separated = True
-                    break
+                    if not every:  # a test that deletes rows counts both sides' tests
+                        break
                 seen = set(side)
             if separated:
                 skeleton[x, y] = skeleton[y, x] = False
                 break
     return skeleton
+
+
+def _side_sets(sides: list[list[int]]) -> list[tuple[list[int], set[int] | None]]:
+    """The sides of :func:`_collider_sets` as :func:`~andrey.constraint._skeleton.kept_apart`
+    reads them: each later side skips the subsets the first side holds."""
+    return [(side, None if n == 0 else set(sides[0])) for n, side in enumerate(sides)]
 
 
 def _collider_sets(sides: list[list[int]], size: int, middle: int) -> Iterator[tuple[int, ...]]:
@@ -561,15 +718,23 @@ def blanket_colliders(
                 continue
             p, strength = -np.inf, np.inf
             for size in range(top + 1):
-                conds = _collider_sets(sides, size, b)
+                kept, left = kept_apart(test, (a, c, b), _side_sets(sides), size)
+                conds = iter(()) if kept is None else _collider_sets([s for s, _ in kept], size, b)
                 width = CHUNK if every else min(_FIRST_CHUNK, CHUNK)
                 while (every or p <= alpha) and (chunk := list(islice(conds, width))):
-                    [(p_chunk, strength_chunk)] = _weakest(test, a, [c], chunk)
-                    p, strength = max(p, p_chunk), min(strength, strength_chunk)
+                    [(p_chunk, strength_chunk)] = _weakest(test, a, [c], chunk, alpha=alpha)
+                    skipped = bool(not_tested([p, p_chunk]).any())
+                    p = _weaker(float(np.fmax(p, p_chunk)), skipped, alpha)
+                    strength = float(np.fmin(strength, strength_chunk))
                     width = min(2 * width, CHUNK)
+                if left:  # a set left out keeps no rows: not tested
+                    p = _weaker(p, True, alpha)
                 if p > alpha:
                     sepsets[a, c] = (*sepsets[a, c], b)
                     break
+            if not_tested(p):  # a set not tested might have separated a and c: no collider
+                ambiguous.add((a, b, c))
+                continue
             strengths[a, b, c] = strength
     return sepsets, strengths, frozenset(ambiguous)
 
@@ -590,12 +755,16 @@ def blanket_cpdag(
     cycle), the colliders are oriented by
     :func:`~andrey.constraint.pc.orient_colliders` in the order ``andrey.config.tie_break``
     selects, Meek's rules complete the result, with R4 under ``constraints``, and an edge two
-    colliders of equal rank dispute is left undirected.
+    colliders of equal rank dispute is left undirected. Inside a
+    :func:`~andrey.core.ci_missing.reading_flags` block, a triple with a side a conditioning set no
+    row could test might have separated is neither a collider nor a non-collider
+    (:func:`~andrey.constraint._skeleton.flagged_triples`).
     """
     # pc imports this module through andrey.search, so its import waits for the call.
     from andrey.constraint.pc import check_knowledge_cycle, orient_colliders, undirect_conflicts
 
     sepsets, strengths, ambiguous = blanket_colliders(test, skeleton, blankets, alpha, max_depth)
+    ambiguous |= flagged_triples(skeleton, running_flags(skeleton))
     marks = np.where(skeleton, TAIL, NULL).astype(np.int8)
     if constraints is not None:
         marks = orient(marks, constraints)
@@ -618,12 +787,18 @@ def blanket_cpdag(
 
 
 def _ranked_test(
-    X: np.ndarray, indep_test: str, categorical: np.ndarray | None, seed: int | None
+    X: np.ndarray,
+    indep_test: str,
+    categorical: np.ndarray | None,
+    seed: int | None,
+    degrees_of_freedom: str,
 ) -> tuple[CITest, list[int]]:
-    """The ``indep_test`` test, seeded by ``seed``, over ``X`` and each column's
-    :func:`~andrey.core.ties.tie_ranks`, the columns the test reads as categories ranked as
-    categories (:func:`~andrey.core.ties.tie_mask`)."""
-    test = make_indep_test(indep_test, X, categorical=categorical, seed=seed)
+    """The ``indep_test`` test, seeded by ``seed``, with ``degrees_of_freedom``, over ``X`` and
+    each column's :func:`~andrey.core.ties.tie_ranks`, the columns the test reads as categories
+    ranked as categories (:func:`~andrey.core.ties.tie_mask`)."""
+    test = make_indep_test(
+        indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
+    )
     return test, tie_ranks(X, tie_mask(indep_test, categorical, X.shape[1])).tolist()
 
 
@@ -862,6 +1037,7 @@ def local_search(
     *,
     alpha: float,
     indep_test: str,
+    degrees_of_freedom: str = "mean",
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -870,11 +1046,12 @@ def local_search(
     """A :class:`LocalSearch` over the ``indep_test`` test of ``X``.
 
     ``categorical`` marks the categorical columns for a mixed-data test; ``seed`` fixes the draws
-    of a stochastic test (``None`` uses ``ANDREY_SEED``); ``alpha``, ``max_depth``, and
+    of a stochastic test (``None`` uses ``ANDREY_SEED``); ``degrees_of_freedom`` reaches a
+    categorical test (:class:`~andrey.core.ci.ChiSquare`); ``alpha``, ``max_depth``, and
     ``constraints`` are as :class:`LocalSearch` takes them. A column the test reads as categories
     (:func:`~andrey.core.ties.tie_mask`) has as many levels as distinct observed values.
     """
-    test, ranks = _ranked_test(X, indep_test, categorical, seed)
+    test, ranks = _ranked_test(X, indep_test, categorical, seed, degrees_of_freedom)
     mask = tie_mask(indep_test, categorical, X.shape[1])
     levels = None
     if mask.any():
@@ -892,6 +1069,7 @@ def local_search(
     )
 
 
+@counts_its_tests
 def local_structure(
     X: np.ndarray,
     method: str,
@@ -899,6 +1077,7 @@ def local_structure(
     *,
     alpha: float,
     indep_test: str,
+    degrees_of_freedom: str = "mean",
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -920,6 +1099,7 @@ def local_structure(
         X,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,
@@ -936,6 +1116,7 @@ def local_set(
     *,
     alpha: float,
     indep_test: str,
+    degrees_of_freedom: str = "mean",
     categorical: np.ndarray | None = None,
     seed: int | None = None,
     max_depth: int | None = None,
@@ -950,6 +1131,7 @@ def local_set(
         X,
         alpha=alpha,
         indep_test=indep_test,
+        degrees_of_freedom=degrees_of_freedom,
         categorical=categorical,
         seed=seed,
         max_depth=max_depth,

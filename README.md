@@ -20,18 +20,18 @@ banner links the website's homepage. -->
 
 ---
 
-## ⭐ What's new in 0.18.0
+## ⭐ What's new in 0.19.0
 
-0.18.0 is a release of new methods and fixes. DAGMA is supported, with its gap stated: like
-NOTEARS, its result depends on the data's scale, and against its authors' package on its paper's
-simulation it made no more errors in any of 42 settings. DAS, SkewD, and CPCM, experimental, extend
-functional causal modeling, for larger graphs, skewed noise, and effects with a chosen distribution
-such as counts. `load_dataset` loads the Tübingen cause-effect pairs. ANM, PNL, and LOCI return the
-same direction under any order of the rows, and PCMCI+ the same p-values under any order of the
-columns. An AI policy holds every change, however it is written, to the same rules and checks.
+0.19.0 is about datasets with overlapping variables. When cohorts that each measure their own
+variables are stacked into one table, a conditional independence test without enough rows is
+skipped, a pair that no test can decide is left out of the graph and listed, and an edge that a
+skipped test might have removed is listed too. On simulated cohorts of 20 to 50 variables, PC's
+graph made fewer errors than the empty graph in every setting. DAS, CPCM, and SkewD are supported,
+LGES, Regime-PCMCI, and the GCM, wGCM, and PCM tests arrive, experimental, and `target` takes a list
+of columns.
 
-**[0.18.0 release card](https://andrey.abel.ai/docs/benchmarks/0.18.0.html)** · Post:
-**[Functional causal models](https://andrey.abel.ai/blog/20261103-andrey-0-13-0.html)**
+**[0.19.0 release card](https://andrey.abel.ai/docs/benchmarks/0.19.0.html)** · Post:
+**[Datasets with overlapping variables](https://andrey.abel.ai/blog/20261124-andrey-0-19-0.html)**
 
 ---
 
@@ -42,7 +42,7 @@ Andrey is a causal discovery package for Python.
 
 - **Fast**: The fastest causal discovery package.
 - **Accurate**: more than 80% fewer errors than other popular packages.
-- **One API**: 50 supported methods, each one function call.
+- **One API**: 55 supported methods, each one function call.
 - **Any data**: continuous, categorical, mixed, time series, nonlinear, hidden confounders.
 - **Agent-ready**: a command line that answers in JSON, and a skill for coding agents.
 
@@ -72,7 +72,7 @@ You install andrey-core and then `import andrey`.
   <picture>
     <source media="(prefers-color-scheme: dark)"
       srcset=".github/readme/package-card-dark.svg">
-    <img alt="Andrey: accelerated, accurate, agentic. 50 supported methods. Data types: continuous,
+    <img alt="Andrey: accelerated, accurate, agentic. 55 supported methods. Data types: continuous,
       categorical, mixed, time series, nonlinear. Real data processing: missing values,
       background knowledge, edge confidence. Graphs: DAG, CPDAG, PAG, temporal; hidden
       confounders. Acceleration: parallel CPU; GPU with PyTorch (CUDA). Portability: NetworkX,
@@ -93,12 +93,12 @@ You install andrey-core and then `import andrey`.
 | Family | Methods | Returns |
 |---|---|---|
 | Constraint-based | [`pc`](https://andrey.abel.ai/docs/api/andrey.pc.html), [`fci`](https://andrey.abel.ai/docs/api/andrey.fci.html), [`gfci`](https://andrey.abel.ai/docs/api/andrey.gfci.html), [`cdnod`](https://andrey.abel.ai/docs/api/andrey.cdnod.html), [`fci_jci`](https://andrey.abel.ai/docs/api/andrey.fci_jci.html), [`icp`](https://andrey.abel.ai/docs/api/andrey.icp.html), [`iamb`](https://andrey.abel.ai/docs/api/andrey.iamb.html), [`inter_iamb`](https://andrey.abel.ai/docs/api/andrey.inter_iamb.html), [`mmpc`](https://andrey.abel.ai/docs/api/andrey.mmpc.html) | CPDAG, PAG, DAG, Undirected graph |
-| Score-based | [`ges`](https://andrey.abel.ai/docs/api/andrey.ges.html), [`gies`](https://andrey.abel.ai/docs/api/andrey.gies.html), [`gnies`](https://andrey.abel.ai/docs/api/andrey.gnies.html), [`xges`](https://andrey.abel.ai/docs/api/andrey.xges.html), [`ages`](https://andrey.abel.ai/docs/api/andrey.ages.html), [`hc`](https://andrey.abel.ai/docs/api/andrey.hc.html), [`tabu`](https://andrey.abel.ai/docs/api/andrey.tabu.html), [`exact_search`](https://andrey.abel.ai/docs/api/andrey.exact_search.html), [`calm`](https://andrey.abel.ai/docs/api/andrey.calm.html), [`notears`](https://andrey.abel.ai/docs/api/andrey.notears.html), [`dagma`](https://andrey.abel.ai/docs/api/andrey.dagma.html), [`mmhc`](https://andrey.abel.ai/docs/api/andrey.mmhc.html), [`rsmax2`](https://andrey.abel.ai/docs/api/andrey.rsmax2.html) | CPDAG, DAG |
+| Score-based | [`ges`](https://andrey.abel.ai/docs/api/andrey.ges.html), [`gies`](https://andrey.abel.ai/docs/api/andrey.gies.html), [`gnies`](https://andrey.abel.ai/docs/api/andrey.gnies.html), [`xges`](https://andrey.abel.ai/docs/api/andrey.xges.html), [`lges`](https://andrey.abel.ai/docs/api/andrey.lges.html)\*, [`ages`](https://andrey.abel.ai/docs/api/andrey.ages.html), [`hc`](https://andrey.abel.ai/docs/api/andrey.hc.html), [`tabu`](https://andrey.abel.ai/docs/api/andrey.tabu.html), [`exact_search`](https://andrey.abel.ai/docs/api/andrey.exact_search.html), [`calm`](https://andrey.abel.ai/docs/api/andrey.calm.html), [`notears`](https://andrey.abel.ai/docs/api/andrey.notears.html), [`dagma`](https://andrey.abel.ai/docs/api/andrey.dagma.html), [`mmhc`](https://andrey.abel.ai/docs/api/andrey.mmhc.html), [`rsmax2`](https://andrey.abel.ai/docs/api/andrey.rsmax2.html) | CPDAG, DAG |
 | Permutation-based | [`boss`](https://andrey.abel.ai/docs/api/andrey.boss.html), [`grasp`](https://andrey.abel.ai/docs/api/andrey.grasp.html), [`boss_fci`](https://andrey.abel.ai/docs/api/andrey.boss_fci.html), [`grasp_fci`](https://andrey.abel.ai/docs/api/andrey.grasp_fci.html), [`igsp`](https://andrey.abel.ai/docs/api/andrey.igsp.html), [`ut_igsp`](https://andrey.abel.ai/docs/api/andrey.ut_igsp.html) | CPDAG, PAG |
-| Functional causal models | [`direct_lingam`](https://andrey.abel.ai/docs/api/andrey.direct_lingam.html), [`ica_lingam`](https://andrey.abel.ai/docs/api/andrey.ica_lingam.html), [`multi_group_direct_lingam`](https://andrey.abel.ai/docs/api/andrey.multi_group_direct_lingam.html), [`cam`](https://andrey.abel.ai/docs/api/andrey.cam.html), [`resit`](https://andrey.abel.ai/docs/api/andrey.resit.html), [`cpcm_graph`](https://andrey.abel.ai/docs/api/andrey.cpcm_graph.html)\*, [`skewd_mv`](https://andrey.abel.ai/docs/api/andrey.skewd_mv.html)\*, [`score_matching`](https://andrey.abel.ai/docs/api/andrey.score_matching.html), [`nogam`](https://andrey.abel.ai/docs/api/andrey.nogam.html), [`das`](https://andrey.abel.ai/docs/api/andrey.das.html)\* | DAG |
-| Temporal causal discovery | [`varma_lingam`](https://andrey.abel.ai/docs/api/andrey.varma_lingam.html), [`longitudinal_lingam`](https://andrey.abel.ai/docs/api/andrey.longitudinal_lingam.html), [`pcmci`](https://andrey.abel.ai/docs/api/andrey.pcmci.html), [`pcmciplus`](https://andrey.abel.ai/docs/api/andrey.pcmciplus.html), [`jpcmciplus`](https://andrey.abel.ai/docs/api/andrey.jpcmciplus.html), [`lpcmci`](https://andrey.abel.ai/docs/api/andrey.lpcmci.html), [`granger`](https://andrey.abel.ai/docs/api/andrey.granger.html), [`dynotears`](https://andrey.abel.ai/docs/api/andrey.dynotears.html) | Temporal graph |
+| Functional causal models | [`direct_lingam`](https://andrey.abel.ai/docs/api/andrey.direct_lingam.html), [`ica_lingam`](https://andrey.abel.ai/docs/api/andrey.ica_lingam.html), [`multi_group_direct_lingam`](https://andrey.abel.ai/docs/api/andrey.multi_group_direct_lingam.html), [`cam`](https://andrey.abel.ai/docs/api/andrey.cam.html), [`resit`](https://andrey.abel.ai/docs/api/andrey.resit.html), [`cpcm_graph`](https://andrey.abel.ai/docs/api/andrey.cpcm_graph.html), [`skewd_mv`](https://andrey.abel.ai/docs/api/andrey.skewd_mv.html), [`score_matching`](https://andrey.abel.ai/docs/api/andrey.score_matching.html), [`nogam`](https://andrey.abel.ai/docs/api/andrey.nogam.html), [`das`](https://andrey.abel.ai/docs/api/andrey.das.html) | DAG |
+| Temporal causal discovery | [`varma_lingam`](https://andrey.abel.ai/docs/api/andrey.varma_lingam.html), [`longitudinal_lingam`](https://andrey.abel.ai/docs/api/andrey.longitudinal_lingam.html), [`pcmci`](https://andrey.abel.ai/docs/api/andrey.pcmci.html), [`pcmciplus`](https://andrey.abel.ai/docs/api/andrey.pcmciplus.html), [`jpcmciplus`](https://andrey.abel.ai/docs/api/andrey.jpcmciplus.html), [`rpcmci`](https://andrey.abel.ai/docs/api/andrey.rpcmci.html)\*, [`lpcmci`](https://andrey.abel.ai/docs/api/andrey.lpcmci.html), [`granger`](https://andrey.abel.ai/docs/api/andrey.granger.html), [`dynotears`](https://andrey.abel.ai/docs/api/andrey.dynotears.html) | Temporal graph |
 | Latent variables | [`gin`](https://andrey.abel.ai/docs/api/andrey.gin.html), [`rcd`](https://andrey.abel.ai/docs/api/andrey.rcd.html), [`bottom_up_parce_lingam`](https://andrey.abel.ai/docs/api/andrey.bottom_up_parce_lingam.html), [`camuv`](https://andrey.abel.ai/docs/api/andrey.camuv.html) | DAG, PAG |
-| Pairwise direction | [`anm`](https://andrey.abel.ai/docs/api/andrey.anm.html), [`pnl`](https://andrey.abel.ai/docs/api/andrey.pnl.html), [`loci`](https://andrey.abel.ai/docs/api/andrey.loci.html), [`cpcm`](https://andrey.abel.ai/docs/api/andrey.cpcm.html)\*, [`skewd`](https://andrey.abel.ai/docs/api/andrey.skewd.html)\* | Two-node DAG |
+| Pairwise direction | [`anm`](https://andrey.abel.ai/docs/api/andrey.anm.html), [`pnl`](https://andrey.abel.ai/docs/api/andrey.pnl.html), [`loci`](https://andrey.abel.ai/docs/api/andrey.loci.html), [`cpcm`](https://andrey.abel.ai/docs/api/andrey.cpcm.html), [`skewd`](https://andrey.abel.ai/docs/api/andrey.skewd.html) | Two-node DAG |
 
 \* [Experimental](https://andrey.abel.ai/docs/api.html#experimental-methods):
 not supported yet (see its Limitations), and the API may change.
@@ -190,7 +190,7 @@ If you use Andrey in your work, please cite it, or use the
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.18.0},
+  version = {0.19.0},
   url = {https://andrey.abel.ai},
 }
 ```

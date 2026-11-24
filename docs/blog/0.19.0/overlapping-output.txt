@@ -1,0 +1,42 @@
+Complete rows: 0
+
+WARNING: andrey.pc: the data hold missing values and missing=None, so the fit ran the default
+handling, test-wise deletion: each test read only the rows where its variables are observed.
+Test-wise deletion is valid when values are missing completely at random, which means that whether a
+value is missing depends on no value in the data; the rows a test reads are then a random sample of
+all rows, and otherwise they are a selected sample that more rows do not correct. Pass
+missing="testwise" to choose it by name, and read the rows the tests kept in
+metadata["rows_tested"]. 1 pair of columns (X and Y) is never observed together, listed in
+metadata["never_observed_together"]. A test whose variables are observed together on fewer rows than
+it needs or that has no degrees of freedom left, a pair never observed together included, is not
+tested: it never separates a pair and never confirms a link. A pair that no test with rows could
+decide, such as a pair never observed together, is undecided: it is left out of the graph, no
+orientation reads it as adjacent or apart, and metadata["undecided_pairs"] lists it. 1 pair (X and
+Y) is undecided. An edge drawn although a conditioning set that could not be tested might have
+separated its pair is listed in metadata["possibly_separable"]: the flag says what the data could
+not check, not that the edge is false. 3 drawn edges (W and Z, X and Z, Y and Z) are flagged. This
+notice is logged once per process.
+pc  cpdag  |  4 nodes  |  3 edges (3 directed)
+
+  X -> Z
+  W -> Z
+  Z -> Y
+
+  rows_tested: min 1000, median 1000
+  not_tested: 9
+  undecided_pairs: [['X', 'Y']]
+  possibly_separable: [['W', 'Z'], ['X', 'Z'], ['Y', 'Z']]
+  indep_test: fisherz
+  tie_break: rank
+  missing: testwise
+  never_observed_together: [['X', 'Y']]
+
+cpdag  |  4 nodes  |  3 edges (3 undirected)
+
+  X -- Z
+  W -- Z
+  Z -- Y
+
+EM: drop column 'X' or column 'Y', or add rows that observe both: missing="em" needs every pair of
+    columns observed together in at least one row, and these two share none, so the data hold no
+    covariance for them
