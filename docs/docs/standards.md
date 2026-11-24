@@ -163,8 +163,10 @@ published measurement is ICA-LiNGAM's, on six BLAS kernels, in the same guide.
 ## Release checks
 
 Before a release merges, `qa/identity.py` fits every supported method on the release and on the
-release before it, on complete data with default arguments, and compares the outputs bit for bit.
-The quality gate and the reference comparisons run on the same code. The tests of the benchmark
+release before it, on complete data with default arguments, apart from the settings the quality gate
+fixes for a few methods, such as the shorter search of SkewD and SkewD-MV (`tuning_iter=2`,
+`max_iter=200`; a fit at the defaults takes minutes), and compares the outputs bit for bit. The
+quality gate and the reference comparisons run on the same code. The tests of the benchmark
 harness that produces the comparisons (`benchmarks/tests`) run on it too, in the harness's own
 environments, since continuous integration runs only some of them.
 
