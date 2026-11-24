@@ -237,6 +237,15 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {"p_value": {"atol": 0.0, "rtol": 1e-3}},
     },
+    # SkewD: the decided graph and both models' mean log-likelihoods, the default criterion's
+    # numbers. The fit chains a Bayesian optimization, CMA-ES, and expectation conditional
+    # maximization, each seeded, so rounding can move the likelihoods in their later digits.
+    "SkewD": {
+        "structural": ["graph"],
+        "numeric": {field: {"atol": 1e-3, "rtol": 1e-3} for field in ("ll_forward", "ll_backward")},
+    },
+    # SkewD-MV: the DAG and the number of DAGs in PC's class it chose among.
+    "SkewDMV": {"structural": ["graph", "candidates"], "numeric": {}},
     "RCD": {
         "structural": ["graph"],
         "numeric": {"weighted_adjacency": {"atol": 1e-6, "rtol": 1e-5}},

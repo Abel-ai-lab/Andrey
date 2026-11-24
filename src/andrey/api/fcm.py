@@ -1715,8 +1715,6 @@ def skewd_mv(
     DataTypeWarning
         When a column holds at most 10 distinct whole numbers and so may hold category codes, which
         the fit reads as numbers. Each message warns once per process.
-    ExperimentalWarning
-        On the first call in a process: the method is not benchmarked yet.
     SearchLimitWarning
         When a conditional model's refinement stops at ``max_iter`` rather than on its own rule.
 
@@ -1727,7 +1725,16 @@ def skewd_mv(
     noise ``n`` independent of its parents, and no hidden common cause; it also assumes the
     faithfulness PC needs, so that the true DAG lies in the estimated class [1]_. It is designed
     for small graphs, 6 to 10 variables in the paper, whose noise scale changes with the parents,
-    which the additive models of :func:`~andrey.cam` and :func:`~andrey.resit` do not allow.
+    which the additive models of :func:`~andrey.cam` and :func:`~andrey.resit` do not allow. It
+    favors accuracy on such graphs and gives up time. On the paper's skew-normal graphs of 6 and 10
+    variables and 1,000 rows it made as few errors as the code published with the paper, and fewer
+    than the empty graph and than :func:`~andrey.pc` (KCI), :func:`~andrey.cam`,
+    :func:`~andrey.nogam`, :func:`~andrey.score_matching`, and :func:`~andrey.resit`, all five
+    faster. A fit took a median of 49 CPU minutes at 6 variables and 37 at 10 on an AMD EPYC 7713,
+    and 28 and 18 on an AMD EPYC 9534 on other seeds, where :func:`~andrey.cam` took a median under
+    a second;
+    ``andrey.config(n_jobs)`` runs its conditional models and their searches on threads, which cuts
+    the wall time.
 
     Each column is standardized first [1]_. PC, order-independent [2]_, gives the class. Its DAGs
     orient the undirected edges with no directed cycle and no new collider [1]_, and are every
@@ -1763,15 +1770,16 @@ def skewd_mv(
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked yet. The paper measures it on skew-normal location-scale
-    graphs of 6 and 10 variables with 1,000 rows [1]_. Its cost grows with the number of distinct
-    parent sets the class allows, exponentially in a variable's undirected edges, and each fit
-    takes minutes at the defaults on one worker, most of which divides over ``n_jobs`` workers; it
-    refuses a class that needs more than 100 (``max_fits``),
-    where the paper counts parent-child configurations and expects the method to apply while they
-    are in the order of 100. An edge PC misses or misorients stays wrong: the likelihood only
-    chooses among the class's DAGs. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** Its cost grows with the number of distinct parent sets the class allows,
+    exponentially in a variable's undirected edges; it refuses a class that needs more than 100
+    (``max_fits``), where the paper counts parent-child configurations and expects the method to
+    apply while they are in the order of 100. The `0.19.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#skewd-mv>`_ has the measured times, up to
+    1.8 CPU hours at 6 variables and 2.4 at 10. An edge PC misses or misorients stays wrong: the
+    likelihood only chooses among the class's DAGs, and PC's skeleton had an F1 of 0.88 and 0.92 at
+    6 variables and 0.84 and 0.80 at 10, on two sets of 20 seeds. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------

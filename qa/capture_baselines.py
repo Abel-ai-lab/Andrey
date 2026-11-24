@@ -145,6 +145,13 @@ ALGORITHMS = {
     "LOCI": (_facade("loci"), "lsnm_pair"),
     "CPCM": (_facade("cpcm"), "lsnm_pair"),
     "CPCMGraph": (_facade("cpcm_graph"), "nonmonotone_4v"),
+    # SkewD and SkewD-MV at the shortest search, the unit tests' budgets: at the defaults one fit
+    # takes minutes.
+    "SkewD": (_facade("skewd", tuning_iter=1, max_iter=5), "lsnm_pair"),
+    "SkewDMV": (
+        _facade("skewd_mv", tuning_iter=1, max_iter=5, indep_test="fisherz"),
+        "nonmonotone_4v",
+    ),
     "GIN": (_facade("gin"), "measurement_6v"),
     "RESIT": (_facade("resit"), "nonmonotone_4v"),
     "ScoreMatching": (_facade("score_matching"), "rational_chain_4v"),

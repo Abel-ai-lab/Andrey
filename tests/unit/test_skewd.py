@@ -235,6 +235,15 @@ def test_the_likelihood_criterion_points_from_the_larger_likelihood_of_the_same_
     assert reverse.structure.oriented_edges() == [(1 - cause, cause, "directed")]
 
 
+def test_skewd_decides_by_the_likelihood_by_default():
+    data = _pair()
+    default = skewd(data, **SHORT_PAIR)
+    assert default.metadata == skewd(data, criterion="likelihood", **SHORT_PAIR).metadata
+    assert "p_values" not in default.metadata
+    with pytest.raises(ValueError, match="criterion='independence'"):
+        skewd(data, alpha=0.05, **SHORT_PAIR)
+
+
 def test_skewd_swapped_columns_swap_the_directions():
     data = pd.DataFrame(_pair(), columns=["x", "y"])
     first = skewd(data, criterion="likelihood", **SHORT_PAIR)
@@ -322,9 +331,10 @@ def test_a_column_that_spans_the_float_range_is_read_without_overflow(missing_ce
         data[3, 1] = huge[3, 1] = np.nan
     with warnings.catch_warnings():
         warnings.simplefilter("error", RuntimeWarning)
-        pair = skewd(huge, **SHORT_PAIR)
+        pair = skewd(huge, criterion="independence", **SHORT_PAIR)
         graph = skewd_mv(huge[~np.isnan(huge).any(axis=1)], **SHORT_GRAPH)
-    assert pair.structure.oriented_edges() == skewd(data, **SHORT_PAIR).structure.oriented_edges()
+    plain = skewd(data, criterion="independence", **SHORT_PAIR)
+    assert pair.structure.oriented_edges() == plain.structure.oriented_edges()
     assert len(graph.structure.oriented_edges()) == 1
 
 

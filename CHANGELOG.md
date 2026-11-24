@@ -45,6 +45,15 @@ names its pull request.
   to 18 times faster on graphs of 4 to 8 variables. The conservative estimate under `"pareto"` and
   Table 2's Pareto setup are not supported, and the [0.19.0 release card][card-0190-cpcm] has the
   numbers. ([#1169])
+- `skewd` and `skewd_mv` are supported: SkewD's pair test and its graph version SkewD-MV, for
+  location-scale data with skewed noise. On their paper's skewed pairs, two Gaussian location-scale
+  pair sets, and its skew-normal graphs of 6 and 10 variables, they made as few errors as the
+  outputs the authors recorded with the paper's code, and fewer than a coin flip or the empty graph;
+  SkewD-MV made fewer errors than PC (KCI), CAM, NoGAM, SCORE, and RESIT at both sizes, all five
+  faster. A pair takes a median of 15 to 22 CPU minutes per set on an AMD EPYC 9534, and a graph 37
+  to 49 on an AMD EPYC 7713 and 18 to 28 on the EPYC 9534 on other seeds; `andrey.config(n_jobs)`
+  runs the searches on threads, which cuts the wall time. The [0.19.0 release card][card-0190-skewd]
+  has the numbers. ([#1181])
 - Two experimental methods and three experimental tests: `lges`, less greedy equivalence search
   (Ejaz and Bareinboim 2025); `rpcmci`, Regime-PCMCI (Saggioro et al. 2020), for one time series
   whose lagged links switch between a few persistent regimes; and the regression-based tests `"gcm"`
@@ -61,6 +70,11 @@ names its pull request.
 
 ### Breaking
 
+- `skewd` decides by the likelihood by default (`criterion="likelihood"`), so a call without
+  `criterion` returns the likelihood's direction, no `p_values` or `statistics`, and raises
+  `ValueError` when it passes `alpha`; pass `criterion="independence"` for the earlier default,
+  which the paper found more accurate on pairs whose marginals are not Gaussian (85% against 77%
+  over its 13 established pair benchmarks, 67% against 46% on the Tübingen pairs). ([#1181])
 - On data with missing values, the graphs of the methods that delete rows per test can change. A
   test with too few rows or with no degrees of freedom left, which in 0.18.0 returned p = 1 and so
   removed its edge, or raised `ValueError`, is now not tested: it never separates a pair, and an
@@ -144,6 +158,8 @@ names its pull request.
   code. ([#1161])
 - `cpcm` and `cpcm_graph` are supported, and the [0.19.0 release card][card-0190-cpcm] compares
   them with their paper's code. ([#1169])
+- `skewd` and `skewd_mv` are supported, and the [0.19.0 release card][card-0190-skewd] compares
+  them with the outputs the authors recorded with their paper's code. ([#1181])
 - With `fisherz` and `student_t` on cohorts with overlapping variables, test-wise deletion computes
   a test's sums from missingness-pattern groups, which made `pc` 2.5 to 6.6 times and `iamb` 1.6 to
   4.2 times faster on synthetic cohorts with overlapping variables, with identical graphs. ([#1148])
@@ -2880,6 +2896,7 @@ First alpha release.
 [#1200]: https://github.com/Abel-ai-lab/Andrey/pull/1200
 [#1161]: https://github.com/Abel-ai-lab/Andrey/pull/1161
 [#1169]: https://github.com/Abel-ai-lab/Andrey/pull/1169
+[#1181]: https://github.com/Abel-ai-lab/Andrey/pull/1181
 [#1132]: https://github.com/Abel-ai-lab/Andrey/pull/1132
 [#1146]: https://github.com/Abel-ai-lab/Andrey/pull/1146
 [#1149]: https://github.com/Abel-ai-lab/Andrey/pull/1149
@@ -2890,6 +2907,7 @@ First alpha release.
 [#1099]: https://github.com/Abel-ai-lab/Andrey/pull/1099
 [card-0190-das]: https://andrey.abel.ai/docs/benchmarks/0.19.0.html#das
 [card-0190-cpcm]: https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm
+[card-0190-skewd]: https://andrey.abel.ai/docs/benchmarks/0.19.0.html#skewd
 [card-0190-missing]: https://andrey.abel.ai/docs/benchmarks/0.19.0.html#datasets-with-overlapping-variables
 [card-0180-dagma]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma
 [#1142]: https://github.com/Abel-ai-lab/Andrey/pull/1142

@@ -1,15 +1,15 @@
 {
  "release": "0.19.0",
  "parity_rule": "paired bootstrap",
- "generated": "2026-11-20",
- "theme": "DAS and CPCM against the code published with their papers, on their papers' simulations and data",
- "build": "DAS: Andrey development build of 18 November 2026 (version string 0.17.1, the functional-models line with DAS as released in 0.18.0); the 0.19.0 release branch returns the same graph on 40 of 40 check datasets (50 variables, ER4, raw and z-scored); CPCM: Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's. On Table 2's POISg and PARg, both data sources, CPCM, the authors' code on the authors' generator's tables, and loci, anm and pnl ran in one job on one node, on commit 9f36092dc; CPCM's decisions there equal those of its earlier run on the Appendix B.3 tables",
- "verdict_rule": "DAS: per cell (scale, graph density, variables; 20 datasets): D = SHD(Andrey) - SHD(reference) per dataset, on the datasets both fitted; worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise. 10,000 resamples of the datasets, default_rng(0). The decision cells are the z-scored and rescaled ones (claim in); the raw cells, where the reference reads the simulation's units and Andrey standardizes inside its order search, are reported, not judged (claim out). A cell worse on its first seeds was rerun on fresh seeds (replication); no decision cell was worse, so none was rerun, and the raw ER1 cells at 20 and 50 variables, worse on their first seeds, were rerun. result is the published verdict, better or worse only where the fresh seeds agree and a tie otherwise; replicated says which. The floor, each row's floor field, per dataset: SHD(Andrey) minus SHD(empty graph), with the same bootstrap; it applies where the reference's interval lies wholly below 0, and a row then passes when Andrey's does too. The lane file's floor section takes the better of the empty graph and the complete DAG in column order; CPCM: per cell (setup, family arm, size): D = error(Andrey) - error(reference) per dataset, on the datasets both fitted (pairs: 1 for the reversed forced direction; graphs: SHD, and the authors' SID beside it, a graph worse on either being worse); worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise; 10,000 resamples, default_rng(0). Pairs: 100 per cell, graphs: 20. A row worse on its first seeds was rerun on fresh seeds, and holds that rerun as replication; every other pair row with fresh seeds holds them as fresh. Fresh graph rows have no reference arm: Andrey's errors and floors only. result is the published verdict, better or worse only where the fresh seeds agree, a tie otherwise. The floor field is Andrey's and the reference's error minus the empty answer's; the lane file also gives the floor of the better of the coin flip and the cell's majority direction (pairs) or the empty and the base-rate graph (graphs). Rows of Table 1's misspecified families, the other family arm on LS, LS-s and MN-U, Table 2's PARg and model (16) at 500 rows (out_of_claim gives the reason), and the edge penalty 1 are out of claim, reported",
+ "generated": "2026-11-22",
+ "theme": "DAS, CPCM and SkewD against the code published with their papers, on their papers' simulations and data",
+ "build": "DAS: Andrey development build of 18 November 2026 (version string 0.17.1, the functional-models line with DAS as released in 0.18.0); the 0.19.0 release branch returns the same graph on 40 of 40 check datasets (50 variables, ER4, raw and z-scored); CPCM: Andrey at commit 9f36092dc, CPCM as merged into the 0.19.0 release branch (the smoothing criterion of the exponential, Pareto, and Poisson fits); the rows whose families that change does not touch (Table 1's gamma with fixed shape and misspecified families, and the graphs G1, G2 and the lambda = 1 arms, Gaussian fixed scale throughout) ran on commit 68170983b of the 0.18.0 line, whose CPCM code is the same for those families. The release branch's CPCM code is the measured build's. On Table 2's POISg and PARg, both data sources, CPCM, the authors' code on the authors' generator's tables, and loci, anm and pnl ran in one job on one node, on commit 9f36092dc; CPCM's decisions there equal those of its earlier run on the Appendix B.3 tables; SkewD: Andrey at commit 4c1cda49b of the functional-models line, from before 0.18.0. Since then, SkewD sums each column's mean and variance over its sorted values (so they do not depend on the row order); counts the two directions as tied when their values agree to 1e-9 relative (the closest of these pairs differ by 2.9%); can run its searches on threads, with the serial result bit for bit; and the ECM step that ends each fit reads the normal density-to-distribution ratio in a more stable form, which changes results in their last digits. Refits with the 0.19.0 code at the defaults, one core and one BLAS thread, on seeds 0-4 of every set and size (50 datasets) gave the same direction under both criteria on all 40 pairs and the same graph on all 10 graphs; 79 of the 80 pair log-likelihoods agree to 1e-8 relative and one by 8e-4 (0.9% relative; P5 seed 2, forward), with the same direction. PC's class as SkewD-MV computes it, and its column order, are the same on all 80 graph datasets under both builds. The criteria are read from one fit per pair",
+ "verdict_rule": "DAS: per cell (scale, graph density, variables; 20 datasets): D = SHD(Andrey) - SHD(reference) per dataset, on the datasets both fitted; worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise. 10,000 resamples of the datasets, default_rng(0). The decision cells are the z-scored and rescaled ones (claim in); the raw cells, where the reference reads the simulation's units and Andrey standardizes inside its order search, are reported, not judged (claim out). A cell worse on its first seeds was rerun on fresh seeds (replication); no decision cell was worse, so none was rerun, and the raw ER1 cells at 20 and 50 variables, worse on their first seeds, were rerun. result is the published verdict, better or worse only where the fresh seeds agree and a tie otherwise; replicated says which. The floor, each row's floor field, per dataset: SHD(Andrey) minus SHD(empty graph), with the same bootstrap; it applies where the reference's interval lies wholly below 0, and a row then passes when Andrey's does too. The lane file's floor section takes the better of the empty graph and the complete DAG in column order; CPCM: per cell (setup, family arm, size): D = error(Andrey) - error(reference) per dataset, on the datasets both fitted (pairs: 1 for the reversed forced direction; graphs: SHD, and the authors' SID beside it, a graph worse on either being worse); worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise; 10,000 resamples, default_rng(0). Pairs: 100 per cell, graphs: 20. A row worse on its first seeds was rerun on fresh seeds, and holds that rerun as replication; every other pair row with fresh seeds holds them as fresh. Fresh graph rows have no reference arm: Andrey's errors and floors only. result is the published verdict, better or worse only where the fresh seeds agree, a tie otherwise. The floor field is Andrey's and the reference's error minus the empty answer's; the lane file also gives the floor of the better of the coin flip and the cell's majority direction (pairs) or the empty and the base-rate graph (graphs). Rows of Table 1's misspecified families, the other family arm on LS, LS-s and MN-U, Table 2's PARg and model (16) at 500 rows (out_of_claim gives the reason), and the edge penalty 1 are out of claim, reported; SkewD: per set (pairs, seeds 0-19, each criterion) or per graph size (seeds 0-19, then 20-39 fresh): D = error(Andrey) - error(the authors' recorded output) per dataset; worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise; 10,000 resamples, default_rng(0). Floors: for pairs the Wilson 95% lower bound of the share right above 0.5 (coin_flip_floor; the column order is swapped on exactly 10 of each 20 pairs, so the majority direction is right on half), for graphs the empty graph (floor). A graph fit over 4 h of CPU counts as failed and scores the worst DAG's SHD; none was",
  "card_verdict_rule": "card_verdict, on every row: the release card's verdict on the row's comparison, 'better', 'tie', or 'worse', and null where the card judges none (rows out of claim). Better or worse counts only where a rerun on fresh seeds agreed; one on the first seeds alone is a tie",
- "fit_protocol": "DAS: each fit in a fresh process on one core with one BLAS thread, one timed fit without warm-up, a cap of 1,800 s per fit up to 100 variables and 3,600 s at 200, past which a fit is a timeout and never scored as a graph; no fit of these rows failed or timed out. Times are process CPU seconds; ratio is the median over the paired datasets of the reference's time over Andrey's; CPCM: each fit in a long-lived worker on one core with one BLAS thread, one timed fit, a cap of 1,800 s per fit (3,600 s for the reference at 8 variables); no fit timed out; the reference's errors are counted and never scored, and each cell is paired on the datasets both finished; times are wall seconds of the fit inside the worker",
- "error_metric": "DAS: SHD of the DAG against the true DAG (a reversed edge counts 1): andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means; CPCM: pairs: SHD of the two-node DAG of the forced direction; graphs: SHD of the DAG, with the authors' SID under sid",
- "complete_definition": "DAS: true when every row has at least 10 paired datasets (both fitted); CPCM: true when every row has at least 10 paired datasets",
- "seeds_note": "DAS: every cell holds 20 datasets: seeds 0-19 for ER1 and for ER4 at 10 variables; seeds 20-39 for ER4 from 20 to 200 variables, kept apart from the ER4 seeds 0-19 used while the method was built; the raw ER4 cell at 50 variables is the one on seeds 0-19, reported as context, with the reference's fits from a separate run on the same datasets. A replication holds 20 fresh datasets, seeds 20-39. The lane file's rows at 500 and 1,000 variables use seeds 0-19, and its paired check at 500 seeds 0-4; CPCM: pairs: first seeds 0-99, fresh seeds 100-199; Table 2: the first seeds are the 100 pairs of each of the five Tagasovska et al. (2020) files the paper takes them from, and the fresh seeds 100 pairs drawn by those files' generator, unmodified, under another seed. That generator at the published commit reproduces the MN-U file exactly and the AN file's causes and directions, but not the AN-s, LS and LS-s files, which match the fresh draws on summary statistics only (the cause's and the effect's spread, kurtosis). POISg and PARg have no published data and were drawn as the paper's Appendix B.3 describes them, under the pair seeds 0-99 and 100-199: the cause N(0, sqrt 2) (standard deviation sqrt 2), theta(x) = f(x) - min f + 0.5 with f a zero-mean Gaussian process with a squared-exponential kernel, sigma 1 and length 0.2, on a grid spanning the cause, and the effect Poisson with mean theta or Pareto of scale 1 and shape theta, the pair's order swapped on a coin. Both sets were also drawn by the authors' own generator (CPCM_generative_model in Simulations/Simulations2/Data generators.R, commit 2ada90e, sourced unmodified with EnvStats 3.1.0, 100 pairs of 1,000 rows per set under set.seed(0), the seed of the authors' simulation script, for the first seeds and set.seed(2026) for the fresh seeds), the pair's order swapped on a coin drawn outside R's stream; that generator differs from the description in three ways: it reads theta from a grid of 201 points that starts at 0, so theta is a step function, constant for causes below 0, and it draws the Pareto effect with EnvStats' rpareto(1, theta, 1), whose arguments are the location and the shape, which gives scale theta and shape 1. Its tables are not the authors' own draws, since their script runs the methods between draws; graphs: first seeds 0-19, fresh seeds 20-39",
+ "fit_protocol": "DAS: each fit in a fresh process on one core with one BLAS thread, one timed fit without warm-up, a cap of 1,800 s per fit up to 100 variables and 3,600 s at 200, past which a fit is a timeout and never scored as a graph; no fit of these rows failed or timed out. Times are process CPU seconds; ratio is the median over the paired datasets of the reference's time over Andrey's; CPCM: each fit in a long-lived worker on one core with one BLAS thread, one timed fit, a cap of 1,800 s per fit (3,600 s for the reference at 8 variables); no fit timed out; the reference's errors are counted and never scored, and each cell is paired on the datasets both finished; times are wall seconds of the fit inside the worker; SkewD: each fit in a job of its set on one core with one BLAS thread, one timed fit at the defaults; pairs killed at 2 h and graphs at 4 h of CPU, which no fit reached; times are CPU seconds",
+ "error_metric": "DAS: SHD of the DAG against the true DAG (a reversed edge counts 1): andrey_shd, comparator_shd, and empty_shd are medians over the paired datasets, and the _mean fields their means; CPCM: pairs: SHD of the two-node DAG of the forced direction; graphs: SHD of the DAG, with the authors' SID under sid; SkewD: SHD of the two-node DAG, 1 for the reversed direction or no edge and 0 for the true one; the _mean fields are the error rates; SkewD-MV: SHD as the paper counts it: the entries of the two 0/1 adjacencies that differ, so a reversed edge counts 2; a fit over the 4 h cap would score the worst DAG's SHD, and none was",
+ "complete_definition": "DAS: true when every row has at least 10 paired datasets (both fitted); CPCM: true when every row has at least 10 paired datasets; SkewD: true when every row has 20 paired datasets",
+ "seeds_note": "DAS: every cell holds 20 datasets: seeds 0-19 for ER1 and for ER4 at 10 variables; seeds 20-39 for ER4 from 20 to 200 variables, kept apart from the ER4 seeds 0-19 used while the method was built; the raw ER4 cell at 50 variables is the one on seeds 0-19, reported as context, with the reference's fits from a separate run on the same datasets. A replication holds 20 fresh datasets, seeds 20-39. The lane file's rows at 500 and 1,000 variables use seeds 0-19, and its paired check at 500 seeds 0-4; CPCM: pairs: first seeds 0-99, fresh seeds 100-199; Table 2: the first seeds are the 100 pairs of each of the five Tagasovska et al. (2020) files the paper takes them from, and the fresh seeds 100 pairs drawn by those files' generator, unmodified, under another seed. That generator at the published commit reproduces the MN-U file exactly and the AN file's causes and directions, but not the AN-s, LS and LS-s files, which match the fresh draws on summary statistics only (the cause's and the effect's spread, kurtosis). POISg and PARg have no published data and were drawn as the paper's Appendix B.3 describes them, under the pair seeds 0-99 and 100-199: the cause N(0, sqrt 2) (standard deviation sqrt 2), theta(x) = f(x) - min f + 0.5 with f a zero-mean Gaussian process with a squared-exponential kernel, sigma 1 and length 0.2, on a grid spanning the cause, and the effect Poisson with mean theta or Pareto of scale 1 and shape theta, the pair's order swapped on a coin. Both sets were also drawn by the authors' own generator (CPCM_generative_model in Simulations/Simulations2/Data generators.R, commit 2ada90e, sourced unmodified with EnvStats 3.1.0, 100 pairs of 1,000 rows per set under set.seed(0), the seed of the authors' simulation script, for the first seeds and set.seed(2026) for the fresh seeds), the pair's order swapped on a coin drawn outside R's stream; that generator differs from the description in three ways: it reads theta from a grid of 201 points that starts at 0, so theta is a step function, constant for causes below 0, and it draws the Pareto effect with EnvStats' rpareto(1, theta, 1), whose arguments are the location and the shape, which gives scale theta and shape 1. Its tables are not the authors' own draws, since their script runs the methods between draws; graphs: first seeds 0-19, fresh seeds 20-39; SkewD: pairs: seeds 0-19, pairs 1-10 of each of a pooled set's two files or pairs 1-20 of a single file; graphs: seeds 0-19 are datasets 1-20 and the fresh seeds 20-39 datasets 21-40 of the authors' files",
  "regimes": {
   "score_paper_standardized": "the papers' simulation: Erdos-Renyi graphs with d edges (ER1) or 4 d (ER4), each link one draw of a Gaussian process over the node's parents, Gaussian noise of variance uniform on [0.4, 0.8], 1,000 rows, every column z-scored",
   "score_paper_rescaled": "the papers' simulation: Erdos-Renyi graphs with d edges (ER1) or 4 d (ER4), each link one draw of a Gaussian process over the node's parents, Gaussian noise of variance uniform on [0.4, 0.8], 1,000 rows, each variable divided by its standard deviation before its children read it",
@@ -27,7 +27,9 @@
   "cpcm_pareto16": "the CPCM paper's model (16): X2 given X1 Pareto with theta(x) = x^gamma log x + 1, gamma 1 or 2, judged at 1,000 and 2,000 rows, 500 rows reported",
   "cpcm_graph_paper": "the CPCM paper's Section 6.4 graphs: random DAGs of 5 variables, 1,000 rows, linear, additive-noise, exponential CPCM, and mixed exponential and Gaussian CPCM variables, with the families the paper's rule picks from each column's support",
   "cpcm_graph_paper_lambda1": "as cpcm_graph_paper, with an edge penalty of 1, the default of the authors' scripts",
-  "cpcm_graph_greedy": "the CPCM paper's Appendix B.1.1 graphs: exponential CPCM variables on random DAGs of 4, 6 and 8 variables, 1,000 rows, the families from the support rule"
+  "cpcm_graph_greedy": "the CPCM paper's Appendix B.1.1 graphs: exponential CPCM variables on random DAGs of 4, 6 and 8 variables, 1,000 rows, the families from the support rule",
+  "skewd_pairs": "the SkewD paper's skewed pairs, 1,000 rows: additive (ANs) and location-scale (LSs) noise models at three noise skewnesses (-0.455, 0.985 and 1.750), and Tagasovska et al.'s (2020) Gaussian-noise location-scale sets LS and LS-s, 20 pairs each, the column order swapped on 10",
+  "skewd_mv_graphs": "the SkewD paper's skew-normal location-scale graphs (Table 2): Erdos-Renyi DAGs with as many edges as variables, 6 and 10 variables, 1,000 rows, sources uniform on [-3.5, 3.5], 20 datasets per size and 20 fresh"
  },
  "coverage": {},
  "packages": {
@@ -44,6 +46,12 @@
    "dHSIC": "2.2",
    "gamlss": "5.5.5",
    "bnlearn": "5.2.1"
+  },
+  "SkewD": {
+   "SkewD (authors' code)": "commit 312632b",
+   "NumPy (authors' code)": "1.26.4",
+   "cmaes": "0.13.1",
+   "scikit-optimize": "0.10.2"
   }
  },
  "hardware": {
@@ -63,6 +71,19 @@
      "AMD EPYC 9534 64-Core Processor",
      "INTEL(R) XEON(R) GOLD 6542Y"
     ],
+    "cores_per_fit": 1,
+    "blas_threads": 1
+   },
+   "SkewD": {
+    "cpu_models": [
+     "AMD EPYC 7713 64-Core Processor",
+     "AMD EPYC 9534 64-Core Processor"
+    ],
+    "cpu_by_part": {
+     "pairs": "AMD EPYC 9534 64-Core Processor",
+     "graphs, seeds 0-19": "AMD EPYC 7713 64-Core Processor",
+     "graphs, seeds 20-39": "AMD EPYC 9534 64-Core Processor"
+    },
     "cores_per_fit": 1,
     "blas_threads": 1
    }
@@ -9495,6 +9516,1486 @@
       "reference": "none"
      },
      "replicated": "tie, fresh seeds without a reference arm",
+     "result": "tie",
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "SkewD",
+   "family": "pairwise",
+   "solution": "andrey.skewd.numpy",
+   "setting": "criterion=\"likelihood\" (default), alpha=None",
+   "comparator": "SkewD authors' recorded outputs",
+   "comparator_solution": "klippert-marx.skewd.recorded",
+   "comparator_setting": "SkewD-LL as recorded per dataset by the code published with the paper (commit 312632b), run by the authors with the paper's arguments on the same data files; checked by a reduced fresh run (reference_check in the lane file)",
+   "lane": "skewd",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 9534 64-Core Processor for Andrey's fits of every method on the pairs, 1 core per fit, 1 BLAS thread; the recorded outputs hold no times",
+   "cores": 1,
+   "build": "Andrey at commit 4c1cda49b of the functional-models line, from before 0.18.0. Since then, SkewD sums each column's mean and variance over its sorted values (so they do not depend on the row order); counts the two directions as tied when their values agree to 1e-9 relative (the closest of these pairs differ by 2.9%); can run its searches on threads, with the serial result bit for bit; and the ECM step that ends each fit reads the normal density-to-distribution ratio in a more stable form, which changes results in their last digits. Refits with the 0.19.0 code at the defaults, one core and one BLAS thread, on seeds 0-4 of every set and size (50 datasets) gave the same direction under both criteria on all 40 pairs and the same graph on all 10 graphs; 79 of the 80 pair log-likelihoods agree to 1e-8 relative and one by 8e-4 (0.9% relative; P5 seed 2, forward), with the same direction. PC's class as SkewD-MV computes it, and its column order, are the same on all 80 graph datasets under both builds. The criteria are read from one fit per pair",
+   "same_graph_test": "the same direction",
+   "regime": "skewd_pairs",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "SHD of the two-node DAG, 1 for the reversed direction or no edge and 0 for the true one; the _mean fields are the error rates",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "SkewD|P1|ANs|likelihood",
+     "effect": "ANs(-0.455), likelihood",
+     "set": "ANs",
+     "noise": "skew-normal (shape -2) and asymmetric generalized normal (k = 0.15)",
+     "noise_skewness": -0.455,
+     "criterion": "likelihood",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 900.1,
+     "andrey_s_max": 1066.0,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 20,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|P2|ANs|likelihood",
+     "effect": "ANs(0.985), likelihood",
+     "set": "ANs",
+     "noise": "skew-normal (shape 20) and asymmetric generalized normal (k = -0.31)",
+     "noise_skewness": 0.985,
+     "criterion": "likelihood",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1105.0,
+     "andrey_s_max": 1349.6,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 20,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|P3|ANs|likelihood",
+     "effect": "ANs(1.750), likelihood",
+     "set": "ANs",
+     "noise": "asymmetric generalized normal (k = -0.5)",
+     "noise_skewness": 1.75,
+     "criterion": "likelihood",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1146.1,
+     "andrey_s_max": 1660.3,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 20,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|P4|LSs|likelihood",
+     "effect": "LSs(-0.455), likelihood",
+     "set": "LSs",
+     "noise": "skew-normal (shape -2) and asymmetric generalized normal (k = 0.15)",
+     "noise_skewness": -0.455,
+     "criterion": "likelihood",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1151.9,
+     "andrey_s_max": 1737.8,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 20,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|P5|LSs|likelihood",
+     "effect": "LSs(0.985), likelihood",
+     "set": "LSs",
+     "noise": "skew-normal (shape 20) and asymmetric generalized normal (k = -0.31)",
+     "noise_skewness": 0.985,
+     "criterion": "likelihood",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1303.5,
+     "andrey_s_max": 1787.3,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 20,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|P6|LSs|likelihood",
+     "effect": "LSs(1.750), likelihood",
+     "set": "LSs",
+     "noise": "asymmetric generalized normal (k = -0.5)",
+     "noise_skewness": 1.75,
+     "criterion": "likelihood",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1309.5,
+     "andrey_s_max": 2317.3,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 20,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|S1|LS|likelihood",
+     "effect": "LS, likelihood",
+     "set": "LS",
+     "noise": "Gaussian",
+     "noise_skewness": null,
+     "criterion": "likelihood",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 988.5,
+     "andrey_s_max": 1346.5,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 20,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|S2|LS-s|likelihood",
+     "effect": "LS-s, likelihood",
+     "set": "LS-s",
+     "noise": "Gaussian",
+     "noise_skewness": null,
+     "criterion": "likelihood",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1076.7,
+     "andrey_s_max": 1697.7,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 20,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "SkewD",
+   "family": "pairwise",
+   "solution": "andrey.skewd.numpy",
+   "setting": "criterion=\"independence\", alpha=None",
+   "comparator": "SkewD authors' recorded outputs",
+   "comparator_solution": "klippert-marx.skewd.recorded",
+   "comparator_setting": "SkewD-IT as recorded per dataset by the code published with the paper (commit 312632b), run by the authors with the paper's arguments on the same data files; checked by a reduced fresh run (reference_check in the lane file)",
+   "lane": "skewd.independence",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 9534 64-Core Processor for Andrey's fits of every method on the pairs, 1 core per fit, 1 BLAS thread; the recorded outputs hold no times",
+   "cores": 1,
+   "build": "Andrey at commit 4c1cda49b of the functional-models line, from before 0.18.0. Since then, SkewD sums each column's mean and variance over its sorted values (so they do not depend on the row order); counts the two directions as tied when their values agree to 1e-9 relative (the closest of these pairs differ by 2.9%); can run its searches on threads, with the serial result bit for bit; and the ECM step that ends each fit reads the normal density-to-distribution ratio in a more stable form, which changes results in their last digits. Refits with the 0.19.0 code at the defaults, one core and one BLAS thread, on seeds 0-4 of every set and size (50 datasets) gave the same direction under both criteria on all 40 pairs and the same graph on all 10 graphs; 79 of the 80 pair log-likelihoods agree to 1e-8 relative and one by 8e-4 (0.9% relative; P5 seed 2, forward), with the same direction. PC's class as SkewD-MV computes it, and its column order, are the same on all 80 graph datasets under both builds. The criteria are read from one fit per pair",
+   "same_graph_test": "the same direction",
+   "regime": "skewd_pairs",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "SHD of the two-node DAG, 1 for the reversed direction or no edge and 0 for the true one; the _mean fields are the error rates",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "SkewD|P1|ANs|independence",
+     "effect": "ANs(-0.455), independence",
+     "set": "ANs",
+     "noise": "skew-normal (shape -2) and asymmetric generalized normal (k = 0.15)",
+     "noise_skewness": -0.455,
+     "criterion": "independence",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 900.1,
+     "andrey_s_max": 1066.0,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 18,
+     "comparator_reversed": 2,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 2,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.9,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.1,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.25,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -1.0,
+        -0.75
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|P2|ANs|independence",
+     "effect": "ANs(0.985), independence",
+     "set": "ANs",
+     "noise": "skew-normal (shape 20) and asymmetric generalized normal (k = -0.31)",
+     "noise_skewness": 0.985,
+     "criterion": "independence",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1105.0,
+     "andrey_s_max": 1349.6,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 20,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|P3|ANs|independence",
+     "effect": "ANs(1.750), independence",
+     "set": "ANs",
+     "noise": "asymmetric generalized normal (k = -0.5)",
+     "noise_skewness": 1.75,
+     "criterion": "independence",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1146.1,
+     "andrey_s_max": 1660.3,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 20,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|P4|LSs|independence",
+     "effect": "LSs(-0.455), independence",
+     "set": "LSs",
+     "noise": "skew-normal (shape -2) and asymmetric generalized normal (k = 0.15)",
+     "noise_skewness": -0.455,
+     "criterion": "independence",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 0.9,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1151.9,
+     "andrey_s_max": 1737.8,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 18,
+     "andrey_reversed": 2,
+     "andrey_no_edge": 0,
+     "comparator_correct": 18,
+     "comparator_reversed": 2,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.9,
+     "andrey_shd_mean": 0.1,
+     "comparator_shd_mean": 0.1,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -1.0,
+        -0.75
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -1.0,
+        -0.75
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.699,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|P5|LSs|independence",
+     "effect": "LSs(0.985), independence",
+     "set": "LSs",
+     "noise": "skew-normal (shape 20) and asymmetric generalized normal (k = -0.31)",
+     "noise_skewness": 0.985,
+     "criterion": "independence",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 0.95,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1303.5,
+     "andrey_s_max": 1787.3,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 19,
+     "andrey_reversed": 1,
+     "andrey_no_edge": 0,
+     "comparator_correct": 17,
+     "comparator_reversed": 3,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 3,
+     "comparator_right_andrey_wrong_count": 1,
+     "comparator_direction_correct": 0.85,
+     "andrey_shd_mean": 0.05,
+     "comparator_shd_mean": 0.15,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.3,
+      0.1
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.85,
+       "bootstrap_95": [
+        -1.0,
+        -0.7
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.764,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|P6|LSs|independence",
+     "effect": "LSs(1.750), independence",
+     "set": "LSs",
+     "noise": "asymmetric generalized normal (k = -0.5)",
+     "noise_skewness": 1.75,
+     "criterion": "independence",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1309.5,
+     "andrey_s_max": 2317.3,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 19,
+     "comparator_reversed": 1,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 1,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.95,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.05,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|S1|LS|independence",
+     "effect": "LS, independence",
+     "set": "LS",
+     "noise": "Gaussian",
+     "noise_skewness": null,
+     "criterion": "independence",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 0.85,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 988.5,
+     "andrey_s_max": 1346.5,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 17,
+     "andrey_reversed": 3,
+     "andrey_no_edge": 0,
+     "comparator_correct": 17,
+     "comparator_reversed": 3,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 2,
+     "comparator_right_andrey_wrong_count": 2,
+     "comparator_direction_correct": 0.85,
+     "andrey_shd_mean": 0.15,
+     "comparator_shd_mean": 0.15,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.2,
+      0.2
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.85,
+       "bootstrap_95": [
+        -1.0,
+        -0.7
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.85,
+       "bootstrap_95": [
+        -1.0,
+        -0.7
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.64,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|S2|LS-s|independence",
+     "effect": "LS-s, independence",
+     "set": "LS-s",
+     "noise": "Gaussian",
+     "noise_skewness": null,
+     "criterion": "independence",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1076.7,
+     "andrey_s_max": 1697.7,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 19,
+     "comparator_reversed": 1,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 1,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.95,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.05,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "SkewD-MV",
+   "family": "functional",
+   "solution": "andrey.skewd_mv.numpy",
+   "setting": "defaults: PC with KCI at alpha 0.05, tuning_iter=20, max_iter=3000, max_fits=100",
+   "comparator": "SkewD authors' recorded outputs",
+   "comparator_solution": "klippert-marx.skewd_mv.recorded",
+   "comparator_setting": "SkewD-MV as recorded per dataset by the code published with the paper (commit 312632b), with its PC class; checked by a reduced fresh run",
+   "lane": "skewd_mv",
+   "output": "DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor for Andrey's fits of every method on seeds 0-19 and AMD EPYC 9534 64-Core Processor on seeds 20-39, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey at commit 4c1cda49b of the functional-models line, from before 0.18.0. Since then, SkewD sums each column's mean and variance over its sorted values (so they do not depend on the row order); counts the two directions as tied when their values agree to 1e-9 relative (the closest of these pairs differ by 2.9%); can run its searches on threads, with the serial result bit for bit; and the ECM step that ends each fit reads the normal density-to-distribution ratio in a more stable form, which changes results in their last digits. Refits with the 0.19.0 code at the defaults, one core and one BLAS thread, on seeds 0-4 of every set and size (50 datasets) gave the same direction under both criteria on all 40 pairs and the same graph on all 10 graphs; 79 of the 80 pair log-likelihoods agree to 1e-8 relative and one by 8e-4 (0.9% relative; P5 seed 2, forward), with the same direction. PC's class as SkewD-MV computes it, and its column order, are the same on all 80 graph datasets under both builds. The criteria are read from one fit per pair",
+   "same_graph_test": "the same adjacency",
+   "regime": "skewd_mv_graphs",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "SHD as the paper counts it: the entries of the two 0/1 adjacencies that differ, so a reversed edge counts 2; a fit over the 4 h cap would score the worst DAG's SHD, and none was",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "SkewD-MV|M1",
+     "d": 6,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_shd_mean": 2.25,
+     "comparator_shd_mean": 2.25,
+     "empty_shd_mean": 6.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "same_graph": 16,
+     "andrey_s": 2944.0,
+     "andrey_s_max": 5865.5,
+     "comparator_s": null,
+     "ratio": null,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.3,
+      0.3
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -3.75,
+       "bootstrap_95": [
+        -4.55,
+        -2.85
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -3.75,
+       "bootstrap_95": [
+        -4.6,
+        -2.849
+       ]
+      }
+     },
+     "skeleton_f1": 0.881,
+     "oracle_class": {
+      "about": "the likelihood stage on the true class, scored as the graph",
+      "andrey_shd_mean": 0.1,
+      "comparator_shd_mean": 0.1
+     },
+     "cost_seeds_0_39": {
+      "median_s": 1849.0,
+      "max_s": 6326.0
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "fresh": {
+      "fits": 20,
+      "andrey_ok": 20,
+      "andrey_shd_mean": 1.55,
+      "comparator_shd_mean": 1.65,
+      "empty_shd_mean": 6.0,
+      "comparator_ok": 20,
+      "paired": 20,
+      "datasets": 20,
+      "same_graph": 16,
+      "andrey_s": 1669.4,
+      "andrey_s_max": 6325.9,
+      "comparator_s": null,
+      "ratio": null,
+      "mean_D": -0.1,
+      "bootstrap_95": [
+       -0.4,
+       0.2
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 20,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 20,
+        "mean": -4.45,
+        "bootstrap_95": [
+         -5.05,
+         -3.75
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 20,
+        "mean": -4.35,
+        "bootstrap_95": [
+         -5.05,
+         -3.55
+        ]
+       }
+      },
+      "skeleton_f1": 0.923,
+      "seeds": "20-39"
+     },
+     "replicated": "tie on both seed sets",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD-MV|M2",
+     "d": 10,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_shd_mean": 4.7,
+     "comparator_shd_mean": 5.2,
+     "empty_shd_mean": 10.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "same_graph": 12,
+     "andrey_s": 2230.2,
+     "andrey_s_max": 8746.7,
+     "comparator_s": null,
+     "ratio": null,
+     "mean_D": -0.5,
+     "bootstrap_95": [
+      -1.3,
+      0.3
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -5.3,
+       "bootstrap_95": [
+        -6.0,
+        -4.6
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -4.8,
+       "bootstrap_95": [
+        -5.7,
+        -3.85
+       ]
+      }
+     },
+     "skeleton_f1": 0.844,
+     "oracle_class": {
+      "about": "the likelihood stage on the true class, scored as the graph",
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.0
+     },
+     "cost_seeds_0_39": {
+      "median_s": 1433.0,
+      "max_s": 8747.0
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "fresh": {
+      "fits": 20,
+      "andrey_ok": 20,
+      "andrey_shd_mean": 4.75,
+      "comparator_shd_mean": 4.95,
+      "empty_shd_mean": 10.0,
+      "comparator_ok": 20,
+      "paired": 20,
+      "datasets": 20,
+      "same_graph": 13,
+      "andrey_s": 1056.6,
+      "andrey_s_max": 3146.0,
+      "comparator_s": null,
+      "ratio": null,
+      "mean_D": -0.2,
+      "bootstrap_95": [
+       -0.8,
+       0.3
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 20,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 20,
+        "mean": -5.25,
+        "bootstrap_95": [
+         -6.2,
+         -4.3
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 20,
+        "mean": -5.05,
+        "bootstrap_95": [
+         -6.0,
+         -3.95
+        ]
+       }
+      },
+      "skeleton_f1": 0.801,
+      "seeds": "20-39"
+     },
+     "replicated": "tie on both seed sets",
      "result": "tie",
      "card_verdict": "tie"
     }
