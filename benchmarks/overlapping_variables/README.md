@@ -15,7 +15,7 @@ on the same data, and each graph is scored against the true one.
 | `amb` | as `a`, with `possibly_separable="ambiguous"` (PC and FCI) |
 | `b` | p = 1: the test separates its pair |
 | `c` | p = 0: the test keeps its pair adjacent |
-| `dcover` | the fewest columns dropped until every pair shares rows, then `a` |
+| `dcover` | columns dropped one at a time, the one in the most pairs never observed together first, until every pair shares rows, then `a`; the medium configuration drops 16 of 40 columns where 15 suffice, the small and large their minimum, 6 of 20 and 8 of 50 |
 | `f` | the complete data, the values before masking |
 
 Arms `b` and `c` emulate what the usual answers do with a test that has no rows, inside the same
@@ -80,13 +80,14 @@ limit, the lagged cells, and the graphs of the hand cases.
 
 A run at the card's size, seeds 0-19 and the fresh seeds 1000-1019, finishes its 8,610 fits with no
 error and no timeout, and the summary prints the card's two tables as published and the figures its
-text quotes: 1,204 fits of Andrey as it is on data with pairs never observed together (480 cohort
-fits, 80 cohort fits without a depth limit, and 644 hand-case fits), none drawing or leaving
-unlisted such a pair, and the 12 settings with fewer errors than the empty graph.
+text quotes: 1,204 fits of Andrey as it is on data with pairs that no test has rows for (480 cohort
+fits, 80 cohort fits without a depth limit, 484 hand-case fits with pairs never observed together,
+and 160 `H5k3` fits whose pair shares three rows), none drawing or leaving unlisted such a pair,
+and the 12 settings with fewer errors than the empty graph.
 
 Of those fits, 7,148 have a graph recorded for the card, and each is the same graph, edge for edge,
 with the same undecided pairs, flagged edges, and kept columns, in every arm: Andrey as it is (`a`,
-2,244 fits), `ambiguous` (`amb`, 1,458), p = 1 (`b`, 1,684), p = 0 (`c`, 1,282), the fewest columns
+2,244 fits), `ambiguous` (`amb`, 1,458), p = 1 (`b`, 1,684), p = 0 (`c`, 1,282), the columns
 dropped (`dcover`, 320), and the complete data (`f`, 160). None differs. The other 1,462 fits are
 fresh seeds the card's run did not cover for these arms. A rerun reproduces the graphs, not the
 wall times, which depend on the hardware.

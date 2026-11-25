@@ -18,7 +18,7 @@ import time
 import traceback
 
 for _name in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "ANDREY_N_JOBS"):
-    os.environ.setdefault(_name, "1")
+    os.environ[_name] = "1"
 
 from . import fit, generate  # noqa: E402
 

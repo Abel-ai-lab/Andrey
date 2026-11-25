@@ -31,7 +31,7 @@ SETTINGS = {
     "alpha_pcmciplus": 0.01,
     "max_depth": 3,
     "tau_max": 2,
-    "seeds": "0-19, each seed a new graph, new weights, and new data",
+    "seed": "each seed a new graph, new weights, and new data",
     "interval": "95% percentile bootstrap of the mean over seeds, 10,000 resamples, generator seed 0",
     "interval_order": "the resamples index the seeds in ascending order, except the two cells of CARD_ORDER",
 }
@@ -46,6 +46,17 @@ CARD_ORDER = {
     + (3, 11, 13, 9, 7, 17, 15, 5, 1, 19),
 }
 ARMS = ("a", "amb", "b", "c", "dcover", "f")
+
+
+def seed_ranges(seeds) -> str:
+    """The seeds as ranges, such as ``0-19, 1000-1019``."""
+    runs: list[list[int]] = []
+    for s in sorted(set(seeds)):
+        if runs and s == runs[-1][1] + 1:
+            runs[-1][1] = s
+        else:
+            runs.append([s, s])
+    return ", ".join(str(a) if a == b else f"{a}-{b}" for a, b in runs)
 
 
 def seed_order(key: tuple, seeds) -> list[int]:
@@ -377,11 +388,13 @@ def main() -> None:
     ap.add_argument("records", nargs="+", help="JSON lines files from run.py (globs allowed)")
     ap.add_argument("--json", help="write every figure to this file")
     args = ap.parse_args()
-    fig = figures(load(args.records))
+    recs = load(args.records)
+    fig = figures(recs)
     print(tables(fig))
     if args.json:
         with open(args.json, "w") as fh:
-            json.dump({"settings": SETTINGS, "figures": fig}, fh, indent=1, default=float)
+            settings = SETTINGS | {"seeds": seed_ranges(r["seed"] for r in recs)}
+            json.dump({"settings": settings, "figures": fig}, fh, indent=1, default=float)
             fh.write("\n")
     else:
         rest = {k: v for k, v in fig.items() if k not in ("shd_table", "recall_collider_table")}

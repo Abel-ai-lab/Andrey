@@ -8,7 +8,8 @@ A spec is a dict with ``design`` (``hand``, ``cohort``, or ``lagged``), ``cell``
 - ``amb``: Andrey with ``possibly_separable="ambiguous"`` (PC and FCI);
 - ``b``: a test without enough rows answers p = 1;
 - ``c``: a test without enough rows answers p = 0;
-- ``dcover``: the fewest columns dropped until every pair shares rows, then Andrey as it is;
+- ``dcover``: columns dropped until every pair shares rows (:func:`arms.drop_cover`), then Andrey as
+  it is;
 - ``f``: the complete data, the values before masking.
 
 The record holds the returned graph as edges ``[i, j, mark_i, mark_j]`` over the full column

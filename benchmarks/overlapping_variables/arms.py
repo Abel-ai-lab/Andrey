@@ -102,9 +102,11 @@ def apart_pairs(observed: np.ndarray) -> list[tuple[int, int]]:
 
 
 def drop_cover(observed: np.ndarray) -> list[int]:
-    """The columns kept after dropping the fewest columns until every pair shares rows: the
+    """The columns kept after dropping columns one at a time until every pair shares rows: the
     column in the most pairs never observed together first, then the one with the most missing
-    cells, then the lowest index."""
+    cells, then the lowest index. The rule is greedy, so it can drop more than the fewest columns:
+    on the medium configuration it drops 16 of 40 where 15 suffice (the small and large
+    configurations drop their minimum, 6 of 20 and 8 of 50)."""
     pairs = set(apart_pairs(observed))
     missing = (~observed).sum(axis=0)
     dropped: set[int] = set()

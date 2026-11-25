@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 
 import numpy as np
 import pytest
-from overlapping_variables import classes, fit, generate, run, score, summary
+from overlapping_variables import arms, classes, fit, generate, run, score, summary
 
 
 def _digest(value) -> str:
@@ -230,3 +231,21 @@ def test_the_seeds_of_a_cell_follow_the_card_order_and_then_ascend():
 def test_a_run_needs_at_least_one_process(tmp_path):
     with pytest.raises(ValueError, match="at least 1"):
         run.run([_spec("hand", "H1_n1000", "a", "pc")], str(tmp_path / "records.jsonl"), procs=0)
+
+
+def test_the_seed_ranges_name_the_seeds_a_summary_holds():
+    assert summary.seed_ranges(list(range(20)) + list(range(1000, 1020))) == "0-19, 1000-1019"
+    assert summary.seed_ranges([1, 0, 1, 7]) == "0-1, 7"
+
+
+def test_the_dropped_columns_are_the_greedy_cover_the_readme_describes():
+    kept = {}
+    for config in ("S3", "M8", "L6"):
+        patterns = generate.cohort_patterns(config)
+        observed = patterns[np.repeat(np.arange(len(patterns)), 5)]
+        kept[config] = len(arms.drop_cover(observed))
+    assert {c: generate.dims(c) - n for c, n in kept.items()} == {"S3": 6, "M8": 16, "L6": 8}
+
+
+def test_a_run_uses_one_thread_per_fit():
+    assert {os.environ[n] for n in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS")} == {"1"}
