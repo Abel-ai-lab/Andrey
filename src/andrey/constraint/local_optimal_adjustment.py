@@ -218,7 +218,7 @@ class Answer:
     treatment: int
     outcome: int
     nonzero: bool | None
-    identifiable: bool
+    identifiable: bool | None
     adjustment_sets: list[list[int]] = field(default_factory=list)
     set_kind: str | None = None
 
@@ -289,8 +289,8 @@ def local_optimal_adjustment(
     column order; the treatment's siblings in Step 2 go in rank order too. ``blanket`` names the
     Markov blanket learner of every MB-by-MB run, Grow-Shrink in [1]_.
 
-    On data with missing values, both answers are undecided, ``nonzero`` ``None`` and
-    ``identifiable`` ``False`` with no set, when a blanket the search learned left a candidate
+    On data with missing values, both answers are undecided, ``nonzero`` and ``identifiable``
+    ``None`` with no set, when a blanket the search learned left a candidate
     undecided (:attr:`~andrey.constraint.blanket.LocalSearch.undecided`), since a variable no test
     decided may be adjacent, or when a test the answer reads was not tested (:class:`NotTested`).
     """
@@ -307,7 +307,7 @@ def local_optimal_adjustment(
     except NotTested:
         possde, decided = None, False
     if not decided:
-        answers = [Answer(x, y, None, False), Answer(y, x, None, False)]
+        answers = [Answer(x, y, None, None), Answer(y, x, None, None)]
     return Result(answers, edges, learned, possde)
 
 

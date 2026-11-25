@@ -623,7 +623,7 @@ def test_load_and_ldecc_leave_the_effect_undecided_when_no_test_decided_a_pair(k
     for record in out.metadata["effects"]:
         assert (record["nonzero"], record["identifiable"], record["adjustment_sets"]) == (
             None,
-            False,
+            None,
             [],
         )
     out = andrey.ldecc(_cohorts(k), treatment="A", outcome="B")
@@ -664,7 +664,7 @@ def test_load_and_ldecc_leave_the_effect_undecided_when_total_conditioning_left_
     for record in out.metadata["effects"]:
         assert (record["nonzero"], record["identifiable"], record["adjustment_sets"]) == (
             None,
-            False,
+            None,
             [],
         )
 

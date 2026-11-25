@@ -991,7 +991,7 @@ def local_optimal_adjustment(
         identifiable in this sense: the edge into the treatment is a back-door path no set blocks.
         On data with missing values, when a blanket the search learned left a candidate undecided or
         a test the answer reads was not tested, both records leave the effect undecided: ``nonzero``
-        is ``None``, ``identifiable`` ``False``, and ``adjustment_sets`` ``[]``.
+        and ``identifiable`` are ``None``, and ``adjustment_sets`` is ``[]``.
         ``metadata["blankets_learned"]`` lists the variables whose Markov blanket the search
         learned, in order; the last step learns blankets over the variables that are not possible
         descendants of the treatment, so a variable can appear twice. ``metadata["algorithm"]`` is
