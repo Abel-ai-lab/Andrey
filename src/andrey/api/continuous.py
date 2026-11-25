@@ -401,8 +401,8 @@ def dagma(
         on the columns' units; it gives up the accuracy the default reads from units in which a
         variable's variance grows along the causal order (varsortability [5]_). On the paper's
         simulation, the default made fewer errors than the empty graph in every setting in the
-        simulation's own units, and on z-scored columns, which ``True`` fits, in none, often more
-        (`0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma>`__).
+        simulation's own units, and on z-scored columns, which ``True`` fits, in none, with more in
+        most (`0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma>`__).
     missing : {"em"} or None, default=None
         How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by
         structural expectation-maximization (EM) over the expected covariance of the data, which
