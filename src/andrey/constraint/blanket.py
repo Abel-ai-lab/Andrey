@@ -1417,7 +1417,8 @@ def _total_conditioning(search: LocalSearch, target: int, sepsets: Sepsets) -> l
     finds independent keeps all the rest as its separating set. A variable whose test was not
     tested, for want of rows (:func:`~andrey.core.ci_missing.not_tested`), has no test that had
     rows: it is undecided, left out with no separating set, as :func:`markov_blanket` leaves one
-    out. A member a required edge joins to ``target`` is in
+    out, and noted in :attr:`LocalSearch.undecided`; every member's test conditioned on it, so no
+    member is flagged beside it. A member a required edge joins to ``target`` is in
     the blanket from the start and never tested, and a pair the knowledge makes non-adjacent is
     tested, since it may be a child's other parent, and left out of the returned set, as in
     :func:`markov_blanket`. Every test conditions on ``d - 2`` variables, so with ``max_depth``
@@ -1445,6 +1446,8 @@ def _total_conditioning(search: LocalSearch, target: int, sepsets: Sepsets) -> l
                 strengths.append(strength)
             elif pvalue > search.total_alpha:
                 sepsets[x] = tuple(z for z in range(search.d) if z not in (target, x))
+            else:  # not tested: undecided; each member's test conditioned on it, so none is flagged
+                search.undecided.add((target, x))
         blanket = required + search.by_strength(dependent, np.asarray(strengths))
     if search.constraints is None:
         return blanket

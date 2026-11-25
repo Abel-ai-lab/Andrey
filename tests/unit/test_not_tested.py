@@ -252,6 +252,7 @@ def test_total_conditioning_leaves_a_variable_not_tested_given_the_rest_undecide
 
     search = LocalSearch(test, [0, 1, 2, 3], 0.05)
     assert search.run("total_conditioning", 0) == ([1], {2: (1, 3)})
+    assert search.undecided == {(0, 3)}
 
 
 class _InfiniteStatistic:
@@ -490,8 +491,8 @@ def test_a_run_flags_each_member_beside_an_undecided_candidate(name):
     with rows_tested() as rows:
         members, _ = search.run(name, 4)
     assert 0 in members and 3 not in members
-    assert search.undecided == {(4, 3)}
     assert (0, 4) in rows.possibly_separable(np.ones((5, 5), dtype=bool))
+    assert search.undecided == {(4, 3)}
 
 
 @pytest.mark.parametrize(
@@ -564,6 +565,39 @@ def test_load_and_ldecc_leave_the_effect_undecided_when_no_test_decided_a_pair(k
         None,
         [],
     )
+
+
+def test_load_and_ldecc_leave_the_effect_undecided_when_total_conditioning_left_one_undecided():
+    """``a -> b -> c`` and ``v``, categorical, ``v`` one category on the rows that observe ``c``:
+    every chi-square test of ``v`` given all the rest has no degrees of freedom, so total
+    conditioning leaves ``v`` undecided, and neither method reads the effect of ``a`` on ``b``."""
+    rng = np.random.default_rng(0)
+    n = 600
+    a = rng.integers(0, 2, n)
+    b = a ^ (rng.random(n) < 0.1)
+    c = b ^ (rng.random(n) < 0.1)
+    df = pd.DataFrame({"a": a, "b": b, "c": c, "v": rng.integers(0, 2, n)}).astype(float)
+    df.loc[: n // 2 - 1, "c"] = np.nan
+    df.loc[n // 2 :, "v"] = 0.0
+    fit = partial(andrey.ldecc, df, treatment="a", outcome="b", indep_test="chisq")
+    out = fit(blanket="total_conditioning")
+    assert ["a", "v"] in out.metadata["undecided_pairs"]
+    (record,) = out.metadata["effects"]
+    assert (record["nonzero"], record["identifiable"], record["adjustment_sets"]) == (
+        None,
+        None,
+        [],
+    )
+    out = andrey.local_optimal_adjustment(
+        df, variables=["a", "b"], blanket="total_conditioning", indep_test="chisq"
+    )
+    assert ["a", "v"] in out.metadata["undecided_pairs"]
+    for record in out.metadata["effects"]:
+        assert (record["nonzero"], record["identifiable"], record["adjustment_sets"]) == (
+            None,
+            False,
+            [],
+        )
 
 
 def test_ldecc_reads_no_dependence_from_a_query_not_tested():
