@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import warnings
 
 import numpy as np
@@ -830,6 +831,26 @@ def test_a_failed_fit_stops_the_run_and_names_its_resample(workers):
     assert any("bootstrap resample 0" in note for note in raised.value.__notes__)
 
 
+def test_the_records_of_the_fits_before_a_failed_one_and_its_own_reach_the_caller(
+    monkeypatch, caplog
+):
+    fit, calls = andrey.pc, []
+
+    def failing(data, **kwargs):
+        calls.append(len(calls))
+        logging.getLogger("andrey.probe").warning("resample %d", calls[-1])
+        if len(calls) == 2:
+            raise RuntimeError("bogus")
+        return fit(data, **kwargs)
+
+    monkeypatch.setattr(resample.api, "pc", failing)
+    with caplog.at_level("WARNING", logger="andrey"), pytest.raises(RuntimeError, match="bogus"):
+        with_workers(1, "pc", lingam_data(), n_resamples=3)
+    records = [r for r in caplog.records if r.name == "andrey.probe"]
+    assert [r.getMessage() for r in records] == ["resample 0", "resample 1"]
+    assert records[0].funcName == "failing" and records[0].pathname == __file__
+
+
 def test_each_warning_of_the_fits_is_raised_once():
     rng = np.random.default_rng(0)
     codes = pd.DataFrame(rng.integers(0, 3, (300, 3)), columns=["a", "b", "c"])
@@ -839,6 +860,19 @@ def test_each_warning_of_the_fits_is_raised_once():
             with_workers(workers, "ges", codes, n_resamples=4, seed=0)
         kinds = [w for w in caught if issubclass(w.category, andrey.DataTypeWarning)]
         assert len(kinds) == 1, workers
+
+
+def test_each_record_the_fits_log_is_logged_once_in_the_calling_process(caplog):
+    """Structural EM's warning, from this process or from worker processes alike."""
+    x = lingam_data().to_numpy(copy=True)
+    x[np.random.default_rng(1).random(x.shape) < 0.1] = np.nan
+    for workers in (1, 2):
+        caplog.clear()
+        with caplog.at_level("WARNING", logger="andrey"):
+            with_workers(workers, "ges", x, n_resamples=4, missing="em", n_em_iterations=1)
+        logged = [r for r in caplog.records if r.name == "andrey.search.em"]
+        assert len(logged) == 1, workers
+        assert logged[0].getMessage().startswith("structural EM: the graph still changed")
 
 
 @pytest.mark.parametrize(("n_jobs", "n_resamples", "workers"), [(1, 3, 0), (2, 3, 2), (4, 2, 2)])

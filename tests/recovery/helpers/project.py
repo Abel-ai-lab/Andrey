@@ -10,7 +10,7 @@ from andrey.core import ARROW, TAIL
 from andrey.core.structure import GraphStructure
 
 # A graph candidate also carries the scalar objective score (from metadata).
-_SCORE_GRAPH = frozenset({"GES", "GIES", "XGES", "HC", "Tabu", "MMHC", "RSMAX2"})
+_SCORE_GRAPH = frozenset({"GES", "GIES", "XGES", "LGES", "HC", "Tabu", "MMHC", "RSMAX2"})
 # Graph-output algorithms: candidate = {"graph"[, "score"]}.
 _GRAPH = (
     frozenset(
@@ -153,6 +153,13 @@ def project_output(out: Any, algorithm: str) -> dict:
         }
     if algorithm in _EFFECTS:
         return {"graph": out.structure.to_numpy(), "effects": out.metadata["effects"]}
+    if algorithm == "SkewD":  # the decided graph and both models' log-likelihoods
+        return {"graph": out.structure.to_numpy()} | {
+            field: out.metadata[key][direction]
+            for field, (key, direction) in _LIKELIHOOD_FIELDS.items()
+        }
+    if algorithm == "SkewDMV":  # the DAG of the class with the largest likelihood
+        return {"graph": out.structure.to_numpy(), "candidates": out.metadata["candidates"]}
     if algorithm == "CPCMGraph":  # the DAG of lowest score and its residuals' p-value
         return {"graph": out.structure.to_numpy(), "p_value": out.metadata["p_value"]}
     if algorithm in _PAIRWISE:
@@ -169,6 +176,17 @@ def project_output(out: Any, algorithm: str) -> dict:
             "graph": out.structure.to_numpy(),
             "score": out.metadata["score"],
             "targets": [targets[key] for key in sorted(targets)],
+        }
+    if algorithm == "RPCMCI":  # the regime of each step, each regime's lag graphs, the objective
+        return {
+            "regimes": np.asarray(out.regimes),
+            "graph": np.stack(
+                [
+                    np.stack([o.structure.lag(lag).to_numpy() for lag in o.structure.lags])
+                    for o in out.outputs
+                ]
+            ),
+            "objective": out.metadata["objective"],
         }
     if algorithm == "JPCMCIplus":  # PCMCI+'s fields, and the context and dummy links
         s, md = out.structure, out.metadata

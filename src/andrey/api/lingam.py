@@ -27,8 +27,9 @@ from andrey.api._adapt import (
     label_of,
     shared_labels,
     structure_output,
+    target_columns,
 )
-from andrey.api._local import target_column, target_columns, target_metadata
+from andrey.api._local import target_column, target_metadata
 from andrey.api._marks import directed_marks
 from andrey.api._method import method_spec
 from andrey.core import GraphStructure
@@ -214,7 +215,7 @@ def direct_lingam(
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the causal order compares the
     residuals of every variable over the same rows, so a row with a missing value has no place in
-    it. Drop the incomplete rows first, which suits values missing completely at random, or use
+    it. Drop the incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear data with uniform noise from Erdos-Renyi graphs
@@ -372,8 +373,8 @@ def ica_lingam(
     variable; the :doc:`column-order guide </docs/guides/column-order>` gives the measured limit.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the independent components
-    unmix every variable over the same rows, so a row with a missing value has no place in them.
-    Drop the incomplete rows first, which suits values missing completely at random, or use
+    require complete rows to unmix every variable.
+    Drop the incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear data with uniform noise from Erdos-Renyi graphs
@@ -522,7 +523,7 @@ def multi_group_direct_lingam(
 
     **Missing values.** A ``NaN`` in a dataset raises ``ValueError``: the causal order compares the
     residuals of every variable over the same rows, so a row with a missing value has no place in
-    it. Drop the incomplete rows first, which suits values missing completely at random, or use
+    it. Drop the incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Measured on simulated linear data with uniform noise in 3 groups that share one
@@ -688,20 +689,20 @@ def local_isa_ling(
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the independent components
     unmix every local variable over the same rows, so a row with a missing value has no place in
-    them. Drop the incomplete rows first, which suits values missing completely at random, or use
+    them. Drop the incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Its claim is graphs with cycles, where it tied the authors' code on the
-    paper's simulations. Data without cycles are outside the claim, small samples among them. On
-    the paper's 50-variable DAGs, global :func:`~andrey.direct_lingam` read at the target was both
-    more accurate and faster from 300 rows up; the `0.18.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#local-isa-ling>`_ has the numbers. The
-    blanket step keeps every column whose standardized Lasso coefficient exceeds 0.01, often many
-    more than the true blanket, and the time grows with them. Algorithm 1 tries every assignment of
-    the demixing matrix's rows to the local variables that its zero pattern allows, a number that
-    grows quickly with the blanket when the matrix is dense. The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    **Limitations.** Its claim is graphs with cycles, where it tied the authors' code on the paper's
+    simulations. Data without cycles are outside the claim, small samples among them. On the paper's
+    50-variable DAGs, global :func:`~andrey.direct_lingam` read at the target was both more accurate
+    and faster from 300 rows up; the `local discovery release card
+    <https://andrey.abel.ai/docs/benchmarks/local-discovery.html#local-isa-ling>`_ has the numbers.
+    The blanket step keeps every column whose standardized Lasso coefficient exceeds 0.01, often
+    many more than the true blanket, and the time grows with them. Algorithm 1 tries every
+    assignment of the demixing matrix's rows to the local variables that its zero pattern allows, a
+    number that grows quickly with the blanket when the matrix is dense. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------

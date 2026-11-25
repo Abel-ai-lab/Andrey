@@ -19,8 +19,9 @@ from andrey.api._adapt import (
     fit_inputs,
     label_of,
     structure_output,
+    target_columns,
 )
-from andrey.api._local import fit_metadata, target_column, target_columns, target_metadata
+from andrey.api._local import fit_metadata, target_column, target_metadata
 from andrey.api._method import method_spec
 from andrey.core import ARROW, TAIL, GraphStructure, backend
 from andrey.core.ci import counting_tests
@@ -129,7 +130,8 @@ def mb_by_mb(
         Required: the variable to answer for, a column label (a string) or a 0-based position (an
         integer). A list of them answers each one with one search, which makes a step two targets
         share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
-        ``indep_test``. ``None`` raises ``ValueError``.
+        ``indep_test``; with missing values, each target has a separate search. ``None`` raises
+        ``ValueError``.
     blanket : str, default="iamb_forward"
         The Markov blanket learner run for each variable the search visits: ``"iamb_forward"``,
         IAMB's grow phase without its shrink, the learner of the paper's runs [1]_, which keeps a
@@ -154,8 +156,15 @@ def mb_by_mb(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -163,7 +172,15 @@ def mb_by_mb(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -193,22 +210,20 @@ def mb_by_mb(
     -------
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
-        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
-        target's result counts. Otherwise, wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`
-        over every column holding only the
-        edges at ``target``: ``x -> target`` for a direct cause, ``target -> x`` for a direct
-        effect, and ``x - target`` where the CPDAG leaves the direction undecided. An absent edge
-        away from the target means nothing. ``metadata["target"]`` names the target, and
-        ``metadata["parents"]``, ``metadata["children"]``, and ``metadata["undirected"]`` list
-        those columns, by column label or 0-based position. ``metadata["blankets_learned"]`` lists
-        the variables whose Markov blanket the search learned, in order, the target first, so its
-        length is the number of blankets the answer took. ``metadata["algorithm"]`` is
-        ``"mb_by_mb"``. Under a mixed-data setting, ``metadata["categorical"]`` lists the
-        categorical columns it read. With a randomized ``indep_test``, ``metadata["seed"]`` is the
-        seed used. ``metadata["n_tests"]`` is the number of conditional-independence tests the fit
-        evaluated; a query answered again from a kept answer is not a new test.
-        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
-        ``andrey.config.tie_break``.
+        alone gives it, ``metadata["n_tests"]`` included. Otherwise, wraps a ``cpdag``
+        :class:`~andrey.core.GraphStructure` over every column holding only the edges at ``target``:
+        ``x -> target`` for a direct cause, ``target -> x`` for a direct effect, and ``x - target``
+        where the CPDAG leaves the direction undecided. An absent edge away from the target means
+        nothing. ``metadata["target"]`` names the target, and ``metadata["parents"]``,
+        ``metadata["children"]``, and ``metadata["undirected"]`` list those columns, by column label
+        or 0-based position. ``metadata["blankets_learned"]`` lists the variables whose Markov
+        blanket the search learned, in order, the target first, so its length is the number of
+        blankets the answer took. ``metadata["algorithm"]`` is ``"mb_by_mb"``. Under a mixed-data
+        setting, ``metadata["categorical"]`` lists the categorical columns it read. With a
+        randomized ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is
+        the number of conditional-independence tests the fit evaluated; a query answered again from
+        a kept answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the fit ran
+        under, ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -276,20 +291,23 @@ def mb_by_mb(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [3]_ [4]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. When values are missing completely at random, the rows a test keeps
-    are a random sample, so each test keeps its level [4]_. When whether a value is missing depends
-    on the variables, the rows a test keeps are a selected sample, and the tests can find dependence
-    where the population has none and keep extra edges [4]_. A test raises ``ValueError`` when it
-    has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
-    other tests, or when a continuous column is constant on its rows.
+    the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
+    ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including sets skipped because no row can test them. A continuous column constant on a
+    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
+    completely at random, which means that whether a value is missing depends on no value in the
+    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
+    selected sample that more rows do not correct.
 
     **Limitations.** At its paper's settings (Alarm and Hailfinder samples at 500 to 5,000 rows, a
     45 x 45 chessboard) it made fewer errors at the target than the empty answer, with a small
     fraction of the tests of one :func:`~andrey.pc` fit; that fit made fewer errors in a few cells,
     among them Alarm at 5,000 rows with alpha 0.05 and Hailfinder at 500 rows with alpha 0.05, and
-    on the chessboard. The `0.18.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#mb-by-mb>`_ has the numbers. Each local
-    structure tests every pair of a blanket against every subset of the rest, up to
+    on the chessboard. The `local discovery release card
+    <https://andrey.abel.ai/docs/benchmarks/local-discovery.html#mb-by-mb>`_ has the numbers. Each
+    local structure tests every pair of a blanket against every subset of the rest, up to
     ``local_max_depth`` members, so a blanket of ``m`` variables takes up to about ``m**2 * 2**m``
     tests without the cap. Under the default ``local_max_depth=5``, a pair that only a larger set
     separates keeps its edge. The default blanket learner never drops a variable it added, so a
@@ -346,7 +364,8 @@ def mb_by_mb(
         return structure_output(to_structure(star, kind="cpdag"), labels=labels, metadata=metadata)
 
     with copies_named(labels):
-        search = local_search(
+        search_of = partial(
+            local_search,
             X,
             alpha=alpha,
             indep_test=indep_test,
@@ -358,9 +377,9 @@ def mb_by_mb(
         )
         if targets is None:
             with rows_tested() as rows, counting_tests() as tests:
-                edges = answer(search, t)
+                edges = answer(search_of(), t)
             return output(t, edges, tests.n, rows)
-        found = answers(search, answer, targets, backend.worker_count())
+        found = answers(search_of, answer, targets, backend.worker_count())
     return [output(t, *answer_) for t, answer_ in zip(targets, found, strict=True)]
 
 
@@ -423,7 +442,8 @@ def mmb_by_mmb(
         Required: the variable to answer for, a column label (a string) or a 0-based position (an
         integer). A list of them answers each one with one search, which makes a step two targets
         share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
-        ``indep_test``. ``None`` raises ``ValueError``.
+        ``indep_test``; with missing values, each target has a separate search. ``None`` raises
+        ``ValueError``.
     blanket : str, default="total_conditioning"
         The Markov blanket learner run for each variable the search visits:
         ``"total_conditioning"``, the paper's [1]_, keeps each variable the test finds dependent
@@ -448,8 +468,15 @@ def mmb_by_mmb(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -457,7 +484,15 @@ def mmb_by_mmb(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -487,25 +522,23 @@ def mmb_by_mmb(
     -------
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
-        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
-        target's result counts. Otherwise, wraps a ``pag`` :class:`~andrey.core.GraphStructure`
-        over every column holding only the
-        edges at ``target``, with their marks: ``x -> target`` for a direct cause, ``target -> x``
-        for a direct effect, ``x <-> target`` where a hidden common cause joins them and neither
-        causes the other, and a circle where the PAG leaves the mark undecided. An absent edge
-        away from the target means nothing. ``metadata["target"]`` names the target;
-        ``metadata["parents"]``, ``metadata["children"]``, and ``metadata["bidirected"]`` list the
-        columns of those edges, and ``metadata["undetermined"]`` those whose edge has a circle at
-        either end, by column label or 0-based position. ``metadata["markov_blanket"]`` lists the
-        target's Markov blanket as the ``blanket`` learner found it.
-        ``metadata["blankets_learned"]`` lists the variables whose Markov blanket the search
-        learned, in order, the target first, so its length is the number of blankets the answer
-        took. ``metadata["algorithm"]`` is ``"mmb_by_mmb"``. Under a mixed-data setting,
-        ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
-        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the
-        number of conditional-independence tests the fit evaluated; a query answered again from a
-        kept answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the fit ran
-        under, ``andrey.config.tie_break``.
+        alone gives it, ``metadata["n_tests"]`` included. Otherwise, wraps a ``pag``
+        :class:`~andrey.core.GraphStructure` over every column holding only the edges at ``target``,
+        with their marks: ``x -> target`` for a direct cause, ``target -> x`` for a direct effect,
+        ``x <-> target`` where a hidden common cause joins them and neither causes the other, and a
+        circle where the PAG leaves the mark undecided. An absent edge away from the target means
+        nothing. ``metadata["target"]`` names the target; ``metadata["parents"]``,
+        ``metadata["children"]``, and ``metadata["bidirected"]`` list the columns of those edges,
+        and ``metadata["undetermined"]`` those whose edge has a circle at either end, by column
+        label or 0-based position. ``metadata["markov_blanket"]`` lists the target's Markov blanket
+        as the ``blanket`` learner found it. ``metadata["blankets_learned"]`` lists the variables
+        whose Markov blanket the search learned, in order, the target first, so its length is the
+        number of blankets the answer took. ``metadata["algorithm"]`` is ``"mmb_by_mmb"``. Under a
+        mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it read. With
+        a randomized ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]``
+        is the number of conditional-independence tests the fit evaluated; a query answered again
+        from a kept answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the
+        fit ran under, ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -594,19 +627,22 @@ def mmb_by_mmb(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [5]_ [6]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. When values are missing completely at random, the rows a test keeps
-    are a random sample, so each test keeps its level [6]_. When whether a value is missing depends
-    on the variables, the rows a test keeps are a selected sample, and the tests can find dependence
-    where the population has none and keep extra edges [6]_. A test raises ``ValueError`` when it
-    has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
-    other tests, or when a continuous column is constant on its rows.
+    the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
+    ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including sets skipped because no row can test them. A continuous column constant on a
+    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
+    completely at random, which means that whether a value is missing depends on no value in the
+    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
+    selected sample that more rows do not correct.
 
     **Limitations.** On the paper's four networks with hidden nodes, at 1,000 and 5,000 rows and the
     paper's targets, its edges and marks were better than those of the authors' code in five of
     eight settings and no worse in the rest, and its errors at the target were below the empty
-    answer's in all eight; the
-    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#mmb-by-mmb>`_ has the
-    numbers. Two adjacent variables that both have very wide blankets can still take long.
+    answer's in all eight; the `local discovery release card
+    <https://andrey.abel.ai/docs/benchmarks/local-discovery.html#mmb-by-mmb>`_ has the numbers. Two
+    adjacent variables that both have very wide blankets can still take long.
     ``"total_conditioning"`` needs more rows than variables and continuous data with linear
     effects; on other data, choose another learner. The numbers are a reference, not a hard limit:
     they change with the data generator, the density, the method's settings, and the machine.
@@ -667,7 +703,8 @@ def mmb_by_mmb(
         )
 
     with copies_named(labels):
-        search = local_search(
+        search_of = partial(
+            local_search,
             X,
             alpha=alpha,
             total_alpha=alpha / (10 * (d // 10)) if d >= 10 else alpha,
@@ -680,9 +717,9 @@ def mmb_by_mmb(
         )
         if targets is None:
             with rows_tested() as rows, counting_tests() as tests:
-                edges = answer(search, t)
+                edges = answer(search_of(), t)
             return output(t, edges, tests.n, rows)
-        found = answers(search, answer, targets, backend.worker_count())
+        found = answers(search_of, answer, targets, backend.worker_count())
     return [output(t, *answer_) for t, answer_ in zip(targets, found, strict=True)]
 
 
@@ -719,7 +756,8 @@ def cmb(
         Required: the variable to answer for, a column label (a string) or a 0-based position (an
         integer). A list of them answers each one with one search, which makes a step two targets
         share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
-        ``indep_test``. ``None`` raises ``ValueError``.
+        ``indep_test``; with missing values, each target has a separate search. ``None`` raises
+        ``ValueError``.
     blanket : {"hiton_mb", "mmmb", "pcmb"}, default="hiton_mb"
         The Markov blanket learner run for each variable CMB visits: :func:`~andrey.hiton_mb`, the
         learner of the paper's runs [1]_, :func:`~andrey.mmmb`, or :func:`~andrey.pcmb`. CMB reads
@@ -740,8 +778,15 @@ def cmb(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -749,7 +794,15 @@ def cmb(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -773,23 +826,21 @@ def cmb(
     -------
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
-        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
-        target's result counts. Otherwise, wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`
-        over every column holding only the
-        edges at ``target``: ``x -> target`` for a direct cause, ``target -> x`` for a direct
-        effect, and ``x - target`` where the direction is left undecided. An absent edge away from
-        the target means nothing. ``metadata["target"]`` names the target, and
-        ``metadata["parents"]``, ``metadata["children"]``, and ``metadata["undirected"]`` list
-        those columns, by column label or 0-based position; ``metadata["markov_blanket"]`` lists
-        the target's Markov blanket as ``blanket`` learned it. ``metadata["blankets_learned"]``
-        lists the variables whose Markov blanket the fit learned, in order, the target first, so
-        its length is the number of blankets the answer took. ``metadata["algorithm"]`` is
-        ``"cmb"``. Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical
-        columns it read. With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
-        ``metadata["n_tests"]`` is the number of conditional-independence tests the fit evaluated,
-        the blanket learner's included; a query answered again from a kept answer is not a new
-        test. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
-        ``andrey.config.tie_break``.
+        alone gives it, ``metadata["n_tests"]`` included. Otherwise, wraps a ``cpdag``
+        :class:`~andrey.core.GraphStructure` over every column holding only the edges at ``target``:
+        ``x -> target`` for a direct cause, ``target -> x`` for a direct effect, and ``x - target``
+        where the direction is left undecided. An absent edge away from the target means nothing.
+        ``metadata["target"]`` names the target, and ``metadata["parents"]``,
+        ``metadata["children"]``, and ``metadata["undirected"]`` list those columns, by column label
+        or 0-based position; ``metadata["markov_blanket"]`` lists the target's Markov blanket as
+        ``blanket`` learned it. ``metadata["blankets_learned"]`` lists the variables whose Markov
+        blanket the fit learned, in order, the target first, so its length is the number of blankets
+        the answer took. ``metadata["algorithm"]`` is ``"cmb"``. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
+        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the number
+        of conditional-independence tests the fit evaluated, the blanket learner's included; a query
+        answered again from a kept answer is not a new test. ``metadata["tie_break"]`` is the
+        tie-break rule the fit ran under, ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -857,25 +908,28 @@ def cmb(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [3]_ [4]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. When values are missing completely at random, the rows a test keeps
-    are a random sample, so each test keeps its level [4]_. When whether a value is missing depends
-    on the variables, the rows a test keeps are a selected sample, and the tests can find dependence
-    where the population has none and keep extra edges [4]_. A test raises ``ValueError`` when it
-    has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and ``"student_t"`` and 2 for the
-    other tests, or when a continuous column is constant on its rows.
+    the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
+    ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including sets skipped because no row can test them. A continuous column constant on a
+    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
+    completely at random, which means that whether a value is missing depends on no value in the
+    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
+    selected sample that more rows do not correct.
 
     **Limitations.** Measured on samples of the Alarm network (37 variables) at 1,000 rows with
     G-square tests at alpha 0.02, every variable a target, as its paper ran it: its edges at the
     target were nearer the true CPDAG's than those of :func:`~andrey.pc` on the same data and than
-    the empty answer, on 20 datasets and again on 20 fresh ones. The
-    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#cmb>`_ has the
-    numbers. With exact tests and exact blankets, every edge and every direction it returns is the
-    true CPDAG's, but it can leave undirected an edge the CPDAG directs: one whose direction follows
-    from a separating set its steps never test, or from directions its visits do not find. Over
-    every target of 100 random graphs of 6 to 20 variables, that happened at 2%, 5%, and 20% of
-    targets at an average of 1.5, 2.5, and 4 neighbors per variable, and on Alarm to 0.09 edges per
-    target. The numbers are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    the empty answer, on 20 datasets and again on 20 fresh ones. The `local discovery release card
+    <https://andrey.abel.ai/docs/benchmarks/local-discovery.html#cmb>`_ has the numbers. With exact
+    tests and exact blankets, every edge and every direction it returns is the true CPDAG's, but it
+    can leave undirected an edge the CPDAG directs: one whose direction follows from a separating
+    set its steps never test, or from directions its visits do not find. Over every target of 100
+    random graphs of 6 to 20 variables, that happened at 2%, 5%, and 20% of targets at an average of
+    1.5, 2.5, and 4 neighbors per variable, and on Alarm to 0.09 edges per target. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -928,7 +982,8 @@ def cmb(
         return structure_output(to_structure(star, kind="cpdag"), labels=labels, metadata=metadata)
 
     with copies_named(labels):
-        search = local_search(
+        search_of = partial(
+            local_search,
             X,
             alpha=alpha,
             indep_test=indep_test,
@@ -940,7 +995,7 @@ def cmb(
         )
         if targets is None:
             with rows_tested() as rows, counting_tests() as tests:
-                result = answer(search, t)
+                result = answer(search_of(), t)
             return output(t, result, tests.n, rows)
-        found = answers(search, answer, targets, backend.worker_count())
+        found = answers(search_of, answer, targets, backend.worker_count())
     return [output(t, *answer_) for t, answer_ in zip(targets, found, strict=True)]

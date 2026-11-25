@@ -1,14 +1,15 @@
 # Development
 
-How the code fits together, the common changes, how a method is tested, and how a release is put
-together. [`CONTRIBUTING.md`](CONTRIBUTING.md) walks a contributor from a fork to a pull request,
-[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) the website, and [`AGENTS.md`](AGENTS.md) the
-repository's conventions.
+How the code fits together, the common changes, how a method is tested, how a release is put
+together, and how AI tools are used. [`CONTRIBUTING.md`](CONTRIBUTING.md) walks a contributor from
+a fork to a pull request, [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) the website, and
+[`AGENTS.md`](AGENTS.md) the repository's conventions.
 
 ## Repository layout
 
 - `src/andrey/`: the library and its public API.
-- `tests/`: correctness checks that run on every pull request.
+- `tests/`: correctness checks; the release pull request runs all of them, and other pull
+  requests all but the `release`-marked ones.
 - `qa/`: the pre-release quality gate, the identity check, baseline capture, and calibration.
 - `benchmarks/`: comparisons with other packages and older Andrey builds.
 - `examples/`: the notebooks.
@@ -118,9 +119,10 @@ registry. Every facade docstring has, in order:
 - **Extended summary**: a sentence or two on the method, where it helps.
 - **Parameters**: every argument with its type or shape and, for enums, the `{"a", "b"}` choices,
   named as in the signature (the drift guard checks them).
-- **Returns**: `StructureOutput` (`multi_group_direct_lingam`, one per group), naming the wrapped
-  kind (`cpdag`, `dag`, `pag`, temporal) and the contents of `.metadata`, and of `.ordering` and
-  `.weighted_adjacency` when the method sets them.
+- **Returns**: `StructureOutput` (`multi_group_direct_lingam`, one per group; `rpcmci`, a
+  `RegimeOutput` with one per regime), naming the wrapped kind (`cpdag`, `dag`, `pag`, temporal)
+  and the contents of `.metadata`, and of `.ordering` and `.weighted_adjacency` when the method
+  sets them.
 - **Raises**: the error taxonomy, noting which `ValueError`s enumerate valid options.
 - **Warns**: the warnings the method raises itself, `ExperimentalWarning` when it is experimental,
   the data check's `DataTypeWarning`, and `BoundaryWarning` when a ladder of the method's measured
@@ -151,8 +153,8 @@ in Returns, and the shared Warns entries. To change one, edit the table and run
 hold one and does not; `tests/unit/test_facade_docstrings.py` fails while a copy differs.
 
 `andrey.pc` is the model. The public core classes autodoc renders (`GraphStructure`,
-`TemporalStructure`, `SummaryGraph`, `StructureOutput`) take the same sections on their
-argument-taking methods; `ruff`'s `D` rules are off there, so
+`TemporalStructure`, `SummaryGraph`, `StructureOutput`, `RegimeOutput`) take the same sections on
+their argument-taking methods; `ruff`'s `D` rules are off there, so
 `test_public_core_methods_document_their_parameters` pins their `Parameters` to the signatures.
 
 ## Common changes
@@ -308,6 +310,15 @@ reaching a code path no other test reaches, on the smallest input that reaches i
   leaves no process-wide setting, environment variable, or file outside `tmp_path` for the tests
   of another file.
 - Nothing runs on a schedule: with dependencies locked, an unchanged commit gives the same result.
+- Pull-request CI stays fast. A test that is release evidence rather than a correctness check (a
+  large-input repeat, a campaign-style recovery cell, anything over about 30 seconds on a CI
+  runner) carries `@pytest.mark.release`, on the test or, through `release_cases`
+  (`tests/release.py`), on single cases of a parametrized test. CI deselects it with
+  `-m "not release"` on a pull request into a release or topic branch; the release pull request
+  into `main`, a push to `main`, and a manual run of `ci.yml` run the whole suite, marked tests
+  included. Every method keeps an unmarked recovery test, so a broken
+  method still fails on its pull request: a method's only recovery test stays unmarked however long
+  it takes.
 
 ### 1. Recovery tests
 
@@ -368,8 +379,11 @@ On each dataset the method passes when its median SHD is below the empty graph's
 tolerance of the recorded baseline in either direction. The gate runs once per release, on the
 release pull request into `main`, which `main` requires to pass; a push that changes only `docs/`,
 `site/`, or top-level Markdown files reuses an earlier passing run, and the publish reuses that run
-when the tagged commit has the same tree and runs the gate itself otherwise. `--jobs N` fits N cells
-at a time.
+when the tagged commit has the same tree and runs the gate itself otherwise. The `quality-gate`
+workflow also runs by hand: `gh workflow run quality-gate.yml --ref <branch>`. `--jobs N` fits N
+cells at a time. A pull request into a release branch that changes a method's gate check runs only
+the gate's consistency tests, `tests/recovery/test_quality_gate.py`, which read the ledger without
+fitting the methods; run the method's cells with `qa.quality_gate <NAME>` before asking for review.
 [`qa/README.md`](qa/README.md#quality-gate) lists the datasets and tolerances. Reference parity is a
 soft gate: the quality gate also flags any published benchmark row where Andrey makes more errors
 than the reference package (from 0.8.0, when the paired bootstrap 95% interval of the difference
@@ -422,6 +436,21 @@ any other branch, or from a release branch whose `pyproject.toml` version is not
 `release/<x.y.z>.post<n>`, fixes the site or the docs of the release on `main`: the check also
 fails one that changes anything under `src/` or whose `main` is not at `<x.y.z>`. The release pull
 request runs the quality gate (`qa/README.md`), also required, once for the whole release.
+
+Pull-request CI (`.github/workflows/ci.yml`, [Testing](docs/docs/ci.md)) runs lint, types, the
+unit tests, the cheap recovery checks, and the fast consistency tests; on a pull request into a
+release or topic branch it deselects the heavy accuracy checks with `-m "not release"`. The release
+pull request into `main` runs every test, the `release`-marked ones included, and so do CI's other
+triggers: a push to `main`, a manual run, and the tag's site deploy.
+
+At each release's freeze the benchmark harness's own tests run too, outside CI: CI runs only the two
+endpoint-conversion files of `benchmarks/tests`, and the rest, which need the harness environments,
+drift when nothing runs them. `benchmarks/run_tests.sh` builds every environment (the
+`benchmarks/start*.sh` scripts), runs `benchmarks/tests` in them with R required, and exits 1 on a
+failed build or test; it takes the Tetrad jars and a JDK from `ANDREY_BENCH_TETRAD_JAR`,
+`ANDREY_BENCH_TETRAD_GIN_JAR`, and `ANDREY_BENCH_JAVA`. The freeze report states the result and
+lists every skipped test with its reason; a failure fixes the lane's test or its harness, and a
+failed build is named as an environment failure.
 Dependabot's version updates target the active release branch (`target-branch` in
 `.github/dependabot.yml`), which each release moves to the next one.
 
@@ -454,6 +483,58 @@ that changed:
 ```shell
 uv run --group docs python scripts/refresh_intersphinx.py
 ```
+
+## AI tools
+
+Using AI tools to write code, tests, and docs is fully acceptable, and much of Andrey is written
+that way under its maintainers' direction and review. One policy covers maintainers and
+contributors:
+
+- **Same rules, same gates.** A change written with a tool follows [`AGENTS.md`](AGENTS.md) and
+  this file, passes every check CI runs and, for a method, each step of
+  [Test a method](#test-a-method) that its status requires, and goes through the same issue, pull
+  request, and review as any other change
+  ([`CONTRIBUTING.md`](CONTRIBUTING.md#make-a-change-step-by-step)), into its release's branch
+  ([Releases, labels, and the changelog](#releases-labels-and-the-changelog)). No rule is relaxed
+  for it.
+- **A person answers for it.** Whoever opens the pull request, or directs the agent that opens it,
+  is its author: that person has reviewed the change, can explain it in review, and has the right
+  to contribute it under the Apache License 2.0. A tool may draft the description; in review the
+  author answers, in their own words or with replies they have read and stand behind. Code a tool
+  reproduces from another project is copied code and keeps that project's license notice.
+- **Use is recorded.** The pull request names each tool, under "How it was checked" or in the
+  tool's own "Generated with" line. A maintainer's commit that a tool wrote also ends with a
+  `Co-Authored-By` trailer that names the tool or its model; in a contribution the trailer is
+  welcome and not required. The record helps the reviewer and is not a request for permission: a
+  pull request without one is asked for it in review and is not closed for that alone. Completion
+  and spelling or grammar checks need no record.
+- **Numbers and references are never generated.** A benchmark number comes from a recorded run, and
+  a reference is cited only after it has been opened and found to support the claim; the author
+  answers for it.
+- **Blog posts and release cards end with an AI statement.** It says how AI tools were used to
+  write the page, as a conference asks of a paper's authors. The author sets `ai` (`none`,
+  `edited`, or `drafted`) and `ai_tools` in the front matter, and the site writes the sentence
+  ([The blog](docs/DEVELOPMENT.md#the-blog)). Every post and every release card has one.
+
+Not acceptable: a change nobody reviewed, a number or a reference an AI tool made up, a test or a
+gate weakened so that a change passes, and a post or a card whose statement is missing or untrue. A
+maintainer may close a pull request that shows one of these without a full review.
+
+These rules follow published ones. The
+[LLVM AI tool policy](https://llvm.org/docs/AIToolPolicy.html) and the
+[Python developer's guide](https://devguide.python.org/getting-started/ai-tools/) hold the person
+who submits a change responsible for it, and the guide rules out altering a test to make it pass.
+[statsmodels](https://www.statsmodels.org/devel/dev/ai-policy.html) holds every contribution to the
+same bar,
+[pandas](https://pandas.pydata.org/docs/dev/development/contributing.html#automated-contributions-policy)
+asks for the tool and its model, and the
+[Apache Software Foundation](https://www.apache.org/legal/generative-tooling.html) suggests the
+commit trailer. The AI statement follows the
+[ICLR 2027 policy for authors](https://iclr.cc/Conferences/2027/AIPolicyForAuthors) and
+[Elsevier's declaration](https://www.elsevier.com/about/policies-and-standards/generative-ai-policies-for-journals):
+what the tools did, that the authors reviewed it, and who is responsible. Some projects, such as
+[NumPy](https://numpy.org/devdocs/dev/ai_policy.html), do not accept a pull request that an agent
+writes and opens; Andrey accepts one when a person directs the agent and answers for the result.
 
 ## Command-line interface
 

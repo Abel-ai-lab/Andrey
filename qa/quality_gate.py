@@ -185,6 +185,8 @@ PAIRS: dict[str, dict[str, str]] = {
 #: Rows per pair. The empty graph's SHD on a pair is 1, so a method passes only when its median SHD
 #: is 0: it names the true direction on most draws, as ANM, PNL, and LOCI do from 1,000 rows.
 PAIR_N = 1000
+#: SkewD's and SkewD-MV's search budget in the gate, that of their recovery tests.
+SKEWD_BUDGET = {"tuning_iter": 2, "max_iter": 200}
 
 #: ``(d, n)`` of GIES's published regime, ``interventional_gauss_er``, at ``n = 50d``, drawn by its
 #: benchmark driver: a share :data:`TARGET_SHARE` of the variables, rounded, are intervention
@@ -810,10 +812,13 @@ def _sizes(regime: str) -> tuple[str, ...]:
 # approximately. RCD and BottomUpParceLiNGAM run on their benchmark regime only: on ASIA's 1,000
 # rows RCD marks most pairs <-> and scores worse than the empty graph, and on Sachs
 # BottomUpParceLiNGAM does. ANM and PNL take one pair of variables, so each runs on its benchmark's
-# pairs only. GIES, GnIES, CD-NOD, MultiGroupDirectLiNGAM, and GIN need what only their regimes
-# have: interventions, environments that change noise variances, domains, groups, or latents
-# measured by indicators. CAM-UV runs on its benchmark's nonlinear regimes with hidden variables.
-# SCORE and NoGAM run on their papers' simulation: Gaussian-process links with additive noise.
+# pairs only. CPCM's pair test runs with the Gaussian location-scale family on the location-scale
+# pairs, and its graph search with the fixed-scale Gaussian family, an additive-noise model, on
+# CAM's and RESIT's additive-noise regime at 5 variables, the size of its benchmark's additive-noise
+# graphs. GIES, GnIES, CD-NOD, MultiGroupDirectLiNGAM, and GIN need what only their regimes have:
+# interventions, environments that change noise variances, domains, groups, or latents measured by
+# indicators. CAM-UV runs on its benchmark's nonlinear regimes with hidden variables.
+# SCORE, NoGAM, and DAS run on their papers' simulation: Gaussian-process links with additive noise.
 # NOTEARS runs on its benchmark's cells, the simulation its claim is measured in: its least-squares
 # fit reads the columns' units, so one cell has standardized columns and one raw. DAGMA runs on the
 # raw cell only: on standardized columns its median SHD is not below the empty graph's by a clear
@@ -843,7 +848,8 @@ INTERVENTION_DATA = tuple(f"interventional_gauss_er_d{d}" for d, _ in INTERVENTI
 NOISE_INTERVENTION_DATA = tuple(NOISE_INTERVENTION_CELLS)
 #: CAM-UV needs nonlinear additive-noise data with hidden variables.
 HIDDEN_CAUSE_DATA = tuple(HIDDEN_CAUSE_CELLS)
-#: SCORE and NoGAM need additive-noise data; each runs on the cells of its claim.
+#: SCORE, NoGAM, and DAS need additive-noise data; each runs on the cells of its claim, DAS on
+#: SCORE's, since it fits the same model.
 SCORE_DATA = ("score_paper_standardized_d10_er1", "score_paper_standardized_d20_er4")
 NOGAM_DATA = (
     "score_paper_laplace_standardized_d10_er1",
@@ -1021,6 +1027,7 @@ SUPPORTED: dict[str, Method] = {
     "RESIT": Method(lambda x: andrey.resit(x), "dag", ("anm_er_n1000_d5", "anm_er_n1000_d10")),
     "ScoreMatching": Method(lambda x: andrey.score_matching(x), "dag", SCORE_DATA),
     "NoGAM": Method(lambda x: andrey.nogam(x), "dag", NOGAM_DATA),
+    "DAS": Method(lambda x: andrey.das(x), "dag", SCORE_DATA),
     "ExactSearch": Method(lambda x: andrey.exact_search(x), "cpdag", SMALL_DATA),
     "CALM": Method(lambda x: andrey.calm(x, seed=0), "cpdag", CALM_DATA),
     "NOTEARS": Method(lambda x: andrey.notears(x), "dag", tuple(LINEAR_SEM_CELLS)),
@@ -1050,6 +1057,14 @@ SUPPORTED: dict[str, Method] = {
     "ANM": Method(lambda x: andrey.anm(x), "dag", (f"anm_pair_n{PAIR_N}",)),
     "PNL": Method(lambda x: andrey.pnl(x), "dag", (f"pnl_pair_n{PAIR_N}",)),
     "LOCI": Method(lambda x: andrey.loci(x), "dag", (f"lsnm_pair_n{PAIR_N}",)),
+    "CPCM": Method(lambda x: andrey.cpcm(x, family="gaussian"), "dag", (f"lsnm_pair_n{PAIR_N}",)),
+    "CPCMGraph": Method(
+        lambda x: andrey.cpcm_graph(x, family="gaussian_fixed_scale"), "dag", ("anm_er_n1000_d5",)
+    ),
+    # SkewD and SkewD-MV at the recovery tests' budget (tuning_iter=2, max_iter=200): at the
+    # defaults ten draws take hours.
+    "SkewD": Method(lambda x: andrey.skewd(x, **SKEWD_BUDGET), "dag", (f"lsnm_pair_n{PAIR_N}",)),
+    "SkewDMV": Method(lambda x: andrey.skewd_mv(x, **SKEWD_BUDGET), "dag", ("anm_er_n1000_d5",)),
     # Time series: the published settings (lags, levels, and order), on the published regimes.
     "PCMCI": Method(
         _adapted(AndreyPCMCI(name="pcmci", indep_test="student_t", tau_max=2)),
@@ -1420,8 +1435,11 @@ def cells(methods: list[str] | None = None) -> list[tuple[str, str]]:
 #: The cells that take over 10 seconds on a CI runner, slowest first. With several jobs they start
 #: first, so no worker is left fitting one long cell after the others have finished.
 SLOWEST_FIRST: tuple[tuple[str, str], ...] = (
+    ("SkewDMV", "anm_er_n1000_d5"),
+    ("SkewD", "lsnm_pair_n1000"),
     ("NOTEARS", "notears_paper_standardized_d50"),
     ("CMIknn", "anm_er_d5"),
+    ("CPCMGraph", "anm_er_n1000_d5"),
     ("CALM", "linear_gauss_er_d10"),
     ("BottomUpParceLiNGAM", "latent_lingam_er_d15"),
     ("CAM-UV", "latent_anm_er_tenth_d22_n1000"),
@@ -1448,6 +1466,8 @@ SLOWEST_FIRST: tuple[tuple[str, str], ...] = (
     ("GPDC", "nonmonotone_er_d5"),
     ("ExactSearch", "linear_gauss_er_d15"),
     ("ScoreMatching", "score_paper_standardized_d10_er1"),
+    ("DAS", "score_paper_standardized_d20_er4"),
+    ("DAS", "score_paper_standardized_d10_er1"),
     ("DAGMA", "notears_paper_raw_d10"),
     ("NOTEARS", "notears_paper_raw_d10"),
 )

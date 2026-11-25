@@ -69,7 +69,9 @@ def test_pair_rows_equal_single_calls():
     pairs = [(0, 1), (1, 0), (2, 3), (3, 3), (0, 3)]
     with andrey.config(backend="numpy"):
         rows = _pnl.pnl_pairs(X, pairs)
-        assert [tuple(row) for row in rows] == [_pnl.pnl(X[:, i], X[:, j]) for i, j in pairs]
+        assert [tuple(row) for row in rows] == [
+            _pnl.pnl((X[:, i], X[:, j]), (X[:, j], X[:, i])) for i, j in pairs
+        ]
         assert np.array_equal(_pnl.pnl_pairs(X, pairs, n_jobs=3), rows)
 
 
@@ -102,7 +104,7 @@ def test_worker_threads_are_capped_by_a_byte_budget(monkeypatch):
         monkeypatch.setattr(_pnl, "_THREAD_BYTES", 2 * per_thread)
         runs.clear()
         with andrey.config(n_jobs=64):
-            _pnl.pnl(X[:, 0], X[:, 1])
+            _pnl.pnl((X[:, 0], X[:, 1]), (X[:, 1], X[:, 0]))
         assert len(runs) == 2
 
 
@@ -131,10 +133,10 @@ def test_device_dispatch_gates_on_rows_squared(monkeypatch):
 
     monkeypatch.setattr(_pnl.backend, "select", spy)
     X = _table(60)
-    _pnl.pnl(X[:, 0], X[:, 1])
+    _pnl.pnl((X[:, 0], X[:, 1]), (X[:, 1], X[:, 0]))
     _pnl.pnl_pairs(X)
     monkeypatch.setenv(env.PNL_GPU_THRESHOLD.name, "100")
-    _pnl.pnl(X[:, 0], X[:, 1])
+    _pnl.pnl((X[:, 0], X[:, 1]), (X[:, 1], X[:, 0]))
     _pnl.pnl_pairs(X)
     cutoff = backend.GPU_THRESHOLDS["pnl"]["cuda"]
     assert seen == [

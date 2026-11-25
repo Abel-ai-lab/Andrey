@@ -22,7 +22,7 @@ from .api._adapt import (
     default_test,
 )
 from .core.ci import make_indep_test
-from .core.ci_missing import rows_metadata, rows_tested
+from .core.ci_missing import not_tested, rows_metadata, rows_tested
 from .core.output import StructureOutput
 from .core.seeding import resolve_seed
 from .core.structure import GraphStructure, topological_order
@@ -46,7 +46,8 @@ class MarkovCheckOutput:
 
     ``structure`` is the graph as checked, and ``dag`` the DAG whose independences were tested (the
     graph itself for a DAG, a consistent extension for a CPDAG). ``p_values`` and ``table`` list the
-    tested independences in order, ``uniformity_statistic`` and ``uniformity_p_value`` are the
+    tested independences in order, without those not tested for want of rows, which
+    ``metadata["not_tested"]`` counts; ``uniformity_statistic`` and ``uniformity_p_value`` are the
     Anderson-Darling test of those p-values against the uniform distribution, ``passed`` is the
     check's verdict, and ``metadata`` records the settings used.
     """
@@ -86,6 +87,12 @@ class MarkovCheckOutput:
     def verdict(self) -> str:
         """One sentence: what was tested and whether the data reject it."""
         n, a = self.n_tests, self.alpha
+        skipped = int(self.metadata.get("not_tested", 0))
+        if n == 0 and skipped:
+            return (
+                f"Not rejected: none of the {skipped} independences the graph implies had the "
+                "rows its test needs, so none was tested."
+            )
         if n == 0:
             return (
                 "Not rejected: the graph implies no independence among its variables, so the data "
@@ -205,7 +212,8 @@ def markov_check(
     ValueError
         If ``graph`` is not a DAG or a CPDAG that has a DAG, if the graph and the data disagree on
         the columns, if an argument is out of range, if a test would read fewer than the
-        conditioning set size plus four rows, or if a test returns a p-value outside ``[0, 1]``.
+        conditioning set size plus four rows, or if a test returns a p-value outside ``[0, 1]``,
+        ``NaN`` included unless its fact was not tested for want of rows.
 
     Warns
     -----
@@ -319,12 +327,19 @@ def markov_check(
 
     with copies_named(column_labels(data)), rows_tested() as rows:
         p_values = _p_values(X, mask, columns, facts, test_name, sample_fraction, seed)
-    if not np.all((p_values >= 0) & (p_values <= 1)):  # also catches NaN
+    # A fact without the rows its test needs reads NaN, counted as not tested; any other NaN is
+    # a p-value outside [0, 1].
+    tested = ~not_tested(p_values)
+    unexplained = int((~tested).sum()) > rows.total_not_tested()
+    if unexplained or not np.all((p_values[tested] >= 0) & (p_values[tested] <= 1)):
         raise ValueError(f"markov_check: the {test_name!r} test returned a p-value outside [0, 1]")
     if test_name in TABLE_TESTS:
-        _warn_sparse(X, columns, facts, test_name, rows_per_test)
+        ran = [fact for fact, kept in zip(facts, tested.tolist()) if kept]
+        _warn_sparse(X, columns, ran, test_name, rows_per_test)
 
-    statistic, p_uniform = anderson_darling_uniform(p_values) if facts else (None, None)
+    statistic, p_uniform = (
+        anderson_darling_uniform(p_values[tested]) if tested.any() else (None, None)
+    )
     labels = dag.labels
     metadata: dict[str, Any] = {
         "indep_test": test_name,
@@ -339,11 +354,11 @@ def markov_check(
         structure=structure,
         dag=dag,
         alpha=alpha,
-        p_values=p_values,
+        p_values=p_values[tested],
         uniformity_statistic=statistic,
         uniformity_p_value=p_uniform,
         metadata=metadata,
-        _tests=tuple(facts),
+        _tests=tuple(fact for fact, kept in zip(facts, tested.tolist(), strict=True) if kept),
     )
 
 

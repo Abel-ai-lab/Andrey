@@ -2,16 +2,17 @@ name: quality-gate
 
 # The release's quality gate: every supported method against data with a known graph
 # (`qa/README.md`). It runs once per release, on the head of the release pull request into `main`
-# (`release-flow.yml` lets only `release/<x.y.z>` merge there), and `main`'s ruleset requires it.
-# `publish.yml` reuses a passing run on the published tree (`scripts/gate_reuse.py`) or calls this
-# workflow itself; every job that publishes to PyPI needs a job that calls it, as
-# `tests/unit/test_release_gates.py` checks. A push that changes only files the gate does not read
-# (`docs/`, `site/`, and top-level Markdown files) reuses a passing run on an earlier commit: the job
-# still succeeds under this name, and its steps after the lookup are skipped
-# (`scripts/gate_reuse.py --ancestor`).
+# (`release-flow.yml` lets only `release/<x.y.z>` merge there), and `main`'s ruleset requires it;
+# it also runs by hand (`gh workflow run quality-gate.yml --ref <branch>`). `publish.yml` reuses a
+# passing run on the published tree (`scripts/gate_reuse.py`) or calls this workflow itself; every
+# job that publishes to PyPI needs a job that calls it, as `tests/unit/test_release_gates.py`
+# checks. A push that changes only files the gate does not read (`docs/`, `site/`, and top-level
+# Markdown files) reuses a passing run on an earlier commit: the job still succeeds under this name,
+# and its steps after the lookup are skipped (`scripts/gate_reuse.py --ancestor`).
 on:
   pull_request:
     branches: [main]
+  workflow_dispatch:
   workflow_call:
 
 permissions:
@@ -24,7 +25,9 @@ env:
 jobs:
   quality-gate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    # SkewD-MV's cell alone took about 49 minutes on one AMD EPYC (Zen 3) core (`qa/README.md`) and
+    # starts first; a fit takes about twice as long on some runners (see the Host CPU step).
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

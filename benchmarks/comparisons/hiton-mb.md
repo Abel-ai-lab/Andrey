@@ -1,11 +1,12 @@
 # HITON-MB
 
-This campaign compares Andrey's `hiton_mb` with the authors' HITON-MB in Causal Explorer 1.5 on
-the Markov blanket each learns at every target, on the networks and sizes of its paper.
-`blanket_cpu.py` fits the solutions, as [Markov blankets](blankets.md) describes, and
-`blanket_summary.py` judges each cell. The rows are in
-[`published/0.18.0/hiton-mb.json`](../published/0.18.0/hiton-mb.json), and the
-[0.18.0 release card](../../docs/docs/benchmarks/0.18.0.md#hiton-mb) summarizes them.
+This campaign compares Andrey's `hiton_mb` with the authors' HITON-MB in Causal Explorer 1.5 on the
+Markov blanket each learns at every target, on the networks and sizes of its paper. `blanket_cpu.py`
+fits the solutions, as [Markov blankets](blankets.md) describes, and `blanket_summary.py` judges
+each cell. The rows are in
+[`published/local-discovery/hiton-mb.json`](../published/local-discovery/hiton-mb.json), and the
+[local discovery release card](../../docs/docs/benchmarks/local-discovery.md#hiton-mb) summarizes
+them.
 
 ## Data
 
@@ -41,7 +42,7 @@ seeds 0 to 19, and a tie otherwise. The floor counts the errors per target, miss
 members, against the empty set's, which are the true set's size; `hiton_mb` passes when the paired
 interval of the difference lies below 0.
 
-## Results (0.18.0)
+## Results (local discovery)
 
 Against the toolbox, `hiton_mb` was better in 11 of the 13 settings and worse in 2, hailfinder and
 insurance at 5,000 rows, where the first datasets and the 20 fresh ones agree: on the fresh ones the

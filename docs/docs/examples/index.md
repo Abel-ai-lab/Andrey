@@ -41,7 +41,7 @@ New to Andrey? Work through the notebooks in this order; each part adds one step
 - **Part 13.** {doc}`Markov check <markov_check>`: test whether the data contradict the graph you
   learned.
 - **Part 14.** {doc}`Missing values <missing_values>`: fit data whose gaps depend on other
-  variables, and correct for them.
+  variables, and correct for them; then FCI, categorical data, and a time series with gaps.
 
 {doc}`Speed on your machine <speed_on_your_machine>` times PC on your own hardware at any point.
 
@@ -161,9 +161,10 @@ one variable, with cycles allowed.
 :img-top: /_generated/thumbs/functional.svg
 :img-alt: The DAG CAM recovers in this notebook
 
-CAM, RESIT, SCORE, and NoGAM learn a DAG, with every edge oriented, when each variable is a
-nonlinear function of its parents plus independent noise; CAM-UV allows hidden causes and marks the
-pairs they join.
+CAM, RESIT, SCORE, NoGAM, and DAS learn a fully oriented DAG when each variable is a nonlinear
+function of its parents plus independent noise; CAM-UV allows hidden causes and marks the pairs they
+join, CPCM's graph search lets each variable follow a family you choose, and SkewD-MV allows skewed
+noise whose scale changes with the parents.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -208,7 +209,7 @@ BottomUpParceLiNGAM orders the variables and leaves those a hidden cause confoun
 :img-top: /_generated/thumbs/pairwise.svg
 :img-alt: The true graph of this notebook's pair
 
-ANM, PNL, and LOCI test which of two variables causes the other.
+ANM, PNL, LOCI, CPCM, and SkewD test which of two variables causes the other.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -279,6 +280,7 @@ Pass what you already know to a search: tiers in time, and required or forbidden
 
 Remove values so that whether one is missing depends on another variable, then fit PC with its
 default handling and with `missing="mvpc"` and GES with `missing="em"`, and count each one's errors.
+Then values missing not at random, FCI, categorical data, and a time series.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::

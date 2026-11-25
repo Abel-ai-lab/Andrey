@@ -4,7 +4,9 @@
 2022) in the setting their papers claim, each against its authors' code, with the empty graph as
 the floor and two sortability baselines as controls. `notears_summary.py` pairs the records into the
 rows of [`published/0.17.0/notears-dagma.json`](../published/0.17.0/notears-dagma.json). DAGMA's
-rows are also in [`published/0.18.0/notears-dagma.json`](../published/0.18.0/notears-dagma.json).
+rows are also in [`published/0.18.0/notears-dagma.json`](../published/0.18.0/notears-dagma.json),
+which also records the `robust=True` path and the fits on the Sachs data shown on the
+[0.18.0 release card](../../docs/docs/benchmarks/0.18.0.md#dagma).
 
 ## Data
 
@@ -85,17 +87,19 @@ finished, with the 95% percentile-bootstrap interval of its mean over 10,000 res
 the interval lies wholly above 0, better when wholly below, a tie otherwise. Fewer than 10 paired
 datasets are reported and not judged.
 
-The rule, fixed before the run. The decision cells are the standardized ones, 24 per method. A
-method is supported when both bars hold:
+The bars, fixed before the run. The decision cells are the standardized ones, 24 per method, and
+each method is measured against two bars:
 
 - **Reference.** In no decision cell is Andrey worse than its reference on the first seeds and
   again on the fresh ones.
 - **Floor.** Andrey's interval against the empty graph lies wholly below 0 in more than half of the
   decision cells.
 
-A method that fails the floor is not supported by this rule. DAGMA fails it exactly as its authors'
-package does, and is supported with that gap stated (see Status). The raw and rescaled cells, the
-controls, and MEC SHD are reported and do not decide.
+The raw and rescaled cells, the controls, and MEC SHD are reported and decide neither bar.
+
+Both methods are supported in Andrey, and what the floor measures on standardized columns is stated
+as their limit (see Status): the result of these least-squares fits depends on the data's scale
+(Reisach et al., 2021).
 
 ## Results
 
@@ -106,7 +110,7 @@ more.
 | method | reference | better / tie / worse, 24 decision cells | worse again | below the empty graph | reference below the empty graph | median fit time, reference / Andrey | verdict |
 |---|---|---|---|---|---|---|---|
 | `notears` | the authors' code | 1 / 23 / 0 | 0 | 15 of 24 | 16 of 24 | 0.66 to 1.64 | meets both bars |
-| `dagma` | the authors' package | 0 / 24 / 0 | 0 | 0 of 24 | 0 of 24 | 0.19 to 1.06 | meets the reference bar; the floor gap is stated |
+| `dagma` | the authors' package | 0 / 24 / 0 | 0 | 0 of 24 | 0 of 24 | 0.19 to 1.06 | meets the reference bar, not the floor |
 
 By size, NOTEARS is below the empty graph in 4 of 6 decision cells at 10 variables, 3 of 6 at 20,
 4 of 6 at 50, and 4 of 6 at 100: in all 12 `ER2` cells and in 3 of the 12 `SF4` cells. DAGMA is
@@ -511,16 +515,18 @@ own experiments use the raw simulated columns only, with a penalty of 0.05.
 
 ## Status
 
-The bar: never less accurate than the reference in a decision cell that repeats, and below the
-empty graph in more than half of the decision cells.
+Both methods are supported in Andrey. Neither is less accurate than its authors' code in a decision
+cell that repeats, and both read the columns' units: on the papers' raw scale each is below the
+empty graph in all 18 cells, and its result on standardized columns, below, is stated as its limit
+(Reisach et al., 2021). The methods' Limitations in the API reference say so in one sentence and
+link to the release card.
 
 - `notears` meets both bars. Against the authors' code it is better in 1 decision cell, tied in
   23, and worse in none, so no cell needed a rerun, and it is below the empty graph in 15 of 24,
   with the small margins listed under Limits.
-- `dagma` meets the reference bar and not the floor, and is supported with that gap stated. It ties
-  the authors' package in all 24 decision cells and in all 18 raw cells. It is below the empty graph
-  in none of the 24 standardized cells and above it in 16, as the authors' package is, so the floor
-  fails for the method on these data and not for Andrey's implementation. On the raw and rescaled
+- `dagma` meets the reference bar and not the floor. It ties the authors' package in all 24
+  decision cells and in all 18 raw cells. It is below the empty graph in none of the 24
+  standardized cells and above it in 16, and so is the authors' package. On the raw and rescaled
   cells it is below the empty graph in all 18. Its result depends on the columns' units: the
   least-squares score reads a variable's variance, which grows along the causal order in
   simulations like these (varsortability; Reisach et al., 2021), and on standardized columns, or
@@ -532,7 +538,7 @@ empty graph in more than half of the decision cells.
   [0.17.0 release card](../../docs/docs/benchmarks/0.17.0.md#notears) has its section. `dagma` is
   supported from 0.18.0: its rows are in that release's summary,
   [`published/0.18.0/summary.json`](../published/0.18.0/summary.json), and the
-  [0.17.0 release card](../../docs/docs/benchmarks/0.17.0.md#dagma) has its section.
+  [0.18.0 release card](../../docs/docs/benchmarks/0.18.0.md#dagma) has its section.
 
 ## Limits
 

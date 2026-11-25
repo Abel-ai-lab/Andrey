@@ -130,6 +130,65 @@ def test_iamb_finds_the_true_blanket_under_an_oracle(seed, interleaved):
     np.testing.assert_array_equal(graph, oracle.moral_graph())
 
 
+class _PValues:
+    """A test of target 0 that answers each variable with its own p-value, whatever the set."""
+
+    def __init__(self, pvalues: dict[int, float]) -> None:
+        self.pvalues = pvalues
+
+    def __call__(self, x, y, cond=()):
+        return self.pvalues[y if x == 0 else x]
+
+
+@pytest.mark.parametrize("interleaved", [False, True], ids=["iamb", "inter_iamb"])
+def test_a_grow_step_admits_the_smallest_p_value_even_far_below_the_key_precision(interleaved):
+    """IAMB and Inter-IAMB order the dependent candidates of a grow step by their p-values to
+    ``KEY_DP`` significant digits, so p-values below ``10**-KEY_DP`` keep the order of their
+    sizes; the rank decides only among equal p-values, exactly zero ones included."""
+    ranks = [0, 5, 4, 3, 2, 1]
+    tiny = _PValues({1: 1e-12, 2: 1e-70, 3: 1e-41, 4: 1e-70, 5: 0.5})
+    assert markov_blanket(tiny, 0, 6, 0.05, ranks, interleaved=interleaved) == [4, 2, 3, 1]
+    zero = _PValues({1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0, 5: 0.5})
+    assert markov_blanket(zero, 0, 6, 0.05, ranks, interleaved=interleaved) == [4, 3, 2, 1]
+
+
+def _chisq_iamb(test, target, d, alpha, ranks, decimals):
+    """IAMB written out for a p-value test: grow by the smallest p-value among candidates at or
+    below ``alpha``, compared to ``KEY_DP`` significant digits (``decimals`` False) or decimals,
+    ties by rank, then shrink once in joining order."""
+    blanket = []
+    while True:
+        best_key, best_x = None, None
+        for x in range(d):
+            if x == target or x in blanket:
+                continue
+            p = test(target, x, blanket)
+            key = (round(p, KEY_DP) if decimals else float(f"{p:.{KEY_DP}g}"), ranks[x])
+            if p <= alpha and (best_key is None or key < best_key):
+                best_key, best_x = key, x
+        if best_x is None:
+            break
+        blanket.append(best_x)
+    for x in list(blanket):
+        rest = [z for z in blanket if z != x]
+        if test(target, x, rest) > alpha:
+            blanket.remove(x)
+    return blanket
+
+
+def test_iamb_on_discrete_data_orders_by_p_value_to_significant_digits():
+    """The engine's blankets equal the written-out IAMB's, which a key of decimals would not give
+    for every target."""
+    x, test = _search_data("chisq")
+    ranks = tie_ranks(x).tolist()
+    by_decimals = 0
+    for target in range(15):
+        want = _chisq_iamb(test, target, 15, 0.05, ranks, decimals=False)
+        assert markov_blanket(test, target, 15, 0.05, ranks) == want, target
+        by_decimals += _chisq_iamb(test, target, 15, 0.05, ranks, decimals=True) != want
+    assert by_decimals
+
+
 @pytest.mark.parametrize("seed", range(4))
 def test_gs_finds_the_true_blanket_under_an_oracle(seed):
     oracle = _oracle(seed)
@@ -157,6 +216,33 @@ def test_gs_shrinks_a_member_its_order_admitted_early():
     given {2}, and the shrink, in the order they joined, drops 2 given {1}."""
     oracle = DSepOracle(nx.DiGraph([(0, 1), (1, 2)]))
     assert LocalSearch(oracle, [0, 2, 1], 0.5).run("gs", 0) == ([1], {2: (1,)})
+
+
+def test_gs_visits_a_candidate_without_an_ordering_test_last():
+    """1 and 3 depend on 0, 3 more strongly, and 2 is never tested: 3 is visited first and joins,
+    then 1 given {3}; 2, with no strength to order it, comes last and joins nothing."""
+    strength = {1: 0.01, 2: np.nan, 3: 1e-9}
+
+    def test(x, y, cond=()):
+        return strength[max(x, y)]
+
+    assert LocalSearch(test, [0, 1, 2, 3], 0.05).run("gs", 0) == ([3, 1], {})
+
+
+def test_gs_adds_a_member_once_that_was_not_tested_at_an_earlier_blanket():
+    """1, 2, and 3 depend on 0 alone, in that order. Given {1}, 2 is not tested and 3 joins; given
+    {1, 3}, 2 tests dependent and joins. The not-tested 2 is not added again at the end, so the
+    blanket matches the one IAMB finds."""
+    strength = {1: 1e-9, 2: 1e-6, 3: 1e-3}
+
+    def test(x, y, cond=()):
+        other = max(x, y)
+        if not cond:
+            return strength[other]
+        return np.nan if other == 2 and tuple(cond) == (1,) else 1e-4
+
+    assert LocalSearch(test, [0, 1, 2, 3], 0.05).run("gs", 0) == ([1, 3, 2], {})
+    assert LocalSearch(test, [0, 1, 2, 3], 0.05).run("iamb", 0) == ([1, 3, 2], {})
 
 
 class _Independent:
@@ -258,55 +344,6 @@ def test_the_strength_order_keeps_tiny_p_values_apart():
     strengths, _ = search.scan(0, xs)
     keys = {v: -round(s, KEY_DP) for v, s in zip(xs, strengths.tolist(), strict=True)}
     assert search.by_strength(xs, strengths) == ordered(keys, search.ranks)
-
-
-@pytest.mark.parametrize("interleaved", [False, True], ids=["iamb", "inter_iamb"])
-def test_a_grow_step_admits_the_smallest_p_value_even_far_below_the_key_precision(interleaved):
-    """IAMB and Inter-IAMB order the dependent candidates of a grow step by their p-values to
-    ``KEY_DP`` significant digits, so p-values below ``10**-KEY_DP`` keep the order of their
-    sizes; the rank decides only among equal p-values, exactly zero ones included."""
-    ranks = [0, 5, 4, 3, 2, 1]
-    tiny = _PValues({1: 1e-12, 2: 1e-70, 3: 1e-41, 4: 1e-70, 5: 0.5})
-    assert markov_blanket(tiny, 0, 6, 0.05, ranks, interleaved=interleaved) == [4, 2, 3, 1]
-    zero = _PValues({1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0, 5: 0.5})
-    assert markov_blanket(zero, 0, 6, 0.05, ranks, interleaved=interleaved) == [4, 3, 2, 1]
-
-
-def _chisq_iamb(test, target, d, alpha, ranks, decimals):
-    """IAMB written out for a p-value test: grow by the smallest p-value among candidates at or
-    below ``alpha``, compared to ``KEY_DP`` significant digits (``decimals`` False) or decimals,
-    ties by rank, then shrink once in joining order."""
-    blanket = []
-    while True:
-        best_key, best_x = None, None
-        for x in range(d):
-            if x == target or x in blanket:
-                continue
-            p = test(target, x, blanket)
-            key = (round(p, KEY_DP) if decimals else float(f"{p:.{KEY_DP}g}"), ranks[x])
-            if p <= alpha and (best_key is None or key < best_key):
-                best_key, best_x = key, x
-        if best_x is None:
-            break
-        blanket.append(best_x)
-    for x in list(blanket):
-        rest = [z for z in blanket if z != x]
-        if test(target, x, rest) > alpha:
-            blanket.remove(x)
-    return blanket
-
-
-def test_iamb_on_discrete_data_orders_by_p_value_to_significant_digits():
-    """The engine's blankets equal the written-out IAMB's, which a key of decimals would not give
-    for every target."""
-    x, test = _search_data("chisq")
-    ranks = tie_ranks(x).tolist()
-    by_decimals = 0
-    for target in range(15):
-        want = _chisq_iamb(test, target, 15, 0.05, ranks, decimals=False)
-        assert markov_blanket(test, target, 15, 0.05, ranks) == want, target
-        by_decimals += _chisq_iamb(test, target, 15, 0.05, ranks, decimals=True) != want
-    assert by_decimals
 
 
 def test_the_order_reads_ranks_only_when_keys_tie():
@@ -596,9 +633,9 @@ def test_a_non_collider_stops_at_its_first_separating_chunk(monkeypatch, kind, f
     tested = []
     weakest = blanket._weakest
 
-    def counted(test, target, xs, conds):
+    def counted(test, target, xs, conds, *args, **kwargs):
         tested.append(len(conds))
-        return weakest(test, target, xs, conds)
+        return weakest(test, target, xs, conds, *args, **kwargs)
 
     monkeypatch.setattr(blanket, "_weakest", counted)
     with rows_tested() as rows:
@@ -751,6 +788,64 @@ def test_each_recorded_separating_set_is_a_test_that_separated(method, kind):
     for t in range(15):
         for v, given in search.local(method, t)[2].items():
             assert test(t, v, given) > 0.05, (t, v, given)
+
+
+@pytest.fixture
+def mmpc_spouses(monkeypatch):
+    """A parents-and-children-then-spouses learner over MMPC, registered for the test."""
+    monkeypatch.setitem(LEARNERS, "mmpc_spouses", Learner("pc_spouses", pc="mmpc"))
+    return "mmpc_spouses"
+
+
+@pytest.mark.parametrize("seed", range(4))
+def test_the_spouse_step_completes_the_blanket_under_an_oracle(mmpc_spouses, seed):
+    dag = data.sample_scm(graph="erdos_renyi", d=12, n=2, seed=seed, density=3.0).graph
+    oracle = DSeparation(dag)
+    search = LocalSearch(oracle, list(range(oracle.d)), 0.5)
+    for t in range(oracle.d):
+        pc, mb, sepsets = search.local(mmpc_spouses, t)
+        assert pc is not None and mb is not None
+        assert set(pc) == oracle.parents_children(t), t
+        assert set(mb) == oracle.markov_blanket(t) and mb[: len(pc)] == pc, t
+        _check_sepsets(oracle, t, pc, sepsets)
+    np.testing.assert_array_equal(
+        search.structure(mmpc_spouses, "moral") != 0, oracle.moral_graph()
+    )
+    np.testing.assert_array_equal(
+        search.structure(mmpc_spouses, "skeleton") != 0, oracle.skeleton()
+    )
+    truth = dag2cpdag(dag.to_numpy())
+    np.testing.assert_array_equal(search.structure(mmpc_spouses, "cpdag"), truth)
+    search.test = _NoTests()
+    assert search.local(mmpc_spouses, 0)[1] is not None
+
+
+def test_the_spouse_step_pairs_a_candidate_only_with_its_neighbor(mmpc_spouses):
+    """On P -> Q -> T -> S <- R <- P, T's blanket is {Q, S, R}: P, separated from T by {Q}, is
+    dependent on T given {Q, S}, but S is not adjacent to P, so that test is never run (Pena et
+    al. 2007, DAG (b))."""
+    p, q, t, s, r = range(5)
+    marks = np.zeros((5, 5), dtype=np.int8)
+    for i, j in [(p, q), (q, t), (t, s), (r, s), (p, r)]:
+        marks[i, j], marks[j, i] = 1, 2
+    oracle = DSeparation(GraphStructure.from_numpy(marks, kind="dag"))
+    search = LocalSearch(oracle, list(range(5)), 0.5)
+    pc, mb, sepsets = search.local(mmpc_spouses, t)
+    assert pc == [q, s] or pc == [s, q]
+    assert mb is not None and set(mb) == {q, s, r}
+    assert oracle(t, p, (q, s)) == 0.0 and q in sepsets[p]
+
+
+@pytest.mark.parametrize("method", ["gs", "fast_iamb", "hiton_pc", "hiton_mb", "mmmb", "pcmb"])
+def test_a_variable_no_test_could_measure_with_the_target_joins_no_set(method):
+    """A column observed on two rows leaves every test with it not tested, so the target's sets
+    never hold it, and the pair is listed as undecided."""
+    x = data.sample_scm(graph="erdos_renyi", d=7, n=300, seed=2, density=2.0).data.copy()
+    x[2:, 5] = np.nan
+    metadata = getattr(andrey, method)(x, target=0).metadata
+    for key in ("parents_and_children", "markov_blanket"):
+        assert 5 not in (metadata.get(key) or []), key
+    assert [0, 5] in metadata["undecided_pairs"]
 
 
 @pytest.mark.parametrize("seed", range(4))
@@ -987,6 +1082,22 @@ _ALL = ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb",
 
 
 @pytest.mark.parametrize("kind", ["fisherz", "chisq"])
+@pytest.mark.parametrize("method", ["iamb", "inter_iamb", "mmpc"])
+def test_the_local_entry_gives_the_set_the_method_returns(method, kind):
+    x, _ = _search_data(kind)
+    indep_test = "fisherz" if kind == "fisherz" else "chisq"
+    search = local_search(x, alpha=0.05, indep_test=indep_test)
+    fit = getattr(andrey, method)
+    key = "parents_and_children" if method == "mmpc" else "markov_blanket"
+    for t in range(15):
+        pc, mb, _ = search.local(method, t)
+        assert (pc if method == "mmpc" else mb) == fit(x, target=t, indep_test=indep_test).metadata[
+            key
+        ], t
+        assert (mb if method == "mmpc" else pc) is None
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "chisq"])
 @pytest.mark.parametrize("method", _ALL)
 def test_the_local_entry_gives_the_sets_the_method_returns(method, kind):
     """The parents and children and the Markov blanket, each the method learns, are the sets its
@@ -1105,6 +1216,57 @@ def test_a_large_scan_given_a_shared_set_is_answered_from_one_factor(kind):
     np.testing.assert_allclose(strengths, want_s, rtol=0.0, atol=1e-12)
     np.testing.assert_allclose(pvalues, want_p, rtol=1e-9, atol=1e-300)
     assert ((pvalues <= 0.05) == (want_p <= 0.05)).all()
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "student_t", "normal_scores"])
+def test_a_large_grow_scan_is_answered_from_one_factor(kind):
+    """A grow scan of enough candidates given two or more variables goes to the test's one-factor
+    path and agrees with each candidate asked alone to rounding (the p-value to 1e-9 relative, on
+    the same side of alpha, the strength key to ``KEY_DP`` decimals); one candidate keeps the
+    per-query answer bit for bit."""
+    x = data.sample_scm(graph="erdos_renyi", d=40, n=400, seed=3, density=3.0).data
+    test = make_indep_test(kind, x)
+    factored = []
+    factor = test._schur_partial_correlations
+    test._schur_partial_correlations = lambda *args: factored.append(1) or factor(*args)
+    search = LocalSearch(test, tie_ranks(x).tolist(), 0.05)
+    cond = [2, 9, 17]
+    xs = [v for v in range(40) if v != 4 and v not in cond]
+    strengths, pvalues = search.scan(4, xs, cond)
+    assert factored == [1]
+    want = np.array([test.statistic_pvalue(4, v, cond) for v in xs])
+    np.testing.assert_allclose(pvalues, want[:, 1], rtol=1e-9, atol=1e-300)
+    assert ((pvalues <= 0.05) == (want[:, 1] <= 0.05)).all()
+    np.testing.assert_allclose(
+        -np.round(strengths, KEY_DP),
+        -np.round(np.abs(want[:, 0]), KEY_DP),
+        rtol=0.0,
+        atol=10.0**-KEY_DP,
+    )
+    strength, pvalue = search.scan(4, xs[:1], cond)
+    r, p = test.statistic_pvalue(4, xs[0], cond)
+    assert (strength.tolist(), pvalue.tolist()) == ([abs(r)], [p])
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "student_t", "normal_scores"])
+def test_a_small_grow_scan_keeps_the_per_query_bits(kind):
+    """A grow scan below the factor's work, or given fewer than two variables, gives each candidate
+    the p-value and strength key of that candidate asked alone, bit for bit."""
+    x = data.sample_scm(graph="erdos_renyi", d=12, n=400, seed=3, density=3.0).data
+    test = make_indep_test(kind, x)
+    search = LocalSearch(test, tie_ranks(x).tolist(), 0.05)
+    for cond in [[], [7], [2, 9], [0, 3, 8]]:
+        xs = [v for v in range(12) if v != 4 and v not in cond]
+        for some in (xs, xs[:3]):
+            if len(cond) >= 2 and len(some) * (len(cond) + 2) >= 128:
+                continue
+            strengths, pvalues = search.scan(4, some, cond)
+            want = [test.statistic_pvalue(4, v, cond) for v in some]
+            assert pvalues.tolist() == [p for _, p in want], (cond, some)
+            assert (-np.round(strengths, KEY_DP)).tolist() == [
+                -round(abs(r), KEY_DP) for r, _ in want
+            ], (cond, some)
+            assert strengths.tolist() == [abs(r) for r, _ in want], (cond, some)
 
 
 def _given_rest(target: int, v: int, d: int) -> list[int]:
@@ -1283,3 +1445,26 @@ def test_table_size_counts_cells_and_degrees_of_freedom():
 def test_a_learner_row_names_one_search_or_one_pc_learner(row):
     with pytest.raises(ValueError, match="pc_spouses"):
         Learner(**row)
+
+
+def test_the_recorded_set_is_the_tested_separator_beside_a_set_not_tested():
+    pvalues = np.array([[np.nan, 0.3, 0.1], [np.nan, np.nan, np.nan]])
+    conds = [(1,), (2,), (3,)]
+    assert blanket._largest_sets(pvalues, conds, [0, 1, 2, 3]) == [(2,), (1,)]
+
+
+@pytest.mark.parametrize("interleaved", [False, True])
+def test_the_shared_factor_leaves_every_blanket_unchanged(interleaved, monkeypatch):
+    """IAMB and Inter-IAMB find the same blanket at every target whether every grow scan is
+    factored or none is."""
+    x = data.sample_scm(graph="erdos_renyi", d=30, n=500, seed=1, density=3.0).data
+    ranks = tie_ranks(x).tolist()
+
+    def blankets(min_work: str) -> list[list[int]]:
+        monkeypatch.setenv("ANDREY_SHARED_SCAN_MIN_WORK", min_work)
+        test = FisherZ(x)
+        return [
+            markov_blanket(test, t, 30, 0.05, ranks, interleaved=interleaved) for t in range(30)
+        ]
+
+    assert blankets("0") == blankets("1000000000")
