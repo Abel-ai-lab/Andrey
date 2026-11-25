@@ -466,18 +466,15 @@ class GCM(_RegressionTest):
     one nonzero constant, a covariance without noise, give an infinite statistic and the p-value
     ``0``.
 
-    **Limitations.** No benchmark campaign yet; the tests run it on up to 4 variables and 400 rows.
-    A ``"boosting"`` regression fits 51 boosted models, once per variable and conditioning set. Its
-    level depends on the regressions: a conditional mean the method cannot learn, such as a function
-    of several variables of ``z`` jointly under ``"linear"``, leaves a covariance in the residuals
-    and reads as dependence. At a few hundred rows, where the conditional means are hard to learn,
-    the test rejects a true independence more often than its level, as the weighted GCM's paper
-    reports for it at 100 and 200 rows [2]_. With ``"boosting"``, pooled over draws of 12 null
-    designs at 200 and 400 rows (those of [1]_ and [2]_, and example 7 of [2]_ without its
-    dependence), it rejected about 6.3% at 0.05 (6.4% and 7.6% in two runs on the designs of
-    [2]_), from 4 to 11% by design, and about 9% on the one-dimensional null of [2]_ at 200 rows.
-    With an empty conditioning set the test is a test of correlation: a dependence without one,
-    such as ``y = x**2`` for a symmetric ``x``, goes unseen.
+    **Limitations.** Its level depends on the regressions: a conditional mean the regression cannot
+    learn, such as a joint function of several variables of ``z`` under ``"linear"``, leaves a
+    covariance in the residuals and reads as dependence. With ``"boosting"`` at a few hundred rows
+    it rejects a true independence more often than its level when ``z`` holds one variable, as the
+    boosted tests in the weighted GCM's paper do [2]_, and holds the level with ten conditioning
+    variables. With an empty conditioning set it is a test of correlation: a dependence without one,
+    such as ``y = x**2`` for a symmetric ``x``, goes unseen. The `0.19.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#the-gcm-wgcm-and-pcm-tests>`__ has the
+    numbers.
 
     References
     ----------
@@ -587,20 +584,16 @@ class WGCM(_RegressionTest):
     uncentered. The split and the multiplier draws are drawn from ``seed`` over the rows in
     lexicographic order of the query's own columns, so they do not depend on other columns.
 
-    **Limitations.** No benchmark campaign yet; the tests run it on up to 4 variables and 400 rows.
-    ``"est"`` tests on 70% of the rows, and its p-value changes with the seed. A ``"boosting"``
-    regression fits 281 boosted models of up to 500 rounds, 28 settings on 10 folds and the chosen
-    one on every row, so a query takes several times as long as the GCM's; ``"est"`` runs five such
-    regressions per query, its split being the query's own. ``"fix"`` uses 7 weights per
-    conditioning variable, so its maximum spreads over more of them as the conditioning set grows;
-    on 10 conditioning variables (10D.Add of [1]_ at 200 rows) it still rejected more often than
-    ``"est"`` (see ``variant``). At a few hundred rows, where the conditional means are hard to
-    learn, neither variant holds its level. With ``"boosting"``, pooled over draws of the paper's
-    null designs at 200 and 400 rows [1]_, ``"est"`` rejected a true independence at 0.05 in about
-    6.8% of draws and ``"fix"`` in 6.0% (6.8% and 6.5% on a second set of draws), up to 7.8% on one
-    design for either; pooled over 12 null designs (those, further nulls
-    of [2]_, and example 7 of [1]_ without its dependence), 6.6% and 6.4%, from 4 to 13% by design
-    for ``"est"``, the most on the a = 4 null of [2]_, and from 4 to 8.6% for ``"fix"``.
+    **Limitations.** ``"est"`` tests on 70% of the rows, and its p-value changes with the seed. With
+    ``"boosting"`` a query takes several times as long as the GCM's, and ``"est"`` runs several
+    regressions per query. ``"fix"`` spreads its maximum over more weights as the conditioning set
+    grows, and with many conditioning variables it rejects more often than ``"est"`` (see
+    ``variant``). With ``"boosting"`` at a few hundred rows both variants reject a true independence
+    more often than the level when ``z`` holds one variable, as the paper's own boosted tests do
+    [1]_, and hold it with ten conditioning variables; on harder nulls of [2]_ ``"est"`` rejects
+    more often still. The `0.19.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#the-gcm-wgcm-and-pcm-tests>`__ has the
+    numbers.
 
     References
     ----------
@@ -807,24 +800,17 @@ class PCM(_RegressionTest):
       which in the measurements turned a few rejections near the level into acceptances and
       changed no other decision.
 
-    **Limitations.** On the null design of the paper's Section 6.1 (seven conditioning variables,
-    500 draws per size), the default rejected a true independence at 0.05 in 0.4% of draws at 250
-    rows and 0.2% at 500 (the authors' code with the same regressions: 0.6% and 0.2%), and in the
-    paper's three alternative settings its power was at or above the authors' code's on the same
-    data, for example 54.8% against 48.8% in the first setting at 250 rows and 13.4% against 7.6% in
-    the third at 500. On the null of Section 6.2, whose conditional means hold an interaction, it
-    rejected 97.6% at 500 rows (the authors' code 95.6%); the paper runs that design from 10,000
-    rows, where ``"forest"`` rejected 4.0% of 50 draws, and no regression measured holds it at 500
-    (the forest rejected 34.4%). The tree regressions fail the Section 6.1 null, where ``x`` nearly
-    copies the conditional mean of ``y`` on ``z``: ``"forest"`` rejected 99.9% at 250 rows and 97.3%
-    at 500, ``"boosting"`` 97.7% at 250. A query on nine columns takes about 7 s at 250 rows, 29 s
-    at 500, and 6 minutes at 1,000 on one core, so a PC search, which runs a query for each pair and
-    conditioning set it tries, is slow. The variance floor of 0.01, in units of the standardized
-    response, is the authors' code's value; the paper sets none. The test detects a dependence of
-    the mean of ``y`` on ``x``; one that changes only the spread of ``y`` goes unseen, as does a
-    dependence of the mean of ``x`` on ``y`` that leaves the mean of ``y`` unchanged. Which variable
-    is the response follows a rule on the data that has nothing to do with the causal question, so
-    swapping the roles can change the answer.
+    **Limitations.** On the paper's main null design the default holds its level, and on its
+    alternatives its power is at least that of the authors' code on the same data. On a null whose
+    conditional means hold an interaction, no regression measured holds the level at a few hundred
+    rows. The tree regressions fail the main null design, where ``x`` nearly copies the conditional
+    mean of ``y`` on ``z``. A query takes seconds at a few hundred rows and minutes at a thousand,
+    so a PC search with it is slow. The test sees a dependence of the mean of ``y`` on ``x``; one
+    that changes only the spread of ``y`` goes unseen, as does a dependence of the mean of ``x`` on
+    ``y`` that leaves the mean of ``y`` unchanged. Which variable is the response follows a rule on
+    the data, not the causal question, so swapping the roles can change the answer. The `0.19.0
+    release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#the-gcm-wgcm-and-pcm-tests>`__
+    has the numbers.
 
     References
     ----------
