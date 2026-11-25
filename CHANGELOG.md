@@ -30,6 +30,9 @@ names its pull request.
   and `degrees_of_freedom="nonempty"` (PC, FCI, IAMB, Inter-IAMB, and MMPC, with `chisq` and `gsq`)
   on sparse discrete data, so the comparison with the previous release covers both options.
   ([#1217])
+- For contributors, `benchmarks/overlapping_variables/` reruns the benchmark behind the 0.19.0
+  release card's section on datasets with overlapping variables, at a small size in minutes and at
+  the card's size, and its summary writes the card's two tables. ([#1224])
 
 ## [0.19.0] - 2026-11-24
 
@@ -2958,3 +2961,4 @@ First alpha release.
 [#1215]: https://github.com/Abel-ai-lab/Andrey/pull/1215
 [#1217]: https://github.com/Abel-ai-lab/Andrey/pull/1217
 [#1221]: https://github.com/Abel-ai-lab/Andrey/pull/1221
+[#1224]: https://github.com/Abel-ai-lab/Andrey/pull/1224
