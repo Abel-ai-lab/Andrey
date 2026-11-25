@@ -16,6 +16,11 @@ names its pull request.
   in `ANDREY_BENCH_R_LIBS_GCM`, apart from the R lane's `ANDREY_BENCH_R_LIBS`, and prints the
   exports of both its libraries, which the `env.sh` of `benchmarks/run_tests.sh` records for
   `benchmarks/regression_ci_agreement.py`. ([#1214])
+- For contributors, `qa/identity.py` fits `possibly_separable="ambiguous"` (PC, FCI, CD-NOD,
+  FCI-JCI, IAMB, Inter-IAMB, MMPC, and PCMCI+) on data stacked from cohorts that no row bridges,
+  and `degrees_of_freedom="nonempty"` (PC, FCI, IAMB, Inter-IAMB, and MMPC, with `chisq` and `gsq`)
+  on sparse discrete data, so the comparison with the previous release covers both options.
+  ([#1217])
 
 ## [0.19.0] - 2026-11-24
 
@@ -2941,3 +2946,4 @@ First alpha release.
 [#1153]: https://github.com/Abel-ai-lab/Andrey/pull/1153
 [#1165]: https://github.com/Abel-ai-lab/Andrey/pull/1165
 [#1214]: https://github.com/Abel-ai-lab/Andrey/pull/1214
+[#1217]: https://github.com/Abel-ai-lab/Andrey/pull/1217

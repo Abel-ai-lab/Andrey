@@ -63,7 +63,19 @@ difference and `--shuffle` on a difference beyond rounding:
   every possible-d-sep search sent to the worker pool.
 
 Method names select methods, as in `uv run python -m qa.identity PC GES --workers 4`, and `--seeds`
-sets the draws per dataset. SkewD and SkewD-MV run with the quality gate's search budget; their
+sets the draws per dataset.
+
+Two options the gate's datasets cannot reach have fits of their own, named for the method and the
+option, on data where each changes the answer. `possibly_separable="ambiguous"` runs PC, FCI,
+CD-NOD, FCI-JCI, IAMB, Inter-IAMB, MMPC (with `structure="cpdag"`, the graph that reads it), and
+PCMCI+, as `PC-ambiguous` and so on. Their data are four cohorts stacked into one table, 14
+variables and 2,000 rows, that no row bridges, and, for PCMCI+, a series of 6 variables and 600
+steps in which two variables are never measured at the same step. `degrees_of_freedom="nonempty"`
+runs PC, FCI, IAMB, Inter-IAMB, and MMPC with `chisq` and with `gsq`, as `PC-chisq-nonempty` and so
+on, on a discrete network of 12 variables with 3 to 5 categories and 250 rows, whose tables are
+sparse, the case where the two rules differ. They are refitted under `--shuffle` and, for PC, FCI,
+CD-NOD, and FCI-JCI, under `--workers`. A fit on data with missing values records no query counts,
+because the counter does not read the tests that delete rows per test. SkewD and SkewD-MV run with the quality gate's search budget; their
 larger fits, two draws each, took 362 s (`lsnm_pair_n1500`, 161 and 201 s) and 712 s
 (`anm_er_n1000_d6`, 644 and 68 s) on one AMD EPYC 7713 core, on top of their gate datasets' draws.
 
