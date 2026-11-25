@@ -482,9 +482,9 @@ def pcmci(
         small enough for the number of tests. ``"none"`` favors true links; it gives up control of
         the extra ones, which grow with the number of variables. On simulated linear-Gaussian VAR
         series, ``"fdr_bh"`` had fewer errors (missing plus extra lagged links) than ``"none"`` in
-        nearly every setting, more only on the smallest graphs; on the largest graphs ``"none"``
-        made more errors than the empty graph, nearly all of them extra links, while ``"fdr_bh"``
-        stayed far below it (`0.12.0 release card
+        most settings and more only in one with the smallest graphs; on the largest graphs
+        ``"none"`` made more errors than the empty graph, nearly all of them extra links, while
+        ``"fdr_bh"`` stayed far below it (`0.12.0 release card
         <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#fdr-control-in-pcmci-and-granger>`__).
         See Notes.
     indep_test : str or None, default=None
@@ -1808,9 +1808,9 @@ def granger(
         enough for the number of tests. ``"none"`` favors true edges; it gives up control of the
         extra ones, which grow with the number of variables. On simulated linear-Gaussian VAR
         series, ``"fdr_bh"`` had fewer errors (missing plus extra lagged edges) than ``"none"`` in
-        nearly every setting, more only on the smallest graphs; on the largest graphs ``"none"``
-        made more errors than the empty graph, nearly all of them extra edges, while ``"fdr_bh"``
-        stayed far below it (`0.12.0 release card
+        most settings and more only in one with the smallest graphs; on the largest graphs
+        ``"none"`` made more errors than the empty graph, nearly all of them extra edges, while
+        ``"fdr_bh"`` stayed far below it (`0.12.0 release card
         <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#fdr-control-in-pcmci-and-granger>`__).
         See Notes.
     knowledge : Knowledge or None, default=None
@@ -2138,9 +2138,9 @@ def dynotears(
     the paper's settings for its short series. Its centering, which the paper's loss leaves out,
     costs errors on short series whose noise has mean zero; the
     `0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#dynotears>`_ has the
-    numbers. The time grows faster than the cube of the number of variables, so fits of moderate
-    graphs take minutes on one core. The measured results are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    numbers. The time grows faster than the cube of the number of variables, so larger graphs take
+    minutes on one core. The measured results are a reference, not a hard limit: they change with
+    the data generator, the density, the method's settings, and the machine.
 
     References
     ----------

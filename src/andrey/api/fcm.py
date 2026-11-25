@@ -769,8 +769,8 @@ def score_matching(
     more accurate. Where links have a strong linear part, such as ``z + sin z``, the search ranks
     the sinks last: its order was close to a random one, and its graph could be farther from the
     truth than the empty graph; more rows or other kernel settings did not change the order, and
-    :func:`~andrey.cam` suits such data. Links the one kernel bandwidth does not resolve can make a
-    cause look like a leaf, and the leaf rule is exact only for Gaussian noise;
+    :func:`~andrey.cam` suits such data. Relations poorly resolved by a single kernel bandwidth can
+    make causes appear as leaves, and the leaf rule is exact only for Gaussian noise;
     :func:`~andrey.nogam` and :func:`~andrey.resit` drop that assumption. The order search's time
     grows with the cube of ``n_samples`` and its memory with the square. The pruning needs at least
     twice as many rows as columns: fewer rows, or a column with fewer than 3 distinct values, binary
@@ -1164,9 +1164,9 @@ def das(
 
     **Limitations.** On the papers' simulation with z-scored or rescaled columns, DAS made no more
     errors than the code published with the paper, and fewer than the empty graph at every measured
-    size, into the hundreds of variables. It reads standardized columns, so the result does not
-    depend on their units; on raw columns, whose variance grows along the causal order, the code
-    published with the paper made fewer errors on sparse graphs. The
+    size, large graphs included. It reads standardized columns, so the result does not depend on
+    their units; on raw columns, whose variance grows along the causal order, the code published
+    with the paper made fewer errors on sparse graphs. The
     `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#das>`_ has the numbers.
     Its SCORE order has the limits stated by :func:`~andrey.score_matching`: near a random order
     where links have a strong linear part, and exact only for Gaussian noise. Pruning cannot recover
@@ -1399,7 +1399,7 @@ def camuv(
     its ranks before the fit found the edge again in most fits. A column with fewer than 3 distinct
     values, binary columns included, raises ``ValueError``, and integer category codes are read as
     numbers, with a :class:`~andrey.DataTypeWarning`. Its cost grows with the square of the number
-    of variables, so large graphs take hours, and the time and memory of its kernel tests grow with
+    of variables, so large graphs are slow, and the time and memory of its kernel tests grow with
     the square of ``n_samples``. The
     `0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#cam-uv>`_ has the
     numbers. The measured results are a reference, not a hard limit: they change with the data
@@ -1569,8 +1569,8 @@ def skewd_mv(
     and gives up time. On the paper's skew-normal graphs it made as few errors as the code published
     with the paper, and fewer than the empty graph and than :func:`~andrey.pc` (KCI),
     :func:`~andrey.cam`, :func:`~andrey.nogam`, :func:`~andrey.score_matching`, and
-    :func:`~andrey.resit`, all five far faster; ``andrey.config(n_jobs)`` runs its conditional
-    models and their searches on threads, which cuts the wall time.
+    :func:`~andrey.resit`, all five faster; ``andrey.config(n_jobs)`` runs its conditional models
+    and their searches on threads, which cuts the wall time.
 
     Each column is standardized first [1]_. PC, order-independent [2]_, gives the class. Its DAGs
     orient the undirected edges with no directed cycle and no new collider [1]_, and are every

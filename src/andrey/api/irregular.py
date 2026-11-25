@@ -718,8 +718,8 @@ def cpcm(
         Notes. ``"gaussian"`` favors effects whose spread changes with the cause;
         ``"gaussian_fixed_scale"`` models the mean alone, an additive-noise family, and gives up
         such effects: on the paper's pairs whose noise's scale changes with the cause,
-        ``"gaussian_fixed_scale"`` named the true direction on at most about half of the pairs, on
-        some sets on almost none, and ``"gaussian"`` on nearly all (the
+        ``"gaussian_fixed_scale"`` named the true direction on little more than half of the pairs at
+        best, and on almost none on some sets, and ``"gaussian"`` on nearly all (the
         `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm>`__ has the
         numbers).
     seed : int or None, default=None

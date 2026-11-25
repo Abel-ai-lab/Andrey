@@ -610,9 +610,9 @@ def ages(
     true DAG. The skeleton is that of GES at the minimum penalty, so its missing and extra edges
     stay: on dense graphs with few or no weak edges the errors were not clearly below the empty
     graph's. A CPDAG of the path can hold an unshielded collider that the first lacks, so the DAGs
-    the result stands for need not be in the equivalence class of the GES CPDAG. A fit costs several
-    times one of :func:`~andrey.ges`. The measured results are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    the result stands for need not be in the equivalence class of the GES CPDAG. Fitting takes
+    several times longer than :func:`~andrey.ges`. The measured results are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -890,8 +890,8 @@ def gies(
     of intervened variables times the square of the variable count. Under the BIC the search never
     selects a parent set that fits its child exactly over the rows without an intervention on it.
     The categorical and mixed-data scores are not benchmarked with GIES yet. Every environment's
-    targets must be known: GIES reads no environment whose targets are unknown. The measured results
-    are a reference, not a hard limit: they change with the data generator, the density, the
+    intervention targets must be specified; GIES does not accept unknown targets. The measured
+    results are a reference, not a hard limit: they change with the data generator, the density, the
     method's settings, and the machine.
 
     References
@@ -2143,7 +2143,7 @@ def hc(
 
     **Limitations.** At the standard BIC (``ebic_gamma=0.0``) on simulated linear-Gaussian data, its
     errors stayed below the empty graph's on sparse graphs of moderate size, on denser graphs only
-    on the largest size measured, and at no size on dense graphs; the
+    at a single size, and at no size on dense graphs; the
     `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
     every setting. With fewer rows than columns the standard BIC is unreliable, and the search never
     selects a parent set that fits its child exactly. With ``env`` it is experimental and not
@@ -3150,13 +3150,13 @@ def calm(
     matrix, so a step's cost grows with the cube of the variable count. The paper's longer schedule
     made fewer errors on moderate graphs in far more time
     (`0.7.0 release card <https://andrey.abel.ai/docs/benchmarks/0.7.0.html#calm>`_). The fit is
-    nonconvex and can stop at a local optimum: on a collider whose two parents are independent, it
-    can return both edges reversed and an edge between the parents. Its result depends on the
-    columns' units unless ``standardize=True``. ``missing="em"`` is experimental and not benchmarked
-    yet, and it has no guarantee under values missing not at random; under it the screen's Fisher-Z
-    tests read the expected correlations as if every row were observed, so the screen keeps more
-    candidate edges than ``screen_alpha`` implies. The measured results are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    nonconvex and can stop at a local optimum: on an unshielded collider with independent parents,
+    it can reverse both edges and connect the parents. Its result depends on the columns' units
+    unless ``standardize=True``. ``missing="em"`` is experimental and not benchmarked yet, and it
+    has no guarantee under values missing not at random; under it the screen's Fisher-Z tests read
+    the expected correlations as if every row were observed, so the screen keeps more candidate
+    edges than ``screen_alpha`` implies. The measured results are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------

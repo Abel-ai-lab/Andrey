@@ -420,7 +420,7 @@ def pc(
     its run time grows combinatorially with the largest neighborhood; on the ANDES network its
     errors passed the empty graph's (`0.1.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.1.0.html#published-network-structures>`__). Test
-    errors can make the colliders it finds fit no DAG on the skeleton, even on small graphs: the
+    errors can produce colliders that fit no DAG on the skeleton, even on small graphs: the
     ``cpdag`` then has no consistent DAG extension, and a graph query such as ``markov_blanket``
     raises ``ValueError`` (`0.16.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.16.0.html#fci-fits-that-are-not-pags>`__).
@@ -2416,8 +2416,8 @@ def icp(
     common cause of the target and another variable can also add a false parent, and with a
     nonlinear effect of a parent the estimate rarely equals the true parents. With a small
     ``max_parents`` on many variables it found almost none of the true parents. Without
-    ``max_parents`` it tests every set of the other variables, so its cost doubles with each
-    variable. Under ``"exact"`` the guarantee does not cover noise that is not Gaussian. The
+    ``max_parents`` it tests every subset of the remaining variables, doubling the cost with each
+    added variable. Under ``"exact"`` the guarantee does not cover noise that is not Gaussian. The
     measured results are a reference, not a hard limit: they change with the data generator, the
     density, the method's settings, and the machine.
 

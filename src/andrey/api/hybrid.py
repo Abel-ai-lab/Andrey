@@ -281,7 +281,7 @@ def mmhc(
     **Limitations.** On simulated linear-Gaussian data, its errors stayed below the empty graph's in
     every measured setting, the closest on small, denser graphs; the
     `0.12.0 release card <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#mmhc>`_ has the
-    numbers. An edge the MMPC phase misses is never added, and the hill-climbing phase stops at a
+    numbers. Edges missed during the MMPC phase are never recovered, and hill climbing stops at a
     local optimum. MMPC tests each candidate against every subset of the current members, so its
     cost grows exponentially with the size of a variable's parents-and-children set.
     ``required_paths`` is experimental, and true path claims directed some edges of a wrong graph
@@ -567,9 +567,9 @@ def rsmax2(
     ``maximize="hc"``, its errors stayed below the empty graph's in every measured setting, the
     closest on small, denser graphs; the
     `0.12.0 release card <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#rsmax2>`_ has the
-    numbers. An edge the restrict phase misses is never added, and the maximize phase stops at a
-    local optimum. MMPC tests each candidate against every subset of the current members, so its
-    cost grows exponentially with the size of a variable's parents-and-children set; IAMB and
+    numbers. Edges missed during the restrict phase are never recovered, and the maximize phase
+    stops at a local optimum. MMPC tests each candidate against every subset of the current members,
+    so its cost grows exponentially with the size of a variable's parents-and-children set; IAMB and
     Inter-IAMB condition on the whole current blanket, so each of their tests needs more rows as the
     blankets grow. ``required_paths`` is experimental, and true path claims directed some edges of a
     wrong graph the wrong way and cannot restore a missed edge: a known edge belongs in ``required``
