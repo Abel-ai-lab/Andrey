@@ -275,14 +275,16 @@ def _shared_set_cases(seed: int, d: int = 60):
 def test_a_shared_set_agrees_with_each_query_to_rounding(test_class, seed):
     """From one factor of the set's block, every candidate's partial correlation agrees with the
     per-query inversion to 1e-12, every p-value above 1e-300 to 1e-9 relative and on the same side
-    of 0.05."""
+    of 0.05, and the call counts one test per candidate."""
     x = sample_scm(graph="erdos_renyi", d=60, n=300, seed=seed, density=3.0).data
     test = test_class(x)
     for target, ys, cond in _shared_set_cases(seed):
-        r, p = test.statistic_pvalues_given(target, ys.tolist(), cond.tolist())
+        with ci.counting_tests() as counted:
+            r, p = test.statistic_pvalues_given(target, ys.tolist(), cond.tolist())
         want_r, want_p = test.statistic_pvalues(
             np.full(len(ys), target), ys, np.tile(cond, (len(ys), 1))
         )
+        assert counted.n == len(ys)
         np.testing.assert_allclose(r, want_r, rtol=0.0, atol=1e-12)
         above = want_p > 1e-300
         np.testing.assert_allclose(p[above], want_p[above], rtol=1e-9, atol=0.0)
