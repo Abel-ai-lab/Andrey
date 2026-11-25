@@ -17,6 +17,8 @@ SET_LEARNERS = (
     "pcmb",
 )
 SEQUENTIAL = ("mb_by_mb", "cmb", "mmb_by_mmb")
+#: The learners whose targets in ``test_each_result_is_the_answer_of_its_own_call`` share a step.
+SHARING = ("mmpc", "hiton_pc", "hiton_mb", "mmmb", "pcmb", "cmb", "mmb_by_mmb")
 TARGETS = [5, 0, 3, 7]
 
 
@@ -72,8 +74,10 @@ def test_each_result_is_the_answer_of_its_own_call(method):
     for out, one in zip(outs, alone, strict=True):
         _same(out, one)
     counts = [one.metadata.get("n_tests") for one in alone]
-    if counts[0] is not None:  # a step two targets share is computed once
-        assert total.n <= sum(counts)
+    if method in SHARING:  # a step two targets share is computed once
+        assert total.n < sum(counts)
+    elif counts[0] is not None:
+        assert total.n == sum(counts)
 
 
 def test_icp_answers_each_target():
