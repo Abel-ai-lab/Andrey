@@ -1669,7 +1669,10 @@ listings, and calibration print JSON when piped and accept `--json` on a termina
 The command reference below is generated from the Typer app.
 
 ```{eval-rst}
+.. highlight:: text
+
 .. typer:: andrey.cli:app
    :prog: andrey
    :show-nested:
+   :preferred: text
 ```

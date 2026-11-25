@@ -1475,6 +1475,20 @@ def test_the_homepage_and_docs_styles_and_scripts_name_no_color(cards):
     assert tokens["--andrey-ground-amber"] == andrey.viz.LIGHT.categorical[1]
 
 
+def test_every_code_color_is_a_palette_token_at_aa_contrast_on_the_code_block():
+    # The docs' and the homepage's code colors: each a palette token, or that token mixed with ink
+    # only as far as 4.5:1 on the code block's surface_2 needs, in both themes.
+    code = runpy.run_path(str(ROOT / "docs" / "palette_css.py"))
+    for theme, palette in (("light", andrey.viz.LIGHT), ("dark", andrey.viz.DARK)):
+        tokens = {code["token_color"](palette, name) for name in code["CODE_TOKENS"].values()}
+        shades = {code["mix"](token, palette.ink, p) for token in tokens for p in range(101)}
+        rules = code["code_block"](".highlight", palette) + build.code_css("", theme)
+        colors = {c.lower() for c in re.findall(r"(?<![\w-])color: (#[0-9a-fA-F]{6})", rules)}
+        assert colors and colors <= shades, colors - shades
+        for color in colors:
+            assert code["contrast"](color, palette.surface_2) >= code["CODE_CONTRAST"], color
+
+
 def test_the_readme_banner_is_the_committed_rounded_svg_the_readme_links(cards):
     import base64
     import io
