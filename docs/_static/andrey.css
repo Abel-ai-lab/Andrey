@@ -1787,7 +1787,8 @@ html :is(div.highlight, .andrey-home) button.copybtn.o-tooltip--left::after {
 }
 
 /* A notebook's code cell is a code block like any other: MyST-NB's frame, fill, and green margin
-   around the block give way, so the block is the only box. */
+   around the block give way, so the block is the only box, and it keeps the hairline that MyST-NB
+   removes from `pre`. */
 .bd-content div.cell div.cell_input {
   --mystnb-source-bg-color: transparent;
   --mystnb-source-border-color: transparent;
@@ -1796,6 +1797,10 @@ html :is(div.highlight, .andrey-home) button.copybtn.o-tooltip--left::after {
   border: 0;
   border-radius: var(--andrey-radius-md);
   background: none;
+}
+
+.bd-content div.cell div.cell_input pre {
+  border: 1px solid var(--andrey-line);
 }
 
 /* A notebook's drawn output in the dark theme: the figures are drawn in the light palette, so
