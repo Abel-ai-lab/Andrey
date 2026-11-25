@@ -847,19 +847,19 @@ def cpcm(
 
     **Limitations.** On the paper's pairs of 1,000 and 2,000 rows, the forced direction was right as
     often as the code published with the paper and more often than a coin flip, except on Table 2's
-    Pareto pairs drawn by the authors' generator, whose effect no family the support rule picks
-    holds: there it was right on 38% and 47% of the pairs of two seed sets, as often as the authors'
-    code. The `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm>`__ has
-    the numbers. The family must be chosen: the paper's support rule and its sequential choice of a
-    family are not offered, and on location-scale and multiplicative pairs the support rule's family
-    misses the direction, so pass ``"gaussian"`` there (see ``family``). Under ``"pareto"``, when
-    the cause's largest value is thousands of times its median, the test of one direction can reject
-    where the authors' code does not, and the conservative estimate is not supported (see
-    ``alpha``). Each HSIC test builds matrices with one row and one column per sample, so time and
-    memory grow with the square of ``n_samples``. Under the count families, from means of a few
-    thousand that vary strongly with the cause, the true direction's test rejects too. The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    Pareto pairs drawn by the authors' generator, whose effect follows none of the families the
+    support rule can pick: there it was right on 38% and 47% of the pairs of two seed sets, as often
+    as the authors' code. The `0.19.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm>`__ has the numbers. The family must be
+    chosen: the paper's support rule and its sequential choice of a family are not offered, and on
+    location-scale and multiplicative pairs the support rule's family misses the direction, so pass
+    ``"gaussian"`` there (see ``family``). Under ``"pareto"``, when the cause's largest value is
+    thousands of times its median, the test of one direction can reject where the authors' code does
+    not, and the conservative estimate is not supported (see ``alpha``). Each HSIC test builds
+    matrices with one row and one column per sample, so time and memory grow with the square of
+    ``n_samples``. Under the count families, from means of a few thousand that vary strongly with
+    the cause, the true direction's test rejects too. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------

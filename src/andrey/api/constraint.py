@@ -2330,7 +2330,7 @@ def icp(
         predicts each environment's rows, and tests the prediction errors with Chow's F-test, exact
         for Gaussian noise. ``"exact"`` favors that exact level and fewer false parents when an
         intervention ``targets`` does not name hits the target; it gives up its guarantee when the
-        noise is not Gaussian. ``"approximate"`` gives up the exact level; it had the fewer false
+        noise is not Gaussian. ``"approximate"`` gives up the exact level; it had fewer false
         parents with a hidden common cause. On simulated linear Gaussian data drawn as in the
         paper's simulation study [1]_ (two environments of 100 to 500 rows, 5 to 12 variables), the
         estimate held a variable outside the true parents in 11% of the fits under ``"exact"`` and

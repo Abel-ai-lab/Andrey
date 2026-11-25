@@ -413,7 +413,7 @@ def resit(
     removal test can reject: on Sachs's 7,466 rows it kept all 55 possible edges. Noise whose scale
     changes with the parents and linear Gaussian data lie outside its model, and there its errors
     were above the empty graph's in most measured settings. A cause with a long tail can reverse its
-    edge, which replacing the cause by its ranks before the fit corrected in the measured pairs. A
+    edge; replacing the cause by its ranks before the fit corrected this in the measured pairs. A
     column with fewer than 3 distinct values, binary columns included, raises ``ValueError``. The
     `0.13.0 release card <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#resit>`_ compares it
     with its authors' code. The numbers are a reference, not a hard limit: they change with the data

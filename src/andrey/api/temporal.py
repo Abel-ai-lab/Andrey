@@ -215,18 +215,16 @@ def varma_lingam(
     **Limitations.** It assumes linear effects and non-Gaussian noise, and with ``prune=False``
     every lag graph is complete. With ``prune=True``, the median F1 score of its directed
     cross-links, which is 0 for the empty graph, was at least 0.66 through 40 variables, or 20 with
-    series five times as long, where fits of the next size ran past 1 h on 4 cores (`0.10.0
-    release card
-    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#methods-on-their-own-axes>`_). With
+    series five times as long, where fits of the next size ran past 1 h on 4 cores (`0.10.0 release
+    card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#methods-on-their-own-axes>`_). With
     ``order=(1, 1)``, its median errors stayed below the empty graph's from 300 time steps and
     exceeded them at 100 steps from 10 variables on (`0.5.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.5.0.html#varma-lingam>`_). The likelihood fit can stop
-    short of convergence without a warning, as after a failed line search, which a larger
-    ``max_iter`` does not prevent, and where it stops depends on the numerical libraries and the
-    CPU's BLAS kernels, so the same series can give a different graph on another machine. With
-    ``criterion`` set, it fits one model for every ``(p, q)`` in the grid. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    short of convergence without a warning, as after a failed line search; a larger ``max_iter``
+    does not prevent this. Where it stops depends on the numerical libraries and the CPU's BLAS
+    kernels, so the same series can give a different graph on another machine. With ``criterion``
+    set, it fits one model for every ``(p, q)`` in the grid. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -2142,8 +2140,8 @@ def dynotears(
     the causal order the fit gains from that order, which ``standardize=True`` gives up. On the
     paper's design [1]_ with 500 time steps, its errors at the defaults stayed far below the empty
     graph's from 5 to 100 variables. At 50 steps the defaults made more errors than the empty graph
-    from 20 variables on, so set ``lambda1=0.2`` and ``lag_threshold=0.2``, the paper's settings for
-    50 steps, for a short series. Its centering, which the paper's loss leaves out, costs errors on
+    from 20 variables on; short series should use ``lambda1=0.2`` and ``lag_threshold=0.2``, the
+    paper's settings for 50 steps. Its centering, which the paper's loss leaves out, costs errors on
     short series whose noise has mean zero; the `0.14.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#dynotears>`_ has the numbers. The time grows
     faster than the cube of the number of variables: at 500 steps on one core, the median fit took
