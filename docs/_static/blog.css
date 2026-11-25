@@ -265,6 +265,126 @@ ul.ablog-archive {
   display: none;
 }
 
+/* ABlog's post cards on a tag's and the author's pages: each post under a hairline, as on the
+   archive's list, its title, then its date, author, and tags in one muted line like a post's
+   byline, the tags as its pills, and "Read more" upright. */
+.bd-article .ablog-post {
+  padding-block: 1.25rem;
+  border-top: 1px solid var(--andrey-line);
+}
+
+.bd-article .ablog-post > hr {
+  display: none;
+}
+
+.bd-article .ablog-post ul.ablog-archive {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.85rem;
+  margin: 0 0 0.75rem;
+  color: var(--andrey-muted);
+  font-size: 0.95rem;
+}
+
+.bd-article .ablog-post ul.ablog-archive :is(i.fa, li > span:has(> i.fa)) {
+  display: none;
+}
+
+.bd-article .ablog-post .ablog__postcard2 {
+  display: contents;
+}
+
+.bd-article .ablog-post .ablog__postcard2 > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.bd-article .ablog-post [id~="ablog__author"] a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.bd-article .ablog-post [id~="ablog__author"] a:hover {
+  color: var(--andrey-accent);
+}
+
+.bd-article .ablog-post [id~="ablog__tags"] a {
+  padding: 0.1rem 0.55rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: 999px;
+  color: var(--andrey-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  text-decoration: none;
+}
+
+.bd-article .ablog-post [id~="ablog__tags"] a:hover {
+  border-color: var(--andrey-accent);
+  color: var(--andrey-accent);
+}
+
+.bd-article .ablog-post-expand em {
+  font-style: normal;
+}
+
+/* The archive and the tag index: each heading a section title in the ink, and each post a row of
+   its date and its title under a hairline, as on the blog's front page. ABlog's dash between them
+   is set at no size. */
+.bd-article .ablog__catalog_header > h2 {
+  margin: 2rem 0 0.5rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.bd-article .ablog__catalog_header > h2 a {
+  color: var(--andrey-ink);
+  text-decoration: none;
+}
+
+.bd-article .ablog__catalog_header > h2 a:hover {
+  color: var(--andrey-accent);
+}
+
+.bd-article .ablog__catalog_post > p {
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: 1rem;
+  margin: 0;
+  padding-block: 0.55rem;
+  border-top: 1px solid var(--andrey-line);
+  font-size: 0;
+}
+
+.bd-article .ablog__catalog_post > p > span {
+  color: var(--andrey-muted);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.bd-article .ablog__catalog_post > p > a {
+  color: var(--andrey-ink);
+  font-size: 1rem;
+  text-decoration: none;
+}
+
+.bd-article .ablog__catalog_post > p > a:hover {
+  color: var(--andrey-accent);
+}
+
+/* A post's links to the previous and next posts: the chevron sits outside the underline. */
+.ablog__prev-next > span a {
+  text-decoration: none;
+}
+
+.ablog__prev-next > span a > span {
+  text-decoration: underline;
+  text-decoration-thickness: max(1px, 0.0625rem);
+  text-underline-offset: 0.1578em;
+}
+
 /* The 0.7.0 post's column-order figure (docs/blog/0.7.0/order.html): the data's true graph, the
    column-order rule's board, a column per data column with each collider under the column it points
    into, and the p-value rule's list, each beside the graph it returns. docs/_static/column-order.js

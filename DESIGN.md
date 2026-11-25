@@ -56,6 +56,23 @@ is the sole accent. Over the art the accent is the ground's amber; amber on the 
 the `--andrey-ground-*` and `--andrey-*` custom properties (`site/grain.py`,
 `docs/palette_css.py`); no stylesheet specifies a hex value.
 
+On the website, selected text sits on a tint of the accent, and a soft tint of `amber_text` marks
+the target of a link (an API entry reached by its anchor) and a searched word. Code takes the
+palette too (`code_style` in `docs/palette_css.py`, for the docs and the homepage): text, names,
+and operators in `ink`, comments and a console's output in `muted`, keywords in `categorical-5`,
+strings in `categorical-3`, numbers and constants in `categorical-7`, functions and classes in
+`categorical-6`, and errors in `categorical-4`. Each reads at 4.5:1 or more on the code block's
+`surface_2` in both themes; a color that falls short is mixed with `ink`, the smallest share that
+reaches it. The accent and amber color no code.
+
+### Boxes
+
+A box on the website takes the docs index's cards' style: a `surface` fill, a 1px `line` border,
+the radius tokens (`--andrey-radius-sm`, `-md`, `-lg`), and no shadow; under the pointer its border
+turns `accent`. The cards, the Back to top button, the AI statement, notes, the color-mode menu and
+the header's tooltips, badges, and the search page's field follow it, and a notebook's code cell is
+a plain code block. A keyboard focus ring is a 2px `accent` outline just outside the element.
+
 ### Art
 
 Every cover uses engraved line art: thin, even white and pale-cobalt lines on a flat cobalt ground
@@ -106,7 +123,7 @@ Each token is a field of `Palette`, with one value in `andrey.viz.LIGHT` and one
 | `edge_undirected` | orientation unknown (CPDAG) |
 | `edge_bidirected` | a hidden common cause (PAG) |
 | `edge_partial` | a circle endpoint (PAG) |
-| `amber_text` | amber on `paper`, such as Andrey's marks in the homepage's comparison: darker in the light theme |
+| `amber_text` | amber on `paper`, such as Andrey's marks in the homepage's comparison: darker in the light theme; tinted, a link's target and a searched word on the website |
 
 ### Charts
 

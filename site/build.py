@@ -74,7 +74,8 @@ RELEASES = (
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 
-palette_block = runpy.run_path(str(DOCS / "palette_css.py"))["palette_block"]
+_palette_css = runpy.run_path(str(DOCS / "palette_css.py"))
+palette_block, code_style = _palette_css["palette_block"], _palette_css["code_style"]
 # The number formats the live demo shares.
 _formatting = runpy.run_path(str(SITE / "formatting.py"))
 _why_fast = runpy.run_path(str(SITE / "why_fast.py"))
@@ -2659,8 +2660,8 @@ def comparison_page() -> str:
     )
 
 
-# The docs' code colors (pydata-sphinx-theme's defaults), so code reads the same on every page.
-CODE_STYLES = {"light": "a11y-high-contrast-light", "dark": "a11y-high-contrast-dark"}
+# The docs' code colors (docs/palette_css.py), so code reads the same on every page.
+CODE_STYLES = {"light": code_style(andrey.viz.LIGHT), "dark": code_style(andrey.viz.DARK)}
 
 
 def code_html(source: str, language: str) -> str:
