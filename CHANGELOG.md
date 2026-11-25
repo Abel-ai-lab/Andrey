@@ -15,7 +15,7 @@ names its pull request.
 - `andrey.data.generate` and `andrey.data.Ensemble` are removed, as their warning said they would be
   in 0.16.0. A loop over `SCM.sample` draws the same datasets:
   `[scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]` replaces
-  `generate(Ensemble(scms=scms, seeds=range(10), n=500))`. ([#1220])
+  `generate(Ensemble(scms=scms, seeds=range(10), n=500))`. ([#1221])
 
 ### Changed
 
@@ -2954,4 +2954,4 @@ First alpha release.
 [#1165]: https://github.com/Abel-ai-lab/Andrey/pull/1165
 [#1214]: https://github.com/Abel-ai-lab/Andrey/pull/1214
 [#1217]: https://github.com/Abel-ai-lab/Andrey/pull/1217
-[#1220]: https://github.com/Abel-ai-lab/Andrey/pull/1220
+[#1221]: https://github.com/Abel-ai-lab/Andrey/pull/1221
