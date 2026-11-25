@@ -20,9 +20,9 @@ import pytest
 
 import andrey
 from andrey.api._method import _not_tested_notice
-from andrey.constraint.blanket import LocalSearch
+from andrey.constraint.blanket import LocalSearch, local_search
 from andrey.core import ARROW, ci
-from andrey.core.ci_missing import NOT_TESTED
+from andrey.core.ci_missing import NOT_TESTED, rows_tested
 from andrey.temporal.pcmci import pc1
 
 COHORT = 300
@@ -450,3 +450,55 @@ def test_lpcmci_conditions_no_test_on_a_link_never_observed_together(monkeypatch
     (search,) = set(searches)
     # Only the tests of A and B lack rows: no test of another link conditions on A given B.
     assert search.skipped and all({i, j} == {a, b} for i, j, _ in search.skipped)
+
+
+def _oracle(answers: dict) -> object:
+    """A test of target 0 answering ``answers[(candidate, sorted set)]``, any other query not
+    tested."""
+
+    def test(x, y, condition_set=()):
+        return answers.get((max(x, y), tuple(sorted(condition_set))), NOT_TESTED)
+
+    return test
+
+
+def test_fast_iamb_keeps_a_dependent_candidate_whose_last_test_was_not_tested():
+    """1, 2, and 3 test dependent on 0 alone; the sparse-table rule admits 1 and 2, the shrink drops
+    1 given 2, and 3 is not tested given 2. No test with rows separated 3, so it stays, as in IAMB,
+    and the shrink keeps both."""
+    answers = {(1, ()): 0.0, (2, ()): 0.001, (3, ()): 0.01, (1, (2,)): 0.5, (2, (3,)): 0.001}
+    search = LocalSearch(_oracle(answers), [0, 1, 2, 3], 0.05, levels=np.full(4, 2), n=50)
+    assert search.run("fast_iamb", 0) == ([2, 3], {1: (2,)})
+    assert not search.undecided
+
+
+def test_fast_iamb_leaves_out_a_candidate_no_test_with_rows_decided():
+    """3 is never tested: it is undecided, and the member 1 is flagged beside it."""
+    search = LocalSearch(_oracle({(1, ()): 0.0, (2, ()): 0.5}), [0, 1, 2, 3], 0.05)
+    assert search.run("fast_iamb", 0) == ([1], {2: ()})
+    assert search.undecided == {(0, 3)}
+
+
+@pytest.mark.parametrize(
+    "name", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "get_pcd"]
+)
+def test_a_run_flags_each_member_beside_an_undecided_candidate(name):
+    """B's run never tests A, which it never observes: A is undecided, and a set holding A, never
+    tested, might separate B from its member S1, so the pair counts a set not tested."""
+    x = _cohorts(0).to_numpy()  # columns S1, S2, S3, A, B
+    search = local_search(x, alpha=0.05, indep_test="fisherz")
+    with rows_tested() as rows:
+        members, _ = search.run(name, 4)
+    assert 0 in members and 3 not in members
+    assert search.undecided == {(4, 3)}
+    assert (0, 4) in rows.possibly_separable(np.ones((5, 5), dtype=bool))
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb", "pcmb"],
+)
+def test_a_target_set_lists_undecided_pairs_and_flags_its_members_beside_them(name):
+    out = getattr(andrey, name)(_cohorts(0), target="B")
+    assert ["A", "B"] in out.metadata["undecided_pairs"]
+    assert ["B", "S1"] in out.metadata["possibly_separable"]
