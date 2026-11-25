@@ -45,6 +45,7 @@ whose Reproduce table lists the driver.
 | SkewD direction test | `skewd_pairs.py` | SkewD, both criteria; LOCI as context | the authors' SkewD code (both criteria) | |
 | [Categorical data](comparisons/categorical.md) | `discrete_cpu.py` | PC, GES, BOSS, GRaSP, hill climbing | causal-learn, bnlearn, pgmpy | 0.6.0, 0.8.0 |
 | [Missing data](comparisons/missing-data.md) | `missing_cpu.py` | PC with MVPC; GES, XGES, BOSS, GRaSP, hill climbing, Tabu search, exact search, NOTEARS, DAGMA, and CALM with structural EM; test-wise PC, listwise deletion, and mean imputation | the MVPC authors' R code, MissDAG, bnlearn's `structural.em`, Tetrad's EM covariance policy | 0.16.0, 0.17.0 |
+| [Datasets with overlapping variables](overlapping_variables/README.md) | `overlapping_variables/` (`run.py`, `summary.py`) | PC, FCI, PCMCI, and PCMCI+ on cohorts that measure overlapping variable sets, with a test without enough rows skipped; PC and FCI also with `possibly_separable="ambiguous"` | the same searches with such a test answered p = 1 or p = 0, with columns dropped until every pair shares rows, and on the complete data | 0.19.0 |
 | [Path and confounder claims](comparisons/knowledge-paths.md) | `knowledge_paths.py` | The 22 methods that honor them, from PC to multi-group DirectLiNGAM, with `required_paths`, `forbidden_paths`, and `confounded`, against the same fit without them | enumeration of every small graph; Tetrad, pcalg, tigramite, lingam, bnlearn, and causal-learn given the same knowledge | |
 | [Mixed data](comparisons/mixed.md) | `mixed_cpu.py` | PC, GES, hill climbing | Tetrad, bnlearn | 0.6.0 |
 | [Nonlinear conditional-independence tests](comparisons/nonlinear-ci.md) | `nonlinear_ci_cpu.py`, `nonlinear_ci_queries.py` | PC and FCI with KCI, RCoT, CMIknn, GPDC | causal-learn, tigramite, pcalg with RCIT | 0.8.0 |
@@ -111,7 +112,10 @@ same data. Its SkewD rows come from [`published/0.19.0/skewd.json`](published/0.
 SkewD under both criteria and SkewD-MV against the authors' recorded outputs on the paper's pairs
 and graphs, which also holds the fresh run of the authors' code that checks those outputs, the
 floors, the fresh graph seeds, and LOCI, ANM, PNL, CAM, and five graph methods on the same data. The
-path and confounder claims are in no release
+0.19.0 card's benchmark on datasets with overlapping variables has no summary under `published/`:
+[`overlapping_variables/summary.py`](overlapping_variables/summary.py) writes its two tables from a
+card-size run, and its [README](overlapping_variables/README.md) says which figures of the card it
+reproduces. The path and confounder claims are in no release
 summary: [`published/0.16.0/knowledge-paths.json`](published/0.16.0/knowledge-paths.json) holds the
 rows of the first eight methods and
 [`published/0.17.0/knowledge-paths.json`](published/0.17.0/knowledge-paths.json) those of the other
