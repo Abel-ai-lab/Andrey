@@ -547,11 +547,68 @@ def test_counting_records_the_exact_search_scores(x: np.ndarray) -> None:
 
 
 def test_every_supported_method_is_fitted_on_its_datasets() -> None:
-    assert set(identity.FITS) - set(identity.TARGET_LISTS) == set(qg.SUPPORTED)
+    extra = set(identity.TARGET_LISTS) | set(identity.OPTIONS)
+    assert set(identity.FITS) - extra == set(qg.SUPPORTED)
     assert set(identity.TARGET_LISTS.values()) <= set(qg.SUPPORTED)
     assert set(identity.TARGET_LISTS) <= set(identity.WORKER_METHODS)
-    fitted = [identity.TARGET_LISTS.get(m, m) for m in identity.FITS]
+    fitted = [identity.TARGET_LISTS.get(m, m) for m in identity.FITS if m not in identity.OPTIONS]
     assert all(m in identity.LARGER or m in identity.UNKNOWN_TARGETS for m in fitted)
+
+
+def test_each_option_fit_names_a_supported_method_and_its_own_data() -> None:
+    """Both options of 0.19.0 are fitted: ``"ambiguous"`` on data with missing values, and
+    ``"nonempty"`` on discrete data, each on a dataset of its own."""
+    options = {name: next(iter(o.options)) for name, o in identity.OPTIONS.items()}
+    assert set(options.values()) == {"possibly_separable", "degrees_of_freedom"}
+    for name, option in identity.OPTIONS.items():
+        assert option.method in qg.SUPPORTED
+        assert option.dataset in identity.OPTION_DRAWS
+        assert identity.datasets(name) == (option.dataset,)
+        x = identity.draws(option.dataset)[0].data
+        if options[name] == "possibly_separable":
+            assert np.isnan(x).any()
+        else:
+            assert not np.isnan(x).any() and np.array_equal(x, np.round(x))
+    nonempty = [n for n, key in options.items() if key == "degrees_of_freedom"]
+    assert {identity.OPTIONS[n].method for n in nonempty} >= {"PC", "FCI"}
+    assert {n.split("-")[1] for n in nonempty} == {"chisq", "gsq"}
+
+
+def test_no_row_of_the_cohort_draws_measures_both_ends_of_the_cohorts() -> None:
+    """No row observes a column of 4-6 with one of 10-13: those pairs stay undecided."""
+    for draw in identity.draws("cohorts_d14_n2000"):
+        observed = ~np.isnan(draw.data)
+        assert observed[:, :4].all()
+        assert not (observed[:, 4:7].any(axis=1) & observed[:, 10:14].any(axis=1)).any()
+        assert observed.any(axis=1).all() and (~observed).any(axis=1).all()
+
+
+@pytest.mark.parametrize("name", list(identity.OPTIONS))
+def test_each_option_changes_the_answer_on_a_draw_of_its_data(name: str) -> None:
+    """The option is fitted where it matters: the same call at the option's default returns a
+    different answer on at least one of the first two draws."""
+    option = identity.OPTIONS[name]
+    with andrey.config(backend="numpy", n_jobs=1):
+        differs = []
+        for draw in identity.draws(option.dataset)[: identity.SEEDS]:
+            x = np.ascontiguousarray(draw.data)
+            differs.append(
+                identity.digest(option.call(x)) != identity.digest(option.call(x, **option.options))
+            )
+    assert any(differs)
+
+
+@pytest.mark.parametrize("name", ["PC-ambiguous", "CDNOD-ambiguous", "PC-gsq-nonempty"])
+def test_an_option_fit_gives_the_same_graph_in_any_column_order_on_any_workers(name: str) -> None:
+    """The lists of pairs that name columns, ``possibly_separable`` and ``undecided_pairs``, are
+    left out of the column-order comparison, as the other lists of nodes are."""
+    assert {"possibly_separable", "undecided_pairs", "never_observed_together"} <= set(
+        identity.NODE_LISTS
+    )
+    rows, findings = identity.run([name], seeds=1, shuffle=2, workers=2)
+    assert findings == []
+    assert {r["method"] for r in rows} == {name}
+    assert {(r["permutation"], r["workers"]) for r in rows} == {(0, 1), (1, 1), (2, 1), (0, 2)}
 
 
 def test_pnl_is_refitted_on_workers_and_gives_the_same_bits() -> None:
