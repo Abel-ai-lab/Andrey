@@ -75,8 +75,12 @@ html[data-theme="dark"] {
   --pst-color-primary-bg: color-mix(in srgb, var(--andrey-accent) 14%, transparent);
   --pst-color-secondary-bg: color-mix(in srgb, var(--andrey-accent) 14%, transparent);
   --pst-color-accent-bg: color-mix(in srgb, var(--andrey-accent) 14%, transparent);
-  /* inline code takes the categorical purple, not the cobalt, so code never reads as a link */
+  /* inline code takes the categorical purple, not the cobalt, so code never reads as a link; code
+     that is a link, such as a cross-reference to the API, takes the link's cobalt */
   --pst-color-inline-code: var(--andrey-categorical-5);
+  --pst-color-link-higher-contrast: var(--andrey-accent);
+  /* the anchor's target and a searched word: a soft tint of the amber, the color of "fast" */
+  --pst-color-target: color-mix(in srgb, var(--andrey-amber-text) 22%, transparent);
 
   /* grounds: the page IS the figure's paper, so a `background=True` SVG composites seamlessly */
   --pst-color-background: var(--andrey-paper);
@@ -88,12 +92,76 @@ html[data-theme="dark"] {
   /* `--pst-color-heading` derives from this, so headings follow without a second override */
   --pst-color-text-base: var(--andrey-ink);
   --pst-color-text-muted: var(--andrey-muted);
+  /* icons and badges the theme sets in its own near-black or near-white */
+  --pst-color-muted: var(--andrey-muted);
+
+  /* a notebook's dataframe: the documentation tables' ink, hairlines, and row tint, no zebra */
+  --pst-color-table: var(--andrey-ink);
+  --pst-color-table-heading-bg: transparent;
+  --pst-color-table-outer-border: var(--andrey-line);
+  --pst-color-table-inner-border: color-mix(in srgb, var(--andrey-line) 55%, transparent);
+  --pst-color-table-row-zebra-low-bg: transparent;
+  --pst-color-table-row-zebra-high-bg: transparent;
+  --pst-color-table-row-hover-bg: var(--andrey-surface-2);
 }
 
-/* pydata keeps the admonition states (info / warning / danger / success), the scroll target, and
-   the shadow alpha, base and `-bg` together. The palette's edge colors carry graph meaning (amber
-   is "orientation unknown"), which would misread as a UI state, and pydata's own set is
-   contrast-tested. */
+/* pydata keeps the admonition states (info / warning / danger / success) and the shadow alpha,
+   base and `-bg` together. The palette's edge colors carry graph meaning (amber is "orientation
+   unknown"), which would misread as a UI state, and pydata's own set is contrast-tested. The
+   admonitions themselves take the cards' shape and a note the accent (see "admonitions"). */
+
+/* ---------- selection, focus, hover, and the skip link (every page) ---------- */
+/* Selected text sits on a tint of the accent and keeps its own color. */
+::selection {
+  background-color: color-mix(in srgb, var(--andrey-accent) 25%, transparent);
+  color: inherit;
+}
+
+/* One focus ring for the keyboard: a 2px accent outline just outside the element, as the
+   documentation tree, the phone's menu, and the footer draw their own. pydata's thicker rings
+   and its box-shadow rings on links, buttons, and icons give way to it. */
+:focus-visible,
+html .nav-link:focus-visible,
+html .btn:focus-visible,
+html body .pst-navbar-icon:focus-visible,
+html body #pst-back-to-top:focus-visible,
+html div.highlight button.copybtn:focus-visible {
+  outline: 2px solid var(--andrey-accent);
+  outline-offset: 2px;
+}
+
+html .nav-link:focus-visible,
+html .btn:focus-visible {
+  box-shadow: none;
+}
+
+/* A card is one link stretched over it, so the ring goes around the card. */
+.sd-card:has(.sd-stretched-link:focus-visible) {
+  outline: 2px solid var(--andrey-accent);
+  outline-offset: 2px;
+}
+
+/* A link's underline stays its resting weight under the pointer; only its color changes. */
+html a:hover,
+html ul.bd-breadcrumbs li.breadcrumb-item a:hover {
+  text-decoration-thickness: max(1px, 0.0625rem);
+}
+
+/* The "Skip to main content" link, on the first Tab: a bar of the surface over a hairline, its
+   link in the accent, in place of the theme's warning orange. */
+html .skip-link {
+  border-bottom: 1px solid var(--andrey-line);
+  background-color: var(--andrey-surface);
+}
+
+html .skip-link a {
+  color: var(--andrey-accent) !important;
+}
+
+html .skip-link a:focus-visible {
+  outline: 2px solid var(--andrey-accent);
+  outline-offset: 2px;
+}
 
 /* ---------- navigation ---------- */
 /* pydata sizes this column at 25% of the page, 352px at full width, mostly empty for our short
@@ -343,6 +411,58 @@ html[data-theme="dark"] .bd-header ul.navbar-nav > li.nav-item > .nav-link {
   column-gap: calc(var(--nav-step) / 2);
 }
 
+/* pydata's underline bar under an icon button on hover: the round tint marks it instead, in the
+   header and in the phone's menu. */
+.bd-header .pst-navbar-icon::before,
+.bd-sidebar-primary .pst-navbar-icon::before {
+  display: none;
+}
+
+/* The color-mode menu, from the header or the phone's menu: a small box of the cards' surface,
+   hairline, and ink, its items tinted under the pointer and the chosen mode in the accent. The
+   theme's dark variant of the menu is set the same way. */
+html .dropdown-menu,
+html .dropdown-menu-dark {
+  --bs-dropdown-bg: var(--andrey-surface);
+  --bs-dropdown-color: var(--andrey-ink);
+  --bs-dropdown-border-color: var(--andrey-line);
+  --bs-dropdown-border-radius: var(--andrey-radius-md);
+  --bs-dropdown-inner-border-radius: calc(var(--andrey-radius-md) - 1px);
+  --bs-dropdown-box-shadow: none;
+  --bs-dropdown-padding-x: 0.3rem;
+  --bs-dropdown-padding-y: 0.3rem;
+  --bs-dropdown-item-border-radius: var(--andrey-radius-sm);
+  --bs-dropdown-link-color: var(--andrey-ink);
+  --bs-dropdown-link-hover-color: var(--andrey-ink);
+  --bs-dropdown-link-hover-bg: var(--andrey-surface-2);
+  --bs-dropdown-link-active-color: var(--andrey-accent);
+  --bs-dropdown-link-active-bg: color-mix(in srgb, var(--andrey-accent) 14%, transparent);
+  font-size: 0.875rem;
+}
+
+html .dropdown-menu .dropdown-item {
+  gap: 0.25rem;
+  border-radius: var(--bs-dropdown-item-border-radius);
+}
+
+/* The header's tooltips (Search, Color mode, GitHub): the same small box, in place of the theme's
+   black one, with no arrow. */
+html .tooltip {
+  --bs-tooltip-bg: var(--andrey-surface);
+  --bs-tooltip-color: var(--andrey-ink);
+  --bs-tooltip-border-radius: var(--andrey-radius-sm);
+  --bs-tooltip-opacity: 1;
+  --bs-tooltip-font-size: 0.8rem;
+}
+
+html .tooltip .tooltip-inner {
+  border: 1px solid var(--andrey-line);
+}
+
+html .tooltip .tooltip-arrow {
+  display: none;
+}
+
 /* Search is a ghost button with its label and shortcut, the shortcut as a faint key cap. */
 .bd-header .search-button-field {
   padding-inline: 0.65rem 0.4rem;
@@ -460,6 +580,74 @@ html[data-theme="dark"] .bd-header ul.navbar-nav > li.nav-item > .nav-link {
   border-radius: 18px;
 }
 
+/* The search page's own field is the dialog's pill on the page: the cards' surface and hairline,
+   the same key caps, and the same soft accent ring while it has focus. Its results sit under
+   hairlines, in line with the field. */
+.bd-search-container form.bd-search {
+  height: 3.25rem;
+  padding-inline: 1.2rem 0.85rem;
+  gap: 0.8rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: 999px;
+  background: var(--andrey-surface);
+  transition: border-color var(--andrey-dur) var(--andrey-ease),
+              box-shadow var(--andrey-dur) var(--andrey-ease);
+}
+
+.bd-search-container form.bd-search:focus-within {
+  border-color: color-mix(in srgb, var(--andrey-accent) 45%, var(--andrey-line));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--andrey-accent) 18%, transparent);
+}
+
+.bd-search-container form.bd-search .fa-magnifying-glass,
+.bd-search-container form.bd-search svg {
+  position: static;
+  color: var(--andrey-muted);
+  font-size: 1rem;
+}
+
+.bd-search-container form.bd-search input.form-control {
+  height: 100%;
+  padding: 0;
+  background: transparent;
+  color: var(--andrey-ink);
+  font: 400 1.05rem/1 var(--andrey-font-sans);
+}
+
+.bd-search-container form.bd-search input.form-control:focus-visible {
+  outline: none;
+}
+
+.bd-search-container form.bd-search input.form-control::placeholder {
+  color: var(--andrey-muted);
+}
+
+.bd-search-container .search-button__kbd-shortcut {
+  gap: 0.15rem;
+  margin: 0;
+  font-size: 0;
+}
+
+.bd-search-container .search-button__kbd-shortcut kbd {
+  margin: 0;
+  padding: 0.14rem 0.36rem;
+  border: 1px solid color-mix(in srgb, var(--andrey-ink) 12%, transparent);
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--andrey-muted);
+  font: 500 0.7rem/1 var(--andrey-font-sans);
+}
+
+.bd-search-container ul.search {
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.bd-search-container ul.search li {
+  border-top-color: var(--andrey-line);
+}
+
 /* The menu's own search button shows only in the phone's menu. */
 .bd-header .drawer-search {
   display: none;
@@ -476,6 +664,33 @@ html[data-theme="dark"] .bd-header ul.navbar-nav > li.nav-item > .nav-link {
 .bd-sidebar-primary .drawer-search > span {
   display: flex;
   margin: 0;
+}
+
+/* Under the pointer, the menu's search button takes the cards' accent border, not the theme's
+   ring. */
+.bd-sidebar-primary .drawer-search:hover {
+  border-color: var(--andrey-accent);
+  box-shadow: none;
+}
+
+/* The menu's color-mode and GitHub buttons: the header's glyph size, and no caret. */
+.bd-sidebar-primary .theme-switch-button::after {
+  display: none;
+}
+
+.bd-sidebar-primary .theme-switch-button svg,
+.bd-sidebar-primary .navbar-icon-links svg {
+  width: 1rem;
+  height: 1rem;
+  font-size: 1rem;
+}
+
+/* The phone's menu opens over the page dimmed and blurred, as the search dialog does. */
+#pst-primary-sidebar-modal::backdrop,
+#pst-secondary-sidebar-modal::backdrop {
+  background-color: color-mix(in srgb, var(--andrey-ground-navy) 35%, transparent);
+  -webkit-backdrop-filter: blur(6px) saturate(1.2);
+  backdrop-filter: blur(6px) saturate(1.2);
 }
 
 /* In the phone's menu, the site's sections are rows like the documentation tree's under them: the
@@ -1544,6 +1759,66 @@ code.literal {
   padding: 0.1em 0.35em;
 }
 
+/* The copy button on every code block, the homepage's too (sphinx-copybutton): the block's own
+   `surface-2` with a muted icon, `line` and the ink under the pointer, and a tick in the accent
+   for the two seconds after a copy. The pointer's tooltip already names the button and the tick
+   confirms the copy, so the button's own "Copy" tooltip stays hidden. */
+html :is(div.highlight, .andrey-home) button.copybtn {
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--andrey-radius-sm);
+  background-color: var(--andrey-surface-2);
+  color: var(--andrey-muted);
+}
+
+html :is(div.highlight, .andrey-home) button.copybtn:hover,
+html :is(div.highlight, .andrey-home) button.copybtn:hover:not(.success) {
+  background-color: var(--andrey-line);
+  color: var(--andrey-ink);
+}
+
+html :is(div.highlight, .andrey-home) button.copybtn.success {
+  color: var(--andrey-accent);
+}
+
+html :is(div.highlight, .andrey-home) button.copybtn.o-tooltip--left::after {
+  content: none;
+}
+
+/* A notebook's code cell is a code block like any other: MyST-NB's frame, fill, and green margin
+   around the block give way, so the block is the only box. */
+.bd-content div.cell div.cell_input {
+  --mystnb-source-bg-color: transparent;
+  --mystnb-source-border-color: transparent;
+  --mystnb-source-margin-color: transparent;
+  --mystnb-source-border-width: 0;
+  border: 0;
+  border-radius: var(--andrey-radius-md);
+  background: none;
+}
+
+/* A notebook's drawn output in the dark theme: the figures are drawn in the light palette, so
+   they sit on the light paper, framed as a code block is, in place of the theme's ink panel. */
+html[data-theme="dark"] .bd-content div.cell_output .text_html:not(:has(table.dataframe)),
+html[data-theme="dark"] .bd-content div.cell_output .widget-subarea,
+html[data-theme="dark"] .bd-content div.cell_output img {
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-md);
+  background-color: var(--andrey-light-paper);
+}
+
+/* A notebook's dataframe: the documentation tables' hairline under the column labels, in place
+   of the theme's accent rule (the colors are in the palette mapping). */
+.bd-content div.cell_output table.dataframe thead tr {
+  border-bottom: 1px solid var(--andrey-line);
+}
+
+.bd-content div.cell_output table.dataframe thead th {
+  color: var(--andrey-muted);
+  font-weight: 500;
+}
+
 /* ---------- the AI statement ---------- */
 /* The last paragraph of a post or a release card: how AI tools were used to write it
    (docs/conf.py, _ai_statement), in a box of the cards' surface, hairline, and radius. */
@@ -1584,12 +1859,88 @@ code.literal {
               transform var(--andrey-dur) var(--andrey-ease);
 }
 
-.sd-card:hover {
+.sd-card:hover,
+.bd-content .sd-card.sd-card-hover:hover {
   border-color: var(--andrey-accent);
   transform: translateY(-2px);
 }
 
 .sd-card-title {
+  color: var(--andrey-ink);
+  font-weight: 600;
+}
+
+/* The cards lie flat: sphinx-design's shadow goes, except on the release covers and tiles, which
+   draw their own. */
+html .bd-content .sd-card.sd-shadow-sm:not(.release-cover, .release-tile) {
+  box-shadow: none !important;
+}
+
+/* ---------- badges and buttons (sphinx-design) ---------- */
+/* A badge, such as a method's "Experimental" or a notebook's "Notebook · Colab", is a flat tag
+   like the release tag beside the wordmark: a hairline, the small radius, and muted or accent
+   text. */
+html .sd-badge {
+  border-color: var(--andrey-line) !important;
+  border-radius: var(--andrey-radius-sm);
+  font-weight: 500;
+}
+
+/* A primary button, such as the brand kit's download: the homepage's primary button, cobalt with
+   the surface's text and the medium radius, deeper under the pointer. */
+html .sd-btn {
+  border-radius: var(--andrey-radius-md);
+}
+
+html .sd-btn-primary,
+html .sd-btn-primary:hover {
+  color: var(--andrey-surface) !important;
+  text-decoration: none;
+}
+
+html .sd-btn-primary:hover {
+  border-color: var(--andrey-ramp-5) !important;
+  background-color: var(--andrey-ramp-5) !important;
+}
+
+/* ---------- admonitions ---------- */
+/* A note, such as a post's "Updated on" note or the API's "See also", is a box of the cards'
+   surface, hairline, and large radius, flat, its title on a `surface-2` band. A note's mark is
+   the accent; the other states keep the theme's colors. */
+html .bd-article div.admonition {
+  padding: 0 1rem 0.85rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-lg);
+  background-color: var(--andrey-surface);
+  box-shadow: none !important;
+}
+
+html .bd-article div.admonition > .admonition-title {
+  margin: 0 -1rem;
+  padding: 0.55rem 1rem 0.55rem 2.6rem;
+  background-color: var(--andrey-surface-2);
+  color: var(--andrey-ink);
+  font-weight: 600;
+}
+
+html .bd-article div.admonition > .admonition-title::after {
+  top: 0.55rem;
+  margin-inline: 1rem 0;
+}
+
+html .bd-article div.admonition p.admonition-title ~ * {
+  margin-inline: 0;
+}
+
+html .bd-article div.admonition:is(.note, .seealso, .tip, .hint) > .admonition-title::after {
+  color: var(--andrey-accent);
+}
+
+/* ---------- API field lists ---------- */
+/* An API page's "Parameters:" and "Returns:" labels are small headings in the ink, with no band
+   behind them. */
+html .bd-article dl.field-list > dt:is(.field-odd, .field-even) {
+  background: none;
   color: var(--andrey-ink);
   font-weight: 600;
 }

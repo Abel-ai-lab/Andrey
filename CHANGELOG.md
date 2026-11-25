@@ -33,9 +33,14 @@ names its pull request.
 - For contributors, `benchmarks/overlapping_variables/` reruns the benchmark behind the 0.19.0
   release card's section on datasets with overlapping variables, at a small size in minutes and at
   the card's size, and its summary writes the card's two tables. ([#1224])
-- On the website, the Back to top button and the AI statement that ends each blog post and
-  release card take the style of the site's cards: their surface, hairline border, and rounded
-  corners. ([#1232])
+- On the website, every box takes the style of the docs index's cards, their surface, hairline
+  border, rounded corners, and no shadow: the Back to top button, the AI statement that ends each
+  blog post and release card, the color-mode menu, the header's tooltips, notes, badges, the brand
+  kit's button, the search page's field, and the post lists of the tag and author pages. A
+  notebook's code cell is a plain code block, and the command-line reference is plain text. Code
+  colors come from the palette, each at 4.5:1 or more on the code block in both themes; code that
+  links to the API reference is cobalt; a soft amber tint marks a link's target and a searched
+  word, and a cobalt tint selected text; and one 2px cobalt ring marks keyboard focus. ([#1232])
 
 ## [0.19.0] - 2026-11-24
 

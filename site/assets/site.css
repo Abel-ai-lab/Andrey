@@ -546,23 +546,11 @@
   outline-offset: -2px;
 }
 
-/* The small copy button every code block on the site has (sphinx-copybutton), placed and shown as
-   in the docs: at a block's corner while the pointer is over it, or always without a pointer. */
+/* The small copy button every code block on the site has (sphinx-copybutton; its colors are in
+   docs/_static/andrey.css), placed and shown as in the docs: at a block's corner while the pointer
+   is over it, or always without a pointer. */
 .andrey-home .code-copy {
   position: relative;
-}
-
-.andrey-home button.copybtn {
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background-color: var(--andrey-surface-2);
-  color: var(--andrey-muted);
-}
-
-.andrey-home button.copybtn:hover:not(.success) {
-  background-color: var(--andrey-line);
-  color: var(--andrey-ink);
 }
 
 .andrey-home .code-copy:hover button.copybtn,
@@ -576,17 +564,7 @@
   }
 }
 
-/* The copy button's own tooltip opens to its left, over the command it copies. The pointer's
-   tooltip already names the button and a check mark confirms the copy, so it stays hidden. */
-.andrey-home .copybtn.o-tooltip--left::after {
-  content: none;
-}
-
-/* A copy turns the icon into a tick, in cobalt, for the two seconds sphinx-copybutton keeps it. */
-.andrey-home button.copybtn.success {
-  color: var(--andrey-accent);
-}
-
+/* On the install line over the art, the tick takes the art's pale cobalt. */
 .andrey-home .install-line button.copybtn.success {
   color: var(--andrey-ground-cobalt-light);
 }
