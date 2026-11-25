@@ -25,7 +25,7 @@ banner links the website's homepage. -->
 0.19.0 is about datasets with overlapping variables. When cohorts that each measure their own
 variables are stacked into one table, a conditional independence test without enough rows is
 skipped, a pair that no test can decide is left out of the graph and listed, and an edge that a
-skipped test might have removed is listed too. On simulated cohorts of 20 to 50 variables, PC's
+skipped test might have removed is listed too. On simulated cohorts with no complete rows, PC's
 graph made fewer errors than the empty graph in every setting. DAS, CPCM, and SkewD are supported,
 LGES, Regime-PCMCI, and the GCM, wGCM, and PCM tests arrive, experimental, and `target` takes a list
 of columns.
