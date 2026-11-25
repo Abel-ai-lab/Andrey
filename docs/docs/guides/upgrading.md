@@ -24,6 +24,21 @@ import andrey
 warnings.simplefilter("error", andrey.DeprecatedArgumentWarning)
 ```
 
+## From 0.19 to 0.20
+
+### Ensembles of datasets
+
+`andrey.data.generate` and `andrey.data.Ensemble` are gone: they warned with
+`andrey.DeprecatedArgumentWarning` from 0.15, and `andrey.data` no longer has either name. A loop
+over `SCM.sample` draws the same datasets:
+
+```python
+# 0.19
+datasets = data.generate(data.Ensemble(scms=scms, seeds=range(10), n=500))
+# 0.20
+datasets = [scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]
+```
+
 ## From 0.14 to 0.15
 
 ### Former names from 0.12 and 0.14
@@ -59,19 +74,6 @@ The other former names are gone too:
   pass `n_resamples` (`--n-resamples`), and read a result's `n_resamples`, not `n_boot`.
 - `andrey.config` refuses `num_workers`, as an argument and as a setting: use `n_jobs`.
 - Andrey no longer reads `ANDREY_NUM_WORKERS`: set `ANDREY_N_JOBS`.
-
-### Ensembles of datasets
-
-`andrey.data.generate` and `andrey.data.Ensemble` still work in 0.15, with an
-`andrey.DeprecatedArgumentWarning`, and stop working in 0.16. A loop over `SCM.sample` draws the
-same datasets:
-
-```python
-# 0.14
-datasets = data.generate(data.Ensemble(scms=scms, seeds=range(10), n=500))
-# 0.15
-datasets = [scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]
-```
 
 ## From 0.13 to 0.14
 

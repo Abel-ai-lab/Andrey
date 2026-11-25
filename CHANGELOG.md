@@ -10,6 +10,13 @@ names its pull request.
 
 ## [Unreleased]
 
+### Breaking
+
+- `andrey.data.generate` and `andrey.data.Ensemble` are removed, as their warning said they would be
+  in 0.16.0. A loop over `SCM.sample` draws the same datasets:
+  `[scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]` replaces
+  `generate(Ensemble(scms=scms, seeds=range(10), n=500))`. ([#1221])
+
 ### Changed
 
 - For contributors, `benchmarks/start_regression_ci_r.sh` builds the GCM and PCM reference library
@@ -2950,3 +2957,4 @@ First alpha release.
 [#1214]: https://github.com/Abel-ai-lab/Andrey/pull/1214
 [#1215]: https://github.com/Abel-ai-lab/Andrey/pull/1215
 [#1217]: https://github.com/Abel-ai-lab/Andrey/pull/1217
+[#1221]: https://github.com/Abel-ai-lab/Andrey/pull/1221
