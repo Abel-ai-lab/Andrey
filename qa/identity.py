@@ -278,6 +278,7 @@ FITS: dict[str, Fit] = {
     "RESIT": Fit(andrey.resit),
     "ScoreMatching": Fit(andrey.score_matching),
     "NoGAM": Fit(andrey.nogam),
+    "DAS": Fit(andrey.das),
     "ExactSearch": Fit(andrey.exact_search),
     "CALM": Fit(functools.partial(andrey.calm, seed=0)),
     "NOTEARS": Fit(andrey.notears),
@@ -300,6 +301,10 @@ FITS: dict[str, Fit] = {
     "ANM": Fit(andrey.anm),
     "PNL": Fit(andrey.pnl),
     "LOCI": Fit(andrey.loci),
+    "CPCM": Fit(functools.partial(andrey.cpcm, family="gaussian")),
+    "CPCMGraph": Fit(functools.partial(andrey.cpcm_graph, family="gaussian_fixed_scale")),
+    "SkewD": Fit(functools.partial(andrey.skewd, **qg.SKEWD_BUDGET)),
+    "SkewDMV": Fit(functools.partial(andrey.skewd_mv, **qg.SKEWD_BUDGET)),
     "PCMCI": Fit(_pcmci),
     "PCMCIplus": Fit(lambda x: andrey.pcmciplus(x, **qg.andrey_pcmciplus_adapter(5).params())),
     "LPCMCI": Fit(lambda x: andrey.lpcmci(x, **qg.andrey_lpcmci_adapter(3).params())),
@@ -379,6 +384,7 @@ LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
     "linear_gauss_er_d16": functools.partial(qg.regime_draws, "linear_gauss_er", 16, 800),
     "anm_er_n1000_d30": functools.partial(qg.regime_draws, "anm_er_n1000", 30, 1000),
     "anm_er_n1000_d12": functools.partial(qg.regime_draws, "anm_er_n1000", 12, 1000),
+    "anm_er_n1000_d6": functools.partial(qg.regime_draws, "anm_er_n1000", 6, 1000),
     "score_paper_standardized_d15_er1": functools.partial(
         qg.order_draws, "score_paper_standardized", 15, "er1"
     ),
@@ -452,6 +458,7 @@ LARGER: dict[str, str] = {
     "RESIT": "anm_er_n1000_d12",
     "ScoreMatching": "score_paper_standardized_d15_er1",
     "NoGAM": "score_paper_laplace_standardized_d12_er1",
+    "DAS": "score_paper_standardized_d15_er1",
     "CALM": "linear_gauss_er_d15",
     "NOTEARS": "notears_paper_standardized_d60",
     "DAGMA": "notears_paper_raw_d40",
@@ -464,6 +471,10 @@ LARGER: dict[str, str] = {
     "ANM": "anm_pair_n1500",
     "PNL": "pnl_pair_n1500",
     "LOCI": "lsnm_pair_n1500",
+    "CPCM": "lsnm_pair_n1500",
+    "CPCMGraph": "anm_er_n1000_d6",
+    "SkewD": "lsnm_pair_n1500",
+    "SkewDMV": "anm_er_n1000_d6",
     "PCMCI": "pcmci_paper_d20_n1000",
     "PCMCIplus": "pcmciplus_paper_d40_n1000",
     "LPCMCI": "lpcmci_paper_d20_n1000",
@@ -758,12 +769,22 @@ def _moves(base: Iterable[int], moves: Iterable[tuple[str, int]]) -> list[list[i
     return [base, *([*base, u] if op == "add" else [p for p in base if p != u] for op, u in moves)]
 
 
+def _rows(x: Any, y: Any, conditions: Any, p_values: Any) -> list[tuple[int, int, Any, float]]:
+    """The queries of a call that answers many, one per p-value: query ``i`` asks ``x[i]`` and
+    ``y[i]`` given row ``i`` of the ``(N, m)`` array ``conditions``."""
+    sets = np.asarray(conditions).reshape(len(x), -1) if len(x) else []
+    return list(zip(x, y, sets, p_values))
+
+
 #: The CI tests' query methods, each with the ``(x, y, conditioning set, p-value)`` of every test
 #: one call makes, read from the call's result, the test, and the call's arguments.
 CI_QUERIES: dict[str, Callable[..., Iterable[tuple[int, int, Any, float]]]] = {
     "__call__": lambda p, test, x, y, conditions=(): [(x, y, conditions, p)],
-    "statistic_pvalue": lambda rp, test, x, y, conditions=(): [(x, y, conditions, rp[1])],
-    "statistic_pvalues": lambda rp, test, xs, ys, sets: list(zip(xs, ys, sets, rp[1])),
+    "statistic_pvalue": lambda rp, test, x, y, condition_set=(): [(x, y, condition_set, rp[1])],
+    "statistic_pvalues": lambda rp, test, x, y, conditions: _rows(x, y, conditions, rp[1]),
+    "residual_statistic_pvalues": lambda rp, test, data, x, y, conditions: _rows(
+        x, y, conditions, rp[1]
+    ),
     "_bounded_pvalue": lambda p, test, x, y, conditions, *settings, **options: [
         (x, y, conditions, p)
     ],
@@ -775,6 +796,10 @@ CI_QUERIES: dict[str, Callable[..., Iterable[tuple[int, int, Any, float]]]] = {
     "first_order_pvalues": lambda ps, test, x, y, zs: [(x, y, (z,), p) for z, p in zip(zs, ps)],
     "statistic_pvalues_given": lambda rp, test, x, ys, condition_set: [
         (x, y, condition_set, p) for y, p in zip(ys, rp[1])
+    ],
+    "statistic_pvalues_given_rest": lambda rp, test, x, ys: [
+        (x, y, [z for z in range(len(test._matrix())) if z not in (x, y)], p)
+        for y, p in zip(ys, rp[1])
     ],
     "pvalues_given": lambda ps, test, target, xs, condition_set=(): [
         (target, x, condition_set, p) for x, p in zip(xs, ps)
@@ -901,7 +926,8 @@ def _counted(
 # The run and the manifest
 # ==================================================================================================
 
-#: The environment variables that set thread and worker counts, recorded in the header.
+#: The environment variables that set thread and worker counts, recorded in the header, and
+#: ``ANDREY_SHARED_SCAN_MIN_WORK``, which picks between two paths whose p-values agree to rounding.
 THREAD_VARIABLES = (
     "OMP_NUM_THREADS",
     "OPENBLAS_NUM_THREADS",
@@ -909,6 +935,7 @@ THREAD_VARIABLES = (
     "VECLIB_MAXIMUM_THREADS",
     "ANDREY_N_JOBS",
     "ANDREY_GES_PARALLEL_MIN_WORK",
+    "ANDREY_SHARED_SCAN_MIN_WORK",
 )
 ROOT = Path(__file__).resolve().parents[1]
 

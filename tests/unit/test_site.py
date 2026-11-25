@@ -505,26 +505,12 @@ def test_the_page_title_names_what_people_search_for(placeholder_page):
         assert words in build.SEARCH_TITLE
 
 
-# The registry as it is, and without one method the description does not name: the count of "more"
-# methods follows the registry.
-@pytest.mark.parametrize("dropped", [None, "gin"])
-def test_the_description_states_the_speed_claim_and_the_method_count(monkeypatch, dropped):
-    summaries = placeholder_summaries()
-    specs = [s for s in list_specs() if s.name != dropped]
-    monkeypatch.setattr(build, "list_specs", lambda: specs)
-    description = build.page_description(summaries)
-    assert description.endswith(build.CLAIM)
-    assert f"with PC, GES, FCI and {len(specs) - 3} more methods" in description
+def test_the_description_states_the_speed_claim_without_a_number():
+    description = build.PAGE_DESCRIPTION
+    assert description.startswith(build.CLAIM.removesuffix("."))
+    assert not re.search(r"\d", description)
     # Search results cut a description at about 160 characters.
     assert len(description) <= 160
-
-
-@pytest.mark.parametrize("name", ["pc", "ges", "fci"])
-def test_the_description_names_only_registered_methods(monkeypatch, name):
-    summaries = placeholder_summaries()
-    monkeypatch.setattr(build, "list_specs", lambda: [s for s in list_specs() if s.name != name])
-    with pytest.raises(ValueError, match=f"unregistered methods: {name.upper()}$"):
-        build.page_description(summaries)
 
 
 @pytest.fixture(scope="module")

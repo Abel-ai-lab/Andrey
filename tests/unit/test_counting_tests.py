@@ -12,6 +12,7 @@ from andrey.core.ci import (
     SHIPPED_INDEP_TESTS,
     count_tests,
     counting_tests,
+    kept_answers,
     make_indep_test,
     register_indep_test,
 )
@@ -110,6 +111,28 @@ def test_a_kept_marginal_answer_is_not_a_new_test(name):
     test = built(name)
     assert counted(lambda: test(0, 3)) == 1
     assert counted(lambda: (test(3, 0), test.pvalues_given(0, [3, 4]))) == 1
+
+
+@pytest.mark.parametrize("name", ["chisq", "gsq"])
+def test_a_new_test_counts_the_kept_pairs_once_and_the_rest_alike(name):
+    """Asked the same queries, a test that kept some marginal answers computes fewer tests than a
+    new one, by exactly the kept answers it read: the tests outside the kept answers, plus one per
+    pair asked of them, are the new test's count."""
+
+    def ask(test):
+        test(0, 3)
+        test(4, 1, [2])
+        test.pvalues_given(0, [1, 3, 4])
+        test.statistic_pvalues(np.array([5, 2]), np.array([0, 3]), np.array([[], []]))
+
+    warm = built(name)
+    warm(3, 0)
+    warm.pvalues_given(1, [0, 4])
+    with counting_tests() as tests, kept_answers() as kept:
+        ask(warm)
+    assert kept.asked == {(0, 3), (0, 1), (0, 4), (0, 5), (2, 3)}
+    assert kept.computed == 3
+    assert tests.n - kept.computed + len(kept.asked) == counted(lambda: ask(built(name)))
 
 
 def test_a_registered_test_counts_what_it_reports():

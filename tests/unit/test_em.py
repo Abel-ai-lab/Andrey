@@ -176,6 +176,7 @@ def test_a_last_round_that_changed_the_graph_logs_a_warning(caplog):
     (logged,) = caplog.records
     assert logged.levelno == logging.WARNING
     assert "still changed in the last of 3 rounds" in logged.getMessage()
+    assert "n_em_iterations above 3 runs more rounds" in logged.getMessage()
 
 
 def test_no_parameter_step_lowers_the_observed_data_log_likelihood(monkeypatch):
@@ -241,9 +242,57 @@ def test_a_fit_on_missing_values_records_its_handling_and_repeats(name):
 
 
 @pytest.mark.parametrize("name", EM_METHODS)
+def test_a_fit_runs_the_rounds_it_is_asked_for_and_ten_are_the_default(name):
+    """Naming the default changes no fit, and a fit of fewer or more rounds runs that many, the
+    rounds it shares with the default fit giving the same record."""
+    fit = _method(name)
+    x = _gaps(_chain(), 0.1)
+    default = fit(x, missing="em")
+    assert ITERATIONS == 10
+    assert fit(x, missing="em", n_em_iterations=10) == default
+    for rounds in (1, 12):
+        record = fit(x, missing="em", n_em_iterations=rounds).metadata["em"]
+        assert record["iterations"] == rounds
+        assert len(record["graph_changed"]) == len(record["log_likelihood"]) == rounds
+        shared = min(rounds, 10)
+        for key in ("graph_changed", "log_likelihood"):
+            assert record[key][:shared] == default.metadata["em"][key][:shared]
+
+
+def test_a_fit_whose_last_round_changed_the_graph_logs_a_warning_that_names_the_rounds(caplog):
+    with caplog.at_level(logging.WARNING, logger="andrey.search.em"):
+        out = andrey.ges(_gaps(_chain(), 0.1), missing="em", n_em_iterations=1)
+    assert out.metadata["em"]["graph_changed"] == [True]  # against the graph with no edge
+    (logged,) = caplog.records
+    assert "n_em_iterations above 1 runs more rounds" in logged.getMessage()
+
+
+@pytest.mark.parametrize("name", EM_METHODS)
+@pytest.mark.parametrize(("value", "error"), [(0, ValueError), (-2, ValueError), (2.0, TypeError)])
+def test_a_number_of_rounds_that_is_not_a_whole_number_from_1_raises_before_the_fit(
+    name, value, error
+):
+    fit = _method(name)
+    for x, missing in ((_gaps(_chain(), 0.1), "em"), (_chain(), "em"), (_chain(), None)):
+        with pytest.raises(error, match=rf"^{name}: n_em_iterations must be "):
+            fit(x, missing=missing, n_em_iterations=value)
+
+
+@pytest.mark.parametrize("name", EM_METHODS)
+def test_the_rounds_change_nothing_when_em_does_not_run(name):
+    fit = _method(name)
+    x = _chain()
+    plain = fit(x)
+    assert fit(x, n_em_iterations=3) == plain
+    assert fit(x, missing="em", n_em_iterations=3) == plain
+
+
+@pytest.mark.parametrize("name", EM_METHODS)
 def test_without_em_a_missing_value_raises_naming_em(name):
     fit = _method(name)
-    with pytest.raises(ValueError, match=rf'^{name} does not accept .*pass missing="em"') as error:
+    with pytest.raises(
+        ValueError, match=rf'^{name}: pass missing="em".*; {name} does not accept'
+    ) as error:
         fit(_gaps(_chain(), 0.1))
     # The message and the schema mark "em" experimental exactly where it is not supported.
     marked = name not in EM_SUPPORTED
@@ -264,7 +313,11 @@ def test_a_row_that_observes_no_value_changes_no_fit(name):
     fit = _method(name)
     x = _gaps(_chain(), 0.1)
     padded = np.insert(x, [0, 150, 150], nan, axis=0)
-    assert fit(padded, missing="em") == fit(x, missing="em")
+    with_rows, without = fit(padded, missing="em"), fit(x, missing="em")
+    assert with_rows.structure == without.structure
+    assert with_rows.metadata["em"].pop("rows_dropped") == 3
+    assert without.metadata["em"].pop("rows_dropped") == 0
+    assert with_rows.metadata == without.metadata
 
 
 def test_the_refusal_names_em_only_where_em_would_run():
@@ -312,6 +365,19 @@ def test_a_copy_among_the_observed_values_raises_as_on_complete_data():
             getattr(andrey, name)(x, missing="em")
 
 
+def test_a_copy_among_the_observed_values_raises_before_a_pair_that_shares_no_row():
+    x = _chain()
+    x[:, 4] = 3.0 * x[:, 2] - 1.0
+    x[:200, 0] = nan
+    x[200:, 1] = nan  # columns 0 and 1 share no observed row
+    for name in ("ges", "xges", "exact_search", "boss"):
+        with pytest.raises(CopiedColumnsError, match=r"\b4 repeats 2\b"):
+            getattr(andrey, name)(x, missing="em")
+    with pytest.raises(ValueError, match=r"^drop column 0 or column 1 .*share none") as error:
+        andrey.notears(x, missing="em")  # a score without the BIC's copies check
+    assert not isinstance(error.value, CopiedColumnsError)
+
+
 def _labeled_marks(out) -> dict:
     m, labels = out.structure.to_numpy(), out.structure.labels
     return {(a, b): int(m[i, j]) for i, a in enumerate(labels) for j, b in enumerate(labels)}
@@ -334,3 +400,38 @@ def test_the_methods_that_take_em_list_it_as_their_only_handling():
         param = next(p for p in REGISTRY[name].params if p.name == "missing")
         assert param.choices == ("em",) and param.default is None
         assert {"missing", "em"} <= set(REGISTRY[name].output.metadata)
+
+
+@pytest.mark.parametrize("name", CORE)
+def test_a_fit_whose_every_gap_sits_in_a_dropped_row_still_records_the_rows(name):
+    fit = _method(name)
+    x = _chain()
+    padded = np.insert(x, [0, 150, 150], nan, axis=0)
+    out, plain = fit(padded, missing="em"), fit(x)
+    assert out.structure == plain.structure
+    assert out.metadata["missing"] == "em"
+    record = out.metadata["em"]
+    assert record["rows_dropped"] == 3 and record["min_shared_rows"] == len(x)
+    assert record["iterations"] == 0 and record["log_likelihood"] == []
+
+
+@pytest.mark.parametrize("name", EM_METHODS)
+def test_the_record_holds_the_fewest_rows_two_columns_share(name):
+    fit = _method(name)
+    x = _gaps(_chain(), 0.1)
+    observed = ~np.isnan(x)
+    record = fit(x, missing="em").metadata["em"]
+    assert record["min_shared_rows"] == (observed[:, :, None] & observed[:, None, :]).sum(0).min()
+    assert record["rows_dropped"] == int((~observed).all(axis=1).sum())
+
+
+@pytest.mark.parametrize("name", EM_METHODS)
+def test_two_columns_that_share_no_observed_row_are_refused(name):
+    fit = _method(name)
+    x = _chain()
+    x[:200, 0] = nan
+    x[200:, 2] = nan
+    with pytest.raises(ValueError, match=r"^drop column 0 or column 2 .*share none"):
+        fit(x, missing="em")
+    x[200, 2] = _chain()[200, 2]  # one shared row is accepted, and recorded
+    assert fit(x, missing="em").metadata["em"]["min_shared_rows"] == 1

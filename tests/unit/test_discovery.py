@@ -112,13 +112,16 @@ def test_the_graph_names_the_organization_the_software_and_the_page():
     assert "aggregateRating" not in software and "offers" not in software
 
 
-def test_a_page_of_the_current_release_shares_its_software_node():
-    # A post or release card of the current release is about the same software as every page.
-    current = graph(render(post={"date": "2026-10-15", "authors": [], "version": "0.4.0"}))
-    card = graph(render({**PAGE, "software_version": "0.4.0"}))
-    for nodes in (current, card):
+def test_every_page_a_post_or_release_card_too_is_about_the_one_software_node():
+    # A post or a release card of any release names the software at the current release.
+    for nodes in (
+        graph(render(post={"date": "2026-10-08", "authors": []})),
+        graph(render({**PAGE, "title": "0.1.0 release card"})),
+        graph(render()),
+    ):
         assert nodes["SoftwareSourceCode"]["@id"] == SITE + "#software"
-        assert nodes["SoftwareSourceCode"]["version"] == "0.4.0"
+        assert nodes["SoftwareSourceCode"]["version"] == SOFTWARE["version"]
+        assert nodes["WebPage"]["about"]["@id"] == SITE + "#software"
 
 
 def test_breadcrumbs_follow_the_parent_pages():
@@ -129,11 +132,10 @@ def test_breadcrumbs_follow_the_parent_pages():
     assert [x["position"] for x in items] == [1, 2, 3]
 
 
-def test_an_earlier_post_keeps_its_date_authors_and_release():
+def test_a_post_carries_its_date_and_authors_and_no_update_until_it_has_one():
     post = {
         "date": "2026-10-08",
         "authors": [{"name": "Shu Wan", "url": SITE + "blog/author/shu-wan.html"}],
-        "version": "0.1.0",
     }
     text = render(post=post)
     nodes = graph(text)
@@ -144,11 +146,21 @@ def test_an_earlier_post_keeps_its_date_authors_and_release():
     assert article["author"] == [{"@type": "Person", **post["authors"][0]}]
     assert article["mainEntityOfPage"]["@id"] == nodes["WebPage"]["@id"]
     assert "breadcrumb" not in article
-    assert nodes["SoftwareSourceCode"]["version"] == "0.1.0"
-    assert nodes["SoftwareSourceCode"]["@id"] == SITE + "#software-0.1.0"
     head = Head(text)
     assert head.meta["article:published_time"] == post["date"]
     assert head.meta["article:author"] == post["authors"][0]["url"]
+    assert "article:modified_time" not in head.meta
+
+
+def test_an_updated_post_carries_its_update_date():
+    text = render(post={"date": "2026-10-08", "authors": [], "modified": "2026-11-11"})
+    assert graph(text)["BlogPosting"]["dateModified"] == "2026-11-11"
+    assert Head(text).meta["article:modified_time"] == "2026-11-11"
+
+
+def test_the_twitter_card_repeats_the_image_alt_text_when_given():
+    assert Head(render({**PAGE, "image_alt": "The card."})).meta["twitter:image:alt"] == "The card."
+    assert "twitter:image:alt" not in Head(render()).meta
 
 
 def test_a_title_cannot_close_its_script_or_add_an_element():
@@ -200,6 +212,22 @@ def test_llms_txt_lists_its_facts_at_a_glance_before_the_sections():
     )
     glance = "## At a glance\n\n- Data: mixed columns.\n- Pairwise direction: `anm`.\n"
     assert glance in text and text.index(glance) < text.index("## Docs")
+
+
+def test_llms_txt_says_how_to_cite_before_the_sections():
+    entries = {"docs/faq": {**PAGE, "title": "FAQ", "description": "The FAQ."}}
+    text = discovery.llms_index(
+        "The summary.",
+        entries,
+        [("Docs", ["docs/faq"])],
+        site_url=SITE,
+        project="Andrey",
+        version="0.4.0",
+        cite="Abel AI Lab.\n Andrey.",
+    )
+    assert "\nCite: Abel AI Lab. Andrey.\n" in text
+    assert text.index("Cite: ") < text.index("## Docs")
+    assert "Cite" not in llms(entries, [("Docs", ["docs/faq"])])
 
 
 def test_llms_txt_refuses_a_missing_private_or_noindex_page():
@@ -259,7 +287,25 @@ def test_the_sitemap_lists_the_indexable_pages_by_their_address(tmp_path):
     page(tmp_path / "old.html", '<meta http-equiv="refresh" content="0; url=docs/faq.html">')
     page(tmp_path / "moved.html", '<meta http-equiv="Refresh" content="0">' + preview("m"))
     urls = discovery.sitemap_urls(tmp_path)
-    assert urls == [SITE, SITE + "docs/faq.html"]
+    assert urls == [(SITE, None), (SITE + "docs/faq.html", None)]
     xml = discovery.sitemap_xml(urls)
     assert xml.startswith('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns=')
+    assert f"<url><loc>{SITE}docs/faq.html</loc></url>" in xml
+    assert "lastmod" not in xml
+
+
+def test_the_sitemap_dates_a_post_by_its_latest_change_and_no_other_page(tmp_path):
+    published = '<meta property="article:published_time" content="2026-10-08">'
+    modified = '<meta property="article:modified_time" content="2026-11-11">'
+    page(tmp_path / "docs" / "faq.html", preview(SITE + "docs/faq.html"))
+    page(tmp_path / "blog" / "a.html", preview(SITE + "blog/a.html") + published)
+    page(tmp_path / "blog" / "b.html", preview(SITE + "blog/b.html") + published + modified)
+    urls = discovery.sitemap_urls(tmp_path)
+    assert urls == [
+        (SITE + "blog/a.html", "2026-10-08"),
+        (SITE + "blog/b.html", "2026-11-11"),
+        (SITE + "docs/faq.html", None),
+    ]
+    xml = discovery.sitemap_xml(urls)
+    assert f"<url><loc>{SITE}blog/b.html</loc><lastmod>2026-11-11</lastmod></url>" in xml
     assert f"<url><loc>{SITE}docs/faq.html</loc></url>" in xml

@@ -1,11 +1,12 @@
 ---
 name: docs-index
-description: Andrey - fast causal discovery on CPU and GPU. Documentation home.
+description: Andrey documentation for installation, concepts, choosing a causal discovery method,
+  examples, and the API and command line.
 meta:
   type: index
 ---
 
-# Andrey
+# Documentation
 
 Andrey is a Python package for causal discovery: from data, observational or from experiments, it
 learns a graph of which variables drive which. It runs PC, FCI, GES, BOSS, GRaSP, the LiNGAM family,
@@ -70,8 +71,8 @@ What changed in each release.
   family, with the data it reads and the graph it returns.
 - [API reference](api.md): methods, graph structures, and visualization.
 - [CLI reference](api.md#command-line-interface): run methods from the shell.
-- [Missing values](guides/missing-values.md): which handling to use for your data and the reason
-  its values are missing.
+- [Handling missing values](guides/missing-values.md): which handling fits your data and the reason
+  for its gaps.
 - [Graph types](guides/graph-types.md): DAGs, CPDAGs, PAGs, and temporal graphs, with diagrams.
 - [Graph representation](guides/graph-representation.md): Andrey's graph model compared with other
   causal discovery packages.

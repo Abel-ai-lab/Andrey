@@ -66,7 +66,9 @@ difference and `--shuffle` on a difference beyond rounding:
   every possible-d-sep search sent to the worker pool.
 
 Method names select methods, as in `uv run python -m qa.identity PC GES --workers 4`, and `--seeds`
-sets the draws per dataset.
+sets the draws per dataset. SkewD and SkewD-MV run with the quality gate's search budget; their
+larger fits, two draws each, took 362 s (`lsnm_pair_n1500`, 161 and 201 s) and 712 s
+(`anm_er_n1000_d6`, 644 and 68 s) on one AMD EPYC 7713 core, on top of their gate datasets' draws.
 
 ## Profile
 
@@ -148,7 +150,8 @@ uv run python -m qa.quality_gate
 ```
 
 The `quality-gate` workflow runs the same command once per release, on the head of the release pull
-request into `main`, and `main`'s ruleset requires it. The publish workflow skips its own run when a
+request into `main`, and `main`'s ruleset requires it; it also runs by hand, as
+`gh workflow run quality-gate.yml --ref <branch>`. The publish workflow skips its own run when a
 passing run has the tree of the commit it publishes (`scripts/gate_reuse.py`; a squash merge keeps
 the tree), so the published files are the ones the gate passed. A change after the gate, or a lookup
 that fails, runs the gate again. Every job that publishes to PyPI must need a job that calls the
@@ -170,10 +173,11 @@ The gate checks PC, FCI, GFCI, CD-NOD, FCI-JCI, IAMB, Inter-IAMB, GS, Fast-IAMB,
 HITON-MB, MMMB, PCMB, MB-by-MB, Y-structures, CMB, LDECC, LOAD, LocPC-CDE, GES, GIES, GnIES, IGSP,
 ICP, XGES, AGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, NOTEARS, DAGMA, BOSS, GRaSP, BOSS-FCI,
 GRaSP-FCI, MMB-by-MMB, UT-IGSP, DirectLiNGAM, ICA-LiNGAM, local ISA-LiNG, MultiGroupDirectLiNGAM,
-RCD, BottomUpParceLiNGAM, SCORE, NoGAM, CAM-UV, GIN, ANM, PNL, LOCI, PCMCI, PCMCI+, LPCMCI,
-J-PCMCI+, VARMA-LiNGAM, LongitudinalLiNGAM, Granger, and DYNOTEARS on the datasets whose assumptions
-each method needs, PC with each supported nonlinear conditional-independence test, KCI, RCoT,
-CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
+RCD, BottomUpParceLiNGAM, SCORE, NoGAM, DAS, CAM-UV, GIN, ANM, PNL, LOCI, CPCM, CPCM's graph search,
+SkewD, SkewD-MV, PCMCI, PCMCI+, LPCMCI, J-PCMCI+, VARMA-LiNGAM, LongitudinalLiNGAM, Granger, and
+DYNOTEARS on the datasets whose assumptions each method needs, PC with each supported nonlinear
+conditional-independence test, KCI, RCoT, CMIknn, and GPDC, on nonlinear data, and the targets
+UT-IGSP learns:
 
 | Dataset | Draws | Methods |
 |---|---|---|
@@ -194,12 +198,13 @@ CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 | `latent_measurement` at `d = 8, 12`, `n = 1000` | 10 seeds each | GIN |
 | `lingam_sf` at `d = 20, 50` | 10 seeds each | DirectLiNGAM, ICA-LiNGAM; local ISA-LiNG at the last column |
 | `latent_lingam_er` at `d = 10, 15` | 10 seeds each | RCD, BottomUpParceLiNGAM |
-| `score_paper_standardized` at `d = 10` with `d` edges and at `d = 20` with `4 d`, `n = 1000` | 10 seeds each | SCORE |
+| `score_paper_standardized` at `d = 10` with `d` edges and at `d = 20` with `4 d`, `n = 1000` | 10 seeds each | SCORE, DAS |
 | `score_paper_laplace_standardized` at `d = 10` with `d` edges, `score_paper_gumbel_standardized` at `d = 10` with `4 d`, `n = 1000` | 10 seeds each | NoGAM |
 | `camuv_paper` at `d = 14`, `latent_anm_er_tenth` at `d = 22`, `n = 1000` | 10 seeds each | CAM-UV |
 | `anm_pair` at `n = 1000` | 10 seeds | ANM |
 | `pnl_pair` at `n = 1000` | 10 seeds | PNL |
-| `lsnm_pair` at `n = 1000` | 10 seeds | LOCI |
+| `lsnm_pair` at `n = 1000` | 10 seeds | LOCI, CPCM (`family="gaussian"`), SkewD (`tuning_iter=2`, `max_iter=200`) |
+| `anm_er_n1000` at `d = 5` | 10 seeds | CPCM's graph search (`family="gaussian_fixed_scale"`), SkewD-MV (`tuning_iter=2`, `max_iter=200`) |
 | `pcmci_paper` at `d = 10`, `n = 500, 1000` | 10 seeds each | PCMCI |
 | `pcmciplus_paper` at `(d, n) = (10, 500), (20, 1000)` | 10 seeds each | PCMCI+ |
 | `lpcmci_paper` at `(d, n) = (5, 500), (10, 1000)` | 10 seeds each | LPCMCI |
@@ -227,7 +232,8 @@ CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
   `d = 20` with `4 d`. NoGAM's is additive noise of any distribution, run with Laplace noise
   (`score_paper_laplace_standardized`) at `d = 10` with `d` edges and with Gumbel noise
   (`score_paper_gumbel_standardized`) at `d = 10` with `4 d`; its fit time grows with `d`, so
-  `d = 20` is left out. Both run at their defaults.
+  `d = 20` is left out. DAS fits SCORE's model and runs on SCORE's cells. All three run at their
+  defaults.
 - **Hidden variables, nonlinear.** CAM-UV's published regimes, drawn by its benchmark driver
   (`benchmarks/camuv_cpu.py`) at two cells in its claim where its errors are below the empty
   graph's: `camuv_paper`, the paper's simulation, 10 observed variables, two hidden common causes,
@@ -310,7 +316,12 @@ CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 - **Pairs.** `anm_pair`, `pnl_pair`, and `lsnm_pair` are the published cause-effect pairs: two
   variables and one edge, in a direction the seed draws, at the benchmarks' 1,000-row size; a test
   keeps them in step with the benchmark drivers. The empty graph's SHD on a pair is 1, so ANM, PNL,
-  and LOCI pass only when they name the true direction on most draws.
+  LOCI, and CPCM pass only when they name the true direction on most draws. CPCM runs with the
+  Gaussian location-scale family, the family its benchmark gives it on location-scale pairs, and
+  its graph search with the fixed-scale Gaussian family, an additive-noise model. SkewD and
+  SkewD-MV run with the search budget of their recovery tests, since at the defaults ten draws
+  take hours. At that budget the SkewD cell's ten draws took 1,034 s and the SkewD-MV cell's
+  2,915 s on one AMD EPYC (Zen 3) core, the two slowest cells of the gate.
 - **Time series.** The published time-series regimes, drawn by the benchmark harness
   (`benchmarks/andrey_bench`), which the gate imports; each method runs through its benchmark
   adapter with the published settings. The sizes are published sizes at which the method's median
@@ -351,9 +362,10 @@ CMIknn, and GPDC, on nonlinear data, and the targets UT-IGSP learns:
 
 SHD follows the published summaries: PC, with any test, IAMB, Inter-IAMB, GS, Fast-IAMB, MMPC,
 HITON-PC, HITON-MB, MMMB, PCMB, GES, XGES, HC, Tabu, MMHC, RSMAX2, exact search, CALM, BOSS, and
-GRaSP against the truth's CPDAG, the LiNGAM methods, NOTEARS, DAGMA, AGES, ANM, PNL, SCORE, and
-NoGAM against the DAG, MultiGroupDirectLiNGAM summed over its groups, and FCI, GFCI, BOSS-FCI, and
-GRaSP-FCI by endpoint SHD against the PAG of the observed variables. MB-by-MB and CMB answer the
+GRaSP against the truth's CPDAG, the LiNGAM methods, NOTEARS, DAGMA, AGES, ANM, PNL, CPCM and its
+graph search, SkewD, SkewD-MV, SCORE, NoGAM, and DAS against the DAG, MultiGroupDirectLiNGAM summed
+over its groups, and FCI, GFCI, BOSS-FCI, and GRaSP-FCI by endpoint SHD against the PAG of the
+observed variables. MB-by-MB and CMB answer the
 last column, and count the missing, extra, and mismarked edges there against the truth's CPDAG.
 MMB-by-MMB answers the last column too and counts the same edges there against the PAG: the true
 edges the answer lacks, the answer's edges the PAG lacks, and the edges in both with a mark that

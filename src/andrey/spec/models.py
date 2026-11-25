@@ -265,6 +265,7 @@ class OutputSpec(Spec):
     # Its claims hold with hidden common causes, which a graph of its kind does not show.
     hidden_causes: bool = False
     multi: bool = False  # returns list[StructureOutput], one per group
+    regimes: bool = False  # returns a RegimeOutput: a regime per time step, a StructureOutput each
     # Every key a fit's metadata can hold; a fit holds a subset (some keys depend on the settings).
     metadata: tuple[str, ...] = ()
     doc: str = ""

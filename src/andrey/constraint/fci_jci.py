@@ -19,25 +19,41 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._skeleton import check_collider_rule, unseparated_triples, vote_triples
+from andrey.constraint._skeleton import (
+    check_collider_rule,
+    flagged_triples,
+    unseparated_triples,
+    vote_triples,
+)
 from andrey.constraint.fci import (
     circle_pag,
     fci,
     fci_orient,
+    flagged_sides,
     knowledge_marks,
     orient_colliders,
     possible_dsep_step,
+    shield_undecided,
+    undecided_sides,
     validate_possible_dsep,
 )
 from andrey.constraint.pc import adjacency_search, knowledge_masks
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import make_indep_test
+from andrey.core.ci_missing import (
+    counts_its_tests,
+    keeps_no_untested_sets,
+    mark_environment,
+    running_flags,
+)
 from andrey.core.structure import EDGE_TYPES
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
 
 
+@counts_its_tests
+@keeps_no_untested_sets
 def fci_jci(
     data: np.ndarray,
     env: np.ndarray,
@@ -109,11 +125,19 @@ def fci_jci(
     augmented = np.concatenate([X, context], axis=1)
     mask = None if categorical is None else np.append(np.asarray(categorical, bool), True)
     padded = None if constraints is None else constraints.padded(d + 1)
-    test = make_indep_test(
-        indep_test, augmented, categorical=mask, seed=seed, degrees_of_freedom=degrees_of_freedom
+    test = mark_environment(
+        make_indep_test(
+            indep_test,
+            augmented,
+            categorical=mask,
+            seed=seed,
+            degrees_of_freedom=degrees_of_freedom,
+        ),
+        d,
     )
     allowed, keep, apart = knowledge_masks(padded)
     workers = backend.worker_count(workers)
+    undecided: set[tuple[int, int]] = set()
     skeleton, sepsets, _ = adjacency_search(
         test,
         d + 1,
@@ -123,12 +147,14 @@ def fci_jci(
         apart=apart,
         max_depth=max_depth,
         workers=workers,
+        undecided=undecided,
     )
 
-    marks = circle_pag(skeleton)
+    shielded, kept = shield_undecided(skeleton, undecided)
+    marks = circle_pag(shielded)
     knowledge_marks(marks, padded)
     mark_index(marks, d, confounded_index)
-    orient_colliders(marks, sepsets)
+    orient_colliders(marks, sepsets, undecided_sides(marks, kept) | flagged_sides(marks))
     # Its knowledge check runs before the index marks: no mark at the index is an arrowhead, so
     # the index cannot lie on a cycle the check reads.
     marks = possible_dsep_step(
@@ -144,14 +170,20 @@ def fci_jci(
         seed=seed,
         max_depth=max_depth,
         constraints=padded,
+        keep=kept,
         workers=workers,
     )
+    if kept is not None:
+        marks[kept] = NULL
     mark_index(marks, d, confounded_index)
-    ambiguous = unseparated_triples(marks != NULL, sepsets, padded)
+    adjacency = marks != NULL
+    flagged = running_flags(adjacency, latent=True)
+    ambiguous = unseparated_triples(adjacency, sepsets, padded, undecided)
     if collider_rule != "sepsets":
         ambiguous |= vote_triples(
             marks, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
         )
+    ambiguous |= flagged_triples(adjacency, flagged)
     if _ambiguous is not None:
         _ambiguous.update(ambiguous)
     orient_colliders(marks, sepsets, ambiguous)
@@ -164,6 +196,7 @@ def fci_jci(
         max_depth=max_depth,
         in_column_order=in_column_order,
         selection_bias=False,
+        flagged=flagged,
     )
 
     index_edges = [

@@ -63,7 +63,9 @@ _OTHER_TESTS = (
     "Gaussian and cond_gauss = conditional Gaussian likelihood ratio. For nonlinear effects in "
     "continuous data, each far slower per test: kci = kernel test; rcot = its random-feature "
     "approximation; cmiknn = nearest-neighbor conditional mutual information; gpdc = "
-    "Gaussian-process regression and distance correlation. These four rank the columns as the "
+    "Gaussian-process regression and distance correlation; gcm, wgcm, pcm = the generalized, "
+    "weighted generalized, and projected covariance measures of regression residuals. These seven "
+    "rank the columns as the "
     "searches do, so ANDREY_TIE_BREAK=position makes their p-values depend on the column order. "
     + _DECLARED.format(every="gsq", fallback="fisherz")
 )
@@ -82,6 +84,14 @@ _POOLED_INDEP_TEST = concept_param(
 _DEGREES_OF_FREEDOM = concept_param("degrees_of_freedom")
 _CATEGORICAL = concept_param("categorical")
 _COLLIDER_RULE = concept_param("collider_rule")
+_POSSIBLY_SEPARABLE = concept_param("possibly_separable")
+_LINKS_POSSIBLY_SEPARABLE = concept_param(
+    "possibly_separable",
+    doc="How a same-step triple with a link listed in metadata['possibly_separable'] is read, on "
+    "data with missing values: orient = as any other triple; ambiguous = no collider vote reads "
+    "it, so it is neither a collider nor a non-collider. On series that no row bridges, ambiguous "
+    "can leave no same-step arrowhead.",
+)
 _POSSIBLE_DSEP = ParamSpec(
     name="possible_dsep",
     type="str",
@@ -142,8 +152,8 @@ _RESTART_DOC = (
 _TEST_SEED = concept_param(
     "seed",
     doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
-    "so a fit repeats. Seed for the random draws of indep_test, which only rcot, cmiknn, and gpdc "
-    "make; the other tests ignore it.",
+    "so a fit repeats. Seed for the random draws of indep_test, which only rcot, cmiknn, gpdc, "
+    "gcm, wgcm, and pcm make; the other tests ignore it.",
 )
 _MATRIX_LAYOUT = "(n_samples, n_variables), row = sample"
 #: The environment index the score searches and their FCI hybrids take for data pooled across
@@ -201,7 +211,9 @@ _add(
             "data with missing values, metadata['missingness_parents'] maps each column whose "
             "missingness indicator has parents to them, and metadata['corrected_edges'] lists the "
             "edges tested again (retested), removed (removed), and left with a test that had too "
-            "few rows to correct (uncorrected), by name or 0-based position",
+            "few rows to correct (uncorrected), by name or 0-based position, the fewest and the "
+            "median rows a corrected test read (rows_tested), and, when it is not zero, the number "
+            "of corrected tests that returned p = 1 (p_one_tests)",
         ),
         accel="numpy",
         status="supported",
@@ -217,6 +229,7 @@ _add(
             _DEGREES_OF_FREEDOM,
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
+            _POSSIBLY_SEPARABLE,
             _CATEGORICAL,
             concept_param(
                 "missing",
@@ -268,6 +281,7 @@ _add(
             _INDEP_TEST,
             _DEGREES_OF_FREEDOM,
             _COLLIDER_RULE,
+            _POSSIBLY_SEPARABLE,
             _CATEGORICAL,
             _POSSIBLE_DSEP,
             _TEST_SEED,
@@ -390,6 +404,7 @@ _add(
             _DEGREES_OF_FREEDOM,
             _COLLIDER_ORDER,
             _COLLIDER_RULE,
+            _POSSIBLY_SEPARABLE,
             _CATEGORICAL,
             ParamSpec(
                 name="dependence_threshold",
@@ -456,6 +471,7 @@ _add(
             _POOLED_INDEP_TEST,
             _DEGREES_OF_FREEDOM,
             _COLLIDER_RULE,
+            _POSSIBLY_SEPARABLE,
             _CATEGORICAL,
             _POSSIBLE_DSEP,
             concept_param("confounded_index"),
@@ -498,7 +514,8 @@ _add(
             graph_kind="dag",
             doc="edges into the target from its estimated parents; metadata['parents'], "
             "metadata['p_values'] and metadata['confidence_intervals'] per column, "
-            "metadata['accepted_sets'], metadata['model_rejected']",
+            "metadata['accepted_sets'], metadata['model_rejected']; with a list of targets, a "
+            "list of those results, one per target in order",
         ),
         accel="numpy",
         status="supported",
@@ -615,6 +632,13 @@ _OWN_OUTPUT = {
     "mmmb": "; metadata['parents_and_children'] lists the parents and children alone",
     "pcmb": "; metadata['parents_and_children'] lists the parents and children alone",
 }
+_BLANKET_POSSIBLY_SEPARABLE = concept_param(
+    "possibly_separable",
+    doc=_POSSIBLY_SEPARABLE.doc + " Read under structure=cpdag only; the skeleton and the moral "
+    "graph orient nothing.",
+)
+#: The set learners whose facade takes ``possibly_separable``.
+_POSSIBLY_SEPARABLE_BLANKETS = ("iamb", "inter_iamb", "mmpc")
 for _name, _summary, _key, _structure, _kind, _refs, _status in (
     (
         "iamb",
@@ -776,6 +800,7 @@ for _name, _summary, _key, _structure, _kind, _refs, _status in (
                 _INDEP_TEST,
                 _OWN_DEGREES_OF_FREEDOM.get(_name, _DEGREES_OF_FREEDOM),
                 _CATEGORICAL,
+                *((_BLANKET_POSSIBLY_SEPARABLE,) if _name in _POSSIBLY_SEPARABLE_BLANKETS else ()),
                 _TEST_SEED,
                 *_OWN_DEPTH.get(_name, ()),
             ),
@@ -1444,6 +1469,75 @@ _add(
             _CATEGORICAL,
         ),
         references=("Nazaret & Blei 2024",),
+    )
+)
+_add(
+    MethodSpec(
+        name="lges",
+        family="score",
+        summary="Less greedy equivalence search: GES that adds no edge between two variables the "
+        "score already holds independent given one's parents in a graph of the current class, and "
+        "deletes and reverses edges as GES and GIES do. schedule=lges (default) is the paper's "
+        "LGES (Algorithm 1), deleting and reversing before each addition; "
+        "schedule=lges0_released is its LGES-0 in the authors' code's order (additions, "
+        "deletions, then reversals). "
+        "insertion=conservative also skips a pair when any of its additions worsens the score. "
+        "The standard BIC by default, BDeu when every column is categorical, conditional Gaussian "
+        "when some are. Returns a CPDAG + score.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
+            "a mixed-data setting read",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            _SCORE_FUNC,
+            _PENALTY_DISCOUNT,
+            _EBIC_GAMMA_STANDARD,
+            _EQUIVALENT_SAMPLE_SIZE,
+            ParamSpec(
+                name="insertion",
+                type="str",
+                default="safe",
+                choices=("safe", "conservative"),
+                doc="Which pairs an edge addition skips: safe (SafeInsert) skips a pair when one "
+                "graph of the current class scores better without the edge, and the paper proves "
+                "that it recovers the true class as the rows grow; conservative "
+                "(ConservativeInsert) also skips it when any valid addition of the edge worsens "
+                "the score, with fewer errors in the paper's simulations and no such proof. safe "
+                "favors the proof and gives up accuracy; conservative favors fewer errors (the "
+                "lower mean error in 31 of 38 settings of the paper's simulation) and gives up "
+                "the proof.",
+            ),
+            ParamSpec(
+                name="schedule",
+                type="str",
+                default="lges",
+                choices=("lges", "lges0_released"),
+                doc="The order of the phases: lges is the paper's LGES (Algorithm 1), deleting "
+                "then reversing edges until neither improves the score before each single "
+                "addition; lges0_released is its LGES-0 (Algorithm 8) in the order of the "
+                "authors' code: additions, deletions, then reversals, once. lges is the "
+                "default as the paper's main method. lges favors accuracy on denser graphs and "
+                "gives up time (where both ran in one process, the conservative rule at mean "
+                "degree 1 and 3, where the safe fits ran first and carry about 0.25 s of start-up, "
+                "its median fit took 1.0 to 1.33 times as long as LGES-0's; at mean degree 2, "
+                "4, and 6, timed in separate runs, so small differences are noise, 0.9 to 1.8 "
+                "times); "
+                "lges0_released favors time and gives up accuracy on denser graphs. On the "
+                "paper's linear-Gaussian simulation lges was better in 15 of 16 settings at "
+                "mean degree 3; at mean degree 1 and 2 the two made about as many errors (mean "
+                "errors summed over 32 settings, 457 against 459), lges0_released better in "
+                "12, lges in 5, with 15 ties.",
+            ),
+            _CATEGORICAL,
+        ),
+        references=("Ejaz & Bareinboim 2025",),
     )
 )
 _add(
@@ -2151,8 +2245,8 @@ _PERMUTATION_FCI_SEED = concept_param(
     "seed",
     doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh random one, "
     "so a fit repeats. Seed for the random order in which the BOSS or GRaSP phase visits "
-    "variables, for GRaSP's random starting order, and for the random draws of rcot, cmiknn, and "
-    "gpdc.",
+    "variables, for GRaSP's random starting order, and for the random draws of rcot, cmiknn, "
+    "gpdc, gcm, wgcm, and pcm.",
 )
 for _name, _summary, _own, _refs in (
     (
@@ -2654,7 +2748,7 @@ _add(
             "residuals, score its score, search exact or greedy, families each column's family.",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         params=(
@@ -2665,8 +2759,9 @@ _add(
                 choices=_CPCM_FAMILIES,
                 doc="The family of each variable given its parents: one name for every column or a "
                 "list of one name per column. gaussian = mean and scale change with the parents; "
-                "gaussian_fixed_scale = the mean alone; exponential; pareto = scale 1, values of "
-                "at least 1; poisson; gamma = mean and shape; gamma_fixed_shape = the mean alone; "
+                "gaussian_fixed_scale = the mean alone; exponential; pareto = scale 1, values "
+                "greater than 1; poisson; gamma = mean and shape; gamma_fixed_shape = the mean "
+                "alone; "
                 "gumbel = location and scale; gumbel_fixed_scale = the location alone; "
                 "negative_binomial = the mean, one size for all rows. A column outside its "
                 "family's support raises ValueError.",
@@ -2693,6 +2788,21 @@ _add(
         ),
     )
 )
+_SKEWD_OPTIMIZER = ParamSpec(
+    name="optimizer",
+    type="str",
+    default="cmaes",
+    choices=("cmaes", "lbfgs"),
+    doc="The optimizer of each search of the penalized likelihood: cmaes = CMA-ES, the paper's "
+    "heuristic; lbfgs = L-BFGS-B with the analytic gradient, from the same starts within the same "
+    "bounds. cmaes favors the paper's optimizer and gives up time; lbfgs favors time and gives up "
+    "the paper's optimizer. On the paper's simulated pairs and graphs of 1,000 rows (graphs of 6 "
+    "and 10 variables; 20 seeds each, one worker), lbfgs decided worse than cmaes in no setting by "
+    "a paired bootstrap, at a median of 5.8 to 14.9 times less time per pair and 2.4 times less "
+    "per graph, and its penalized likelihood was lower in 306 of the 738 fitted models and higher "
+    "in 233.",
+)
+
 _add(
     MethodSpec(
         name="skewd_mv",
@@ -2709,7 +2819,7 @@ _add(
             "of DAGs scored and fits the number of conditional models fitted.",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         params=(
@@ -2726,7 +2836,8 @@ _add(
                 "nonlinear effects, each far slower per test: kci = kernel test, the authors' "
                 "choice; rcot = its random-feature approximation; cmiknn = nearest-neighbor "
                 "conditional mutual information; gpdc = Gaussian-process regression and distance "
-                "correlation. null picks fisherz.",
+                "correlation; gcm, wgcm, pcm = the generalized, weighted generalized, and "
+                "projected covariance measures of regression residuals. null picks fisherz.",
             ),
             ParamSpec(
                 name="tuning_iter",
@@ -2754,6 +2865,7 @@ _add(
                 "ValueError, raised once they are found, before any is fitted. 100 is the order up "
                 "to which the paper expects the method to apply. null sets no cap.",
             ),
+            _SKEWD_OPTIMIZER,
             concept_param(
                 "seed",
                 doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
@@ -2853,7 +2965,7 @@ _add(
             "search.",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         tie_break=True,
         params=(
@@ -3123,6 +3235,7 @@ _add(
                 "the ends and fewer than half (majority) or none (conservative) of them hold the "
                 "middle. The default majority does not depend on the order of the variables.",
             ),
+            _LINKS_POSSIBLY_SEPARABLE,
             _INDEP_TEST,
             _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
@@ -3249,6 +3362,119 @@ _add(
             ),
         ),
         references=("Gunther et al. 2023", "Runge 2020"),
+    )
+)
+_add(
+    MethodSpec(
+        name="rpcmci",
+        family="temporal",
+        summary="Regime-PCMCI for one multivariate time series whose lagged causal links switch "
+        "between a few persistent regimes: the regime of each time step and the lagged links of "
+        "each regime. Returns one temporal structure per regime.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data", kind="matrix", doc="A multivariate time series, row = step."
+                ),
+            ),
+            layout="(n_samples, n_variables), row = time step",
+        ),
+        output=OutputSpec(
+            structure_type="temporal",
+            graph_kind=None,
+            regimes=True,
+            doc="the regime of each time step and the regime weights; per regime, lag graphs "
+            "for lags 1..tau_max with MCI p_values, statistics, and the PC1 parents in metadata.",
+        ),
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            ParamSpec(
+                name="n_regimes",
+                type="int",
+                default=2,
+                doc="The number of regimes, at least 2.",
+                minimum=2,
+            ),
+            ParamSpec(
+                name="max_transitions",
+                type="int",
+                default=1,
+                doc="The most times each regime may switch on or off over the series, at least 1; "
+                "about n_samples / (mean regime length * n_regimes).",
+                minimum=1,
+            ),
+            ParamSpec(
+                name="switch_threshold",
+                type="float",
+                default=0.5,
+                doc="The weight above which a time step joins a regime's PCMCI step and model "
+                "fit, in (0, 1).",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+            ),
+            concept_param(
+                "tau_max",
+                doc="The largest lag tested; links at lags 1 to tau_max are tested.",
+            ),
+            ParamSpec(
+                name="pc1_alpha",
+                type="float",
+                default=0.2,
+                doc="Significance level of each regime's PC1 parent selection; larger keeps more "
+                "parents as conditions.",
+                minimum=0,
+                maximum=1,
+                exclusive_minimum=True,
+                exclusive_maximum=True,
+            ),
+            concept_param(
+                "alpha",
+                default=0.01,
+                doc="Significance level of each regime's MCI test, the level that decides the "
+                "returned links; a link is kept when its p-value is at most this.",
+            ),
+            concept_param(
+                "fdr_method",
+                default="none",
+                doc="How each regime's MCI p-values are corrected for the number of links tested: "
+                "none keeps them as tested; fdr_bh replaces them with their Benjamini-Hochberg "
+                "adjusted values over all the regime's links together, and a link is kept when its "
+                "adjusted p-value is at most alpha.",
+            ),
+            concept_param(
+                "indep_test",
+                default="student_t",
+                nullable=False,
+                choices=("student_t", "fisherz"),
+                doc="The partial-correlation test, for linear effects: student_t takes the p-value "
+                "from the Student-t distribution, fisherz from Fisher's z-transform.",
+            ),
+            concept_param(
+                "n_starts",
+                default=50,
+                doc="Number of starts, each from its own random regime assignment drawn from "
+                "seed and its index; returns the start with the lowest objective.",
+            ),
+            concept_param(
+                "max_iter",
+                default=20,
+                nullable=False,
+                doc="The most iterations of each start, at least 1; one iteration learns every "
+                "regime's graph and then reassigns the time steps.",
+            ),
+            concept_param(
+                "seed",
+                doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
+                "random one, so a fit repeats. Start 0 draws its first regime weights from "
+                "seed, start a > 0 from SeedSequence(seed, spawn_key=(a,)).",
+            ),
+        ),
+        references=("Saggioro et al. 2020", "Runge et al. 2019"),
     )
 )
 _add(
@@ -3640,8 +3866,9 @@ _add(
                 choices=_CPCM_FAMILIES,
                 doc="The family of each variable given its parents: one name for every column or a "
                 "list of one name per column. gaussian = mean and scale change with the parents; "
-                "gaussian_fixed_scale = the mean alone; exponential; pareto = scale 1, values of "
-                "at least 1; poisson; gamma = mean and shape; gamma_fixed_shape = the mean alone; "
+                "gaussian_fixed_scale = the mean alone; exponential; pareto = scale 1, values "
+                "greater than 1; poisson; gamma = mean and shape; gamma_fixed_shape = the mean "
+                "alone; "
                 "gumbel = location and scale; gumbel_fixed_scale = the location alone; "
                 "negative_binomial = the mean, one size for all rows. A column outside its "
                 "family's support raises ValueError.",
@@ -3662,7 +3889,7 @@ _add(
             "p-value of the test that x and y are independent; families is each column's family.",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         references=("Bodik & Chavez-Demoulin 2025", "Gretton et al. 2008", "Pfister et al. 2018"),
     )
@@ -3715,11 +3942,15 @@ _add(
             ParamSpec(
                 name="criterion",
                 type="str",
-                default="independence",
-                choices=("independence", "likelihood"),
-                doc="independence = an HSIC test of each direction's scaled residual against its "
-                "proposed cause decides (SkewD-IT); likelihood = the direction whose model has the "
-                "larger likelihood (SkewD-LL).",
+                default="likelihood",
+                choices=("likelihood", "independence"),
+                doc="likelihood = the direction whose model has the larger likelihood (SkewD-LL); "
+                "right on all 160 measured pairs, no p-value, assumes Gaussian marginals of the "
+                "standardized variables: on the paper's 13 established pair benchmarks it "
+                "averaged 77% right against 85% for the independence test, 46% against 67% on "
+                "the Tübingen pairs. independence = an HSIC test of each direction's scaled "
+                "residual against its proposed cause decides (SkewD-IT); a p-value and alpha, "
+                "right on 154 of the 160. Both read the same fits.",
             ),
             _TUNING_ITER,
             concept_param(
@@ -3729,6 +3960,7 @@ _add(
                 "direction, at least 1; 5000 is the value of the paper's runs. Reaching it warns "
                 "with SearchLimitWarning.",
             ),
+            _SKEWD_OPTIMIZER,
             concept_param(
                 "seed",
                 doc="null is the configured seed, ANDREY_SEED or 0 when it is unset, not a fresh "
@@ -3744,7 +3976,7 @@ _add(
             "statistic, divided by its mean under independence, of each test.",
         ),
         accel="numpy",
-        status="experimental",
+        status="supported",
         column_order="relabels",
         references=("Klippert & Marx 2026", "Gretton et al. 2008"),
     )
@@ -4234,24 +4466,26 @@ for _name in CONCEPTS["missing"].conforming:
 
 #: Structural EM on the searches whose fit reads only a covariance and the row count, after their
 #: categorical columns where they have them: supported in EM_SUPPORTED, experimental in the others.
+#: The number of its rounds follows it.
 _MISSING_EM = {
     supported: concept_param(
         "missing",
         choices=(EM,),
         doc=f"How missing values (NaN) are handled: em = {status}structural EM, which alternates "
         "the search on the expected covariance of the data with linear-Gaussian fits of the "
-        "graph it returns: 10 searches, with 5 parameter-only EM steps on the current graph "
-        "before each after the first; it assumes values missing completely at random or at "
-        "random given observed values. null refuses missing values.",
+        "graph it returns: n_em_iterations searches, with 5 parameter-only EM steps on the "
+        "current graph before each after the first; it assumes values missing completely at "
+        "random or at random given observed values. null refuses missing values.",
     )
     for supported, status in ((True, ""), (False, "experimental "))
 }
+_N_EM_ITERATIONS = concept_param("n_em_iterations")
 for _name in EM_METHODS:
     _params = REGISTRY[_name].params
     _cut = next((i + 1 for i, p in enumerate(_params) if p.name == "categorical"), len(_params))
     _missing_em = _MISSING_EM[_name in EM_SUPPORTED]
     REGISTRY[_name] = REGISTRY[_name].model_copy(
-        update={"params": (*_params[:_cut], _missing_em, *_params[_cut:])}
+        update={"params": (*_params[:_cut], _missing_em, _N_EM_ITERATIONS, *_params[_cut:])}
     )
 
 #: The path and confounder parts a method honors as supported: the method ran in the lanes of
@@ -4363,7 +4597,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     ),
     **dict.fromkeys(("ldp", "ld3"), ("partition",)),
     "locpc_cde": ("hop", "visited", "double_bar"),
-    **dict.fromkeys(("gies", "xges", "mmhc", "rsmax2"), ("score",)),
+    **dict.fromkeys(("gies", "xges", "lges", "mmhc", "rsmax2"), ("score",)),
     **dict.fromkeys(
         ("ges", "hc", "tabu", "boss", "grasp"), ("score", "index_edges", "changing_variables")
     ),
@@ -4386,6 +4620,11 @@ _METADATA: dict[str, tuple[str, ...]] = {
         *("context_links", "index_edges", "time_index_edges", "time_dummy"),
     ),
     "lpcmci": ("links", "p_values", "statistics", "parents", "conflicts"),
+    # The run's keys, then each regime's.
+    "rpcmci": (
+        *("objective", "start", "n_iterations", "converged", "failed_starts"),
+        *("p_values", "statistics", "parents"),
+    ),
     **dict.fromkeys(("anm", "pnl"), ("p_values", "statistics")),
     "loci": ("log_likelihoods", "p_values", "statistics"),
     "cpcm": ("p_values", "statistics", "independence_p_value", "families"),
@@ -4400,6 +4639,11 @@ _METADATA: dict[str, tuple[str, ...]] = {
         *("target", "markov_blanket", "parents", "children", "equivalent_models", "subspaces"),
     ),
 }
+# The methods with missing values whose searches remove pairs by conditioning sets, which list the
+# drawn edges a set not tested might have removed.
+_SEPARATING_SEARCHES = frozenset(
+    ("pc", "fci", "cdnod", "fci_jci", "iamb", "inter_iamb", "mmpc", "pcmci", "pcmciplus", "lpcmci")
+)
 # The shared keys: the name, the seed of a seeded fit, the changes before each later start, the
 # test and the score it used with the score's penalties, the configuration's tie-break rule, the
 # column types a mixed-data setting read, the fewest rows a test used and how missing values were
@@ -4422,7 +4666,18 @@ for _name, _spec in REGISTRY.items():
         ),
         *(("tie_break",) if _spec.tie_break else ()),
         *(("categorical",) if "categorical" in _concepts else ()),
-        *(("rows_tested",) if _spec.data.missing else ()),
+        *(
+            (
+                "rows_tested",
+                "p_one_tests",
+                "not_tested",
+                "undecided_pairs",
+                *(("possibly_separable",) if _name in _SEPARATING_SEARCHES else ()),
+                "never_observed_together",
+            )
+            if _spec.data.missing
+            else ()
+        ),
         *(("missing",) if "missing" in _concepts else ()),
         *(("em",) if _name in EM_METHODS else ()),
         *(("ambiguous_triples",) if "collider_rule" in _concepts else ()),

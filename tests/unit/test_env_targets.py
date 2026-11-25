@@ -467,7 +467,10 @@ def test_environments_apart_that_cannot_be_read_raise(case):
 
 def test_a_missing_value_names_its_environment_and_row():
     nan = {**APART, "set x1": _with_nan(APART["set x1"])}
-    with pytest.raises(ValueError, match=r"environment 'set x1'.* row 3,"):
+    with pytest.raises(
+        ValueError,
+        match=r"^gies: drop the rows .*; gies does not accept .* environment 'set x1'.* row 3,",
+    ):
         andrey.gies(nan, targets=TARGETS)
 
 

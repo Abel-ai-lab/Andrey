@@ -207,17 +207,17 @@ def test_each_pass_is_counted_once(pools: list[int], monkeypatch: pytest.MonkeyP
     counted = {"search": 0, "pool": 0}
     scans: list[tuple[int, list[int] | None]] = []
 
-    def counting(module, name):
-        real = module.pair_queries
+    def counting(module, name, function):
+        real = getattr(module, function)
 
         def count(*args):
             counted[name] += 1
             return real(*args)
 
-        monkeypatch.setattr(module, "pair_queries", count)
+        monkeypatch.setattr(module, function, count)
 
-    counting(pc_module, "search")
-    counting(_parallel_skeleton, "pool")
+    counting(pc_module, "search", "testable_queries")
+    counting(_parallel_skeleton, "pool", "pair_queries")
     real_scan = _parallel_skeleton.SkeletonWorkerPool.scan
 
     def scan(self, pairs, neighbors, adj_mask, size, alpha, record_pvalues=True, weights=None):

@@ -42,7 +42,7 @@ whose Reproduce table lists the driver.
 | [DirectLiNGAM and ICA-LiNGAM](comparisons/lingam.md) | `lingam_cpu.py`, `lingam_gpu.py` | DirectLiNGAM (CPU and GPU), ICA-LiNGAM | causal-learn | 0.1.0, 0.9.0 |
 | [ANM direction test](comparisons/anm.md) | `anm_pairs.py` | ANM | causal-learn | 0.4.0, 0.9.0 |
 | [CAM and RESIT](comparisons/cam-resit.md) | `fcm_cpu.py` | CAM, RESIT | CAM 1.0 (R), the authors' R code for RESIT, lingam | 0.13.0 |
-| [SCORE and NoGAM](comparisons/score-nogam.md) | `stein_cpu.py` | SCORE, NoGAM, DAS; CAM as context | the authors' SCORE code, NoGAM and DAS in dodiscover, CausalDisco (R2-SortnRegress) | 0.17.0 |
+| [SCORE and NoGAM](comparisons/score-nogam.md) | `stein_cpu.py` | SCORE, NoGAM, DAS; CAM as context | the authors' SCORE code, NoGAM and DAS in dodiscover, CausalDisco (R2-SortnRegress) | 0.17.0, 0.19.0 |
 | [NOTEARS and DAGMA](comparisons/notears-dagma.md) | `notears_cpu.py`, `notears_summary.py` | NOTEARS, DAGMA, each also with `standardize=True` and `robust=True` | the authors' NOTEARS code, the authors' dagma; CausalDisco (R2-SortnRegress, Var-SortnRegress) as controls | 0.17.0, 0.18.0 |
 | [PNL direction test](comparisons/pnl.md) | `pnl_pairs.py` | PNL | causal-learn | 0.4.0, 0.9.0 |
 | [LOCI direction test](comparisons/loci.md) | `loci_pairs.py` | LOCI, both criteria; ANM, PNL, and CAM as context | the authors' LOCI code (spline features, both criteria) | 0.16.0 |
@@ -64,14 +64,16 @@ whose Reproduce table lists the driver.
 | [VARMA-LiNGAM and longitudinal LiNGAM](comparisons/lingam-time-series.md) | `lingam_ts.py` | VARMA-LiNGAM, LongitudinalLiNGAM | lingam | 0.5.0, 0.9.0 |
 | [DYNOTEARS](comparisons/dynotears.md) | `dynotears_ts.py` | DYNOTEARS | CausalNex | 0.14.0 |
 | [Cross-link F1 of a time-series run](comparisons/cross-link-f1.md) | `rescore_cross_links.py`, `rescore_window_pag.py` | rescores a finished run | | |
+| Tübingen cause-effect pairs | `tuebingen_pairs.py`, `tuebingen_summary.py` | `anm`, `pnl`, `loci` (both criteria), and `resit` on the real pairs of `load_dataset("tuebingen")` | the authors' code of QCCD, HECI, and GRCI | |
 | Public datasets | `public_datasets.py` | every method on Sachs and the bnlearn networks | every package | 0.1.0 |
 | [Dispatch thresholds](comparisons/dispatch-thresholds.md) | | Andrey's own execution paths | | |
 
 `start.sh` builds the benchmark environment; `start_r.sh`, `start_cam_r.sh`, `start_resit_r.sh`,
 `start_mvpc_r.sh`, `start_sbcd_r.sh`, `start_missdag.sh`, `start_mmb.sh`, `start_xges.sh`,
 `start_tigramite.sh`, `start_lingam.sh`, `start_lingam_ts.sh`, `start_causalnex.sh`,
-`start_utigsp.sh`, `start_loci.sh`, `start_skewd.sh`, `start_stein.sh`, and `start_notears.sh` build
-the separate environments some comparisons need ([setup](README.md#setup)).
+`start_utigsp.sh`, `start_loci.sh`, `start_skewd.sh`, `start_stein.sh`, `start_notears.sh`,
+`start_qccd.sh`, `start_heci.sh`, `start_grci.sh`, and `start_regression_ci_r.sh` build the separate
+environments some comparisons need ([setup](README.md#setup)).
 
 ## Release cards
 
@@ -107,9 +109,20 @@ and the other pairwise methods on the same pairs. The 0.17.0 summary draws SCORE
 from [`published/0.17.0/stein-score.json`](published/0.17.0/stein-score.json), SCORE with its
 authors' code and NoGAM with dodiscover, which their [comparison page](comparisons/score-nogam.md)
 presents, with `cam` and the floors on the same datasets, the fresh seeds, and the additive-noise
-check. The path and confounder claims are in no release summary:
-[`published/0.16.0/knowledge-paths.json`](published/0.16.0/knowledge-paths.json) holds the rows of
-the first eight methods and
+check. The 0.19.0 summary draws DAS's rows from
+[`published/0.19.0/das.json`](published/0.19.0/das.json), DAS with dodiscover, which also holds its
+floors up to 1,000 variables, `cam`, SCORE, and NoGAM on the same datasets, the fresh seeds, the
+five paired fits at 500 variables, and the check of its order search on raw columns. Its CPCM rows
+come from [`published/0.19.0/cpcm.json`](published/0.19.0/cpcm.json), the pair test and the graph
+search with the authors' R code on the paper's pairs and graphs, which also holds the conservative
+estimate's outcomes, the floors, the fresh seeds, and LOCI, ANM, PNL, and eight graph methods on the
+same data. Its SkewD rows come from [`published/0.19.0/skewd.json`](published/0.19.0/skewd.json),
+SkewD under both criteria and SkewD-MV against the authors' recorded outputs on the paper's pairs
+and graphs, which also holds the fresh run of the authors' code that checks those outputs, the
+floors, the fresh graph seeds, and LOCI, ANM, PNL, CAM, and five graph methods on the same data. The
+path and confounder claims are in no release
+summary: [`published/0.16.0/knowledge-paths.json`](published/0.16.0/knowledge-paths.json) holds the
+rows of the first eight methods and
 [`published/0.17.0/knowledge-paths.json`](published/0.17.0/knowledge-paths.json) those of the other
 14, which their [comparison page](comparisons/knowledge-paths.md) presents. The missing-data lanes'
 rows are in [`published/0.16.0/missing-data.json`](published/0.16.0/missing-data.json) and, for GES,
@@ -141,6 +154,7 @@ which its [comparison page](comparisons/mmmb.md) presents.
 
 | Release | Release card | Summary |
 |---|---|---|
+| 0.19.0 | [0.19.0 release card](../docs/docs/benchmarks/0.19.0.md) | [`published/0.19.0/summary.json`](published/0.19.0/summary.json) |
 | local discovery | [local discovery release card](../docs/docs/benchmarks/local-discovery.md) | [`published/local-discovery/summary.json`](published/local-discovery/summary.json) |
 | 0.18.0 | [0.18.0 release card](../docs/docs/benchmarks/0.18.0.md) | [`published/0.18.0/summary.json`](published/0.18.0/summary.json) |
 | 0.17.0 | [0.17.0 release card](../docs/docs/benchmarks/0.17.0.md) | [`published/0.17.0/summary.json`](published/0.17.0/summary.json) |

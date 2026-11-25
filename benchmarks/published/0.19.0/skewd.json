@@ -1,0 +1,2994 @@
+{
+ "release": "0.19.0",
+ "generated": "2026-11-22",
+ "lane": "skewd",
+ "methods": [
+  "skewd",
+  "skewd_mv"
+ ],
+ "status": "supported",
+ "about": "SkewD's published measurements; the release summary's SkewD and SkewD-MV entries are built from it",
+ "build": "Andrey at commit 4c1cda49b of the functional-models line, from before 0.18.0. Since then, SkewD sums each column's mean and variance over its sorted values (so they do not depend on the row order); counts the two directions as tied when their values agree to 1e-9 relative (the closest of these pairs differ by 2.9%); can run its searches on threads, with the serial result bit for bit; and the ECM step that ends each fit reads the normal density-to-distribution ratio in a more stable form, which changes results in their last digits. Refits with the 0.19.0 code at the defaults, one core and one BLAS thread, on seeds 0-4 of every set and size (50 datasets) gave the same direction under both criteria on all 40 pairs and the same graph on all 10 graphs; 79 of the 80 pair log-likelihoods agree to 1e-8 relative and one by 8e-4 (0.9% relative; P5 seed 2, forward), with the same direction. PC's class as SkewD-MV computes it, and its column order, are the same on all 80 graph datasets under both builds. The criteria are read from one fit per pair",
+ "comparators": {
+  "SkewD authors' recorded outputs": "SkewD-LL as recorded per dataset by the code published with the paper (commit 312632b), run by the authors with the paper's arguments on the same data files; checked by a reduced fresh run (reference_check in the lane file)"
+ },
+ "packages": {
+  "SkewD (authors' code)": "commit 312632b",
+  "NumPy (authors' code)": "1.26.4",
+  "cmaes": "0.13.1",
+  "scikit-optimize": "0.10.2"
+ },
+ "hardware": {
+  "cpu_models": [
+   "AMD EPYC 7713 64-Core Processor",
+   "AMD EPYC 9534 64-Core Processor"
+  ],
+  "cpu_by_part": {
+   "pairs": "AMD EPYC 9534 64-Core Processor",
+   "graphs, seeds 0-19": "AMD EPYC 7713 64-Core Processor",
+   "graphs, seeds 20-39": "AMD EPYC 9534 64-Core Processor"
+  },
+  "cores_per_fit": 1,
+  "blas_threads": 1
+ },
+ "verdict_rule": "per set (pairs, seeds 0-19, each criterion) or per graph size (seeds 0-19, then 20-39 fresh): D = error(Andrey) - error(the authors' recorded output) per dataset; worse when the 95% percentile-bootstrap interval of mean D lies entirely above 0, better when entirely below, a tie otherwise; 10,000 resamples, default_rng(0). Floors: for pairs the Wilson 95% lower bound of the share right above 0.5 (coin_flip_floor; the column order is swapped on exactly 10 of each 20 pairs, so the majority direction is right on half), for graphs the empty graph (floor). A graph fit over 4 h of CPU counts as failed and scores the worst DAG's SHD; none was",
+ "seeds_note": "pairs: seeds 0-19, pairs 1-10 of each of a pooled set's two files or pairs 1-20 of a single file; graphs: seeds 0-19 are datasets 1-20 and the fresh seeds 20-39 datasets 21-40 of the authors' files",
+ "fit_protocol": "each fit in a job of its set on one core with one BLAS thread, one timed fit at the defaults; pairs killed at 2 h and graphs at 4 h of CPU, which no fit reached; times are CPU seconds",
+ "regimes": {
+  "skewd_pairs": "the SkewD paper's skewed pairs, 1,000 rows: additive (ANs) and location-scale (LSs) noise models at three noise skewnesses (-0.455, 0.985 and 1.750), and Tagasovska et al.'s (2020) Gaussian-noise location-scale sets LS and LS-s, 20 pairs each, the column order swapped on 10",
+  "skewd_mv_graphs": "the SkewD paper's skew-normal location-scale graphs (Table 2): Erdos-Renyi DAGs with as many edges as variables, 6 and 10 variables, 1,000 rows, sources uniform on [-3.5, 3.5], 20 datasets per size and 20 fresh"
+ },
+ "data_identity": "each recorded pair output stores the standardized data it fitted; it agrees to 1e-12 with the standardized (cause, effect) Andrey's arm read on 320 of the 320 pairs of the eight sets, seeds 0-39",
+ "recorded_outputs": {
+  "about": "the recorded outputs over every pair of each set and the first 100 graphs of each size: the share each criterion names right, the paper's Table 5, and the mean SHD (a reversal counting 2), the paper's Table 2",
+  "pairs": {
+   "P1": {
+    "set": "ANs(-0.455)",
+    "pairs": 200,
+    "it_share": 0.985,
+    "ll_share": 1.0
+   },
+   "P2": {
+    "set": "ANs(0.985)",
+    "pairs": 200,
+    "it_share": 0.975,
+    "ll_share": 1.0
+   },
+   "P3": {
+    "set": "ANs(1.750)",
+    "pairs": 100,
+    "it_share": 1.0,
+    "ll_share": 1.0
+   },
+   "P4": {
+    "set": "LSs(-0.455)",
+    "pairs": 200,
+    "it_share": 0.86,
+    "ll_share": 1.0
+   },
+   "P5": {
+    "set": "LSs(0.985)",
+    "pairs": 200,
+    "it_share": 0.825,
+    "ll_share": 1.0
+   },
+   "P6": {
+    "set": "LSs(1.750)",
+    "pairs": 100,
+    "it_share": 0.92,
+    "ll_share": 1.0
+   },
+   "S1": {
+    "set": "LS (Gaussian noise)",
+    "pairs": 100,
+    "it_share": 0.87,
+    "ll_share": 1.0
+   },
+   "S2": {
+    "set": "LSs (Gaussian noise, sigmoid)",
+    "pairs": 100,
+    "it_share": 0.97,
+    "ll_share": 1.0
+   }
+  },
+  "graphs": {
+   "M1": {
+    "d": 6,
+    "datasets": 100,
+    "mean_shd": 2.27
+   },
+   "M2": {
+    "d": 10,
+    "datasets": 100,
+    "mean_shd": 4.72
+   }
+  }
+ },
+ "parity": [
+  {
+   "method": "SkewD",
+   "family": "pairwise",
+   "solution": "andrey.skewd.numpy",
+   "setting": "criterion=\"likelihood\" (default), alpha=None",
+   "comparator": "SkewD authors' recorded outputs",
+   "comparator_solution": "klippert-marx.skewd.recorded",
+   "comparator_setting": "SkewD-LL as recorded per dataset by the code published with the paper (commit 312632b), run by the authors with the paper's arguments on the same data files; checked by a reduced fresh run (reference_check in the lane file)",
+   "lane": "skewd",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 9534 64-Core Processor for Andrey's fits of every method on the pairs, 1 core per fit, 1 BLAS thread; the recorded outputs hold no times",
+   "cores": 1,
+   "build": "Andrey at commit 4c1cda49b of the functional-models line, from before 0.18.0. Since then, SkewD sums each column's mean and variance over its sorted values (so they do not depend on the row order); counts the two directions as tied when their values agree to 1e-9 relative (the closest of these pairs differ by 2.9%); can run its searches on threads, with the serial result bit for bit; and the ECM step that ends each fit reads the normal density-to-distribution ratio in a more stable form, which changes results in their last digits. Refits with the 0.19.0 code at the defaults, one core and one BLAS thread, on seeds 0-4 of every set and size (50 datasets) gave the same direction under both criteria on all 40 pairs and the same graph on all 10 graphs; 79 of the 80 pair log-likelihoods agree to 1e-8 relative and one by 8e-4 (0.9% relative; P5 seed 2, forward), with the same direction. PC's class as SkewD-MV computes it, and its column order, are the same on all 80 graph datasets under both builds. The criteria are read from one fit per pair",
+   "same_graph_test": "the same direction",
+   "regime": "skewd_pairs",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "SHD of the two-node DAG, 1 for the reversed direction or no edge and 0 for the true one; the _mean fields are the error rates",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "SkewD|P1|ANs|likelihood",
+     "effect": "ANs(-0.455), likelihood",
+     "set": "ANs",
+     "noise": "skew-normal (shape -2) and asymmetric generalized normal (k = 0.15)",
+     "noise_skewness": -0.455,
+     "criterion": "likelihood",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 900.1,
+     "andrey_s_max": 1066.0,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 20,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|P2|ANs|likelihood",
+     "effect": "ANs(0.985), likelihood",
+     "set": "ANs",
+     "noise": "skew-normal (shape 20) and asymmetric generalized normal (k = -0.31)",
+     "noise_skewness": 0.985,
+     "criterion": "likelihood",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1105.0,
+     "andrey_s_max": 1349.6,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 20,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|P3|ANs|likelihood",
+     "effect": "ANs(1.750), likelihood",
+     "set": "ANs",
+     "noise": "asymmetric generalized normal (k = -0.5)",
+     "noise_skewness": 1.75,
+     "criterion": "likelihood",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1146.1,
+     "andrey_s_max": 1660.3,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 20,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|P4|LSs|likelihood",
+     "effect": "LSs(-0.455), likelihood",
+     "set": "LSs",
+     "noise": "skew-normal (shape -2) and asymmetric generalized normal (k = 0.15)",
+     "noise_skewness": -0.455,
+     "criterion": "likelihood",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1151.9,
+     "andrey_s_max": 1737.8,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 20,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|P5|LSs|likelihood",
+     "effect": "LSs(0.985), likelihood",
+     "set": "LSs",
+     "noise": "skew-normal (shape 20) and asymmetric generalized normal (k = -0.31)",
+     "noise_skewness": 0.985,
+     "criterion": "likelihood",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1303.5,
+     "andrey_s_max": 1787.3,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 20,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|P6|LSs|likelihood",
+     "effect": "LSs(1.750), likelihood",
+     "set": "LSs",
+     "noise": "asymmetric generalized normal (k = -0.5)",
+     "noise_skewness": 1.75,
+     "criterion": "likelihood",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1309.5,
+     "andrey_s_max": 2317.3,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 20,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|S1|LS|likelihood",
+     "effect": "LS, likelihood",
+     "set": "LS",
+     "noise": "Gaussian",
+     "noise_skewness": null,
+     "criterion": "likelihood",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 988.5,
+     "andrey_s_max": 1346.5,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 20,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|S2|LS-s|likelihood",
+     "effect": "LS-s, likelihood",
+     "set": "LS-s",
+     "noise": "Gaussian",
+     "noise_skewness": null,
+     "criterion": "likelihood",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1076.7,
+     "andrey_s_max": 1697.7,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 20,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "SkewD",
+   "family": "pairwise",
+   "solution": "andrey.skewd.numpy",
+   "setting": "criterion=\"independence\", alpha=None",
+   "comparator": "SkewD authors' recorded outputs",
+   "comparator_solution": "klippert-marx.skewd.recorded",
+   "comparator_setting": "SkewD-IT as recorded per dataset by the code published with the paper (commit 312632b), run by the authors with the paper's arguments on the same data files; checked by a reduced fresh run (reference_check in the lane file)",
+   "lane": "skewd.independence",
+   "output": "two-node DAG",
+   "hardware": "AMD EPYC 9534 64-Core Processor for Andrey's fits of every method on the pairs, 1 core per fit, 1 BLAS thread; the recorded outputs hold no times",
+   "cores": 1,
+   "build": "Andrey at commit 4c1cda49b of the functional-models line, from before 0.18.0. Since then, SkewD sums each column's mean and variance over its sorted values (so they do not depend on the row order); counts the two directions as tied when their values agree to 1e-9 relative (the closest of these pairs differ by 2.9%); can run its searches on threads, with the serial result bit for bit; and the ECM step that ends each fit reads the normal density-to-distribution ratio in a more stable form, which changes results in their last digits. Refits with the 0.19.0 code at the defaults, one core and one BLAS thread, on seeds 0-4 of every set and size (50 datasets) gave the same direction under both criteria on all 40 pairs and the same graph on all 10 graphs; 79 of the 80 pair log-likelihoods agree to 1e-8 relative and one by 8e-4 (0.9% relative; P5 seed 2, forward), with the same direction. PC's class as SkewD-MV computes it, and its column order, are the same on all 80 graph datasets under both builds. The criteria are read from one fit per pair",
+   "same_graph_test": "the same direction",
+   "regime": "skewd_pairs",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "SHD of the two-node DAG, 1 for the reversed direction or no edge and 0 for the true one; the _mean fields are the error rates",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "SkewD|P1|ANs|independence",
+     "effect": "ANs(-0.455), independence",
+     "set": "ANs",
+     "noise": "skew-normal (shape -2) and asymmetric generalized normal (k = 0.15)",
+     "noise_skewness": -0.455,
+     "criterion": "independence",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 900.1,
+     "andrey_s_max": 1066.0,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 18,
+     "comparator_reversed": 2,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 2,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.9,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.1,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.25,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -1.0,
+        -0.75
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|P2|ANs|independence",
+     "effect": "ANs(0.985), independence",
+     "set": "ANs",
+     "noise": "skew-normal (shape 20) and asymmetric generalized normal (k = -0.31)",
+     "noise_skewness": 0.985,
+     "criterion": "independence",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1105.0,
+     "andrey_s_max": 1349.6,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 20,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|P3|ANs|independence",
+     "effect": "ANs(1.750), independence",
+     "set": "ANs",
+     "noise": "asymmetric generalized normal (k = -0.5)",
+     "noise_skewness": 1.75,
+     "criterion": "independence",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1146.1,
+     "andrey_s_max": 1660.3,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 20,
+     "comparator_reversed": 0,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 1.0,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.0,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|P4|LSs|independence",
+     "effect": "LSs(-0.455), independence",
+     "set": "LSs",
+     "noise": "skew-normal (shape -2) and asymmetric generalized normal (k = 0.15)",
+     "noise_skewness": -0.455,
+     "criterion": "independence",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 0.9,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1151.9,
+     "andrey_s_max": 1737.8,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 18,
+     "andrey_reversed": 2,
+     "andrey_no_edge": 0,
+     "comparator_correct": 18,
+     "comparator_reversed": 2,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 0,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.9,
+     "andrey_shd_mean": 0.1,
+     "comparator_shd_mean": 0.1,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      0.0,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -1.0,
+        -0.75
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.9,
+       "bootstrap_95": [
+        -1.0,
+        -0.75
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.699,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|P5|LSs|independence",
+     "effect": "LSs(0.985), independence",
+     "set": "LSs",
+     "noise": "skew-normal (shape 20) and asymmetric generalized normal (k = -0.31)",
+     "noise_skewness": 0.985,
+     "criterion": "independence",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 0.95,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1303.5,
+     "andrey_s_max": 1787.3,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 19,
+     "andrey_reversed": 1,
+     "andrey_no_edge": 0,
+     "comparator_correct": 17,
+     "comparator_reversed": 3,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 3,
+     "comparator_right_andrey_wrong_count": 1,
+     "comparator_direction_correct": 0.85,
+     "andrey_shd_mean": 0.05,
+     "comparator_shd_mean": 0.15,
+     "mean_D": -0.1,
+     "bootstrap_95": [
+      -0.3,
+      0.1
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.85,
+       "bootstrap_95": [
+        -1.0,
+        -0.7
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.764,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|P6|LSs|independence",
+     "effect": "LSs(1.750), independence",
+     "set": "LSs",
+     "noise": "asymmetric generalized normal (k = -0.5)",
+     "noise_skewness": 1.75,
+     "criterion": "independence",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1309.5,
+     "andrey_s_max": 2317.3,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 19,
+     "comparator_reversed": 1,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 1,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.95,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.05,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|S1|LS|independence",
+     "effect": "LS, independence",
+     "set": "LS",
+     "noise": "Gaussian",
+     "noise_skewness": null,
+     "criterion": "independence",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 0.85,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 988.5,
+     "andrey_s_max": 1346.5,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 17,
+     "andrey_reversed": 3,
+     "andrey_no_edge": 0,
+     "comparator_correct": 17,
+     "comparator_reversed": 3,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 2,
+     "comparator_right_andrey_wrong_count": 2,
+     "comparator_direction_correct": 0.85,
+     "andrey_shd_mean": 0.15,
+     "comparator_shd_mean": 0.15,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.2,
+      0.2
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -0.85,
+       "bootstrap_95": [
+        -1.0,
+        -0.7
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.85,
+       "bootstrap_95": [
+        -1.0,
+        -0.7
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.64,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD|S2|LS-s|independence",
+     "effect": "LS-s, independence",
+     "set": "LS-s",
+     "noise": "Gaussian",
+     "noise_skewness": null,
+     "criterion": "independence",
+     "d": 2,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_direction_correct": 1.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "andrey_s": 1076.7,
+     "andrey_s_max": 1697.7,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_correct": 20,
+     "andrey_reversed": 0,
+     "andrey_no_edge": 0,
+     "comparator_correct": 19,
+     "comparator_reversed": 1,
+     "comparator_no_edge": 0,
+     "andrey_right_comparator_wrong_count": 1,
+     "comparator_right_andrey_wrong_count": 0,
+     "comparator_direction_correct": 0.95,
+     "andrey_shd_mean": 0.0,
+     "comparator_shd_mean": 0.05,
+     "mean_D": -0.05,
+     "bootstrap_95": [
+      -0.15,
+      0.0
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -1.0,
+       "bootstrap_95": [
+        -1.0,
+        -1.0
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      }
+     },
+     "coin_flip_floor": {
+      "rule": "Wilson 95% lower bound of the share right above 0.5",
+      "wilson_low": 0.839,
+      "pass": true
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "replicated": "tie, not rerun",
+     "result": "tie",
+     "card_verdict": "tie"
+    }
+   ]
+  },
+  {
+   "method": "SkewD-MV",
+   "family": "functional",
+   "solution": "andrey.skewd_mv.numpy",
+   "setting": "defaults: PC with KCI at alpha 0.05, tuning_iter=20, max_iter=3000, max_fits=100",
+   "comparator": "SkewD authors' recorded outputs",
+   "comparator_solution": "klippert-marx.skewd_mv.recorded",
+   "comparator_setting": "SkewD-MV as recorded per dataset by the code published with the paper (commit 312632b), with its PC class; checked by a reduced fresh run",
+   "lane": "skewd_mv",
+   "output": "DAG",
+   "hardware": "AMD EPYC 7713 64-Core Processor for Andrey's fits of every method on seeds 0-19 and AMD EPYC 9534 64-Core Processor on seeds 20-39, 1 core per fit, 1 BLAS thread",
+   "cores": 1,
+   "build": "Andrey at commit 4c1cda49b of the functional-models line, from before 0.18.0. Since then, SkewD sums each column's mean and variance over its sorted values (so they do not depend on the row order); counts the two directions as tied when their values agree to 1e-9 relative (the closest of these pairs differ by 2.9%); can run its searches on threads, with the serial result bit for bit; and the ECM step that ends each fit reads the normal density-to-distribution ratio in a more stable form, which changes results in their last digits. Refits with the 0.19.0 code at the defaults, one core and one BLAS thread, on seeds 0-4 of every set and size (50 datasets) gave the same direction under both criteria on all 40 pairs and the same graph on all 10 graphs; 79 of the 80 pair log-likelihoods agree to 1e-8 relative and one by 8e-4 (0.9% relative; P5 seed 2, forward), with the same direction. PC's class as SkewD-MV computes it, and its column order, are the same on all 80 graph datasets under both builds. The criteria are read from one fit per pair",
+   "same_graph_test": "the same adjacency",
+   "regime": "skewd_mv_graphs",
+   "claim": "in",
+   "metric": "shd",
+   "error_metric": "SHD as the paper counts it: the entries of the two 0/1 adjacencies that differ, so a reversed edge counts 2; a fit over the 4 h cap would score the worst DAG's SHD, and none was",
+   "complete": true,
+   "rows": [
+    {
+     "cell": "SkewD-MV|M1",
+     "d": 6,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_shd_mean": 2.25,
+     "comparator_shd_mean": 2.25,
+     "empty_shd_mean": 6.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "same_graph": 16,
+     "andrey_s": 2944.0,
+     "andrey_s_max": 5865.5,
+     "comparator_s": null,
+     "ratio": null,
+     "mean_D": 0.0,
+     "bootstrap_95": [
+      -0.3,
+      0.3
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -3.75,
+       "bootstrap_95": [
+        -4.55,
+        -2.85
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -3.75,
+       "bootstrap_95": [
+        -4.6,
+        -2.849
+       ]
+      }
+     },
+     "skeleton_f1": 0.881,
+     "oracle_class": {
+      "about": "the likelihood stage on the true class, scored as the graph",
+      "andrey_shd_mean": 0.1,
+      "comparator_shd_mean": 0.1
+     },
+     "cost_seeds_0_39": {
+      "median_s": 1849.0,
+      "max_s": 6326.0
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "fresh": {
+      "fits": 20,
+      "andrey_ok": 20,
+      "andrey_shd_mean": 1.55,
+      "comparator_shd_mean": 1.65,
+      "empty_shd_mean": 6.0,
+      "comparator_ok": 20,
+      "paired": 20,
+      "datasets": 20,
+      "same_graph": 16,
+      "andrey_s": 1669.4,
+      "andrey_s_max": 6325.9,
+      "comparator_s": null,
+      "ratio": null,
+      "mean_D": -0.1,
+      "bootstrap_95": [
+       -0.4,
+       0.2
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 20,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 20,
+        "mean": -4.45,
+        "bootstrap_95": [
+         -5.05,
+         -3.75
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 20,
+        "mean": -4.35,
+        "bootstrap_95": [
+         -5.05,
+         -3.55
+        ]
+       }
+      },
+      "skeleton_f1": 0.923,
+      "seeds": "20-39"
+     },
+     "replicated": "tie on both seed sets",
+     "result": "tie",
+     "card_verdict": "tie"
+    },
+    {
+     "cell": "SkewD-MV|M2",
+     "d": 10,
+     "n": 1000,
+     "fits": 20,
+     "andrey_ok": 20,
+     "andrey_shd_mean": 4.7,
+     "comparator_shd_mean": 5.2,
+     "empty_shd_mean": 10.0,
+     "comparator_ok": 20,
+     "paired": 20,
+     "datasets": 20,
+     "same_graph": 12,
+     "andrey_s": 2230.2,
+     "andrey_s_max": 8746.7,
+     "comparator_s": null,
+     "ratio": null,
+     "mean_D": -0.5,
+     "bootstrap_95": [
+      -1.3,
+      0.3
+     ],
+     "above_zero": false,
+     "verdict": "tie",
+     "coverage": {
+      "datasets": 20,
+      "andrey_short": 0,
+      "reference_short": 0
+     },
+     "floor": {
+      "applies": true,
+      "pass": true,
+      "andrey_minus_empty": {
+       "paired": 20,
+       "mean": -5.3,
+       "bootstrap_95": [
+        -6.0,
+        -4.6
+       ]
+      },
+      "reference_minus_empty": {
+       "paired": 20,
+       "mean": -4.8,
+       "bootstrap_95": [
+        -5.7,
+        -3.85
+       ]
+      }
+     },
+     "skeleton_f1": 0.844,
+     "oracle_class": {
+      "about": "the likelihood stage on the true class, scored as the graph",
+      "andrey_shd_mean": 0.0,
+      "comparator_shd_mean": 0.0
+     },
+     "cost_seeds_0_39": {
+      "median_s": 1433.0,
+      "max_s": 8747.0
+     },
+     "claim": "in",
+     "first_seeds": "0-19",
+     "seeds": 20,
+     "fresh": {
+      "fits": 20,
+      "andrey_ok": 20,
+      "andrey_shd_mean": 4.75,
+      "comparator_shd_mean": 4.95,
+      "empty_shd_mean": 10.0,
+      "comparator_ok": 20,
+      "paired": 20,
+      "datasets": 20,
+      "same_graph": 13,
+      "andrey_s": 1056.6,
+      "andrey_s_max": 3146.0,
+      "comparator_s": null,
+      "ratio": null,
+      "mean_D": -0.2,
+      "bootstrap_95": [
+       -0.8,
+       0.3
+      ],
+      "above_zero": false,
+      "verdict": "tie",
+      "coverage": {
+       "datasets": 20,
+       "andrey_short": 0,
+       "reference_short": 0
+      },
+      "floor": {
+       "applies": true,
+       "pass": true,
+       "andrey_minus_empty": {
+        "paired": 20,
+        "mean": -5.25,
+        "bootstrap_95": [
+         -6.2,
+         -4.3
+        ]
+       },
+       "reference_minus_empty": {
+        "paired": 20,
+        "mean": -5.05,
+        "bootstrap_95": [
+         -6.0,
+         -3.95
+        ]
+       }
+      },
+      "skeleton_f1": 0.801,
+      "seeds": "20-39"
+     },
+     "replicated": "tie on both seed sets",
+     "result": "tie",
+     "card_verdict": "tie"
+    }
+   ]
+  }
+ ],
+ "reference_check": {
+  "about": "the code published with the paper (commit 312632b, NumPy 1.26.4, cmaes 0.13.1, scikit-optimize 0.10.2), run fresh on a subset of the datasets and compared with the authors' recorded outputs for the same datasets. The rule was proposed with the 11 earlier fresh pairs (9 independence agreements) and the 2 graphs whose PC class is fully directed already known, before any of the 4 new pairs or the 3 graphs whose class leaves edges to orient finished, and accepted by the maintainers with 1 of those pairs and 2 of those graphs known: at least 2 of the 4 new pairs and 2 of the 3 graphs finish; the likelihood direction agrees on every fresh pair; the independence direction on all but one in five; each fresh graph within 2 SHD of its recorded graph. The authors' optimizers are stochastic, so their scores differ from the recorded ones; on graphs whose PC class is fully directed only PC is checked",
+  "pairs": [
+   {
+    "cell": "P5",
+    "seed": 0,
+    "run": "an earlier fresh run",
+    "fresh": {
+     "independence": "right",
+     "likelihood": "right"
+    },
+    "recorded": {
+     "likelihood": "right",
+     "independence": "right"
+    },
+    "agree": {
+     "likelihood": true,
+     "independence": true
+    },
+    "hours": 7.1
+   },
+   {
+    "cell": "P5",
+    "seed": 18,
+    "run": "an earlier fresh run",
+    "fresh": {
+     "independence": "right",
+     "likelihood": "right"
+    },
+    "recorded": {
+     "likelihood": "right",
+     "independence": "right"
+    },
+    "agree": {
+     "likelihood": true,
+     "independence": true
+    },
+    "hours": 7.3
+   },
+   {
+    "cell": "P5",
+    "seed": 22,
+    "run": "an earlier fresh run",
+    "fresh": {
+     "independence": "right",
+     "likelihood": "right"
+    },
+    "recorded": {
+     "likelihood": "right",
+     "independence": "right"
+    },
+    "agree": {
+     "likelihood": true,
+     "independence": true
+    },
+    "hours": 6.9
+   },
+   {
+    "cell": "P5",
+    "seed": 26,
+    "run": "an earlier fresh run",
+    "fresh": {
+     "independence": "wrong",
+     "likelihood": "right"
+    },
+    "recorded": {
+     "likelihood": "right",
+     "independence": "right"
+    },
+    "agree": {
+     "likelihood": true,
+     "independence": false
+    },
+    "hours": 9.3
+   },
+   {
+    "cell": "P5",
+    "seed": 28,
+    "run": "an earlier fresh run",
+    "fresh": {
+     "independence": "right",
+     "likelihood": "right"
+    },
+    "recorded": {
+     "likelihood": "right",
+     "independence": "right"
+    },
+    "agree": {
+     "likelihood": true,
+     "independence": true
+    },
+    "hours": 11.7
+   },
+   {
+    "cell": "P5",
+    "seed": 30,
+    "run": "an earlier fresh run",
+    "fresh": {
+     "independence": "wrong",
+     "likelihood": "right"
+    },
+    "recorded": {
+     "likelihood": "right",
+     "independence": "wrong"
+    },
+    "agree": {
+     "likelihood": true,
+     "independence": true
+    },
+    "hours": 11.6
+   },
+   {
+    "cell": "P5",
+    "seed": 38,
+    "run": "an earlier fresh run",
+    "fresh": {
+     "independence": "right",
+     "likelihood": "right"
+    },
+    "recorded": {
+     "likelihood": "right",
+     "independence": "right"
+    },
+    "agree": {
+     "likelihood": true,
+     "independence": true
+    },
+    "hours": 8.3
+   },
+   {
+    "cell": "P5",
+    "seed": 4,
+    "run": "an earlier fresh run",
+    "fresh": {
+     "independence": "right",
+     "likelihood": "right"
+    },
+    "recorded": {
+     "likelihood": "right",
+     "independence": "right"
+    },
+    "agree": {
+     "likelihood": true,
+     "independence": true
+    },
+    "hours": 6.1
+   },
+   {
+    "cell": "P5",
+    "seed": 10,
+    "run": "an earlier fresh run",
+    "fresh": {
+     "independence": "right",
+     "likelihood": "right"
+    },
+    "recorded": {
+     "likelihood": "right",
+     "independence": "wrong"
+    },
+    "agree": {
+     "likelihood": true,
+     "independence": false
+    },
+    "hours": 5.4
+   },
+   {
+    "cell": "P5",
+    "seed": 12,
+    "run": "an earlier fresh run",
+    "fresh": {
+     "independence": "right",
+     "likelihood": "right"
+    },
+    "recorded": {
+     "likelihood": "right",
+     "independence": "right"
+    },
+    "agree": {
+     "likelihood": true,
+     "independence": true
+    },
+    "hours": 8.4
+   },
+   {
+    "cell": "P5",
+    "seed": 14,
+    "run": "an earlier fresh run",
+    "fresh": {
+     "independence": "wrong",
+     "likelihood": "right"
+    },
+    "recorded": {
+     "likelihood": "right",
+     "independence": "wrong"
+    },
+    "agree": {
+     "likelihood": true,
+     "independence": true
+    },
+    "hours": 7.6
+   },
+   {
+    "cell": "P4",
+    "seed": 7,
+    "run": "this campaign",
+    "fresh": {
+     "independence": "wrong",
+     "likelihood": "right"
+    },
+    "recorded": {
+     "likelihood": "right",
+     "independence": "wrong"
+    },
+    "agree": {
+     "likelihood": true,
+     "independence": true
+    },
+    "hours": 8.5
+   },
+   {
+    "cell": "P6",
+    "seed": 0,
+    "run": "this campaign",
+    "fresh": {
+     "independence": "right",
+     "likelihood": "right"
+    },
+    "recorded": {
+     "likelihood": "right",
+     "independence": "right"
+    },
+    "agree": {
+     "likelihood": true,
+     "independence": true
+    },
+    "hours": 13.9
+   },
+   {
+    "cell": "P6",
+    "seed": 3,
+    "run": "this campaign",
+    "fresh": {
+     "independence": "wrong",
+     "likelihood": "right"
+    },
+    "recorded": {
+     "likelihood": "right",
+     "independence": "wrong"
+    },
+    "agree": {
+     "likelihood": true,
+     "independence": true
+    },
+    "hours": 9.1
+   },
+   {
+    "cell": "S1",
+    "seed": 2,
+    "run": "this campaign",
+    "fresh": {
+     "independence": "wrong",
+     "likelihood": "right"
+    },
+    "recorded": {
+     "likelihood": "right",
+     "independence": "wrong"
+    },
+    "agree": {
+     "likelihood": true,
+     "independence": true
+    },
+    "hours": 17.3
+   }
+  ],
+  "graphs": [
+   {
+    "cell": "M1",
+    "seed": 4,
+    "fresh_shd": 3,
+    "recorded_shd": 3,
+    "same_graph": true,
+    "same_pc_class": true
+   },
+   {
+    "cell": "M1",
+    "seed": 13,
+    "fresh_shd": 7,
+    "recorded_shd": 7,
+    "same_graph": true,
+    "same_pc_class": true
+   },
+   {
+    "cell": "M1",
+    "seed": 16,
+    "fresh_shd": 1,
+    "recorded_shd": 1,
+    "same_graph": true,
+    "same_pc_class": true
+   },
+   {
+    "cell": "M2",
+    "seed": 6,
+    "fresh_shd": 5,
+    "recorded_shd": 5,
+    "same_graph": true,
+    "same_pc_class": true
+   },
+   {
+    "cell": "M2",
+    "seed": 10,
+    "fresh_shd": 10,
+    "recorded_shd": 10,
+    "same_graph": true,
+    "same_pc_class": true
+   }
+  ],
+  "agree": {
+   "likelihood": [
+    15,
+    15
+   ],
+   "independence": [
+    13,
+    15
+   ]
+  },
+  "new_pairs_finished": 4,
+  "pass": true
+ },
+ "frontier": {
+  "about": "beside other Andrey methods on the same datasets, in the same jobs: a comparator dominates when its paired error interval lies below SkewD's (share right for pairs, SHD for graphs) and its median CPU seconds are lower",
+  "pairs": [
+   {
+    "cell": "P1",
+    "set": "ANs",
+    "noise_skewness": -0.455,
+    "skewd_s": 900.1,
+    "likelihood_right": 20,
+    "independence_right": 20,
+    "comparators": {
+     "loci_ll": {
+      "name": "LOCI, likelihood",
+      "right": 20,
+      "s": 0.26,
+      "right_minus_likelihood": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_independence": false
+     },
+     "loci_it": {
+      "name": "LOCI, independence",
+      "right": 20,
+      "s": 0.37,
+      "right_minus_likelihood": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_independence": false
+     },
+     "anm": {
+      "name": "ANM",
+      "right": 20,
+      "s": 2.21,
+      "right_minus_likelihood": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_independence": false
+     },
+     "pnl": {
+      "name": "PNL",
+      "right": 16,
+      "s": 0.12,
+      "right_minus_likelihood": {
+       "mean": -0.2,
+       "bootstrap_95": [
+        -0.4,
+        -0.05
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": -0.2,
+       "bootstrap_95": [
+        -0.4,
+        -0.05
+       ]
+      },
+      "dominates_independence": false
+     },
+     "cam": {
+      "name": "CAM",
+      "right": 20,
+      "s": 0.35,
+      "right_minus_likelihood": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_independence": false
+     }
+    }
+   },
+   {
+    "cell": "P2",
+    "set": "ANs",
+    "noise_skewness": 0.985,
+    "skewd_s": 1105.0,
+    "likelihood_right": 20,
+    "independence_right": 20,
+    "comparators": {
+     "loci_ll": {
+      "name": "LOCI, likelihood",
+      "right": 20,
+      "s": 0.27,
+      "right_minus_likelihood": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_independence": false
+     },
+     "loci_it": {
+      "name": "LOCI, independence",
+      "right": 20,
+      "s": 0.36,
+      "right_minus_likelihood": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_independence": false
+     },
+     "anm": {
+      "name": "ANM",
+      "right": 20,
+      "s": 2.04,
+      "right_minus_likelihood": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_independence": false
+     },
+     "pnl": {
+      "name": "PNL",
+      "right": 12,
+      "s": 0.12,
+      "right_minus_likelihood": {
+       "mean": -0.4,
+       "bootstrap_95": [
+        -0.6,
+        -0.2
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": -0.4,
+       "bootstrap_95": [
+        -0.6,
+        -0.2
+       ]
+      },
+      "dominates_independence": false
+     },
+     "cam": {
+      "name": "CAM",
+      "right": 20,
+      "s": 0.33,
+      "right_minus_likelihood": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_independence": false
+     }
+    }
+   },
+   {
+    "cell": "P3",
+    "set": "ANs",
+    "noise_skewness": 1.75,
+    "skewd_s": 1146.1,
+    "likelihood_right": 20,
+    "independence_right": 20,
+    "comparators": {
+     "loci_ll": {
+      "name": "LOCI, likelihood",
+      "right": 17,
+      "s": 0.27,
+      "right_minus_likelihood": {
+       "mean": -0.15,
+       "bootstrap_95": [
+        -0.3,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": -0.15,
+       "bootstrap_95": [
+        -0.3,
+        0.0
+       ]
+      },
+      "dominates_independence": false
+     },
+     "loci_it": {
+      "name": "LOCI, independence",
+      "right": 18,
+      "s": 0.38,
+      "right_minus_likelihood": {
+       "mean": -0.1,
+       "bootstrap_95": [
+        -0.25,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": -0.1,
+       "bootstrap_95": [
+        -0.25,
+        0.0
+       ]
+      },
+      "dominates_independence": false
+     },
+     "anm": {
+      "name": "ANM",
+      "right": 20,
+      "s": 2.21,
+      "right_minus_likelihood": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_independence": false
+     },
+     "pnl": {
+      "name": "PNL",
+      "right": 8,
+      "s": 0.12,
+      "right_minus_likelihood": {
+       "mean": -0.6,
+       "bootstrap_95": [
+        -0.8,
+        -0.4
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": -0.6,
+       "bootstrap_95": [
+        -0.8,
+        -0.4
+       ]
+      },
+      "dominates_independence": false
+     },
+     "cam": {
+      "name": "CAM",
+      "right": 20,
+      "s": 0.33,
+      "right_minus_likelihood": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_independence": false
+     }
+    }
+   },
+   {
+    "cell": "P4",
+    "set": "LSs",
+    "noise_skewness": -0.455,
+    "skewd_s": 1151.9,
+    "likelihood_right": 20,
+    "independence_right": 18,
+    "comparators": {
+     "loci_ll": {
+      "name": "LOCI, likelihood",
+      "right": 20,
+      "s": 0.26,
+      "right_minus_likelihood": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": 0.1,
+       "bootstrap_95": [
+        0.0,
+        0.25
+       ]
+      },
+      "dominates_independence": false
+     },
+     "loci_it": {
+      "name": "LOCI, independence",
+      "right": 18,
+      "s": 0.36,
+      "right_minus_likelihood": {
+       "mean": -0.1,
+       "bootstrap_95": [
+        -0.25,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        -0.15,
+        0.15
+       ]
+      },
+      "dominates_independence": false
+     },
+     "anm": {
+      "name": "ANM",
+      "right": 6,
+      "s": 2.21,
+      "right_minus_likelihood": {
+       "mean": -0.7,
+       "bootstrap_95": [
+        -0.9,
+        -0.5
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": -0.6,
+       "bootstrap_95": [
+        -0.8,
+        -0.4
+       ]
+      },
+      "dominates_independence": false
+     },
+     "pnl": {
+      "name": "PNL",
+      "right": 7,
+      "s": 0.12,
+      "right_minus_likelihood": {
+       "mean": -0.65,
+       "bootstrap_95": [
+        -0.85,
+        -0.45
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": -0.55,
+       "bootstrap_95": [
+        -0.8,
+        -0.3
+       ]
+      },
+      "dominates_independence": false
+     },
+     "cam": {
+      "name": "CAM",
+      "right": 19,
+      "s": 0.26,
+      "right_minus_likelihood": {
+       "mean": -0.05,
+       "bootstrap_95": [
+        -0.15,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": 0.05,
+       "bootstrap_95": [
+        -0.1,
+        0.2
+       ]
+      },
+      "dominates_independence": false
+     }
+    }
+   },
+   {
+    "cell": "P5",
+    "set": "LSs",
+    "noise_skewness": 0.985,
+    "skewd_s": 1303.5,
+    "likelihood_right": 20,
+    "independence_right": 19,
+    "comparators": {
+     "loci_ll": {
+      "name": "LOCI, likelihood",
+      "right": 19,
+      "s": 0.27,
+      "right_minus_likelihood": {
+       "mean": -0.05,
+       "bootstrap_95": [
+        -0.15,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        -0.15,
+        0.15
+       ]
+      },
+      "dominates_independence": false
+     },
+     "loci_it": {
+      "name": "LOCI, independence",
+      "right": 18,
+      "s": 0.38,
+      "right_minus_likelihood": {
+       "mean": -0.1,
+       "bootstrap_95": [
+        -0.25,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": -0.05,
+       "bootstrap_95": [
+        -0.2,
+        0.1
+       ]
+      },
+      "dominates_independence": false
+     },
+     "anm": {
+      "name": "ANM",
+      "right": 12,
+      "s": 2.36,
+      "right_minus_likelihood": {
+       "mean": -0.4,
+       "bootstrap_95": [
+        -0.6,
+        -0.2
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": -0.35,
+       "bootstrap_95": [
+        -0.55,
+        -0.15
+       ]
+      },
+      "dominates_independence": false
+     },
+     "pnl": {
+      "name": "PNL",
+      "right": 14,
+      "s": 0.13,
+      "right_minus_likelihood": {
+       "mean": -0.3,
+       "bootstrap_95": [
+        -0.5,
+        -0.1
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": -0.25,
+       "bootstrap_95": [
+        -0.45,
+        -0.1
+       ]
+      },
+      "dominates_independence": false
+     },
+     "cam": {
+      "name": "CAM",
+      "right": 15,
+      "s": 0.16,
+      "right_minus_likelihood": {
+       "mean": -0.25,
+       "bootstrap_95": [
+        -0.45,
+        -0.1
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": -0.2,
+       "bootstrap_95": [
+        -0.4,
+        -0.05
+       ]
+      },
+      "dominates_independence": false
+     }
+    }
+   },
+   {
+    "cell": "P6",
+    "set": "LSs",
+    "noise_skewness": 1.75,
+    "skewd_s": 1309.5,
+    "likelihood_right": 20,
+    "independence_right": 20,
+    "comparators": {
+     "loci_ll": {
+      "name": "LOCI, likelihood",
+      "right": 15,
+      "s": 0.25,
+      "right_minus_likelihood": {
+       "mean": -0.25,
+       "bootstrap_95": [
+        -0.45,
+        -0.1
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": -0.25,
+       "bootstrap_95": [
+        -0.45,
+        -0.1
+       ]
+      },
+      "dominates_independence": false
+     },
+     "loci_it": {
+      "name": "LOCI, independence",
+      "right": 15,
+      "s": 0.36,
+      "right_minus_likelihood": {
+       "mean": -0.25,
+       "bootstrap_95": [
+        -0.45,
+        -0.05
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": -0.25,
+       "bootstrap_95": [
+        -0.45,
+        -0.05
+       ]
+      },
+      "dominates_independence": false
+     },
+     "anm": {
+      "name": "ANM",
+      "right": 6,
+      "s": 2.09,
+      "right_minus_likelihood": {
+       "mean": -0.7,
+       "bootstrap_95": [
+        -0.9,
+        -0.5
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": -0.7,
+       "bootstrap_95": [
+        -0.9,
+        -0.5
+       ]
+      },
+      "dominates_independence": false
+     },
+     "pnl": {
+      "name": "PNL",
+      "right": 12,
+      "s": 0.12,
+      "right_minus_likelihood": {
+       "mean": -0.4,
+       "bootstrap_95": [
+        -0.6,
+        -0.2
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": -0.4,
+       "bootstrap_95": [
+        -0.6,
+        -0.2
+       ]
+      },
+      "dominates_independence": false
+     },
+     "cam": {
+      "name": "CAM",
+      "right": 6,
+      "s": 0.21,
+      "right_minus_likelihood": {
+       "mean": -0.7,
+       "bootstrap_95": [
+        -0.9,
+        -0.5
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": -0.7,
+       "bootstrap_95": [
+        -0.9,
+        -0.5
+       ]
+      },
+      "dominates_independence": false
+     }
+    }
+   },
+   {
+    "cell": "S1",
+    "set": "LS",
+    "noise_skewness": null,
+    "skewd_s": 988.5,
+    "likelihood_right": 20,
+    "independence_right": 17,
+    "comparators": {
+     "loci_ll": {
+      "name": "LOCI, likelihood",
+      "right": 20,
+      "s": 0.27,
+      "right_minus_likelihood": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": 0.15,
+       "bootstrap_95": [
+        0.0,
+        0.3
+       ]
+      },
+      "dominates_independence": false
+     },
+     "loci_it": {
+      "name": "LOCI, independence",
+      "right": 20,
+      "s": 0.38,
+      "right_minus_likelihood": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": 0.15,
+       "bootstrap_95": [
+        0.0,
+        0.3
+       ]
+      },
+      "dominates_independence": false
+     },
+     "anm": {
+      "name": "ANM",
+      "right": 12,
+      "s": 2.28,
+      "right_minus_likelihood": {
+       "mean": -0.4,
+       "bootstrap_95": [
+        -0.6,
+        -0.2
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": -0.25,
+       "bootstrap_95": [
+        -0.5,
+        0.05
+       ]
+      },
+      "dominates_independence": false
+     },
+     "pnl": {
+      "name": "PNL",
+      "right": 20,
+      "s": 0.12,
+      "right_minus_likelihood": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": 0.15,
+       "bootstrap_95": [
+        0.0,
+        0.3
+       ]
+      },
+      "dominates_independence": false
+     },
+     "cam": {
+      "name": "CAM",
+      "right": 20,
+      "s": 0.3,
+      "right_minus_likelihood": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": 0.15,
+       "bootstrap_95": [
+        0.0,
+        0.3
+       ]
+      },
+      "dominates_independence": false
+     }
+    }
+   },
+   {
+    "cell": "S2",
+    "set": "LS-s",
+    "noise_skewness": null,
+    "skewd_s": 1076.7,
+    "likelihood_right": 20,
+    "independence_right": 20,
+    "comparators": {
+     "loci_ll": {
+      "name": "LOCI, likelihood",
+      "right": 20,
+      "s": 0.25,
+      "right_minus_likelihood": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_independence": false
+     },
+     "loci_it": {
+      "name": "LOCI, independence",
+      "right": 20,
+      "s": 0.36,
+      "right_minus_likelihood": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": 0.0,
+       "bootstrap_95": [
+        0.0,
+        0.0
+       ]
+      },
+      "dominates_independence": false
+     },
+     "anm": {
+      "name": "ANM",
+      "right": 1,
+      "s": 2.01,
+      "right_minus_likelihood": {
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": -0.95,
+       "bootstrap_95": [
+        -1.0,
+        -0.85
+       ]
+      },
+      "dominates_independence": false
+     },
+     "pnl": {
+      "name": "PNL",
+      "right": 5,
+      "s": 0.12,
+      "right_minus_likelihood": {
+       "mean": -0.75,
+       "bootstrap_95": [
+        -0.95,
+        -0.55
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": -0.75,
+       "bootstrap_95": [
+        -0.95,
+        -0.55
+       ]
+      },
+      "dominates_independence": false
+     },
+     "cam": {
+      "name": "CAM",
+      "right": 10,
+      "s": 0.15,
+      "right_minus_likelihood": {
+       "mean": -0.5,
+       "bootstrap_95": [
+        -0.7,
+        -0.3
+       ]
+      },
+      "dominates_likelihood": false,
+      "right_minus_independence": {
+       "mean": -0.5,
+       "bootstrap_95": [
+        -0.7,
+        -0.3
+       ]
+      },
+      "dominates_independence": false
+     }
+    }
+   }
+  ],
+  "graphs": [
+   {
+    "cell": "M1",
+    "d": 6,
+    "seeds": "0-39",
+    "skewd_mv_shd_mean": 1.9,
+    "skewd_mv_s": 1849.0,
+    "comparators": {
+     "pc": {
+      "name": "PC, KCI",
+      "shd_mean": 4.78,
+      "s": 11.7,
+      "shd_minus_skewd_mv": {
+       "mean": 2.875,
+       "bootstrap_95": [
+        2.3,
+        3.45
+       ]
+      },
+      "dominates": false
+     },
+     "cam": {
+      "name": "CAM",
+      "shd_mean": 5.72,
+      "s": 0.4,
+      "shd_minus_skewd_mv": {
+       "mean": 3.825,
+       "bootstrap_95": [
+        2.7,
+        4.95
+       ]
+      },
+      "dominates": false
+     },
+     "resit": {
+      "name": "RESIT",
+      "shd_mean": 13.43,
+      "s": 2.4,
+      "shd_minus_skewd_mv": {
+       "mean": 11.525,
+       "bootstrap_95": [
+        10.25,
+        12.8
+       ]
+      },
+      "dominates": false
+     },
+     "nogam": {
+      "name": "NoGAM",
+      "shd_mean": 9.22,
+      "s": 3.0,
+      "shd_minus_skewd_mv": {
+       "mean": 7.325,
+       "bootstrap_95": [
+        6.05,
+        8.7
+       ]
+      },
+      "dominates": false
+     },
+     "score_matching": {
+      "name": "SCORE",
+      "shd_mean": 9.53,
+      "s": 0.6,
+      "shd_minus_skewd_mv": {
+       "mean": 7.625,
+       "bootstrap_95": [
+        6.35,
+        8.975
+       ]
+      },
+      "dominates": false
+     }
+    }
+   },
+   {
+    "cell": "M2",
+    "d": 10,
+    "seeds": "0-39",
+    "skewd_mv_shd_mean": 4.72,
+    "skewd_mv_s": 1433.0,
+    "comparators": {
+     "pc": {
+      "name": "PC, KCI",
+      "shd_mean": 8.43,
+      "s": 33.2,
+      "shd_minus_skewd_mv": {
+       "mean": 3.7,
+       "bootstrap_95": [
+        3.025,
+        4.4
+       ]
+      },
+      "dominates": false
+     },
+     "cam": {
+      "name": "CAM",
+      "shd_mean": 7.17,
+      "s": 0.7,
+      "shd_minus_skewd_mv": {
+       "mean": 2.45,
+       "bootstrap_95": [
+        0.975,
+        4.025
+       ]
+      },
+      "dominates": false
+     },
+     "resit": {
+      "name": "RESIT",
+      "shd_mean": 36.38,
+      "s": 7.1,
+      "shd_minus_skewd_mv": {
+       "mean": 31.65,
+       "bootstrap_95": [
+        29.425,
+        33.95
+       ]
+      },
+      "dominates": false
+     },
+     "nogam": {
+      "name": "NoGAM",
+      "shd_mean": 15.62,
+      "s": 7.8,
+      "shd_minus_skewd_mv": {
+       "mean": 10.9,
+       "bootstrap_95": [
+        9.0,
+        12.9
+       ]
+      },
+      "dominates": false
+     },
+     "score_matching": {
+      "name": "SCORE",
+      "shd_mean": 16.45,
+      "s": 1.0,
+      "shd_minus_skewd_mv": {
+       "mean": 11.725,
+       "bootstrap_95": [
+        9.9,
+        13.625
+       ]
+      },
+      "dominates": false
+     }
+    }
+   }
+  ]
+ },
+ "not_measured": "SID is not reported. The paper's IGCI, ROCHE, QCCD, HOST and GraN-DAG baselines have no Andrey implementation and were not run. The fresh run of the authors' code covered the graphs whose classes are cheapest to score"
+}

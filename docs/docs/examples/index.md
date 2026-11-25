@@ -161,9 +161,10 @@ one variable, with cycles allowed.
 :img-top: /_generated/thumbs/functional.svg
 :img-alt: The DAG CAM recovers in this notebook
 
-CAM, RESIT, SCORE, and NoGAM learn a DAG, with every edge oriented, when each variable is a
-nonlinear function of its parents plus independent noise; CAM-UV allows hidden causes and marks the
-pairs they join.
+CAM, RESIT, SCORE, NoGAM, and DAS learn a fully oriented DAG when each variable is a nonlinear
+function of its parents plus independent noise; CAM-UV allows hidden causes and marks the pairs they
+join, CPCM's graph search lets each variable follow a family you choose, and SkewD-MV allows skewed
+noise whose scale changes with the parents.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -208,7 +209,7 @@ BottomUpParceLiNGAM orders the variables and leaves those a hidden cause confoun
 :img-top: /_generated/thumbs/pairwise.svg
 :img-alt: The true graph of this notebook's pair
 
-ANM, PNL, and LOCI test which of two variables causes the other.
+ANM, PNL, LOCI, CPCM, and SkewD test which of two variables causes the other.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
