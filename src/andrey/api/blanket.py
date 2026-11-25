@@ -177,8 +177,9 @@ def iamb(
         The variable whose set to learn: a column label (a string) or a 0-based position (an
         integer). A list of them learns each one's set with one search, which makes a step two
         targets share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
-        ``indep_test``; with missing values, each target has a separate search. ``None`` learns
-        every variable's set and keeps a pair when each variable is in the other's set.
+        ``indep_test``; with missing values or a chi-square ``indep_test``, each target has a
+        separate search. ``None`` learns every variable's set and keeps a pair when each variable is
+        in the other's set.
     structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
@@ -502,8 +503,9 @@ def inter_iamb(
         The variable whose set to learn: a column label (a string) or a 0-based position (an
         integer). A list of them learns each one's set with one search, which makes a step two
         targets share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
-        ``indep_test``; with missing values, each target has a separate search. ``None`` learns
-        every variable's set and keeps a pair when each variable is in the other's set.
+        ``indep_test``; with missing values or a chi-square ``indep_test``, each target has a
+        separate search. ``None`` learns every variable's set and keeps a pair when each variable is
+        in the other's set.
     structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
@@ -825,8 +827,9 @@ def gs(
         The variable whose set to learn: a column label (a string) or a 0-based position (an
         integer). A list of them learns each one's set with one search, which makes a step two
         targets share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
-        ``indep_test``; with missing values, each target has a separate search. ``None`` learns
-        every variable's set and keeps a pair when each variable is in the other's set.
+        ``indep_test``; with missing values or a chi-square ``indep_test``, each target has a
+        separate search. ``None`` learns every variable's set and keeps a pair when each variable is
+        in the other's set.
     structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
@@ -1122,8 +1125,9 @@ def fast_iamb(
         The variable whose set to learn: a column label (a string) or a 0-based position (an
         integer). A list of them learns each one's set with one search, which makes a step two
         targets share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
-        ``indep_test``; with missing values, each target has a separate search. ``None`` learns
-        every variable's set and keeps a pair when each variable is in the other's set.
+        ``indep_test``; with missing values or a chi-square ``indep_test``, each target has a
+        separate search. ``None`` learns every variable's set and keeps a pair when each variable is
+        in the other's set.
     structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
@@ -1424,8 +1428,9 @@ def mmpc(
         The variable whose set to learn: a column label (a string) or a 0-based position (an
         integer). A list of them learns each one's set with one search, which makes a step two
         targets share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
-        ``indep_test``; with missing values, each target has a separate search. ``None`` learns
-        every variable's set and keeps a pair when each variable is in the other's set.
+        ``indep_test``; with missing values or a chi-square ``indep_test``, each target has a
+        separate search. ``None`` learns every variable's set and keeps a pair when each variable is
+        in the other's set.
     structure : {"skeleton", "cpdag"}, default="skeleton"
         The graph returned when ``target`` is ``None``. ``"skeleton"``: the adjacencies with no
         directions, each variable joined to its parents and children, the graph the sets give.
@@ -1750,8 +1755,9 @@ def hiton_pc(
         The variable whose set to learn: a column label (a string) or a 0-based position (an
         integer). A list of them learns each one's set with one search, which makes a step two
         targets share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
-        ``indep_test``; with missing values, each target has a separate search. ``None`` learns
-        every variable's set and keeps a pair when each variable is in the other's set.
+        ``indep_test``; with missing values or a chi-square ``indep_test``, each target has a
+        separate search. ``None`` learns every variable's set and keeps a pair when each variable is
+        in the other's set.
     structure : {"skeleton", "cpdag"}, default="skeleton"
         The graph returned when ``target`` is ``None``. ``"skeleton"``: the adjacencies with no
         directions, each variable joined to its parents and children, the graph the sets give.
@@ -2052,8 +2058,9 @@ def hiton_mb(
         The variable whose set to learn: a column label (a string) or a 0-based position (an
         integer). A list of them learns each one's set with one search, which makes a step two
         targets share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
-        ``indep_test``; with missing values, each target has a separate search. ``None`` learns
-        every variable's set and keeps a pair when each variable is in the other's set.
+        ``indep_test``; with missing values or a chi-square ``indep_test``, each target has a
+        separate search. ``None`` learns every variable's set and keeps a pair when each variable is
+        in the other's set.
     structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
@@ -2359,8 +2366,9 @@ def mmmb(
         The variable whose set to learn: a column label (a string) or a 0-based position (an
         integer). A list of them learns each one's set with one search, which makes a step two
         targets share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
-        ``indep_test``; with missing values, each target has a separate search. ``None`` learns
-        every variable's set and keeps a pair when each variable is in the other's set.
+        ``indep_test``; with missing values or a chi-square ``indep_test``, each target has a
+        separate search. ``None`` learns every variable's set and keeps a pair when each variable is
+        in the other's set.
     structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
@@ -2662,8 +2670,9 @@ def pcmb(
         The variable whose set to learn: a column label (a string) or a 0-based position (an
         integer). A list of them learns each one's set with one search, which makes a step two
         targets share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
-        ``indep_test``; with missing values, each target has a separate search. ``None`` learns
-        every variable's set and keeps a pair when each variable is in the other's set.
+        ``indep_test``; with missing values or a chi-square ``indep_test``, each target has a
+        separate search. ``None`` learns every variable's set and keeps a pair when each variable is
+        in the other's set.
     structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same

@@ -466,18 +466,17 @@ block with `andrey.config(n_jobs=...)`, or with the `ANDREY_*` variables of
 [Configuration](configuration.md); `bootstrap` follows them too.
 
 % concept: target
-`iamb`, `inter_iamb`, `gs`, `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`,
-`mb_by_mb`, `cmb`, `mmb_by_mmb`, `icp`, and `local_isa_ling` take `target`, the variable they
-answer for, as a column label or a 0-based position. A list of them returns a list of results, one
-per target in the list's order, each the result a call for that target alone returns. The first
-twelve answer every target with one search, so a step two targets share, such as the parents and
-children of a common neighbor, is made once, and each result's `metadata["n_tests"]` counts only
-the tests no earlier result counts. With `andrey.config(n_jobs=...)` above 1 and a
-partial-correlation `indep_test` (`"fisherz"`, `"student_t"`, `"normal_scores"`), they split the
-targets over that many worker processes, with the same results for any number of workers. With
-missing values, each target has a search of its own in the calling process, so each result,
-`metadata["n_tests"]` included, is the one a call for that target alone returns. `icp` and
-`local_isa_ling` answer each target in turn. On the command line, `'target=[a,b]'` names the
+`iamb`, `inter_iamb`, `gs`, `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`,
+`cmb`, `mmb_by_mmb`, `icp`, and `local_isa_ling` take `target`, the variable they answer for, as a
+column label or a 0-based position. A list of them returns a list of results, one per target in the
+list's order, each the result a call for that target alone returns, `metadata["n_tests"]` included.
+The first twelve answer every target with one search, so a step two targets share, such as the
+parents and children of a common neighbor, is made once and counts in the `n_tests` of each result
+that reads it. With `andrey.config(n_jobs=...)` above 1 and a partial-correlation `indep_test`
+(`"fisherz"`, `"student_t"`, `"normal_scores"`), they split the targets over that many worker
+processes, with the same results for any number of workers. With missing values or a chi-square
+`indep_test` (`"chisq"`, `"gsq"`), each target has a search of its own in the calling process. `icp`
+and `local_isa_ling` answer each target in turn. On the command line, `'target=[a,b]'` names the
 columns by header or position, and the JSON result holds `multi: true` and `results`, one entry per
 target in the list's order, in place of `structure` and `metadata`.
 

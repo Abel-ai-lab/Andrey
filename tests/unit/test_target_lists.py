@@ -53,14 +53,10 @@ def _fit(method: str, data, target, **kwargs):
     return getattr(andrey, method)(data, target=target, **kwargs)
 
 
-def _same(a, b, *, tests: bool = True) -> None:
-    """Assert two results hold the same graph and metadata, ``n_tests`` included when asked."""
+def _same(a, b) -> None:
+    """Assert two results hold the same graph and metadata, ``n_tests`` included."""
     assert a.structure == b.structure
-    left, right = dict(a.metadata), dict(b.metadata)
-    if not tests:
-        left.pop("n_tests", None)
-        right.pop("n_tests", None)
-    assert left == right
+    assert dict(a.metadata) == dict(b.metadata)
 
 
 @pytest.mark.parametrize("method", [*SET_LEARNERS, *SEQUENTIAL, "local_isa_ling"])
@@ -74,12 +70,10 @@ def test_each_result_is_the_answer_of_its_own_call(method):
     assert isinstance(outs, list)
     assert len(outs) == len(TARGETS)
     for out, one in zip(outs, alone, strict=True):
-        _same(out, one, tests=False)
-    _same(outs[0], alone[0])
-    counts = [out.metadata.get("n_tests") for out in outs]
-    if counts[0] is not None:
-        assert sum(counts) == total.n
-        assert all(c <= one.metadata["n_tests"] for c, one in zip(counts, alone, strict=True))
+        _same(out, one)
+    counts = [one.metadata.get("n_tests") for one in alone]
+    if counts[0] is not None:  # a step two targets share is computed once
+        assert total.n <= sum(counts)
 
 
 def test_icp_answers_each_target():
@@ -99,7 +93,7 @@ def test_kept_chi_square_answers_change_no_result(method):
     data = _discrete()
     outs = _fit(method, data, [3, 1, 4, 0], indep_test="chisq")
     for out, t in zip(outs, [3, 1, 4, 0], strict=True):
-        _same(out, _fit(method, data, t, indep_test="chisq"), tests=False)
+        _same(out, _fit(method, data, t, indep_test="chisq"))
 
 
 @pytest.mark.parametrize("method", ["iamb", "mmpc", "hiton_mb", "cmb"])
@@ -117,12 +111,13 @@ def test_a_list_of_one_is_the_one_result(method):
 def test_results_do_not_depend_on_the_workers(method):
     data = _gaussian()
     targets = list(range(8))
-    serial = _fit(method, data, targets)
+    with counting_tests() as serial_total:
+        serial = _fit(method, data, targets)
     with andrey.config(n_jobs=4), counting_tests() as total:
         pooled = _fit(method, data, targets)
     for a, b in zip(serial, pooled, strict=True):
         _same(a, b)
-    assert total.n == sum(out.metadata["n_tests"] for out in serial)
+    assert total.n == serial_total.n
 
 
 @pytest.mark.parametrize(
