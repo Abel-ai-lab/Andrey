@@ -669,6 +669,85 @@ def test_load_and_ldecc_leave_the_effect_undecided_when_total_conditioning_left_
         )
 
 
+def _five(n: int = 1200) -> pd.DataFrame:
+    """``x0 -> x1 -> x3 <- x2 <- x0`` and an independent ``x4``."""
+    rng = np.random.default_rng(0)
+    x0, e1, e2, e3, x4 = rng.normal(size=(5, n))
+    x1, x2 = x0 + e1, x0 + e2
+    return pd.DataFrame({"x0": x0, "x1": x1, "x2": x2, "x3": x1 + x2 + e3, "x4": x4})
+
+
+def _own_rows(df: pd.DataFrame) -> pd.DataFrame:
+    """Each column observed on its own block of rows: no pair is ever observed together."""
+    x = df.to_numpy().copy()
+    block = np.arange(len(x)) // (len(x) // x.shape[1])
+    x[block[:, None] != np.arange(x.shape[1])] = np.nan
+    return pd.DataFrame(x, columns=df.columns)
+
+
+def _alone(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    """``column`` observed only on the first quarter of the rows, where every other column is
+    missing."""
+    out = df.copy()
+    quarter = len(df) // 4
+    out.loc[quarter:, column] = np.nan
+    out.loc[: quarter - 1, [c for c in df.columns if c != column]] = np.nan
+    return out
+
+
+#: Data on which a pair the direct effect of x1 on x3 rests on has no test with rows.
+NEVER_TESTED = {
+    "no pair observed together": _own_rows,
+    "treatment alone": partial(_alone, column="x1"),
+    "outcome alone": partial(_alone, column="x3"),
+}
+
+
+@pytest.mark.parametrize("case", list(NEVER_TESTED))
+@pytest.mark.parametrize("name", ["ld3", "locpc_cde", "ldp"])
+def test_an_effect_resting_on_a_pair_no_test_decided_is_undecided(name, case):
+    out = getattr(andrey, name)(NEVER_TESTED[case](_five()), treatment="x1", outcome="x3")
+    (record,) = out.metadata["effects"]
+    assert (record["nonzero"], record["identifiable"], record["adjustment_sets"]) == (
+        None,
+        None,
+        [],
+    )
+    assert out.metadata["undecided_pairs"]
+
+
+def test_ld3_draws_no_edge_from_a_pair_no_test_decided():
+    """x3 is never observed with another column: no test confirms a parent."""
+    out = andrey.ld3(_alone(_five(), "x3"), treatment="x1", outcome="x3")
+    assert not any(_adjacent(out, c, "x3") for c in ("x0", "x1", "x2", "x4"))
+
+
+def test_locpc_cde_leaves_a_pair_no_test_decided_out_of_its_graph():
+    """x1 is never observed with another column: its edge to x3 is undecided, not adjacent."""
+    out = andrey.locpc_cde(_alone(_five(), "x1"), treatment="x1", outcome="x3")
+    assert ["x1", "x3"] in out.metadata["undecided_pairs"]
+    assert not _adjacent(out, "x1", "x3")
+
+
+def test_ldp_and_ld3_read_no_dependence_from_a_query_not_tested():
+    """The treatment 0 and the outcome 1 test dependent and every query of 2 is not tested: 2 is
+    no parent and takes no label, and both answers are undecided."""
+    from andrey.constraint import partition
+
+    def test(x, y, condition_set=()):
+        return 0.0 if {x, y} == {0, 1} else NOT_TESTED
+
+    ld3 = partition.ld3(LocalSearch(test, [0, 1, 2], 0.05), 0, 1, [2])
+    assert (ld3.parents, ld3.partition["unlabeled"], ld3.direct, ld3.undecided) == (
+        [],
+        [2],
+        True,
+        True,
+    )
+    ldp = partition.ldp(LocalSearch(test, [0, 1, 2], 0.05), 0, 1, [2])
+    assert (ldp.partition["unlabeled"], ldp.valid, ldp.undecided) == ([2], False, True)
+
+
 def test_ldecc_reads_no_dependence_from_a_query_not_tested():
     """UCChildren marks the neighbor 1 a child when the spouse 2, separated from 0 by no set, is
     dependent on 1; a query of 1 and 2 not tested marks nothing."""

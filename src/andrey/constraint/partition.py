@@ -5,7 +5,8 @@ each variable other than the treatment ``x`` and the outcome ``y`` by its causal
 pair (the partitions ``Z1`` to ``Z8`` of Maasch et al. 2024, Table 1), from tests whose conditioning
 sets are the labels found before. Each query ``(a, b | S)`` is asked of the test once and its
 p-value kept, so a later step that needs it again, such as LDP's Step 7, runs no test. A p-value
-above ``alpha`` is an independence, any other a dependence.
+above ``alpha`` is an independence and one at or below it a dependence; a query not tested
+(:func:`~andrey.core.ci_missing.not_tested`) is neither, and an answer that read one is undecided.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from andrey.constraint.blanket import LocalSearch
+from andrey.core.ci_missing import not_tested
 
 __all__ = ["LD3_LABELS", "LDP_LABELS", "LD3Result", "LDPResult", "ld3", "ldp"]
 
@@ -32,10 +34,12 @@ class LDPResult:
 
     ``partition`` maps each label of :data:`LDP_LABELS` to its members, ascending. ``valid`` is
     the Z5 criterion: when it holds, ``partition["Z1"]`` is a valid adjustment set for the pair.
+    ``undecided`` is whether a query the answer read was not tested, so a label may be wrong.
     """
 
     partition: dict[str, list[int]]
     valid: bool
+    undecided: bool = False
 
 
 @dataclass(frozen=True)
@@ -45,21 +49,25 @@ class LD3Result:
     ``partition`` maps each label of :data:`LD3_LABELS` to its members, ascending (a variable that
     passes both the ``Z8`` and the ``Z4`` test is under both). ``parents`` are the parents of the
     outcome found among the other variables, ascending; ``direct`` is the structural direct
-    criterion, whether the treatment is a parent of the outcome.
+    criterion, whether the treatment is a parent of the outcome. ``undecided`` is whether a query
+    the answer read was not tested, so a parent may be missing.
     """
 
     partition: dict[str, list[int]]
     parents: list[int]
     direct: bool
+    undecided: bool = False
 
 
 class _Tests:
-    """The answers of ``search`` to the queries asked, each asked once."""
+    """The answers of ``search`` to the queries asked, each asked once. ``untested`` is whether a
+    query read was not tested."""
 
     def __init__(self, search: LocalSearch) -> None:
         self.search = search
         self.alpha = search.alpha
         self.kept: dict[tuple[int, int, tuple[int, ...]], float] = {}
+        self.untested = False
 
     @staticmethod
     def _key(a: int, b: int, cond: Iterable[int]) -> tuple[int, int, tuple[int, ...]]:
@@ -74,12 +82,22 @@ class _Tests:
             for b, p in zip(new, pvalues, strict=True):
                 self.kept[self._key(a, b, cond)] = float(p)
 
-    def independent(self, a: int, b: int, cond: Sequence[int] = ()) -> bool:
-        """Whether ``a`` and ``b`` test independent given ``cond``."""
+    def _read(self, a: int, b: int, cond: Sequence[int]) -> float:
         key = self._key(a, b, cond)
         if key not in self.kept:
             self.ask(a, [b], cond)
-        return self.kept[key] > self.alpha
+        p = self.kept[key]
+        self.untested = self.untested or bool(not_tested(p))
+        return p
+
+    def independent(self, a: int, b: int, cond: Sequence[int] = ()) -> bool:
+        """Whether ``a`` and ``b`` test independent given ``cond``: a p-value above ``alpha``."""
+        return self._read(a, b, cond) > self.alpha
+
+    def dependent(self, a: int, b: int, cond: Sequence[int] = ()) -> bool:
+        """Whether ``a`` and ``b`` test dependent given ``cond``: a p-value at or below ``alpha``.
+        A query not tested is neither independent nor dependent."""
+        return self._read(a, b, cond) <= self.alpha
 
 
 def _partition(labels: Sequence[str], sets: dict[str, list[int]]) -> dict[str, list[int]]:
@@ -101,34 +119,34 @@ def ldp(search: LocalSearch, x: int, y: int, others: Sequence[int]) -> LDPResult
     Step 6's first pass, those adjacent to the outcome, whose tests it has run.
     """
     tests = _Tests(search)
-    indep = tests.independent
+    indep, dep = tests.independent, tests.dependent
     others = list(others)
     tests.ask(x, others)
     tests.ask(y, others)
 
     # Steps 1-3: the tests that read the pair alone, each asked only when its branch needs it.
-    tests.ask(x, [z for z in others if indep(x, z) and not indep(y, z)], (y,))
+    tests.ask(x, [z for z in others if indep(x, z) and dep(y, z)], (y,))
     z8, z4, z57, rest = [], [], [], []
     for z in others:
         if indep(x, z) and indep(y, z):
             z8.append(z)
-        elif indep(x, z) and not indep(x, z, (y,)):
+        elif indep(x, z) and dep(x, z, (y,)):
             z4.append(z)
         else:
             rest.append(z)
-    tests.ask(y, [z for z in rest if not indep(y, z)], (x,))
-    z57 = [z for z in rest if not indep(y, z) and indep(y, z, (x,))]
+    tests.ask(y, [z for z in rest if dep(y, z)], (x,))
+    z57 = [z for z in rest if dep(y, z) and indep(y, z, (x,))]
     rest = [z for z in rest if z not in z57]
 
     # Step 4: a variable dependent on a cause of the outcome, or made independent of it by the
     # pair, is post-treatment.
     post = []
     if z4:
-        post = [z for z in rest if any(not indep(z, w) or indep(z, w, (x, y)) for w in z4)]
+        post = [z for z in rest if any(dep(z, w) or indep(z, w, (x, y)) for w in z4)]
         rest = [z for z in rest if z not in post]
 
     # Step 5: the variables the treatment and the rest make independent of the outcome.
-    zmix = [z for z in rest if not indep(y, z) and indep(y, z, (x, *(w for w in rest if w != z)))]
+    zmix = [z for z in rest if dep(y, z) and indep(y, z, (x, *(w for w in rest if w != z)))]
     rest = [z for z in rest if z not in zmix]
 
     # Step 6: a remaining variable that forms a collider at the treatment with a candidate of
@@ -140,7 +158,7 @@ def ldp(search: LocalSearch, x: int, y: int, others: Sequence[int]) -> LDPResult
     resolved = bool(mix) and bool(rest)
     if resolved:
         for z in rest:
-            witnesses = [w for w in mix if indep(w, z) and not indep(w, z, (x,))]
+            witnesses = [w for w in mix if indep(w, z) and dep(w, z, (x,))]
             if witnesses:
                 z1.append(z)
                 z15.extend(w for w in witnesses if w not in z15)
@@ -161,7 +179,7 @@ def ldp(search: LocalSearch, x: int, y: int, others: Sequence[int]) -> LDPResult
     # others are instruments.
     z5 = []
     for u in z15:
-        if any(not indep(u, a) for a in adjacent):
+        if any(dep(u, a) for a in adjacent):
             z1.append(u)
         else:
             z5.append(u)
@@ -180,7 +198,7 @@ def ldp(search: LocalSearch, x: int, y: int, others: Sequence[int]) -> LDPResult
         "Zpost": post,
         "unlabeled": [z for z in others if z not in labeled],
     }
-    return LDPResult(partition=_partition(LDP_LABELS, sets), valid=valid)
+    return LDPResult(partition=_partition(LDP_LABELS, sets), valid=valid, undecided=tests.untested)
 
 
 def ld3(search: LocalSearch, x: int, y: int, others: Sequence[int]) -> LD3Result:
@@ -194,21 +212,21 @@ def ld3(search: LocalSearch, x: int, y: int, others: Sequence[int]) -> LD3Result
     treatment against the outcome given the parents line 8 found.
     """
     tests = _Tests(search)
-    indep = tests.independent
+    indep, dep = tests.independent, tests.dependent
     others = list(others)
     tests.ask(x, others)
     tests.ask(y, others)
-    tests.ask(y, [z for z in others if not indep(y, z)], (x,))
+    tests.ask(y, [z for z in others if dep(y, z)], (x,))
     tests.ask(x, [z for z in others if indep(x, z)], (y,))
     z8 = [z for z in others if indep(x, z) and indep(y, z)]
-    z57 = [z for z in others if not indep(y, z) and indep(y, z, (x,))]
-    z4 = [z for z in others if indep(x, z) and not indep(x, z, (y,))]
+    z57 = [z for z in others if dep(y, z) and indep(y, z, (x,))]
+    z4 = [z for z in others if indep(x, z) and dep(x, z, (y,))]
     found = {*z8, *z57, *z4}
     rest = [z for z in others if z not in found]
 
-    parents13 = [z for z in rest if not indep(z, y, (x, *z4, *(w for w in rest if w != z)))]
-    parents4 = [w for w in z4 if not indep(w, y, (x, *parents13, *(v for v in z4 if v != w)))]
-    direct = not indep(x, y, parents13)
+    parents13 = [z for z in rest if dep(z, y, (x, *z4, *(w for w in rest if w != z)))]
+    parents4 = [w for w in z4 if dep(w, y, (x, *parents13, *(v for v in z4 if v != w)))]
+    direct = dep(x, y, parents13)
 
     sets = {
         "Z1,3": parents13,
@@ -221,4 +239,5 @@ def ld3(search: LocalSearch, x: int, y: int, others: Sequence[int]) -> LD3Result
         partition=_partition(LD3_LABELS, sets),
         parents=sorted([*parents13, *parents4]),
         direct=direct,
+        undecided=tests.untested,
     )

@@ -165,9 +165,10 @@ def ldp(
         one record (:mod:`andrey.core.effects`) for the pair, by column label or 0-based position:
         ``estimand`` is ``"total"`` and ``nonzero`` is ``None``; when the Z5 criterion passes,
         ``identifiable`` is ``True`` and ``adjustment_sets`` is ``[Z1]``, the confounders found,
-        with ``set_kind`` ``"valid"``; when it fails, ``identifiable`` is ``None`` and
-        ``adjustment_sets`` is ``[]``: the method gives no answer, which does not mean that no
-        valid set exists. ``metadata["partition"]`` maps each label to its variables: ``"Z1"``
+        with ``set_kind`` ``"valid"``; when it fails, or a test the answer read was not tested on
+        data with missing values, ``identifiable`` is ``None`` and ``adjustment_sets`` is ``[]``:
+        the method gives no answer, which does not mean that no valid set exists.
+        ``metadata["partition"]`` maps each label to its variables: ``"Z1"``
         (confounders), ``"Z4"`` (causes of the outcome independent of the treatment), ``"Z5"``
         (instruments), ``"Z5,7"`` (instruments or descendants of the treatment, left unsplit when
         no confounder is found), ``"Z7"`` (descendants of the treatment whose paths to the
@@ -294,13 +295,14 @@ def ldp(
     result, (x, y, d, labels, name), metadata = _fit(
         "ldp", data, treatment, outcome, alpha, indep_test, degrees_of_freedom, categorical, seed
     )
+    valid = result.valid and not result.undecided
     record = effect_record(
         x,
         y,
         estimand="total",
-        identifiable=True if result.valid else None,
-        adjustment_sets=[result.partition["Z1"]] if result.valid else [],
-        set_kind="valid" if result.valid else None,
+        identifiable=True if valid else None,
+        adjustment_sets=[result.partition["Z1"]] if valid else [],
+        set_kind="valid" if valid else None,
         name=name,
     )
     return structure_output(
@@ -400,8 +402,11 @@ def ld3(
         ``identifiable`` is ``None``, since the method assumes every parent of the outcome is
         observed and does not test it; ``adjustment_sets`` is ``[parents]``, the parents of the
         outcome found other than the treatment, possibly empty, with ``set_kind``
-        ``"parents_of_outcome"``. ``metadata["partition"]`` maps each label to its variables:
-        ``"Z1,3"`` (the confounders and mediators found to be parents of the outcome), ``"Z4"``
+        ``"parents_of_outcome"``. When a test the answer read was not tested, on data with
+        missing values, the record decides nothing: ``nonzero`` is ``None`` and
+        ``adjustment_sets`` is ``[]``, with ``set_kind`` ``None``. ``metadata["partition"]`` maps
+        each label to its variables: ``"Z1,3"`` (the confounders and mediators found to be parents
+        of the outcome), ``"Z4"``
         (causes of the outcome independent of the treatment, parents or not), ``"Z5,7"``
         (instruments or descendants of the treatment), ``"Z8"`` (independent of both), and
         ``"unlabeled"``; a variable that passes both the ``"Z8"`` and the ``"Z4"`` test, which
@@ -523,15 +528,18 @@ def ld3(
     result, (x, y, d, labels, name), metadata = _fit(
         "ld3", data, treatment, outcome, alpha, indep_test, degrees_of_freedom, categorical, seed
     )
-    record = effect_record(
-        x,
-        y,
-        estimand="direct",
-        nonzero=result.direct,
-        adjustment_sets=[result.parents],
-        set_kind="parents_of_outcome",
-        name=name,
-    )
+    if result.undecided:  # a parent may be missing, so neither the criterion nor the set holds
+        record = effect_record(x, y, estimand="direct", name=name)
+    else:
+        record = effect_record(
+            x,
+            y,
+            estimand="direct",
+            nonzero=result.direct,
+            adjustment_sets=[result.parents],
+            set_kind="parents_of_outcome",
+            name=name,
+        )
     causes = {*result.parents, *([x] if result.direct else [])}
     edges = [(v, y, TAIL, ARROW) for v in sorted(causes)]
     return structure_output(
@@ -1299,12 +1307,15 @@ def locpc_cde(
         ``"parents_of_outcome"``; or ``"not orientable"``, where ``identifiable`` is ``False``
         and ``nonzero`` is ``True`` when the treatment's edge into the outcome is directed, else
         ``None``. After an early stop with a zero effect, ``identifiable`` and the set are as for
-        ``"oriented"`` when every edge at the outcome is directed, else ``None`` and ``[]``.
-        ``metadata["hop"]`` is the last hop learned, ``metadata["visited"]`` lists the variables
-        whose tests ran, in order, the outcome first, and ``metadata["double_bar"]`` lists the
-        undirected edges ``[inner, outer]`` the no-non-collider rule marks. Under a mixed-data
-        setting, ``metadata["categorical"]`` lists the categorical columns it read. With a
-        randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+        ``"oriented"`` when every edge at the outcome is directed, else ``None`` and ``[]``. On data
+        with missing values, when a pair the search tested had no test with rows (an undecided
+        pair, left out of the graph), the record decides nothing: ``nonzero`` and ``identifiable``
+        are ``None`` and ``adjustment_sets`` is ``[]``, and ``reason`` names where the search
+        stopped. ``metadata["hop"]`` is the last hop learned, ``metadata["visited"]`` lists the
+        variables whose tests ran, in order, the outcome first, and ``metadata["double_bar"]``
+        lists the undirected edges ``[inner, outer]`` the no-non-collider rule marks. Under a
+        mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it read. With
+        a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
         ``metadata["n_tests"]`` is the number of conditional-independence tests the fit
         evaluated; a query answered again from a kept answer is not a new test.
         ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
@@ -1466,16 +1477,19 @@ def locpc_cde(
     graph = answer.graph
     parents = graph.parents(y)
     oriented = not graph.non_arrow(y)
-    if answer.reason in ("not adjacent", "treatment is a child"):
-        nonzero = False
-    elif x in parents:
-        nonzero = True
+    if answer.undecided:  # an edge at the outcome may be missing: the record decides nothing
+        nonzero = identifiable = None
     else:
-        nonzero = None
-    if answer.reason == "not orientable":
-        identifiable = False
-    else:
-        identifiable = True if oriented else None
+        if answer.reason in ("not adjacent", "treatment is a child"):
+            nonzero = False
+        elif x in parents:
+            nonzero = True
+        else:
+            nonzero = None
+        if answer.reason == "not orientable":
+            identifiable = False
+        else:
+            identifiable = True if oriented else None
     name = label_of(labels)
     record = effect_record(
         x,
