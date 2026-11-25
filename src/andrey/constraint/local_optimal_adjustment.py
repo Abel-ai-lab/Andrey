@@ -37,6 +37,7 @@ from andrey.constraint.pc import undirect_conflicts
 from andrey.constraint.sequential import LOAD, Cache, Network, sequential
 from andrey.core import ARROW, NULL, TAIL
 from andrey.core.ci import pins_blas
+from andrey.core.ci_missing import not_tested
 
 
 @dataclass(frozen=True)
@@ -63,10 +64,18 @@ def edges_at(network: Network, v: int) -> Edges:
     return Edges(parents, children, siblings)
 
 
+class NotTested(Exception):
+    """A query an answer reads was not tested (:func:`~andrey.core.ci_missing.not_tested`): it
+    finds the pair neither dependent nor independent, so the answer is left undecided."""
+
+
 def _dependent(search: LocalSearch, a: int, b: int, cond: Iterable[int]) -> bool:
     """Whether the test finds ``a`` and ``b`` dependent given ``cond``: a p-value at or below
-    ``alpha``."""
-    return bool(search.scan(a, [b], sorted(set(cond)))[1][0] <= search.alpha)
+    ``alpha``. Raises :class:`NotTested` when the query was not tested."""
+    p = search.scan(a, [b], sorted(set(cond)))[1][0]
+    if not_tested(p):
+        raise NotTested
+    return bool(p <= search.alpha)
 
 
 def explicit_ancestor(search: LocalSearch, x: int, y: int, network: Network) -> bool:
@@ -279,18 +288,44 @@ def local_optimal_adjustment(
     The variable whose rank comes first is ``X`` of [1]_, so the answer does not depend on the
     column order; the treatment's siblings in Step 2 go in rank order too. ``blanket`` names the
     Markov blanket learner of every MB-by-MB run, Grow-Shrink in [1]_.
+
+    On data with missing values, both answers are undecided, ``nonzero`` ``None`` and
+    ``identifiable`` ``False`` with no set, when a blanket the search learned left a candidate
+    undecided (:attr:`~andrey.constraint.blanket.LocalSearch.undecided`), since a variable no test
+    decided may be adjacent, or when a test the answer reads was not tested (:class:`NotTested`).
     """
     x, y = search.ordered({v: 0.0 for v in pair})
-    d = search.d
     cache = Cache()
     runs = {v: sequential(search, v, blanket, LOAD, cache) for v in (x, y)}
     learned = [v for r in runs.values() for v in r.learned]
     graph = {v: r.network for v, r in runs.items()}
     edges = _union_edges(graph[x], x, graph[y], y)
+    views: list[LocalSearch] = []
+    try:
+        answers, possde = _answers(search, x, y, blanket, cache, graph, learned, views)
+        decided = not search.undecided and not any(view.undecided for view in views)
+    except NotTested:
+        possde, decided = None, False
+    if not decided:
+        answers = [Answer(x, y, None, False), Answer(y, x, None, False)]
+    return Result(answers, edges, learned, possde)
 
-    def result(answers: list[Answer], possde: list[int] | None = None) -> Result:
-        return Result(answers, edges, learned, possde)
 
+def _answers(
+    search: LocalSearch,
+    x: int,
+    y: int,
+    blanket: str,
+    cache: Cache,
+    graph: dict[int, Network],
+    learned: list[int],
+    views: list[LocalSearch],
+) -> tuple[list[Answer], list[int] | None]:
+    """Steps 1 to 4 of :func:`local_optimal_adjustment` from the runs at ``x`` and ``y``: the
+    answers and the possible descendants of the treatment, ``None`` when the search stopped before
+    Step 3. The variables whose blankets the later steps learn are added to ``learned``, and the
+    search Step 4 runs over to ``views``."""
+    d = search.d
     # Step 1: the relation of the two variables (Algorithm 1).
     if explicit_ancestor(search, x, y, graph[x]):
         t, o = x, y
@@ -304,7 +339,7 @@ def local_optimal_adjustment(
                 answers.append(Answer(a, b, None, False, sets, "local_parents"))
             else:
                 answers.append(_zero(graph[a], a, b))
-        return result(answers)
+        return answers, None
     reverse = _zero(graph[o], o, t)
 
     # Step 2: amenability, from each sibling of the treatment (Algorithm 2).
@@ -313,7 +348,7 @@ def local_optimal_adjustment(
         learned += run.learned
         if not amenable_at(search, t, o, v, run.network):
             sets = local_valid_sets(graph[t], t, o)
-            return result([Answer(t, o, True, False, sets, "local_parents"), reverse])
+            return [Answer(t, o, True, False, sets, "local_parents"), reverse], None
 
     # Step 3: the possible descendants of the treatment (Algorithm 9 for every other variable).
     at = edges_at(graph[t], t)
@@ -322,13 +357,16 @@ def local_optimal_adjustment(
     possde = sorted((set(at.children) | set(at.siblings)) - {o})
     if others:
         pvalues = search.scan(t, others, sorted(at.parents))[1]
+        if not_tested(pvalues).any():
+            raise NotTested
         possde = sorted([*possde, *(v for v, p in zip(others, pvalues) if p <= search.alpha)])
 
     # Step 4: the outcome's parents over the rest, the optimal set (Lemma 4.4).
     keep = [v for v in range(d) if v not in set(possde)]
     view = column_search(search, keep)
+    views.append(view)
     step = sequential(view, keep.index(o), blanket, LOAD, Cache())
     learned += [keep[v] for v in step.learned]
     parents = edges_at(step.network, keep.index(o)).parents
     optimal = sorted(keep[v] for v in parents if keep[v] != t)
-    return result([Answer(t, o, True, True, [optimal], "optimal"), reverse], possde)
+    return [Answer(t, o, True, True, [optimal], "optimal"), reverse], possde

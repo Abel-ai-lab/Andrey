@@ -2844,11 +2844,13 @@ def y_structures(
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
-    tested, including sets skipped because no row can test them. A continuous column constant on a
-    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
-    completely at random, which means that whether a value is missing depends on no value in the
-    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
-    selected sample that more rows do not correct.
+    tested, including sets skipped because no row can test them. A pair no tested query could
+    decide, as a pair never observed together, is undecided and listed in
+    ``metadata["undecided_pairs"]``; on merged cohorts, pairs measured only in different cohorts are
+    undecided. A continuous column constant on a test's rows raises ``ValueError``. Test-wise
+    deletion is valid when values are missing completely at random, which means that whether a value
+    is missing depends on no value in the data; the rows a test reads are then a random sample of
+    all rows, and otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured at alpha 0.01 on one core on the simulation of [3]_ with 10,000 rows,
     the 7-node graph and random graphs with 8 and 16 variables, with and without selection. Under
@@ -2944,7 +2946,7 @@ def y_structures(
     metadata = {
         "effects": effects,
         **categorical_metadata(mask, data),
-        **rows_metadata(rows),
+        **rows_metadata(rows, name),
         "n_tests": tests.n,
     }
     adjacency = np.zeros((d, d), dtype=np.int8)

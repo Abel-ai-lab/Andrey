@@ -139,10 +139,11 @@ pair as adjacent or as apart, so a triple over one produces no mark: PC, FCI, CD
 leave every triple whose ends are undecided unoriented, and LPCMCI every triple with an undecided
 side. The Markov-blanket searches leave an undecided candidate out of the target's set, and PCMCI,
 PCMCI+, and LPCMCI leave an undecided link out of the graph, where it has no p-value (`NaN`, `null`
-on the command line). In PCMCI and PCMCI+, a test conditions only on the candidates, strongest
-first, that leave enough rows for the test, so its rows do not mix cohorts that are never observed
-together; LPCMCI conditions no test on a node whose link to either end of the tested pair is
-undecided.
+on the command line). LDECC and LOAD leave the effect undecided when a blanket they learned left a
+candidate undecided, since it may be adjacent, and LOAD also when a test its answer reads was not
+tested. In PCMCI and PCMCI+, a test conditions only on the candidates, strongest first, that leave
+enough rows for the test, so its rows do not mix cohorts that are never observed together; LPCMCI
+conditions no test on a node whose link to either end of the tested pair is undecided.
 
 An edge is drawn if no test with enough rows separated its pair, though an untested conditioning set
 might have. PC, FCI, CD-NOD, FCI-JCI, the Markov-blanket searches, PCMCI, PCMCI+, and LPCMCI list

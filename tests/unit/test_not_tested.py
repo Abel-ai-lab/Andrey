@@ -502,3 +502,88 @@ def test_a_target_set_lists_undecided_pairs_and_flags_its_members_beside_them(na
     out = getattr(andrey, name)(_cohorts(0), target="B")
     assert ["A", "B"] in out.metadata["undecided_pairs"]
     assert ["B", "S1"] in out.metadata["possibly_separable"]
+
+
+#: The local facades, each on ``_pair_never_together()`` around ``x1``.
+LOCAL_FACADES = {
+    "mb_by_mb": lambda df: andrey.mb_by_mb(df, target="x1", blanket="iamb"),
+    "mb_by_mb_gs": lambda df: andrey.mb_by_mb(df, target="x1", blanket="gs"),
+    "cmb": lambda df: andrey.cmb(df, target="x1"),
+    "mmb_by_mmb": lambda df: andrey.mmb_by_mmb(df, target="x1", blanket="iamb"),
+    "ldecc": lambda df: andrey.ldecc(df, treatment="x1", outcome="x0"),
+    "local_optimal_adjustment": lambda df: andrey.local_optimal_adjustment(
+        df, variables=["x1", "x0"]
+    ),
+    "ldp": lambda df: andrey.ldp(df, treatment="x1", outcome="x0"),
+    "ld3": lambda df: andrey.ld3(df, treatment="x1", outcome="x0"),
+    "locpc_cde": lambda df: andrey.locpc_cde(df, treatment="x1", outcome="x0"),
+    "y_structures": lambda df: andrey.y_structures(df),
+}
+
+
+def _pair_never_together() -> pd.DataFrame:
+    """``x1 -> x0 <- x2`` and an independent ``x3``, with ``x1`` and ``x2`` never observed
+    together."""
+    rng = np.random.default_rng(0)
+    n = 600
+    x1, x2, noise = rng.normal(size=(3, n))
+    df = pd.DataFrame({"x0": x1 + x2 + noise, "x1": x1, "x2": x2, "x3": rng.normal(size=n)})
+    df.loc[: n // 2 - 1, "x1"] = np.nan
+    df.loc[n // 2 :, "x2"] = np.nan
+    return df
+
+
+@pytest.mark.parametrize("name", list(LOCAL_FACADES))
+def test_a_local_facade_lists_the_pair_no_test_decided(name):
+    """Its notice names the undecided pair rather than saying no pair is undecided."""
+    out = LOCAL_FACADES[name](_pair_never_together())
+    assert out.metadata["not_tested"] > 0
+    assert ["x1", "x2"] in out.metadata["undecided_pairs"]
+    notice = _not_tested_notice(out.metadata)
+    assert "x1 and x2" in notice and "No pair is undecided" not in notice
+
+
+@pytest.mark.parametrize("k", [0, 2])
+def test_load_and_ldecc_leave_the_effect_undecided_when_no_test_decided_a_pair(k):
+    """A and B share fewer rows than a test needs, so B's blanket leaves A undecided and no test
+    reads their relation: neither method reads the effect, though each did before, LOAD as no
+    effect, identified by the empty set."""
+    out = andrey.local_optimal_adjustment(_cohorts(k), variables=["B", "A"])
+    assert out.metadata["undecided_pairs"] == [["A", "B"]]
+    for record in out.metadata["effects"]:
+        assert (record["nonzero"], record["identifiable"], record["adjustment_sets"]) == (
+            None,
+            False,
+            [],
+        )
+    out = andrey.ldecc(_cohorts(k), treatment="A", outcome="B")
+    assert out.metadata["undecided_pairs"] == [["A", "B"]]
+    (record,) = out.metadata["effects"]
+    assert (record["nonzero"], record["identifiable"], record["adjustment_sets"]) == (
+        None,
+        None,
+        [],
+    )
+
+
+def test_ldecc_reads_no_dependence_from_a_query_not_tested():
+    """UCChildren marks the neighbor 1 a child when the spouse 2, separated from 0 by no set, is
+    dependent on 1; a query of 1 and 2 not tested marks nothing."""
+    from andrey.constraint.ldecc import Tests, uc_children
+
+    def test(x, y, condition_set=()):
+        return 0.5 if {x, y} == {0, 2} and not condition_set else NOT_TESTED
+
+    search = LocalSearch(test, [0, 1, 2], 0.05)
+    assert uc_children(Tests(search), 0, [1, 2], [1]) == set()
+
+
+def test_load_reads_no_ancestry_from_a_query_not_tested():
+    """Whether 0 is an explicit ancestor of 1 is a test of the two given 0's parents; a query not
+    tested decides neither."""
+    from andrey.constraint.local_optimal_adjustment import NotTested, explicit_ancestor
+    from andrey.constraint.sequential import Network
+
+    search = LocalSearch(_oracle({}), [0, 1], 0.05)
+    with pytest.raises(NotTested):
+        explicit_ancestor(search, 0, 1, Network(2))

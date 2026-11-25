@@ -70,7 +70,7 @@ def _fit(
     metadata = {
         "partition": {k: [name(j) for j in v] for k, v in result.partition.items()},
         **categorical_metadata(mask, data),
-        **rows_metadata(rows),
+        **rows_metadata(rows, name),
         "n_tests": tests.n,
     }
     return result, (x, y, d, labels, name), metadata
@@ -241,11 +241,13 @@ def ldp(
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
-    tested, including sets skipped because no row can test them. A continuous column constant on a
-    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
-    completely at random, which means that whether a value is missing depends on no value in the
-    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
-    selected sample that more rows do not correct.
+    tested, including sets skipped because no row can test them. A pair no tested query could
+    decide, as a pair never observed together, is undecided and listed in
+    ``metadata["undecided_pairs"]``; on merged cohorts, pairs measured only in different cohorts are
+    undecided. A continuous column constant on a test's rows raises ``ValueError``. Test-wise
+    deletion is valid when values are missing completely at random, which means that whether a value
+    is missing depends on no value in the data; the rows a test reads are then a random sample of
+    all rows, and otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Not benchmarked yet. Tested with exact d-separation on the partition graphs
     of [1]_ and on random graphs, and on simulated linear-Gaussian data. Without a confounder in
@@ -465,11 +467,13 @@ def ld3(
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
-    tested, including sets skipped because no row can test them. A continuous column constant on a
-    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
-    completely at random, which means that whether a value is missing depends on no value in the
-    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
-    selected sample that more rows do not correct.
+    tested, including sets skipped because no row can test them. A pair no tested query could
+    decide, as a pair never observed together, is undecided and listed in
+    ``metadata["undecided_pairs"]``; on merged cohorts, pairs measured only in different cohorts are
+    undecided. A continuous column constant on a test's rows raises ``ValueError``. Test-wise
+    deletion is valid when values are missing completely at random, which means that whether a value
+    is missing depends on no value in the data; the rows a test reads are then a random sample of
+    all rows, and otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Not benchmarked yet. Tested with exact d-separation on the graph of [1]_
     and on random graphs whose outcome has no descendants, and on simulated linear-Gaussian data.
@@ -542,10 +546,14 @@ def _ldecc_record(result, x: int, y: int, name) -> dict:
 
     The outcome a parent of the treatment makes the effect zero in every graph the answer allows,
     and no set valid; with one set and no outcome in it, the effect is identified; otherwise the
-    sets are listed with the outcome left out of a set that holds it.
+    sets are listed with the outcome left out of a set that holds it. When the blanket's search
+    left a candidate undecided, which may be a neighbor, the record decides nothing and lists no
+    set.
     """
     from andrey.core.effects import effect_record
 
+    if result.undecided:
+        return effect_record(x, y, estimand="total", name=name)
     sets = result.parent_sets
     if y in result.parents:
         return effect_record(x, y, estimand="total", nonzero=False, identifiable=False, name=name)
@@ -685,8 +693,9 @@ def ldecc(
         ``identifiable`` is ``True``; with several, ``None``. When the outcome is a parent of the
         treatment, the effect is zero in every graph the answer allows and no set is valid:
         ``nonzero`` and ``identifiable`` are ``False`` and ``adjustment_sets`` is ``[]``.
-        ``nonzero`` is ``None`` otherwise.
-        ``metadata["algorithm"]`` is ``"ldecc"``. Under a mixed-data setting,
+        ``nonzero`` is ``None`` otherwise. When the blanket left a candidate undecided on data with
+        missing values, ``nonzero`` and ``identifiable`` are ``None`` and ``adjustment_sets`` is
+        ``[]``. ``metadata["algorithm"]`` is ``"ldecc"``. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
         ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the number
         of conditional-independence tests the fit evaluated; a query asked again reads its kept
@@ -768,11 +777,15 @@ def ldecc(
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
-    tested, including sets skipped because no row can test them. A continuous column constant on a
-    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
-    completely at random, which means that whether a value is missing depends on no value in the
-    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
-    selected sample that more rows do not correct.
+    tested, including sets skipped because no row can test them. A pair no tested query could
+    decide, as a pair never observed together, is undecided and listed in
+    ``metadata["undecided_pairs"]``; on merged cohorts, pairs measured only in different cohorts are
+    undecided. When the blanket left a candidate undecided, which may be a neighbor, the effect is
+    left undecided (see Returns). A continuous column constant on a test's rows raises
+    ``ValueError``. Test-wise deletion is valid when values are missing completely at random, which
+    means that whether a value is missing depends on no value in the data; the rows a test reads are
+    then a random sample of all rows, and otherwise they are a selected sample that more rows do not
+    correct.
 
     **Limitations.** Measured against its authors' code on the graphs of the generator of [1]_ (App.
     C.1) and on the MAGIC-NIAB network at 8,000 to 32,000 rows, with Fisher's z test at the level of
@@ -854,7 +867,7 @@ def ldecc(
     metadata = {
         "effects": [_ldecc_record(result, x, y, name)],
         **categorical_metadata(mask, data),
-        **rows_metadata(rows),
+        **rows_metadata(rows, name),
         "n_tests": tests.n,
     }
     return structure_output(
@@ -957,26 +970,29 @@ def local_optimal_adjustment(
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` over every column holding only the
         edges at the two variables, as their own searches directed them: ``a -> v`` for a direct
         cause of ``v``, ``v -> a`` for a direct effect, and ``a - v`` where the search left the
-        direction undecided. An absent edge away from the two means nothing.
-        ``metadata["effects"]`` holds two records (:mod:`andrey.core.effects`), the first with the
-        first of ``variables`` as the treatment, by column label or 0-based position, each for the
-        total effect: ``nonzero`` is ``True`` when the treatment is an explicit ancestor of the
-        outcome, ``False`` when it is an ancestor in no graph the tests allow, and ``None`` when it
-        is one in some; ``identifiable`` is ``True`` when one set is a valid adjustment set in
-        every such graph, with ``adjustment_sets`` the optimal set (``set_kind`` ``"optimal"``) for
-        a nonzero effect and ``[]`` for a zero one; otherwise it is ``False`` and
-        ``adjustment_sets`` lists the locally valid parent sets of the treatment (``set_kind``
-        ``"local_parents"``), the outcome left out, one estimate each. A zero effect between two
-        adjacent variables is not identifiable in this sense: the edge into the treatment is a
-        back-door path no set blocks. ``metadata["blankets_learned"]`` lists the variables whose
-        Markov blanket the search learned, in order; the last step learns blankets over the
-        variables that are not possible descendants of the treatment, so a variable can appear
-        twice. ``metadata["algorithm"]`` is ``"local_optimal_adjustment"``. Under a mixed-data
-        setting, ``metadata["categorical"]`` lists the categorical columns it read. With a
-        randomized ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]``
-        is the number of conditional-independence tests the fit evaluated; a query answered again
-        from a kept answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the
-        fit ran under, ``andrey.config.tie_break``.
+        direction undecided. An absent edge away from the two means nothing. ``metadata["effects"]``
+        holds two records (:mod:`andrey.core.effects`), the first with the first of ``variables`` as
+        the treatment, by column label or 0-based position, each for the total effect: ``nonzero``
+        is ``True`` when the treatment is an explicit ancestor of the outcome, ``False`` when it is
+        an ancestor in no graph the tests allow, and ``None`` when it is one in some;
+        ``identifiable`` is ``True`` when one set is a valid adjustment set in every such graph,
+        with ``adjustment_sets`` the optimal set (``set_kind`` ``"optimal"``) for a nonzero effect
+        and ``[]`` for a zero one; otherwise it is ``False`` and ``adjustment_sets`` lists the
+        locally valid parent sets of the treatment (``set_kind`` ``"local_parents"``), the outcome
+        left out, one estimate each. A zero effect between two adjacent variables is not
+        identifiable in this sense: the edge into the treatment is a back-door path no set blocks.
+        On data with missing values, when a blanket the search learned left a candidate undecided or
+        a test the answer reads was not tested, both records leave the effect undecided: ``nonzero``
+        is ``None``, ``identifiable`` ``False``, and ``adjustment_sets`` ``[]``.
+        ``metadata["blankets_learned"]`` lists the variables whose Markov blanket the search
+        learned, in order; the last step learns blankets over the variables that are not possible
+        descendants of the treatment, so a variable can appear twice. ``metadata["algorithm"]`` is
+        ``"local_optimal_adjustment"``. Under a mixed-data setting, ``metadata["categorical"]``
+        lists the categorical columns it read. With a randomized ``indep_test``,
+        ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the number of
+        conditional-independence tests the fit evaluated; a query answered again from a kept answer
+        is not a new test. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -1053,11 +1069,15 @@ def local_optimal_adjustment(
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
-    tested, including sets skipped because no row can test them. A continuous column constant on a
-    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
-    completely at random, which means that whether a value is missing depends on no value in the
-    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
-    selected sample that more rows do not correct.
+    tested, including sets skipped because no row can test them. A pair no tested query could
+    decide, as a pair never observed together, is undecided and listed in
+    ``metadata["undecided_pairs"]``; on merged cohorts, pairs measured only in different cohorts are
+    undecided. When a blanket the search learned left a candidate undecided, which may be adjacent,
+    or a test the answer reads was not tested, the effect is left undecided (see Returns). A
+    continuous column constant on a test's rows raises ``ValueError``. Test-wise deletion is valid
+    when values are missing completely at random, which means that whether a value is missing
+    depends on no value in the data; the rows a test reads are then a random sample of all rows, and
+    otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured against its authors' code on the random graphs of [1]_ with 100 to
     1,000 variables and on pairs drawn from the MAGIC-NIAB network at 10,000 rows, with Fisher's z
@@ -1158,7 +1178,7 @@ def local_optimal_adjustment(
         "effects": records,
         "blankets_learned": [name(v) for v in result.learned],
         **categorical_metadata(mask, data),
-        **rows_metadata(rows),
+        **rows_metadata(rows, name),
         "n_tests": tests.n,
     }
     return structure_output(
@@ -1365,11 +1385,13 @@ def locpc_cde(
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
-    tested, including sets skipped because no row can test them. A continuous column constant on a
-    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
-    completely at random, which means that whether a value is missing depends on no value in the
-    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
-    selected sample that more rows do not correct.
+    tested, including sets skipped because no row can test them. A pair no tested query could
+    decide, as a pair never observed together, is undecided and listed in
+    ``metadata["undecided_pairs"]``; on merged cohorts, pairs measured only in different cohorts are
+    undecided. A continuous column constant on a test's rows raises ``ValueError``. Test-wise
+    deletion is valid when values are missing completely at random, which means that whether a value
+    is missing depends on no value in the data; the rows a test reads are then a random sample of
+    all rows, and otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured against its authors' code on the random graphs of [1]_ with 10 to 200
     variables and 5,000 rows, linear-Gaussian with Fisher's z test and binary with the G-square
@@ -1472,7 +1494,7 @@ def locpc_cde(
         "visited": [name(v) for v in graph.visited],
         "double_bar": [[name(a), name(b)] for a, b in sorted(graph.double_bar)],
         **categorical_metadata(mask, data),
-        **rows_metadata(rows),
+        **rows_metadata(rows, name),
         "n_tests": tests.n,
     }
     return structure_output(
