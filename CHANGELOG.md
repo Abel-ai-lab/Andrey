@@ -49,6 +49,15 @@ names its pull request.
   links to the API reference is cobalt; a soft amber tint marks a link's target and a searched
   word, and a cobalt tint selected text; and one 2px cobalt ring marks keyboard focus. ([#1232])
 
+### Fixed
+
+- On data with missing values, `inter_iamb` keeps a candidate whose test given the blanket it ends
+  on was not tested, when a test with rows found it dependent and none separated it, on every stop
+  but the `max_depth` cap, as `iamb` does. A blanket that repeated one it held after an earlier
+  shrink ended the search without the keep step, which dropped such a candidate with no trace, and
+  the keep step counted only the grow tests as separating, so a member a shrink dropped could join
+  again. ([#1235])
+
 ## [0.19.0] - 2026-11-24
 
 ### Highlights
@@ -2979,3 +2988,4 @@ First alpha release.
 [#1222]: https://github.com/Abel-ai-lab/Andrey/pull/1222
 [#1224]: https://github.com/Abel-ai-lab/Andrey/pull/1224
 [#1232]: https://github.com/Abel-ai-lab/Andrey/pull/1232
+[#1235]: https://github.com/Abel-ai-lab/Andrey/pull/1235
