@@ -20,7 +20,9 @@ import pytest
 
 import andrey
 from andrey.api._method import _not_tested_notice
+from andrey.constraint.blanket import markov_blanket
 from andrey.core import ARROW, ci
+from andrey.core.ci_missing import NOT_TESTED
 from andrey.temporal.pcmci import pc1
 
 COHORT = 300
@@ -215,6 +217,39 @@ def test_a_target_set_leaves_out_a_variable_never_observed_with_the_target(name)
     key = "parents_and_children" if name == "mmpc" else "markov_blanket"
     assert "S1" in out.metadata[key] and "A" not in out.metadata[key]
     assert ["A", "B"] in out.metadata["undecided_pairs"]
+
+
+def _blanket(answers: dict, d: int, *, interleaved: bool) -> tuple[list[int], dict]:
+    """Target 0's blanket and separating sets by IAMB or Inter-IAMB over a test answering
+    ``answers[(candidate, sorted set)]``, any other query not tested."""
+
+    def test(x, y, condition_set=()):
+        return answers.get((max(x, y), tuple(sorted(condition_set))), NOT_TESTED)
+
+    sepsets: dict = {}
+    blanket = markov_blanket(test, 0, d, 0.05, range(d), interleaved=interleaved, sepsets=sepsets)
+    return blanket, sepsets
+
+
+def test_inter_iamb_keeps_a_candidate_not_tested_when_its_blanket_repeats():
+    """2 joins; given 2, 3 joins and 1 is not tested; the shrink drops both, and 2 joins again,
+    which ends the search. 1 tests dependent on 0 alone and no test separated it: it stays, as in
+    IAMB."""
+    answers = {(1, ()): 0.0067, (2, ()): 0.0002, (3, ()): 0.0575, (3, (2,)): 0.0458}
+    answers[2, (3,)] = 0.2262
+    assert _blanket(answers, 4, interleaved=True) == ([2, 1], {3: ()})
+    assert _blanket(answers, 4, interleaved=False)[0] == [2, 3, 1]
+
+
+def test_inter_iamb_keeps_out_a_candidate_a_shrink_separated():
+    """1, 2, and 3 join; the shrink drops 1 given 2 and 3, then 2 given 3, and 1 is not tested
+    given 3 after: the shrink's test separated it, so it stays out, as in IAMB."""
+    answers = {
+        **{(1, ()): 0.001, (2, ()): 0.002, (3, ()): 0.003, (2, (1,)): 0.001, (1, (2,)): 0.001},
+        **{(3, (1, 2)): 0.001, (1, (2, 3)): 0.5, (2, (3,)): 0.5},
+    }
+    for interleaved in (True, False):
+        assert _blanket(answers, 4, interleaved=interleaved) == ([3], {1: (2, 3), 2: (3,)})
 
 
 class _InfiniteStatistic:

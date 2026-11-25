@@ -185,10 +185,7 @@ def markov_blanket(
 
     Grow: add the candidate most dependent on ``target`` given the current blanket, among those
     whose p-value is at or below ``alpha``, until none is; a p-value strength is compared to
-    ``KEY_DP`` significant digits; then add, in rank order, each candidate whose test given the
-    blanket was not tested and that no earlier test separated, since a test without rows separates
-    no pair; a candidate with no test that had rows, as one never observed with ``target``, is
-    undecided and left out (:func:`_count_beside_undecided`).
+    ``KEY_DP`` significant digits.
     Shrink: visit the members in the order they joined and drop each one
     the test finds independent of ``target`` (a p-value above ``alpha``) given the other current
     members. IAMB
@@ -197,6 +194,11 @@ def markov_blanket(
     ends. Every grow test conditions on
     the whole blanket, so with ``max_depth`` the grow phase also stops once the blanket holds more
     than ``max_depth`` members, and every test conditions on at most ``max_depth`` variables.
+    When the grow stops short of that cap, each candidate whose test given the final blanket was
+    not tested and that no test with rows separated, a shrink's included, joins in rank order,
+    since a test without rows separates no pair; Inter-IAMB then shrinks once more. A candidate
+    with no test that had rows, as one never observed with ``target``, is undecided and left out
+    (:func:`_count_beside_undecided`).
     Returns the members in the order they joined.
 
     With ``constraints``, each variable a required edge joins to ``target`` is a member from the
@@ -212,13 +214,16 @@ def markov_blanket(
     required = _required(constraints, target, ranks)
     blanket: list[int] = list(required)
     seen: set[frozenset[int]] = set()
-    separated: set[int] = set()
+    separated: set[int] = set()  # the candidates a test with rows found independent, a shrink's too
     decided: set[int] = set()  # the candidates with a test that had rows
+    # The candidates not tested given each blanket a grow step scanned.
+    untested: dict[frozenset[int], list[int]] = {}
+    capped = True
     while max_depth is None or len(blanket) <= max_depth:
         best_key, best_x = None, None
         candidates = [x for x in range(d) if x != target and x not in blanket]
         given = tuple(sorted(blanket))
-        untested = []
+        missing = untested[frozenset(blanket)] = []
         for x, (p, strength) in zip(
             candidates, dependences(target, candidates, blanket), strict=True
         ):
@@ -231,24 +236,28 @@ def markov_blanket(
                     sepsets[x] = given
             if not not_tested(p):
                 decided.add(x)
-            elif x not in separated:
-                untested.append(x)
+            else:
+                missing.append(x)
         if best_x is None:
-            # A candidate whose blanket test was not tested stays if no earlier test separated it: a
-            # test without rows separates no pair. One with no tested query, such as a variable
-            # never observed with the target, is undecided and left out.
-            untested = [x for x in untested if x in decided]
-            blanket.extend(sorted(untested, key=lambda x: ranks[x]))
-            if interleaved and untested:
-                _shrink(test, target, alpha, blanket, required, sepsets)
+            capped = False
             break
         blanket.append(best_x)
         if interleaved:
-            _shrink(test, target, alpha, blanket, required, sepsets)
+            separated.update(_shrink(test, target, alpha, blanket, required, sepsets))
             state = frozenset(blanket)
             if state in seen:
+                capped = False
                 break
             seen.add(state)
+    if not capped:
+        # A candidate whose test given the final blanket was not tested stays if a test with rows
+        # asked it and none separated it: a test without rows separates no pair. One with no tested
+        # query, such as a variable never observed with the target, is undecided and left out. A
+        # repeated blanket was scanned when it first held, so its candidates' answers are known.
+        stay = [x for x in untested[frozenset(blanket)] if x in decided and x not in separated]
+        blanket.extend(sorted(stay, key=lambda x: ranks[x]))
+        if interleaved and stay:
+            _shrink(test, target, alpha, blanket, required, sepsets)
     if not interleaved:
         _shrink(test, target, alpha, blanket, required, sepsets)
     if sepsets is not None:
@@ -290,18 +299,21 @@ def _shrink(
     blanket: list[int],
     keep: Sequence[int] = (),
     sepsets: Sepsets | None = None,
-) -> None:
+) -> list[int]:
     """Drop, in place and in joining order, each member independent of ``target`` given the rest;
     the members in ``keep`` are not tested. With ``sepsets``, a dropped member's entry is set to the
-    rest."""
+    rest. Returns the members dropped."""
+    dropped = []
     for x in list(blanket):
         if x in keep:
             continue
         rest = [z for z in blanket if z != x]
         if test(target, x, rest) > alpha:
             blanket.remove(x)
+            dropped.append(x)
             if sepsets is not None:
                 sepsets[x] = tuple(sorted(rest))
+    return dropped
 
 
 def blanket_graph(
