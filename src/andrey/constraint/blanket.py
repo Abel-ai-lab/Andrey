@@ -1566,13 +1566,15 @@ class LocalSearch:
         self._runs: dict[tuple[str, int], tuple[list[int], Sepsets]] = {}
         self._spouses: dict[tuple[str, int], list[int]] = {}
         # The tests each kept step computed when it ran, outside the kept answers, the pairs it
-        # asked of the kept answers, and the rows its tests read; the kept steps each spouse step
-        # read inside it, the tests' sum, and the steps a reading() block has read.
+        # asked of the kept answers when it ran inside a reading() block, and the rows its tests
+        # read; the kept steps each spouse step read inside it, the tests' sum, whether a reading()
+        # block is open, and the steps it has read.
         self.step_tests: dict[Step, int] = {}
         self.step_kept: dict[Step, set[tuple[int, int]]] = {}
         self.step_rows: dict[Step, Counter[int]] = {}
         self.step_reads: dict[Step, list[Step]] = {}
         self._kept_tests = 0
+        self._reading = False
         self._read: dict[Step, None] | None = None
 
     def scan(
@@ -1816,11 +1818,12 @@ class LocalSearch:
         by all the tests, filled when the block ends (:func:`read_tests`, :func:`first_reads`)."""
         reading = Reading([], 0, Counter())
         self._read, kept, before = {}, self._kept_tests, len(self.step_rows)
+        self._reading = True
         try:
             with counting_tests() as tests, kept_answers() as answers, rows_tested() as rows:
                 yield reading
         finally:
-            reading.steps, self._read = list(self._read), None
+            reading.steps, self._read, self._reading = list(self._read), None, False
         reading.own = tests.n - answers.computed - (self._kept_tests - kept)
         reading.kept = answers.asked
         reading.rows = rows - self._rows_of(before)
@@ -1836,9 +1839,12 @@ class LocalSearch:
 
     def _kept(self, step: Step, n: int, kept: set[tuple[int, int]], rows: Counter[int]) -> None:
         """Record that the kept step ``step`` computed ``n`` tests of its own outside the kept
-        answers, asked the pairs ``kept`` of them, and read ``rows``."""
+        answers, asked the pairs ``kept`` of them, and read ``rows``. The pairs are kept only for a
+        step made inside a :meth:`reading` block, the one place :func:`read_tests` reads them, so a
+        search outside one, as of every variable's set, holds none."""
         self.step_tests[step] = n
-        self.step_kept[step] = kept
+        if self._reading:
+            self.step_kept[step] = kept
         self.step_rows[step] = rows
         self._kept_tests += n
 

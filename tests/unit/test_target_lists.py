@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 import andrey
-from andrey.constraint.blanket import LazyTieRanks
+from andrey.constraint.blanket import LazyTieRanks, local_search
 from andrey.core.ci import counting_tests
 
 SET_LEARNERS = (
@@ -104,6 +104,18 @@ def test_kept_chi_square_answers_change_no_result(method, order):
     for out, one in zip(outs, alone, strict=True):
         _same(out, one)
     assert total.n < sum(one.metadata["n_tests"] for one in alone)
+
+
+def test_only_a_step_made_for_a_listed_target_keeps_its_kept_answer_pairs():
+    """A search of every variable's set reads no step's pairs, so it holds none; a step made for a
+    target of a list keeps the pairs it asked of the chi-square test's kept answers."""
+    search = local_search(_discrete(), alpha=0.05, indep_test="chisq")
+    search.run("mmpc", 0)
+    assert search.step_tests and not search.step_kept
+    with search.reading():
+        search.run("mmpc", 1)
+    assert list(search.step_kept) == [("run", "mmpc", 1)]
+    assert search.step_kept["run", "mmpc", 1]
 
 
 @pytest.mark.parametrize("method", ["iamb", "mmpc", "hiton_mb", "cmb"])
