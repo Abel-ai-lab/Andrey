@@ -389,6 +389,13 @@ def _gs(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     of ``target`` given the other current members is dropped at once, and the visit starts again
     from the first member, until every member tests dependent.
 
+    A test without the rows it needs (:func:`~andrey.core.ci_missing.not_tested`) separates no pair
+    and adds no member, as in :func:`markov_blanket`: when a pass adds nothing, each candidate
+    whose last grow test was not tested, that a test with rows asked and none separated, joins in
+    rank order before the shrink; a candidate with no test that had rows, as one never observed
+    with ``target``, is left out. A candidate whose ordering test was not tested has no strength
+    and is visited after the others, in rank order.
+
     ``max_depth``, ``constraints``, and ``sepsets`` act as in :func:`markov_blanket`: the grow
     stops once the blanket holds more than ``max_depth`` members, a member a required edge joins to
     ``target`` is in the blanket from the start and never tested, a pair the knowledge makes
@@ -407,19 +414,26 @@ def _gs(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     blanket = list(required)
     candidates = [x for x in range(search.d) if x != target and x not in required]
     strengths, pvalues = search.scan(target, candidates, ())
-    order = search.by_strength(candidates, strengths)
+    missing = not_tested(pvalues)
+    tested = [x for x, m in zip(candidates, missing.tolist(), strict=True) if not m]
+    order = search.by_strength(tested, strengths[~missing]) + sorted(
+        (x for x in candidates if x not in tested), key=lambda x: search.ranks[x]
+    )
     unconditional = dict(zip(candidates, pvalues.tolist(), strict=True))
-    # The blanket size at each candidate's last independent verdict: the blanket only grows here,
-    # so an equal size is the same conditioning set.
+    decided = set(tested)  # the candidates with a test that had rows
+    separated = {x for x in tested if unconditional[x] > alpha}
+    untested: set[int] = set()  # the candidates whose last grow test was not tested
+    # The blanket size at each candidate's last grow test that added nothing: the blanket only
+    # grows here, so an equal size is the same conditioning set.
     last: dict[int, int] = {}
-    growing = True
+    growing, capped = True, False
     while growing:
         added = False
         for y in order:
             if y in blanket or last.get(y) == len(blanket):
                 continue
             if max_depth is not None and len(blanket) > max_depth:
-                growing = False
+                growing, capped = False, True
                 break
             if blanket:
                 p = search.scan(target, [y], blanket)[1][0]
@@ -428,10 +442,21 @@ def _gs(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
             if p <= alpha:
                 blanket.append(y)
                 added = True
-            else:
-                last[y] = len(blanket)
+                continue
+            last[y] = len(blanket)
+            if p > alpha:
+                decided.add(y)
+                separated.add(y)
+                untested.discard(y)
                 sepsets[y] = tuple(sorted(blanket))
+            else:  # not tested: it separates no pair
+                untested.add(y)
+                if y in separated:  # keeps the set of the last test that separated it
+                    sepsets.setdefault(y, ())
         growing = growing and added
+    if not capped:
+        stay = [x for x in untested if x in decided and x not in separated]
+        blanket.extend(sorted(stay, key=lambda x: search.ranks[x]))
     removing = True
     while removing:
         removing = False
@@ -1342,8 +1367,11 @@ def _total_conditioning(search: LocalSearch, target: int, sepsets: Sepsets) -> l
     Under faithfulness these are exactly the blanket's members: the variables outside the blanket
     are independent of ``target`` given the blanket, and each member is dependent given the rest
     [1]_. The same holds with hidden variables, for the blanket in the maximal ancestral graph over
-    the observed variables, whose separation keeps those properties [2]_. Each variable left out
-    keeps all the rest as its separating set. A member a required edge joins to ``target`` is in
+    the observed variables, whose separation keeps those properties [2]_. Each variable the test
+    finds independent keeps all the rest as its separating set. A variable whose test was not
+    tested, for want of rows (:func:`~andrey.core.ci_missing.not_tested`), has no test that had
+    rows: it is undecided, left out with no separating set, as :func:`markov_blanket` leaves one
+    out. A member a required edge joins to ``target`` is in
     the blanket from the start and never tested, and a pair the knowledge makes non-adjacent is
     tested, since it may be a child's other parent, and left out of the returned set, as in
     :func:`markov_blanket`. Every test conditions on ``d - 2`` variables, so with ``max_depth``
@@ -1369,7 +1397,7 @@ def _total_conditioning(search: LocalSearch, target: int, sepsets: Sepsets) -> l
             if pvalue <= search.total_alpha:
                 dependent.append(x)
                 strengths.append(strength)
-            else:
+            elif pvalue > search.total_alpha:
                 sepsets[x] = tuple(z for z in range(search.d) if z not in (target, x))
         blanket = required + search.by_strength(dependent, np.asarray(strengths))
     if search.constraints is None:

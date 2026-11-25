@@ -20,7 +20,9 @@ import pytest
 
 import andrey
 from andrey.api._method import _not_tested_notice
+from andrey.constraint.blanket import LocalSearch
 from andrey.core import ARROW, ci
+from andrey.core.ci_missing import NOT_TESTED
 from andrey.temporal.pcmci import pc1
 
 COHORT = 300
@@ -215,6 +217,39 @@ def test_a_target_set_leaves_out_a_variable_never_observed_with_the_target(name)
     key = "parents_and_children" if name == "mmpc" else "markov_blanket"
     assert "S1" in out.metadata[key] and "A" not in out.metadata[key]
     assert ["A", "B"] in out.metadata["undecided_pairs"]
+
+
+def _neighbors_seen_together_on_three_rows() -> pd.DataFrame:
+    """``x1 -> x0 <- x2`` with ``x1`` and ``x2`` observed together on 3 rows, so a test of ``x0``
+    and one of them given the other has too few rows."""
+    rng = np.random.default_rng(0)
+    x1, x2, noise = rng.normal(size=(3, 600))
+    df = pd.DataFrame({"x0": x1 + x2 + noise, "x1": x1, "x2": x2})
+    df.loc[300:596, "x1"] = np.nan
+    df.loc[:299, "x2"] = np.nan
+    return df
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["iamb", "inter_iamb", "gs", "fast_iamb", "hiton_pc", "hiton_mb", "mmpc", "mmmb", "pcmb"],
+)
+def test_a_test_with_too_few_rows_drops_no_neighbor_of_the_target(name):
+    out = getattr(andrey, name)(_neighbors_seen_together_on_three_rows(), target="x0")
+    sets = [out.metadata[k] for k in ("markov_blanket", "parents_and_children") if k in out.metadata]
+    assert sets and all(sorted(s) == ["x1", "x2"] for s in sets)
+
+
+def test_total_conditioning_leaves_a_variable_not_tested_given_the_rest_undecided():
+    """Given the rest, x1 tests dependent, x2 independent, and x3 is not tested: x3 has no test that
+    had rows, so it is left out with no separating set."""
+    answers = {1: 0.0, 2: 0.5, 3: NOT_TESTED}
+
+    def test(x, y, condition_set=()):
+        return answers[max(x, y)]
+
+    search = LocalSearch(test, [0, 1, 2, 3], 0.05)
+    assert search.run("total_conditioning", 0) == ([1], {2: (1, 3)})
 
 
 class _InfiniteStatistic:

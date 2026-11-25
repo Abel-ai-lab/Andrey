@@ -218,6 +218,17 @@ def test_gs_shrinks_a_member_its_order_admitted_early():
     assert LocalSearch(oracle, [0, 2, 1], 0.5).run("gs", 0) == ([1], {2: (1,)})
 
 
+def test_gs_visits_a_candidate_without_an_ordering_test_last():
+    """1 and 3 depend on 0, 3 more strongly, and 2 is never tested: 3 is visited first and joins,
+    then 1 given {3}; 2, with no strength to order it, comes last and joins nothing."""
+    strength = {1: 0.01, 2: np.nan, 3: 1e-9}
+
+    def test(x, y, cond=()):
+        return strength[max(x, y)]
+
+    assert LocalSearch(test, [0, 1, 2, 3], 0.05).run("gs", 0) == ([3, 1], {})
+
+
 class _Independent:
     """A test that finds ``x`` independent of the target given exactly the sets listed for ``x`` and
     dependent given any other, and logs each query in the order asked."""
