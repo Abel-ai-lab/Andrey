@@ -33,6 +33,9 @@ names its pull request.
 - For contributors, `benchmarks/overlapping_variables/` reruns the benchmark behind the 0.19.0
   release card's section on datasets with overlapping variables, at a small size in minutes and at
   the card's size, and its summary writes the card's two tables. ([#1224])
+- On the website, the Back to top button and the AI statement that ends each blog post and
+  release card take the style of the site's cards: their surface, hairline border, and rounded
+  corners. ([#1232])
 
 ## [0.19.0] - 2026-11-24
 
@@ -2962,3 +2965,4 @@ First alpha release.
 [#1217]: https://github.com/Abel-ai-lab/Andrey/pull/1217
 [#1221]: https://github.com/Abel-ai-lab/Andrey/pull/1221
 [#1224]: https://github.com/Abel-ai-lab/Andrey/pull/1224
+[#1232]: https://github.com/Abel-ai-lab/Andrey/pull/1232
