@@ -278,27 +278,19 @@ def mmhc(
     score of one dataset. Drop the incomplete rows yourself, which suits values missing completely
     at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Measured on simulated linear-Gaussian data with 20, 50, and 100 variables,
-    1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05 and the BIC, on
-    one core. In every setting the mean CPDAG errors stay below the empty graph's; the closest is at
-    20 variables and mean degree 4, with 29 to 31 pairs wrong against 40 for the empty graph. A fit
-    took 0.05 to 1.8 s, the longest at 100 variables, 5,000 rows, and mean degree 4. An edge the
-    MMPC phase misses is never added, and the hill-climbing phase stops at a local optimum. MMPC
-    tests each candidate against every subset of the current members, so its cost grows
-    exponentially with the size of a variable's parents-and-children set. With true
-    ``required_paths`` or ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated
-    linear-Gaussian data (10 to 50 variables, mean degree 2 or 4, 500 or 2,000 rows), its result was
-    no farther from the true DAG than without them in any setting. The claims direct edges of the
-    graph the search found, as their rules take the class as given: of the edges they directed,
-    18.2% with required paths and 24.7% with forbidden paths pointed against the true DAG.
-    ``required_paths`` is experimental: given the required edges those paths imply, it made more
-    errors than a reference implementation given the same edges at mean degree 4, in 2 of 36
-    settings with required paths alone and 4 of 36 with both parts, each on two sets of 20 datasets.
-    A required path says less than a required edge and directs less: it cannot restore an edge the
-    search left out, and on simulated data a required edge, which also states that the pair is
-    adjacent, lowered the errors more. A known edge belongs in ``required``. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    **Limitations.** On simulated linear-Gaussian data (20 to 100 variables, mean degree 2 and 4,
+    Fisher-z tests at alpha 0.05), its errors stayed below the empty graph's in every setting, the
+    closest at 20 variables and mean degree 4; the `0.12.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#mmhc>`_ has the numbers. An edge the MMPC
+    phase misses is never added, and the hill-climbing phase stops at a local optimum. MMPC tests
+    each candidate against every subset of the current members, so its cost grows exponentially with
+    the size of a variable's parents-and-children set. ``required_paths`` is experimental, and true
+    path claims can direct an edge of a wrong graph the wrong way, as 18.2% and 24.7% of the edges
+    they directed did, and cannot restore a missed edge: a known edge belongs in ``required``
+    (`0.17.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -573,29 +565,20 @@ def rsmax2(
     one dataset. Drop the incomplete rows yourself, which suits values missing completely at random,
     or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Measured on simulated linear-Gaussian data with 20, 50, and 100 variables,
-    1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05 and the BIC, on
-    one core, with ``restrict="mmpc"`` and ``"iamb"`` and ``maximize="hc"``. In every setting the
-    mean CPDAG errors stay below the empty graph's; the closest is at 20 variables and mean degree
-    4, with 29 to 31 pairs wrong for ``"mmpc"`` and 21 to 24 for ``"iamb"``, against 40 for the
-    empty graph. A fit took about 0.02 to 3.5 s with ``"mmpc"`` and 0.05 to 8.8 s with ``"iamb"``,
-    the longest at 100 variables, 5,000 rows, and mean degree 4. An edge the restrict phase misses
-    is never added, and the maximize phase stops at a local optimum. MMPC tests each candidate
-    against every subset of the current members, so its cost grows exponentially with the size of a
-    variable's parents-and-children set. IAMB and Inter-IAMB condition on the whole current blanket,
-    so each of their tests needs more rows as the blankets grow. With true ``required_paths`` or
-    ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated linear-Gaussian data (10 to
-    50 variables, mean degree 2 or 4, 500 or 2,000 rows), its result was no farther from the true
-    DAG than without them in any setting. The claims direct edges of the graph the search found, as
-    their rules take the class as given: of the edges they directed, 18.2% with required paths and
-    24.7% with forbidden paths pointed against the true DAG. ``required_paths`` is experimental:
-    given the required edges those paths imply, it made more errors than a reference implementation
-    given the same edges at mean degree 4, in 2 of 36 settings with required paths alone and 4 of 36
-    with both parts, each on two sets of 20 datasets. A required path says less than a required edge
-    and directs less: it cannot restore an edge the search left out, and on simulated data a
-    required edge, which also states that the pair is adjacent, lowered the errors more. A known
-    edge belongs in ``required``. The numbers are a reference, not a hard limit: they change with
-    the data generator, the density, the method's settings, and the machine.
+    **Limitations.** On simulated linear-Gaussian data (20 to 100 variables, mean degree 2 and 4,
+    Fisher-z tests at alpha 0.05), with ``restrict="mmpc"`` and ``"iamb"`` and ``maximize="hc"``,
+    its errors stayed below the empty graph's in every setting, the closest at 20 variables and mean
+    degree 4; the `0.12.0 release card <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#rsmax2>`_
+    has the numbers. An edge the restrict phase misses is never added, and the maximize phase stops
+    at a local optimum. MMPC tests each candidate against every subset of the current members, so
+    its cost grows exponentially with the size of a variable's parents-and-children set; IAMB and
+    Inter-IAMB condition on the whole current blanket, so each of their tests needs more rows as the
+    blankets grow. ``required_paths`` is experimental, and true path claims can direct an edge of a
+    wrong graph the wrong way, as 18.2% and 24.7% of the edges they directed did, and cannot restore
+    a missed edge: a known edge belongs in ``required`` (`0.17.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------

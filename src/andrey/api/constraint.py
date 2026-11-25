@@ -94,8 +94,13 @@ def pc(
         regression residuals. ``None`` picks from the declared column types: ``"gsq"`` when every
         column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
         declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
-        type, never by its values. See **Categorical data.** and **Mixed data.** in Notes.
-        ``metadata["indep_test"]`` names the test used, including the choice for ``None``.
+        type, never by its values. See **Categorical data.** and **Mixed data.** in Notes. On
+        simulated mixed data (conditional linear Gaussian networks on sparse random graphs, the
+        first half of the variables categorical with 2 to 5 categories) with 40 variables and 2,000
+        rows, PC's median errors were 9.5 with ``"cond_gauss"`` and 18.5 with ``"degen_gauss"``,
+        against the empty graph's 40, in a median 0.42 and 0.38 s on 4 cores, with
+        ``collider_order="column"``. ``metadata["indep_test"]`` names the test used, including the
+        choice for ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
@@ -171,8 +176,8 @@ def pc(
         together (144 settings), it tied in 136 with values missing completely at random; it was
         behind in 12 of the 141 judged with many weak parents per indicator (3 again on fresh seeds)
         and, with one parent that has missing values itself, ahead in 12 of 144 and behind in 24 (9
-        again); the repeated ones all had 50 or 100 variables and 20 or 30% missing (see
-        Limitations). See **Missing values.** in Notes.
+        again); the repeated ones all had 50 or 100 variables and 20 or 30% missing (0.16.0 release
+        card). See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -417,102 +422,28 @@ def pc(
     nor a column's units or origin, nor the number of workers. On complete data, ``"mvpc"`` gives
     the result of ``"testwise"``.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores
-    with a cap of 1 h and 28 GB per fit. The largest sizes through which its median errors (SHD)
-    stayed below the empty graph's, and through which its fits finished within the caps, were 50 and
-    200 variables at mean degree 1 with 2,000 rows; 400 and 1,600 at mean degree 2 with 500, 2,000,
-    or 10,000 rows; and 3,200 and 3,200 at mean degree 4 or 8 with 2,000 rows. At 1,600 variables
-    (mean degree 2, 10,000 rows), 2 of 5 fits ran past 1 h. The ladders ended after two sizes in a
-    row did not beat the empty graph, except at mean degree 4 or 8 with 2,000 rows, where they ended
-    at the largest planned size. The median fit took 1,279 s at 3,200 variables (mean degree 8,
-    2,000 rows). Test errors can make the colliders it finds fit no DAG on the skeleton, and the
-    ``cpdag`` it returns then has no consistent DAG extension, so a graph query such as
-    ``markov_blanket`` raises ``ValueError``. With the default settings, of 200 simulated datasets
-    with 10 variables, mean degree 3, and 2,000 rows, 33 fits with ``"fisherz"`` and 31 with
-    ``"normal_scores"`` returned one. The ANDES, mixed-data, and categorical numbers that follow
-    were measured with ``collider_order="column"``. On the 223-variable ANDES network with 1,000
-    simulated rows, its median errors passed the empty graph's (372 against 338). Its run time grows
-    combinatorially with the largest neighborhood. On simulated mixed data (conditional linear
-    Gaussian networks on sparse random graphs, the first half of the variables categorical with 2 to
-    5 categories), from 10 to 40 variables with 2,000 rows, its median errors stayed below the empty
-    graph's at every size: at 40 variables, 18.5 with ``"degen_gauss"`` and 9.5 with
-    ``"cond_gauss"``, against 40. On simulated categorical networks with 2 or 3 categories per
-    variable, of the same sizes and rows, they were 14 with ``"chisq"`` and 16 with ``"gsq"`` at 40
-    variables. The median fit at 40 variables took 0.38 s with ``"degen_gauss"``, 0.42 s with
-    ``"cond_gauss"``, and 0.18 s with either categorical test, on 4 cores.
-    ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet; their tests run
-    them on up to 8 variables. With missing values, measured on simulated linear-Gaussian data on
-    one core with a cap of 30 minutes per fit, at ``alpha=0.01`` unless another level is named. In
-    the setting of Tu et al. [13]_ (random DAGs with 20 variables, 10 of them with missing values,
-    or with 50 and 16; 100 to 10,000 rows; one parent per indicator, always observed or with missing
-    values itself), the mean errors of ``missing="mvpc"`` stayed below the empty graph's in all 32
-    settings. They were below those of ``"testwise"`` in 10 of the 16 settings with such a mask and
-    tied in 6, and tied in the 16 controls with as many values missing completely at random: at 50
-    variables and 10,000 rows, 5.1 against 14.3 with observed parents and 7.4 against 14.9 with
-    parents that have missing values, in a median of 2.5 s. At 100 rows, 7 of 1,600 fits raised
-    because a test had fewer rows than it needs, as with ``"testwise"``. On Erdos-Renyi graphs of 10
-    to 100 variables (mean degree 2 or 4; 500, 2,000, or 10,000 rows; 10 to 30% of the values
-    missing), with one observed parent per indicator, ``"mvpc"`` had fewer errors than
-    ``"testwise"`` in 14 of 72 settings, and in 28 at ``alpha=0.05``, and more in none. The
-    correction does not help where there is nothing to correct or where an indicator has many weak
-    parents. With values missing completely at random it tied in 136 of 144 settings over both
-    levels, and no setting where it was behind repeated on fresh seeds. Under a logistic mask that
-    gives an indicator many weak parents, up to 30 at 100 variables, it tied in 125 of the 141
-    settings judged and was behind ``"testwise"`` in 12, in 3 of them on fresh seeds too, all with
-    100 variables and 30% missing: at mean degree 2 and 10,000 rows by 3.1 errors on the 11 of 20
-    datasets that finished, both times, and at mean degree 4 with 2,000 and 10,000 rows by 1.8 and
-    2.65 errors and then by 3.5. With one parent per indicator that has missing values itself, it
-    had fewer errors in 12 of 144 settings and more in 24, in 9 of them on fresh seeds too (3 at
-    ``alpha=0.01`` and 6 at ``alpha=0.05``): all 9 with 50 or 100 variables and 20 or 30% missing,
-    by 0.55 to 2.3 errors on the first seeds and 0.7 to 3.55 on the fresh ones, in settings where
-    ``"testwise"`` made 11 to 128; in the 12 settings that repeated, over both masks, ``"testwise"``
-    is the better choice. Traced under the quantile mask at 50 variables (mean degree 2, 30%
-    missing, 500 rows at ``alpha=0.05`` and 2,000 at 0.01) and at 100 (mean degree 4, 20% missing,
-    2,000 rows, ``alpha=0.05``), the loss is edges the correction removes, not orientation: 21 of
-    its 24 and 21 of its 25 changes at 50 variables, and 90 of its 121 at 100, removed a true edge.
-    One cause is the rows: when the parents of the indicators have missing values themselves, ``W``,
-    the indicator parents a corrected test reads, closed under the parents of their own indicators,
-    held a median of 7 to 8 columns at 50 variables, and there a corrected test read a median of 13%
-    and 19% of the rows the test-wise test read; a true edge it removed was tested on a median of 22
-    and 41 rows where the test-wise test read about 245 and 965. The other is Step 3, which re-tests
-    a pair that shares an indicator and no adjacent variable, and falsely detected indicator parents
-    make such pairs: 44 of 79 and 13 of 57 re-tested pairs at 50 variables, all true edges, of which
-    the correction removed 16 and 8 (at 100 variables, 99 of 331, 94 of them true edges, of which
-    the correction removed 28); the code published with the paper corrects a pair only when it
-    shares an adjacent variable, so it corrects fewer pairs, and it still removes true edges (12 and
-    16 at 50 variables, against 21 and 21 here). Both follow the paper: its experiments with values
-    missing not at random use masks where ``W`` closes after one level, and it names the general
-    case and does not run it [13]_.
-    The correction holds when no missingness indicator causes a
-    variable, every independence in the observed rows also holds in the missing ones, no indicator
-    is a deterministic function of others, and no value causes its own missingness (self-masking)
-    [13]_; the data cannot check these, and a violation voids the correction. PermC also needs
-    linear-Gaussian variables and the paper's two conditions: (i) given ``W``, the indicators of
-    ``x``, ``y``, ``S``, and ``W`` are independent of ``x``, ``y``, and ``S``; and (ii) conditioning
-    on the indicators of ``W`` leaves the tested relation unchanged, so ``x`` and ``y`` are
-    d-separated given ``S`` exactly when they are given ``S`` and those indicators. Condition (ii)
-    fails when the indicator of a variable in ``W`` is a common effect of ``x`` and ``y``, or a
-    descendant of one, as in their Figure 1c: ``x`` and ``y`` are then dependent on the rows where
-    ``W`` is observed, the corrected test keeps the extra edge, and more rows make that more likely.
-    The density-ratio correction the paper gives for these cases is not implemented. A corrected
-    test with too few rows is answered by the test-wise test (see **Missing-Value PC.**), so its
-    pair is not corrected: of the 14,323 fits that returned on the Erdos-Renyi graphs, 962 held such
-    a test, nearly all under masks where most columns have missing values, and
-    ``metadata["corrected_edges"]["uncorrected"]`` lists the pairs. Step 2 runs one skeleton search
-    per variable with missing values, and its cost grows with the parents an indicator has: under
-    the logistic mask at mean degree 2 with 100 variables and 10,000 rows, 77 of 120 fits ran past
-    the 30 minute cap in that search, on data where the fit with ``"testwise"`` took 3.3 s (median).
-    ``max_depth`` bounds the search. With true ``required_paths`` or ``forbidden_paths`` on 5 to 30%
-    of the variable pairs of simulated linear-Gaussian data (10 to 50 variables, mean degree 2 or 4,
-    500 or 2,000 rows), its result was no farther from the true DAG than without them in any
-    setting. The claims direct edges of the graph the search found, as their rules take the class as
-    given: of the edges they directed, 5.8% with required paths and 10.9% with forbidden paths
-    pointed against the true DAG, each in a fit whose graph had an edge missing or extra or a
-    collider wrong. A required path says less than a required edge and directs less: it cannot
-    restore an edge the search left out, and on simulated data a required edge, which also states
-    that the pair is adjacent, lowered the errors more. A known edge belongs in ``required``. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** On simulated linear-Gaussian data its errors stay below the empty graph's up to
+    400 variables at mean degree 2 with 2,000 rows (`0.10.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_), and its run time grows
+    combinatorially with the largest neighborhood; on the 223-variable ANDES network its errors
+    passed the empty graph's (`0.1.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.1.0.html#published-network-structures>`__). Test
+    errors can make the colliders it finds fit no DAG on the skeleton (33 of 200 fits on 10
+    variables): the ``cpdag`` then has no consistent DAG extension, and a graph query such as
+    ``markov_blanket`` raises ``ValueError`` (`0.16.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.16.0.html#fci-fits-that-are-not-pags>`__).
+    ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet. With
+    ``missing="mvpc"``, the correction holds only when no missingness indicator causes a variable,
+    every independence in the observed rows also holds in the missing ones, no indicator is a
+    deterministic function of others, and no value causes its own missingness [13]_; the data cannot
+    check these, and a violation voids the correction. It also needs linear-Gaussian variables,
+    keeps an extra edge when the indicator of a variable it conditions on is a common effect of the
+    tested pair, and can search long for the parents of indicators that have many weak ones
+    (``max_depth`` bounds it); the `0.16.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.16.0.html#what-we-measured-on-missing-data>`_ has the
+    numbers. Where the graph found is wrong, a true path claim can direct an edge against the truth;
+    a known edge belongs in ``required``. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -795,8 +726,16 @@ def fci(
         ``"order_free"`` visits the pairs and nodes by a rank computed from the data,
         so the result does not depend on the column order unless two columns are identical.
         ``"fast"`` visits them in column order. ``None`` follows ``andrey.config.tie_break``:
-        ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. See Notes and
-        Limitations.
+        ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. ``"order_free"`` favors
+        a result that does not depend on the column order; it gives up time on some graphs from 400
+        variables, where its order needs more tests. ``"fast"`` gives up that independence and saves
+        time only on some graphs. On simulated linear-Gaussian data with one variable in ten or one
+        in five hidden (20 to 800 variables counting the hidden ones, mean degree 2 or 4, 10 or 50
+        rows per variable, 4 cores), ``"order_free"`` took 0.99 to 1.05 times as long as ``"fast"``
+        up to 200 variables and 0.78 to 1.42 times at 400 and 800, and its median endpoint errors
+        were within 2% of ``"fast"``'s; on one graph with 400 variables, mean degree 4, one variable
+        in five hidden, and 50 rows per variable, it took 34 s against 23 to 29 s for ``"fast"``
+        over five column orders. See Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -967,49 +906,25 @@ def fci(
     missing depends on no value in the data; the rows a test reads are then a random sample of all
     rows, and otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs with no
-    hidden variable, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through which
-    its median errors (SHD against the PAG of the observed variables) stayed below the empty
-    graph's, and through which its fits finished within the caps, were 200 and 800 variables at mean
-    degree 2 with 10 or 50 rows per variable; and 1,600 and 1,600 at mean degree 4 with 10 or 50
-    rows per variable. The ladders ended after two sizes in a row did not beat the empty graph,
-    except at mean degree 4 with 10 or 50 rows per variable, where they ended when three fits of the
-    next size ran past 1 h. The median fit took 116 s at 1,600 variables (mean degree 4, 50 rows per
-    variable). Measured with ``possible_dsep="fast"`` on simulated linear-Gaussian data from random
-    graphs with mean degree 2 or 4 and one variable in ten or one in five hidden, from 20 to 800
-    variables counting the hidden ones, with 10 or 50 rows per variable, on 4 cores. Its median
-    endpoint errors, each mismatched tail, arrowhead, or circle, stayed below the empty graph's at
-    every size with mean degree 4, and up to 400 variables with mean degree 2, where they passed it
-    at 800 (2,582 against 1,738 with one variable in ten hidden and ten rows per variable). With
-    those settings the median fit took 0.0064 s at 20 variables and 114 s at 800; with one variable
-    in five hidden and 50 rows per variable it took 78 s at 400 and 4,829 s at 800, where two of
-    five fits ran past 7,200 s. ``"order_free"``, which the default ``None`` picks under the default
-    ``andrey.config.tie_break="rank"``, took 0.99 to 1.05 times as long as ``"fast"`` up to 200
-    variables and 0.78 to 1.42 times at 400 and 800, and its median endpoint errors were within 2%
-    of ``"fast"``'s. On some graphs from 400 variables its order needs more tests than the column
-    order: on one with 400 variables, mean degree 4, one variable in five hidden, and 50 rows per
-    variable, it took 34 s against 23 to 29 s for ``"fast"`` over five column orders.
-    ``possible_dsep="fast"`` gives the column-order mode. On the 223-variable ANDES network with
-    1,000 simulated rows, its median endpoint errors passed the empty graph's (696 against 676).
-    Test errors can give results that no MAG fits, and the ``pag`` it returns is then not the PAG of
-    any MAG. With the default settings, of 200 simulated datasets with 10 variables, mean degree 3,
-    and 2,000 rows, 36 fits with ``"fisherz"`` and 36 with ``"normal_scores"`` returned one. On 28
-    and 29 of them, the MAG that Zhang's construction [3]_ builds from the ``pag`` is not ancestral,
-    and a graph query such as ``m_separated`` raised ``ValueError``; on the others, that MAG's PAG
-    differs from the ``pag``. Rule R5 stops searching a pair after a fixed number of partial paths
-    and leaves its circles, so on graphs with many circle-circle edges it can miss an undirected
-    cycle. With the mixed-data tests, it is experimental and not benchmarked yet; its tests run it
-    on 5 variables with 3,000 rows. ``collider_rule="conservative"`` and ``"majority"`` are not
-    benchmarked yet; their tests run them on up to 8 variables. Missing values are not benchmarked
-    yet; the tests run them on up to 20 variables with up to a fifth of the values missing
-    completely at random. On synthetic data merged from cohorts, with ``max_depth=None``, the fit
-    took 12 to 58 s at 40 variables and 4 to 6 minutes at 50: the possible-d-separation step skips
-    the sets that hold a variable never observed with the tested pair, but asks those whose
-    variables no row observes all together; ``max_depth`` bounds it. A required path says less
-    than a required edge and directs less: it cannot restore an edge the search left out, and on
-    simulated data a required edge, which also states that the pair is adjacent, lowered the errors
-    more. A known edge belongs in ``required``. The numbers are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** On simulated linear-Gaussian data with 10 or 50 rows per variable its errors
+    stay below the empty graph's up to 200 variables at mean degree 2, and up to 1,600 at mean
+    degree 4, past which its fits ran past 1 h (`0.10.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_). Its errors passed the
+    empty graph's on the 223-variable ANDES network, and, with hidden variables, at 800 variables
+    with mean degree 2 (`0.8.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.8.0.html#fci-s-feasible-sizes>`_). Test errors can
+    give results that no MAG fits (36 of 200 fits on 10 variables): the ``pag`` is then not the PAG
+    of any MAG, and a graph query such as ``m_separated`` can raise ``ValueError`` (`0.16.0 release
+    card <https://andrey.abel.ai/docs/benchmarks/0.16.0.html#fci-fits-that-are-not-pags>`__). Rule
+    R5 stops after a fixed number of partial paths, so on graphs with many circle-circle edges it
+    can miss an undirected cycle. With the mixed-data tests it is experimental, and
+    ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet. On data merged from
+    cohorts, the possible-d-separation step asks the sets whose variables no row observes all
+    together, so a fit can take minutes from 50 variables; ``max_depth`` bounds it (`0.19.0 release
+    card
+    <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#datasets-with-overlapping-variables>`__).
+    The numbers are a reference, not a hard limit: they change with the data generator, the density,
+    the method's settings, and the machine.
 
     References
     ----------
@@ -1270,15 +1185,27 @@ def gfci(
         ``"order_free"`` visits the pairs and nodes by a rank computed from the data,
         so the result does not depend on the column order unless two columns are identical.
         ``"fast"`` visits them in column order. ``None`` follows ``andrey.config.tie_break``:
-        ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. See Notes and
-        Limitations.
+        ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. ``"order_free"`` favors
+        a result that does not depend on the column order; it gives up time on some graphs from 400
+        variables, where its order needs more tests. ``"fast"`` gives up that independence and saves
+        time only on some graphs. On simulated linear-Gaussian data with one variable in ten or one
+        in five hidden (20 to 800 variables counting the hidden ones, mean degree 2 or 4, 10 or 50
+        rows per variable, 4 cores), ``"order_free"`` took 1.00 to 1.02 times as long as ``"fast"``
+        up to 200 variables and 0.87 to 1.03 times at 400 and 800, and its median endpoint errors
+        were within 2% of ``"fast"``'s; on one graph with 400 variables, mean degree 2, one variable
+        in five hidden, and 50 rows per variable, it took 407 s against 120 to 336 s for ``"fast"``
+        over five column orders. See Notes.
     edge_removal : {"all", "triangles"}, default="all"
         Which edges of the GES CPDAG the tests may remove: ``"all"`` tests every edge, and
         ``"triangles"`` only the edges in a triangle of the CPDAG, whose ends share a neighbor in
         it, as Section 5 of [1]_ does, in the adjacency search and the possible-d-separation step.
         An edge in no triangle then stays in the PAG and still conditions the tests of the other
         pairs. The triangles come from the CPDAG, so the option adds no dependence on the column
-        order. See Notes.
+        order. ``"all"`` favors removing every edge the tests reject; it gives up the true edges in
+        no triangle that a test removes in error. ``"triangles"`` favors those true edges, with a
+        strict penalty and alpha and most on dense graphs; it gives up removing the false edges in
+        no triangle that the GES phase adds, so at the defaults on sparse graphs it made more
+        errors. Their fit times differed little. See Notes for the numbers.
     confounded_index : bool, default=True
         With ``env``, whether a hidden variable may cause both the index and a data variable, as for
         :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as in a
@@ -1466,47 +1393,21 @@ def gfci(
     one dataset. Drop the incomplete rows yourself, which suits values missing completely at random,
     or use :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs with no
-    hidden variable, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through which
-    its median errors (SHD against the PAG of the observed variables) stayed below the empty
-    graph's, and through which its fits finished within the caps, were 1,600 and 1,600 variables at
-    mean degree 2 or 4 with 10 rows per variable; and 3,200 and 3,200 at mean degree 2 or 4 with 50
-    rows per variable. The ladders ended when three fits of the next size ran past 1 h, except at
-    mean degree 2 or 4 with 50 rows per variable, where they ended at the largest planned size. The
-    median fit took 1,480 s at 3,200 variables (mean degree 4, 50 rows per variable). Measured with
-    ``possible_dsep="fast"`` on simulated linear-Gaussian data from random graphs with mean degree 2
-    or 4 and one variable in ten or one in five hidden, from 20 to 800 variables counting the hidden
-    ones, with 10 or 50 rows per variable, on 4 cores. Its median endpoint errors, each mismatched
-    tail, arrowhead, or circle, stayed below the empty graph's wherever its fits finished (197
-    against 444 at 200 variables with mean degree 2, one variable in ten hidden, and ten rows per
-    variable). With those settings the median fit took 0.53 s at 100 variables, 2.6 s at 200, and
-    132 s at 800. Every fit at 800 variables finished within 7,200 s in four of the eight settings;
-    with mean degree 4, one variable in five hidden, and 50 rows per variable, none did, and three
-    of five fits at 400 ran past 3,600 s. ``"order_free"``, which the default ``None`` picks under
-    the default ``andrey.config.tie_break="rank"``, took 1.00 to 1.02 times as long as ``"fast"`` up
-    to 200 variables and 0.87 to 1.03 times at 400 and 800, and its median endpoint errors were
-    within 2% of ``"fast"``'s. On some graphs from 400 variables its order needs more tests than the
-    column order: on one with 400 variables, mean degree 2, one variable in five hidden, and 50 rows
-    per variable, it took 407 s against 120 to 336 s for ``"fast"`` over five column orders.
-    ``possible_dsep="fast"`` gives the column-order mode. It runs a full :func:`~andrey.ges` search
-    before any test, so it takes at least as long as GES on the same data. Its BIC score and
-    Fisher-Z tests assume linear relations with Gaussian noise. With fewer rows than columns the BIC
-    score is unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly,
-    so the GES search never selects one, nor any parent set that leaves its child a residual
-    variance of at most ``1e-12`` times its variance. Rule R5 has the search bound described under
-    :func:`~andrey.fci`. With the mixed-data score and test, it is experimental and not benchmarked
-    yet; its tests run it on 5 variables with 3,000 rows. ``collider_rule="conservative"`` and
-    ``"majority"`` are not benchmarked yet; their tests run them on up to 8 variables. With ``env``,
-    GFCI is experimental and not benchmarked yet; its tests run it on up to 12 measured variables
-    and 2 hidden ones, with 2,000 rows from two environments, and on Sachs's 11 proteins, 7,466
-    cells from nine conditions, with ``"cond_gauss"``. ``"bic"`` and ``"fisherz"`` read a numeric
-    ``env`` as a number, so with three or more environments a shift that does not follow the labels'
-    values can go unnoticed. ``max_parents`` counts the index as a parent in the GES phase. A
-    required path says less than a required edge and directs less: it cannot restore an edge the
-    search left out, and on simulated data a required edge, which also states that the pair is
-    adjacent, lowered the errors more. A known edge belongs in ``required``. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    **Limitations.** On simulated linear-Gaussian data its errors stay below the empty graph's up to
+    1,600 variables with 10 rows per variable, past which its fits ran past 1 h, and up to 3,200
+    with 50 (`0.10.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_). With hidden variables they
+    stayed below it wherever its fits finished, but some fits at 800 variables ran past 2 h in four
+    of eight settings, and in one of them fits at 400 ran past 1 h (`0.8.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.8.0.html#fci-s-feasible-sizes>`_). It runs a full
+    :func:`~andrey.ges` search before any test, so it takes at least as long as GES. With fewer rows
+    than columns its BIC score is unreliable. Rule R5 has the search bound described under
+    :func:`~andrey.fci`. With the mixed-data score and test, or with ``env``, it is experimental,
+    and ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet. ``"bic"`` and
+    ``"fisherz"`` read a numeric ``env`` as a number, so with three or more environments a shift
+    that does not follow the labels' values can go unnoticed. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------
@@ -1859,45 +1760,22 @@ def cdnod(
     is missing depends on no value in the data; the rows a test reads are then a random sample of
     all rows, and otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs whose means
-    shift across 4 domains, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes
-    through which its median errors (SHD) stayed below the empty graph's, and through which its fits
-    finished within the caps, were 50 and 50 variables at mean degree 1 with 2,000 rows; 100 and 100
-    at mean degree 2 with 2,000 or 10,000 rows; 200 and 200 at mean degree 2 with 500 rows and mean
-    degree 4 with 2,000 rows; and 400 and 400 at mean degree 8 with 2,000 rows. At 100 variables
-    (mean degree 2, 10,000 rows pooled from 4 domains), 1 of 5 fits ran past 1 h. Every ladder ended
-    when three fits of the next size ran past 1 h. The median fit took 39 s at 400 variables (mean
-    degree 8, 2,000 rows pooled from 4 domains). The independent-change step is not benchmarked yet;
-    its tests run it on at most 3 variables with 600 rows from 20 domains. It runs the PC search
-    with the index as one more variable, so it costs about as much as :func:`~andrey.pc` on the data
-    plus one column. Its partial-correlation tests assume linear relations with Gaussian noise and
-    find only a change in a variable's mean that is linear in the index: on two variables from two
-    domains with 600 rows, a mean shift of the cause oriented the edge on 20 of 20 seeds, and a
-    change of its variance alone, or of the weight of the effect on a mean-zero cause alone, on
-    none. Without the independent-change step, an edge between two variables that both change with
-    the index stays undirected unless the collider or Meek's rules orient it. With ``"fisherz"`` or
-    ``"student_t"``, the step reaches only variables whose means follow the index. On two variables
-    from 20 domains with 600 rows, both means rising linearly by about 1 across the domains, the
-    cause's noise scale drawn per domain, and the effect's weight on it drawn per domain from (0.5,
-    2.5), at the threshold 0.06 it oriented the edge on 1 of 20 seeds. Given the true skeleton of
-    ten complete three-variable DAGs from 20 domains with 600 rows, no mean trend, and weights in
-    (-2, 2) drawn per domain, it oriented 18 of their 30 edges correctly and 4 against the truth.
-    The paper fits the kernel widths, the index kernel, and the ridge of the step by
-    Gaussian-process likelihood; Andrey fixes them. With a mixed-data test, it is experimental and
-    not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
-    ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet; their tests run
-    them on up to 8 variables. Missing values are not benchmarked yet; the tests run them on up to
-    20 variables with up to a fifth of the values missing completely at random. With true
-    ``required_paths`` or ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated
-    linear-Gaussian data from 4 domains whose means shift (10 to 50 variables, mean degree 2 or 4,
-    500 or 2,000 rows), its result was no farther from the true DAG than without them in any
-    setting. The claims direct edges of the graph the search found, as their rules take the class as
-    given: of the edges they directed, 10.0% with required paths and 15.5% with forbidden paths
-    pointed against the true DAG, and the fits dropped 64% of the required and 40% of the forbidden
-    paths as claims their graph could not meet. A required path says less than a required edge and
-    directs less: it cannot restore an edge the search left out, and on simulated data a required
-    edge, which also states that the pair is adjacent, lowered the errors more. A known edge belongs
-    in ``required``. The numbers are a reference, not a hard limit: they change with the data
+    **Limitations.** On simulated linear-Gaussian data whose means shift across 4 domains its errors
+    stay below the empty graph's up to 100 variables at mean degree 2 with 2,000 rows, past which
+    its fits ran past 1 h (`0.10.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_). Its partial-correlation
+    tests assume linear relations with Gaussian noise and find only a change in a variable's mean,
+    so a change of a variance alone, or of an effect's weight on a mean-zero cause, orients no edge.
+    The independent-change step is not benchmarked yet: it fixes the kernel widths, the index
+    kernel, and the ridge, which the paper fits by Gaussian-process likelihood, and at the threshold
+    0.06, on two variables from 20 domains whose means both follow the index, it oriented the edge
+    on 1 of 20 seeds, and given the true skeletons of three-variable DAGs with no such trend it
+    oriented 4 of 30 edges against the truth (`0.7.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.7.0.html#cd-nod>`__). With a mixed-data test it is
+    experimental, and ``collider_rule="conservative"`` and ``"majority"`` and missing values are not
+    benchmarked yet. Where the graph found is wrong, a true path claim can direct an edge against
+    the truth, and the fits dropped many claims their graph could not meet; a known edge belongs in
+    ``required``. The numbers are a reference, not a hard limit: they change with the data
     generator, the density, the method's settings, and the machine.
 
     References
@@ -2133,7 +2011,12 @@ def fci_jci(
         The order of the possible-d-separation step, as for :func:`~andrey.fci`: ``"order_free"``
         visits the pairs and nodes by a rank computed from the data, and ``"fast"`` in column
         order. ``None`` follows ``andrey.config.tie_break``: ``"order_free"`` under ``"rank"``,
-        ``"fast"`` under ``"position"``.
+        ``"fast"`` under ``"position"``. ``"order_free"`` favors a result that does not depend on
+        the column order; it gives up time on some graphs, where its order needs more tests.
+        ``"fast"`` gives up that independence and saves time only on some graphs. With
+        :func:`~andrey.fci`, whose entry gives the numbers, the two took about as long up to 200
+        variables and their median endpoint errors were within 2% of each other; not measured with
+        FCI-JCI.
     confounded_index : bool, default=True
         Whether a hidden variable may cause both the index and a data variable, such as a patient's
         health deciding both the hospital and an outcome: FCI-JCI1 [1]_. ``False`` assumes the index
@@ -2280,31 +2163,19 @@ def fci_jci(
     random sample of all rows, and otherwise they are a selected sample that more rows do not
     correct.
 
-    **Limitations.** Measured on its authors' simulation [1]_, linear-Gaussian data with hidden
-    common causes and one context variable that changes one variable: 4, 10, and 100 variables with
-    100 to 2,000 rows per domain, and 20 and 50 variables at the density of the 10-variable setting,
-    at alpha 0.01 and 0.05, under both values of ``confounded_index``, on one core. Its errors
-    (endpoint SHD over the data variables and the index) were below the empty graph's on every
-    dataset; at 100 variables with 100 rows per domain, its median at the defaults was 345.5 against
-    the empty graph's 410. Every fit took under 0.5 s. It takes one environment variable: the
-    several context variables of the authors' designs, one per intervention, are not implemented, so
-    domains that change different variables share one index; with 2 or 10 context variables merged
-    into one index numbered by domain, its errors were still below the empty graph's on every
-    dataset. Its possible-d-separation step tests subsets of each set, so its cost grows fast with
-    the number of variables; on data merged from cohorts it asks the sets whose variables no row
-    observes all together, as :func:`~andrey.fci` does, and ``max_depth`` bounds it. ``"fisherz"``
-    and ``"student_t"`` can miss a shift in a middle domain of three or more, as above. Missing
-    values are not benchmarked yet; the tests run them on up to 20 variables with up to a fifth of
-    the values missing completely at random. With true ``required_paths``, ``forbidden_paths``, or
-    ``confounded`` claims on 10 or 30% of the pairs of simulated linear-Gaussian data from two
-    domains with hidden common causes (10 or 20 variables, 500 or 2,000 rows per domain), its result
-    had no more wrong marks than without them in any setting, and fewer with required paths in every
-    one. The fits dropped 9.8% of the required paths and 0.4% of the forbidden paths as claims their
-    graph could not meet, and no confounded pair. No reference implementation takes these claims
-    with a domain index, so they were compared with the same fit without them. A required path says
-    less than a required edge and directs less: it cannot restore an edge the search left out. A
-    known edge belongs in ``required``. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** On its authors' simulation [1]_, linear-Gaussian data with hidden common causes
+    and one context variable, from 4 to 100 variables with 100 to 2,000 rows per domain, its errors
+    were below the empty graph's on every dataset; the `0.15.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#fci-jci>`_ has the numbers. It takes one
+    environment variable: the several context variables of the authors' designs are not implemented,
+    so domains that change different variables share one index. Its possible-d-separation step tests
+    subsets of each set, so its cost grows fast with the number of variables, and on data merged
+    from cohorts it asks the sets whose variables no row observes all together; ``max_depth`` bounds
+    it. ``"fisherz"`` and ``"student_t"`` read the index as a number and can miss a shift in a
+    middle domain of three or more. Missing values are not benchmarked yet, and no reference
+    implementation takes knowledge with a domain index, so the claims were checked only against the
+    same fit without them. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -2457,7 +2328,15 @@ def icp(
         compares each environment's residuals with the other rows' by Welch's t-test of their means
         and the F-test of their variances. ``"exact"`` fits the regression on the other rows,
         predicts each environment's rows, and tests the prediction errors with Chow's F-test, exact
-        for Gaussian noise. See Notes.
+        for Gaussian noise. ``"exact"`` favors that exact level and fewer false parents when an
+        intervention ``targets`` does not name hits the target; it gives up its guarantee when the
+        noise is not Gaussian. ``"approximate"`` gives up the exact level; it had the fewer false
+        parents with a hidden common cause. On simulated linear Gaussian data drawn as in the
+        paper's simulation study [1]_ (two environments of 100 to 500 rows, 5 to 12 variables), the
+        estimate held a variable outside the true parents in 11% of the fits under ``"exact"`` and
+        18% under ``"approximate"`` over the 55 scenarios whose interventions could hit the target,
+        and in 1.8% and 1.2% over 20 scenarios with a hidden common cause of the target and one
+        other variable. See Notes.
     max_parents : int or None, default=None
         A cap on the target's parents, at least ``0``: only sets of at most ``max_parents``
         variables are tested, so no estimate gives the target more than ``max_parents`` parents.
@@ -2558,24 +2437,19 @@ def icp(
     regresses ``target`` on a set of the other variables in each environment. Drop the incomplete
     rows first.
 
-    **Limitations.** Measured on simulated linear Gaussian data drawn as in the paper's simulation
-    study [1]_: two environments of 100 to 500 rows each, 5 to 12 variables, and noise interventions
-    on one or more of them, with 200 datasets per scenario. When those interventions could also hit
-    the target and ``targets`` did not name them, the estimate held a variable outside the true
-    parents in 18% of the fits under ``"approximate"`` and 11% under ``"exact"``, over the 55
-    scenarios that hit it, against under 1% in the scenarios that left it alone. An intervention
-    that changes the target's noise makes the regression on its parents differ across environments,
-    so their set is rejected, while a set with a child of the target, whose own equation does not
-    change, stays close to invariant and is accepted: 88% and 87% of those fits held a child.
-    ``targets`` leaves such environments out. A hidden common cause of the target and one other
-    variable raised the share to 1.2% and 1.8% over 20 scenarios, and to 14.5% in one of them under
-    ``"exact"``. A ``tanh`` effect of one parent on the target kept it at 1.0% at most, but the
-    estimate equaled the true parents in under 0.5% of the fits. With ``max_parents=3`` on 40
-    variables, it found 0.2% of the true parents under ``"exact"``. Without ``max_parents`` it tests
-    ``2^(n_variables - 1)`` sets: the median fit of the approximate test took 0.24 s on one core at
-    15 variables and 1,000 rows. The guarantee does not cover noise that is not Gaussian under
-    ``"exact"``. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    **Limitations.** Its guarantee needs environments that leave the target's mechanism alone. On
+    simulated linear Gaussian data drawn as in the paper's simulation study [1]_, when interventions
+    could also hit the target and ``targets`` did not name them, the estimate held a variable
+    outside the true parents in 18% of the fits under the default test (11% under ``"exact"``), most
+    often a child of the target, whose set stays close to invariant; ``targets`` leaves such
+    environments out (`0.14.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#icp>`_). A hidden common cause of the target
+    and another variable can raise that share too, and with a nonlinear effect of a parent the
+    estimate rarely equals the true parents. With ``max_parents=3`` on 40 variables it found almost
+    none of the true parents. Without ``max_parents`` it tests ``2^(n_variables - 1)`` sets, so its
+    cost doubles with each variable. Under ``"exact"`` the guarantee does not cover noise that is
+    not Gaussian. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------

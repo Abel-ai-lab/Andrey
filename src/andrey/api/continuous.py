@@ -108,8 +108,14 @@ def notears(
         warns with :class:`~andrey.SearchLimitWarning`.
     standardize : bool, default=False
         Scale each column to unit variance first, so the fit does not read the columns' units;
-        the weights are then those of the scaled columns. The release card gives the fit's errors
-        on standardized columns.
+        the weights are then those of the scaled columns. ``True`` favors a graph that does not
+        depend on the columns' units; it gives up the accuracy the default reads from units in
+        which a variable's variance grows along the causal order (varsortability [5]_). In the
+        0.17.0 NOTEARS benchmark (the paper's simulation in its own units: 1,000 rows, Gaussian,
+        exponential, and Gumbel noise, Erdos-Renyi graphs with twice as many edges as variables),
+        the mean errors were 2.5 and 14.4 at 10 and 50 variables by default and 18.5 and 87.2
+        with ``True``, against the empty graph's 20 and 100; on columns already of unit variance
+        the two differed by at most 0.7.
     missing : {"em"} or None, default=None
         How missing values (``NaN``) are handled. ``"em"`` fits the method by structural
         expectation-maximization (EM) over the expected covariance of the data, which assumes values
@@ -249,29 +255,13 @@ def notears(
 
     **Limitations.** The result depends on the data's scale (varsortability [5]_); the `0.18.0
     release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#notears>`_ has the numbers.
-    With ``missing="em"``, measured in the setting of Gao et al. [8]_: linear-Gaussian data with
-    unit noise variances on raw columns, from Erdos-Renyi graphs of mean degree 1 and 2 and
-    scale-free graphs of mean degree 2, with 20 variables and 100 rows, 20 datasets per setting, at
-    the default settings on one core. With 10 to 50% of the values missing completely at random or
-    at random given observed values, its mean errors (SHD) stayed below the empty graph's in all 24
-    settings. With 10% missing completely at random they were 0.6, 1.8, and 2.4 on the three graphs,
-    against 10, 20, and 19 for the empty graph and 0.2, 1.25, and 1.55 on the complete data; with
-    50% they were 8.4, 18.05, and 17.2. A reference implementation of the method of Gao et al. [8]_
-    ran on the same data: this fit had fewer errors than it in 23 of the 24 settings and tied in 1.
-    It had fewer errors than :func:`~andrey.pc`, whose tests delete rows per test, in 18 of the 24
-    settings and tied in 6, and fewer than the default fit on data with column means filled in in
-    22, with 2 ties; dropping the incomplete rows left enough rows to compare in 6 settings, and it
-    had fewer errors in each. EM runs the fit 10 times and the E-step 56 times: the median fit took
-    8 to 41 s, against 1.9 to 3.8 s on the complete data. In 13 of the 660 fits the last round still
-    changed the graph, and each such fit logs a warning. On standardized columns (Erdos-Renyi, mean
-    degree 2, 20 variables, 500 rows, 20% missing), where the least-squares fit is weaker, its mean
-    errors were 15.35 completely at random and 16.0 at random, against 15.25 on the complete data
-    and 20 for the empty graph; ``pc`` had 7.5 there, and the default fit on mean-filled data 13.55
-    with values missing completely at random, a difference not rerun on fresh seeds. The numbers on
-    standardized columns were measured with one parameter refit per round in place of the 5
-    parameter steps. Under values missing not at random it has no guarantee. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    With ``missing="em"``, in the setting of Gao et al. [8]_ (raw columns, 20 variables, 100 rows),
+    its errors stayed below the empty graph's in all 24 settings (`0.17.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#missing-data>`_). On standardized columns,
+    where the least-squares fit is weaker, its errors with EM were about those on complete data, and
+    :func:`~andrey.pc` with test-wise deletion made fewer. It has no guarantee under values missing
+    not at random. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -409,8 +399,12 @@ def dagma(
         warns with :class:`~andrey.SearchLimitWarning`.
     standardize : bool, default=False
         Scale each column to unit variance first, so the fit does not read the columns' units;
-        the weights are then those of the scaled columns. The release card gives the fit's errors
-        on standardized columns.
+        the weights are then those of the scaled columns. ``True`` favors a graph that does not
+        depend on the columns' units; it gives up the accuracy the default reads from units in
+        which a variable's variance grows along the causal order (varsortability [5]_). In the
+        0.18.0 DAGMA benchmark (the paper's simulation: 1,000 rows, 10 to 100 variables), the
+        default made fewer errors than the empty graph in all 18 settings in the simulation's own
+        units, and on z-scored columns, which ``True`` fits, in none of 24, with more in 16.
     missing : {"em"} or None, default=None
         How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by
         structural expectation-maximization (EM) over the expected covariance of the data, which
@@ -550,14 +544,9 @@ def dagma(
 
     **Limitations.** The result depends on the data's scale (varsortability [5]_); the `0.18.0
     release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma>`_ has the numbers.
-    ``missing="em"`` is experimental and not benchmarked yet; its tests run it on a collider of 3
-    variables with 1,000 rows and 30% of one variable's values missing at random, which it learns,
-    and on 8 variables with 500 rows and values missing at random, 30% of each column that can go
-    missing, where over 4 graphs it made no more errors in total than the fit on the complete rows,
-    fewer than the fit with each missing value replaced by its column's mean, and fewer than the
-    empty graph. It runs the fit 10 times, so it takes about 10 times as long, and under values
-    missing not at random it has no guarantee. The numbers are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    ``missing="em"`` is experimental and not benchmarked yet, and it has no guarantee under values
+    missing not at random. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------

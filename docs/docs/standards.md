@@ -157,8 +157,9 @@ ranks computed from the data, and most methods run their linear algebra on one B
 host's thread count cannot change their result.
 
 **Exceptions.** [Across machines](guides/column-order.md#across-machines) names the methods whose
-result can change on another machine, and why. No check compares outputs across machines; the one
-published measurement is ICA-LiNGAM's, on six BLAS kernels, in the same guide.
+result can change on another machine, and why. No check compares outputs across machines; the
+published measurements are ICA-LiNGAM's, on six BLAS kernels, and those of NOTEARS with EM, on two
+types of CPU, in the same guide.
 
 ## Release checks
 

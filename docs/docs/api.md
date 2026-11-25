@@ -287,7 +287,7 @@ step, by an approximation of the pairwise likelihood ratios of Hyvarinen and Smi
 `"pwling"`, the default, uses the entropies of each variable and of each regression residual.
 `"tanh"` uses a correlation of the standardized pair through `tanh`, which suits sparse noise such
 as Laplace, and `"skew"` one through the square after a sign correction, which suits skewed noise;
-they cost less, and `direct_lingam`'s Notes and Limitations give where each fails.
+they cost less, and the `measure` entry of `direct_lingam` gives where each fails.
 
 % concept: confounded_index
 `fci_jci`, `gfci`, `boss_fci`, and `grasp_fci` take `confounded_index`, whether a hidden variable

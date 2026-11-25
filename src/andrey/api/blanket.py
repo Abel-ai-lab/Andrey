@@ -379,46 +379,22 @@ def iamb(
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** Measured on simulated linear-Gaussian data with Fisher-z tests at alpha 0.05,
-    on one core: 20, 50, and 100 variables with 1,000 and 5,000 rows and mean degree 2 and 4, with
-    the columns standardized and not, and 200 variables with the same rows and degrees. In every
-    setting the mean errors of the CPDAG, the skeleton, and the moral graph stay below the empty
-    graph's. The CPDAG is closest to it on unstandardized data at 100 variables, 1,000 rows, and
-    mean degree 2, with 79 pairs wrong against 100 for the empty graph, and on standardized data at
-    20 variables, 1,000 rows, and mean degree 4, with 24 against 40. The median CPDAG fit took 0.03
-    to 6.1 s up to 100 variables, the longest at 5,000 rows and mean degree 4, and 13 to 17 s at 200
-    variables. The benchmark covers continuous data; the categorical and mixed-data tests are not in
-    it yet. Tested with exact d-separation on 15 variables. It conditions on the whole current
-    blanket, so each test needs more rows as the blanket grows, and a candidate the grow step adds
-    in error enlarges every later conditioning set. The skeleton and the CPDAG test every subset of
-    the smaller blanket for each pair of the moral graph and each unshielded triple, and a collider
-    takes all of them, so a triple whose smaller blanket holds ``m`` variables takes up to ``2**m``
-    tests. On simulated linear-Gaussian data with 50 variables, 5,000 rows, and mean degree 4, the
-    smaller blankets held at most 16 variables, the collider tests took 0.07 to 0.7 s on five
-    datasets, and learning the blankets 0.8 to 1.0 s. The skeleton step also separates true edges,
-    more often as the blankets grow: on simulated linear-Gaussian data of mean degree 4 (10 to 50
-    variables, 500 or 2,000 rows, 120 datasets) it separated 6% of the truly adjacent pairs whose
-    smaller blanket held 2 variables, 21% at 4, 43% at 6, and about half at 7 to 9. Required edges
-    enlarge the blankets: with true required edges on 5 or 10% of the variable pairs, the step
-    separated about one true pair per graph at 50 variables that the fit without them kept, and 0.4
-    averaged over 10, 20, and 50 variables, on 240 datasets. Missing values are not benchmarked yet;
-    the tests run them on up to 20 variables with up to a fifth of the values missing completely at
-    random. ``required_paths`` is supported and ``forbidden_paths`` is experimental. On simulated
-    linear-Gaussian data (10 to 50 variables, mean degree 2 or 4, 500 or 2,000 rows, true claims on
-    5 to 30% of the variable pairs) the graph found had no consistent extension, and so stood for no
-    DAG, in 106 of 240 datasets, and in 20 of 20 with 50 variables, 2,000 rows, and mean degree 4.
-    On such a graph a claim acts only on an edge, as :class:`~andrey.Knowledge` describes, and most
-    claims are dropped: of 70 required paths per fit, 4 directed an undirected edge, 13 were met by
-    an edge the data directed, and 53 were dropped, and of 86 forbidden paths, 1, 2, and 83. Over
-    every dataset the fits dropped 57% of the required and 51% of the forbidden paths. With true
-    required paths the CPDAG was no farther from the class of graphs that the truth and the claims
-    define than without them in any of the 36 settings, and closer in 25. With true forbidden paths
-    alone it was farther from that class in 3 of the 6 settings with 50 variables and mean degree 2,
-    by 0.65 to 1.35 edges per graph over 40 datasets, since the class is more directed than the
-    graph the dropped claims leave; no single setting was farther on two separate sets of 20
-    datasets. The CPDAG was closer to the true DAG in 35 of the 36 settings with required paths and
-    32 with forbidden paths, and farther in none. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** On simulated linear-Gaussian data with Fisher-z tests, from 20 to 200
+    variables, the errors of its CPDAG, skeleton, and moral graph stay below the empty graph's in
+    every setting (`0.13.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#iamb>`_); the mixed-data tests and missing
+    values are not benchmarked yet. Each test conditions on the whole current blanket, so it needs
+    more rows as the blanket grows, and a candidate the grow step adds in error enlarges every later
+    conditioning set. The skeleton step then separates more true edges: about half the truly
+    adjacent pairs whose smaller blanket holds 7 to 9 variables, and more with required edges, which
+    enlarge the blankets. A triple whose smaller blanket holds ``m`` variables takes up to ``2**m``
+    tests. ``forbidden_paths`` is experimental. Its tests can contradict each other, and the graph
+    found then has no consistent extension and stands for no DAG, as on 106 of 240 simulated
+    datasets with 10 to 50 variables; a ``knowledge`` claim then acts only on an edge, and most
+    claims are dropped (`0.17.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -705,41 +681,20 @@ def inter_iamb(
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** Measured on simulated linear-Gaussian data with 20, 50, and 100 variables,
-    1,000 and 5,000 rows, and mean degree 2 and 4, with Fisher-z tests at alpha 0.05, on one core.
-    In every setting the mean errors of the CPDAG, the skeleton, and the moral graph stay below the
-    empty graph's; the CPDAG is closest at 20 variables, 1,000 rows, and mean degree 4, with 24
-    pairs wrong against 40 for the empty graph. A fit took 0.06 to 8.9 s, the longest at 100
-    variables, 5,000 rows, and mean degree 4. Tested with exact d-separation on 15 variables. It
-    conditions on the whole current blanket, so each test needs more rows as the blanket grows. The
-    skeleton and the CPDAG test every subset of the smaller blanket for each pair of the moral graph
-    and each unshielded triple, and a collider takes all of them, so a triple whose smaller blanket
-    holds ``m`` variables takes up to ``2**m`` tests. On simulated linear-Gaussian data with 50
-    variables, 5,000 rows, and mean degree 4, the smaller blankets held at most 16 variables, the
-    collider tests took 0.06 to 0.7 s on five datasets, and learning the blankets 0.9 to 1.3 s. The
-    skeleton step also separates true edges, more often as the blankets grow: on simulated
-    linear-Gaussian data of mean degree 4 (10 to 50 variables, 500 or 2,000 rows, 120 datasets) it
-    separated 6% of the truly adjacent pairs whose smaller blanket held 2 variables, 21% at 4, 41%
-    at 6, and about half at 7 to 9. Required edges enlarge the blankets: with true required edges on
-    5 or 10% of the variable pairs, the step separated about one true pair per graph at 50 variables
-    that the fit without them kept, and 0.3 to 0.4 averaged over 10, 20, and 50 variables, on 240
-    datasets. Missing values are not benchmarked yet; the tests run them on up to 20 variables with
-    up to a fifth of the values missing completely at random. ``required_paths`` is supported and
-    ``forbidden_paths`` is experimental. On simulated linear-Gaussian data (10 to 50 variables, mean
-    degree 2 or 4, 500 or 2,000 rows, true claims on 5 to 30% of the variable pairs) the graph found
-    had no consistent extension, and so stood for no DAG, in 105 of 240 datasets, and in 20 of 20
-    with 50 variables, 2,000 rows, and mean degree 4. On such a graph a claim acts only on an edge,
-    as :class:`~andrey.Knowledge` describes, and most claims are dropped: of 71 required paths per
-    fit, 4 directed an undirected edge, 13 were met by an edge the data directed, and 54 were
-    dropped, and of 86 forbidden paths, 1, 2, and 83. Over every dataset the fits dropped 56% of the
-    required and 51% of the forbidden paths. With true required paths the CPDAG was no farther from
-    the class of graphs that the truth and the claims define than without them in any of the 36
-    settings, and closer in 24. With true forbidden paths alone it was farther from that class in 3
-    of the 6 settings with 50 variables and mean degree 2, by 0.65 to 1.35 edges per graph over 40
-    datasets, since the class is more directed than the graph the dropped claims leave; no single
-    setting was farther on two separate sets of 20 datasets. The CPDAG was closer to the true DAG in
-    35 of the 36 settings with required paths and 31 with forbidden paths, and farther in none. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    **Limitations.** On simulated linear-Gaussian data with Fisher-z tests, from 20 to 100
+    variables, the errors of its CPDAG, skeleton, and moral graph stay below the empty graph's in
+    every setting (`0.12.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#inter-iamb>`_); the mixed-data tests and
+    missing values are not benchmarked yet. Each test conditions on the whole current blanket, so it
+    needs more rows as the blanket grows, and the skeleton step separates more true edges: about
+    half the truly adjacent pairs whose smaller blanket holds 7 to 9 variables, and more with
+    required edges, which enlarge the blankets. A triple whose smaller blanket holds ``m`` variables
+    takes up to ``2**m`` tests. ``forbidden_paths`` is experimental. Its tests can contradict each
+    other, and the graph found then has no consistent extension and stands for no DAG, as on 105 of
+    240 simulated datasets with 10 to 50 variables; a ``knowledge`` claim then acts only on an edge,
+    and most claims are dropped (`0.17.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
     method's settings, and the machine.
 
     References
@@ -1021,47 +976,22 @@ def mmpc(
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** Measured on simulated linear-Gaussian data with Fisher-z tests at alpha 0.05,
-    on one core: 20, 50, and 100 variables with 1,000 and 5,000 rows and mean degree 2 and 4, with
-    the columns standardized and not, and 200 variables with 1,000 and 5,000 rows. Wherever fits
-    finished, the mean skeleton errors stay below the empty graph's; the skeleton is closest to it
-    on unstandardized data at 100 variables, 1,000 rows, and mean degree 2, with 56.9 pairs wrong
-    against 100, and the CPDAG with 78.1 against 100. The median skeleton fit took 0.01 to 1.6 s up
-    to 100 variables and 0.3 to 3.3 s at 200 variables. The CPDAG fit took up to 30 s where it
-    finished and reached the 600 s cap at 100 variables, mean degree 4: on 6 of 20 datasets at 1,000
-    rows and 19 of 20 at 5,000 on standardized data. At 200 variables and 5,000 rows, MMPC's forward
-    step often faces candidates whose dependence is too strong to rank by p-value, and it admits the
-    strongest, which is a true neighbor 99.7% of the time. Borderline false edges between unrelated
-    pairs, with a statistic just past the cutoff, then survive: about 2 more per graph than with an
-    arbitrary order, which happens to admit a strongly correlated non-neighbor that removes them. At
-    mean degree 2 the skeleton there makes 75.5 errors on average, and 86.9 on 10 fresh datasets.
-    The continuous benchmark does not cover the categorical and mixed-data tests, which only the
-    discrete-network lanes cover. Tested with exact d-separation on 15 variables. It tests each
-    candidate against the subsets of the current members, up to the first size that separates it, so
-    its cost grows exponentially with the size of the set; the symmetry check runs the search once
-    more for each member. The CPDAG tests every subset of the smaller blanket for each unshielded
-    triple, and a collider takes all of them. These blankets reach two steps from a variable, so
-    they are larger than a Markov blanket, and a triple whose smaller blanket holds ``m`` variables
-    takes up to ``2**m`` tests. On simulated linear-Gaussian data with 50 variables, 5,000 rows, and
-    mean degree 4, the collider tests took 1.6 to 2.2 s on four datasets and 277 s on a fifth, whose
-    smaller blanket held 24 variables (38 million tests), and learning the sets 0.13 to 0.18 s.
-    Missing values are not benchmarked yet; the tests run them on up to 20 variables with up to a
-    fifth of the values missing completely at random. ``required_paths`` is supported and
-    ``forbidden_paths`` is experimental. On simulated linear-Gaussian data (10 to 50 variables, mean
-    degree 2 or 4, 500 or 2,000 rows, true claims on 5 to 30% of the variable pairs) the graph found
-    had no consistent extension, and so stood for no DAG, in 125 of 240 datasets, and in 19 of 20
-    with 50 variables, 2,000 rows, and mean degree 4. On such a graph a claim acts only on an edge,
-    as :class:`~andrey.Knowledge` describes, and most claims are dropped: of 69 required paths per
-    fit, 4 directed an undirected edge, 11 were met by an edge the data directed, and 54 were
-    dropped, and of 85 forbidden paths, 1, 2, and 82. Over every dataset the fits dropped 62% of the
-    required and 60% of the forbidden paths. With true required paths the CPDAG was no farther from
-    the class of graphs that the truth and the claims define than without them in any of the 36
-    settings, and closer in 26. With true forbidden paths alone it was farther from that class in 4
-    of the 6 settings with 50 variables and mean degree 2, by 0.72 to 1.95 edges per graph over 40
-    datasets, since the class is more directed than the graph the dropped claims leave; no single
-    setting was farther on two separate sets of 20 datasets. The CPDAG was closer to the true DAG in
-    35 of the 36 settings with required paths and 32 with forbidden paths, and farther in none. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    **Limitations.** On simulated linear-Gaussian data with Fisher-z tests, from 20 to 200
+    variables, its skeleton errors stay below the empty graph's wherever its fits finished (`0.13.0
+    release card <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#mmpc>`_); the mixed-data tests
+    and missing values are not benchmarked yet. Its cost grows exponentially with the size of a set,
+    and ``structure="cpdag"`` takes up to ``2**m`` tests for a triple whose smaller blanket, which
+    reaches two steps from a variable, holds ``m`` variables: a CPDAG fit reached the 600 s cap on
+    19 of 20 standardized datasets with 100 variables, mean degree 4, and 5,000 rows. At 200
+    variables and 5,000 rows, a few borderline false edges survive where the forward step admits the
+    strongest of candidates too dependent to rank by p-value (`0.13.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#where-bnlearn-makes-fewer-errors>`__).
+    ``forbidden_paths`` is experimental. Its tests can contradict each other, and the graph found
+    then has no consistent extension and stands for no DAG, as on 125 of 240 simulated datasets with
+    10 to 50 variables; a ``knowledge`` claim then acts only on an edge, and most claims are dropped
+    (`0.17.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The numbers
+    are a reference, not a hard limit: they change with the data generator, the density, the
     method's settings, and the machine.
 
     References

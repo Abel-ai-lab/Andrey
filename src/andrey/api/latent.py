@@ -121,25 +121,20 @@ def gin(data: npt.ArrayLike, *, alpha: float = 0.05) -> StructureOutput:
     incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Measured on simulated linear data with uniform noise from latent variables in a
-    complete DAG, each measured by 3 observed indicators, on 4 cores with a cap of 1 h and 28 GB per
-    fit. The median adjusted Rand index of its clusters, which is 0 for the empty graph, was 0.77 to
-    1 at every size through 16 latents (48 indicators) with 1,000 rows and 1 through 8 latents (24
-    indicators) with 5,000 rows, the largest sizes its fits finished within the caps. The ladder
-    with 1,000 rows ended at the largest planned size, and the one with 5,000 rows when three fits
-    of the next size ran past 1 h. The median fit took 340 s at 16 latents (48 indicators) with
-    1,000 rows. Given the true clusters and 1,000 rows, over 10 seeds each, the order of a chain of
-    three latents never stopped early and that of a complete three-latent model stopped early once,
-    with no latent put after one it causes; with the benchmark's random weights instead, 2 of 10
-    complete three-latent models put a latent after one it causes. It tests every group of observed
-    variables of each size, from pairs upward, so the number of tests grows combinatorially with the
-    variable count, and each HSIC test's time and memory grow with the square of the row count; the
-    fit keeps one such kernel matrix per variable, 8 MB each at 1,000 rows. Clusters have at least
-    two variables, so a latent with a single indicator is not found. Each cluster gets one latent,
-    so indicators that share two or more latents appear as one. It assumes every observed variable
-    measures a latent: variables that depend on no other variable pass the cluster test trivially
-    and are grouped into one cluster. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** On simulated linear data with uniform noise, each latent measured by 3
+    indicators, the median adjusted Rand index of its clusters (0 for the empty graph) was 0.77 to 1
+    up to 16 latents with 1,000 rows, the largest size measured, and up to 8 with 5,000 rows, past
+    which its fits ran past 1 h (`0.10.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_). Its order of the latents
+    can put a latent after one it causes, as in 2 of 10 complete three-latent models with random
+    weights (`0.7.0 release card <https://andrey.abel.ai/docs/benchmarks/0.7.0.html#gin>`__). It
+    tests every group of observed variables of each size, so the number of tests grows
+    combinatorially with the variables, and each HSIC test's time and memory grow with the square of
+    the rows. A latent with a single indicator is not found, indicators that share two or more
+    latents appear as one, and it assumes every observed variable measures a latent: variables that
+    depend on no other variable are grouped into one cluster. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------

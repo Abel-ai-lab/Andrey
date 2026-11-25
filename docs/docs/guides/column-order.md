@@ -87,11 +87,15 @@ phase), `gies`, `gnies`, `xges`, `lges`, `ages`, `hc`, `tabu`, `mmhc`, and `rsma
 their results. From 2,000 rows, KCI runs on every BLAS thread, where its kernel products run faster;
 its p-values then repeat for a fixed thread count.
 
-Two methods depend on more than ties. `calm` trains with PyTorch: its results repeat on one machine
-with one torch version, and another platform can give another graph. When the likelihood fit of
-`varma_lingam` stops before it converges, its graph can change with the versions of the numerical
-libraries. Where the fit stops, even when it converges, also depends on the BLAS kernels the CPU
-runs, so a series can give another graph on another type of CPU.
+Two methods, and `notears` with `missing="em"`, depend on more than ties. `calm` trains with
+PyTorch: its results repeat on one machine with one torch version, and another platform can give
+another graph. When the likelihood fit of `varma_lingam` stops before it converges, its graph can
+change with the versions of the numerical libraries. Where the fit stops, even when it converges,
+also depends on the BLAS kernels the CPU runs, so a series can give another graph on another type of
+CPU. `notears` with `missing="em"` can also give another graph on another type of CPU: on simulated
+linear-Gaussian data with 20 variables, 100 rows, and 10 to 50% of the values missing completely at
+random, 5 of 150 datasets gave graphs that differed in 2 to 4 entries of the adjacency matrix
+between two types of AMD EPYC CPU.
 
 ### ICA-LiNGAM
 
