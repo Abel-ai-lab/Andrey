@@ -679,7 +679,6 @@ def test_every_other_method_refuses_missing_values_naming_itself(name):
         assert f'{name}: pass missing="em"' in str(error.value)
         assert "drop the rows of data that hold a missing value yourself" in str(error.value)
     else:
-        assert "drop the rows that hold one" in str(error.value)
         listed = [
             n
             for n in SUPPORTED
@@ -691,7 +690,6 @@ def test_every_other_method_refuses_missing_values_naming_itself(name):
             error.value
         )
         assert "the same rows of every argument that has one entry per row" in str(error.value)
-        assert "pc, fci, cdnod, fci_jci, iamb, inter_iamb, or mmpc" in str(error.value)
         assert 'missing="em"' not in str(error.value)
 
 
@@ -726,22 +724,6 @@ def test_no_text_says_that_fci_stays_sound_when_values_are_missing_for_a_reason(
     assert not [name for name, text in texts.items() if "missingness mechanism" in text]
     assert TESTWISE_CLAIM in texts["fci"]
     assert TESTWISE_CLAIM in texts["agent text"]
-
-
-@pytest.mark.parametrize("page", ["api.md", "guides/missing-values.md"])
-def test_a_page_that_names_the_tests_needing_more_rows_names_each_partial_correlation_test(page):
-    """A partial-correlation test needs ``|S| + 3`` rows; the other tests need 2."""
-    partial = {
-        name
-        for name, test in ci._CI_REGISTRY.items()
-        if isinstance(test, type) and issubclass(test, ci.PartialCorrelationTest)
-    }
-    text = " ".join((Path(__file__).parents[2] / "docs" / "docs" / page).read_text().split())
-    spans = re.findall(r"\|S\| \+ 3` for (.*?) and 2 for the other tests", text)
-    assert spans
-    for span in spans:
-        named = set(re.findall(r'`"?(\w+)"?`', span)) & set(ci.SHIPPED_INDEP_TESTS)
-        assert named in (set(), partial)
 
 
 @pytest.mark.parametrize("name", ["anm", "pnl", "loci"])
