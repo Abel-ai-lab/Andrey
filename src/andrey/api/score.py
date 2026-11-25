@@ -100,15 +100,13 @@ def ges(
         column [13]_ [14]_. ``"bdeu"`` is the BDeu score [3]_ and ``"discrete_bic"`` the multinomial
         BIC [7]_, for categorical data coded by whole numbers. ``"degen_gauss"`` (degenerate
         Gaussian) [4]_ and ``"cond_gauss"`` (conditional Gaussian) [5]_ are BIC scores for mixed
-        data, continuous and categorical columns. ``"degen_gauss"`` favors time; ``"cond_gauss"``
-        gives up time, and neither made fewer errors at every size. In the 0.6.0 release card's
-        mixed-data benchmark both made far fewer errors than the empty graph, ``"degen_gauss"``
-        fewer on smaller graphs and ``"cond_gauss"`` on larger ones, and ``"cond_gauss"`` took
-        longer. ``None`` picks from the declared column types: ``"bdeu"`` when every column is
-        categorical, ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared
-        categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type,
-        never by its values. See Notes. ``metadata["score_func"]`` names the score the fit used: the
-        one picked from the declared column types when this is ``None``.
+        data, continuous and categorical columns. ``"degen_gauss"`` favors time and accuracy on
+        smaller graphs; ``"cond_gauss"`` favors accuracy on larger graphs and gives up time.
+        ``None`` picks from the declared column types: ``"bdeu"`` when every column is categorical,
+        ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared categorical by
+        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
+        values. See Notes. ``metadata["score_func"]`` names the score the fit used: the one picked
+        from the declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is
@@ -147,14 +145,7 @@ def ges(
         ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
         fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
         ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
-        up time: each round runs the search again. In the 0.17.0 missing-data benchmark
-        (linear-Gaussian data, 10 to 50 variables, 100 to 2,000 rows, 10 to 50% missing; the
-        searches at ``ebic_gamma=0``), against dropping the incomplete rows, ``"em"`` made fewer
-        errors in 186 of the 225 settings judged with GES, BOSS, GRaSP, and NOTEARS, as many in 39,
-        and more in none, and in 204 more dropping the rows left too few to fit most datasets; HC
-        and Tabu were not compared with it. With the default 10 rounds, a setting's median fit in
-        the six searches took 2 to 72 times as long as the same search on the complete data. See
-        **Missing values.** in Notes.
+        up time: each round runs the search again. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
         least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
@@ -373,27 +364,17 @@ def ges(
     the result on the last round's expected covariance. EM holds when values are missing completely
     at random or at random given observed values; when missingness depends on the missing values
     themselves, the expected covariance is biased, and the data cannot show it. On complete data,
-    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows yourself,
-    which suits values missing completely at random, or use :func:`~andrey.pc` or
-    :func:`~andrey.fci`, whose tests delete rows per test.
+    ``"em"`` gives the complete-data result. Before EM, a column that is a linear function of
+    several others is not caught. Without ``"em"``, drop the incomplete rows yourself, which suits
+    values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose
+    tests delete rows per test.
 
-    **Limitations.** At the standard BIC (``ebic_gamma=0.0``) on simulated linear-Gaussian data, its
-    errors stayed below the empty graph's on sparse graphs of hundreds of variables and at no size
-    on dense graphs, where :func:`~andrey.boss`, at ``penalty_discount=4.0``, stayed below it on all
-    but the smallest graphs; the
-    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_ has
-    every setting. Its ``max_parents`` cap is not benchmarked yet: that benchmark gated only the
-    forward phase. The search never selects a parent set that fits its child exactly.
-    ``"discrete_bic"`` is not benchmarked with GES yet. With ``env`` it is experimental and not
-    benchmarked yet. With ``missing="em"`` at the standard BIC on denser graphs it was rarely better
-    than the empty graph, as on complete data
-    (`0.17.0 release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#missing-data>`_); it
-    has no guarantee under values missing not at random, and a column that is a linear function of
-    several others is not caught before EM. True path claims can direct an edge of a wrong graph the
-    wrong way, and cannot restore a missed edge: a known edge belongs in ``required`` (`0.16.0
-    release card <https://andrey.abel.ai/docs/benchmarks/0.16.0.html#path-and-confounder-claims>`_).
-    The measured results are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    **Limitations.** At the standard BIC (``ebic_gamma=0.0``), on linear-Gaussian data it made fewer
+    errors than the empty graph on sparse graphs of hundreds of variables, but on dense graphs at no
+    size, where :func:`~andrey.boss` at ``penalty_discount=4.0`` made fewer on all but the smallest
+    graphs. The search never selects a parent set that fits its child exactly. The
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
+    every setting.
 
     References
     ----------
@@ -600,19 +581,13 @@ def ages(
     rows yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Measured on the paper's simulation on its smaller graphs only; its larger
-    setting uses a variant of the search that is not implemented here. With many rows AGES directed
-    more edges correctly than GES at the same penalty in most settings and more wrongly in the same
-    ones, so an added direction is about as reliable as one of GES and no more; with few rows the
-    result is mostly the GES CPDAG. The
-    `0.17.0 release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#ages>`_ has the
-    numbers. When path strong faithfulness fails, a CPDAG of the path can direct an edge against the
-    true DAG. The skeleton is that of GES at the minimum penalty, so its missing and extra edges
-    stay: on dense graphs with few or no weak edges the errors were not clearly below the empty
-    graph's. A CPDAG of the path can hold an unshielded collider that the first lacks, so the DAGs
-    the result stands for need not be in the equivalence class of the GES CPDAG. Fitting takes
-    several times longer than :func:`~andrey.ges`. The measured results are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** With many rows it directed more edges correctly than :func:`~andrey.ges` at the
+    same penalty, and about as many more wrongly, so an added direction is about as reliable as one
+    of GES; with few rows the result is mostly the GES CPDAG. Its skeleton is that of GES, so on
+    dense graphs with few or no weak edges its errors were not clearly below the empty graph's. When
+    path strong faithfulness fails, it can direct an edge against the true DAG. The
+    `0.17.0 release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#ages>`__ has the
+    numbers.
 
     References
     ----------
@@ -881,18 +856,13 @@ def gies(
     rows yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** At the standard BIC (``ebic_gamma=0.0``) on simulated linear-Gaussian data with
-    single-variable interventions on part of the variables, its errors stayed below the empty
-    graph's on sparse graphs of hundreds of variables; the
-    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_ has
-    every setting. Each distinct set of rows without an intervention on a variable keeps its own
-    score, under the BIC a covariance matrix of all the variables, so memory grows with the number
-    of intervened variables times the square of the variable count. Under the BIC the search never
-    selects a parent set that fits its child exactly over the rows without an intervention on it.
-    The categorical and mixed-data scores are not benchmarked with GIES yet. Every environment's
-    intervention targets must be specified; GIES does not accept unknown targets. The measured
-    results are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** At the standard BIC (``ebic_gamma=0.0``), on linear-Gaussian data with
+    single-variable interventions it made fewer errors than the empty graph on sparse graphs of
+    hundreds of variables. Each distinct set of rows without an intervention on a variable keeps its
+    own score, so memory grows with the number of intervened variables times the square of the
+    variable count. Every environment's intervention targets must be given. The
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
+    every setting.
 
     References
     ----------
@@ -1153,20 +1123,12 @@ def gnies(
     rows yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Measured with the targets unknown on simulated data from the model above: with
-    enough rows per environment its errors were below the empty graph's in every setting on small
-    graphs, on both counts, and with many rows far below it on graphs of moderate size; with few
-    rows per environment its graph was not reliably better than the empty graph on denser graphs or
-    when the targets' noise variances changed less
-    (`0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#gnies>`_). A shift of
-    the mean alone is invisible to it, and after an intervention that only weakened a target's
-    incoming weights it beat the empty graph on neither count. Each set of targets it visits costs
-    one search over graphs, so the searches per fit grow with the number of targets times the number
-    of variables. Given the true targets, its single search over graphs made more errors than the
-    target search in most settings. No target gets more parents than the smallest environment's row
-    count minus 2, so a variable that ``knowledge`` requires more parents for is not learned as one.
-    The measured results are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    **Limitations.** With the targets unknown and enough rows per environment it made fewer errors
+    than the empty graph on small graphs, and far fewer on graphs of moderate size with many rows.
+    With few rows per environment, on denser graphs or when the targets' noise variances changed
+    little, it was not reliably better than the empty graph. A shift of the mean alone is invisible
+    to it. The `0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#gnies>`__
+    has the numbers.
 
     References
     ----------
@@ -1340,9 +1302,8 @@ def xges(
         See Notes.
     extended_search : bool, default=True
         Run the extended search after the base search (see Notes). ``True`` favors accuracy on
-        denser graphs; ``False`` returns the base search's graph and favors time. In the 0.3.0
-        release card's benchmark, on sparse graphs the two made about as many errors, and on denser
-        graphs ``False`` made far more, while it ran many times faster.
+        denser graphs; it gives up time. ``False`` returns the base search's graph and favors time;
+        it gives up that accuracy.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1358,9 +1319,7 @@ def xges(
         handling used and ``metadata["em"]`` the EM record, with the rows dropped for observing no
         value and the fewest rows two columns share; two columns that share no observed row raise
         ``ValueError``. ``"em"`` favors the partly observed rows, which dropping the incomplete rows
-        loses; it gives up time: each round runs the search again, so the default 10 rounds run it
-        10 times. Its time against complete data was not measured with this search. See **Missing
-        values.** in Notes.
+        loses; it gives up time: each round runs the search again. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
         least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
@@ -1483,27 +1442,18 @@ def xges(
     ``metadata["score"]`` is the score of the result on the last round's expected covariance. EM
     holds when values are missing completely at random or at random given observed values; when
     missingness depends on the missing values themselves, the expected covariance is biased, and the
-    data cannot show it. On complete data, ``"em"`` gives the complete-data result. Without
-    ``"em"``, drop the incomplete rows yourself, which suits values missing completely at random, or
-    use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    data cannot show it. On complete data, ``"em"`` gives the complete-data result. Before EM, a
+    column that is a linear function of several others is not caught. Without ``"em"``, drop the
+    incomplete rows yourself, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** At the standard BIC (``ebic_gamma=0.0``) on simulated linear-Gaussian data, its
-    errors stayed below the empty graph's on sparse graphs of hundreds of variables and at no size
-    on dense graphs; the
-    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_ has
-    every setting. With few rows per variable on sparse graphs, its errors passed the empty graph's
-    on large graphs while the BIC still preferred its graphs to the true one
-    (`0.3.0 release card <https://andrey.abel.ai/docs/benchmarks/0.3.0.html#known-limits>`_). The
-    extended search's run time grows with the number of edges. With fewer rows than columns the
-    standard BIC is unreliable, and the search never selects a parent set that fits its child
-    exactly. The categorical and mixed-data scores are not benchmarked with XGES yet.
-    ``missing="em"`` is experimental and not benchmarked yet; it has no guarantee under values
-    missing not at random, and a column that is a linear function of several others is not caught
-    before EM. True path claims can direct an edge of a wrong graph the wrong way, and cannot
-    restore a missed edge: a known edge belongs in ``required`` (`0.17.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The measured
-    results are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** At the standard BIC (``ebic_gamma=0.0``), on linear-Gaussian data it made fewer
+    errors than the empty graph on sparse graphs of hundreds of variables, but on dense graphs at no
+    size, and with few rows per variable its errors passed the empty graph's on large sparse graphs.
+    With fewer rows than columns the BIC is unreliable, and the search never selects a parent set
+    that fits its child exactly. The
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
+    every setting.
 
     References
     ----------
@@ -1651,13 +1601,7 @@ def lges(
         cover LGES-0) [1]_. ``"conservative"`` (ConservativeInsert) also leaves out a pair when any
         valid addition of the edge worsens the score; it made fewer errors in the paper's
         simulations, with no such proof. ``"safe"`` favors the proof of recovery; it gives up
-        accuracy. ``"conservative"`` favors fewer errors; it gives up that proof. On the paper's
-        linear-Gaussian simulation (the authors' generator; 10, 20, 50, and 100 variables at mean
-        degree 1 to 4, and 10, 20, and 50 at degree 6; 1,000 and 10,000 rows; 20 graphs per
-        setting), under ``schedule="lges"``, ``"conservative"`` had the lower mean error in 31 of 38
-        settings, the higher in 3 (by 0.1 to 1.15 edges, all at mean degree 4 and 6), and tied in 4;
-        over the 480 graphs of mean degree 1 to 3 it made 6,789 errors against 9,029, and its median
-        fit took 0.78 to 1.03 times as long (mean degree 2, 4, and 6).
+        accuracy. ``"conservative"`` favors fewer errors; it gives up that proof.
     schedule : {"lges", "lges0_released"}, default="lges"
         The order of the search's phases (see Notes). ``"lges"`` is the paper's main method, LGES
         (its Algorithm 1): before each single edge addition it deletes, then reverses, edges until
@@ -1665,16 +1609,7 @@ def lges(
         the paper's LGES-0 (its Algorithm 8) in the phase order of the code published with the
         paper: additions, then deletions, then reversals, each phase run once until no move improves
         the score. ``"lges"`` favors accuracy on denser graphs; it gives up time.
-        ``"lges0_released"`` favors time; it gives up accuracy on denser graphs. On the simulation
-        of ``insertion``, counting a schedule better in a setting and rule when its mean error is
-        lower and it is lower on more graphs than higher, LGES was better in 15 of 16 at mean degree
-        3 and 12 of 16 at mean degree 4, LGES-0 in 1 and 2. At mean degree 1 and 2 the two made
-        about as many errors, 457 against 459 summed over the 32 settings and rules of the mean
-        errors, with LGES-0 better in 12, LGES in 5, and 15 ties. LGES rescans the deletions and
-        reversals after every addition: where both ran in one process (the conservative rule at mean
-        degree 1 and 3; the safe fits there ran first and carry about 0.25 s of start-up), its
-        median fit took 1.0 to 1.33 times LGES-0's time; at mean degree 2, 4, and 6, timed in
-        separate runs, so small differences are noise, 0.9 to 1.8 times.
+        ``"lges0_released"`` favors time; it gives up accuracy on denser graphs.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1780,17 +1715,13 @@ def lges(
     rows yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on up to 20 variables with 5,000 rows.
-    With the linear-Gaussian BIC, ``"lges0_released"`` was compared with the authors' code on the
-    paper's simulation up to 50 variables and 10,000 rows, and ``"lges"`` with the authors' step
-    functions run in Algorithm 1's order up to 35 variables; ``"lges0_released"`` was also compared
-    on the paper's Sachs data, continuous and discretized, the latter with the multinomial BIC. BDeu
-    and the mixed-data scores were not compared: the package's checks run them on small tables only.
-    The paper proves the recovery of the true class as the rows grow only for ``insertion="safe"``.
-    Each addition step scores every pair of non-adjacent variables, and every valid addition for
-    each pair it keeps, in one process; ``"lges"`` also rescans the deletions and reversals after
-    every addition. The measured results are a reference, not a hard limit: they change with the
-    data generator, the density, the method's settings, and the machine.
+    **Limitations.** Not benchmarked yet. With ``schedule="lges0_released"`` and
+    ``andrey.config(tie_break="position")`` it returned the CPDAG of its authors' code on every
+    dataset of its paper's simulation. The paper proves that it recovers the true class as the rows
+    grow only under ``insertion="safe"``. Each addition step scores every pair of non-adjacent
+    variables in one process. The
+    `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#lges>`__ has the
+    comparison.
 
     References
     ----------
@@ -1884,20 +1815,18 @@ def hc(
         Local score objective: ``"bic"``, a covariance-based Gaussian BIC for continuous data;
         ``"bdeu"``, the BDeu score, or ``"discrete_bic"``, the multinomial BIC, for categorical data
         coded by whole numbers; or ``"degen_gauss"`` and ``"cond_gauss"``, the degenerate and
-        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. In the 0.6.0 release
-        card's benchmark, on mixed data ``"degen_gauss"`` favors time and ``"cond_gauss"`` gives up
-        time, with neither ahead at every size, both far below the empty graph's errors. On
-        categorical data ``"bdeu"`` favors accuracy at about the same time: on the few discrete
-        networks measured it made as many or slightly fewer errors than ``"discrete_bic"``.
-        ``"normal_scores"``, experimental, is ``"bic"`` on each column's normal scores, for
-        continuous data that are Gaussian only after an unknown increasing transformation of each
-        column, as :func:`~andrey.ges` describes, with its limits; the consistency result for this
-        score covers GES, so with this search it is the analogous construction, not a proven result.
-        ``None`` picks from the declared column types: ``"bdeu"`` when every column is categorical,
-        ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared categorical by
-        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
-        values. ``metadata["score_func"]`` names the score the fit used: the one picked from the
-        declared column types when this is ``None``.
+        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. On mixed data
+        ``"degen_gauss"`` favors time and ``"cond_gauss"`` gives up time, with neither ahead at
+        every size. On categorical data ``"bdeu"`` favors accuracy, at about the time of
+        ``"discrete_bic"``. ``"normal_scores"``, experimental, is ``"bic"`` on each column's normal
+        scores, for continuous data that are Gaussian only after an unknown increasing
+        transformation of each column, as :func:`~andrey.ges` describes, with its limits; the
+        consistency result for this score covers GES, so with this search it is the analogous
+        construction, not a proven result. ``None`` picks from the declared column types: ``"bdeu"``
+        when every column is categorical, ``"cond_gauss"`` when some are, else ``"bic"``. A column
+        is declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or
+        text type, never by its values. ``metadata["score_func"]`` names the score the fit used: the
+        one picked from the declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the
@@ -1953,14 +1882,7 @@ def hc(
         ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
         fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
         ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
-        up time: each round runs the search again. In the 0.17.0 missing-data benchmark
-        (linear-Gaussian data, 10 to 50 variables, 100 to 2,000 rows, 10 to 50% missing; the
-        searches at ``ebic_gamma=0``), against dropping the incomplete rows, ``"em"`` made fewer
-        errors in 186 of the 225 settings judged with GES, BOSS, GRaSP, and NOTEARS, as many in 39,
-        and more in none, and in 204 more dropping the rows left too few to fit most datasets; HC
-        and Tabu were not compared with it. With the default 10 rounds, a setting's median fit in
-        the six searches took 2 to 72 times as long as the same search on the complete data. See
-        **Missing values.** in Notes.
+        up time: each round runs the search again. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
         least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
@@ -2137,27 +2059,18 @@ def hc(
     the result on the last round's expected covariance. EM holds when values are missing completely
     at random or at random given observed values; when missingness depends on the missing values
     themselves, the expected covariance is biased, and the data cannot show it. On complete data,
-    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows yourself,
-    which suits values missing completely at random, or use :func:`~andrey.pc` or
-    :func:`~andrey.fci`, whose tests delete rows per test.
+    ``"em"`` gives the complete-data result. Before EM, a column that is a linear function of
+    several others is not caught. Without ``"em"``, drop the incomplete rows yourself, which suits
+    values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose
+    tests delete rows per test.
 
-    **Limitations.** At the standard BIC (``ebic_gamma=0.0``) on simulated linear-Gaussian data, its
-    errors stayed below the empty graph's on sparse graphs of moderate size, on denser graphs only
-    at a single size, and at no size on dense graphs; the
+    **Limitations.** At the standard BIC (``ebic_gamma=0.0``), on linear-Gaussian data it made fewer
+    errors than the empty graph on sparse graphs of moderate size, where :func:`~andrey.ges` reached
+    hundreds of variables, on denser graphs only at a single size, and on dense graphs at no size.
+    With fewer rows than columns the BIC is unreliable, and the search never selects a parent set
+    that fits its child exactly. The
     `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
-    every setting. With fewer rows than columns the standard BIC is unreliable, and the search never
-    selects a parent set that fits its child exactly. With ``env`` it is experimental and not
-    benchmarked yet. With ``missing="em"`` at the standard BIC and few rows it was often no better
-    than the empty graph, as on complete data (`0.16.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.16.0.html#what-we-measured-on-missing-data>`__ and
-    `0.17.0 release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#missing-data>`__); it
-    has no guarantee under values missing not at random, and a column that is a linear function of
-    several others is not caught before EM. True path claims can direct an edge of a wrong graph the
-    wrong way, and cannot restore a missed edge: a known edge belongs in ``required`` (`0.17.0
-    release card
-    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`__). The
-    measured results are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    every setting.
 
     References
     ----------
@@ -2337,14 +2250,7 @@ def tabu(
         ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
         fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
         ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
-        up time: each round runs the search again. In the 0.17.0 missing-data benchmark
-        (linear-Gaussian data, 10 to 50 variables, 100 to 2,000 rows, 10 to 50% missing; the
-        searches at ``ebic_gamma=0``), against dropping the incomplete rows, ``"em"`` made fewer
-        errors in 186 of the 225 settings judged with GES, BOSS, GRaSP, and NOTEARS, as many in 39,
-        and more in none, and in 204 more dropping the rows left too few to fit most datasets; HC
-        and Tabu were not compared with it. With the default 10 rounds, a setting's median fit in
-        the six searches took 2 to 72 times as long as the same search on the complete data. See
-        **Missing values.** in Notes.
+        up time: each round runs the search again. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
         least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
@@ -2513,27 +2419,18 @@ def tabu(
     the result on the last round's expected covariance. EM holds when values are missing completely
     at random or at random given observed values; when missingness depends on the missing values
     themselves, the expected covariance is biased, and the data cannot show it. On complete data,
-    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows yourself,
-    which suits values missing completely at random, or use :func:`~andrey.pc` or
-    :func:`~andrey.fci`, whose tests delete rows per test.
+    ``"em"`` gives the complete-data result. Before EM, a column that is a linear function of
+    several others is not caught. Without ``"em"``, drop the incomplete rows yourself, which suits
+    values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose
+    tests delete rows per test.
 
-    **Limitations.** At the standard BIC (``ebic_gamma=0.0``) on simulated linear-Gaussian data, its
-    errors stayed below the empty graph's on sparse graphs of moderate size, on denser graphs only
-    on small ones, and at no size on dense graphs; the
+    **Limitations.** At the standard BIC (``ebic_gamma=0.0``), on linear-Gaussian data it made fewer
+    errors than the empty graph on sparse graphs of moderate size, where :func:`~andrey.ges` reached
+    hundreds of variables, on denser graphs only on small ones, and on dense graphs at no size. With
+    fewer rows than columns the BIC is unreliable, and the search never selects a parent set that
+    fits its child exactly. The
     `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
-    every setting. With fewer rows than columns the standard BIC is unreliable, and the search never
-    selects a parent set that fits its child exactly. Its categorical and mixed-data scores are not
-    benchmarked yet. With ``env`` it is experimental and not benchmarked yet. With ``missing="em"``
-    at the standard BIC and few rows it was often no better than the empty graph, as on complete
-    data
-    (`0.17.0 release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#missing-data>`__); it
-    has no guarantee under values missing not at random, and a column that is a linear function of
-    several others is not caught before EM. ``required_paths`` is experimental. True path claims can
-    direct an edge of a wrong graph the wrong way, and cannot restore a missed edge: a known edge
-    belongs in ``required`` (`0.17.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`__). The
-    measured results are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    every setting.
 
     References
     ----------
@@ -2679,9 +2576,7 @@ def exact_search(
         handling used and ``metadata["em"]`` the EM record, with the rows dropped for observing no
         value and the fewest rows two columns share; two columns that share no observed row raise
         ``ValueError``. ``"em"`` favors the partly observed rows, which dropping the incomplete rows
-        loses; it gives up time: each round runs the search again, so the default 10 rounds run it
-        10 times. Its time against complete data was not measured with this search. See **Missing
-        values.** in Notes.
+        loses; it gives up time: each round runs the search again. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
         least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
@@ -2810,25 +2705,18 @@ def exact_search(
     some graphs, while others keep changing; values other than 10 are not benchmarked. EM holds when
     values are missing completely at random or at random given observed values; when missingness
     depends on the missing values themselves, the expected covariance is biased, and the data cannot
-    show it. On complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the
-    incomplete rows yourself, which suits values missing completely at random, or use
-    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    show it. On complete data, ``"em"`` gives the complete-data result. Before EM, a column that is
+    a linear function of several others is not caught. Without ``"em"``, drop the incomplete rows
+    yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** At ``ebic_gamma=0.0`` on simulated linear-Gaussian data, its errors stayed
-    below the empty graph's at every size and density it finished within the time cap; the
-    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_ has
-    every setting. It scores every possible parent set of every variable, so its run time at least
-    doubles with each added variable, and ``"dp"`` also keeps one entry per subset of the variables,
-    so its memory doubles as well. With fewer rows than columns the standard BIC is unreliable, and
-    the search never selects a parent set that fits its child exactly. The mixed-data and
-    categorical scores are not benchmarked with it yet. ``missing="em"`` is experimental and not
-    benchmarked yet; it has no guarantee under values missing not at random, and a column that is a
-    linear function of several others is not caught before EM. True path claims can direct an edge
-    of a wrong graph the wrong way, and cannot restore a missed edge: a known edge belongs in
-    ``required`` (`0.17.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The measured
-    results are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** At ``ebic_gamma=0.0`` on linear-Gaussian data it made fewer errors than the
+    empty graph at every size and density it finished, but it scores every possible parent set of
+    every variable, so its run time at least doubles with each added variable, and under ``"dp"`` so
+    does its memory. With fewer rows than columns the BIC is unreliable, and the search never
+    selects a parent set that fits its child exactly. The
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
+    every setting.
 
     References
     ----------
@@ -3008,9 +2896,7 @@ def calm(
         handling used and ``metadata["em"]`` the EM record, with the rows dropped for observing no
         value and the fewest rows two columns share; two columns that share no observed row raise
         ``ValueError``. ``"em"`` favors the partly observed rows, which dropping the incomplete rows
-        loses; it gives up time: each round runs the search again, so the default 10 rounds run it
-        10 times. Its time against complete data was not measured with this search. See **Missing
-        values.** in Notes.
+        loses; it gives up time: each round runs the search again. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
         least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
@@ -3138,25 +3024,20 @@ def calm(
     some graphs, while others keep changing; values other than 10 are not benchmarked. EM holds when
     values are missing completely at random or at random given observed values; when missingness
     depends on the missing values themselves, the expected covariance is biased, and the data cannot
-    show it. On complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the
-    incomplete rows yourself, which suits values missing completely at random, or use
-    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    show it. On complete data, ``"em"`` gives the complete-data result. Under it the screen's
+    Fisher-Z tests read the expected correlations as if every row were observed, so the screen keeps
+    more candidate edges than ``screen_alpha`` implies. Without ``"em"``, drop the incomplete rows
+    yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On simulated linear-Gaussian data its errors stayed below the empty graph's on
-    sparse graphs of hundreds of variables, up to the largest size it finished within the time cap,
-    and on dense graphs only on moderate and large ones; the
-    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_ has
-    every setting. Every optimizer step computes a determinant and a matrix power of the full weight
-    matrix, so a step's cost grows with the cube of the variable count. The paper's longer schedule
-    made fewer errors on moderate graphs in far more time
-    (`0.7.0 release card <https://andrey.abel.ai/docs/benchmarks/0.7.0.html#calm>`_). The fit is
-    nonconvex and can stop at a local optimum: on an unshielded collider with independent parents,
-    it can reverse both edges and connect the parents. Its result depends on the columns' units
-    unless ``standardize=True``. ``missing="em"`` is experimental and not benchmarked yet, and it
-    has no guarantee under values missing not at random; under it the screen's Fisher-Z tests read
-    the expected correlations as if every row were observed, so the screen keeps more candidate
-    edges than ``screen_alpha`` implies. The measured results are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** On linear-Gaussian data it made fewer errors than the empty graph on sparse
+    graphs of hundreds of variables, and on dense graphs only on moderate and large ones. The cost
+    of each optimizer step grows with the cube of the number of variables, and the nonconvex fit can
+    stop at a local optimum: on an unshielded collider with independent parents, it can reverse both
+    edges and join the parents. Its result depends on the columns' units unless
+    ``standardize=True``. The
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
+    every setting.
 
     References
     ----------

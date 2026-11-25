@@ -68,7 +68,8 @@ method's boundary warns with a {py:class}`~andrey.BoundaryWarning`, and
 `tests/unit/test_boundary.py` fails when the table and the newest published boundary differ.
 
 **Exceptions.** The map covers the methods Andrey had at 0.10.0. A method added since has no map and
-no warning; its **Limitations.** paragraph gives the sizes its campaign measured.
+no warning; its **Limitations.** paragraph links the release card with the sizes its campaign
+measured.
 
 ## Column order
 

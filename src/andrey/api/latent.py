@@ -121,20 +121,13 @@ def gin(data: npt.ArrayLike, *, alpha: float = 0.05) -> StructureOutput:
     incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On simulated linear data with uniform noise, each latent measured by a few
-    indicators, its clusters matched the true ones far better than the empty graph's (by the
-    adjusted Rand index) at every measured size with fewer rows, and with more rows until its fits
-    passed the time cap
-    (`0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_). Its
-    order of the latents can put a latent after one it causes, as in some small latent models with
-    random weights (`0.7.0 release card <https://andrey.abel.ai/docs/benchmarks/0.7.0.html#gin>`__).
-    It tests every group of observed variables of each size, so the number of tests grows
-    combinatorially with the variables, and each HSIC test's time and memory grow with the square of
-    the rows. A latent with a single indicator is not found, indicators that share two or more
-    latents appear as one, and it assumes every observed variable measures a latent: variables that
-    depend on no other variable are grouped into one cluster. The measured results are a reference,
-    not a hard limit: they change with the data generator, the density, the method's settings, and
-    the machine.
+    **Limitations.** On linear data with uniform noise and a few indicators per latent, its clusters
+    matched the true ones far better than the empty graph's at every size until its fits became too
+    slow, as the number of its tests grows combinatorially with the variables. A latent with a
+    single indicator is not found, indicators that share two or more latents appear as one, and
+    variables that depend on no other variable are grouped into one cluster. The
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
+    every size.
 
     References
     ----------

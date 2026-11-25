@@ -119,12 +119,7 @@ def direct_lingam(
         sparse (heavy-tailed) noise and the square after a sign correction for skewed noise, which
         costs far less; the Notes say when each applies. ``"pwling"`` favors accuracy under any
         non-Gaussian noise; it gives up time. ``"skew"`` and ``"tanh"`` favor time; they give up
-        accuracy outside the noise each suits. On simulated linear data, ``"pwling"`` made few
-        errors under every noise, and neither ``"skew"`` nor ``"tanh"`` made fewer in any setting:
-        ``"skew"`` matched it under exponential noise and ``"tanh"`` under Laplace noise, while
-        under uniform noise both made far more (`0.12.0 release card
-        <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#directlingam-s-order-measures>`__).
-        Their order search took a fraction of ``"pwling"``'s time, and the whole fit less.
+        accuracy outside the noise each suits.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The causal order puts the cause of
@@ -219,16 +214,12 @@ def direct_lingam(
     it. Drop the incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On simulated linear data with uniform noise its errors stayed below the empty
-    graph's, and its fits finished within the time cap, on graphs of hundreds of variables at every
-    measured density; the
-    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_ has
-    every size. Its time grows quickly with the number of variables, as it compares them in pairs,
-    so large fits are slow even on many cores (the
-    `0.1.0 release card <https://andrey.abel.ai/docs/benchmarks/0.1.0.html#directlingam>`_).
-    ``"skew"`` and ``"tanh"`` make far more errors under noise they do not suit, such as uniform
-    noise for both (see ``measure``). The measured results are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** On linear data with uniform noise it made fewer errors than the empty graph on
+    graphs of hundreds of variables at every density, while :func:`~andrey.ica_lingam` made more
+    errors than the empty graph beyond small graphs. Its time grows quickly with the number of
+    variables, as it compares them in pairs, so large fits are slow. The
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
+    every size.
 
     References
     ----------
@@ -361,21 +352,13 @@ def ica_lingam(
     Drop the incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On simulated linear data with uniform noise, its fits finished within the time
-    cap on graphs of hundreds of variables, but its errors stayed below the empty graph's only on
-    smaller graphs, smaller still with fewer rows or denser graphs, and at no size on the densest;
-    the `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_ has
-    every size. On scale-free graphs with few rows per variable, its errors passed the empty graph's
-    at every measured size (the
-    `0.1.0 release card <https://andrey.abel.ai/docs/benchmarks/0.1.0.html#ica-lingam>`_). Its
-    causal order depends on the columns' units, as its authors note [2]_: matching the unmixing
-    matrix to the variables assumes every noise term has the same scale [1]_. Standardizing the
-    columns removes that dependence but can make the order far less accurate: on dense graphs its
-    errors rose from few to far more than the empty graph's (the
-    `0.11.0 release card <https://andrey.abel.ai/docs/benchmarks/0.11.0.html#limits>`__).
-    :func:`~andrey.direct_lingam` finds the order in a way that does not depend on the scale [2]_.
-    The measured results are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    **Limitations.** On linear data with uniform noise it made fewer errors than the empty graph
+    only on small graphs, and on the densest graphs at no size, while :func:`~andrey.direct_lingam`
+    stayed below it on graphs of hundreds of variables. Its causal order depends on the columns'
+    units, as its authors note [2]_; :func:`~andrey.direct_lingam` finds the order in a way that
+    does not depend on the scale. The
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
+    every size.
 
     References
     ----------
@@ -498,17 +481,11 @@ def multi_group_direct_lingam(
     it. Drop the incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On simulated linear data with uniform noise in several groups that share one
-    graph, its errors stayed below the empty graph's, and its fits finished within the time cap, at
-    every measured size, into the hundreds of variables; the
-    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_ has
-    every size. It assumes linear effects and non-Gaussian noise in every group, and it gives every
-    group the one shared causal order, even when a group's own order differs. With true
-    ``required_paths`` or ``forbidden_paths``, its errors were higher in no setting that repeated
-    (`0.17.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The measured
-    results are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** On linear data with uniform noise in several groups that share one graph it
+    made fewer errors than the empty graph at every size, into the hundreds of variables. It gives
+    every group the one shared causal order, even when a group's own order differs. The
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
+    every size.
 
     References
     ----------

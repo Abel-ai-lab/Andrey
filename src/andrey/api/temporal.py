@@ -212,20 +212,13 @@ def varma_lingam(
     delete rows per test and keep every time step, as dropping a step would join the steps around
     it.
 
-    **Limitations.** It assumes linear effects and non-Gaussian noise, and with ``prune=False``
-    every lag graph is complete. With ``prune=True``, the F1 score of its directed cross-links
-    stayed well above the empty graph's until its fits passed the time cap, which longer series
-    reach on smaller graphs (`0.10.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#methods-on-their-own-axes>`_). With
-    ``order=(1, 1)``, its errors stayed below the empty graph's on long series and exceeded them on
-    short series beyond the smallest graphs
-    (`0.5.0 release card <https://andrey.abel.ai/docs/benchmarks/0.5.0.html#varma-lingam>`_). The
-    likelihood fit can stop short of convergence without a warning, as after a failed line search; a
-    larger ``max_iter`` does not prevent this. Where it stops depends on the numerical libraries and
-    the CPU's BLAS kernels, so the same series can give a different graph on another machine. With
-    ``criterion`` set, it fits one model for every ``(p, q)`` in the grid. The measured results are
-    a reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    **Limitations.** With ``prune=True`` the F1 score of its directed cross-links stayed well above
+    the empty graph's until its fits became too slow, which longer series reach on smaller graphs.
+    The likelihood fit can stop short of convergence without a warning, and where it stops depends
+    on the numerical libraries and the CPU, so the same series can give a different graph on another
+    machine. The `0.10.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#methods-on-their-own-axes>`__ has the
+    numbers.
 
     References
     ----------
@@ -384,13 +377,12 @@ def longitudinal_lingam(
     in it. Drop the units that hold one from every dataset first, which suits values missing
     completely at random.
 
-    **Limitations.** It assumes linear effects and non-Gaussian noise. Each time point's fit uses
-    only the units' rows at that time, so its accuracy depends on the number of units, not on the
-    number of time points. On simulated panels, the F1 score of its directed cross-links was close
-    to perfect at every measured size, with few and many units (`0.10.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#methods-on-their-own-axes>`_). The measured
-    results are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** On simulated panels the F1 score of its directed cross-links was close to
+    perfect at every size, with few and with many units. Each time point's fit uses only the units'
+    rows at that time, so its accuracy depends on the number of units, not on the number of time
+    points. The `0.10.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#methods-on-their-own-axes>`__ has the
+    numbers.
 
     References
     ----------
@@ -480,13 +472,7 @@ def pcmci(
         test: it is not counted and keeps p-value ``1``; a required link is counted with p-value
         ``0``. ``"fdr_bh"`` favors fewer extra links; it gives up true links whose p-value is not
         small enough for the number of tests. ``"none"`` favors true links; it gives up control of
-        the extra ones, which grow with the number of variables. On simulated linear-Gaussian VAR
-        series, ``"fdr_bh"`` had fewer errors (missing plus extra lagged links) than ``"none"`` in
-        most settings and more only in one with the smallest graphs; on the largest graphs
-        ``"none"`` made more errors than the empty graph, nearly all of them extra links, while
-        ``"fdr_bh"`` stayed far below it (`0.12.0 release card
-        <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#fdr-control-in-pcmci-and-granger>`__).
-        See Notes.
+        the extra ones, which grow with the number of variables. See Notes.
     indep_test : str or None, default=None
         The conditional-independence test behind every p-value. ``"fisherz"`` and ``"student_t"``
         test partial correlation, for linear effects in continuous data: ``"fisherz"`` applies
@@ -511,15 +497,12 @@ def pcmci(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
-        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
-        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
-        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
-        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
-        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
-        were rejected. Their time and their power were not measured against each other. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; with ``"gsq"`` it gives
+        up time, a sum of hypergeometric terms per cell, and in the sparsest tables it rejects below
+        that level. ``"nonempty"`` favors degrees of freedom read from the table alone, as Spirtes,
+        Glymour and Scheines (1993) count them; it gives up the level, as it rejects true
+        independences more often than the nominal rate. Only ``"chisq"`` and ``"gsq"`` read it:
+        passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -531,14 +514,7 @@ def pcmci(
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
         handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
-        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
-        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
-        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
-        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
-        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
-        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
-        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
-        Not measured with this method. See **Missing values.** in Notes.
+        outside values missing completely at random. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -679,18 +655,13 @@ def pcmci(
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** With ``fdr_method="none"`` on simulated linear-Gaussian series, its errors
-    stayed below the empty graph's on small graphs, with series of either length, and not on larger
-    ones (`0.10.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#methods-on-their-own-axes>`_); the
-    ``fdr_method`` entry compares the default. It assumes a stationary series, no hidden common
-    causes, and, with a partial-correlation test, linear effects; ``"cmiknn"`` and ``"gpdc"`` lift
-    that assumption at a far higher cost per test and are not benchmarked yet. It does not test
-    same-step (lag 0) links: an effect within one time step is missed and can show up as a false
-    lagged link. An MCI test conditions on up to ``2 * n_variables * tau_max - 1`` lagged values, so
-    the series needs many more time steps than that. Missing values are not benchmarked yet. The
-    measured results are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    **Limitations.** On linear-Gaussian series with ``fdr_method="none"`` it made fewer errors than
+    the empty graph on small graphs but not on larger ones; the default ``"fdr_bh"`` made fewer
+    errors than ``"none"`` in most settings (see ``fdr_method``). It does not test same-step (lag 0)
+    links, so an effect within one time step is missed and can show up as a false lagged link. The
+    `0.10.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#methods-on-their-own-axes>`__ has the
+    numbers.
 
     References
     ----------
@@ -830,9 +801,7 @@ def pcmciplus(
         any other triple. ``"ambiguous"`` makes it neither a collider nor a non-collider: no
         collider vote reads it, and no rule orients through it. ``"orient"`` favors same-step
         arrowheads; it gives up protection from false colliders. ``"ambiguous"`` favors no false
-        collider; it gives up the same-step arrowheads. On lagged series whose modules are observed
-        in different periods, so that no row bridges them, ``"ambiguous"`` took the same-step
-        arrowheads per fit from 1.5-1.9 to 0; what that does to accuracy was not measured.
+        collider; it gives up the same-step arrowheads.
     indep_test : str or None, default=None
         The conditional-independence test behind every p-value. ``"fisherz"`` and ``"student_t"``
         test partial correlation, for linear effects in continuous data: ``"fisherz"`` applies
@@ -857,15 +826,12 @@ def pcmciplus(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
-        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
-        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
-        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
-        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
-        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
-        were rejected. Their time and their power were not measured against each other. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; with ``"gsq"`` it gives
+        up time, a sum of hypergeometric terms per cell, and in the sparsest tables it rejects below
+        that level. ``"nonempty"`` favors degrees of freedom read from the table alone, as Spirtes,
+        Glymour and Scheines (1993) count them; it gives up the level, as it rejects true
+        independences more often than the nominal rate. Only ``"chisq"`` and ``"gsq"`` read it:
+        passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -877,14 +843,7 @@ def pcmciplus(
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
         handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
-        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
-        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
-        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
-        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
-        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
-        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
-        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
-        Not measured with this method. See **Missing values.** in Notes.
+        outside values missing completely at random. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -1054,18 +1013,14 @@ def pcmciplus(
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** On simulated linear-Gaussian series with lagged and same-step links, its errors
-    stayed below the empty graph's at every measured size, up to the largest the data generator
-    could draw (`0.10.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#methods-on-their-own-axes>`_). It assumes a
-    stationary series, no hidden common causes, and, with a partial-correlation test, linear
-    effects; ``"cmiknn"`` and ``"gpdc"`` lift that assumption at a far higher cost per test and are
-    not benchmarked yet. The skeleton and collider phases test every subset of a variable's
-    same-step neighbors, so the number of tests grows exponentially with the same-step links at one
-    variable. A test conditions on up to ``2 * n_variables * tau_max + n_variables - 2`` values, so
-    the series needs many more time steps than that. Missing values are not benchmarked yet. The
-    measured results are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    **Limitations.** On linear-Gaussian series with lagged and same-step links it made fewer errors
+    than the empty graph at every size. Its skeleton and collider phases test every subset of a
+    variable's same-step neighbors, so the number of tests grows exponentially with the same-step
+    links at one variable, and a test conditions on up to
+    ``2 * n_variables * tau_max + n_variables - 2`` values, so the series needs many more time steps
+    than that. The `0.10.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#methods-on-their-own-axes>`__ has the
+    numbers.
 
     References
     ----------
@@ -1188,9 +1143,7 @@ def jpcmciplus(
         dataset is always used. ``metadata["time_dummy"]`` says whether the fit used it. The dummy
         favors a graph without the links a hidden time context adds; it gives up time and memory, a
         column per step in the conditions of every test that takes it. Leaving it out favors long
-        series and more system variables; it gives up that stand-in for hidden time contexts. Fits
-        with it took many times as long as without, and on the larger systems measured it ran out of
-        memory where the fit without it finished.
+        series and more system variables; it gives up that stand-in for hidden time contexts.
     tau_max : int, default=1
         The largest lag tested, at least ``1``: links at lags ``0`` to ``tau_max`` are tested.
     alpha : float, default=0.01
@@ -1326,23 +1279,13 @@ def jpcmciplus(
     :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, and :func:`~andrey.lpcmci` read one series, so
     drop the datasets that hold one.
 
-    **Limitations.** On the linear model of its authors' experiment script [1]_, with every context
-    observed or some hidden, its errors stayed below the empty graph's in every setting
-    (`0.15.0 release card <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#j-pcmci>`_). It
-    assumes faithfulness, so a missed dummy link can leave the links a hidden context adds. A dummy
-    link needs one level that stands out: a dataset effect far larger than the noise can hide behind
-    the lagged values, and the time dummy misses a smooth effect spread over the steps, which leaves
-    false links; list such a context if it is known. The lagged phase first tests each candidate
-    without conditions, so an autocorrelated target can hide a context link from it for good, and
-    with few steps against many datasets false positives stay high as the datasets grow [1]_. A time
-    context that the lags of the time contexts determine, such as a sine and cosine of one period,
-    or a sine or a quadratic trend alone from ``tau_max=2``, cannot be told apart from them: only
-    the variables its context links reach can be trusted, not the context or the lag they name. It
-    tests and reports no link between contexts [1]_. Under ``"majority"`` and ``"conservative"``,
-    hidden contexts leave most same-step links undirected, as a context cannot orient a link into a
-    variable that has the context's dummy as a parent. The cost grows fastest with the system
-    variables (see ``time_dummy``). The measured results are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** With every context observed or some hidden, on linear series it made as many
+    errors as its authors' code and fewer than the empty graph in every setting. A hidden context is
+    found only through a dummy level that stands out: a dataset effect far larger than the noise can
+    hide behind the lagged values, and the time dummy misses a smooth effect spread over the steps;
+    both leave false links, so list such a context if it is known. The
+    `0.15.0 release card <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#j-pcmci>`__ has the
+    numbers.
 
     References
     ----------
@@ -1475,15 +1418,12 @@ def lpcmci(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
-        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
-        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
-        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
-        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
-        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
-        were rejected. Their time and their power were not measured against each other. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; with ``"gsq"`` it gives
+        up time, a sum of hypergeometric terms per cell, and in the sparsest tables it rejects below
+        that level. ``"nonempty"`` favors degrees of freedom read from the table alone, as Spirtes,
+        Glymour and Scheines (1993) count them; it gives up the level, as it rejects true
+        independences more often than the nominal rate. Only ``"chisq"`` and ``"gsq"`` read it:
+        passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1495,14 +1435,7 @@ def lpcmci(
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
         handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
-        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
-        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
-        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
-        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
-        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
-        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
-        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
-        Not measured with this method. See **Missing values.** in Notes.
+        outside values missing completely at random. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -1672,19 +1605,13 @@ def lpcmci(
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** On simulated linear-Gaussian series with part of the series unobserved, its
-    errors stayed below the empty graph's at every measured size, up to a few dozen variables, where
-    some fits already ran past the time cap (`0.10.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#methods-on-their-own-axes>`_). It assumes a
-    stationary series, no selection bias, and, with a partial-correlation test, linear effects;
-    ``"cmiknn"`` and ``"gpdc"`` lift that assumption at a far higher cost per test and are not
-    benchmarked yet. Hidden common causes are allowed, but the graph covers only ``tau_max + 1``
-    time steps, and a hidden cause that acts through earlier steps can add links within that window.
-    The removal and rule steps test subsets of a node's neighbors, so the number of tests grows
-    exponentially with the links at one node, and a test conditions on up to
-    ``n_variables * (tau_max + 1) - 2`` values, so the series needs many more time steps than that.
-    Missing values are not benchmarked yet. The measured results are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** On linear-Gaussian series with part of the series unobserved it made fewer
+    errors than the empty graph at every size, up to a few dozen variables. A test conditions on up
+    to ``n_variables * (tau_max + 1) - 2`` values, so the series needs many more time steps than
+    that. The graph covers only ``tau_max + 1`` time steps, and a hidden cause that acts through
+    earlier steps can add links within them. The `0.10.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#methods-on-their-own-axes>`__ has the
+    numbers.
 
     References
     ----------
@@ -1805,13 +1732,7 @@ def granger(
         it is not counted and keeps p-value ``1``; a required link is counted with p-value ``0``.
         ``"fdr_bh"`` favors fewer extra edges; it gives up true edges whose p-value is not small
         enough for the number of tests. ``"none"`` favors true edges; it gives up control of the
-        extra ones, which grow with the number of variables. On simulated linear-Gaussian VAR
-        series, ``"fdr_bh"`` had fewer errors (missing plus extra lagged edges) than ``"none"`` in
-        most settings and more only in one with the smallest graphs; on the largest graphs
-        ``"none"`` made more errors than the empty graph, nearly all of them extra edges, while
-        ``"fdr_bh"`` stayed far below it (`0.12.0 release card
-        <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#fdr-control-in-pcmci-and-granger>`__).
-        See Notes.
+        extra ones, which grow with the number of variables. See Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables over lags ``1`` to ``tau_max``: required and forbidden links, the pairs allowed
@@ -1899,12 +1820,12 @@ def granger(
     :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete
     rows per test and keep every time step, as dropping a step would join the steps around it.
 
-    **Limitations.** It assumes linear effects and tests no same-step effects. On simulated
-    linear-Gaussian VAR series, its errors stayed below the empty graph's in every measured setting
-    with the default ``fdr_method="fdr_bh"``; with ``"none"`` they exceeded them in some settings,
-    the largest graphs included (see ``fdr_method``). The work grows with ``tau_max`` and with the
-    square of the number of variables. The measured results are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** It assumes linear effects and tests no same-step effects. On linear-Gaussian
+    VAR series it made fewer errors than the empty graph in every setting with the default
+    ``"fdr_bh"``, and more in some with ``fdr_method="none"``, the largest graphs included. The
+    `0.12.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#fdr-control-in-pcmci-and-granger>`__ has the
+    numbers.
 
     References
     ----------
@@ -2011,9 +1932,7 @@ def dynotears(
         weights, ``lag_weights`` included, are then those of the scaled columns. ``True`` favors a
         fit that no change of units moves; it gives up the gain the fit takes from the data's units
         on series whose variance grows along the causal order. ``False`` favors the data's units,
-        the setting the paper's simulations measure; it gives up independence from the units. On the
-        paper's design with Gaussian noise and long series, the errors (SHD) in the data's units
-        stayed far below the empty graph's, and with z-scored columns they came much closer to it.
+        the setting the paper's simulations measure; it gives up independence from the units.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables over lags ``0`` to ``tau_max``: required and forbidden links, the pairs allowed
@@ -2128,18 +2047,13 @@ def dynotears(
     :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete rows per test and keep
     every time step, as dropping a step would join the steps around it.
 
-    **Limitations.** The ``l1`` penalty and the weight thresholds read the data's units, as in
-    NOTEARS [4]_ [5]_: rescaling a column changes the fit, and on series whose variance grows along
-    the causal order the fit gains from that order, which ``standardize=True`` gives up. On the
-    paper's design [1]_ with long series, its errors at the defaults stayed far below the empty
-    graph's at every measured size. On short series the defaults made more errors than the empty
-    graph beyond small graphs; short series should use ``lambda1=0.2`` and ``lag_threshold=0.2``,
-    the paper's settings for its short series. Its centering, which the paper's loss leaves out,
-    costs errors on short series whose noise has mean zero; the
-    `0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#dynotears>`_ has the
-    numbers. The time grows faster than the cube of the number of variables, so larger graphs are
-    slow. The measured results are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    **Limitations.** On long series it made far fewer errors than the empty graph at every size, but
+    on short series its defaults made more errors than the empty graph beyond small graphs; there
+    use ``lambda1=0.2`` and ``lag_threshold=0.2``, its paper's settings for short series. The ``l1``
+    penalty and the weight thresholds read the data's units, as in NOTEARS [4]_ [5]_, so rescaling a
+    column changes the fit. The
+    `0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#dynotears>`__ has the
+    numbers.
 
     References
     ----------
@@ -2252,8 +2166,7 @@ def rpcmci(
         adjusted values [3]_ over all of the regime's links together, and a link is then in the
         graph when its adjusted p-value is at most ``alpha``. ``"none"`` favors true links; it gives
         up control of the extra ones. ``"fdr_bh"`` favors fewer extra links; it gives up some true
-        ones. Not measured with Regime-PCMCI; :func:`~andrey.pcmci` states the trade as measured
-        there.
+        ones.
     indep_test : {"student_t", "fisherz"}, default="student_t"
         The conditional-independence test behind every p-value, a partial-correlation test for
         linear effects: ``"student_t"`` takes the p-value from the Student-t distribution,
@@ -2262,11 +2175,7 @@ def rpcmci(
         Gaussian rows and a test that runs with one row fewer (``|S| + 3`` against ``|S| + 4`` for
         ``|S|`` conditions); it gives up agreement with the p-values of :func:`~andrey.pcmci`'s
         default, ``"fisherz"``. ``"fisherz"`` favors that agreement; it gives up the exact level on
-        a test with few rows. The two are nearly the same test: on independent Gaussian rows with
-        two conditions, Fisher's z at ``alpha=0.01`` rejects a true independence with probability
-        1.13% on 20 rows, 1.05% on 50, and 1.02% on 100, calculated from the null distribution of
-        the partial correlation, against 1% for ``"student_t"``. Their effect on Regime-PCMCI's
-        graphs was not measured.
+        a test with few rows. The two are nearly the same test.
     n_starts : int, default=50
         The number of starts, at least ``1``, each with a random regime assignment; the start with
         the lowest objective is returned.
@@ -2370,16 +2279,13 @@ def rpcmci(
     :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete rows per test and keep
     every time step, as dropping a step would join the steps around it.
 
-    **Limitations.** Not benchmarked yet; its tests run it only on small problems, and the
-    `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#regime-pcmci>`_
-    compares it with its authors' code. The nonconvex objective can leave a regime holding steps
-    from several true regimes, or too few to fit; more ``n_starts`` guard against it at a cost that
-    grows linearly with them [1]_. Regimes whose models differ little, such as one link's strength
-    alone, are hard to tell apart [1]_. On a series without regimes, a regime, most often a small
-    one, can hold a spurious link. The number of regimes and ``max_transitions`` are not learned.
-    Each iteration runs PCMCI once per regime and solves one linear program over
-    ``2 * n_regimes * n_samples`` variables. The measured results are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** Not benchmarked yet. On its paper's toy models it gave the same regime weights
+    and graphs as its authors' code, start by start, but a start whose regime holds too few steps to
+    test fails where that code continues. The nonconvex objective can leave a regime holding steps
+    from several true regimes; more ``n_starts`` guard against it [1]_. On a series without regimes,
+    a regime can hold a spurious link. The
+    `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#regime-pcmci>`__ has
+    the comparison.
 
     References
     ----------

@@ -201,15 +201,12 @@ def iamb(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
-        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
-        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
-        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
-        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
-        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
-        were rejected. Their time and their power were not measured against each other. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; with ``"gsq"`` it gives
+        up time, a sum of hypergeometric terms per cell, and in the sparsest tables it rejects below
+        that level. ``"nonempty"`` favors degrees of freedom read from the table alone, as Spirtes,
+        Glymour and Scheines (1993) count them; it gives up the level, as it rejects true
+        independences more often than the nominal rate. Only ``"chisq"`` and ``"gsq"`` read it:
+        passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -221,26 +218,14 @@ def iamb(
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
         lies within the parents of one end, so the search might have missed that separating set.
         ``"orient"`` favors arrowheads; it gives up protection from false colliders. ``"ambiguous"``
-        favors no false collider; it gives up the true arrowheads beside them. With
-        :func:`~andrey.pc`, on merged cohorts of three graph sizes, with about 29 to 76 true edges,
-        that no row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's
-        false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it
-        found from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty
-        graph in 6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs.
-        With IAMB, its effect on accuracy was not measured. Read under ``structure="cpdag"`` only.
+        favors no false collider; it gives up the true arrowheads beside them. Read under
+        ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
         handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
-        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
-        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
-        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
-        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
-        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
-        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
-        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
-        Not measured with this method. See **Missing values.** in Notes.
+        outside values missing completely at random. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -379,20 +364,14 @@ def iamb(
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** On simulated linear-Gaussian data, the errors of its CPDAG, skeleton, and moral
-    graph stayed below the empty graph's in every measured setting
-    (`0.13.0 release card <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#iamb>`_); the
-    mixed-data tests and missing values are not benchmarked yet. Each test conditions on the whole
-    current blanket, so it needs more rows as the blanket grows, and a candidate the grow step adds
-    in error enlarges every later conditioning set; the skeleton step then removes many true edges
-    between variables with large blankets, more with required edges, and its tests grow
-    exponentially with a blanket's size. ``forbidden_paths`` is experimental. Tests that contradict
-    each other leave a graph with no consistent extension, which stands for no DAG and often
-    occurred on simulated data; a ``knowledge`` claim then acts only on an edge, and most claims are
-    dropped (`0.17.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The measured
-    results are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** On linear-Gaussian data each graph it returns made fewer errors than the empty
+    graph in every setting. Each test conditions on the whole current blanket, so it needs more rows
+    as blankets grow: between variables with large blankets the skeleton step removes many true
+    edges, and its tests grow exponentially with a blanket's size. Tests that contradict each other
+    can leave a graph with no consistent extension, which stands for no DAG; a ``knowledge`` claim
+    then acts only on an edge. The
+    `0.13.0 release card <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#iamb>`__ has the
+    numbers.
 
     References
     ----------
@@ -497,15 +476,12 @@ def inter_iamb(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
-        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
-        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
-        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
-        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
-        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
-        were rejected. Their time and their power were not measured against each other. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; with ``"gsq"`` it gives
+        up time, a sum of hypergeometric terms per cell, and in the sparsest tables it rejects below
+        that level. ``"nonempty"`` favors degrees of freedom read from the table alone, as Spirtes,
+        Glymour and Scheines (1993) count them; it gives up the level, as it rejects true
+        independences more often than the nominal rate. Only ``"chisq"`` and ``"gsq"`` read it:
+        passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -517,27 +493,14 @@ def inter_iamb(
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
         lies within the parents of one end, so the search might have missed that separating set.
         ``"orient"`` favors arrowheads; it gives up protection from false colliders. ``"ambiguous"``
-        favors no false collider; it gives up the true arrowheads beside them. With
-        :func:`~andrey.pc`, on merged cohorts of three graph sizes, with about 29 to 76 true edges,
-        that no row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's
-        false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it
-        found from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty
-        graph in 6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs.
-        With Inter-IAMB, its effect on accuracy was not measured. Read under ``structure="cpdag"``
-        only.
+        favors no false collider; it gives up the true arrowheads beside them. Read under
+        ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
         handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
-        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
-        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
-        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
-        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
-        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
-        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
-        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
-        Not measured with this method. See **Missing values.** in Notes.
+        outside values missing completely at random. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -679,19 +642,14 @@ def inter_iamb(
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** On simulated linear-Gaussian data, the errors of its CPDAG, skeleton, and moral
-    graph stayed below the empty graph's in every measured setting
-    (`0.12.0 release card <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#inter-iamb>`_); the
-    mixed-data tests and missing values are not benchmarked yet. Each test conditions on the whole
-    current blanket, so it needs more rows as the blanket grows; the skeleton step then removes many
-    true edges between variables with large blankets, more with required edges, and its tests grow
-    exponentially with a blanket's size. ``forbidden_paths`` is experimental. Tests that contradict
-    each other leave a graph with no consistent extension, which stands for no DAG and often
-    occurred on simulated data; a ``knowledge`` claim then acts only on an edge, and most claims are
-    dropped (`0.17.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The measured
-    results are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** On linear-Gaussian data each graph it returns made fewer errors than the empty
+    graph in every setting. Each test conditions on the whole current blanket, so it needs more rows
+    as blankets grow: between variables with large blankets the skeleton step removes many true
+    edges, and its tests grow exponentially with a blanket's size. Tests that contradict each other
+    can leave a graph with no consistent extension, which stands for no DAG; a ``knowledge`` claim
+    then acts only on an edge. The
+    `0.12.0 release card <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#inter-iamb>`__ has the
+    numbers.
 
     References
     ----------
@@ -793,15 +751,12 @@ def mmpc(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
-        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
-        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
-        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
-        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
-        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
-        were rejected. Their time and their power were not measured against each other. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; with ``"gsq"`` it gives
+        up time, a sum of hypergeometric terms per cell, and in the sparsest tables it rejects below
+        that level. ``"nonempty"`` favors degrees of freedom read from the table alone, as Spirtes,
+        Glymour and Scheines (1993) count them; it gives up the level, as it rejects true
+        independences more often than the nominal rate. Only ``"chisq"`` and ``"gsq"`` read it:
+        passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -813,26 +768,14 @@ def mmpc(
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
         lies within the parents of one end, so the search might have missed that separating set.
         ``"orient"`` favors arrowheads; it gives up protection from false colliders. ``"ambiguous"``
-        favors no false collider; it gives up the true arrowheads beside them. With
-        :func:`~andrey.pc`, on merged cohorts of three graph sizes, with about 29 to 76 true edges,
-        that no row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's
-        false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it
-        found from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty
-        graph in 6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs.
-        With MMPC, its effect on accuracy was not measured. Read under ``structure="cpdag"`` only.
+        favors no false collider; it gives up the true arrowheads beside them. Read under
+        ``structure="cpdag"`` only.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
         handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
-        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
-        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
-        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
-        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
-        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
-        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
-        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
-        Not measured with this method. See **Missing values.** in Notes.
+        outside values missing completely at random. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -972,21 +915,14 @@ def mmpc(
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** On simulated linear-Gaussian data, its skeleton errors stayed below the empty
-    graph's wherever its fits finished
-    (`0.13.0 release card <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#mmpc>`_); the
-    mixed-data tests and missing values are not benchmarked yet. Its cost grows exponentially with
-    the size of a set, and ``structure="cpdag"`` adds tests that grow exponentially with each
-    triple's blankets, which reach two steps from a variable: on denser graphs with many rows, most
-    CPDAG fits did not finish within the time cap. On large graphs with many rows, a few borderline
-    false edges survive where the forward step admits the strongest of candidates too dependent to
-    rank by p-value (`0.13.0 release card <https://andrey.abel.ai/docs/benchmarks/0.13.0.html>`__).
-    ``forbidden_paths`` is experimental. Tests that contradict each other leave a graph with no
-    consistent extension, which stands for no DAG and often occurred on simulated data; a
-    ``knowledge`` claim then acts only on an edge, and most claims are dropped (`0.17.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The measured
-    results are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** On linear-Gaussian data its skeleton made fewer errors than the empty graph
+    wherever its fits finished. Its cost grows exponentially with the size of a parents-and-children
+    set, and ``structure="cpdag"`` adds tests over each triple's blankets, so on denser graphs with
+    many rows most CPDAG fits did not finish in time. Tests that contradict each other can leave a
+    graph with no consistent extension, which stands for no DAG; a ``knowledge`` claim then acts
+    only on an edge. The
+    `0.13.0 release card <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#mmpc>`__ has the
+    numbers.
 
     References
     ----------

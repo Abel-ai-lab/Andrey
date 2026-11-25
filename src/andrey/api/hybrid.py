@@ -135,15 +135,12 @@ def mmhc(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
-        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
-        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
-        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
-        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
-        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
-        were rejected. Their time and their power were not measured against each other. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; with ``"gsq"`` it gives
+        up time, a sum of hypergeometric terms per cell, and in the sparsest tables it rejects below
+        that level. ``"nonempty"`` favors degrees of freedom read from the table alone, as Spirtes,
+        Glymour and Scheines (1993) count them; it gives up the level, as it rejects true
+        independences more often than the nominal rate. Only ``"chisq"`` and ``"gsq"`` read it:
+        passing it with another test raises ``ValueError``.
     score_func : str or None, default=None
         Local score of the hill-climbing phase, any of :func:`~andrey.hc`'s: ``"bic"`` (Gaussian
         BIC) for continuous data, ``"bdeu"`` or ``"discrete_bic"`` for categorical data,
@@ -278,17 +275,13 @@ def mmhc(
     score of one dataset. Drop the incomplete rows yourself, which suits values missing completely
     at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On simulated linear-Gaussian data, its errors stayed below the empty graph's in
-    every measured setting, the closest on small, denser graphs; the
-    `0.12.0 release card <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#mmhc>`_ has the
-    numbers. Edges missed during the MMPC phase are never recovered, and hill climbing stops at a
-    local optimum. MMPC tests each candidate against every subset of the current members, so its
-    cost grows exponentially with the size of a variable's parents-and-children set.
-    ``required_paths`` is experimental, and true path claims directed some edges of a wrong graph
-    the wrong way and cannot restore a missed edge: a known edge belongs in ``required`` (`0.17.0
-    release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_).
-    The measured results are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    **Limitations.** On linear-Gaussian data it made fewer errors than the empty graph in every
+    setting, by the least margin on small, denser graphs. An edge the MMPC phase misses is never
+    recovered, hill climbing stops at a local optimum, and MMPC's cost grows exponentially with the
+    size of a parents-and-children set. A true path claim cannot restore a missed edge and can
+    direct an edge of a wrong graph the wrong way; a known edge belongs in ``required``. The
+    `0.12.0 release card <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#mmhc>`__ has the
+    numbers.
 
     References
     ----------
@@ -373,13 +366,7 @@ def rsmax2(
         keeps the skeleton of :func:`~andrey.pc`'s adjacency search [4]_. With ``knowledge``,
         ``"mmpc"`` and ``"pc"`` read it in the restrict phase, and ``"iamb"`` and ``"inter_iamb"``
         read the data alone; ``knowledge`` below says why. ``"mmpc"`` favors time; it gives up
-        accuracy. ``"iamb"`` favors accuracy; it gives up time. On the linear-Gaussian graphs of
-        Limitations, with ``maximize="hc"``, ``"iamb"`` had lower mean CPDAG errors than ``"mmpc"``
-        in all 12 settings (20, 50, and 100 variables; 1,000 and 5,000 rows; mean degree 2 and 4),
-        by 0.7 to 39.7. The means are not paired: in two settings ``"iamb"`` was scored on 14
-        datasets where ``"mmpc"`` was on 15 and 20. Its fits took about 0.05 to 8.8 s against 0.02
-        to 3.5 s, timed in separate runs on mixed nodes, so the times do not pair. ``"inter_iamb"``
-        and ``"pc"`` were not measured against them. See Notes.
+        accuracy. ``"iamb"`` favors accuracy; it gives up time. See Notes.
     maximize : {"hc", "tabu"}, default="hc"
         The maximize phase: :func:`~andrey.hc` or :func:`~andrey.tabu`.
     alpha : float, default=0.05
@@ -396,15 +383,12 @@ def rsmax2(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
-        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
-        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
-        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
-        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
-        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
-        were rejected. Their time and their power were not measured against each other. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; with ``"gsq"`` it gives
+        up time, a sum of hypergeometric terms per cell, and in the sparsest tables it rejects below
+        that level. ``"nonempty"`` favors degrees of freedom read from the table alone, as Spirtes,
+        Glymour and Scheines (1993) count them; it gives up the level, as it rejects true
+        independences more often than the nominal rate. Only ``"chisq"`` and ``"gsq"`` read it:
+        passing it with another test raises ``ValueError``.
     score_func : str or None, default=None
         Local score of the maximize phase, any of :func:`~andrey.hc`'s. ``"normal_scores"``,
         experimental, is ``"bic"`` on each column's normal scores, for continuous data that are
@@ -563,20 +547,13 @@ def rsmax2(
     one dataset. Drop the incomplete rows yourself, which suits values missing completely at random,
     or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On simulated linear-Gaussian data, with ``restrict="mmpc"`` and ``"iamb"`` and
-    ``maximize="hc"``, its errors stayed below the empty graph's in every measured setting, the
-    closest on small, denser graphs; the
-    `0.12.0 release card <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#rsmax2>`_ has the
-    numbers. Edges missed during the restrict phase are never recovered, and the maximize phase
-    stops at a local optimum. MMPC tests each candidate against every subset of the current members,
-    so its cost grows exponentially with the size of a variable's parents-and-children set; IAMB and
-    Inter-IAMB condition on the whole current blanket, so each of their tests needs more rows as the
-    blankets grow. ``required_paths`` is experimental, and true path claims directed some edges of a
-    wrong graph the wrong way and cannot restore a missed edge: a known edge belongs in ``required``
-    (`0.17.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The measured
-    results are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** With ``restrict="mmpc"`` or ``"iamb"`` and ``maximize="hc"``, on
+    linear-Gaussian data it made fewer errors than the empty graph in every setting, by the least
+    margin on small, denser graphs. An edge the restrict phase misses is never recovered, and the
+    maximize phase stops at a local optimum. A true path claim cannot restore a missed edge and can
+    direct an edge of a wrong graph the wrong way; a known edge belongs in ``required``. The
+    `0.12.0 release card <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#rsmax2>`__ has the
+    numbers.
 
     References
     ----------

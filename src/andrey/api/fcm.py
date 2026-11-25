@@ -196,21 +196,13 @@ def cam(
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On simulated additive-noise data with many rows and sparse graphs, its errors
-    stay below the empty graph's into the thousands of variables, though they grow faster than the
-    variables, nearly all extra edges, and large fits are slow: the neighbor preselection's cost
-    grows with the square of the number of variables. With few rows per variable it keeps false
-    edges: on independent columns with fewer rows than variables it made more errors than the empty
-    graph. Outside its model the result can be wrong: noise whose scale changes with the parents
-    reverses many edges, linear Gaussian data leave the direction of an edge arbitrary where the
-    Markov equivalence class leaves it undirected, a hidden common cause joins the variables it
-    drives, interacting effects such as the product of two causes are missed or reversed, and a
-    strongly skewed cause can be reversed. A column with fewer than 3 distinct values, binary
-    columns included, raises ``ValueError``, as do text labels; integer category codes are read as
-    numbers, with a :class:`~andrey.DataTypeWarning`. The
-    `0.13.0 release card <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#cam>`_ compares it with
-    its authors' code. The measured results are a reference, not a hard limit: they change with the
-    data generator, the density, the method's settings, and the machine.
+    **Limitations.** On additive-noise data with many rows and sparse graphs it made fewer errors
+    than the empty graph into the thousands of variables, though large fits are slow. With few rows
+    per variable it keeps false edges, and outside its model it can be wrong: noise whose scale
+    changes with the parents reverses many edges, and interacting effects, such as the product of
+    two causes, are missed or reversed. The
+    `0.13.0 release card <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#cam>`__ compares it
+    with its authors' code.
 
     References
     ----------
@@ -405,18 +397,13 @@ def resit(
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Its accuracy holds only on small graphs: on Gaussian additive-noise data with
-    many rows its errors come near the empty graph's on moderate graphs and exceed them on larger
-    ones. Its cost grows faster than the cube of the number of variables, so it suits small graphs,
-    and its time and memory grow with the square of ``n_samples``. With many rows every removal test
-    can reject: on the Sachs data it kept every possible edge. Noise whose scale changes with the
-    parents and linear Gaussian data lie outside its model, and there its errors were above the
-    empty graph's in most measured settings. A cause with a long tail can reverse its edge;
-    replacing the cause by its ranks before the fit corrected this in the measured pairs. A column
-    with fewer than 3 distinct values, binary columns included, raises ``ValueError``. The
-    `0.13.0 release card <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#resit>`_ compares it
-    with its authors' code. The measured results are a reference, not a hard limit: they change with
-    the data generator, the density, the method's settings, and the machine.
+    **Limitations.** On Gaussian additive-noise data with many rows it made fewer errors than the
+    empty graph only on small graphs: its errors come near the empty graph's on moderate graphs and
+    pass it on larger ones, and its cost grows faster than the cube of the number of variables.
+    Under noise whose scale changes with the parents, or on linear Gaussian data, its errors were
+    above the empty graph's in most settings, and with many rows every removal test can reject. The
+    `0.13.0 release card <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#resit>`__ compares it
+    with its authors' code.
 
     References
     ----------
@@ -568,17 +555,13 @@ def cpcm_graph(
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On the paper's graphs its graph had as many errors as the code published with
-    the paper and fewer than the empty graph; the paper's largest graphs were not measured.
-    :func:`~andrey.pc` with ``indep_test="kci"`` was close in accuracy there, and faster. The
-    `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm-graph-search>`_
-    has the numbers. The exact search scores every DAG and runs up to 4 variables; above, the greedy
-    search refits a variable for each parent set it tries, and memory grows with the square of
-    ``n_samples``. Under the count families, large means that vary strongly with the parents make
-    the true graph's test reject too. The family must be chosen: the paper's choice of a family from
-    each column's support, and its sequential choice between one- and two-parameter families, are
-    not offered. The measured results are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    **Limitations.** On its paper's graphs it made as many errors as its authors' code and fewer
+    than the empty graph, and :func:`~andrey.pc` with ``indep_test="kci"`` was close in accuracy and
+    faster. The exact search runs up to 4 variables; above that the greedy search refits a variable
+    for each parent set it tries, and memory grows with the square of ``n_samples``. The family must
+    be chosen: the paper's choice of a family from each column's support is not offered. The
+    `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm-graph-search>`__
+    has the numbers.
 
     References
     ----------
@@ -763,21 +746,13 @@ def score_matching(
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On data simulated as in the paper its errors stay below the empty graph's at
-    every measured size, but on sparse graphs, where the order search orders fewer edges correctly
-    on the standardized columns it reads than on the columns as simulated, :func:`~andrey.cam` was
-    more accurate. Where links have a strong linear part, such as ``z + sin z``, the search ranks
-    the sinks last: its order was close to a random one, and its graph could be farther from the
-    truth than the empty graph; more rows or other kernel settings did not change the order, and
-    :func:`~andrey.cam` suits such data. Relations poorly resolved by a single kernel bandwidth can
-    make causes appear as leaves, and the leaf rule is exact only for Gaussian noise;
-    :func:`~andrey.nogam` and :func:`~andrey.resit` drop that assumption. The order search's time
-    grows with the cube of ``n_samples`` and its memory with the square. The pruning needs at least
-    twice as many rows as columns: fewer rows, or a column with fewer than 3 distinct values, binary
-    columns included, raise ``ValueError``. The
-    `0.17.0 release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#score-and-nogam>`_ has
-    the numbers. The measured results are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    **Limitations.** On its paper's simulation it made no more errors than its authors' code and
+    fewer than the empty graph at every size, but on sparse graphs :func:`~andrey.cam` was more
+    accurate. Where links have a strong linear part, such as ``z + sin z``, its order is close to a
+    random one and its graph can be farther from the truth than the empty graph; :func:`~andrey.cam`
+    suits such data. The
+    `0.17.0 release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#score-and-nogam>`__ has
+    the numbers.
 
     References
     ----------
@@ -956,20 +931,13 @@ def nogam(
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On data simulated as in the paper, under Gaussian, Laplace, and Gumbel noise,
-    its errors stay below the empty graph's on small graphs; larger graphs were not measured. On
-    sparse graphs, where the order search orders fewer edges correctly on the standardized columns
-    it reads than on the columns as simulated, :func:`~andrey.cam` was at least as accurate under
-    every noise. Where links have a strong linear part, such as ``z + sin z``, the search ranks the
-    sinks last: its order was close to a random one, and its graph could be farther from the truth
-    than the empty graph; more rows changed the order little, and :func:`~andrey.cam` suits such
-    data. The order search's time grows with the square of ``n_variables`` and the cube of
-    ``n_samples``, and its memory with the square of ``n_samples``. The pruning needs at least twice
-    as many rows as columns: fewer rows, or a column with fewer than 3 distinct values, binary
-    columns included, raise ``ValueError``. The
-    `0.17.0 release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#score-and-nogam>`_ has
-    the numbers. The measured results are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    **Limitations.** Under Gaussian, Laplace, and Gumbel noise it made fewer errors than the empty
+    graph on small graphs, but on sparse graphs :func:`~andrey.cam` was at least as accurate under
+    every noise. Where links have a strong linear part, such as ``z + sin z``, its order is close to
+    a random one and its graph can be farther from the truth than the empty graph;
+    :func:`~andrey.cam` suits such data. The
+    `0.17.0 release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#score-and-nogam>`__ has
+    the numbers.
 
     References
     ----------
@@ -1162,19 +1130,13 @@ def das(
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On the papers' simulation with z-scored or rescaled columns, DAS made no more
-    errors than the code published with the paper, and fewer than the empty graph at every measured
-    size, large graphs included. It reads standardized columns, so the result does not depend on
-    their units; on raw columns, whose variance grows along the causal order, the code published
-    with the paper made fewer errors on sparse graphs. The
-    `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#das>`_ has the numbers.
-    Its SCORE order has the limits stated by :func:`~andrey.score_matching`: near a random order
-    where links have a strong linear part, and exact only for Gaussian noise. Pruning cannot recover
-    an edge the order reversed or a true parent the screen dropped. The order search's time grows
-    with the cube of ``n_samples`` and its memory with the square. A column with fewer than 3
-    distinct values, binary columns included, raises ``ValueError``. The measured results are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    **Limitations.** On z-scored or rescaled columns it made no more errors than its authors' code
+    and fewer than the empty graph at every size, large graphs included. On raw columns whose
+    variance grows along the causal order, the authors' code made fewer errors on sparse graphs, as
+    DAS reads standardized columns. Where links have a strong linear part its order is close to a
+    random one, as for :func:`~andrey.score_matching`. The
+    `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#das>`__ has the
+    numbers.
 
     References
     ----------
@@ -1390,20 +1352,13 @@ def camuv(
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** With a sizable share of the nodes hidden it made no fewer errors than the empty
-    graph on small graphs; with no variable hidden, every pair it marks ``o-o`` is false; and with
-    linear Gaussian effects it made more errors than the empty graph. With few hidden variables its
-    errors stay below the empty graph's on graphs of a few dozen observed variables and rise back
-    toward it as the graph grows, reaching it on graphs of hundreds of variables. A cause with a
-    long tail, or a single extreme value, can turn an edge into an ``o-o`` mark; replacing a
-    long-tailed cause by its ranks before the fit found the edge again in most fits. A column with
-    fewer than 3 distinct values, binary columns included, raises ``ValueError``, and integer
-    category codes are read as numbers, with a :class:`~andrey.DataTypeWarning`. Its cost grows with
-    the square of the number of variables, so large graphs are slow, and the time and memory of its
-    kernel tests grow with the square of ``n_samples``. The
-    `0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#cam-uv>`_ has the
-    numbers. The measured results are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    **Limitations.** With few hidden variables it made fewer errors than the empty graph on graphs
+    of a few dozen observed variables, and as many on graphs of hundreds. With a sizable share of
+    the nodes hidden, or with linear Gaussian effects, it made no fewer errors than the empty graph.
+    A cause with a long tail can turn an edge into an ``o-o`` mark; replacing that cause by its
+    ranks before the fit restored the edge in most fits. The
+    `0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#cam-uv>`__ has the
+    numbers.
 
     References
     ----------
@@ -1518,14 +1473,10 @@ def skewd_mv(
         combinations.
     optimizer : {"cmaes", "lbfgs"}, default="cmaes"
         The optimizer of each search of a conditional model's penalized likelihood, as in
-        :func:`~andrey.skewd`: ``"cmaes"`` is CMA-ES, the paper's heuristic; ``"lbfgs"`` is
-        L-BFGS-B with the analytic gradient, from the same starts within the same bounds.
-        ``"cmaes"`` favors the paper's optimizer; it gives up time. ``"lbfgs"`` favors time; it
-        gives up the paper's optimizer. On the paper's simulated pairs and graphs of 1,000 rows
-        (graphs of 6 and 10 variables; 20 seeds each, one worker), ``"lbfgs"`` decided worse than
-        ``"cmaes"`` in no setting by a paired bootstrap, at a median of 5.8 to 14.9 times less time
-        per pair and 2.4 times less per graph, and its penalized likelihood was lower in 306 of the
-        738 fitted models and higher in 233.
+        :func:`~andrey.skewd`: ``"cmaes"`` is CMA-ES, the paper's heuristic; ``"lbfgs"`` is L-BFGS-B
+        with the analytic gradient, from the same starts within the same bounds. ``"cmaes"`` favors
+        the paper's optimizer; it gives up time. ``"lbfgs"`` favors time; it gives up the paper's
+        optimizer.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed of PC's randomized tests and of the random
@@ -1606,14 +1557,12 @@ def skewd_mv(
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Its cost grows with the number of distinct parent sets the class allows,
-    exponentially in a variable's undirected edges, and it refuses a class that needs more than
-    ``max_fits`` (100) conditional models. The
-    `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#skewd-mv>`_ has the
-    measured times. An edge PC misses or misorients stays wrong: the likelihood only chooses among
-    the class's DAGs, and PC's skeleton missed or added some edges on the measured graphs. The
-    measured results are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    **Limitations.** Its accuracy comes at a high cost: the cost grows with the number of distinct
+    parent sets PC's class allows, exponentially in a variable's undirected edges, and it refuses a
+    class that needs more than ``max_fits`` conditional models. An edge PC misses or misorients
+    stays wrong, as the likelihood only chooses among the class's DAGs. The
+    `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#skewd-mv>`__ has the
+    numbers.
 
     References
     ----------

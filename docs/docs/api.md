@@ -1172,8 +1172,8 @@ is unknown; `anm` and `pnl` count rows instead. It warns when the data have more
 ended on the time or memory cap. Past a ladder that ended on accuracy, an error, or its last
 planned size, the method was not measured, so it does not warn, and a method with no ladder never
 does. The sizes are a reference, not a hard limit: they change with the data, the density, the
-settings, and the machine. The method's **Limitations** paragraph and the release card give them,
-and `warnings.filterwarnings("ignore", category=andrey.BoundaryWarning)` silences the warning.
+settings, and the machine. The release card gives them, and
+`warnings.filterwarnings("ignore", category=andrey.BoundaryWarning)` silences the warning.
 
 Filter the base class for all of them, or one category. A later filter takes precedence, so
 the broad one goes first:

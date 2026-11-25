@@ -110,10 +110,7 @@ def notears(
         Scale each column to unit variance first, so the fit does not read the columns' units; the
         weights are then those of the scaled columns. ``True`` favors a graph that does not depend
         on the columns' units; it gives up the accuracy the default reads from units in which a
-        variable's variance grows along the causal order (varsortability [5]_). On the paper's
-        simulation in its own units, the default made far fewer errors than ``True``, whose errors
-        came close to the empty graph's; on columns already of unit variance the two gave nearly the
-        same errors.
+        variable's variance grows along the causal order (varsortability [5]_).
     missing : {"em"} or None, default=None
         How missing values (``NaN``) are handled. ``"em"`` fits the method by structural
         expectation-maximization (EM) over the expected covariance of the data, which assumes values
@@ -122,14 +119,7 @@ def notears(
         ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
         fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
         ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
-        up time: each round runs the search again. In the 0.17.0 missing-data benchmark
-        (linear-Gaussian data, 10 to 50 variables, 100 to 2,000 rows, 10 to 50% missing; the
-        searches at ``ebic_gamma=0``), against dropping the incomplete rows, ``"em"`` made fewer
-        errors in 186 of the 225 settings judged with GES, BOSS, GRaSP, and NOTEARS, as many in 39,
-        and more in none, and in 204 more dropping the rows left too few to fit most datasets; HC
-        and Tabu were not compared with it. With the default 10 rounds, a setting's median fit in
-        the six searches took 2 to 72 times as long as the same search on the complete data. See
-        **Missing values.** in Notes.
+        up time: each round runs the search again. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
         least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
@@ -251,15 +241,11 @@ def notears(
     Without ``"em"``, drop the incomplete rows yourself, which suits values missing completely at
     random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** The result depends on the data's scale (varsortability [5]_); the
-    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#notears>`_ has the
-    numbers. With ``missing="em"`` on raw columns, as Gao et al. [8]_ simulate them, its errors
-    stayed below the empty graph's in every setting
-    (`0.17.0 release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#missing-data>`_). On
-    standardized columns, where the least-squares fit is weaker, its errors with EM were about those
-    on complete data, and :func:`~andrey.pc` with test-wise deletion made fewer. It has no guarantee
-    under values missing not at random. The measured results are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** In the units of its paper's simulation, where a variable's variance grows along
+    the causal order, it made far fewer errors than on the same data z-scored, where its errors came
+    close to the empty graph's: its result depends on the data's scale (varsortability [5]_). The
+    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#notears>`__ has the
+    numbers.
 
     References
     ----------
@@ -399,10 +385,7 @@ def dagma(
         Scale each column to unit variance first, so the fit does not read the columns' units; the
         weights are then those of the scaled columns. ``True`` favors a graph that does not depend
         on the columns' units; it gives up the accuracy the default reads from units in which a
-        variable's variance grows along the causal order (varsortability [5]_). On the paper's
-        simulation, the default made fewer errors than the empty graph in every setting in the
-        simulation's own units, and on z-scored columns, which ``True`` fits, in none, with more in
-        most (`0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma>`__).
+        variable's variance grows along the causal order (varsortability [5]_).
     missing : {"em"} or None, default=None
         How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by
         structural expectation-maximization (EM) over the expected covariance of the data, which
@@ -411,9 +394,7 @@ def dagma(
         handling used and ``metadata["em"]`` the EM record, with the rows dropped for observing no
         value and the fewest rows two columns share; two columns that share no observed row raise
         ``ValueError``. ``"em"`` favors the partly observed rows, which dropping the incomplete rows
-        loses; it gives up time: each round runs the search again, so the default 10 rounds run it
-        10 times. Its time against complete data was not measured with this search. See **Missing
-        values.** in Notes.
+        loses; it gives up time: each round runs the search again. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
         least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
@@ -540,11 +521,12 @@ def dagma(
     incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** The result depends on the data's scale (varsortability [5]_); the
-    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma>`_ has the
-    numbers. ``missing="em"`` is experimental and not benchmarked yet, and it has no guarantee under
-    values missing not at random. The measured results are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** In the units of its paper's simulation, where a variable's variance grows along
+    the causal order, it made no more errors than its authors' code and fewer than the empty graph,
+    but on the same data z-scored it made more errors than the empty graph in most settings: its
+    result depends on the data's scale (varsortability [5]_). The
+    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma>`__ has the
+    numbers.
 
     References
     ----------

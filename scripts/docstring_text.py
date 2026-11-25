@@ -1,13 +1,13 @@
 """Write the shared sentences of the method docstrings from one table, or check them.
 
 Some sentences of the method docstrings in ``src/andrey/api`` state one rule for many methods: the
-openers of the Raises entries, the seed, knowledge, and env entries, the closing sentences of
-**Missing values.** and **Limitations.**, the ``tie_break`` record, and the Warns entries of the
-shared data checks. ``SHARED`` holds each once, with its place and the methods that hold it. A
-place is the first or last sentence of a docstring entry or of a labeled Notes paragraph, or a
-whole entry. Writing replaces each copy with the table's text and rewraps its paragraph at 100
-columns. A copy is found by its place and its first three words, so a method that should hold a
-sentence and has no copy is named, for the first copy to be written in by hand.
+openers of the Raises entries, the seed, knowledge, and env entries, the closing sentence of
+**Missing values.**, the ``tie_break`` record, and the Warns entries of the shared data checks.
+``SHARED`` holds each once, with its place and the methods that hold it. A place is the first or
+last sentence of a docstring entry or of a labeled Notes paragraph, or a whole entry. Writing
+replaces each copy with the table's text and rewraps its paragraph at 100 columns. A copy is found
+by its place and its first three words, so a method that should hold a sentence and has no copy is
+named, for the first copy to be written in by hand.
 
     uv run python scripts/docstring_text.py
     uv run python scripts/docstring_text.py --check
@@ -195,14 +195,7 @@ SHARED = {
         "reads only the rows where all of its variables are observed. ``None`` picks the method's "
         'default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the '
         'handling used. ``"testwise"`` favors every row each test can read; it gives up its '
-        "guarantee outside values missing completely at random. With PC at 20 variables and 1,000 "
-        "rows, 10 to 30% of the values missing completely at random, test-wise deletion made median "
-        "errors of 6.5 to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 "
-        "complete rows and had no complete row at 30% (complete data: 4.0; 0.11.0 release card). "
-        "Where values are missing for a reason that other variables carry, on Erdos-Renyi graphs of "
-        '10 to 100 variables with one observed parent per indicator, ``pc``\'s ``"mvpc"`` made fewer '
-        "errors than test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none. Not "
-        "measured with this method. See **Missing values.** in Notes.",
+        "guarantee outside values missing completely at random. See **Missing values.** in Notes.",
         lambda m: m in CONCEPTS["missing"].conforming and m != "fci",
     ),
     "missing_fci": Shared(
@@ -213,14 +206,7 @@ SHARED = {
         "reads only the rows where all of its variables are observed. ``None`` picks the method's "
         'default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the '
         'handling used. ``"testwise"`` favors every row each test can read; it gives up its '
-        "guarantee outside values missing completely at random. With 20 variables and 1,000 rows, "
-        "10 to 30% of the values missing completely at random, FCI made median errors of 28.5 to "
-        "30.5 where dropping the incomplete rows made 32.5 and 42.0 on 124 and 10 complete rows and "
-        "had no complete row at 30% (complete data: 28.0; 0.11.0 release card). Where values are "
-        "missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100 "
-        'variables with one observed parent per indicator, ``pc``\'s ``"mvpc"`` made fewer errors '
-        "than test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none; not measured with "
-        "FCI. See **Missing values.** in Notes.",
+        "guarantee outside values missing completely at random. See **Missing values.** in Notes.",
         lambda m: m == "fci" and m in CONCEPTS["missing"].conforming,
     ),
     # A method whose default follows its paper words its own entry.
@@ -232,15 +218,11 @@ SHARED = {
         "mean of the statistic when ``y`` is shuffled within each configuration of the conditioning "
         'set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x`` '
         "and ``y`` present in it, the table's empty rows and columns struck. The two differ only on "
-        'sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true '
-        "independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning "
-        'variables, 500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% '
-        '(``"gsq"``). With ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and '
-        "rejects below the nominal rate in the sparsest tables (0.8% at 3,125 cells). "
-        '``"nonempty"`` favors the degrees of freedom of Spirtes, Glymour and Scheines (1993), read '
-        "from the table alone, with no hypergeometric sum; it gives up the level: 11.1% and 21.7% "
-        "of the same true independences were rejected. Their time and their power were not "
-        "measured against each other. "
+        'sparse tables. There ``"mean"`` favors a level near the nominal one; with ``"gsq"`` it '
+        "gives up time, a sum of hypergeometric terms per cell, and in the sparsest tables it "
+        'rejects below that level. ``"nonempty"`` favors degrees of freedom read from the table '
+        "alone, as Spirtes, Glymour and Scheines (1993) count them; it gives up the level, as it "
+        "rejects true independences more often than the nominal rate. "
         'Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.',
         lambda m: m in CONCEPTS["degrees_of_freedom"].conforming,
     ),
@@ -257,14 +239,7 @@ SHARED = {
         "the fewest rows two columns share; two columns that share no observed row raise "
         "``ValueError``. "
         '``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it '
-        "gives up time: each round runs the search again. In the 0.17.0 missing-data benchmark "
-        "(linear-Gaussian data, 10 to 50 variables, 100 to 2,000 rows, 10 to 50% missing; the "
-        'searches at ``ebic_gamma=0``), against dropping the incomplete rows, ``"em"`` made fewer '
-        "errors in 186 of the 225 settings judged with GES, BOSS, GRaSP, and NOTEARS, as many in "
-        "39, and more in none, and in 204 more dropping the rows left too few to fit most "
-        "datasets; HC and Tabu were not compared with it. With the default 10 rounds, a setting's "
-        "median fit in the six searches took 2 to 72 times as long as the same search on the "
-        "complete data. See **Missing values.** in Notes.",
+        "gives up time: each round runs the search again. See **Missing values.** in Notes.",
         lambda m: m in EM_SUPPORTED,
     ),
     "missing_em_experimental": Shared(
@@ -279,9 +254,7 @@ SHARED = {
         "value and the fewest rows two columns share; two columns that share no observed row raise "
         "``ValueError``. "
         '``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it '
-        "gives up time: each round runs the search again, so the default 10 rounds run it 10 "
-        "times. Its time against complete data was not measured with this search. See **Missing "
-        "values.** in Notes.",
+        "gives up time: each round runs the search again. See **Missing values.** in Notes.",
         lambda m: m in EM_METHODS and m not in EM_SUPPORTED,
     ),
     # One sentence for every method that deletes rows per test, the pair methods included.
@@ -335,14 +308,6 @@ SHARED = {
         ":func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, and :func:`~andrey.lpcmci` read one "
         "series, so drop the datasets that hold one.",
         lambda m: m == "jpcmciplus",
-    ),
-    "limits": Shared(
-        "Notes",
-        "**Limitations.**",
-        "last",
-        "The measured results are a reference, not a hard limit: they change with the data "
-        "generator, the density, the method's settings, and the machine.",
-        lambda m: True,
     ),
     "tie_break": Shared(
         "Returns",

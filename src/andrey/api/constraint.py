@@ -94,24 +94,20 @@ def pc(
         regression residuals. ``None`` picks from the declared column types: ``"gsq"`` when every
         column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
         declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
-        type, never by its values. See **Categorical data.** and **Mixed data.** in Notes. On
-        simulated mixed data, PC made fewer errors with ``"cond_gauss"`` than with
-        ``"degen_gauss"``, both well below the empty graph's, in about the same time.
+        type, never by its values. See **Categorical data.** and **Mixed data.** in Notes. On mixed
+        data ``"cond_gauss"`` favors accuracy at about the time of ``"degen_gauss"``.
         ``metadata["indep_test"]`` names the test used, including the choice for ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
-        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
-        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
-        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
-        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
-        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
-        were rejected. Their time and their power were not measured against each other. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; with ``"gsq"`` it gives
+        up time, a sum of hypergeometric terms per cell, and in the sparsest tables it rejects below
+        that level. ``"nonempty"`` favors degrees of freedom read from the table alone, as Spirtes,
+        Glymour and Scheines (1993) count them; it gives up the level, as it rejects true
+        independences more often than the nominal rate. Only ``"chisq"`` and ``"gsq"`` read it:
+        passing it with another test raises ``ValueError``.
     collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, which decides between two colliders that would
         orient one edge in opposite directions. ``"p_value"`` orients first the collider whose
@@ -138,11 +134,7 @@ def pc(
         lies within the parents of one end, so the search might have missed that separating set.
         ``"orient"`` favors arrowheads and accuracy; it gives up protection from false colliders.
         ``"ambiguous"`` favors no false collider; it gives up the true arrowheads beside them, and
-        accuracy. On merged cohorts of three graph sizes, with about 29 to 76 true edges, that no
-        row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's false
-        colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it found
-        from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty graph in
-        6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs.
+        accuracy.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -155,21 +147,17 @@ def pc(
         reads only the rows where all of its variables are observed. ``"mvpc"`` is Missing-Value PC
         [13]_: after the test-wise skeleton, it finds the parents of each variable's missingness
         indicator and tests again, on virtual data that correct for them, the edges such an
-        indicator could have kept; it takes ``"fisherz"`` or ``"student_t"``. ``None`` picks the
-        method's default, ``"testwise"``. On data with missing values, ``metadata["missing"]``
-        records the handling used. ``"testwise"`` favors every row each test can read and, on large
-        graphs where an indicator has many weak parents or parents with missing values, accuracy; it
-        gives up its guarantee outside values missing completely at random. With values missing
-        completely at random it made fewer errors than dropping the incomplete rows, which leaves
-        few or no complete rows as more values go missing (0.11.0 release card), and fewer than
-        ``"mvpc"`` in the settings below where ``"mvpc"`` fell behind. ``"mvpc"`` favors values
-        missing for a reason that other variables carry; it gives up every test but those two and,
-        where an indicator has many weak parents or parents with missing values, accuracy on large
-        graphs. On simulated data with one observed parent per indicator, ``"mvpc"`` had fewer
-        errors than ``"testwise"`` in some settings and more in none; it tied with values missing
-        completely at random, and it fell behind on large graphs with many values missing, where
-        indicators have many weak parents or a parent with missing values (0.16.0 release card). See
-        **Missing values.** in Notes.
+        indicator could have kept; it takes ``"fisherz"`` or ``"student_t"``. ``"mvpc"`` assumes
+        that no missingness indicator causes a variable or is a deterministic function of others,
+        that no value causes its own missingness, and that the independences of the observed rows
+        hold in the missing ones [13]_. ``None`` picks the method's default, ``"testwise"``. On data
+        with missing values, ``metadata["missing"]`` records the handling used. ``"testwise"``
+        favors every row each test can read and, on large graphs where an indicator has many weak
+        parents or parents with missing values, accuracy; it gives up its guarantee outside values
+        missing completely at random. ``"mvpc"`` favors values missing for a reason that other
+        variables carry; it gives up every test but those two and, where an indicator has many weak
+        parents or parents with missing values, accuracy on large graphs. See **Missing values.** in
+        Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -414,28 +402,13 @@ def pc(
     nor a column's units or origin, nor the number of workers. On complete data, ``"mvpc"`` gives
     the result of ``"testwise"``.
 
-    **Limitations.** On simulated linear-Gaussian data its errors stay below the empty graph's on
-    sparse graphs of hundreds of variables
-    (`0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_), and
-    its run time grows combinatorially with the largest neighborhood; on the ANDES network its
-    errors passed the empty graph's (`0.1.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.1.0.html#published-network-structures>`__). Test
-    errors can produce colliders that fit no DAG on the skeleton, even on small graphs: the
-    ``cpdag`` then has no consistent DAG extension, and a graph query such as ``markov_blanket``
-    raises ``ValueError`` (`0.16.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.16.0.html#fci-fits-that-are-not-pags>`__).
-    ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet. With
-    ``missing="mvpc"``, the correction holds only when no missingness indicator causes a variable,
-    every independence in the observed rows also holds in the missing ones, no indicator is a
-    deterministic function of others, and no value causes its own missingness [13]_; the data cannot
-    check these, and a violation voids the correction. It also needs linear-Gaussian variables,
-    keeps an extra edge when the indicator of a variable it conditions on is a common effect of the
-    tested pair, and can search long for the parents of indicators that have many weak ones
-    (``max_depth`` bounds it); the `0.16.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.16.0.html#what-we-measured-on-missing-data>`_ has the
-    numbers. Where the graph found is wrong, a true path claim can direct an edge against the truth;
-    a known edge belongs in ``required``. The measured results are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** On linear-Gaussian data it made fewer errors than the empty graph on sparse
+    graphs of up to hundreds of variables. On larger sparse graphs its errors passed the empty
+    graph's, on dense graphs they came close to it, and its run time grows combinatorially with the
+    largest neighborhood. Test errors can produce colliders that fit no DAG: the ``cpdag`` then has
+    no consistent DAG extension, and a graph query such as ``markov_blanket`` raises ``ValueError``.
+    The `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__
+    has the numbers.
 
     References
     ----------
@@ -657,15 +630,12 @@ def fci(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
-        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
-        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
-        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
-        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
-        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
-        were rejected. Their time and their power were not measured against each other. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; with ``"gsq"`` it gives
+        up time, a sum of hypergeometric terms per cell, and in the sparsest tables it rejects below
+        that level. ``"nonempty"`` favors degrees of freedom read from the table alone, as Spirtes,
+        Glymour and Scheines (1993) count them; it gives up the level, as it rejects true
+        independences more often than the nominal rate. Only ``"chisq"`` and ``"gsq"`` read it:
+        passing it with another test raises ``ValueError``.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
         How FCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
@@ -686,12 +656,7 @@ def fci(
         possible-d-separation step reads it too, so that step's sets, the skeleton, and
         ``metadata["not_tested"]`` can change. ``"orient"`` favors arrowheads and accuracy; it gives
         up protection from false colliders. ``"ambiguous"`` favors no false collider; it gives up
-        the true arrowheads beside them, and accuracy. On merged cohorts of three graph sizes, with
-        about 29 to 76 true edges, that no row bridges (20 seeds each, conditioning sets of up to
-        3), ``"ambiguous"`` took FCI's false colliders per fit from 21.5-165.4 to at most 0.1 and
-        the share of true arrowheads it found from 0.61-0.81 to 0, and raised its errors by 0.5 to
-        4.4, still fewer than the empty graph's in 6 of 6 settings; on bridged cohorts and complete
-        data the two gave the same graphs.
+        the true arrowheads beside them, and accuracy.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -704,14 +669,7 @@ def fci(
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
         handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
-        outside values missing completely at random. With 20 variables and 1,000 rows, 10 to 30% of
-        the values missing completely at random, FCI made median errors of 28.5 to 30.5 where
-        dropping the incomplete rows made 32.5 and 42.0 on 124 and 10 complete rows and had no
-        complete row at 30% (complete data: 28.0; 0.11.0 release card). Where values are missing for
-        a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100 variables with one
-        observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than test-wise deletion
-        in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none; not measured with
-        FCI. See **Missing values.** in Notes.
+        outside values missing completely at random. See **Missing values.** in Notes.
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of FCI's possible-d-separation step [2]_ [3]_, which removes edges the first step
         kept, one at a time, so each removal changes what the step tests after it. ``"order_free"``
@@ -720,9 +678,7 @@ def fci(
         order. ``None`` follows ``andrey.config.tie_break``: ``"order_free"`` under ``"rank"``,
         ``"fast"`` under ``"position"``. ``"order_free"`` favors a result that does not depend on
         the column order; it gives up time on some large graphs, where its order needs more tests.
-        ``"fast"`` gives up that independence and saves time only on some graphs. On simulated
-        linear-Gaussian data with hidden variables, the two took about as long and made nearly the
-        same endpoint errors; on large graphs either could take longer. See Notes.
+        ``"fast"`` favors time on some graphs; it gives up that independence. See Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -893,24 +849,13 @@ def fci(
     missing depends on no value in the data; the rows a test reads are then a random sample of all
     rows, and otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** On simulated linear-Gaussian data its errors stay below the empty graph's on
-    graphs of hundreds of variables, and on denser graphs until its fits pass the time cap
-    (`0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_). Its
-    errors passed the empty graph's on the ANDES network, and, with hidden variables, on large
-    sparse graphs
-    (`0.8.0 release card <https://andrey.abel.ai/docs/benchmarks/0.8.0.html#fci-s-feasible-sizes>`_).
-    Test errors can give results that no MAG fits, even on small graphs: the ``pag`` is then not the
-    PAG of any MAG, and a graph query such as ``m_separated`` can raise ``ValueError`` (`0.16.0
-    release card
-    <https://andrey.abel.ai/docs/benchmarks/0.16.0.html#fci-fits-that-are-not-pags>`__). Rule R5
-    stops after a fixed number of partial paths, so on graphs with many circle-circle edges it can
-    miss an undirected cycle. With the mixed-data tests it is experimental, and
-    ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet. On data merged from
-    cohorts, the possible-d-separation step asks the sets whose variables no row observes all
-    together, so a fit can be slow; ``max_depth`` bounds it (`0.19.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#datasets-with-overlapping-variables>`__).
-    The measured results are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    **Limitations.** With hidden variables it made fewer errors than the empty graph on graphs of up
+    to hundreds of variables, but on the largest sparse graphs its errors passed the empty graph's,
+    and :func:`~andrey.gfci` made fewer at nearly every size. Test errors can give results that no
+    MAG fits: the ``pag`` is then not the PAG of any MAG, and a graph query such as ``m_separated``
+    can raise ``ValueError``. The
+    `0.8.0 release card <https://andrey.abel.ai/docs/benchmarks/0.8.0.html#fci-s-feasible-sizes>`__
+    has the numbers.
 
     References
     ----------
@@ -1135,15 +1080,12 @@ def gfci(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
-        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
-        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
-        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
-        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
-        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
-        were rejected. Their time and their power were not measured against each other. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; with ``"gsq"`` it gives
+        up time, a sum of hypergeometric terms per cell, and in the sparsest tables it rejects below
+        that level. ``"nonempty"`` favors degrees of freedom read from the table alone, as Spirtes,
+        Glymour and Scheines (1993) count them; it gives up the level, as it rejects true
+        independences more often than the nominal rate. Only ``"chisq"`` and ``"gsq"`` read it:
+        passing it with another test raises ``ValueError``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test, in ``(0, 1)``. Smaller values give
         sparser graphs.
@@ -1173,9 +1115,7 @@ def gfci(
         in column order. ``None`` follows ``andrey.config.tie_break``: ``"order_free"`` under
         ``"rank"``, ``"fast"`` under ``"position"``. ``"order_free"`` favors a result that does not
         depend on the column order; it gives up time on some large graphs, where its order needs
-        more tests. ``"fast"`` gives up that independence and saves time only on some graphs. On
-        simulated linear-Gaussian data with hidden variables, the two took about as long and made
-        nearly the same endpoint errors; on large graphs either could take longer. See Notes.
+        more tests. ``"fast"`` favors time on some graphs; it gives up that independence. See Notes.
     edge_removal : {"all", "triangles"}, default="all"
         Which edges of the GES CPDAG the tests may remove: ``"all"`` tests every edge, and
         ``"triangles"`` only the edges in a triangle of the CPDAG, whose ends share a neighbor in
@@ -1183,10 +1123,10 @@ def gfci(
         An edge in no triangle then stays in the PAG and still conditions the tests of the other
         pairs. The triangles come from the CPDAG, so the option adds no dependence on the column
         order. ``"all"`` favors removing every edge the tests reject; it gives up the true edges in
-        no triangle that a test removes in error. ``"triangles"`` favors those true edges, with a
-        strict penalty and alpha and most on dense graphs; it gives up removing the false edges in
-        no triangle that the GES phase adds, so at the defaults on sparse graphs it made more
-        errors. Their fit times differed little. See Notes for the numbers.
+        no triangle that a test removes in error. ``"triangles"`` favors those true edges, most with
+        a strict penalty and alpha on dense graphs; it gives up removing the false edges in no
+        triangle that the GES phase adds, which costs accuracy at the defaults on sparse graphs. See
+        Notes.
     confounded_index : bool, default=True
         With ``env``, whether a hidden variable may cause both the index and a data variable, as for
         :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as in a
@@ -1374,20 +1314,12 @@ def gfci(
     one dataset. Drop the incomplete rows yourself, which suits values missing completely at random,
     or use :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On simulated linear-Gaussian data its errors stay below the empty graph's at
-    every size whose fits finished within the time cap, into the thousands of variables
-    (`0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_). With
-    hidden variables they stayed below it wherever its fits finished, but some fits on large graphs
-    ran past the time cap
-    (`0.8.0 release card <https://andrey.abel.ai/docs/benchmarks/0.8.0.html#fci-s-feasible-sizes>`_).
-    It runs a full :func:`~andrey.ges` search before any test, so it takes at least as long as GES.
-    With fewer rows than columns its BIC score is unreliable. Rule R5 has the search bound described
-    under :func:`~andrey.fci`. With the mixed-data score and test, or with ``env``, it is
-    experimental, and ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet.
-    ``"bic"`` and ``"fisherz"`` read a numeric ``env`` as a number, so with three or more
-    environments a shift that does not follow the labels' values can go unnoticed. The measured
-    results are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** With hidden variables it made fewer errors than the empty graph wherever its
+    fits finished, and fewer than :func:`~andrey.fci` at nearly every size, but some fits on large
+    graphs did not finish in time. It runs a full :func:`~andrey.ges` search before any test, so it
+    takes at least as long as GES, and with fewer rows than columns its BIC score is unreliable. The
+    `0.8.0 release card <https://andrey.abel.ai/docs/benchmarks/0.8.0.html#fci-s-feasible-sizes>`__
+    has the numbers.
 
     References
     ----------
@@ -1508,15 +1440,12 @@ def cdnod(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
-        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
-        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
-        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
-        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
-        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
-        were rejected. Their time and their power were not measured against each other. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; with ``"gsq"`` it gives
+        up time, a sum of hypergeometric terms per cell, and in the sparsest tables it rejects below
+        that level. ``"nonempty"`` favors degrees of freedom read from the table alone, as Spirtes,
+        Glymour and Scheines (1993) count them; it gives up the level, as it rejects true
+        independences more often than the nominal rate. Only ``"chisq"`` and ``"gsq"`` read it:
+        passing it with another test raises ``ValueError``.
     collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, as for :func:`~andrey.pc`: ``"p_value"`` by the
         largest p-value that separated each collider's endpoints, so the colliders do not depend on
@@ -1541,13 +1470,7 @@ def cdnod(
         other nodes adjacent to one of its ends or undecided with it: a set that separates a pair
         lies within the parents of one end, so the search might have missed that separating set.
         ``"orient"`` favors arrowheads; it gives up protection from false colliders. ``"ambiguous"``
-        favors no false collider; it gives up the true arrowheads beside them. With
-        :func:`~andrey.pc`, on merged cohorts of three graph sizes, with about 29 to 76 true edges,
-        that no row bridges (20 seeds each, conditioning sets of up to 3), ``"ambiguous"`` took PC's
-        false colliders per fit from 12.8-90.0 to at most 0.2 and the share of true arrowheads it
-        found from 0.54-0.72 to 0, and PC's graph was then farther from the truth than the empty
-        graph in 6 of 6 settings; on bridged cohorts and complete data the two gave the same graphs.
-        With CD-NOD, its effect on accuracy was not measured.
+        favors no false collider; it gives up the true arrowheads beside them.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1561,14 +1484,7 @@ def cdnod(
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
         handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
-        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
-        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
-        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
-        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
-        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
-        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
-        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
-        Not measured with this method. See **Missing values.** in Notes.
+        outside values missing completely at random. See **Missing values.** in Notes.
     dependence_threshold : float or None, default=None
         Runs the independent-change step at this threshold, in ``(0, 1)``, on its module
         dependence measure: two modules, the distributions of a candidate cause and of its effect
@@ -1740,21 +1656,13 @@ def cdnod(
     is missing depends on no value in the data; the rows a test reads are then a random sample of
     all rows, and otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** On simulated linear-Gaussian data whose means shift across domains its errors
-    stay below the empty graph's on sparse graphs until its fits pass the time cap
-    (`0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_). Its
-    partial-correlation tests assume linear relations with Gaussian noise and find only a change in
-    a variable's mean, so a change of a variance alone, or of an effect's weight on a mean-zero
-    cause, orients no edge. The independent-change step is not benchmarked yet: it fixes the kernel
-    widths, the index kernel, and the ridge, which the paper fits by Gaussian-process likelihood; on
-    small simulated examples it rarely oriented an edge whose two variables' means both follow the
-    index, and given the true skeleton it oriented some edges against the truth
-    (`0.7.0 release card <https://andrey.abel.ai/docs/benchmarks/0.7.0.html#cd-nod>`__). With a
-    mixed-data test it is experimental, and ``collider_rule="conservative"`` and ``"majority"`` and
-    missing values are not benchmarked yet. Where the graph found is wrong, a true path claim can
-    direct an edge against the truth, and the fits dropped many claims their graph could not meet; a
-    known edge belongs in ``required``. The measured results are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** On linear-Gaussian data whose means shift across domains it made fewer errors
+    than the empty graph on sparse graphs, until its fits became too slow. Its partial-correlation
+    tests see only a change in a variable's mean, so a change of a variance alone, or of an effect's
+    weight on a mean-zero cause, orients no edge. Where the graph found is wrong, a true path claim
+    can direct an edge against the truth; a known edge belongs in ``required``. The
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
+    the numbers.
 
     References
     ----------
@@ -1930,15 +1838,12 @@ def fci_jci(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
-        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
-        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
-        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
-        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
-        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
-        were rejected. Their time and their power were not measured against each other. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; with ``"gsq"`` it gives
+        up time, a sum of hypergeometric terms per cell, and in the sparsest tables it rejects below
+        that level. ``"nonempty"`` favors degrees of freedom read from the table alone, as Spirtes,
+        Glymour and Scheines (1993) count them; it gives up the level, as it rejects true
+        independences more often than the nominal rate. Only ``"chisq"`` and ``"gsq"`` read it:
+        passing it with another test raises ``ValueError``.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
         How a collider is decided on a triple ``x - z - y`` where ``x`` and ``y`` are not adjacent,
         as for :func:`~andrey.fci`: by the separating set that removed the edge ``x - y``
@@ -1957,13 +1862,7 @@ def fci_jci(
         possible-d-separation step reads it too, so that step's sets, the skeleton, and
         ``metadata["not_tested"]`` can change. ``"orient"`` favors arrowheads; it gives up
         protection from false colliders. ``"ambiguous"`` favors no false collider; it gives up the
-        true arrowheads beside them. With :func:`~andrey.fci`, on merged cohorts of three graph
-        sizes, with about 29 to 76 true edges, that no row bridges (20 seeds each, conditioning sets
-        of up to 3), ``"ambiguous"`` took FCI's false colliders per fit from 21.5-165.4 to at most
-        0.1 and the share of true arrowheads it found from 0.61-0.81 to 0, and raised its errors by
-        0.5 to 4.4, still fewer than the empty graph's in 6 of 6 settings; on bridged cohorts and
-        complete data the two gave the same graphs. With FCI-JCI, its effect on accuracy was not
-        measured.
+        true arrowheads beside them.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1977,22 +1876,14 @@ def fci_jci(
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
         handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
-        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
-        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
-        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
-        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
-        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
-        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
-        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
-        Not measured with this method. See **Missing values.** in Notes.
+        outside values missing completely at random. See **Missing values.** in Notes.
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of the possible-d-separation step, as for :func:`~andrey.fci`: ``"order_free"``
         visits the pairs and nodes by a rank computed from the data, and ``"fast"`` in column order.
         ``None`` follows ``andrey.config.tie_break``: ``"order_free"`` under ``"rank"``, ``"fast"``
         under ``"position"``. ``"order_free"`` favors a result that does not depend on the column
-        order; it gives up time on some graphs, where its order needs more tests. ``"fast"`` gives
-        up that independence and saves time only on some graphs. With :func:`~andrey.fci` the two
-        took about as long and made nearly the same endpoint errors; not measured with FCI-JCI.
+        order; it gives up time on some graphs, where its order needs more tests. ``"fast"`` favors
+        time on some graphs; it gives up that independence.
     confounded_index : bool, default=True
         Whether a hidden variable may cause both the index and a data variable, such as a patient's
         health deciding both the hospital and an outcome: FCI-JCI1 [1]_. ``False`` assumes the index
@@ -2136,18 +2027,12 @@ def fci_jci(
     random sample of all rows, and otherwise they are a selected sample that more rows do not
     correct.
 
-    **Limitations.** On data simulated as its authors do [1]_, with hidden common causes and one
-    context variable, its errors were below the empty graph's on every dataset; the
-    `0.15.0 release card <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#fci-jci>`_ has the
-    numbers. It takes one environment variable: the several context variables of the authors'
-    designs are not implemented, so domains that change different variables share one index. Its
-    possible-d-separation step tests subsets of each set, so its cost grows fast with the number of
-    variables, and on data merged from cohorts it asks the sets whose variables no row observes all
-    together; ``max_depth`` bounds it. ``"fisherz"`` and ``"student_t"`` read the index as a number
-    and can miss a shift in a middle domain of three or more. Missing values are not benchmarked
-    yet, and no reference implementation takes knowledge with a domain index, so the claims were
-    checked only against the same fit without them. The measured results are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** With hidden common causes and one context variable it made as many errors as
+    its authors' code and fewer than the empty graph on every dataset. Its possible-d-separation
+    step tests subsets of each set, so its cost grows fast with the number of variables, and it
+    takes one environment variable, so domains that change different variables share one index. The
+    `0.15.0 release card <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#fci-jci>`__ has the
+    numbers.
 
     References
     ----------
@@ -2302,11 +2187,8 @@ def icp(
         predicts each environment's rows, and tests the prediction errors with Chow's F-test, exact
         for Gaussian noise. ``"exact"`` favors that exact level and fewer false parents when an
         intervention that ``targets`` does not name hits the target; it gives up its guarantee when
-        the noise is not Gaussian. ``"approximate"`` gives up the exact level; it had fewer false
-        parents with a hidden common cause. On data simulated as in the paper [1]_, the estimate
-        held a variable outside the true parents less often under ``"exact"`` when interventions
-        could hit the target, and less often under ``"approximate"`` with a hidden common cause of
-        the target and another variable. See Notes.
+        the noise is not Gaussian. ``"approximate"`` favors fewer false parents with a hidden common
+        cause; it gives up the exact level. See Notes.
     max_parents : int or None, default=None
         A cap on the target's parents, at least ``0``: only sets of at most ``max_parents``
         variables are tested, so no estimate gives the target more than ``max_parents`` parents.
@@ -2407,19 +2289,14 @@ def icp(
     regresses ``target`` on a set of the other variables in each environment. Drop the incomplete
     rows first.
 
-    **Limitations.** Its guarantee needs environments that leave the target's mechanism alone. On
-    data simulated as in the paper [1]_, when interventions could also hit the target and
-    ``targets`` did not name them, the estimate held a variable outside the true parents in more
-    fits than ``alpha`` allows, more often under the default test than under ``"exact"``, most often
-    a child of the target, whose set stays close to invariant; ``targets`` leaves such environments
-    out (`0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#icp>`_). A hidden
-    common cause of the target and another variable can also add a false parent, and with a
-    nonlinear effect of a parent the estimate rarely equals the true parents. With a small
-    ``max_parents`` on many variables it found almost none of the true parents. Without
-    ``max_parents`` it tests every subset of the remaining variables, doubling the cost with each
-    added variable. Under ``"exact"`` the guarantee does not cover noise that is not Gaussian. The
-    measured results are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    **Limitations.** On linear-Gaussian data whose environments leave the target's mechanism alone,
+    the share of fits with a false parent stayed well below ``alpha``. When an intervention also
+    hits the target and ``targets`` does not name it, a child of the target can enter the estimate
+    in more fits than ``alpha`` allows, and a hidden common cause of the target and another variable
+    can add a false parent. Without ``max_parents`` it tests every subset of the other variables,
+    doubling the cost with each added variable. The
+    `0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#icp>`__ has the
+    numbers.
 
     References
     ----------

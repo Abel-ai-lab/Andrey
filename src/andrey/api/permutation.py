@@ -146,14 +146,7 @@ def boss(
         ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
         fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
         ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
-        up time: each round runs the search again. In the 0.17.0 missing-data benchmark
-        (linear-Gaussian data, 10 to 50 variables, 100 to 2,000 rows, 10 to 50% missing; the
-        searches at ``ebic_gamma=0``), against dropping the incomplete rows, ``"em"`` made fewer
-        errors in 186 of the 225 settings judged with GES, BOSS, GRaSP, and NOTEARS, as many in 39,
-        and more in none, and in 204 more dropping the rows left too few to fit most datasets; HC
-        and Tabu were not compared with it. With the default 10 rounds, a setting's median fit in
-        the six searches took 2 to 72 times as long as the same search on the complete data. See
-        **Missing values.** in Notes.
+        up time: each round runs the search again. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
         least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
@@ -344,34 +337,18 @@ def boss(
     the result on the last round's expected covariance. EM holds when values are missing completely
     at random or at random given observed values; when missingness depends on the missing values
     themselves, the expected covariance is biased, and the data cannot show it. On complete data,
-    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows yourself,
-    which suits values missing completely at random, or use :func:`~andrey.pc` or
-    :func:`~andrey.fci`, whose tests delete rows per test.
+    ``"em"`` gives the complete-data result. Before EM, a column that is a linear function of
+    several others is not caught. Without ``"em"``, drop the incomplete rows yourself, which suits
+    values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose
+    tests delete rows per test.
 
-    **Limitations.** At the standard BIC (``ebic_gamma=0.0``) with ``penalty_discount=4.0``, on
-    simulated linear-Gaussian data, its errors stayed below the empty graph's, and most of its fits
-    finished within the time cap, on sparse graphs into the thousands of variables and on denser
-    ones into the hundreds; on the densest graphs its errors passed the empty graph's on the
-    smallest size, and its fits ran out of memory on the largest (the
-    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_). At
-    the standard BIC with ``penalty_discount=1.0`` its errors passed the empty graph's on the ANDES
-    network (the `0.1.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.1.0.html#published-network-structures>`_). With fewer
-    rows than columns the standard BIC is unreliable. With either categorical score its errors
-    stayed below the empty graph's on simulated categorical data, and on the diabetes network with
-    BDeu but not with the multinomial BIC (the `0.8.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.8.0.html#boss-and-grasp-with-bdeu>`__). The mixed-data
-    scores and ``env`` are experimental. ``"bic"`` read a numeric ``env`` as a number, so with three
-    or more environments a shift that does not follow the labels' values can go unnoticed. With
-    ``missing="em"``, its errors did not always stay below the empty graph's with few rows, and the
-    default ``ebic_gamma=1.0`` was measured only with an earlier EM scheme (the
-    `0.17.0 release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#missing-data>`_);
-    before EM, a column that is a linear function of several others goes unchecked. A path claim
-    cannot restore an edge the search left out and can direct an edge the wrong way where the
-    search's graph is wrong: a known edge belongs in ``required`` (the `0.16.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.16.0.html#path-and-confounder-claims>`_). The measured
-    results are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** At ``penalty_discount=4.0`` and ``ebic_gamma=0.0``, on linear-Gaussian data it
+    made fewer errors than the empty graph on sparse graphs into the thousands of variables and on
+    denser ones into the hundreds. On the densest graphs, where :func:`~andrey.ges` made more errors
+    than the empty graph, it made fewer except on the smallest graphs, and its fits ran out of
+    memory on the largest. With fewer rows than columns the BIC is unreliable. The
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
+    every size.
 
     References
     ----------
@@ -546,14 +523,7 @@ def grasp(
         ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
         fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
         ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
-        up time: each round runs the search again. In the 0.17.0 missing-data benchmark
-        (linear-Gaussian data, 10 to 50 variables, 100 to 2,000 rows, 10 to 50% missing; the
-        searches at ``ebic_gamma=0``), against dropping the incomplete rows, ``"em"`` made fewer
-        errors in 186 of the 225 settings judged with GES, BOSS, GRaSP, and NOTEARS, as many in 39,
-        and more in none, and in 204 more dropping the rows left too few to fit most datasets; HC
-        and Tabu were not compared with it. With the default 10 rounds, a setting's median fit in
-        the six searches took 2 to 72 times as long as the same search on the complete data. See
-        **Missing values.** in Notes.
+        up time: each round runs the search again. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
         least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
@@ -754,36 +724,17 @@ def grasp(
     the result on the last round's expected covariance. EM holds when values are missing completely
     at random or at random given observed values; when missingness depends on the missing values
     themselves, the expected covariance is biased, and the data cannot show it. On complete data,
-    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows yourself,
-    which suits values missing completely at random, or use :func:`~andrey.pc` or
-    :func:`~andrey.fci`, whose tests delete rows per test.
+    ``"em"`` gives the complete-data result. Before EM, a column that is a linear function of
+    several others is not caught. Without ``"em"``, drop the incomplete rows yourself, which suits
+    values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose
+    tests delete rows per test.
 
-    **Limitations.** At the standard BIC (``ebic_gamma=0.0``) with ``penalty_discount=4.0``, on
-    simulated linear-Gaussian data, its errors stayed below the empty graph's, and most of its fits
-    finished within the time cap, at every measured density and row count, into the hundreds of
-    variables (the
-    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__). On
-    dense graphs one search often stops at a DAG that scores worse than the true one, at the
-    standard BIC with ``penalty_discount=1.0``: raise ``n_starts`` there. At the standard BIC with
-    ``penalty_discount=1.0`` its errors passed the empty graph's on the ANDES network (the `0.1.0
-    release card
-    <https://andrey.abel.ai/docs/benchmarks/0.1.0.html#published-network-structures>`__). With fewer
-    rows than columns the standard BIC is unreliable. With either categorical score its errors
-    stayed below the empty graph's on simulated categorical data, and on the diabetes network with
-    BDeu but not with the multinomial BIC (the `0.8.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.8.0.html#boss-and-grasp-with-bdeu>`__). The mixed-data
-    scores and ``env`` are experimental. ``"bic"`` read a numeric ``env`` as a number, so with three
-    or more environments a shift that does not follow the labels' values can go unnoticed. With
-    ``missing="em"``, its errors did not always stay below the empty graph's with few rows, the
-    default ``ebic_gamma=1.0`` was measured only with an earlier EM scheme, and some fits had not
-    settled within the default ``n_em_iterations`` (the
-    `0.17.0 release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#missing-data>`__);
-    before EM, a column that is a linear function of several others goes unchecked. A path claim
-    cannot restore an edge the search left out and can direct an edge the wrong way where the
-    search's graph is wrong: a known edge belongs in ``required`` (the `0.17.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`__). The
-    measured results are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    **Limitations.** At ``penalty_discount=4.0`` and ``ebic_gamma=0.0``, on linear-Gaussian data it
+    made fewer errors than the empty graph at every density and row count, into the hundreds of
+    variables; sparse graphs of more variables were too slow. With fewer rows than columns the BIC
+    is unreliable. The
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
+    every size.
 
     References
     ----------
@@ -919,23 +870,18 @@ def igsp(
         column's normal scores mix their distributions. ``None`` picks from the declared column
         types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are, else
         ``"fisherz"``. ``metadata["indep_test"]`` names the test the fit used. ``"kci"`` favors
-        nonlinear effects; it gives up time, and with few rows accuracy. On simulated data with
-        additive nonlinear effects, it made more errors than the Gaussian tests with few rows per
-        setting and fewer with more rows, at a far higher cost per fit.
+        nonlinear effects; it gives up time, and with few rows accuracy.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
-        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
-        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
-        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
-        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
-        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
-        were rejected. Their time and their power were not measured against each other. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; with ``"gsq"`` it gives
+        up time, a sum of hypergeometric terms per cell, and in the sparsest tables it rejects below
+        that level. ``"nonempty"`` favors degrees of freedom read from the table alone, as Spirtes,
+        Glymour and Scheines (1993) count them; it gives up the level, as it rejects true
+        independences more often than the nominal rate. Only ``"chisq"`` and ``"gsq"`` read it:
+        passing it with another test raises ``ValueError``.
     invariance_test : {"gaussian", "indicator"} or None, default=None
         The invariance test, which asks whether a variable's distribution given a set of others is
         the same in a setting as in the observational rows. ``"gaussian"`` compares the linear
@@ -1091,22 +1037,13 @@ def igsp(
     regresses or tests a variable on all of its conditioning variables in each environment. Drop
     the incomplete rows first.
 
-    **Limitations.** In its authors' settings, its errors stayed below the empty graph's in every
-    group, but :func:`~andrey.gies` and :func:`~andrey.ut_igsp`, told every target, often had fewer.
-    A perfect intervention that leaves its target's distribution unchanged, such as cutting the
-    causes of a variable that has none, orients nothing, and the search then reverses some true
-    edges out of that target. Where the objective ties the true DAG with a wrong one, fits with few
-    starts repeat one result. Its time grows with the number of rows, fast with the number of
-    variables, and on dense graphs with settings of more than one target: with many single-variable
-    settings, fits on hundreds of variables were slow, and on larger graphs none finished within the
-    time cap (the
-    `0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#limits>`_). Unmeasured
-    common causes are outside its model and not measured. One level serves both tests unless
-    ``invariance_alpha`` is given. In :func:`~andrey.bootstrap`, the averaged graph is made a CPDAG
-    without the targets, so an edge that only the settings orient comes back undirected there; each
-    fit and the edge frequencies keep its direction. The measured results are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    **Limitations.** On linear-Gaussian data with known targets it made fewer errors than the empty
+    graph in every setting, but :func:`~andrey.gies` and :func:`~andrey.ut_igsp`, told every target,
+    often made fewer. Its time grows fast with the number of variables, so fits on large graphs are
+    slow. A perfect intervention that leaves its target's distribution unchanged orients nothing,
+    and the search then reverses some true edges out of that target. The
+    `0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#limits>`__ has the
+    numbers.
 
     References
     ----------
@@ -1262,15 +1199,12 @@ def ut_igsp(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
-        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
-        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
-        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
-        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
-        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
-        were rejected. Their time and their power were not measured against each other. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; with ``"gsq"`` it gives
+        up time, a sum of hypergeometric terms per cell, and in the sparsest tables it rejects below
+        that level. ``"nonempty"`` favors degrees of freedom read from the table alone, as Spirtes,
+        Glymour and Scheines (1993) count them; it gives up the level, as it rejects true
+        independences more often than the nominal rate. Only ``"chisq"`` and ``"gsq"`` read it:
+        passing it with another test raises ``ValueError``.
     invariance_test : {"gaussian", "indicator"} or None, default=None
         The invariance test, which asks whether a variable's distribution given a set of others is
         the same in a setting as in the observational rows. ``"gaussian"`` compares the linear
@@ -1441,18 +1375,14 @@ def ut_igsp(
     regresses or tests a variable on all of its conditioning variables in each environment. Drop
     the incomplete rows first.
 
-    **Limitations.** In its authors' setting, every fit finished, and in every group its errors
-    stayed below the empty graph's and its target errors below those of the given targets alone.
-    With few rows per setting and no unknown targets it names false targets. On a larger, denser
-    graph with few settings, it did not clearly beat the empty graph (the
-    `0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#limits>`_). The
-    search's cost grows with the number of I-covered edges to the power of its depth, and each start
-    tests every pair given all other variables, so time grows fast with the number of variables. The
-    objective counts targets, so a setting whose intervention leaves its target's distribution
-    unchanged orients nothing through that target. Unmeasured common causes are outside its model
-    and not measured. One level serves both tests unless ``invariance_alpha`` is given. The measured
-    results are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** With targets given in part or not at all, it made no more errors than its
+    authors' code and fewer than the empty graph in every setting, and fewer target errors than the
+    given targets alone. With few rows per setting and no unknown targets it names false targets,
+    and on a larger, denser graph with few settings it did not clearly beat the empty graph. A
+    setting whose intervention leaves its target's distribution unchanged orients nothing through
+    that target. The
+    `0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#limits>`__ has the
+    numbers.
 
     References
     ----------
@@ -1633,15 +1563,12 @@ def boss_fci(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
-        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
-        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
-        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
-        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
-        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
-        were rejected. Their time and their power were not measured against each other. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; with ``"gsq"`` it gives
+        up time, a sum of hypergeometric terms per cell, and in the sparsest tables it rejects below
+        that level. ``"nonempty"`` favors degrees of freedom read from the table alone, as Spirtes,
+        Glymour and Scheines (1993) count them; it gives up the level, as it rejects true
+        independences more often than the nominal rate. Only ``"chisq"`` and ``"gsq"`` read it:
+        passing it with another test raises ``ValueError``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
@@ -1667,13 +1594,8 @@ def boss_fci(
         and still conditions the tests of the other pairs. The triangles come from the CPDAG, so the
         option adds no dependence on the column order. ``"triangles"`` favors a strict penalty and
         alpha on dense graphs, where it keeps true edges a test would remove; it gives up removing
-        the false edges in no triangle, so it hurts at the defaults on sparse graphs, and it saves
-        no time. On the authors' simulation [1]_, with ``penalty_discount=2.0`` and ``alpha=0.01``
-        it lowered the endpoint errors (SHD against the true PAG) at every density and size; at the
-        defaults it raised them on sparse graphs, where it kept more false edges, and lowered them
-        slightly on dense ones. The fit times differed little (the
-        `0.15.0 release card <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#boss-fci>`__). See
-        Notes.
+        the false edges in no triangle, which costs accuracy at the defaults on sparse graphs, and
+        it saves no time. See Notes.
     confounded_index : bool, default=True
         With ``env``, whether a hidden variable may cause both the index and a data variable, as
         for :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as
@@ -1816,19 +1738,13 @@ def boss_fci(
     which suits values missing completely at random, or use :func:`~andrey.fci`, whose tests delete
     rows per test.
 
-    **Limitations.** On its authors' simulation [1]_, its errors stayed below the empty graph's in
-    every setting, but much of the PAG stays wrong on these data: on dense graphs its errors were
-    not far below the empty graph's (the
-    `0.15.0 release card <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#boss-fci>`_). It runs a
-    full :func:`~andrey.boss` search before any test, so it takes at least as long as BOSS on the
-    same data. Without the possible-d-separation step, a pair that only a set outside both ends'
-    remaining neighbors separates keeps its edge, where :func:`~andrey.gfci` removes it, so the PAG
-    can hold an edge too many. Its BIC score and Fisher's z test assume linear effects with Gaussian
-    noise. The mixed-data score and test and ``env`` are not benchmarked; its tests run them on
-    small graphs only. ``"bic"`` and ``"fisherz"`` read a numeric ``env`` as a number, so with three
-    or more environments a shift that does not follow the labels' values can go unnoticed. The
-    measured results are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    **Limitations.** With hidden variables in linear-Gaussian data it made no more errors than its
+    authors' code and fewer than the empty graph in every setting, though on dense graphs not by
+    much. It runs a full :func:`~andrey.boss` search before any test, so it takes at least as long
+    as BOSS, and with no possible-d-separation step it keeps the edge of a pair that only a set
+    outside both ends' remaining neighbors separates, which :func:`~andrey.gfci` removes. The
+    `0.15.0 release card <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#boss-fci>`__ has the
+    numbers.
 
     References
     ----------
@@ -1977,15 +1893,12 @@ def grasp_fci(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
-        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
-        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
-        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
-        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
-        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
-        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
-        were rejected. Their time and their power were not measured against each other. Only
-        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one; with ``"gsq"`` it gives
+        up time, a sum of hypergeometric terms per cell, and in the sparsest tables it rejects below
+        that level. ``"nonempty"`` favors degrees of freedom read from the table alone, as Spirtes,
+        Glymour and Scheines (1993) count them; it gives up the level, as it rejects true
+        independences more often than the nominal rate. Only ``"chisq"`` and ``"gsq"`` read it:
+        passing it with another test raises ``ValueError``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
@@ -2011,13 +1924,8 @@ def grasp_fci(
         and still conditions the tests of the other pairs. The triangles come from the CPDAG, so the
         option adds no dependence on the column order. ``"triangles"`` favors a strict penalty and
         alpha on dense graphs, where it keeps true edges a test would remove; it gives up removing
-        the false edges in no triangle, so it hurts at the defaults on sparse graphs, and it saves
-        no time. On the authors' simulation [1]_, with ``penalty_discount=2.0`` and ``alpha=0.01``
-        it lowered the endpoint errors (SHD against the true PAG) at every density and size; at the
-        defaults it raised them on sparse graphs, where it kept more false edges, and lowered them
-        slightly on dense ones. The fit times differed little (the
-        `0.15.0 release card <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#grasp-fci>`__). See
-        Notes.
+        the false edges in no triangle, which costs accuracy at the defaults on sparse graphs, and
+        it saves no time. See Notes.
     confounded_index : bool, default=True
         With ``env``, whether a hidden variable may cause both the index and a data variable, as
         for :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as
@@ -2149,21 +2057,13 @@ def grasp_fci(
     which suits values missing completely at random, or use :func:`~andrey.fci`, whose tests delete
     rows per test.
 
-    **Limitations.** On its authors' simulation [1]_, its errors stayed below the empty graph's in
-    every setting, but much of the PAG stays wrong on these data: on dense graphs its errors were
-    not far below the empty graph's (the
-    `0.15.0 release card <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#grasp-fci>`_). It runs
-    a full :func:`~andrey.grasp` search before any test, so it takes at least as long as GRaSP on
-    the same data. Without the possible-d-separation step, a pair that only a set outside both ends'
-    remaining neighbors separates keeps its edge, where :func:`~andrey.gfci` removes it, so the PAG
-    can hold an edge too many. Its BIC score and Fisher's z test assume linear effects with Gaussian
-    noise. The mixed-data score and test and ``env`` are not benchmarked; its tests run them on
-    small graphs only. ``"bic"`` and ``"fisherz"`` read a numeric ``env`` as a number, so with three
-    or more environments a shift that does not follow the labels' values can go unnoticed. A path
-    claim cannot restore an edge the search left out: a known edge belongs in ``required`` (`0.17.0
-    release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_).
-    The measured results are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    **Limitations.** With hidden variables in linear-Gaussian data it made no more errors than its
+    authors' code and fewer than the empty graph in every setting, though on dense graphs not by
+    much. It runs a full :func:`~andrey.grasp` search before any test, so it takes at least as long
+    as GRaSP, and with no possible-d-separation step it keeps the edge of a pair that only a set
+    outside both ends' remaining neighbors separates, which :func:`~andrey.gfci` removes. The
+    `0.15.0 release card <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#grasp-fci>`__ has the
+    numbers.
 
     References
     ----------

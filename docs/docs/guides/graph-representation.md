@@ -305,7 +305,7 @@ kind the other one defines, naming it, and so do both on a `digraph`, which may 
 cycles. `markov_blanket` answers for every kind but the `digraph`. On a `pag` whose MAG, built by
 Zhang's construction, is not ancestral, `m_separated` and `markov_blanket` raise a `ValueError`:
 `fci` can return such a graph when test errors on finite data give separating sets that no MAG fits,
-as its **Limitations** paragraph measures.
+as its **Limitations** paragraph says.
 
 ## Hand a graph to DoWhy
 
