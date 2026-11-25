@@ -236,7 +236,9 @@ def _neighbors_seen_together_on_three_rows() -> pd.DataFrame:
 )
 def test_a_test_with_too_few_rows_drops_no_neighbor_of_the_target(name):
     out = getattr(andrey, name)(_neighbors_seen_together_on_three_rows(), target="x0")
-    sets = [out.metadata[k] for k in ("markov_blanket", "parents_and_children") if k in out.metadata]
+    sets = [
+        out.metadata[k] for k in ("markov_blanket", "parents_and_children") if k in out.metadata
+    ]
     assert sets and all(sorted(s) == ["x1", "x2"] for s in sets)
 
 
