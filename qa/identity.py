@@ -3,12 +3,13 @@
 Every supported method of the quality gate (:mod:`qa.quality_gate`) is fitted on the first draws of
 its gate datasets and of one larger dataset (:data:`LARGER`), and UT-IGSP and GnIES on the gate's
 smaller interventional dataset (:data:`UNKNOWN_TARGETS`), on the numpy backend with one worker and
-one BLAS thread. A fit's hash covers its whole output: the graph, the edge weights, the causal
-order, and every metadata value, such as a score, a p-value, or a list of nodes. Floats enter as
-their bytes, never as printed text, NaN as one bit pattern, and mappings in key order, so equal
-hashes mean equal bits. A second hash covers only the endpoint marks of the graphs, and each part of
-the output has its own digest (:func:`parts`), so a difference reads as a changed graph, as changed
-bits under the same graph, or as changed metadata values alone, named by key.
+one BLAS thread. The options 0.19.0 added (:data:`OPTIONS`) have fits of their own on data where
+they change the answer. A fit's hash covers its whole output: the graph, the edge weights, the
+causal order, and every metadata value, such as a score, a p-value, or a list of nodes. Floats
+enter as their bytes, never as printed text, NaN as one bit pattern, and mappings in key order, so
+equal hashes mean equal bits. A second hash covers only the endpoint marks of the graphs, and each
+part of the output has its own digest (:func:`parts`), so a difference reads as a changed graph, as
+changed bits under the same graph, or as changed metadata values alone, named by key.
 
 The manifest holds one row per fit, keyed by method, dataset, seed, permutation, and worker count,
 under a header naming the commit, the imported Andrey package's directory and commit, the Python,
@@ -62,7 +63,7 @@ import threadpoolctl
 from threadpoolctl import threadpool_limits
 
 import andrey
-from andrey import GraphStructure, StructureOutput, TemporalStructure
+from andrey import GraphStructure, StructureOutput, TemporalStructure, data
 from andrey.core import ci, ci_cmiknn, ci_gpdc, ci_kernel, score, score_delta
 from andrey.search import hc, xges
 from qa import quality_gate as qg
@@ -302,11 +303,187 @@ SET_LEARNERS = {"IAMB": "iamb", "InterIAMB": "inter_iamb", "MMPC": "mmpc"}
 TARGET_LISTS: dict[str, str] = {f"{name}-targets": name for name in SET_LEARNERS}
 FITS |= {f"{name}-targets": _target_list(SET_LEARNERS[name]) for name in SET_LEARNERS}
 
+# --------------------------------------------------------------------------------------------------
+# The options of 0.19.0 -- each fitted outside the gate, on data where it changes the answer.
+# --------------------------------------------------------------------------------------------------
+
+#: The columns each of four cohorts measures, in blocks of equal rows. Columns 0-3 are in every
+#: cohort; 4-6 only in the first two, 7-9 only in the middle two, and 10-13 only in the last two. No
+#: row measures a column of 4-6 with one of 10-13, and no row bridges the cohorts, so a test given
+#: a column from another cohort reads no rows. The columns of a model are in a seeded order, so
+#: which columns a cohort measures bears no relation to the graph.
+COHORT_COLUMNS: tuple[tuple[int, ...], ...] = (
+    (*range(7),),
+    (*range(10),),
+    (*range(4), *range(7, 14)),
+    (*range(4), *range(10, 14)),
+)
+#: The columns of a gapped series: the first is not measured in the first half of the steps and the
+#: second not in the second half, so no step measures both.
+SERIES_GAPS = ((0, slice(None, 300)), (1, slice(300, None)))
+#: A draw is sparse in the sense of ``degrees_of_freedom``'s docstring, which separates the two
+#: rules on sparse tables: each variable has 3 to 5 categories and a table of two variables given
+#: two more has 81 to 625 cells for 250 rows.
+SPARSE_DISCRETE = {"d": 12, "n": 250, "categories": (3, 5)}
+
+
+def cohort_draws(n: int) -> tuple[qg.Draw, ...]:
+    """Return a draw per seed of ``n`` rows stacked from the cohorts of :data:`COHORT_COLUMNS`.
+
+    The values of a model of the gate's ``linear_gauss_er`` regime, with each cohort's rows missing
+    the columns it does not measure.
+    """
+    d = 1 + max(max(columns) for columns in COHORT_COLUMNS)
+    cohort = cohort_index(n)[:, 0]
+    out = []
+    for seed in qg.SEEDS:
+        sample = data.sample_scm(**qg.regime_kwargs("linear_gauss_er", d, n, seed))
+        x = sample.data.copy()
+        for k, columns in enumerate(COHORT_COLUMNS):
+            x[np.ix_(cohort == k, np.setdiff1d(np.arange(d), columns))] = np.nan
+        out.append(qg.Draw(x, sample.graph))
+    return tuple(out)
+
+
+def cohort_index(n: int) -> np.ndarray:
+    """Return the ``(n, 1)`` cohort of each row of a draw of :func:`cohort_draws`."""
+    return qg.regime_models.domain_index(n, len(COHORT_COLUMNS))
+
+
+def gapped_series_draws(d: int, n: int) -> tuple[qg.Draw, ...]:
+    """Return a draw per seed of the gate's ``pcmciplus_paper`` series with the gaps of
+    :data:`SERIES_GAPS`."""
+    out = []
+    for draw in qg.series_draws("pcmciplus_paper", d, n):
+        x = draw.data.copy()
+        for column, steps in SERIES_GAPS:
+            x[steps, column] = np.nan
+        out.append(qg.Draw(x, draw.truth))
+    return tuple(out)
+
+
+def sparse_discrete_draws() -> tuple[qg.Draw, ...]:
+    """Return a draw per seed of a discrete network of :data:`SPARSE_DISCRETE`, its categories'
+    codes as the columns."""
+    out = (data.sample_discrete(**SPARSE_DISCRETE, seed=seed) for seed in qg.SEEDS)
+    return tuple(qg.Draw(sample.data, sample.graph) for sample in out)
+
+
+#: The datasets of the option fits, which the gate does not draw.
+OPTION_DRAWS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
+    "cohorts_d14_n2000": functools.partial(cohort_draws, 2000),
+    "gapped_series_d6_n600": functools.partial(gapped_series_draws, 6, 600),
+    "discrete_sparse_d12_n250": sparse_discrete_draws,
+}
+
+
+@dataclass(frozen=True)
+class OptionFit:
+    """A supported method's call with one of the options 0.19.0 added, on data where it matters.
+
+    ``call(x, **options)`` fits a draw of ``dataset``; ``call(x)`` is the same fit at the option's
+    default. ``method`` names the supported method it is a call of, and ``alpha`` is the
+    significance level of a CI-test method.
+    """
+
+    method: str
+    call: Callable[..., Any]
+    options: dict[str, str]
+    dataset: str
+    alpha: float | None = None
+
+    @property
+    def fit(self) -> Fit:
+        return Fit(functools.partial(self.call, **self.options), alpha=self.alpha)
+
+
+def _cohorts(x: np.ndarray) -> np.ndarray:
+    """The cohort of each row of ``x``, 1-D."""
+    return cohort_index(len(x))[:, 0]
+
+
+def _ambiguous_fits() -> dict[str, OptionFit]:
+    """The searches that read ``possibly_separable``, each at ``"ambiguous"`` on cohorts that no row
+    bridges, PCMCI+ on a gapped series; MMPC returns the CPDAG that reads it."""
+    options = {"possibly_separable": "ambiguous"}
+    cohorts = "cohorts_d14_n2000"
+    calls: dict[str, tuple[str, Callable[..., Any], str]] = {
+        "PC": ("PC", lambda x, **o: andrey.pc(x, alpha=ALPHA, **o), cohorts),
+        "FCI": ("FCI", lambda x, **o: andrey.fci(x, alpha=ALPHA, **o), cohorts),
+        "CDNOD": (
+            "CDNOD",
+            lambda x, **o: andrey.cdnod(
+                x, cohort_index(len(x)), alpha=_CDNOD["alpha"], indep_test=_CDNOD["indep_test"], **o
+            ),
+            cohorts,
+        ),
+        "FCI-JCI": (
+            "FCI-JCI",
+            lambda x, **o: andrey.fci_jci(x, _cohorts(x), alpha=ALPHA, **o),
+            cohorts,
+        ),
+        "IAMB": ("IAMB", lambda x, **o: andrey.iamb(x, alpha=ALPHA, **o), cohorts),
+        "InterIAMB": ("InterIAMB", lambda x, **o: andrey.inter_iamb(x, alpha=ALPHA, **o), cohorts),
+        "MMPC": (
+            "MMPC",
+            lambda x, **o: andrey.mmpc(x, alpha=ALPHA, structure="cpdag", **o),
+            cohorts,
+        ),
+        "PCMCIplus": (
+            "PCMCIplus",
+            lambda x, **o: andrey.pcmciplus(x, **qg.andrey_pcmciplus_adapter(5).params(), **o),
+            "gapped_series_d6_n600",
+        ),
+    }
+    return {
+        f"{name}-ambiguous": OptionFit(
+            method, call, options, dataset, None if name == "PCMCIplus" else ALPHA
+        )
+        for name, (method, call, dataset) in calls.items()
+    }
+
+
+def _nonempty_fits() -> dict[str, OptionFit]:
+    """The constraint-based and set-learning searches at ``degrees_of_freedom="nonempty"`` with each
+    categorical test, on sparse discrete data."""
+    options = {"degrees_of_freedom": "nonempty"}
+    methods = {
+        "PC": andrey.pc,
+        "FCI": andrey.fci,
+        "IAMB": andrey.iamb,
+        "InterIAMB": andrey.inter_iamb,
+        "MMPC": andrey.mmpc,
+    }
+    return {
+        f"{name}-{test}-nonempty": OptionFit(
+            name,
+            functools.partial(search, alpha=ALPHA, indep_test=test),
+            options,
+            "discrete_sparse_d12_n250",
+            ALPHA,
+        )
+        for name, search in methods.items()
+        for test in ("chisq", "gsq")
+    }
+
+
+#: The fits of the options 0.19.0 added, each named for its method and option:
+#: ``possibly_separable="ambiguous"`` (:func:`_ambiguous_fits`) and
+#: ``degrees_of_freedom="nonempty"`` (:func:`_nonempty_fits`). A fit on data with missing values
+#: records no query counts: the counter does not read the test-wise deletion tests.
+OPTIONS: dict[str, OptionFit] = {**_ambiguous_fits(), **_nonempty_fits()}
+FITS |= {name: option.fit for name, option in OPTIONS.items()}
+
 #: The methods that run on ``andrey.config(n_jobs=...)``: GES, GFCI's GES phase, the skeleton
 #: searches of PC, FCI, FCI-JCI, GFCI, CD-NOD, and RSMAX2's PC phase, and the possible-d-sep
 #: searches of FCI, FCI-JCI, and GFCI in worker processes, PNL's two directions on threads, and the
-#: lists of targets of :data:`TARGET_LISTS`.
-WORKER_METHODS = ("PC", "FCI", "FCI-JCI", "GFCI", "CDNOD", "RSMAX2", "GES", "PNL", *TARGET_LISTS)
+#: lists of targets of :data:`TARGET_LISTS`, and the option fits of those methods.
+_WORKERS = ("PC", "FCI", "FCI-JCI", "GFCI", "CDNOD", "RSMAX2", "GES", "PNL")
+WORKER_METHODS = (
+    *_WORKERS,
+    *TARGET_LISTS,
+    *(name for name, option in OPTIONS.items() if option.method in _WORKERS),
+)
 
 #: The factor on the longitudinal LiNGAM panel's coefficients at ``d = 10``. At the published
 #: ranges the panel grows several-fold per time point; at this factor the spectral radius of every
@@ -426,6 +603,8 @@ UNKNOWN_TARGETS: dict[str, tuple[str, ...]] = dict.fromkeys(
 
 def datasets(method: str) -> tuple[str, ...]:
     """Return the datasets ``method`` is fitted on: its gate datasets, then its larger dataset."""
+    if method in OPTIONS:
+        return (OPTIONS[method].dataset,)
     method = TARGET_LISTS.get(method, method)
     if method in UNKNOWN_TARGETS:
         return UNKNOWN_TARGETS[method]
@@ -434,7 +613,9 @@ def datasets(method: str) -> tuple[str, ...]:
 
 @functools.cache
 def draws(dataset: str) -> tuple[qg.Draw, ...]:
-    """Return the draws of a gate or larger dataset, generated once per process."""
+    """Return the draws of a gate, larger, or option dataset, generated once per process."""
+    if dataset in OPTION_DRAWS:
+        return OPTION_DRAWS[dataset]()
     return LARGER_DATASETS[dataset]() if dataset in LARGER_DATASETS else qg.draws(dataset)
 
 
@@ -558,9 +739,12 @@ NODE_LISTS = (
     "context_links",
     "index_edges",
     "latent_pairs",
+    "never_observed_together",
     "parents",
+    "possibly_separable",
     "partial_order",
     "time_index_edges",
+    "undecided_pairs",
     "unordered",
 )
 #: ICP's metadata with a value for each variable, ``[i]``.
