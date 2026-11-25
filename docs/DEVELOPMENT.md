@@ -17,7 +17,9 @@ and the brand are in [`DESIGN.md`](../DESIGN.md).
 
 ## Build
 
-The unpublished `docs` dependency group (PEP 735) keeps site dependencies out of the wheel.
+The unpublished `docs` dependency group (PEP 735) keeps site dependencies out of the wheel. The
+group needs Python 3.11.5 or later (`tool.uv.dependency-groups` in `pyproject.toml`), because the
+fixed soupsieve releases do; the package itself supports Python 3.11 and later.
 
 ```shell
 uv sync --group docs

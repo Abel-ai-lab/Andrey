@@ -79,6 +79,11 @@ docs = [
     "ablog>=0.11.13",
 ]
 
+# The fixed soupsieve releases (3.0.2 and later), which beautifulsoup4 pulls in for the docs group
+# through pydata-sphinx-theme, need Python 3.11.5. The package itself keeps `>=3.11`.
+[tool.uv.dependency-groups]
+docs = { requires-python = ">=3.11.5" }
+
 # This repo only (not published): the lock uses the CPU torch build. For a GPU build, run
 # `uv pip install --reinstall --torch-backend=auto torch` after sync. See CONTRIBUTING.md.
 [[tool.uv.index]]
