@@ -48,6 +48,14 @@ CARD_ORDER = {
 ARMS = ("a", "amb", "b", "c", "dcover", "f")
 
 
+def seed_order(key: tuple, seeds) -> list[int]:
+    """The seeds of a cell in the order its interval indexes them: ascending, except that the seeds
+    of ``CARD_ORDER[key]`` come first in that order, and any other seed follows in ascending order."""
+    seeds = set(seeds)
+    first = [s for s in CARD_ORDER.get(key, ()) if s in seeds]
+    return first + sorted(seeds - set(first))
+
+
 def boot(values) -> tuple[float, float, float] | None:
     """The mean of ``values`` and its 95% percentile bootstrap interval; ``None`` if empty."""
     v = np.asarray([x for x in values if x is not None], dtype=float)
@@ -62,8 +70,11 @@ def boot(values) -> tuple[float, float, float] | None:
 
 def verdict(diffs, margin: float, higher_better: bool) -> str:
     """``better``, ``not worse``, ``worse``, or ``not shown`` for per-seed differences ``a - z``
-    against a margin: the interval of their mean lies beyond the margin on one side, or within
-    it (``not worse``), or neither."""
+    against a margin. With the bootstrap interval ``[lo, hi]`` of their mean (negated when higher is
+    not better, so that a positive mean is an improvement): ``better`` when ``lo > 0`` and the mean
+    is above the margin; else ``not worse`` when ``lo`` is no lower than minus the margin; else
+    ``worse`` when ``hi < 0`` and the mean is below minus the margin; else ``not shown``. It is the
+    rule that decided the card's comparisons."""
     b = boot(diffs)
     if b is None:
         return "no data"
@@ -109,8 +120,7 @@ class Scored:
         """The mean and interval of a metric over the seeds of a cell and arm, the seeds in
         ascending order or in ``CARD_ORDER``."""
         rows = {r["rec"]["seed"]: r for r in self.get(*key)}
-        order = CARD_ORDER.get(key) or sorted(rows)
-        return boot([rows[s].get(metric) for s in order if s in rows])
+        return boot([rows[s].get(metric) for s in seed_order(key, rows)])
 
     def paired(self, key_a: tuple, key_z: tuple, metric_a: str, metric_z: str | None = None):
         """Per-seed ``a - z`` of two cells' metrics, on the seeds where both finished."""

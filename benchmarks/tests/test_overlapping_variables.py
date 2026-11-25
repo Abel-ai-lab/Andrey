@@ -22,10 +22,19 @@ def _digest(value) -> str:
 
 
 def test_the_cohort_variants_hold_the_rows_they_name():
-    """No row observes every column without bridging rows, and 2% do with them."""
+    """No row observes every column without bridging rows, and 2% do with them. The scatter of
+    the ``s10`` variants also removes cells from the bridging rows, so few of them stay complete."""
     pats = generate.cohort_patterns("S3")
     assert pats.shape == (3, generate.dims("S3")) and generate.dims("S3") == 20
-    for variant, complete in (("b0s0", 0), ("b0s10", 0), ("b2s0", 100), ("b5s0", 250)):
+    variants = (
+        ("b0s0", 0),
+        ("b0s10", 0),
+        ("b2s0", 100),
+        ("b5s0", 250),
+        ("b2s10", 14),
+        ("b5s10", 29),
+    )
+    for variant, complete in variants:
         ds = generate.cohort("S3", variant, 0)
         assert ds["data"].shape == (5000, 20)
         assert int((~np.isnan(ds["data"])).all(axis=1).sum()) == complete
@@ -208,3 +217,16 @@ def test_the_card_order_names_every_seed_of_its_two_cells_once():
     }
     for order in summary.CARD_ORDER.values():
         assert sorted(order) == list(range(20))
+
+
+def test_the_seeds_of_a_cell_follow_the_card_order_and_then_ascend():
+    key = ("cohort", "M8_b0s10", "pc", 3, "a")
+    assert summary.seed_order(key, range(20)) == list(summary.CARD_ORDER[key])
+    assert summary.seed_order(key, range(40)) == list(summary.CARD_ORDER[key]) + list(range(20, 40))
+    assert summary.seed_order(key, [3, 4, 2]) == [2, 4, 3]  # the card's order of those seeds
+    assert summary.seed_order(("cohort", "S3_b0s10", "pc", 3, "a"), [4, 2, 9]) == [2, 4, 9]
+
+
+def test_a_run_needs_at_least_one_process(tmp_path):
+    with pytest.raises(ValueError, match="at least 1"):
+        run.run([_spec("hand", "H1_n1000", "a", "pc")], str(tmp_path / "records.jsonl"), procs=0)

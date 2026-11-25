@@ -31,7 +31,7 @@ in units with spreads from 0.1 to 100, and rows in random order.
 
 | Design | Cells |
 |---|---|
-| Cohorts | `S3` (3 cohorts, 20 variables, 5,000 rows), `M8` (8, 40, 20,000), `L6` (6, 50, 30,000), each with 0, 2, or 5% of the rows observing every column (`b0`, `b2`, `b5`) and 0 or 10% of the other cells missing completely at random (`s0`, `s10`), and the complete data |
+| Cohorts | `S3` (3 cohorts, 20 variables, 5,000 rows), `M8` (8, 40, 20,000), `L6` (6, 50, 30,000), each with 0, 2, or 5% of the rows as bridging rows that observe every column (`b0`, `b2`, `b5`) and then 0 or 10% of all cells, bridging rows included, missing completely at random (`s0`, `s10`), and the complete data; with `s10`, 14 (`b2`) and 29 (`b5`) of the 5,000 rows of `S3` seed 0 stay complete, and with `s0` all 100 and 250 do |
 | Hand cases | the forks and colliders of three columns `H1`, `H1c`, `H4`, and `H5k3` with 1,000 and 10,000 rows, and `H1_fixed`, one fork of 1,000 rows drawn from `default_rng(0)` |
 | Lagged cohorts | a VAR(1) of 10 variables and 6,000 time steps in three periods, whose two modules are never observed at the same time (`nolap0`, and `nolap5` with 5% of the cells missing at random), and the complete data |
 
@@ -53,12 +53,12 @@ python -m overlapping_variables.summary records.jsonl
 ```
 
 The small size is the 20-variable configuration, two hand cases, and the lagged cells on 2 seeds
-(186 fits, about 2 minutes on 4 cores). The card's size is `--size card`: 5,250 fits on seeds 0-19 over all three
-configurations, the hand cases, and the lagged cells. `--seeds 1000-1019` runs the fresh seeds
-(`--designs cohort` restricts them to the cohorts, 3,360 fits), `--configs S3,M8` and `--designs`
-narrow a run so that its parts can run apart, and `--cap` sets the seconds a fit may take before it
-is recorded as a timeout (a timeout is never scored as an empty graph). The summary reads several
-records files at once.
+(186 fits, about 2 minutes on 4 cores). The card's size is `--size card`: 5,250 fits on seeds 0-19
+over all three configurations, the hand cases, and the lagged cells. `--seeds 1000-1019` runs the
+fresh seeds (`--designs cohort` restricts them to the cohorts, 3,360 fits), `--configs S3,M8` and
+`--designs` narrow a run so that its parts can run apart, and `--cap` sets the seconds a fit may
+take before it is recorded as a timeout (a timeout is never scored as an empty graph). The summary
+reads several records files at once.
 
 ```shell
 python -m overlapping_variables.run records.jsonl --size card --procs 16
@@ -80,8 +80,9 @@ limit, the lagged cells, and the graphs of the hand cases.
 
 A run at the card's size, seeds 0-19 and the fresh seeds 1000-1019, finishes its 8,610 fits with no
 error and no timeout, and the summary prints the card's two tables as published and the figures its
-text quotes: 1,204 fits of Andrey as it is on data with pairs never observed together, none drawing
-or leaving unlisted such a pair, and the 12 settings with fewer errors than the empty graph.
+text quotes: 1,204 fits of Andrey as it is on data with pairs never observed together (480 cohort
+fits, 80 cohort fits without a depth limit, and 644 hand-case fits), none drawing or leaving
+unlisted such a pair, and the 12 settings with fewer errors than the empty graph.
 
 Of those fits, 7,148 have a graph recorded for the card, and each is the same graph, edge for edge,
 with the same undecided pairs, flagged edges, and kept columns, in every arm: Andrey as it is (`a`,
@@ -91,9 +92,9 @@ fresh seeds the card's run did not cover for these arms. A rerun reproduces the 
 wall times, which depend on the hardware.
 
 The intervals index the seeds in ascending order. The card's first table gives the medium and large
-configurations' Andrey intervals as [44.1, 54.8] and [49.3, 63.0], which its fits drew with the seeds
-in the order they finished; `CARD_ORDER` in `summary.py` holds that order for those two cells, and
-in ascending order their ends are 54.7 and 49.2. The means do not depend on the order.
+configurations' Andrey intervals as [44.1, 54.8] and [49.3, 63.0], which its fits drew with the
+seeds in the order they finished; `CARD_ORDER` in `summary.py` holds that order for those two cells,
+and in ascending order their ends are 54.7 and 49.2. The means do not depend on the order.
 
 ## Layout
 

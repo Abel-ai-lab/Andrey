@@ -135,7 +135,10 @@ def done_keys(path: str) -> set[str]:
 
 def run(specs: list[dict], records: str, procs: int = 1, cap: float = 1800.0) -> int:
     """Run the fits not yet in ``records``, ``procs`` at a time; return how many ran."""
-    todo = [s for s in specs if fit.key(s) not in done_keys(records)]
+    if procs < 1:
+        raise ValueError(f"procs must be at least 1, not {procs}")
+    done = done_keys(records)
+    todo = [s for s in specs if fit.key(s) not in done]
     ctx = mp.get_context("fork")
     running: list = []
     ran = 0
