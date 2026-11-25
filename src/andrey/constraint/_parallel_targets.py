@@ -6,10 +6,11 @@ Each run depends only on the data, the settings, and its variable, so an answer 
 of its own would give, and its count of tests is the one such a search computes
 (:func:`~andrey.constraint.blanket.read_tests`): its own tests and those of every step it read,
 whichever answer made the step. A test that keeps answers, as the chi-square tests keep their
-marginal answers and count a kept one as no test, and a test-wise deletion test, which counts the
-rows each test reads, the queries it does not test, and the pairs no test decided
-(:func:`~andrey.core.ci_missing.rows_tested`), answer each target with a search of its own in this
-process, so each answer counts what a call for that target alone counts.
+marginal answers and count a kept one as no test, counts each pair the answer or its steps asked
+of them once, as a new search computes it the first time it is asked. A test-wise deletion test,
+which counts the rows each test reads, the queries it does not test, and the pairs no test decided
+(:func:`~andrey.core.ci_missing.rows_tested`), answers each target with a search of its own in
+this process, so each answer counts what a call for that target alone counts.
 
 With more than one worker, at least two targets, and a FisherZ, StudentT, or NormalScores test
 (:func:`~andrey.constraint._skeleton.canonical_capable`), the targets are cut into contiguous
@@ -40,7 +41,7 @@ from andrey.constraint.blanket import (
     first_reads,
     read_tests,
 )
-from andrey.core.ci import ChiSquare, count_tests, counting_tests
+from andrey.core.ci import count_tests, counting_tests
 from andrey.core.ci_missing import TestwiseDeletion, rows_tested
 
 T = TypeVar("T")
@@ -95,18 +96,18 @@ def answers(
     read (:func:`~andrey.core.ci_missing.rows_tested`), in the order of ``targets``.
 
     ``search_of`` makes a new search. An answer's tests and rows are those a search of its own would
-    count, the steps an earlier answer made included, so each answer counts what a call for that
-    target alone counts, while the caller's :func:`~andrey.core.ci.counting_tests` count is the
-    tests the call computed, each once. A chi-square test, which keeps answers, and a test-wise
-    deletion test answer each target with a search of its own, whose counts are a call for that
-    target alone gives, the queries not tested and the pairs no test decided among them. ``answer``
-    is a module-level function when ``workers`` is above 1, so that it reaches the workers. The
-    tests the workers compute are added to the caller's :func:`~andrey.core.ci.counting_tests`
-    count. The rows are counted only in this process: a test-wise deletion test, the one test that
-    counts them, answers here.
+    count, the steps an earlier answer made included and each pair asked of a chi-square test's
+    kept answers once, so each answer counts what a call for that target alone counts, while the
+    caller's :func:`~andrey.core.ci.counting_tests` count is the tests the call computed, each
+    once. A test-wise deletion test answers each target with a search of its own, whose counts are
+    a call for that target alone gives, the queries not tested and the pairs no test decided among
+    them. ``answer`` is a module-level function when ``workers`` is above 1, so that it reaches the
+    workers. The tests the workers compute are added to the caller's
+    :func:`~andrey.core.ci.counting_tests` count. The rows are counted only in this process: a
+    test-wise deletion test, the one test that counts them, answers here.
     """
     search = search_of()
-    if isinstance(search.test, (ChiSquare, TestwiseDeletion)):
+    if isinstance(search.test, TestwiseDeletion):
         out = []
         for i, t in enumerate(targets):
             own = search if i == 0 else search_of()
@@ -121,7 +122,8 @@ def answers(
         for t in targets:
             with search.reading() as reading:
                 found = answer(search, t)
-            out.append((found, read_tests(reading, search.step_tests), reading.rows))
+            tests = read_tests(reading, search.step_tests, search.step_kept)
+            out.append((found, tests, reading.rows))
     return out
 
 

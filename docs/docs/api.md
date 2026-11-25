@@ -460,11 +460,11 @@ The first twelve answer every target with one search, so a step two targets shar
 parents and children of a common neighbor, is made once and counts in the `n_tests` of each result
 that reads it. With `andrey.config(n_jobs=...)` above 1 and a partial-correlation `indep_test`
 (`"fisherz"`, `"student_t"`, `"normal_scores"`), they split the targets over that many worker
-processes, with the same results for any number of workers. With missing values or a chi-square
-`indep_test` (`"chisq"`, `"gsq"`), each target has a search of its own in the calling process. `icp`
-and `local_isa_ling` answer each target in turn. On the command line, `'target=[a,b]'` names the
-columns by header or position, and the JSON result holds `multi: true` and `results`, one entry per
-target in the list's order, in place of `structure` and `metadata`.
+processes, with the same results for any number of workers. With missing values, each target has
+a search of its own in the calling process. `icp` and `local_isa_ling` answer each target in turn.
+On the command line, `'target=[a,b]'` names the columns by header or position, and the JSON result
+holds `multi: true` and `results`, one entry per target in the list's order, in place of `structure`
+and `metadata`.
 
 % concept: penalty_discount
 `ges`, `gies`, `gnies`, `xges`, `lges`, `ages`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`,

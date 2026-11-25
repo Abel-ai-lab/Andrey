@@ -58,7 +58,7 @@ import math
 from collections import Counter
 from collections.abc import Callable, Generator, Iterable, Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager, contextmanager, nullcontext
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import partial
 from itertools import combinations, islice
 from time import perf_counter
@@ -74,7 +74,7 @@ from andrey.constraint._skeleton import (
     scan_conditioning_sets,
 )
 from andrey.core import ARROW, NULL, TAIL, backend
-from andrey.core.ci import CITest, counting_tests, make_indep_test, pins_blas
+from andrey.core.ci import CITest, counting_tests, kept_answers, make_indep_test, pins_blas
 from andrey.core.ci_missing import (
     NOT_TESTED,
     TestwiseDeletion,
@@ -1463,23 +1463,37 @@ class SearchCounts:
 class Reading:
     """What one answer read from a :class:`LocalSearch` (:meth:`LocalSearch.reading`): the kept
     steps it read, in the order it first read them, the runs a kept spouse step read included, the
-    tests it computed outside them, and the rows every test of its steps and its own read
-    (:func:`~andrey.core.ci_missing.rows_tested`), whichever answer computed the step."""
+    tests it computed outside them, not counting those answered from kept answers, the pairs of its
+    own queries answered from kept answers (:func:`~andrey.core.ci.kept_answers`), and the rows
+    every test of its steps and its own read (:func:`~andrey.core.ci_missing.rows_tested`),
+    whichever answer computed the step."""
 
     steps: list[Step]
     own: int
     rows: Counter[int]
+    kept: set[tuple[int, int]] = field(default_factory=set)
 
 
-def read_tests(reading: Reading, tests: Mapping[Step, int]) -> int:
+def read_tests(
+    reading: Reading,
+    tests: Mapping[Step, int],
+    kept: Mapping[Step, set[tuple[int, int]]] | None = None,
+) -> int:
     """The tests a search of its own computes for the answer that made ``reading``: its own tests
     and those of every kept step it read, ``tests`` giving each step's
-    (:attr:`LocalSearch.step_tests`).
+    (:attr:`LocalSearch.step_tests`), and one for each distinct pair it or those steps asked of
+    the kept answers, ``kept`` giving each step's pairs (:attr:`LocalSearch.step_kept`), ``None``
+    for a test that keeps none.
 
-    A step computes the same tests wherever it runs on a test that keeps no answers, so the count
-    does not depend on which answer, or which search, made the step first.
+    A step asks the same queries wherever it runs, and computes the same tests outside the kept
+    answers, so the count does not depend on which answer, or which search, made the step first.
+    A new search computes each pair of the kept answers once, the first time it is asked.
     """
-    return reading.own + sum(tests[step] for step in reading.steps)
+    pairs = set(reading.kept)
+    if kept is not None:
+        for step in reading.steps:
+            pairs |= kept[step]
+    return reading.own + sum(tests[step] for step in reading.steps) + len(pairs)
 
 
 def first_reads(readings: Sequence[Reading], tests: Mapping[Step, int]) -> list[int]:
@@ -1551,10 +1565,11 @@ class LocalSearch:
         self._measuring = False
         self._runs: dict[tuple[str, int], tuple[list[int], Sepsets]] = {}
         self._spouses: dict[tuple[str, int], list[int]] = {}
-        # The tests and the rows read by the tests each kept step computed when it ran, the kept
-        # steps each spouse step read inside it, the tests' sum, and the steps a reading() block
-        # has read.
+        # The tests each kept step computed when it ran, outside the kept answers, the pairs it
+        # asked of the kept answers, and the rows its tests read; the kept steps each spouse step
+        # read inside it, the tests' sum, and the steps a reading() block has read.
         self.step_tests: dict[Step, int] = {}
+        self.step_kept: dict[Step, set[tuple[int, int]]] = {}
         self.step_rows: dict[Step, Counter[int]] = {}
         self.step_reads: dict[Step, list[Step]] = {}
         self._kept_tests = 0
@@ -1797,16 +1812,17 @@ class LocalSearch:
     @contextmanager
     def reading(self) -> Generator[Reading]:
         """The kept steps (runs and spouse steps) read inside the block, the tests computed
-        outside them, and the rows read by all the tests, filled when the block ends
-        (:func:`read_tests`, :func:`first_reads`)."""
+        outside them and the kept answers, the pairs asked of the kept answers, and the rows read
+        by all the tests, filled when the block ends (:func:`read_tests`, :func:`first_reads`)."""
         reading = Reading([], 0, Counter())
         self._read, kept, before = {}, self._kept_tests, len(self.step_rows)
         try:
-            with counting_tests() as tests, rows_tested() as rows:
+            with counting_tests() as tests, kept_answers() as answers, rows_tested() as rows:
                 yield reading
         finally:
             reading.steps, self._read = list(self._read), None
-        reading.own = tests.n - (self._kept_tests - kept)
+        reading.own = tests.n - answers.computed - (self._kept_tests - kept)
+        reading.kept = answers.asked
         reading.rows = rows - self._rows_of(before)
         for step in reading.steps:
             reading.rows.update(self.step_rows[step])
@@ -1818,10 +1834,11 @@ class LocalSearch:
             total.update(rows)
         return total
 
-    def _kept(self, step: Step, n: int, rows: Counter[int]) -> None:
-        """Record that the kept step ``step`` computed ``n`` tests of its own, which read
-        ``rows``."""
+    def _kept(self, step: Step, n: int, kept: set[tuple[int, int]], rows: Counter[int]) -> None:
+        """Record that the kept step ``step`` computed ``n`` tests of its own outside the kept
+        answers, asked the pairs ``kept`` of them, and read ``rows``."""
         self.step_tests[step] = n
+        self.step_kept[step] = kept
         self.step_rows[step] = rows
         self._kept_tests += n
 
@@ -1840,10 +1857,15 @@ class LocalSearch:
             if search is None:
                 raise ValueError(f"{method!r} has no search of its own; ask LocalSearch.local")
             sepsets: Sepsets = {}
-            with self._measured(), counting_tests() as tests, search_outcomes() as rows:
+            with (
+                self._measured(),
+                counting_tests() as tests,
+                kept_answers() as answers,
+                search_outcomes() as rows,
+            ):
                 members = search(self, target, sepsets)
             self._runs[key] = (members, sepsets)
-            self._kept(("run", method, target), tests.n, rows)
+            self._kept(("run", method, target), tests.n - answers.computed, answers.asked, rows)
         return self._runs[key]
 
     def parents_children(self, method: str, target: int) -> list[int]:
@@ -1883,7 +1905,11 @@ class LocalSearch:
             kept, before = self._kept_tests, len(self.step_rows)
             outer, self._read = self._read, {}
             try:
-                with counting_tests() as tests, search_outcomes() as rows:
+                with (
+                    counting_tests() as tests,
+                    kept_answers() as answers,
+                    search_outcomes() as rows,
+                ):
                     self._spouses[method, target] = self.spouses(
                         name,
                         target,
@@ -1895,9 +1921,11 @@ class LocalSearch:
             finally:
                 inner, self._read = self._read, outer
             self.step_reads[step] = list(inner)
-            # The runs the step made inside it passed their rows to this block, whose own rows are
-            # the rest.
-            self._kept(step, tests.n - (self._kept_tests - kept), rows - self._rows_of(before))
+            # The runs the step made inside it passed their tests and rows to this block, whose own
+            # are the rest; their pairs of the kept answers stay in its own, which a reading of the
+            # step joins with theirs.
+            own = tests.n - answers.computed - (self._kept_tests - kept)
+            self._kept(step, own, answers.asked, rows - self._rows_of(before))
         if self._read is not None:  # the step, and the runs it read, as a new search reads them
             self._read[step] = None
             self._read.update(dict.fromkeys(self.step_reads[step]))

@@ -83,7 +83,7 @@ import importlib
 import math
 from collections.abc import Callable, Generator, Iterable, Sequence
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache, partial
 from typing import Any, Protocol, Self, cast, runtime_checkable
 
@@ -179,6 +179,51 @@ def count_tests(k: int = 1) -> None:
     counter = _TESTS.get()
     if counter is not None:
         counter.n += k
+
+
+@dataclass(slots=True)
+class KeptAnswers:
+    """The queries of a :func:`kept_answers` block that a test answers from answers it keeps, as
+    the chi-square tests keep their marginal ones: ``asked`` holds each such query's pair, the lower
+    variable first, whether its answer was kept or computed, and ``computed`` counts those the
+    block computed, as no earlier query had."""
+
+    asked: set[tuple[int, int]] = field(default_factory=set)
+    computed: int = 0
+
+
+#: The record of the innermost :func:`kept_answers` block, or ``None`` outside every block.
+_KEPT: ContextVar[KeptAnswers | None] = ContextVar("andrey_kept_answers", default=None)
+
+
+@contextlib.contextmanager
+def kept_answers() -> Generator[KeptAnswers]:
+    """Record the queries asked inside the block that a test answers from answers it keeps.
+
+    A test counts such a query once, the first time it computes it (:func:`counting_tests`), so a
+    block's count depends on what was asked before it; ``tests.n - kept.computed`` does not, and a
+    new test asked the same queries counts that plus ``len(kept.asked)``. When the block ends, its
+    record is added to the enclosing block's.
+    """
+    record = KeptAnswers()
+    token = _KEPT.set(record)
+    try:
+        yield record
+    finally:
+        _KEPT.reset(token)
+        outer = _KEPT.get()
+        if outer is not None:
+            outer.asked |= record.asked
+            outer.computed += record.computed
+
+
+def _note_kept(lo: Iterable[int], hi: Iterable[int], computed: int) -> None:
+    """Add the pairs ``(lo[i], hi[i])`` of queries answered from kept answers, ``computed`` of
+    them computed, to the running :func:`kept_answers` record, if one is running."""
+    record = _KEPT.get()
+    if record is not None:
+        record.asked.update(zip(lo, hi, strict=True))
+        record.computed += computed
 
 
 class SingularCorrelationError(ValueError):
@@ -1360,6 +1405,7 @@ class ChiSquare:
         if memo is not None:
             known, kept_statistics, kept_p_values = memo
             new = np.flatnonzero(~known[a, b])
+            _note_kept(a.tolist(), b.tolist(), len(new))
             if len(new):
                 found = self._counted_given(a[new], b[new], cond)
                 kept_statistics[a[new], b[new]], kept_p_values[a[new], b[new]] = found
@@ -1385,7 +1431,9 @@ class ChiSquare:
             cells = kx * ky
             if not scan or m * cells > _DENSE_CELLS:
                 for i in members:
-                    statistics[i], p_values[i] = self._statistic_pvalue(a[i], b[i], cond)
+                    statistics[i], p_values[i] = self._counted_statistic_pvalue(
+                        int(a[i]), int(b[i]), cond
+                    )
                 continue
             step = max(1, BATCH_CELLS // max(n, m * cells))
             # Each row's first cell in its configuration. A block's tables hold at most
@@ -1444,6 +1492,7 @@ class ChiSquare:
         memo = None if cond else self._marginal_memo()
         if memo is not None:
             known, kept_statistics, kept_p_values = memo
+            _note_kept([x_int], [y_int], int(not known[x_int, y_int]))
             if not known[x_int, y_int]:
                 found = self._counted_statistic_pvalue(x_int, y_int, cond)
                 kept_statistics[x_int, y_int], kept_p_values[x_int, y_int] = found

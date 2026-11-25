@@ -92,12 +92,18 @@ def test_icp_answers_each_target():
         _same(out, _fit("icp", data, t))
 
 
-@pytest.mark.parametrize("method", ["mmpc", "hiton_mb", "iamb"])
-def test_kept_chi_square_answers_change_no_result(method):
+@pytest.mark.parametrize("order", [[3, 1, 4, 0], [0, 4, 1, 3]])
+@pytest.mark.parametrize("method", [*SET_LEARNERS, *SEQUENTIAL])
+def test_kept_chi_square_answers_change_no_result(method, order):
+    """One search answers every target and keeps the chi-square test's marginal answers, so a pair
+    two targets ask is computed once, and each result still counts the tests its own call does."""
     data = _discrete()
-    outs = _fit(method, data, [3, 1, 4, 0], indep_test="chisq")
-    for out, t in zip(outs, [3, 1, 4, 0], strict=True):
-        _same(out, _fit(method, data, t, indep_test="chisq"))
+    alone = [_fit(method, data, t, indep_test="chisq") for t in order]
+    with counting_tests() as total:
+        outs = _fit(method, data, order, indep_test="chisq")
+    for out, one in zip(outs, alone, strict=True):
+        _same(out, one)
+    assert total.n < sum(one.metadata["n_tests"] for one in alone)
 
 
 @pytest.mark.parametrize("method", ["iamb", "mmpc", "hiton_mb", "cmb"])

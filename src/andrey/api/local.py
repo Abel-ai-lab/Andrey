@@ -134,8 +134,8 @@ def mb_by_mb(
         Required: the variable to answer for, a column label (a string) or a 0-based position (an
         integer). A list of them answers each one with one search, which makes a step two targets
         share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
-        ``indep_test``; with missing values or a chi-square ``indep_test``, each target has a
-        separate search. ``None`` raises ``ValueError``.
+        ``indep_test``; with missing values, each target has a separate search. ``None`` raises
+        ``ValueError``.
     blanket : str, default="iamb_forward"
         The Markov blanket learner run for each variable the search visits: ``"iamb_forward"``,
         IAMB's grow phase without its shrink, the learner of the paper's runs [1]_, which keeps a
@@ -452,8 +452,8 @@ def mmb_by_mmb(
         Required: the variable to answer for, a column label (a string) or a 0-based position (an
         integer). A list of them answers each one with one search, which makes a step two targets
         share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
-        ``indep_test``; with missing values or a chi-square ``indep_test``, each target has a
-        separate search. ``None`` raises ``ValueError``.
+        ``indep_test``; with missing values, each target has a separate search. ``None`` raises
+        ``ValueError``.
     blanket : str, default="total_conditioning"
         The Markov blanket learner run for each variable the search visits:
         ``"total_conditioning"``, the paper's [1]_, keeps each variable the test finds dependent
@@ -769,8 +769,8 @@ def cmb(
         Required: the variable to answer for, a column label (a string) or a 0-based position (an
         integer). A list of them answers each one with one search, which makes a step two targets
         share once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
-        ``indep_test``; with missing values or a chi-square ``indep_test``, each target has a
-        separate search. ``None`` raises ``ValueError``.
+        ``indep_test``; with missing values, each target has a separate search. ``None`` raises
+        ``ValueError``.
     blanket : {"hiton_mb", "mmmb", "pcmb"}, default="hiton_mb"
         The Markov blanket learner run for each variable CMB visits: :func:`~andrey.hiton_mb`, the
         learner of the paper's runs [1]_, :func:`~andrey.mmmb`, or :func:`~andrey.pcmb`. CMB reads
