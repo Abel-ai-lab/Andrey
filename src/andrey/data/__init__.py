@@ -45,7 +45,6 @@ from . import (
 from .contexts import ContextSeries, sample_context_series
 from .dataset import CausalDataset, Measurements, Missingness, QAReport, SCMParams
 from .discrete import sample_discrete
-from .generate import Ensemble, generate
 from .mixed import sample_mixed
 from .qa import FaithfulnessScreen
 from .real import CausePair, CausePairs, RealDataset, list_datasets, load_dataset
@@ -58,8 +57,6 @@ __all__ = [
     "sample_mixed",
     "sample_context_series",
     "ContextSeries",
-    "Ensemble",
-    "generate",
     "CausalDataset",
     "Missingness",
     "Measurements",
