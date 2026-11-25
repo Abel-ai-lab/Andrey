@@ -466,3 +466,21 @@ def test_one_blas_thread_limits_inside_and_restores_after():
         with backend.one_blas_thread():
             assert set(counts()) == {1}
         assert counts() == before
+
+
+def test_nested_one_blas_thread_blocks_restore_the_count_of_the_outer_one():
+    from threadpoolctl import threadpool_info, threadpool_limits
+
+    def counts():
+        return [lib["num_threads"] for lib in threadpool_info() if lib["user_api"] == "blas"]
+
+    if not counts():
+        pytest.skip("no BLAS library that threadpoolctl can control")
+    backend._thread_pools.cache_clear()
+    with threadpool_limits(limits=2):
+        before = counts()
+        with backend.one_blas_thread():
+            with backend.one_blas_thread():
+                assert set(counts()) == {1}
+            assert set(counts()) == {1}
+        assert counts() == before

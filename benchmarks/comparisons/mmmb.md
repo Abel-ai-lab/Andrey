@@ -3,8 +3,9 @@
 This campaign compares Andrey's `mmmb` with the authors' MMMB in Causal Explorer 1.5 on the Markov
 blanket each learns at every target, on the networks and sizes of its paper. `blanket_cpu.py` fits
 the solutions, as [Markov blankets](blankets.md) describes, and `blanket_summary.py` judges each
-cell. The rows are in [`published/0.18.0/mmmb.json`](../published/0.18.0/mmmb.json), and the
-[0.18.0 release card](../../docs/docs/benchmarks/0.18.0.md#mmmb) summarizes them.
+cell. The rows are in
+[`published/local-discovery/mmmb.json`](../published/local-discovery/mmmb.json), and the [local
+discovery release card](../../docs/docs/benchmarks/local-discovery.md#mmmb) summarizes them.
 
 ## Data
 
@@ -38,7 +39,7 @@ seeds 0 to 19, and a tie otherwise. The floor counts the errors per target, miss
 members, against the empty set's, which are the true set's size; `mmmb` passes when the paired
 interval of the difference lies below 0.
 
-## Results (0.18.0)
+## Results (local discovery)
 
 Against the toolbox, `mmmb` was better in 8 of the 21 settings, tied in 3, and worse in 10, where
 the first datasets and the 20 fresh ones agree: hailfinder at 500, 700, 1,000, and 5,000 rows,

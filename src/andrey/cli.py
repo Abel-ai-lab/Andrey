@@ -14,10 +14,12 @@ result. Failures print a structured JSON error on stderr and exit non-zero.
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import importlib.metadata
 import inspect
 import io
 import json
+import logging
 import math
 import os
 import platform
@@ -38,9 +40,10 @@ from andrey.core import LATENT, GraphStructure
 from andrey.core.backend import usable_cpus
 from andrey.core.env import SETTINGS
 from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgeError
-from andrey.core.output import summary_lines
+from andrey.core.output import RegimeOutput, regime_summary_lines, summary_lines
 from andrey.core.removed import removal_hint
 from andrey.core.structure import SUMMARY_EDGES, edge_count_text, edge_lines, node_labels
+from andrey.core.warning_policy import held_records
 from andrey.resample import bootstrap_summary_lines
 from andrey.spec import ENV_VARS, REGISTRY, SCHEMA_VERSION, get_spec, help_schema, list_specs
 from andrey.spec.concepts import BOOTSTRAP_PARAMS, MARKOV_CHECK_PARAMS
@@ -320,6 +323,12 @@ def envelope(spec: MethodSpec, out, run: dict) -> dict:
     if isinstance(out, list):  # multi-output (multi_group_direct_lingam)
         env["multi"] = True
         env["results"] = [result_view(o) for o in out]
+    elif isinstance(out, RegimeOutput):  # one result per regime, and the regime of each step
+        env["multi"] = True
+        env["regimes"] = out.regimes.tolist()
+        env["regime_weights"] = out.weights.tolist()
+        env["results"] = [result_view(o) for o in out.outputs]
+        env["metadata"] = dict(out.metadata)
     else:
         result = result_view(out)
         env["structure"] = result["structure"]
@@ -454,6 +463,13 @@ def apply_output_cap(env: dict, limit: int) -> None:
     """
     results = env["results"] if env.get("multi") else [env]
     cut = [truncate_output(r["structure"], limit) for r in results if "structure" in r]
+    for key in ("regimes", "regime_weights"):  # a regime fit's steps and weights, O(n_samples)
+        values = env.get(key)
+        if values is not None and _size(_nested_shape(values)) > limit:
+            env[f"{key}_shape"] = _nested_shape(values)
+            env[key] = None
+            env[f"{key}_truncated"] = True
+            cut.append(True)
     check = env.get("markov_check")
     if check is not None and len(check["tests"]) > limit:  # a Markov check keeps its smallest p
         keep = sorted(
@@ -488,7 +504,11 @@ def _run_footer(run: dict) -> str:
 
 
 def render_human(
-    spec: MethodSpec, out: StructureOutput | list[StructureOutput], run: dict, *, full: bool = False
+    spec: MethodSpec,
+    out: StructureOutput | list[StructureOutput] | RegimeOutput,
+    run: dict,
+    *,
+    full: bool = False,
 ) -> str:
     """Render a terminal summary of the result and run details.
 
@@ -496,6 +516,9 @@ def render_human(
     most ``SUMMARY_EDGES`` edges. The run footer follows the result.
     """
     limit = None if full else SUMMARY_EDGES
+    if isinstance(out, RegimeOutput):
+        lines = regime_summary_lines(out, name=spec.name, limit=limit, more=_MORE_HINT)
+        return "\n".join(lines) + _run_footer(run)
     if not isinstance(out, list):
         lines = summary_lines(out, name=spec.name, limit=limit, more=_MORE_HINT)
         return "\n".join(lines) + _run_footer(run)
@@ -645,7 +668,12 @@ def _coerce(raw: str, param: ParamSpec) -> object:
             )
         return pair
     if kind == "str_list" or (kind == "str_or_list" and value.startswith("[")):
-        return tuple(_bracket_items(value, param.name))
+        items = tuple(_bracket_items(value, param.name))
+        if kind == "str_or_list" and not items:
+            raise CliError(
+                "bad_value", f"{param.name} expects one value or a list like [a,b]", EXIT_USAGE
+            )
+        return items
     return _current_choice(value, param)
 
 
@@ -734,7 +762,7 @@ def _validate_config_value(value: object, param: ParamSpec) -> object:
     if param.type in ("str", "str_or_list") and isinstance(value, str):
         return _current_choice(value, param)
     strings = isinstance(value, (list, tuple)) and all(isinstance(i, str) for i in value)
-    if param.type in ("str_list", "str_or_list") and strings:
+    if strings and (param.type == "str_list" or (param.type == "str_or_list" and value)):
         return tuple(value)
     if param.type in ("str", "str_list", "str_or_list"):
         raise CliError(
@@ -1024,7 +1052,8 @@ def prepare_call(
     ``andrey.Knowledge``;
     the method reads each text key of ``targets=`` that spells a number as the label of ``--env``
     it spells. A method that reads column types or knowledge, or whose graph adds latent nodes
-    (GIN), gets the data as a DataFrame, so its warnings and its graph name the header's columns.
+    (GIN), or that takes a ``target``, gets the data as a DataFrame, so its warnings, its graph, and
+    its metadata name the header's columns.
     Returns the inputs, params, and the labels still to apply to the result.
     """
     if fkwargs.get("categorical") is not None:
@@ -1032,9 +1061,9 @@ def prepare_call(
     target = fkwargs.get("target")
     if isinstance(target, (list, tuple)):  # one answer per target, in order
         positions = column_positions(target, labels, "target")
-        if not positions or len(set(positions)) != len(positions):
-            why = "is an empty list" if not positions else "names a column twice"
-            raise CliError("bad_value", f"target {why}: {list(target)}", EXIT_USAGE)
+        if len(set(positions)) != len(positions):
+            message = f"target names a column twice: {list(target)}"
+            raise CliError("bad_value", message, EXIT_USAGE)
         fkwargs = {**fkwargs, "target": positions}
     elif target is not None:
         fkwargs = {**fkwargs, "target": column_positions([target], labels, "target")[0]}
@@ -1046,10 +1075,11 @@ def prepare_call(
             fkwargs = {**fkwargs, "knowledge": andrey.Knowledge(**fkwargs["knowledge"])}
         except (TypeError, ValueError) as exc:
             raise CliError("bad_value", f"knowledge: {exc}", EXIT_USAGE) from exc
-    named = any(p.name in ("categorical", "knowledge") for p in spec.params)
+    named = any(p.name in ("categorical", "knowledge", "target") for p in spec.params)
     if labels is not None and (named or spec.output.has_latents):
         # A method that reads column types names the header's columns in its warnings and in
-        # metadata["categorical"]; knowledge names them too, in each group of a panel. A graph
+        # metadata["categorical"]; knowledge names them too, in each group of a panel, and a
+        # method that takes a target names its target and sets in its metadata. A graph
         # with latent nodes names its observed variables from the table, and a graph that leaves
         # out the contexts names what it keeps, so no label is left to apply to the result.
         import pandas as pd
@@ -1086,6 +1116,29 @@ def fit_errors() -> Generator[None]:
         raise CliError("algorithm_failure", str(exc), EXIT_ALGORITHM) from exc
 
 
+class LogWarning(Warning):
+    """The category ``run.warnings`` records a fit's warning-level log entry."""
+
+
+@contextlib.contextmanager
+def recorded_warnings() -> Generator[list[warnings.WarningMessage]]:
+    """Record a fit's warnings and the warning-level records of its loggers, for ``run.warnings``.
+
+    The list fills on block exit with warnings followed by warning-level log records, each as a
+    :class:`LogWarning`. :func:`~andrey.core.warning_policy.held_records` holds them, so none
+    reaches standard error or is lost to a logger above ``WARNING``.
+    """
+    with held_records() as records:
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            yield caught
+        caught.extend(
+            warnings.WarningMessage(r.getMessage(), LogWarning, r.pathname, r.lineno)
+            for r in records
+            if r.levelno >= logging.WARNING
+        )
+
+
 def run_info(
     positional: list,
     resolved: dict,
@@ -1106,20 +1159,37 @@ def run_info(
     return run
 
 
+def strict_json(value: object) -> str:
+    """``value`` as indented standard JSON: a nonfinite number, such as an untested p-value, is
+    ``null``."""
+
+    def finite(item: object) -> object:
+        if isinstance(item, float) and not math.isfinite(item):
+            return None
+        if isinstance(item, dict):
+            return {key: finite(v) for key, v in item.items()}
+        if isinstance(item, (list, tuple)):
+            return [finite(v) for v in item]
+        return item
+
+    return json.dumps(finite(value), indent=2, allow_nan=False)
+
+
 def emit(env: dict, human: Callable[[], str], *, output: str | None, as_json: bool, full: bool):
-    """Write the envelope to ``output``, or print it: capped JSON, or ``human()`` on a terminal."""
+    """Write the envelope to ``output``, or print it: capped JSON (:func:`strict_json`), or
+    ``human()`` on a terminal."""
     if output:  # a file is not context-bounded -> always the complete envelope
-        _atomic_write(output, json.dumps(env, indent=2))
+        _atomic_write(output, strict_json(env))
         return
     if not full:  # bound stdout so a large graph can't flood it
         apply_output_cap(env, EDGE_LIMIT)
     if as_json or not sys.stdout.isatty():  # piped / agent / CI / forced -> JSON
-        typer.echo(json.dumps(env, indent=2))
+        typer.echo(strict_json(env))
         return
     try:  # an interactive terminal -> a human summary (never fail to produce output)
         typer.echo(human())
     except Exception:
-        typer.echo(json.dumps(env, indent=2))
+        typer.echo(strict_json(env))
 
 
 def execute_run(
@@ -1142,12 +1212,14 @@ def execute_run(
     start = time.perf_counter()
     with fit_errors():
         # The fit's warnings travel in the envelope: stderr carries only a failure's JSON.
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
+        with recorded_warnings() as caught:
             out = fn(*positional, **fkwargs)
     elapsed = time.perf_counter() - start
     if isinstance(out, list):
         out = [with_labels(o, labels) for o in out]
+    elif isinstance(out, RegimeOutput):
+        outputs = tuple(with_labels(o, labels) for o in out.outputs)
+        out = dataclasses.replace(out, _outputs=outputs)
     else:
         out = with_labels(out, labels)
 
@@ -1244,8 +1316,7 @@ def execute_bootstrap(
     aligned = {inp.name: x for inp, x in zip(spec.data.inputs[1:], positional[1:])}
     start = time.perf_counter()
     with fit_errors():
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
+        with recorded_warnings() as caught:
             out = andrey.bootstrap(
                 spec.name,
                 positional[0],
@@ -1366,8 +1437,7 @@ def execute_markov_check(
     table = _table(data, labels)
     start = time.perf_counter()
     with fit_errors():
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
+        with recorded_warnings() as caught:
             out = andrey.markov_check(
                 graph,
                 table,  # ty: ignore[invalid-argument-type]  # one table; _table also takes a list

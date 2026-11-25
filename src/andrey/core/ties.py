@@ -10,7 +10,9 @@ position, and :func:`resolve_collider_order`, :func:`resolve_in_column_order`, a
 
 Scores and p-values that differ only in their last bits count as equal: a method compares them
 rounded to :data:`KEY_DP` decimal places (:func:`tie_key`, :func:`stable_key`), and a greedy search
-counts a move as improving only when it lowers the score by more than :data:`EPS_IMPROVE`.
+counts a move as improving only when it lowers the score by more than :data:`EPS_IMPROVE`. A
+pairwise direction test counts its two directions' values as equal when they agree within
+:data:`PAIR_RTOL` (:func:`tied`).
 """
 
 from __future__ import annotations
@@ -70,6 +72,29 @@ def stable_key(delta: float, n: int) -> float:
 def tie_key(value: float) -> float:
     """``value``, such as a log p-value, rounded to :data:`KEY_DP` decimal places."""
     return round(value, KEY_DP)
+
+
+#: Tolerance under which the two directions of a pairwise direction test (``anm``, ``pnl``,
+#: ``loci``, ``cpcm``) count as equal: two log p-values, two test statistics, or two
+#: log-likelihoods ``a`` and ``b`` tie when ``|a - b| <= PAIR_RTOL * max(1, |a|, |b|)``. For
+#: ``anm``, ``pnl`` and ``loci`` each direction's fit reads its rows in one canonical order, so a
+#: table whose two columns hold the same values swapped gives both directions the same numbers bit
+#: for bit, and they tie. ``cpcm`` fits both directions on the rows as given; on such tables in
+#: other row orders and units its two directions differed by at most ``1e-13``. The tolerance
+#: covers rounding carried through a fit: with such a table's columns in different units, which
+#: changes the last bits of its standardized values, the largest relative gap over 1,840 fits with
+#: 100 to 300 rows was ``1e-13`` for ``anm`` and ``0`` for ``pnl``, while for ``anm`` the two
+#: directions of 50 unrelated pairs, which nearly mirror each other, differ by ``2e-8`` and more.
+#: ``loci``'s solver stops when the mean log-likelihood changes by less than ``1e-6``, so its gap on
+#: such a table can reach ``6e-4``, and there the direction follows that difference.
+PAIR_RTOL = 1e-9
+
+
+def tied(a: float, b: float) -> bool:
+    """Whether ``a`` and ``b`` agree within :data:`PAIR_RTOL`; an infinity ties only with itself."""
+    if not (math.isfinite(a) and math.isfinite(b)):
+        return a == b
+    return abs(a - b) <= PAIR_RTOL * max(1.0, abs(a), abs(b))
 
 
 def tie_mask(name: str, categorical: npt.ArrayLike | None, d: int) -> np.ndarray:

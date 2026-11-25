@@ -6,6 +6,7 @@ The tests that fill the page's template need Jinja, from the docs group; without
 from __future__ import annotations
 
 import copy
+import datetime
 import html
 import importlib.util
 import json
@@ -504,26 +505,12 @@ def test_the_page_title_names_what_people_search_for(placeholder_page):
         assert words in build.SEARCH_TITLE
 
 
-# The registry as it is, and without one method the description does not name: the count of "more"
-# methods follows the registry.
-@pytest.mark.parametrize("dropped", [None, "gin"])
-def test_the_description_states_the_speed_claim_and_the_method_count(monkeypatch, dropped):
-    summaries = placeholder_summaries()
-    specs = [s for s in list_specs() if s.name != dropped]
-    monkeypatch.setattr(build, "list_specs", lambda: specs)
-    description = build.page_description(summaries)
-    assert description.endswith(build.CLAIM)
-    assert f"with PC, GES, FCI and {len(specs) - 3} more methods" in description
+def test_the_description_states_the_speed_claim_without_a_number():
+    description = build.PAGE_DESCRIPTION
+    assert description.startswith(build.CLAIM.removesuffix("."))
+    assert not re.search(r"\d", description)
     # Search results cut a description at about 160 characters.
     assert len(description) <= 160
-
-
-@pytest.mark.parametrize("name", ["pc", "ges", "fci"])
-def test_the_description_names_only_registered_methods(monkeypatch, name):
-    summaries = placeholder_summaries()
-    monkeypatch.setattr(build, "list_specs", lambda: [s for s in list_specs() if s.name != name])
-    with pytest.raises(ValueError, match=f"unregistered methods: {name.upper()}$"):
-        build.page_description(summaries)
 
 
 @pytest.fixture(scope="module")
@@ -1395,6 +1382,19 @@ def test_the_blog_lists_the_newest_post_first(conf):
     assert newest_first(posts[1::-1]) == newest_first(posts[:2])
 
 
+def test_a_post_shows_its_update_after_its_date_only_when_a_later_one_dates_it(conf):
+    app = types.SimpleNamespace(config=types.SimpleNamespace(post_date_format="%B %-d, %Y"))
+    first = datetime.datetime(2026, 10, 15)
+    post = types.SimpleNamespace(date=first, update=first)
+    date = '<time datetime="2026-10-15">October 15, 2026</time>'
+    assert conf["_post_days"](app, post) == date
+    post.update = datetime.datetime(2026, 11, 19)
+    assert conf["_post_days"](app, post) == (
+        f'{date} · <span class="post-updated">Updated '
+        '<time datetime="2026-11-19">November 19, 2026</time></span>'
+    )
+
+
 def test_the_hero_grain_is_small_and_the_same_on_every_build(cards):
     tiles = dict(cards.grain.hero_tiles())
     assert sum(len(t) for t in tiles.values()) <= 150 * 1024
@@ -1577,11 +1577,14 @@ def test_a_cover_that_is_not_in_the_brand_kit_fails(cards):
 
 
 def _release_covers():
-    """Each release cover and tile in the Release cards page, the cards, and the example in
-    ``docs/DEVELOPMENT.md``: how many folders deep its page is built, its classes, and its body's
-    paragraphs. The example is the Release cards page's cover."""
+    """Each release cover and tile in the Release cards page, the cards named by a version, and the
+    example in ``docs/DEVELOPMENT.md``: how many folders deep its page is built, its classes, and
+    its body's paragraphs. The example is the Release cards page's cover. A card named for its
+    topic shows the topic on its cover until its release is cut and numbers both."""
     docs = ROOT / "docs"
-    pages = [docs / "docs" / "benchmarks.md", *sorted((docs / "docs" / "benchmarks").glob("*.md"))]
+    cards = (docs / "docs" / "benchmarks").glob("*.md")
+    versioned = sorted(card for card in cards if re.fullmatch(r"\d+\.\d+\.\d+", card.stem))
+    pages = [docs / "docs" / "benchmarks.md", *versioned]
     for page in [*pages, docs / "DEVELOPMENT.md"]:
         depth = max(len(page.relative_to(docs).parts) - 1, 1)
         text = page.read_text(encoding="utf-8")

@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import andrey
-from andrey.core.ci_missing import EM_METHODS, EM_SUPPORTED
+from andrey.core.ci_missing import EM_METHODS, EM_SUPPORTED, TESTWISE_CLAIM
 from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.core.structure import EDGE_GLYPHS
 
@@ -68,7 +68,7 @@ _JSON_TYPES: dict[str, dict] = {
     "bool": {"type": "boolean"},
     "int_pair": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2},
     "str_list": {"type": "array", "items": {"type": "string"}},
-    # One column, or a list of at least one: the answer of a list is a list of answers.
+    # One string, or a list of at least one.
     "str_or_list": {"type": ["string", "array"], "items": {"type": "string"}, "minItems": 1},
     "knowledge": {
         "type": "object",
@@ -114,7 +114,12 @@ KNOWLEDGE_NOTE = (
 def _param_schema(p: ParamSpec) -> dict:
     schema = dict(_JSON_TYPES[p.type])
     if p.choices:  # a nullable choice param must admit null as a valid enum member (its default)
-        schema["enum"] = [*p.choices, None] if p.nullable else list(p.choices)
+        enum = [*p.choices, None] if p.nullable else list(p.choices)
+        if p.type == "str_or_list":  # one of the choices, or a list whose items each are one
+            schema["items"] = {**schema["items"], "enum": list(p.choices)}
+            schema["anyOf"] = [{"enum": enum}, {"type": "array"}]
+        else:
+            schema["enum"] = enum
     if p.nullable:
         kinds = schema["type"]
         schema["type"] = [*([kinds] if isinstance(kinds, str) else kinds), "null"]
@@ -166,7 +171,7 @@ def grammar_default(p: ParamSpec) -> str:
         return "null"
     if p.type == "int_pair":
         return "[" + ",".join(str(i) for i in d) + "]"
-    if p.type == "str_list":
+    if p.type == "str_list" or (p.type == "str_or_list" and not isinstance(d, str)):
         return "[" + ",".join(d) + "]"
     if p.type == "bool":
         return "true" if d else "false"
@@ -195,7 +200,7 @@ def grammar_example(p: ParamSpec) -> str:
 def _example_token(p: ParamSpec) -> str:
     """One `key=value` example token; list values are quoted so a shell keeps the brackets."""
     val = grammar_example(p)
-    return f"'{p.name}={val}'" if p.type in ("int_pair", "str_list") else f"{p.name}={val}"
+    return f"'{p.name}={val}'" if val.startswith("[") else f"{p.name}={val}"
 
 
 def cli_example(spec: MethodSpec, command: str = "run", *, files: bool = False) -> str:
@@ -263,6 +268,7 @@ def to_json_schema(spec: MethodSpec) -> dict:
             "has_ordering": spec.output.has_ordering,
             "has_latents": spec.output.has_latents,
             "multi": spec.output.multi,
+            "regimes": spec.output.regimes,
             "metadata": list(spec.output.metadata),
             "description": spec.output.doc,
         },
@@ -300,8 +306,8 @@ def cli_meta() -> dict:
         "output": (
             "runs and listings -> JSON on a non-interactive stdout (piped, an agent, CI); "
             "an interactive terminal gets a human summary, and --json forces JSON. failure -> a "
-            "JSON error envelope on stderr plus a non-zero exit. Warnings from the fit go in "
-            "run.warnings, never to stderr."
+            "JSON error envelope on stderr plus a non-zero exit. Warnings from the fit, and the "
+            "notices it logs (category LogWarning), go in run.warnings, never to stderr."
         ),
         "bounded_output": (
             "large arrays are capped at 1000 on stdout: a graph's inline edges (edges_truncated) "
@@ -321,7 +327,7 @@ def cli_meta() -> dict:
             "results": (
                 "with multi: true, in place of structure and metadata: one {structure, metadata} "
                 "per group (multi_group_direct_lingam) or per target, in the order of a list such "
-                "as 'target=[a,b]' on a target-centered method"
+                "as 'target=[a,b]' on a method that takes a target"
             ),
             "run": "resolved params, seed, versions, elapsed, n_samples, n_variables, and the "
             "fit's warnings (category, message)",
@@ -582,20 +588,34 @@ def render_skill() -> str:
         "The methods whose schema sets `data.missing` accept it, and their `missing` parameter "
         "names how: `testwise`, the default under `null`, deletes rows per test, each test "
         "reading the rows observed in all of its variables. `metadata.rows_tested` gives the "
-        "fewest (`min`) and the median rows a test read, and `metadata.missing` the handling. "
-        "They are "
+        "fewest (`min`) and the median rows a test read, `metadata.missing` the handling, and "
+        "`metadata.p_one_tests`, present when it is not zero, the number of tests that returned "
+        "p = 1, whichever test it is. A test with fewer rows than it needs, or with zero degrees "
+        "of freedom left, is not tested: it never separates a pair and never confirms a link. "
+        "`metadata.not_tested` counts the conditioning sets not tested, including those the "
+        "search skipped because no row can test them, `metadata.undecided_pairs` lists the pairs "
+        "no tested query could decide, which the graph leaves out and no orientation reads, "
+        "`metadata.possibly_separable` the edges drawn although a conditioning set that could not "
+        "be tested might have separated their pair (in the PC and FCI family, the blanket "
+        "learners, and the PCMCI family; a flag of what the data could not check, not a finding "
+        "that the edge is false), and `metadata.never_observed_together` the pairs of columns no "
+        "row observes together. A fit that runs the deletion under `null` logs one notice per "
+        "process that names it and gives the number of undecided pairs, of possibly separable "
+        "edges, and of pairs never observed together, naming them when there are at most five. "
+        "The searches that delete rows per test are "
         + ", ".join(f"`{s.name}`" for s in REGISTRY.values() if s.data.missing)
-        + ". The deletion is sound when values are missing completely at random; when whether a "
-        "value is missing depends on the variables, `pc` can keep extra edges, and `fci` stays "
-        "sound when no missingness mechanism causally affects another. The searches whose fit "
+        + f". {TESTWISE_CLAIM} The searches whose fit "
         "reads only a covariance, "
         + ", ".join(f"`{name}`" for name in EM_METHODS)
         + ", refuse a missing value under `null` and take `em`: structural EM, which runs the "
         "search on the expected covariance of the data 10 times, with 5 parameter-only EM steps "
         "on the current graph before each search after the first, and assumes values missing "
         "completely at random or at random given observed values; `metadata.em` records its "
-        "rounds, the observed-data log-likelihood after each, and whether each changed the "
-        "graph, and a fit whose last round changed it logs a warning. `em` is supported in "
+        "rounds, the observed-data log-likelihood after each, whether each changed the "
+        "graph, the rows dropped for observing no value (`rows_dropped`), and the fewest rows "
+        "that observe both columns of a pair (`min_shared_rows`); a fit whose last round changed "
+        "the graph logs a warning, and data in which two columns share no observed row are "
+        "refused. `em` is supported in "
         + ", ".join(f"`{name}`" for name in EM_SUPPORTED)
         + ", where it measured no less accurate than a reference implementation, and "
         "experimental in the others, which have none to compare with. Every other method refuses "

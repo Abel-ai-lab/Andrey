@@ -16,6 +16,7 @@ from __future__ import annotations
 import dataclasses
 import functools
 import inspect
+import logging
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -30,8 +31,16 @@ from andrey.core.ci import (
     STOCHASTIC_INDEP_TESTS,
     available_indep_tests,
 )
-from andrey.core.ci_missing import TESTWISE
+from andrey.core.ci_missing import (
+    NOT_TESTED_CLAIM,
+    POSSIBLY_SEPARABLE_CLAIM,
+    TESTWISE,
+    TESTWISE_CLAIM,
+    named_pairs,
+    reading_flags,
+)
 from andrey.core.knowledge import PATH_PARTS, Knowledge, resolve
+from andrey.core.output import RegimeOutput
 from andrey.core.removed import removal_hint
 from andrey.core.score import LINEAR_SCORES, PENALIZED_SCORES, RANK_SCORES
 from andrey.core.seeding import resolve_seed
@@ -40,6 +49,7 @@ from andrey.core.warning_policy import (
     DeprecatedArgumentWarning,
     ExperimentalWarning,
     KnowledgeWarning,
+    log_once,
     warn_each,
     warn_once,
 )
@@ -50,6 +60,8 @@ if TYPE_CHECKING:
     from andrey.spec.models import MethodSpec, ParamSpec
 
 __all__ = ["method_spec"]
+
+_log = logging.getLogger(__name__)
 
 Facade = TypeVar("Facade", bound=Callable[..., Any])
 
@@ -66,33 +78,31 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
     """Run the facade of method ``name`` inside the steps its spec defines.
 
     Before the facade: a former argument name or value becomes the current one, and a dropped
-    argument is removed, with one :class:`~andrey.DeprecatedArgumentWarning` for each; an argument
-    or a choice that an earlier release removed raises as an unknown one does, and the message
-    gives its current name (:mod:`andrey.core.removed`); every argument the call passes is checked
-    and converted by :meth:`~andrey.spec.models.ParamSpec.check`, which raises ``TypeError`` or
+    argument is removed, each with one :class:`~andrey.DeprecatedArgumentWarning`; an argument or
+    choice that an earlier release removed raises as an unknown one does, and the message gives its
+    current name (:mod:`andrey.core.removed`); every argument the call passes is checked and
+    converted by :meth:`~andrey.spec.models.ParamSpec.check`, which raises ``TypeError`` or
     ``ValueError``; for a method that takes ``env``, data given as each environment's rows apart
     become one table and ``env`` (:func:`pool_environments`); a row-aligned argument that names a
-    column of the data is taken out of it (:func:`take_columns`); a
-    seeded method's seed is resolved (:func:`~andrey.core.seeding.resolve_seed`) and passed on as
-    an int; an experimental method warns :class:`~andrey.ExperimentalWarning`
-    (:func:`warn_experimental`); a ``knowledge`` part the method does not honor raises
-    ``NotImplementedError``, one it honors experimentally warns, and ``required_paths`` and
-    ``forbidden_paths`` are resolved and set apart from the knowledge the facade gets
-    (:func:`path_constraints`); a ``None`` ``indep_test`` or ``score_func`` is picked from the
-    declared column types, and the facade gets the pick and the columns it reads
-    (:func:`chosen_settings`); a call that passes ``ebic_gamma`` or ``equivalent_sample_size`` with
-    a score that does not use it raises ``ValueError`` (:func:`check_penalties`), and so does one
-    that passes ``degrees_of_freedom`` with a test that does not read it
-    (:func:`check_degrees_of_freedom`).
-    After it: a CPDAG result keeps the DAGs it stands for that meet ``required_paths`` and
-    ``forbidden_paths`` (:func:`restrict_paths`), a PAG or a DAG is checked against them
-    (:func:`meet_paths`), and a claim the result does not meet is dropped with a warning
-    (:func:`drop_unmet`); each result's ``metadata["algorithm"]`` is
-    ``name``, ``metadata["indep_test"]`` and ``metadata["score_func"]`` are the test and the score
-    the fit used, for a method that takes them, with the penalties that score used
-    (:func:`used_penalties`);
-    ``metadata["tie_break"]`` is :data:`andrey.config`'s ``tie_break`` for a method whose result it
-    can change (``MethodSpec.tie_break``); when the fit draws random numbers
+    column of the data is taken out of it (:func:`take_columns`); a seeded method's seed is resolved
+    (:func:`~andrey.core.seeding.resolve_seed`) and passed on as an int; an experimental method
+    warns :class:`~andrey.ExperimentalWarning` (:func:`warn_experimental`); a ``knowledge`` part the
+    method does not honor raises ``NotImplementedError``, one it honors experimentally warns, and
+    ``required_paths`` and ``forbidden_paths`` are resolved and set apart from the knowledge the
+    facade gets (:func:`path_constraints`); a ``None`` ``indep_test`` or ``score_func`` is picked
+    from the declared column types, and the facade gets the pick and the columns it reads
+    (:func:`chosen_settings`); passing ``ebic_gamma`` or ``equivalent_sample_size`` with a score
+    that ignores it raises ``ValueError`` (:func:`check_penalties`), as does passing
+    ``degrees_of_freedom`` with a test that ignores it (:func:`check_degrees_of_freedom`). After it:
+    a CPDAG result keeps the DAGs it stands for that meet ``required_paths`` and ``forbidden_paths``
+    (:func:`restrict_paths`), a PAG or a DAG is checked against them (:func:`meet_paths`), and a
+    claim the result does not meet is dropped with a warning (:func:`drop_unmet`); each result's
+    ``metadata["algorithm"]`` is ``name``, ``metadata["indep_test"]`` and ``metadata["score_func"]``
+    are the test and the score the fit used, for a method that takes them, with the penalties that
+    score used (:func:`used_penalties`); ``metadata["tie_break"]`` is :data:`andrey.config`'s
+    ``tie_break`` for a method whose result it can change (``MethodSpec.tie_break``); the
+    orientation rules read flagged sides under ``possibly_separable="ambiguous"``
+    (:func:`~andrey.core.ci_missing.reading_flags`); when the fit draws random numbers
     (:func:`draws_random_numbers`), ``metadata["seed"]`` is the seed used; and, when its tests met
     missing values, ``metadata["missing"]`` is how it handled them (:func:`missing_used`).
     """
@@ -127,7 +137,8 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
             chosen = chosen_settings(spec, bound.arguments)
             check_penalties(spec, bound.arguments, chosen.get("score_func"))
             check_degrees_of_freedom(spec, bound.arguments, chosen.get("indep_test"))
-            out = facade(*bound.args, **bound.kwargs)
+            with reading_flags(bound.arguments.get("possibly_separable") == "ambiguous"):
+                out = facade(*bound.args, **bound.kwargs)
             if paths is not None:
                 out = (restrict_paths if spec.restricts_paths else meet_paths)(out, paths, name)
             stamp.update(chosen)
@@ -136,6 +147,10 @@ def method_spec(name: str) -> Callable[[Facade], Facade]:
                 stamp["tie_break"] = config.tie_break
             if isinstance(out, list):
                 return [stamped(o, stamp | missing_used(spec, bound.arguments, o)) for o in out]
+            if isinstance(out, RegimeOutput):  # the run and each regime's graph carry the stamp
+                outputs = tuple(stamped(o, stamp) for o in out.outputs)
+                metadata = {"algorithm": name, **out.metadata, **stamp}
+                return dataclasses.replace(out, _outputs=outputs, _metadata=metadata)
             return stamped(out, stamp | missing_used(spec, bound.arguments, out))
 
         return run  # ty: ignore[invalid-return-type]  # functools.wraps keeps the signature
@@ -449,19 +464,20 @@ def withheld_reason(param: ParamSpec, value: Any, method: str) -> str | None:
 def draws_random_numbers(spec: MethodSpec, arguments: dict[str, Any]) -> bool:
     """Whether a fit of the seeded method ``spec`` with ``arguments`` draws random numbers.
 
-    A method that takes ``tuning_iter`` always does: its optimization draws in every fit, whatever
-    test it runs. A method with an ``indep_test`` draws them only under a randomized test
+    A method that takes ``tuning_iter`` always does: its optimization draws in every fit regardless
+    of the test; so does a method returning regimes, since every start draws its first assignment. A
+    method with an ``indep_test`` draws them only under a randomized test
     (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`) or, when it takes ``n_starts``, for the starts
-    after the first, with ``n_starts`` above 1, unless it also takes a ``score_func``: then a
-    search over variable orders, visited in a random order, runs before the tests (``boss_fci``,
-    ``grasp_fci``), and it always does. A method with ``n_perturbations`` draws them only for the
-    random changes before a later start, with ``n_starts`` above 1; a method with a ``family``
-    draws them only for a count family (the randomized probability transform); every other seeded
-    method always does. ``pc``'s ``missing="mvpc"`` draws them only on data with missing values,
-    which this check does not read: ``pc`` records its seed itself when the correction ran.
+    after the first, with ``n_starts`` above 1, unless it also takes a ``score_func``: then a search
+    visiting variable orders randomly precedes the tests (``boss_fci``, ``grasp_fci``), and it
+    always does. A method with ``n_perturbations`` draws them only for the random changes before a
+    later start, with ``n_starts`` above 1; a method with a ``family`` draws them only for a count
+    family (the randomized probability transform); every other seeded method always does. ``pc``'s
+    ``missing="mvpc"`` draws them only on data with missing values, which this check does not read:
+    ``pc`` records its seed itself when the correction ran.
     """
-    if any(p.name == "tuning_iter" for p in spec.params):
-        return True
+    if any(p.name == "tuning_iter" for p in spec.params) or spec.output.regimes:
+        return True  # an optimization's draws, or a regime search's random first assignments
     test = next((p for p in spec.params if p.name == "indep_test"), None)
     starts = next((p for p in spec.params if p.name == "n_starts"), None)
     order_search = starts is not None and any(p.name == "score_func" for p in spec.params)
@@ -573,8 +589,8 @@ def check_degrees_of_freedom(spec: MethodSpec, arguments: dict[str, Any], test: 
     """Raise ``ValueError`` when the call passes ``degrees_of_freedom`` with a test that ignores it.
 
     Only the categorical tests (:data:`~andrey.core.ci.DISCRETE_INDEP_TESTS`) read it; ``test`` is
-    the one the fit uses (:func:`chosen_settings`). A default is never checked, so a method whose
-    default is ``"nonempty"`` runs with any test.
+    the one the fit uses (:func:`chosen_settings`). Defaults are not checked, so ``"nonempty"`` as a
+    default permits any test.
     """
     if "degrees_of_freedom" in arguments and test not in DISCRETE_INDEP_TESTS:
         raise ValueError(
@@ -645,14 +661,138 @@ def missing_used(
 ) -> dict[str, object]:
     """Return ``{"missing": value}`` when the fit ``out`` met missing values, else ``{}``.
 
-    A fit met them when its tests counted the rows they read, ``metadata["rows_tested"]``, or when
-    it ran structural EM, ``metadata["em"]``. The value is the call's ``missing`` or, for ``None``,
-    the method's default handling, ``"testwise"``.
+    A fit met them when its tests counted the rows they read, ``metadata["rows_tested"]``, when it
+    ran structural EM, ``metadata["em"]``, or when its data hold a missing value, as a fit that runs
+    no test does; such a fit gets ``{"rows_tested": {"min": 0, "median": 0}}``, as
+    :func:`~andrey.core.ci_missing.rows_metadata` gives when no query was tested. The value is the
+    call's ``missing`` or, for ``None``, the method's default handling, ``"testwise"``, which the
+    call left implicit: the process's first such fit logs :func:`notice_default_missing`. A fit
+    without structural EM on data with pairs of columns never observed together also gets
+    ``{"never_observed_together": ...}``, the pairs by name (:func:`never_observed_together`),
+    counted from the data before the tests read them.
     """
-    met = "rows_tested" in out.metadata or "em" in out.metadata
-    if not met or not any(p.concept == "missing" for p in spec.params):
+    if not any(p.concept == "missing" for p in spec.params):
         return {}
-    return {"missing": arguments.get("missing") or TESTWISE}
+    data = arguments.get(spec.data.inputs[0].name)
+    stamp: dict[str, object] = {}
+    if "rows_tested" not in out.metadata and "em" not in out.metadata:
+        missing = _missing_cells(data)
+        if missing is None or not missing.any():
+            return {}
+        stamp["rows_tested"] = {"min": 0, "median": 0}
+    stamp["missing"] = arguments.get("missing") or TESTWISE
+    if "em" not in out.metadata and (pairs := never_observed_together(data)):
+        stamp["never_observed_together"] = pairs
+    if arguments.get("missing") is None:
+        notice_default_missing(spec.name, {**out.metadata, **stamp})
+    return stamp
+
+
+def _missing_cells(data: object) -> np.ndarray | None:
+    """Return where the table ``data`` holds a missing value.
+
+    ``None`` for data that is neither a DataFrame nor one table of numbers.
+    """
+    import pandas as pd
+
+    if isinstance(data, pd.DataFrame):  # of any column types
+        return np.asarray(data.isna(), dtype=bool)
+    try:
+        array = np.asarray(data)
+        if array.dtype.kind in "biu":  # no value of these types is missing
+            missing = np.zeros(array.shape, dtype=bool)
+        elif array.dtype.kind == "f":
+            missing = np.isnan(array)
+        else:
+            missing = np.isnan(np.asarray(array, dtype=np.float64))
+    except (TypeError, ValueError):
+        return None
+    return missing if missing.ndim == 2 else None
+
+
+def never_observed_together(data: object) -> list[list]:
+    """Return the pairs of columns of ``data`` with no row observing both, by name.
+
+    Named by the DataFrame's labels, or by 0-based position, as
+    :func:`~andrey.core.ci_missing.named_pairs` lists pairs; ``[]`` for data that is not one table.
+    One product of the observed masks takes one pass over the data.
+    """
+    if (missing := _missing_cells(data)) is None:
+        return []
+    observed = (~missing).astype(np.float64)
+    together = observed.T @ observed
+    pairs = zip(*np.nonzero(np.triu(together == 0, 1)))
+    return named_pairs(((int(a), int(b)) for a, b in pairs), label_of(column_labels(data)))
+
+
+#: The key of :func:`notice_default_missing` in :func:`~andrey.core.warning_policy.log_once`.
+MISSING_DEFAULT_NOTICE = "missing_default"
+#: The maximum pairs named in the notice; beyond it, the notice counts them and metadata lists them
+#: all.
+_NOTICE_PAIRS = 5
+
+
+def notice_default_missing(method: str, metadata: dict | None = None) -> None:
+    """Log, once per process, that ``method`` ran test-wise deletion as its default handling.
+
+    The notice names the handling, its validity conditions
+    (:data:`~andrey.core.ci_missing.TESTWISE_CLAIM`), and how to select it explicitly. When the
+    fit's ``metadata`` names pairs never observed together, has untested queries, or names undecided
+    pairs, the notice reports them (:func:`_not_tested_notice`); the metadata holds every pair of
+    every fit. The calling process logs for :func:`~andrey.bootstrap` workers, which log none.
+    """
+    log_once(
+        _log,
+        MISSING_DEFAULT_NOTICE,
+        f"andrey.{method}: the data hold missing values and missing=None, so the fit ran the "
+        "default handling, test-wise deletion: each test read only the rows where its variables "
+        f'are observed. {TESTWISE_CLAIM} Pass missing="testwise" to choose it by name, and read '
+        f'the rows the tests kept in metadata["rows_tested"].{_not_tested_notice(metadata or {})} '
+        "This notice is logged once per process.",
+    )
+
+
+def _not_tested_notice(metadata: dict) -> str:
+    """Return what :func:`notice_default_missing` says of a fit's ``metadata``.
+
+    ``""`` when the fit has no pair never observed together, no test not tested, and no undecided
+    pair. Otherwise it gives the number of pairs never observed together and, with tests not tested
+    or undecided pairs, the :data:`~andrey.core.ci_missing.NOT_TESTED_CLAIM` and the number of
+    undecided pairs, and with possibly separable edges the
+    :data:`~andrey.core.ci_missing.POSSIBLY_SEPARABLE_CLAIM` and their number, naming the pairs when
+    there are at most ``_NOTICE_PAIRS``. The number of conditioning sets not tested,
+    ``metadata["not_tested"]``, is left out: it includes the sets the search skipped because no row
+    can test them, so its size reflects the search rather than user control.
+    """
+
+    def counted(pairs: list[list], of: str = "", noun: str = "pair") -> str:
+        n = len(pairs)
+        text = f"{n:,} {noun if n == 1 else noun + 's'}{of}"
+        if n <= _NOTICE_PAIRS:
+            text += " (" + ", ".join(f"{a} and {b}" for a, b in pairs) + ")"
+        return text
+
+    text = ""
+    if pairs := metadata.get("never_observed_together"):
+        verb = "is" if len(pairs) == 1 else "are"
+        text += (
+            f" {counted(pairs, ' of columns')} {verb} never observed together, listed in "
+            'metadata["never_observed_together"].'
+        )
+    undecided = metadata.get("undecided_pairs") or []
+    if metadata.get("not_tested") or undecided:
+        text += f" {NOT_TESTED_CLAIM}"
+        if undecided:
+            verb = "is" if len(undecided) == 1 else "are"
+            text += f" {counted(undecided)} {verb} undecided."
+        else:
+            text += " No pair is undecided."
+    if possibly := metadata.get("possibly_separable"):
+        verb = "is" if len(possibly) == 1 else "are"
+        text += (
+            f" {POSSIBLY_SEPARABLE_CLAIM} {counted(possibly, noun='drawn edge')} {verb} flagged."
+        )
+    return text
 
 
 def stamped(out: StructureOutput, stamp: dict[str, object]) -> StructureOutput:

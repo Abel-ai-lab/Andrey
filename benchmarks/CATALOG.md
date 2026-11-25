@@ -33,26 +33,26 @@ whose Reproduce table lists the driver.
 | [BOSS-FCI and GRaSP-FCI](comparisons/boss-fci-grasp-fci.md) | `boss_grasp_fci_cpu.py` | BOSS-FCI, GRaSP-FCI, each also with `edge_removal="triangles"`; GFCI and FCI as context | Tetrad (BOSS-FCI, GRaSP-FCI; GFCI and FCI as context); pcalg for the truth | 0.15.0 |
 | [FCI-JCI](comparisons/fci-jci.md) | `fci_jci_cpu.py` | FCI-JCI; FCI and CD-NOD as context | pcalg (FCI-JCI); Tetrad (FCI with the environment in the first tier) as context | 0.15.0 |
 | [Hidden-confounder methods](comparisons/hidden-confounder-methods.md) | `confounded_cpu.py` | RCD, BottomUpParceLiNGAM | lingam | |
-| [MMB-by-MMB](comparisons/mmb-by-mmb.md) | `mmb_by_mmb_cpu.py` | MMB-by-MMB (total conditioning, IAMB); FCI as context | the authors' MMB-by-MMB code; pcalg (RFCI) | 0.18.0 |
-| [Y-structures](comparisons/y-structures.md) | `y_structures_cpu.py`, `y_structures_summary.py` | Y-structures, extended Y-structures | the authors' Y-structure code (sbcd) | 0.18.0 |
-| [Local ISA-LiNG](comparisons/local-isa-ling.md) | `local_lingam_cpu.py`, `local_lingam_summary.py` | local ISA-LiNG, with its own blanket and the true one; global DirectLiNGAM and ICA-LiNGAM as context | the authors' local ISA-LiNG code (Local-LiNG-Discovery) | 0.18.0 |
-| [Treatment-outcome methods](comparisons/adjustment.md) | `adjustment_cpu.py` | the methods that answer for a treatment and an outcome, as they ship (`covariate_rules`, `ldecc`, `ldp`, `ld3`, `snap`, `local_optimal_adjustment`, `locpc_cde`); PC read at the pair | the authors' code for LDECC, LDP, LD3, SNAP, LOAD, and LocPC-CDE | 0.18.0 |
+| [MMB-by-MMB](comparisons/mmb-by-mmb.md) | `mmb_by_mmb_cpu.py` | MMB-by-MMB (total conditioning, IAMB); FCI as context | the authors' MMB-by-MMB code; pcalg (RFCI) | local discovery |
+| [Y-structures](comparisons/y-structures.md) | `y_structures_cpu.py`, `y_structures_summary.py` | Y-structures, extended Y-structures | the authors' Y-structure code (sbcd) | local discovery |
+| [Local ISA-LiNG](comparisons/local-isa-ling.md) | `local_lingam_cpu.py`, `local_lingam_summary.py` | local ISA-LiNG, with its own blanket and the true one; global DirectLiNGAM and ICA-LiNGAM as context | the authors' local ISA-LiNG code (Local-LiNG-Discovery) | local discovery |
+| [Treatment-outcome methods](comparisons/adjustment.md) | `adjustment_cpu.py` | the methods that answer for a treatment and an outcome, as they ship (`covariate_rules`, `ldecc`, `ldp`, `ld3`, `snap`, `local_optimal_adjustment`, `locpc_cde`); PC read at the pair | the authors' code for LDECC, LDP, LD3, SNAP, LOAD, and LocPC-CDE | local discovery |
 | [CAM-UV](comparisons/camuv.md) | `camuv_cpu.py` | CAM-UV | lingam, causal-learn | 0.14.0 |
 | [Domains, groups, and latent indicators](comparisons/domains-groups-latent.md) | `cdnod_cpu.py`, `multi_group_cpu.py`, `gin_cpu.py` | CD-NOD, MultiGroupDirectLiNGAM, GIN | causal-learn, lingam, Tetrad | 0.7.0, 0.9.0 |
 | [DirectLiNGAM and ICA-LiNGAM](comparisons/lingam.md) | `lingam_cpu.py`, `lingam_gpu.py` | DirectLiNGAM (CPU and GPU), ICA-LiNGAM | causal-learn | 0.1.0, 0.9.0 |
 | [ANM direction test](comparisons/anm.md) | `anm_pairs.py` | ANM | causal-learn | 0.4.0, 0.9.0 |
 | [CAM and RESIT](comparisons/cam-resit.md) | `fcm_cpu.py` | CAM, RESIT | CAM 1.0 (R), the authors' R code for RESIT, lingam | 0.13.0 |
-| [SCORE and NoGAM](comparisons/score-nogam.md) | `stein_cpu.py` | SCORE, NoGAM, DAS; CAM as context | the authors' SCORE code, NoGAM and DAS in dodiscover, CausalDisco (R2-SortnRegress) | 0.17.0 |
+| [SCORE and NoGAM](comparisons/score-nogam.md) | `stein_cpu.py` | SCORE, NoGAM, DAS; CAM as context | the authors' SCORE code, NoGAM and DAS in dodiscover, CausalDisco (R2-SortnRegress) | 0.17.0, 0.19.0 |
 | [NOTEARS and DAGMA](comparisons/notears-dagma.md) | `notears_cpu.py`, `notears_summary.py` | NOTEARS, DAGMA, each also with `standardize=True` and `robust=True` | the authors' NOTEARS code, the authors' dagma; CausalDisco (R2-SortnRegress, Var-SortnRegress) as controls | 0.17.0, 0.18.0 |
 | [PNL direction test](comparisons/pnl.md) | `pnl_pairs.py` | PNL | causal-learn | 0.4.0, 0.9.0 |
 | [LOCI direction test](comparisons/loci.md) | `loci_pairs.py` | LOCI, both criteria; ANM, PNL, and CAM as context | the authors' LOCI code (spline features, both criteria) | 0.16.0 |
 | SkewD direction test | `skewd_pairs.py` | SkewD, both criteria; LOCI as context | the authors' SkewD code (both criteria) | |
 | [Categorical data](comparisons/categorical.md) | `discrete_cpu.py` | PC, GES, BOSS, GRaSP, hill climbing | causal-learn, bnlearn, pgmpy | 0.6.0, 0.8.0 |
-| [Markov blankets, and parents and children](comparisons/blankets.md) | `blanket_cpu.py`, `pcmb_summary.py` | IAMB, Inter-IAMB, MMPC, PCMB, and the family's other learners as they ship; the sets at a target and the graphs they give | bnlearn (GS, IAMB, Fast-IAMB, Inter-IAMB, MMPC, SI-HITON-PC; PC-stable read at a target); the authors' Causal Explorer (HITON-PC, HITON-MB, MMMB), MATLAB; for PCMB, which has no implementation, the published results of its paper | 0.18.0 |
-| [Edges and directions at a target](comparisons/target-edges.md) | `direct_cpu.py`, `direct_summary.py` | CMB and MB-by-MB, at every target; PC read at the target | bnlearn (PC-stable read at the target); for CMB and MB-by-MB, which have no implementation, the published results of their papers | 0.18.0 |
-| [GS, Fast-IAMB, and HITON-PC](comparisons/gs-fast-iamb-hiton-pc.md) | `blanket_cpu.py`, `blanket_summary.py` | GS, Fast-IAMB, HITON-PC; IAMB, Inter-IAMB, MMPC, HITON-PC at `max_depth=3` and without its rows-per-cell rule as context | bnlearn (GS, Fast-IAMB, SI-HITON-PC), with `mi-adf` and plain `mi` | 0.18.0 |
-| [HITON-MB](comparisons/hiton-mb.md) | `blanket_cpu.py`, `blanket_summary.py` | HITON-MB; MMMB at `max_depth=3`, IAMB, Inter-IAMB, GS, PCMB, and HITON-MB with `degrees_of_freedom="nonempty"` as context | the authors' Causal Explorer 1.5 (HITON-MB), MATLAB | 0.18.0 |
-| [MMMB](comparisons/mmmb.md) | `blanket_cpu.py`, `blanket_summary.py` | MMMB; IAMB, Inter-IAMB, GS, PCMB, and MMMB with `degrees_of_freedom="mean"` as context | the authors' Causal Explorer 1.5 (MMMB), MATLAB | 0.18.0 |
+| [Markov blankets, and parents and children](comparisons/blankets.md) | `blanket_cpu.py`, `pcmb_summary.py` | IAMB, Inter-IAMB, MMPC, PCMB, and the family's other learners as they ship; the sets at a target and the graphs they give | bnlearn (GS, IAMB, Fast-IAMB, Inter-IAMB, MMPC, SI-HITON-PC; PC-stable read at a target); the authors' Causal Explorer (HITON-PC, HITON-MB, MMMB), MATLAB; for PCMB, which has no implementation, the published results of its paper | local discovery |
+| [Edges and directions at a target](comparisons/target-edges.md) | `direct_cpu.py`, `direct_summary.py` | CMB and MB-by-MB, at every target; PC read at the target | bnlearn (PC-stable read at the target); for CMB and MB-by-MB, which have no implementation, the published results of their papers | local discovery |
+| [GS, Fast-IAMB, and HITON-PC](comparisons/gs-fast-iamb-hiton-pc.md) | `blanket_cpu.py`, `blanket_summary.py` | GS, Fast-IAMB, HITON-PC; IAMB, Inter-IAMB, MMPC, HITON-PC at `max_depth=3` and without its rows-per-cell rule as context | bnlearn (GS, Fast-IAMB, SI-HITON-PC), with `mi-adf` and plain `mi` | local discovery |
+| [HITON-MB](comparisons/hiton-mb.md) | `blanket_cpu.py`, `blanket_summary.py` | HITON-MB; MMMB at `max_depth=3`, IAMB, Inter-IAMB, GS, PCMB, and HITON-MB with `degrees_of_freedom="nonempty"` as context | the authors' Causal Explorer 1.5 (HITON-MB), MATLAB | local discovery |
+| [MMMB](comparisons/mmmb.md) | `blanket_cpu.py`, `blanket_summary.py` | MMMB; IAMB, Inter-IAMB, GS, PCMB, and MMMB with `degrees_of_freedom="mean"` as context | the authors' Causal Explorer 1.5 (MMMB), MATLAB | local discovery |
 | [Missing data](comparisons/missing-data.md) | `missing_cpu.py` | PC with MVPC; GES, XGES, BOSS, GRaSP, hill climbing, Tabu search, exact search, NOTEARS, DAGMA, and CALM with structural EM; test-wise PC, listwise deletion, and mean imputation | the MVPC authors' R code, MissDAG, bnlearn's `structural.em`, Tetrad's EM covariance policy | 0.16.0, 0.17.0 |
 | [Path and confounder claims](comparisons/knowledge-paths.md) | `knowledge_paths.py` | The 22 methods that honor them, from PC to multi-group DirectLiNGAM, with `required_paths`, `forbidden_paths`, and `confounded`, against the same fit without them | enumeration of every small graph; Tetrad, pcalg, tigramite, lingam, bnlearn, and causal-learn given the same knowledge | |
 | [Mixed data](comparisons/mixed.md) | `mixed_cpu.py` | PC, GES, hill climbing | Tetrad, bnlearn | 0.6.0 |
@@ -64,14 +64,16 @@ whose Reproduce table lists the driver.
 | [VARMA-LiNGAM and longitudinal LiNGAM](comparisons/lingam-time-series.md) | `lingam_ts.py` | VARMA-LiNGAM, LongitudinalLiNGAM | lingam | 0.5.0, 0.9.0 |
 | [DYNOTEARS](comparisons/dynotears.md) | `dynotears_ts.py` | DYNOTEARS | CausalNex | 0.14.0 |
 | [Cross-link F1 of a time-series run](comparisons/cross-link-f1.md) | `rescore_cross_links.py`, `rescore_window_pag.py` | rescores a finished run | | |
+| Tübingen cause-effect pairs | `tuebingen_pairs.py`, `tuebingen_summary.py` | `anm`, `pnl`, `loci` (both criteria), and `resit` on the real pairs of `load_dataset("tuebingen")` | the authors' code of QCCD, HECI, and GRCI | |
 | Public datasets | `public_datasets.py` | every method on Sachs and the bnlearn networks | every package | 0.1.0 |
 | [Dispatch thresholds](comparisons/dispatch-thresholds.md) | | Andrey's own execution paths | | |
 
 `start.sh` builds the benchmark environment; `start_r.sh`, `start_cam_r.sh`, `start_resit_r.sh`,
 `start_mvpc_r.sh`, `start_sbcd_r.sh`, `start_missdag.sh`, `start_mmb.sh`, `start_xges.sh`,
 `start_tigramite.sh`, `start_lingam.sh`, `start_lingam_ts.sh`, `start_causalnex.sh`,
-`start_utigsp.sh`, `start_loci.sh`, `start_skewd.sh`, `start_stein.sh`, and `start_notears.sh` build
-the separate environments some comparisons need ([setup](README.md#setup)).
+`start_utigsp.sh`, `start_loci.sh`, `start_skewd.sh`, `start_stein.sh`, `start_notears.sh`,
+`start_qccd.sh`, `start_heci.sh`, `start_grci.sh`, and `start_regression_ci_r.sh` build the separate
+environments some comparisons need ([setup](README.md#setup)).
 
 ## Release cards
 
@@ -107,7 +109,18 @@ and the other pairwise methods on the same pairs. The 0.17.0 summary draws SCORE
 from [`published/0.17.0/stein-score.json`](published/0.17.0/stein-score.json), SCORE with its
 authors' code and NoGAM with dodiscover, which their [comparison page](comparisons/score-nogam.md)
 presents, with `cam` and the floors on the same datasets, the fresh seeds, and the additive-noise
-check. The path and confounder claims are in no release
+check. The 0.19.0 summary draws DAS's rows from
+[`published/0.19.0/das.json`](published/0.19.0/das.json), DAS with dodiscover, which also holds its
+floors up to 1,000 variables, `cam`, SCORE, and NoGAM on the same datasets, the fresh seeds, the
+five paired fits at 500 variables, and the check of its order search on raw columns. Its CPCM rows
+come from [`published/0.19.0/cpcm.json`](published/0.19.0/cpcm.json), the pair test and the graph
+search with the authors' R code on the paper's pairs and graphs, which also holds the conservative
+estimate's outcomes, the floors, the fresh seeds, and LOCI, ANM, PNL, and eight graph methods on the
+same data. Its SkewD rows come from [`published/0.19.0/skewd.json`](published/0.19.0/skewd.json),
+SkewD under both criteria and SkewD-MV against the authors' recorded outputs on the paper's pairs
+and graphs, which also holds the fresh run of the authors' code that checks those outputs, the
+floors, the fresh graph seeds, and LOCI, ANM, PNL, CAM, and five graph methods on the same data. The
+path and confounder claims are in no release
 summary: [`published/0.16.0/knowledge-paths.json`](published/0.16.0/knowledge-paths.json) holds the
 rows of the first eight methods and
 [`published/0.17.0/knowledge-paths.json`](published/0.17.0/knowledge-paths.json) those of the other
@@ -120,27 +133,29 @@ rows of the alternating structural EM and, under `earlier_scheme`, those of one 
 holds hill climbing, Tabu search, and NOTEARS with the alternating EM against bnlearn and MissDAG,
 on the datasets of the 0.16.0 record. Their [comparison page](comparisons/missing-data.md) presents
 all three. The NOTEARS and DAGMA lane's rows are in
-[`published/0.17.0/notears-dagma.json`](published/0.17.0/notears-dagma.json), with their
-[comparison page](comparisons/notears-dagma.md); the 0.17.0 summary holds NOTEARS's rows against its
-authors' code, with the fresh seeds of one setting. The 0.18.0 summary holds DAGMA's rows against
-its authors' package, from
-[`published/0.18.0/notears-dagma.json`](published/0.18.0/notears-dagma.json), which keeps the rows
-of the default fit that 0.17.0 measured. The AGES lane's rows are in
-[`published/0.17.0/ages.json`](published/0.17.0/ages.json), with their
-[comparison page](comparisons/ages.md); the 0.17.0 summary holds its rows against pcalg. The 0.18.0
-summary holds PCMB's rows beside the published results of its paper, which the [comparison
-page](comparisons/blankets.md#pcmb-against-its-paper) presents with the other readings of an empty
-answer and the floors. It draws GS's, Fast-IAMB's, and HITON-PC's rows from
-[`published/0.18.0/gs-fast-iamb-hiton-pc.json`](published/0.18.0/gs-fast-iamb-hiton-pc.json), the
-three methods with bnlearn, which their [comparison page](comparisons/gs-fast-iamb-hiton-pc.md)
+[`published/0.17.0/notears-dagma.json`](published/0.17.0/notears-dagma.json), with their [comparison
+page](comparisons/notears-dagma.md); the 0.17.0 summary holds NOTEARS's rows against its authors'
+code, with the fresh seeds of one setting. The 0.18.0 summary holds DAGMA's rows against its
+authors' package, from [`published/0.18.0/notears-dagma.json`](published/0.18.0/notears-dagma.json),
+which keeps the rows of the default fit that 0.17.0 measured; both files also record the
+`robust=True` path beside its authors' code and the fits on the Sachs data, under `likelihood_path`
+and `sachs`. The AGES lane's rows are in [`published/0.17.0/ages.json`](published/0.17.0/ages.json),
+with their [comparison page](comparisons/ages.md); the 0.17.0 summary holds its rows against pcalg.
+The local discovery summary holds PCMB's rows beside the published results of its paper, which the
+[comparison page](comparisons/blankets.md#pcmb-against-its-paper) presents with the other readings
+of an empty answer and the floors. It draws GS's, Fast-IAMB's, and HITON-PC's rows from
+[`published/local-discovery/gs-fast-iamb-hiton-pc.json`](published/local-discovery/gs-fast-iamb-hiton-pc.json),
+the three methods with bnlearn, which their [comparison page](comparisons/gs-fast-iamb-hiton-pc.md)
 presents, with the fresh seeds, the floors, and the context comparisons. HITON-MB's rows come from
-[`published/0.18.0/hiton-mb.json`](published/0.18.0/hiton-mb.json), against its authors' Causal
-Explorer, which its [comparison page](comparisons/hiton-mb.md) presents the same way, and MMMB's
-from [`published/0.18.0/mmmb.json`](published/0.18.0/mmmb.json), which its [comparison
-page](comparisons/mmmb.md) presents.
+[`published/local-discovery/hiton-mb.json`](published/local-discovery/hiton-mb.json), against its
+authors' Causal Explorer, which its [comparison page](comparisons/hiton-mb.md) presents the same
+way, and MMMB's from [`published/local-discovery/mmmb.json`](published/local-discovery/mmmb.json),
+which its [comparison page](comparisons/mmmb.md) presents.
 
 | Release | Release card | Summary |
 |---|---|---|
+| 0.19.0 | [0.19.0 release card](../docs/docs/benchmarks/0.19.0.md) | [`published/0.19.0/summary.json`](published/0.19.0/summary.json) |
+| local discovery | [local discovery release card](../docs/docs/benchmarks/local-discovery.md) | [`published/local-discovery/summary.json`](published/local-discovery/summary.json) |
 | 0.18.0 | [0.18.0 release card](../docs/docs/benchmarks/0.18.0.md) | [`published/0.18.0/summary.json`](published/0.18.0/summary.json) |
 | 0.17.0 | [0.17.0 release card](../docs/docs/benchmarks/0.17.0.md) | [`published/0.17.0/summary.json`](published/0.17.0/summary.json) |
 | 0.16.0 | [0.16.0 release card](../docs/docs/benchmarks/0.16.0.md) | [`published/0.16.0/summary.json`](published/0.16.0/summary.json) |

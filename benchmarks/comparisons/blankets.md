@@ -153,9 +153,9 @@ an empty answer:
 
 The floor is the errors of the sets, the members missed plus the members added, against the empty
 set's, the size of the true set, with the paired bootstrap interval of the difference over the
-datasets. The table beside the paper's is on the
-[0.18.0 release card](../../docs/docs/benchmarks/0.18.0.md#pcmb). Here are the other reading, the
-floor, and the time of a fit for every node on one core:
+datasets. The table beside the paper's is on the [local discovery release
+card](../../docs/docs/benchmarks/local-discovery.md#pcmb). Here are the other reading, the floor,
+and the time of a fit for every node on one core:
 
 | Network | Rows | Datasets | Empty answers per dataset | Distance, empty counted 1 | Errors | Empty set's errors | Errors minus the empty set's [95% interval] | Median fit |
 |---|---:|---:|---:|---:|---:|---:|---|---:|

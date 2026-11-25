@@ -62,7 +62,7 @@ undirected edges, 0.430 against 0.638 and 1.335. The paper reports 0.69 extra, 0
 symmetry check of HITON-MB, CMB's default blanket learner, they were 0.21; counting the degrees of
 freedom from the cells that occur, or capping the conditioning sets at 3, left them at 0.01 to 0.02.
 With exact tests, by d-separation in the true graph, CMB's only errors were 0.09 edges per target
-left undirected that the CPDAG directs. The [0.18.0 release card][card] has the table.
+left undirected that the CPDAG directs. The [local discovery release card][card] has the table.
 
 ## MB-by-MB against global PC and CMB
 
@@ -76,13 +76,13 @@ hold 10 and 10 (seeds 0-9 and 10-19), with fresh PC fits at 500 and 1,000 rows o
 there takes 4 to 39 million tests. The cap is 1,800 s per fit, 3,600 s on the chessboard.
 
 No cell is dominated per answer: an answer took 279 to 930 tests on Alarm and Hailfinder against
-3,954 to 14,070 for one fit of Andrey's PC, and 27,000 to 93,000 on the chessboard against 4.4 to
-39 million. MB-by-MB was better than `pc.stable` in all 16 Alarm and Hailfinder cells and better
-than Andrey's PC in 8, tied in 6, and worse in 2, Alarm at 5,000 rows and alpha 0.05 and
-Hailfinder at 500 rows and alpha 0.05. On the chessboard it was worse in all 8 cells on the first
-datasets, and again on the fresh ones at 500 and 1,000 rows. For every target at once, one PC fit
-takes fewer tests than the 37 or 56 walks in every Alarm and Hailfinder cell, and is better on
-both accuracy and tests in those two. The [0.18.0 release card][card-mb] has the tables and the plot.
+3,954 to 14,070 for one fit of Andrey's PC, and 27,000 to 93,000 on the chessboard against 4.4 to 39
+million. MB-by-MB was better than `pc.stable` in all 16 Alarm and Hailfinder cells and better than
+Andrey's PC in 8, tied in 6, and worse in 2, Alarm at 5,000 rows and alpha 0.05 and Hailfinder at
+500 rows and alpha 0.05. On the chessboard it was worse in all 8 cells on the first datasets, and
+again on the fresh ones at 500 and 1,000 rows. For every target at once, one PC fit takes fewer
+tests than the 37 or 56 walks in every Alarm and Hailfinder cell, and is better on both accuracy and
+tests in those two. The [local discovery release card][card-mb] has the tables and the plot.
 
 ## Run
 
@@ -116,5 +116,5 @@ an empty answer. The records go to `records.jsonl`, one line per fit and target 
 the target, so `--rescore` recomputes the scores without fitting, and the build and machine to
 `provenance.json`.
 
-[card]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#cmb
-[card-mb]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#mb-by-mb
+[card]: https://andrey.abel.ai/docs/benchmarks/local-discovery.html#cmb
+[card-mb]: https://andrey.abel.ai/docs/benchmarks/local-discovery.html#mb-by-mb

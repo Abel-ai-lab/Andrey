@@ -35,7 +35,7 @@ CPDAG_FITS = {
     **{f"pc-{test}": partial(andrey.pc, indep_test=test) for test in ("chisq", "gsq")},
     **{
         f"{method}-{name}": partial(getattr(andrey, method), score_func=score)
-        for method in ("ges", "hc", "gies", "xges", "tabu", "boss", "grasp")
+        for method in ("ges", "hc", "gies", "xges", "lges", "tabu", "boss", "grasp")
         for name, score in (("bdeu", "bdeu"), ("bic", "discrete_bic"))
     },
     "cdnod-chisq": lambda x: andrey.cdnod(x, np.zeros(len(x)), indep_test="chisq"),
@@ -162,7 +162,8 @@ def random_network():
     "fit",
     [
         *("pc-chisq", "pc-gsq", "ges-bdeu", "ges-bic", "gies-bdeu", "gies-bic"),
-        *("xges-bdeu", "xges-bic", "boss-bdeu", "boss-bic", "grasp-bic"),
+        *("xges-bdeu", "xges-bic", "lges-bdeu", "lges-bic", "boss-bdeu", "boss-bic"),
+        "grasp-bic",
     ],
 )
 def test_a_random_network_is_recovered_within_the_margin(random_network, fit):

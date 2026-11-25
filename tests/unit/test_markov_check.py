@@ -202,3 +202,28 @@ def test_sparse_categorical_tables_warn_and_dense_ones_do_not():
     with warnings.catch_warnings():
         warnings.simplefilter("error", SampleSizeWarning)
         markov_check(graph, dense, indep_test="gsq", categorical=[0, 1, 2])
+
+
+def test_facts_not_tested_stay_out_of_the_summary():
+    """A fact over two columns no row observes together is not tested: the count, the share, the
+    table, and the verdict hold only the tested facts."""
+    sample = _sample(6, 400, 5)
+    data = sample.data.copy()
+    data[:200, 0] = np.nan
+    data[200:, 5] = np.nan  # columns 0 and 5 share no row
+    check = markov_check(sample.graph, data, sample_fraction=1.0)
+    assert check.metadata["not_tested"] > 0
+    assert check.n_tests == len(check.p_values) == len(check.table())
+    assert np.isfinite(check.p_values).all()
+    assert check.share_dependent == np.mean(check.p_values < check.alpha)
+    assert check.verdict and str(check)
+
+
+def test_a_check_with_no_fact_tested_says_so():
+    a, b, c = (np.random.default_rng(s).standard_normal(100) for s in range(3))
+    data = np.column_stack([a, b, c])
+    data[:50, 0] = data[50:, 2] = np.nan  # 0 and 2 share no row
+    graph = GraphStructure.from_numpy(np.array([[0, 1, 0], [2, 0, 1], [0, 2, 0]]), kind="dag")
+    check = markov_check(graph, data, sample_fraction=1.0)
+    assert check.n_tests == 0 and check.metadata["not_tested"] == 1
+    assert check.passed and "none was tested" in check.verdict

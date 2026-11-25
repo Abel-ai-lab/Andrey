@@ -172,9 +172,9 @@ class _Config:
     once with ``BackendFallbackWarning`` before using ``"auto"``. Unknown names raise
     ``ValueError``.
 
-    ``n_jobs`` counts worker processes (threads for ``pnl``): ``-1`` uses every usable
-    core, ``0`` or ``1`` runs serially (the default is ``1``), and larger values request that many
-    workers.
+    ``n_jobs`` counts worker processes (threads for ``pnl``, ``skewd``, and ``skewd_mv``): ``-1``
+    uses every usable core, ``0`` or ``1`` runs serially (the default is ``1``), and larger values
+    request that many workers.
 
     ``tie_break`` sets how a method chooses between candidates that tie, such as two moves with
     equal rounded score changes. ``"rank"`` (the default) orders them by a rank computed from the

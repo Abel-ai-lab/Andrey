@@ -9,7 +9,7 @@ column do both directions leave independent residuals, so only there the directi
 
 The figure is inline SVG written next to this script as ``direction.html``, whose colors are
 ``--andrey-*`` tokens, so it follows the page's light or dark theme. Run with
-``uv run python docs/blog/0.17.0/direction.py``.
+``uv run python docs/blog/0.19.0/direction.py``.
 """
 
 from __future__ import annotations

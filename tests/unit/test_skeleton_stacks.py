@@ -225,9 +225,9 @@ def test_first_order_queries_are_prepared_as_they_are_evaluated(
     prepared = 0
     real = _skeleton._first_order_queries
 
-    def counting(pairs, neighbors):
+    def counting(pairs, neighbors, test=None):
         nonlocal prepared
-        for query in real(pairs, neighbors):
+        for query in real(pairs, neighbors, test):
             prepared += len(query[2])
             yield query
 

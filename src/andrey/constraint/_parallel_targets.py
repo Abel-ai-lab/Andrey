@@ -2,8 +2,15 @@
 process or on worker processes.
 
 One search answers every target, so a run or a spouse step that two targets read is made once.
-Each run depends only on the data, the settings, and its variable, and the tests that keep answers
-return the bits they would compute, so an answer is the one a search of its own would give.
+Each run depends only on the data, the settings, and its variable, so an answer is the one a search
+of its own would give, and its count of tests is the one such a search computes
+(:func:`~andrey.constraint.blanket.read_tests`): its own tests and those of every step it read,
+whichever answer made the step. A test that keeps answers, as the chi-square tests keep their
+marginal answers and count a kept one as no test, counts each pair the answer or its steps asked
+of them once, as a new search computes it the first time it is asked. A test-wise deletion test,
+which counts the rows each test reads, the queries it does not test, and the pairs no test decided
+(:func:`~andrey.core.ci_missing.rows_tested`), answers each target with a search of its own in
+this process, so each answer counts what a call for that target alone counts.
 
 With more than one worker, at least two targets, and a FisherZ, StudentT, or NormalScores test
 (:func:`~andrey.constraint._skeleton.canonical_capable`), the targets are cut into contiguous
@@ -12,8 +19,10 @@ any step ran: the test's exact correlation bytes and the tie ranks, or the data 
 from, and pins BLAS to one thread, as the caller's search does inside
 :meth:`~LocalSearch.pinned`. The answers come back in the order of the targets. These tests keep no
 answers, so each kept step computes the same tests in any process, and each answer's count of tests
-(:func:`~andrey.constraint.blanket.first_reads`) equals the one a single search gives the targets in
-order, whatever the number of workers. Any other test answers in this process.
+(:func:`~andrey.constraint.blanket.read_tests`) is the one a search of its own computes,
+whatever the number of workers, and the caller's count of tests
+(:func:`~andrey.constraint.blanket.first_reads`) is the one a single search computes. Any other
+test answers in this process with the one search.
 """
 
 from __future__ import annotations
@@ -24,8 +33,16 @@ from concurrent.futures import ProcessPoolExecutor
 from typing import TypeVar
 
 from andrey.constraint._skeleton import canonical_capable
-from andrey.constraint.blanket import LazyTieRanks, LocalSearch, Reading, Step, first_reads
+from andrey.constraint.blanket import (
+    LazyTieRanks,
+    LocalSearch,
+    Reading,
+    Step,
+    first_reads,
+    read_tests,
+)
 from andrey.core.ci import count_tests, counting_tests
+from andrey.core.ci_missing import TestwiseDeletion, rows_tested
 
 T = TypeVar("T")
 
@@ -70,30 +87,43 @@ def _answer_chunk(
 
 
 def answers(
-    search: LocalSearch,
+    search_of: Callable[[], LocalSearch],
     answer: Callable[[LocalSearch, int], T],
     targets: Sequence[int],
     workers: int = 1,
 ) -> list[tuple[T, int, Counter[int]]]:
-    """``answer(search, t)`` for each target ``t``, with the tests it computed and the rows read
-    by every test it read (:func:`~andrey.core.ci_missing.rows_tested`), in the order of
-    ``targets``.
+    """``answer(search, t)`` for each target ``t``, with the tests and the rows of every test it
+    read (:func:`~andrey.core.ci_missing.rows_tested`), in the order of ``targets``.
 
-    A test counts toward the first answer that reads it, so the counts add up to the tests the
-    call computed, while the rows of an answer are those a search of its own would count, the
-    steps an earlier answer made included. ``answer`` is a module-level function when ``workers`` is
-    above 1, so that it reaches the workers. The tests the workers compute are added to the
-    caller's :func:`~andrey.core.ci.counting_tests` count. The rows are counted only in this
-    process: a test-wise deletion test, the one test that counts them, answers here.
+    ``search_of`` makes a new search. An answer's tests and rows are those a search of its own would
+    count, the steps an earlier answer made included and each pair asked of a chi-square test's
+    kept answers once, so each answer counts what a call for that target alone counts, while the
+    caller's :func:`~andrey.core.ci.counting_tests` count is the tests the call computed, each
+    once. A test-wise deletion test answers each target with a search of its own, whose counts are
+    a call for that target alone gives, the queries not tested and the pairs no test decided among
+    them. ``answer`` is a module-level function when ``workers`` is above 1, so that it reaches the
+    workers. The tests the workers compute are added to the caller's
+    :func:`~andrey.core.ci.counting_tests` count. The rows are counted only in this process: a
+    test-wise deletion test, the one test that counts them, answers here.
     """
+    search = search_of()
+    if isinstance(search.test, TestwiseDeletion):
+        out = []
+        for i, t in enumerate(targets):
+            own = search if i == 0 else search_of()
+            with own.pinned(), counting_tests() as tests, rows_tested() as rows:
+                found = answer(own, t)
+            out.append((found, tests.n, rows))
+        return out
     if workers > 1 and len(targets) > 1 and canonical_capable(search.test):
         return _pooled(search, answer, targets, workers)
     out = []
     with search.pinned():
         for t in targets:
-            with counting_tests() as tests, search.reading() as reading:
+            with search.reading() as reading:
                 found = answer(search, t)
-            out.append((found, tests.n, reading.rows))
+            tests = read_tests(reading, search.step_tests, search.step_kept)
+            out.append((found, tests, reading.rows))
     return out
 
 
@@ -123,6 +153,5 @@ def _pooled(
         found += chunk_answers
         for step, n in steps:
             tests.setdefault(step, n)
-    counts = first_reads([reading for _, reading in found], tests)
-    count_tests(sum(counts))
-    return [(value, n, reading.rows) for (value, reading), n in zip(found, counts, strict=True)]
+    count_tests(sum(first_reads([reading for _, reading in found], tests)))
+    return [(value, read_tests(reading, tests), reading.rows) for value, reading in found]

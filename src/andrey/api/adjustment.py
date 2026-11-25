@@ -18,6 +18,7 @@ import numpy as np
 
 from andrey.api._adapt import (
     categorical_metadata,
+    check_total_conditioning_rows,
     copies_named,
     fit_inputs,
     label_of,
@@ -126,8 +127,15 @@ def ldp(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -135,7 +143,15 @@ def ldp(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -222,11 +238,15 @@ def ldp(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [2]_ [3]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. When values are missing completely at random, the rows a test keeps
-    are a random sample, so each test keeps its level [3]_. When whether a value is missing depends
-    on the variables, the rows a test keeps are a selected sample of their own. A test raises
-    ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
-    ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
+    the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
+    ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including sets skipped because no row can test them. A continuous column constant on a
+    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
+    completely at random, which means that whether a value is missing depends on no value in the
+    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
+    selected sample that more rows do not correct.
 
     **Limitations.** Not benchmarked yet. Tested with exact d-separation on the partition graphs
     of [1]_ and on random graphs, and on simulated linear-Gaussian data. Without a confounder in
@@ -339,8 +359,15 @@ def ld3(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -348,7 +375,15 @@ def ld3(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -429,11 +464,15 @@ def ld3(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [2]_ [3]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. When values are missing completely at random, the rows a test keeps
-    are a random sample, so each test keeps its level [3]_. When whether a value is missing depends
-    on the variables, the rows a test keeps are a selected sample of their own. A test raises
-    ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
-    ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
+    the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
+    ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including sets skipped because no row can test them. A continuous column constant on a
+    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
+    completely at random, which means that whether a value is missing depends on no value in the
+    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
+    selected sample that more rows do not correct.
 
     **Limitations.** Not benchmarked yet. Tested with exact d-separation on the graph of [1]_
     and on random graphs whose outcome has no descendants, and on simulated linear-Gaussian data.
@@ -599,8 +638,15 @@ def ldecc(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -608,7 +654,15 @@ def ldecc(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -654,7 +708,10 @@ def ldecc(
         method, the argument, what it accepts, and the value. Also if ``treatment`` or ``outcome``
         is missing or names a column ``data`` lacks, or both name one column; or if ``data`` or
         ``categorical`` does not suit the test, as for :func:`~andrey.pc`. With ``"fisherz"`` or
-        ``"student_t"``, also if a column repeats another up to scale and shift.
+        ``"student_t"``, also if a column repeats another up to scale and shift. With
+        ``blanket="total_conditioning"``, a partial-correlation test, and no ``max_depth`` below
+        ``d - 2``, also if ``data`` has fewer than ``d + 2`` rows with every variable observed,
+        ``d`` its number of columns.
 
     Warns
     -----
@@ -710,26 +767,32 @@ def ldecc(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [3]_ [4]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. When values are missing completely at random, the rows a test keeps
-    are a random sample, so each test keeps its level [4]_. When whether a value is missing depends
-    on the variables, the rows a test keeps are a selected sample of their own. A test raises
-    ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
-    ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
+    the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
+    ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including sets skipped because no row can test them. A continuous column constant on a
+    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
+    completely at random, which means that whether a value is missing depends on no value in the
+    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
+    selected sample that more rows do not correct.
 
-    **Limitations.** Measured against its authors' code on the graphs of the generator of [1]_
-    (App. C.1) and on the MAGIC-NIAB network at 8,000 to 32,000 rows, with Fisher's z test at the
-    level of their notebooks: its parent sets and effect estimates were as near the truth as the
-    code's in every setting, on 20 datasets and again on 20 fresh ones. Like the code's, its answers
-    scored below the better of abstaining and adjusting for nothing in every setting. The
-    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#ldecc>`_ has the
+    **Limitations.** Measured against its authors' code on the graphs of the generator of [1]_ (App.
+    C.1) and on the MAGIC-NIAB network at 8,000 to 32,000 rows, with Fisher's z test at the level of
+    their notebooks: its parent sets and effect estimates were as near the truth as the code's in
+    every setting, on 20 datasets and again on 20 fresh ones. Like the code's, its answers scored
+    below the better of abstaining and adjusting for nothing in every setting. The `local discovery
+    release card <https://andrey.abel.ai/docs/benchmarks/local-discovery.html#ldecc>`_ has the
     numbers. In some graphs the eager collider checks leave a parent of the treatment undirected
     that the CPDAG directs [2]_ (App. A.2): the answer then lists more parent sets than the CPDAG
     allows, the treatment's true parents among them. When some neighbor stays undirected, the PC
     algorithm's tests run over every pair, as many as learning the whole skeleton, and the sets
     number up to two to the power of the undirected neighbors. A fit ran a median of 500 to 570
     tests, in under a tenth of a second, on the 25-node graphs, and 72,000 to 166,000 tests, in 4 to
-    11 seconds, on MAGIC-NIAB (44 nodes). The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    11 seconds, on MAGIC-NIAB (44 nodes). ``"total_conditioning"`` with a partial-correlation test
+    needs at least two more rows than variables, rows with every variable observed, and raises
+    ``ValueError`` below that. The numbers are a reference, not a hard limit: they change with the
+    data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -774,6 +837,7 @@ def ldecc(
     )
     d = X.shape[1]
     x, y = pair_columns(treatment, outcome, labels, d, "ldecc")
+    check_total_conditioning_rows(X, blanket, indep_test, method="ldecc", max_depth=max_depth)
     with copies_named(labels), rows_tested() as rows, counting_tests() as tests:
         search = local_search(
             X,
@@ -859,8 +923,15 @@ def local_optimal_adjustment(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -868,7 +939,15 @@ def local_optimal_adjustment(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -915,6 +994,8 @@ def local_optimal_adjustment(
         does not name exactly two different columns, or names a column ``data`` lacks; or if
         ``data`` or ``categorical`` does not suit the test, as for :func:`~andrey.pc`. With
         ``"fisherz"`` or ``"student_t"``, also if a column repeats another up to scale and shift.
+        With ``blanket="total_conditioning"`` and a partial-correlation test, also if ``data`` has
+        fewer than ``d + 2`` rows with every variable observed, ``d`` its number of columns.
 
     Warns
     -----
@@ -971,11 +1052,15 @@ def local_optimal_adjustment(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [6]_ [7]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. When values are missing completely at random, the rows a test keeps
-    are a random sample, so each test keeps its level [7]_. When whether a value is missing depends
-    on the variables, the rows a test keeps are a selected sample of their own. A test raises
-    ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
-    ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
+    the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
+    ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including sets skipped because no row can test them. A continuous column constant on a
+    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
+    completely at random, which means that whether a value is missing depends on no value in the
+    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
+    selected sample that more rows do not correct.
 
     **Limitations.** Measured against its authors' code on the random graphs of [1]_ with 100 to
     1,000 variables and on pairs drawn from the MAGIC-NIAB network at 10,000 rows, with Fisher's z
@@ -983,13 +1068,15 @@ def local_optimal_adjustment(
     setting, on 20 datasets or again on 20 fresh ones, and its sets nearer the optimal set than the
     empty set. Like the code's, its answers scored below adjusting for nothing in every setting. An
     edge that two v-structures direct both ways is directed as the more clearly separated one asks,
-    and on 11 of those 200 datasets that answered no effect where the truth has one. The
-    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#load>`_ has the
-    numbers. Each local structure tests a pair against the subsets of the neighbors of its ends with
-    no cap, so a variable with many neighbors costs many tests, and the parent sets of a treatment
-    grow with the subsets of its undirected neighbors. A fit ran a median of 1,300 to 14,000 tests,
-    in under 3 seconds, on those graphs. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    and on 11 of those 200 datasets that answered no effect where the truth has one. The `local
+    discovery release card <https://andrey.abel.ai/docs/benchmarks/local-discovery.html#load>`_ has
+    the numbers. Each local structure tests a pair against the subsets of the neighbors of its ends
+    with no cap, so a variable with many neighbors costs many tests, and the parent sets of a
+    treatment grow with the subsets of its undirected neighbors. A fit ran a median of 1,300 to
+    14,000 tests, in under 3 seconds, on those graphs. ``"total_conditioning"`` with a
+    partial-correlation test needs at least two more rows than variables, rows with every variable
+    observed, and raises ``ValueError`` below that. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1045,6 +1132,7 @@ def local_optimal_adjustment(
     a, b = variable_columns(variables, labels, d, method, minimum=2, maximum=2)
     assert variables is not None  # variable_columns raises on None
     first = column_position(as_node(list(variables)[0], method), labels, d, method)
+    check_total_conditioning_rows(X, blanket, indep_test, method=method)
     with copies_named(labels), rows_tested() as rows, counting_tests() as tests:
         search = local_search(
             X,
@@ -1134,8 +1222,15 @@ def locpc_cde(
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
         set; ``"nonempty"`` is ``(r_x - 1) * (r_y - 1)`` per configuration over the values of ``x``
         and ``y`` present in it, the table's empty rows and columns struck. The two differ only on
-        sparse tables. Only ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises
-        ``ValueError``.
+        sparse tables. There ``"mean"`` favors a level near the nominal one: over 35,808 true
+        independences of random discrete networks (3 to 5 categories, 0 to 3 conditioning variables,
+        500 to 5,000 rows), a test at 0.05 rejected 4.9% (``"chisq"``) and 3.8% (``"gsq"``). With
+        ``"gsq"`` it gives up time, a sum of hypergeometric terms per cell, and rejects below the
+        nominal rate in the sparsest tables (0.8% at 3,125 cells). ``"nonempty"`` favors the degrees
+        of freedom of Spirtes, Glymour and Scheines (1993), read from the table alone, with no
+        hypergeometric sum; it gives up the level: 11.1% and 21.7% of the same true independences
+        were rejected. Their time and their power were not measured against each other. Only
+        ``"chisq"`` and ``"gsq"`` read it: passing it with another test raises ``ValueError``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data test, as for :func:`~andrey.pc`. A
         continuous test raises ``ValueError`` on a declared column.
@@ -1143,7 +1238,15 @@ def locpc_cde(
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
-        handling used. See **Missing values.** in Notes.
+        handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
+        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
+        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
+        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
+        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
+        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
+        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
+        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
+        Not measured with this method. See **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -1262,11 +1365,15 @@ def locpc_cde(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Each test reads only the rows
     where all of its variables are observed (test-wise deletion) [3]_ [4]_, so it keeps rows that
     deleting every incomplete row first would drop; ``metadata["rows_tested"]`` gives the fewest and
-    the median rows a test read. When values are missing completely at random, the rows a test keeps
-    are a random sample, so each test keeps its level [4]_. When whether a value is missing depends
-    on the variables, the rows a test keeps are a selected sample of their own. A test raises
-    ``ValueError`` when it has fewer rows than it needs, ``|S| + 3`` for ``"fisherz"`` and
-    ``"student_t"`` and 2 for the other tests, or when a continuous column is constant on its rows.
+    the median rows a test read. A test with fewer rows than it needs (``|S| + 4`` rows for
+    ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
+    2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
+    pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
+    tested, including sets skipped because no row can test them. A continuous column constant on a
+    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
+    completely at random, which means that whether a value is missing depends on no value in the
+    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
+    selected sample that more rows do not correct.
 
     **Limitations.** Measured against its authors' code on the random graphs of [1]_ with 10 to 200
     variables and 5,000 rows, linear-Gaussian with Fisher's z test and binary with the G-square
@@ -1274,15 +1381,15 @@ def locpc_cde(
     code's in every setting, on 20 datasets each. On pairs whose effect the CPDAG does not identify,
     its verdict, like the code's, was wrong or undecided on 20% to 90% of the datasets; over both
     kinds of pair it beat the constant answer "not identifiable" in every setting but the
-    linear-Gaussian graphs with 200 variables. The
-    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#locpc-cde>`_ has the
-    numbers. Without the paper's early stop (see **When it stops.**), a non-identifiable effect is
-    searched until a hop adds no variable: on the paper's linear-Gaussian graphs with 5,000 rows
-    that ran 12% more tests with 10 variables, 60% more with 50, and 128% more with 100. An
-    unmeasured common cause breaks the claim. A fit ran a median of 90 to 2,700 tests on an
-    identifiable pair and up to 17,000 on one that is not, in under a second, except about 7 seconds
-    on the binary non-identifiable pairs with 200 variables. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    linear-Gaussian graphs with 200 variables. The `local discovery release card
+    <https://andrey.abel.ai/docs/benchmarks/local-discovery.html#locpc-cde>`_ has the numbers.
+    Without the paper's early stop (see **When it stops.**), a non-identifiable effect is searched
+    until a hop adds no variable: on the paper's linear-Gaussian graphs with 5,000 rows that ran 12%
+    more tests with 10 variables, 60% more with 50, and 128% more with 100. An unmeasured common
+    cause breaks the claim. A fit ran a median of 90 to 2,700 tests on an identifiable pair and up
+    to 17,000 on one that is not, in under a second, except about 7 seconds on the binary
+    non-identifiable pairs with 200 variables. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------

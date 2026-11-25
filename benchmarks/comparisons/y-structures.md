@@ -112,4 +112,4 @@ context in the last one and returns `pack_answer(scores, n_tests)`: a `(d, d)` a
 `scores[i, j] > 0` claims that `i` is an ancestor of `j`, the larger the score the more confident the
 claim, and the number of tests, or `None`.
 
-[card]: https://andrey.abel.ai/docs/benchmarks/0.18.0.html#y-structures
+[card]: https://andrey.abel.ai/docs/benchmarks/local-discovery.html#y-structures
