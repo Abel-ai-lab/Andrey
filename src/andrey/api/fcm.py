@@ -102,8 +102,7 @@ def cam(
         Significance level of the pruning test, in ``(0, 1)``: a parent stays when its smooth term's
         p-value is at most ``alpha``. ``0.001`` is the paper's value at every sample size. A larger
         value keeps more of the true edges a small sample tests weakly, and more false edges with
-        them: at 100 rows, on additive-noise graphs of 10 variables, ``alpha=0.01`` found 2 more of
-        100 true adjacencies and 5 more false ones.
+        them: with few rows, a larger value found a few more true adjacencies and more false ones.
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: the order search adds no edge that gives a
         node more, so no node of the returned DAG has more than ``max_parents`` parents. A cap can
@@ -197,21 +196,21 @@ def cam(
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On simulated additive-noise data with 1,000 rows and mean degree 2, its errors
-    stay below the empty graph's up to 2,000 variables, though they grow faster than the variables
-    (37% of the empty graph's at 2,000, nearly all extra edges), and a fit takes about an hour
-    there, most of it in the neighbor preselection, whose cost grows as ``d^2``. With few rows per
-    variable it keeps false edges: on independent columns with 40 rows and 60 variables it made more
-    errors than the empty graph. Outside its model the result can be wrong: noise whose scale
-    changes with the parents reverses many edges, linear Gaussian data leave the direction of an
-    edge arbitrary where the Markov equivalence class leaves it undirected, a hidden common cause
-    joins the variables it drives, interacting effects such as the product of two causes are missed
-    or reversed, and a strongly skewed cause can be reversed. A column with fewer than 3 distinct
-    values, binary columns included, raises ``ValueError``, as do text labels; integer category
-    codes are read as numbers, with a :class:`~andrey.DataTypeWarning`. The `0.13.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#cam>`_ compares it with its authors' code.
-    The numbers are a reference, not a hard limit: they change with the data generator, the density,
-    the method's settings, and the machine.
+    **Limitations.** On simulated additive-noise data with many rows and sparse graphs, its errors
+    stay below the empty graph's into the thousands of variables, though they grow faster than the
+    variables, nearly all extra edges, and large fits are slow: the neighbor preselection's cost
+    grows with the square of the number of variables. With few rows per variable it keeps false
+    edges: on independent columns with fewer rows than variables it made more errors than the empty
+    graph. Outside its model the result can be wrong: noise whose scale changes with the parents
+    reverses many edges, linear Gaussian data leave the direction of an edge arbitrary where the
+    Markov equivalence class leaves it undirected, a hidden common cause joins the variables it
+    drives, interacting effects such as the product of two causes are missed or reversed, and a
+    strongly skewed cause can be reversed. A column with fewer than 3 distinct values, binary
+    columns included, raises ``ValueError``, as do text labels; integer category codes are read as
+    numbers, with a :class:`~andrey.DataTypeWarning`. The
+    `0.13.0 release card <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#cam>`_ compares it with
+    its authors' code. The measured results are a reference, not a hard limit: they change with the
+    data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -406,18 +405,18 @@ def resit(
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Its accuracy holds up to 10 variables: on Gaussian additive-noise data with
-    1,000 rows its errors come near the empty graph's from 20 variables and exceed them at 50 (91
-    against 50). Its cost grows fast, about as ``d^3.3`` up to 50 variables, so a fit passes an hour
-    near 75, and its time and memory grow with the square of ``n_samples``. With many rows every
-    removal test can reject: on Sachs's 7,466 rows it kept all 55 possible edges. Noise whose scale
-    changes with the parents and linear Gaussian data lie outside its model, and there its errors
-    were above the empty graph's in most measured settings. A cause with a long tail can reverse its
-    edge; replacing the cause by its ranks before the fit corrected this in the measured pairs. A
-    column with fewer than 3 distinct values, binary columns included, raises ``ValueError``. The
+    **Limitations.** Its accuracy holds only on small graphs: on Gaussian additive-noise data with
+    many rows its errors come near the empty graph's on moderate graphs and exceed them on larger
+    ones. Its cost grows faster than the cube of the number of variables, so it suits small graphs,
+    and its time and memory grow with the square of ``n_samples``. With many rows every removal test
+    can reject: on the Sachs data it kept every possible edge. Noise whose scale changes with the
+    parents and linear Gaussian data lie outside its model, and there its errors were above the
+    empty graph's in most measured settings. A cause with a long tail can reverse its edge;
+    replacing the cause by its ranks before the fit corrected this in the measured pairs. A column
+    with fewer than 3 distinct values, binary columns included, raises ``ValueError``. The
     `0.13.0 release card <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#resit>`_ compares it
-    with its authors' code. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    with its authors' code. The measured results are a reference, not a hard limit: they change with
+    the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -543,11 +542,10 @@ def cpcm_graph(
     parents follows a known parametric family, with no hidden common cause [1]_. It is designed for
     effects whose whole distribution changes with their causes, such as counts, positive or
     heavy-tailed variables, or a mix where each column gets its own family; the paper claims it for
-    graphs of 5 to 10 variables [1]_. On its graphs of 4 to 8 variables, with the families its rule
-    picks from each column's support, it makes as few errors as the code published with the paper
-    and runs about ten times faster. For a pair, :func:`~andrey.cpcm` runs the paper's pair
-    test; for nonlinear effects with additive noise, use :func:`~andrey.resit` or
-    :func:`~andrey.cam`.
+    small graphs [1]_. On the paper's graphs, with the families its rule picks from each column's
+    support, it makes as few errors as the code published with the paper and runs faster. For a
+    pair, :func:`~andrey.cpcm` runs the paper's pair test; for nonlinear effects with additive
+    noise, use :func:`~andrey.resit` or :func:`~andrey.cam`.
 
     Each variable with parents is fitted by its family on them and mapped through the fitted
     distribution function, as in :func:`~andrey.cpcm`; a variable without parents is its own
@@ -570,18 +568,17 @@ def cpcm_graph(
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On the paper's graphs of 4 to 8 variables and 1,000 rows its graph had as many
-    errors (SHD and SID) as the code published with the paper and fewer than the empty graph; graphs
-    of 10 variables, which the paper also claims, were not measured. :func:`~andrey.pc` with
-    ``indep_test="kci"`` was close in accuracy there, and faster at 4, 6, and 8 variables. The
+    **Limitations.** On the paper's graphs its graph had as many errors as the code published with
+    the paper and fewer than the empty graph; the paper's largest graphs were not measured.
+    :func:`~andrey.pc` with ``indep_test="kci"`` was close in accuracy there, and faster. The
     `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm-graph-search>`_
     has the numbers. The exact search scores every DAG and runs up to 4 variables; above, the greedy
     search refits a variable for each parent set it tries, and memory grows with the square of
-    ``n_samples``. Under the count families, means of a few thousand that vary strongly with the
-    parents make the true graph's test reject too. The family must be chosen: the paper's choice of
-    a family from each column's support, and its sequential choice between one- and two-parameter
-    families, are not offered. The numbers are a reference, not a hard limit: they change with the
-    data generator, the density, the method's settings, and the machine.
+    ``n_samples``. Under the count families, large means that vary strongly with the parents make
+    the true graph's test reject too. The family must be chosen: the paper's choice of a family from
+    each column's support, and its sequential choice between one- and two-parameter families, are
+    not offered. The measured results are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -713,16 +710,15 @@ def score_matching(
 
     Notes
     -----
-    **When to use.** SCORE suits i.i.d. continuous observational data whose effects are nonlinear
-    in every parent, with additive Gaussian noise and no unmeasured common causes [1]_; under that
+    **When to use.** SCORE suits i.i.d. continuous observational data whose effects are nonlinear in
+    every parent, with additive Gaussian noise and no unmeasured common causes [1]_; under that
     model the DAG is identified [4]_, and it returns the DAG with a causal order. Its order search
     fits no regression: each step is one kernel estimate over all the remaining variables, so its
-    cost grows with the number of variables only linearly, and with the cube of the rows. The
-    paper shows it on 10 to 50 variables and 1,000 rows. A link that is linear in a parent leaves
-    that parent's derivative constant too, so it can be taken for a leaf: with linear effects and
-    Gaussian noise use :func:`~andrey.pc` or :func:`~andrey.ges`, which return the Markov
-    equivalence class. For additive noise that is not Gaussian use :func:`~andrey.resit`, and for
-    the same model searched by regressions, :func:`~andrey.cam`.
+    cost grows with the number of variables only linearly, and with the cube of the rows. A link
+    that is linear in a parent leaves that parent's derivative constant too, so it can be taken for
+    a leaf: with linear effects and Gaussian noise use :func:`~andrey.pc` or :func:`~andrey.ges`,
+    which return the Markov equivalence class. For additive noise that is not Gaussian use
+    :func:`~andrey.resit`, and for the same model searched by regressions, :func:`~andrey.cam`.
 
     **The steps.** The paper's two phases [1]_:
 
@@ -767,21 +763,21 @@ def score_matching(
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On the paper's simulation with 1,000 rows its errors stay below the empty
-    graph's at 10 to 50 variables, but on sparse graphs, where the order search orders fewer edges
-    correctly on the standardized columns it reads than on the columns as simulated,
-    :func:`~andrey.cam` was more accurate. Where links have a strong linear part, such as ``z + sin
-    z``, the search ranks the sinks last: its order was close to a random one, and at 20 variables
-    its graph was farther from the truth than the empty graph; more rows or other kernel settings
-    did not change the order, and :func:`~andrey.cam` suits such data. Links the one kernel
-    bandwidth does not resolve can make a cause look like a leaf, and the leaf rule is exact only
-    for Gaussian noise; :func:`~andrey.nogam` and :func:`~andrey.resit` drop that assumption. The
-    order search's time grows with the cube of ``n_samples`` and its memory with the square. The
-    pruning needs at least twice as many rows as columns: fewer rows, or a column with fewer than 3
-    distinct values, binary columns included, raise ``ValueError``. The `0.17.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#score-and-nogam>`_ has the numbers. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** On data simulated as in the paper its errors stay below the empty graph's at
+    every measured size, but on sparse graphs, where the order search orders fewer edges correctly
+    on the standardized columns it reads than on the columns as simulated, :func:`~andrey.cam` was
+    more accurate. Where links have a strong linear part, such as ``z + sin z``, the search ranks
+    the sinks last: its order was close to a random one, and its graph could be farther from the
+    truth than the empty graph; more rows or other kernel settings did not change the order, and
+    :func:`~andrey.cam` suits such data. Links the one kernel bandwidth does not resolve can make a
+    cause look like a leaf, and the leaf rule is exact only for Gaussian noise;
+    :func:`~andrey.nogam` and :func:`~andrey.resit` drop that assumption. The order search's time
+    grows with the cube of ``n_samples`` and its memory with the square. The pruning needs at least
+    twice as many rows as columns: fewer rows, or a column with fewer than 3 distinct values, binary
+    columns included, raise ``ValueError``. The
+    `0.17.0 release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#score-and-nogam>`_ has
+    the numbers. The measured results are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -907,10 +903,9 @@ def nogam(
     with additive noise of any distribution and no unmeasured common causes [1]_; under that model
     the DAG is identified [4]_, and it returns the DAG with a causal order. It does not assume
     Gaussian noise, as :func:`~andrey.score_matching` and :func:`~andrey.cam` do, and its order
-    search needs no independence test, as :func:`~andrey.resit`'s does. The paper shows it on 10
-    and 20 variables and 1,000 rows, with Gaussian, Laplace, Gumbel, Beta, exponential, and gamma
-    noise. With linear effects and Gaussian noise only the Markov equivalence class is identified:
-    use :func:`~andrey.pc` or :func:`~andrey.ges`.
+    search needs no independence test, as :func:`~andrey.resit`'s does. With linear effects and
+    Gaussian noise only the Markov equivalence class is identified: use :func:`~andrey.pc` or
+    :func:`~andrey.ges`.
 
     **The steps.** The paper's two phases [1]_:
 
@@ -961,20 +956,20 @@ def nogam(
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On the paper's simulation with 1,000 rows, under Gaussian, Laplace, and Gumbel
-    noise, its errors stay below the empty graph's at 10 and 20 variables; it was not measured at
-    50, where one fit took about three minutes. On sparse graphs, where the order search orders
-    fewer edges correctly on the standardized columns it reads than on the columns as simulated,
-    :func:`~andrey.cam` was at least as accurate under every noise. Where links have a strong linear
-    part, such as ``z + sin z``, the search ranks the sinks last: its order was close to a random
-    one, and at 20 variables its graph was farther from the truth than the empty graph; 4,000 rows
-    changed the order little, and :func:`~andrey.cam` suits such data. The order search's time grows
-    with the square of ``n_variables`` and the cube of ``n_samples``, and its memory with the square
-    of ``n_samples``. The pruning needs at least twice as many rows as columns: fewer rows, or a
-    column with fewer than 3 distinct values, binary columns included, raise ``ValueError``. The
+    **Limitations.** On data simulated as in the paper, under Gaussian, Laplace, and Gumbel noise,
+    its errors stay below the empty graph's on small graphs; larger graphs were not measured. On
+    sparse graphs, where the order search orders fewer edges correctly on the standardized columns
+    it reads than on the columns as simulated, :func:`~andrey.cam` was at least as accurate under
+    every noise. Where links have a strong linear part, such as ``z + sin z``, the search ranks the
+    sinks last: its order was close to a random one, and its graph could be farther from the truth
+    than the empty graph; more rows changed the order little, and :func:`~andrey.cam` suits such
+    data. The order search's time grows with the square of ``n_variables`` and the cube of
+    ``n_samples``, and its memory with the square of ``n_samples``. The pruning needs at least twice
+    as many rows as columns: fewer rows, or a column with fewer than 3 distinct values, binary
+    columns included, raise ``ValueError``. The
     `0.17.0 release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#score-and-nogam>`_ has
-    the numbers. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    the numbers. The measured results are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1109,14 +1104,13 @@ def das(
     every parent, with additive Gaussian noise and no unmeasured common causes [1]_, when there are
     too many variables for :func:`~andrey.score_matching`'s pruning: it finds the same causal order
     and prunes at most ``max_parents`` candidates per variable instead of every variable before it.
-    The paper shows it on 10 to 1,000 variables and 1,000 rows, with a DAG close to SCORE's and a
-    fit several times faster from 20 variables up. It is the fastest of the methods here for this
-    model. :func:`~andrey.cam` made fewer errors on the same data in all measured settings but dense
-    graphs of 10 variables, where they tied, and took 1.5 to 2.7 times as long, except on sparse
-    graphs of 10 variables, where it was as fast; use it when time allows. With fewer variables
-    :func:`~andrey.score_matching` prunes every edge its order allows; with linear effects and
-    Gaussian noise use :func:`~andrey.pc` or :func:`~andrey.ges`, and for additive noise that is not
-    Gaussian, :func:`~andrey.nogam` or :func:`~andrey.resit`.
+    The paper shows a DAG close to SCORE's from a fit several times faster on all but small graphs.
+    It is the fastest of the methods here for this model. :func:`~andrey.cam` made fewer errors on
+    the same data in nearly every measured setting and took longer on all but the smallest sparse
+    graphs; use it when time allows. With fewer variables :func:`~andrey.score_matching` prunes
+    every edge its order allows; with linear effects and Gaussian noise use :func:`~andrey.pc` or
+    :func:`~andrey.ges`, and for additive noise that is not Gaussian, :func:`~andrey.nogam` or
+    :func:`~andrey.resit`.
 
     **The steps.** The paper's three phases [1]_:
 
@@ -1169,17 +1163,18 @@ def das(
     :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** On the papers' simulation with z-scored or rescaled columns, DAS made no more
-    errors than the code published with the paper from 10 to 200 variables, and fewer than the empty
-    graph up to 1,000. It reads standardized columns, so the result does not depend on their units;
-    on raw columns, whose variance grows along the causal order, the code published with the paper
-    made fewer errors on sparse graphs (19 against 28 at 50 variables). The `0.19.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#das>`_ has the numbers. Its SCORE order has
-    the limits stated by :func:`~andrey.score_matching`: near a random order where links have a
-    strong linear part, and exact only for Gaussian noise. Pruning cannot recover an edge the order
-    reversed or a true parent the screen dropped. The order search's time grows with the cube of
-    ``n_samples`` and its memory with the square. A column with fewer than 3 distinct values, binary
-    columns included, raises ``ValueError``. The numbers are a reference, not a hard limit: they
-    change with the data generator, the density, the method's settings, and the machine.
+    errors than the code published with the paper, and fewer than the empty graph at every measured
+    size, into the hundreds of variables. It reads standardized columns, so the result does not
+    depend on their units; on raw columns, whose variance grows along the causal order, the code
+    published with the paper made fewer errors on sparse graphs. The
+    `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#das>`_ has the numbers.
+    Its SCORE order has the limits stated by :func:`~andrey.score_matching`: near a random order
+    where links have a strong linear part, and exact only for Gaussian noise. Pruning cannot recover
+    an edge the order reversed or a true parent the screen dropped. The order search's time grows
+    with the cube of ``n_samples`` and its memory with the square. A column with fewer than 3
+    distinct values, binary columns included, raises ``ValueError``. The measured results are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -1319,15 +1314,15 @@ def camuv(
     **When to use.** CAM-UV suits i.i.d. continuous observational data whose effects are nonlinear
     and additive in the causes, with independent noise of any distribution, where any number of
     causes may be unmeasured, none included [1]_; with none unmeasured every ``o-o`` pair it marks
-    is false. With one node in five hidden among 4 to 12 observed variables its directed edges were
-    no better than the empty graph's (**Limitations**). Its kernel independence tests compare every
-    pair of rows, and its search tests sets of up to ``max_depth + 1`` variables, so it suits a
-    moderate number of variables and rows. It returns a PAG: ``i -> j`` for a direct cause and
-    ``i o-o j`` for a pair that shares a hidden common cause or of which one causes the other
-    through a hidden variable, which the method does not tell apart. With linear effects, a path
-    through a hidden variable can be regressed away and the pairs are identified differently: use
-    :func:`~andrey.rcd` for non-Gaussian noise and :func:`~andrey.fci` for Gaussian noise. Without
-    hidden variables, :func:`~andrey.cam` and :func:`~andrey.resit` also give a causal order.
+    is false. With many of the nodes hidden its directed edges were no better than the empty graph's
+    (**Limitations**). Its kernel independence tests compare every pair of rows, and its search
+    tests sets of up to ``max_depth + 1`` variables, so it suits a moderate number of variables and
+    rows. It returns a PAG: ``i -> j`` for a direct cause and ``i o-o j`` for a pair that shares a
+    hidden common cause or of which one causes the other through a hidden variable, which the method
+    does not tell apart. With linear effects, a path through a hidden variable can be regressed away
+    and the pairs are identified differently: use :func:`~andrey.rcd` for non-Gaussian noise and
+    :func:`~andrey.fci` for Gaussian noise. Without hidden variables, :func:`~andrey.cam` and
+    :func:`~andrey.resit` also give a causal order.
 
     **The steps.** Every pair of variables is first tested for dependence; then come the paper's
     three steps, with its settings [1]_:
@@ -1395,21 +1390,20 @@ def camuv(
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** With one node in five hidden, at 5 to 15 nodes, it made no fewer errors than
-    the empty graph (1.35 more per graph over 40 graphs of 8 observed variables); with no variable
-    hidden, every pair it marks ``o-o`` is false; and with linear Gaussian effects it made more
-    errors than the empty graph. With one hidden variable per ten observed ones its errors stay
-    below the empty graph's at 20 and 50 observed variables and rise back toward it from 70,
-    reaching it near 400. A cause with a long tail, or a single extreme value, can turn an edge into
-    an ``o-o`` mark; replacing a long-tailed cause by its ranks before the fit found the edge again
-    in most fits. A column with fewer than 3 distinct values, binary columns included, raises
-    ``ValueError``, and integer category codes are read as numbers, with a
-    :class:`~andrey.DataTypeWarning`. Its cost grows about as ``d^2``, past an hour near 300
-    observed variables, and the time and memory of its kernel tests grow with the square of
-    ``n_samples``. The `0.14.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#cam-uv>`_ has the numbers. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    **Limitations.** With many of the nodes hidden it made no fewer errors than the empty graph on
+    small graphs; with no variable hidden, every pair it marks ``o-o`` is false; and with linear
+    Gaussian effects it made more errors than the empty graph. With few hidden variables its errors
+    stay below the empty graph's on graphs of a few dozen observed variables and rise back toward it
+    as the graph grows, reaching it on graphs of hundreds of variables. A cause with a long tail, or
+    a single extreme value, can turn an edge into an ``o-o`` mark; replacing a long-tailed cause by
+    its ranks before the fit found the edge again in most fits. A column with fewer than 3 distinct
+    values, binary columns included, raises ``ValueError``, and integer category codes are read as
+    numbers, with a :class:`~andrey.DataTypeWarning`. Its cost grows with the square of the number
+    of variables, so large graphs take hours, and the time and memory of its kernel tests grow with
+    the square of ``n_samples``. The
+    `0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#cam-uv>`_ has the
+    numbers. The measured results are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1569,18 +1563,14 @@ def skewd_mv(
     **When to use.** SkewD-MV learns a DAG from continuous variables observed i.i.d. under a
     location-scale noise model, each variable ``y = f(pa) + g(pa) n`` with ``g > 0``, skew-normal
     noise ``n`` independent of its parents, and no hidden common cause; it also assumes the
-    faithfulness PC needs, so that the true DAG lies in the estimated class [1]_. It is designed
-    for small graphs, 6 to 10 variables in the paper, whose noise scale changes with the parents,
-    which the additive models of :func:`~andrey.cam` and :func:`~andrey.resit` do not allow. It
-    favors accuracy on such graphs and gives up time. On the paper's skew-normal graphs of 6 and 10
-    variables and 1,000 rows it made as few errors as the code published with the paper, and fewer
-    than the empty graph and than :func:`~andrey.pc` (KCI), :func:`~andrey.cam`,
-    :func:`~andrey.nogam`, :func:`~andrey.score_matching`, and :func:`~andrey.resit`, all five
-    faster. A fit took a median of 49 CPU minutes at 6 variables and 37 at 10 on an AMD EPYC 7713,
-    and 28 and 18 on an AMD EPYC 9534 on other seeds, where :func:`~andrey.cam` took a median under
-    a second;
-    ``andrey.config(n_jobs)`` runs its conditional models and their searches on threads, which cuts
-    the wall time.
+    faithfulness PC needs, so that the true DAG lies in the estimated class [1]_. It is designed for
+    small graphs whose noise scale changes with the parents, which the additive models of
+    :func:`~andrey.cam` and :func:`~andrey.resit` do not allow. It favors accuracy on such graphs
+    and gives up time. On the paper's skew-normal graphs it made as few errors as the code published
+    with the paper, and fewer than the empty graph and than :func:`~andrey.pc` (KCI),
+    :func:`~andrey.cam`, :func:`~andrey.nogam`, :func:`~andrey.score_matching`, and
+    :func:`~andrey.resit`, all five far faster; ``andrey.config(n_jobs)`` runs its conditional
+    models and their searches on threads, which cuts the wall time.
 
     Each column is standardized first [1]_. PC, order-independent [2]_, gives the class. Its DAGs
     orient the undirected edges with no directed cycle and no new collider [1]_, and are every
@@ -1618,12 +1608,12 @@ def skewd_mv(
 
     **Limitations.** Its cost grows with the number of distinct parent sets the class allows,
     exponentially in a variable's undirected edges, and it refuses a class that needs more than
-    ``max_fits`` (100) conditional models. The `0.19.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#skewd-mv>`_ has the measured times, up to
-    1.8 CPU hours at 6 variables and 2.4 at 10. An edge PC misses or misorients stays wrong: the
-    likelihood only chooses among the class's DAGs, and PC's skeleton had an F1 of 0.80 to 0.92 on
-    the measured graphs. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    ``max_fits`` (100) conditional models. The
+    `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#skewd-mv>`_ has the
+    measured times. An edge PC misses or misorients stays wrong: the likelihood only chooses among
+    the class's DAGs, and PC's skeleton missed or added some edges on the measured graphs. The
+    measured results are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------

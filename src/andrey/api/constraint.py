@@ -95,12 +95,9 @@ def pc(
         column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
         declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
         type, never by its values. See **Categorical data.** and **Mixed data.** in Notes. On
-        simulated mixed data (conditional linear Gaussian networks on sparse random graphs, the
-        first half of the variables categorical with 2 to 5 categories) with 40 variables and 2,000
-        rows, PC's median errors were 9.5 with ``"cond_gauss"`` and 18.5 with ``"degen_gauss"``,
-        against the empty graph's 40, in a median 0.42 and 0.38 s on 4 cores, with
-        ``collider_order="column"``. ``metadata["indep_test"]`` names the test used, including the
-        choice for ``None``.
+        simulated mixed data, PC made fewer errors with ``"cond_gauss"`` than with
+        ``"degen_gauss"``, both well below the empty graph's, in about the same time.
+        ``metadata["indep_test"]`` names the test used, including the choice for ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
@@ -162,22 +159,17 @@ def pc(
         method's default, ``"testwise"``. On data with missing values, ``metadata["missing"]``
         records the handling used. ``"testwise"`` favors every row each test can read and, on large
         graphs where an indicator has many weak parents or parents with missing values, accuracy; it
-        gives up its guarantee outside values missing completely at random. With 20 variables and
-        1,000 rows, 10 to 30% of the values missing completely at random, it made median errors of
-        6.5 to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows
-        and had no complete row at 30% (complete data: 4.0; 0.11.0 release card); in the 12 settings
-        below where ``"mvpc"`` was behind again on fresh seeds (50 or 100 variables, 20 or 30%
-        missing), it made fewer errors. ``"mvpc"`` favors values missing for a reason that other
-        variables carry; it gives up every test but those two and, where an indicator has many weak
-        parents or parents with missing values, accuracy on large graphs. On Erdos-Renyi graphs of
-        10 to 100 variables (mean degree 2 or 4; 500 to 10,000 rows; 10 to 30% missing), with one
-        observed parent per indicator, ``"mvpc"`` had fewer errors than ``"testwise"`` in 14 of 72
-        settings at ``alpha=0.01`` and 28 at the default 0.05, and more in none. Over both levels
-        together (144 settings), it tied in 136 with values missing completely at random; it was
-        behind in 12 of the 141 judged with many weak parents per indicator (3 again on fresh seeds)
-        and, with one parent that has missing values itself, ahead in 12 of 144 and behind in 24 (9
-        again); the repeated ones all had 50 or 100 variables and 20 or 30% missing (0.16.0 release
-        card). See **Missing values.** in Notes.
+        gives up its guarantee outside values missing completely at random. With values missing
+        completely at random it made fewer errors than dropping the incomplete rows, which leaves
+        few or no complete rows as more values go missing (0.11.0 release card), and fewer than
+        ``"mvpc"`` in the settings below where ``"mvpc"`` fell behind. ``"mvpc"`` favors values
+        missing for a reason that other variables carry; it gives up every test but those two and,
+        where an indicator has many weak parents or parents with missing values, accuracy on large
+        graphs. On simulated data with one observed parent per indicator, ``"mvpc"`` had fewer
+        errors than ``"testwise"`` in some settings and more in none; it tied with values missing
+        completely at random, and it fell behind on large graphs with many values missing, where
+        indicators have many weak parents or a parent with missing values (0.16.0 release card). See
+        **Missing values.** in Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -422,15 +414,15 @@ def pc(
     nor a column's units or origin, nor the number of workers. On complete data, ``"mvpc"`` gives
     the result of ``"testwise"``.
 
-    **Limitations.** On simulated linear-Gaussian data its errors stay below the empty graph's up to
-    400 variables at mean degree 2 with 2,000 rows (`0.10.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_), and its run time grows
-    combinatorially with the largest neighborhood; on the 223-variable ANDES network its errors
-    passed the empty graph's (`0.1.0 release card
+    **Limitations.** On simulated linear-Gaussian data its errors stay below the empty graph's on
+    sparse graphs of hundreds of variables
+    (`0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_), and
+    its run time grows combinatorially with the largest neighborhood; on the ANDES network its
+    errors passed the empty graph's (`0.1.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.1.0.html#published-network-structures>`__). Test
-    errors can make the colliders it finds fit no DAG on the skeleton (33 of 200 fits on 10
-    variables): the ``cpdag`` then has no consistent DAG extension, and a graph query such as
-    ``markov_blanket`` raises ``ValueError`` (`0.16.0 release card
+    errors can make the colliders it finds fit no DAG on the skeleton, even on small graphs: the
+    ``cpdag`` then has no consistent DAG extension, and a graph query such as ``markov_blanket``
+    raises ``ValueError`` (`0.16.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.16.0.html#fci-fits-that-are-not-pags>`__).
     ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet. With
     ``missing="mvpc"``, the correction holds only when no missingness indicator causes a variable,
@@ -442,8 +434,8 @@ def pc(
     (``max_depth`` bounds it); the `0.16.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.16.0.html#what-we-measured-on-missing-data>`_ has the
     numbers. Where the graph found is wrong, a true path claim can direct an edge against the truth;
-    a known edge belongs in ``required``. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    a known edge belongs in ``required``. The measured results are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -722,20 +714,15 @@ def fci(
         FCI. See **Missing values.** in Notes.
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of FCI's possible-d-separation step [2]_ [3]_, which removes edges the first step
-        kept, one at a time, so each removal changes what the step tests after it.
-        ``"order_free"`` visits the pairs and nodes by a rank computed from the data,
-        so the result does not depend on the column order unless two columns are identical.
-        ``"fast"`` visits them in column order. ``None`` follows ``andrey.config.tie_break``:
-        ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. ``"order_free"`` favors
-        a result that does not depend on the column order; it gives up time on some graphs from 400
-        variables, where its order needs more tests. ``"fast"`` gives up that independence and saves
-        time only on some graphs. On simulated linear-Gaussian data with one variable in ten or one
-        in five hidden (20 to 800 variables counting the hidden ones, mean degree 2 or 4, 10 or 50
-        rows per variable, 4 cores), ``"order_free"`` took 0.99 to 1.05 times as long as ``"fast"``
-        up to 200 variables and 0.78 to 1.42 times at 400 and 800, and its median endpoint errors
-        were within 2% of ``"fast"``'s; on one graph with 400 variables, mean degree 4, one variable
-        in five hidden, and 50 rows per variable, it took 34 s against 23 to 29 s for ``"fast"``
-        over five column orders. See Notes.
+        kept, one at a time, so each removal changes what the step tests after it. ``"order_free"``
+        visits the pairs and nodes by a rank computed from the data, so the result does not depend
+        on the column order unless two columns are identical. ``"fast"`` visits them in column
+        order. ``None`` follows ``andrey.config.tie_break``: ``"order_free"`` under ``"rank"``,
+        ``"fast"`` under ``"position"``. ``"order_free"`` favors a result that does not depend on
+        the column order; it gives up time on some large graphs, where its order needs more tests.
+        ``"fast"`` gives up that independence and saves time only on some graphs. On simulated
+        linear-Gaussian data with hidden variables, the two took about as long and made nearly the
+        same endpoint errors; on large graphs either could take longer. See Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -906,25 +893,24 @@ def fci(
     missing depends on no value in the data; the rows a test reads are then a random sample of all
     rows, and otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** On simulated linear-Gaussian data with 10 or 50 rows per variable its errors
-    stay below the empty graph's up to 200 variables at mean degree 2, and up to 1,600 at mean
-    degree 4, past which its fits ran past 1 h (`0.10.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_). Its errors passed the
-    empty graph's on the 223-variable ANDES network, and, with hidden variables, at 800 variables
-    with mean degree 2 (`0.8.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.8.0.html#fci-s-feasible-sizes>`_). Test errors can
-    give results that no MAG fits (36 of 200 fits on 10 variables): the ``pag`` is then not the PAG
-    of any MAG, and a graph query such as ``m_separated`` can raise ``ValueError`` (`0.16.0 release
-    card <https://andrey.abel.ai/docs/benchmarks/0.16.0.html#fci-fits-that-are-not-pags>`__). Rule
-    R5 stops after a fixed number of partial paths, so on graphs with many circle-circle edges it
-    can miss an undirected cycle. With the mixed-data tests it is experimental, and
+    **Limitations.** On simulated linear-Gaussian data its errors stay below the empty graph's on
+    graphs of hundreds of variables, and on denser graphs until its fits pass the time cap
+    (`0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_). Its
+    errors passed the empty graph's on the ANDES network, and, with hidden variables, on large
+    sparse graphs
+    (`0.8.0 release card <https://andrey.abel.ai/docs/benchmarks/0.8.0.html#fci-s-feasible-sizes>`_).
+    Test errors can give results that no MAG fits, even on small graphs: the ``pag`` is then not the
+    PAG of any MAG, and a graph query such as ``m_separated`` can raise ``ValueError`` (`0.16.0
+    release card
+    <https://andrey.abel.ai/docs/benchmarks/0.16.0.html#fci-fits-that-are-not-pags>`__). Rule R5
+    stops after a fixed number of partial paths, so on graphs with many circle-circle edges it can
+    miss an undirected cycle. With the mixed-data tests it is experimental, and
     ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet. On data merged from
     cohorts, the possible-d-separation step asks the sets whose variables no row observes all
-    together, so a fit can take minutes from 50 variables; ``max_depth`` bounds it (`0.19.0 release
-    card
+    together, so a fit can be slow; ``max_depth`` bounds it (`0.19.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#datasets-with-overlapping-variables>`__).
-    The numbers are a reference, not a hard limit: they change with the data generator, the density,
-    the method's settings, and the machine.
+    The measured results are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------
@@ -1182,19 +1168,14 @@ def gfci(
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of GFCI's possible-d-separation step [2]_ [4]_, which removes edges the adjacency
         search kept, one at a time, so each removal changes what the step tests after it.
-        ``"order_free"`` visits the pairs and nodes by a rank computed from the data,
-        so the result does not depend on the column order unless two columns are identical.
-        ``"fast"`` visits them in column order. ``None`` follows ``andrey.config.tie_break``:
-        ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. ``"order_free"`` favors
-        a result that does not depend on the column order; it gives up time on some graphs from 400
-        variables, where its order needs more tests. ``"fast"`` gives up that independence and saves
-        time only on some graphs. On simulated linear-Gaussian data with one variable in ten or one
-        in five hidden (20 to 800 variables counting the hidden ones, mean degree 2 or 4, 10 or 50
-        rows per variable, 4 cores), ``"order_free"`` took 1.00 to 1.02 times as long as ``"fast"``
-        up to 200 variables and 0.87 to 1.03 times at 400 and 800, and its median endpoint errors
-        were within 2% of ``"fast"``'s; on one graph with 400 variables, mean degree 2, one variable
-        in five hidden, and 50 rows per variable, it took 407 s against 120 to 336 s for ``"fast"``
-        over five column orders. See Notes.
+        ``"order_free"`` visits the pairs and nodes by a rank computed from the data, so the result
+        does not depend on the column order unless two columns are identical. ``"fast"`` visits them
+        in column order. ``None`` follows ``andrey.config.tie_break``: ``"order_free"`` under
+        ``"rank"``, ``"fast"`` under ``"position"``. ``"order_free"`` favors a result that does not
+        depend on the column order; it gives up time on some large graphs, where its order needs
+        more tests. ``"fast"`` gives up that independence and saves time only on some graphs. On
+        simulated linear-Gaussian data with hidden variables, the two took about as long and made
+        nearly the same endpoint errors; on large graphs either could take longer. See Notes.
     edge_removal : {"all", "triangles"}, default="all"
         Which edges of the GES CPDAG the tests may remove: ``"all"`` tests every edge, and
         ``"triangles"`` only the edges in a triangle of the CPDAG, whose ends share a neighbor in
@@ -1393,21 +1374,20 @@ def gfci(
     one dataset. Drop the incomplete rows yourself, which suits values missing completely at random,
     or use :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On simulated linear-Gaussian data its errors stay below the empty graph's up to
-    1,600 variables with 10 rows per variable, past which its fits ran past 1 h, and up to 3,200
-    with 50 (`0.10.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_). With hidden variables they
-    stayed below it wherever its fits finished, but some fits at 800 variables ran past 2 h in four
-    of eight settings, and in one of them fits at 400 ran past 1 h (`0.8.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.8.0.html#fci-s-feasible-sizes>`_). It runs a full
-    :func:`~andrey.ges` search before any test, so it takes at least as long as GES. With fewer rows
-    than columns its BIC score is unreliable. Rule R5 has the search bound described under
-    :func:`~andrey.fci`. With the mixed-data score and test, or with ``env``, it is experimental,
-    and ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet. ``"bic"`` and
-    ``"fisherz"`` read a numeric ``env`` as a number, so with three or more environments a shift
-    that does not follow the labels' values can go unnoticed. The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    **Limitations.** On simulated linear-Gaussian data its errors stay below the empty graph's at
+    every size whose fits finished within the time cap, into the thousands of variables
+    (`0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_). With
+    hidden variables they stayed below it wherever its fits finished, but some fits on large graphs
+    ran past the time cap
+    (`0.8.0 release card <https://andrey.abel.ai/docs/benchmarks/0.8.0.html#fci-s-feasible-sizes>`_).
+    It runs a full :func:`~andrey.ges` search before any test, so it takes at least as long as GES.
+    With fewer rows than columns its BIC score is unreliable. Rule R5 has the search bound described
+    under :func:`~andrey.fci`. With the mixed-data score and test, or with ``env``, it is
+    experimental, and ``collider_rule="conservative"`` and ``"majority"`` are not benchmarked yet.
+    ``"bic"`` and ``"fisherz"`` read a numeric ``env`` as a number, so with three or more
+    environments a shift that does not follow the labels' values can go unnoticed. The measured
+    results are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -1760,23 +1740,21 @@ def cdnod(
     is missing depends on no value in the data; the rows a test reads are then a random sample of
     all rows, and otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** On simulated linear-Gaussian data whose means shift across 4 domains its errors
-    stay below the empty graph's up to 100 variables at mean degree 2 with 2,000 rows, past which
-    its fits ran past 1 h (`0.10.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_). Its partial-correlation
-    tests assume linear relations with Gaussian noise and find only a change in a variable's mean,
-    so a change of a variance alone, or of an effect's weight on a mean-zero cause, orients no edge.
-    The independent-change step is not benchmarked yet: it fixes the kernel widths, the index
-    kernel, and the ridge, which the paper fits by Gaussian-process likelihood, and at the threshold
-    0.06, on two variables from 20 domains whose means both follow the index, it oriented the edge
-    on 1 of 20 seeds, and given the true skeletons of three-variable DAGs with no such trend it
-    oriented 4 of 30 edges against the truth (`0.7.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.7.0.html#cd-nod>`__). With a mixed-data test it is
-    experimental, and ``collider_rule="conservative"`` and ``"majority"`` and missing values are not
-    benchmarked yet. Where the graph found is wrong, a true path claim can direct an edge against
-    the truth, and the fits dropped many claims their graph could not meet; a known edge belongs in
-    ``required``. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    **Limitations.** On simulated linear-Gaussian data whose means shift across domains its errors
+    stay below the empty graph's on sparse graphs until its fits pass the time cap
+    (`0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_). Its
+    partial-correlation tests assume linear relations with Gaussian noise and find only a change in
+    a variable's mean, so a change of a variance alone, or of an effect's weight on a mean-zero
+    cause, orients no edge. The independent-change step is not benchmarked yet: it fixes the kernel
+    widths, the index kernel, and the ridge, which the paper fits by Gaussian-process likelihood; on
+    small simulated examples it rarely oriented an edge whose two variables' means both follow the
+    index, and given the true skeleton it oriented some edges against the truth
+    (`0.7.0 release card <https://andrey.abel.ai/docs/benchmarks/0.7.0.html#cd-nod>`__). With a
+    mixed-data test it is experimental, and ``collider_rule="conservative"`` and ``"majority"`` and
+    missing values are not benchmarked yet. Where the graph found is wrong, a true path claim can
+    direct an edge against the truth, and the fits dropped many claims their graph could not meet; a
+    known edge belongs in ``required``. The measured results are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -2009,14 +1987,12 @@ def fci_jci(
         Not measured with this method. See **Missing values.** in Notes.
     possible_dsep : {"order_free", "fast"} or None, default=None
         The order of the possible-d-separation step, as for :func:`~andrey.fci`: ``"order_free"``
-        visits the pairs and nodes by a rank computed from the data, and ``"fast"`` in column
-        order. ``None`` follows ``andrey.config.tie_break``: ``"order_free"`` under ``"rank"``,
-        ``"fast"`` under ``"position"``. ``"order_free"`` favors a result that does not depend on
-        the column order; it gives up time on some graphs, where its order needs more tests.
-        ``"fast"`` gives up that independence and saves time only on some graphs. With
-        :func:`~andrey.fci`, whose entry gives the numbers, the two took about as long up to 200
-        variables and their median endpoint errors were within 2% of each other; not measured with
-        FCI-JCI.
+        visits the pairs and nodes by a rank computed from the data, and ``"fast"`` in column order.
+        ``None`` follows ``andrey.config.tie_break``: ``"order_free"`` under ``"rank"``, ``"fast"``
+        under ``"position"``. ``"order_free"`` favors a result that does not depend on the column
+        order; it gives up time on some graphs, where its order needs more tests. ``"fast"`` gives
+        up that independence and saves time only on some graphs. With :func:`~andrey.fci` the two
+        took about as long and made nearly the same endpoint errors; not measured with FCI-JCI.
     confounded_index : bool, default=True
         Whether a hidden variable may cause both the index and a data variable, such as a patient's
         health deciding both the hospital and an outcome: FCI-JCI1 [1]_. ``False`` assumes the index
@@ -2097,15 +2073,12 @@ def fci_jci(
 
     Notes
     -----
-    **When to use.** FCI-JCI suits independent rows from several domains, sites, batches,
-    or experiments, with each row's domain known, where hidden common causes may act on the data
+    **When to use.** FCI-JCI suits independent rows from several domains, sites, batches, or
+    experiments, with each row's domain known, where hidden common causes may act on the data
     variables and on the domain itself [1]_. It assumes no selection bias and a distribution
-    faithful to the graph over the data and the domain. Its authors simulate linear-Gaussian models
-    of 4, 10, and 100 variables with hidden common causes, and binary context variables that each
-    shift one variable, with 100 or 500 rows per context, tested by partial correlation at an alpha
-    of 0.01; with one context variable, as here, that is two domains. It returns a PAG over the data
-    variables and the domain's edges. When no hidden common cause acts, use :func:`~andrey.cdnod`;
-    when the rows come from one domain, :func:`~andrey.fci`.
+    faithful to the graph over the data and the domain. It returns a PAG over the data variables and
+    the domain's edges. When no hidden common cause acts, use :func:`~andrey.cdnod`; when the rows
+    come from one domain, :func:`~andrey.fci`.
 
     The index is appended to the data as a last column, the context variable of Joint Causal
     Inference [1]_, and FCI's adjacency search and possible-d-separation step run over the data and
@@ -2163,19 +2136,18 @@ def fci_jci(
     random sample of all rows, and otherwise they are a selected sample that more rows do not
     correct.
 
-    **Limitations.** On its authors' simulation [1]_, linear-Gaussian data with hidden common causes
-    and one context variable, from 4 to 100 variables with 100 to 2,000 rows per domain, its errors
-    were below the empty graph's on every dataset; the `0.15.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#fci-jci>`_ has the numbers. It takes one
-    environment variable: the several context variables of the authors' designs are not implemented,
-    so domains that change different variables share one index. Its possible-d-separation step tests
-    subsets of each set, so its cost grows fast with the number of variables, and on data merged
-    from cohorts it asks the sets whose variables no row observes all together; ``max_depth`` bounds
-    it. ``"fisherz"`` and ``"student_t"`` read the index as a number and can miss a shift in a
-    middle domain of three or more. Missing values are not benchmarked yet, and no reference
-    implementation takes knowledge with a domain index, so the claims were checked only against the
-    same fit without them. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    **Limitations.** On data simulated as its authors do [1]_, with hidden common causes and one
+    context variable, its errors were below the empty graph's on every dataset; the
+    `0.15.0 release card <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#fci-jci>`_ has the
+    numbers. It takes one environment variable: the several context variables of the authors'
+    designs are not implemented, so domains that change different variables share one index. Its
+    possible-d-separation step tests subsets of each set, so its cost grows fast with the number of
+    variables, and on data merged from cohorts it asks the sets whose variables no row observes all
+    together; ``max_depth`` bounds it. ``"fisherz"`` and ``"student_t"`` read the index as a number
+    and can miss a shift in a middle domain of three or more. Missing values are not benchmarked
+    yet, and no reference implementation takes knowledge with a domain index, so the claims were
+    checked only against the same fit without them. The measured results are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -2331,12 +2303,10 @@ def icp(
         for Gaussian noise. ``"exact"`` favors that exact level and fewer false parents when an
         intervention that ``targets`` does not name hits the target; it gives up its guarantee when
         the noise is not Gaussian. ``"approximate"`` gives up the exact level; it had fewer false
-        parents with a hidden common cause. On simulated linear Gaussian data drawn as in the
-        paper's simulation study [1]_ (two environments of 100 to 500 rows, 5 to 12 variables), the
-        estimate held a variable outside the true parents in 11% of the fits under ``"exact"`` and
-        18% under ``"approximate"`` over the 55 scenarios whose interventions could hit the target,
-        and in 1.8% and 1.2% over 20 scenarios with a hidden common cause of the target and one
-        other variable. See Notes.
+        parents with a hidden common cause. On data simulated as in the paper [1]_, the estimate
+        held a variable outside the true parents less often under ``"exact"`` when interventions
+        could hit the target, and less often under ``"approximate"`` with a hidden common cause of
+        the target and another variable. See Notes.
     max_parents : int or None, default=None
         A cap on the target's parents, at least ``0``: only sets of at most ``max_parents``
         variables are tested, so no estimate gives the target more than ``max_parents`` parents.
@@ -2394,16 +2364,16 @@ def icp(
 
     Notes
     -----
-    **When to use.** ICP suits continuous data from several environments, such as
-    observation and experiments, when you want the causal parents of one target with an error
-    guarantee. Its claim [1]_: when the target is a linear function of its parents plus noise
-    whose distribution is the same in every environment, so that the environments change the other
-    variables in any way but leave the target's mechanism alone, the estimated parents are a subset
-    of the true parents with probability at least ``1 - alpha``, without faithfulness or any
-    condition on how strong the changes are; the exact test needs Gaussian noise. Weak or few
-    changes give fewer parents, not wrong ones. It tests every set of the other variables, so it
-    suits about 15 of them, or more with ``max_parents``. For the whole graph from interventional
-    data, use :func:`~andrey.gies` when every environment's intervened variables are known and
+    **When to use.** ICP suits continuous data from several environments, such as observation and
+    experiments, when you want the causal parents of one target with an error guarantee. Its claim
+    [1]_: when the target is a linear function of its parents plus noise whose distribution is the
+    same in every environment, so that the environments change the other variables in any way but
+    leave the target's mechanism alone, the estimated parents are a subset of the true parents with
+    probability at least ``1 - alpha``, without faithfulness or any condition on how strong the
+    changes are; the exact test needs Gaussian noise. Weak or few changes give fewer parents, not
+    wrong ones. It tests every set of the other variables, so it suits a small number of them, or
+    more with ``max_parents``. For the whole graph from interventional data, use
+    :func:`~andrey.gies` when every environment's intervened variables are known and
     :func:`~andrey.cdnod` when they are not.
 
     **How it works.** For every set ``S`` of the other variables, of at most ``max_parents`` of
@@ -2438,18 +2408,18 @@ def icp(
     rows first.
 
     **Limitations.** Its guarantee needs environments that leave the target's mechanism alone. On
-    simulated linear Gaussian data drawn as in the paper's simulation study [1]_, when interventions
-    could also hit the target and ``targets`` did not name them, the estimate held a variable
-    outside the true parents in 18% of the fits under the default test (11% under ``"exact"``), most
-    often a child of the target, whose set stays close to invariant; ``targets`` leaves such
-    environments out (`0.14.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#icp>`_). A hidden common cause of the target
-    and another variable can raise that share too, and with a nonlinear effect of a parent the
-    estimate rarely equals the true parents. With ``max_parents=3`` on 40 variables it found almost
-    none of the true parents. Without ``max_parents`` it tests ``2^(n_variables - 1)`` sets, so its
-    cost doubles with each variable. Under ``"exact"`` the guarantee does not cover noise that is
-    not Gaussian. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    data simulated as in the paper [1]_, when interventions could also hit the target and
+    ``targets`` did not name them, the estimate held a variable outside the true parents in more
+    fits than ``alpha`` allows, more often under the default test than under ``"exact"``, most often
+    a child of the target, whose set stays close to invariant; ``targets`` leaves such environments
+    out (`0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#icp>`_). A hidden
+    common cause of the target and another variable can also add a false parent, and with a
+    nonlinear effect of a parent the estimate rarely equals the true parents. With a small
+    ``max_parents`` on many variables it found almost none of the true parents. Without
+    ``max_parents`` it tests every set of the other variables, so its cost doubles with each
+    variable. Under ``"exact"`` the guarantee does not cover noise that is not Gaussian. The
+    measured results are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------

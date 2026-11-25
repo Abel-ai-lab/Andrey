@@ -119,15 +119,12 @@ def direct_lingam(
         sparse (heavy-tailed) noise and the square after a sign correction for skewed noise, which
         costs far less; the Notes say when each applies. ``"pwling"`` favors accuracy under any
         non-Gaussian noise; it gives up time. ``"skew"`` and ``"tanh"`` favor time; they give up
-        accuracy outside the noise each suits. On simulated linear data from Erdos-Renyi graphs of
-        mean degree 2 (10 and 20 variables, 500 and 2,000 rows, standardized columns, 10 datasets
-        per cell), ``"pwling"`` made a mean 0.7 to 0.9 errors (SHD) under every noise, and no cell
-        had fewer errors with ``"skew"`` or ``"tanh"`` by a paired 95% interval: ``"skew"`` matched
-        it under exponential noise (0.6) and ``"tanh"`` under Laplace noise (0.8), while under
-        uniform noise ``"tanh"`` made 35.1 and ``"skew"`` 22.4 (`0.12.0 release card
+        accuracy outside the noise each suits. On simulated linear data, ``"pwling"`` made few
+        errors under every noise, and neither ``"skew"`` nor ``"tanh"`` made fewer in any setting:
+        ``"skew"`` matched it under exponential noise and ``"tanh"`` under Laplace noise, while
+        under uniform noise both made far more (`0.12.0 release card
         <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#directlingam-s-order-measures>`__).
-        Their order search took 0.1 to 0.3 of ``"pwling"``'s time, and the whole fit about half to
-        two thirds of it.
+        Their order search took a fraction of ``"pwling"``'s time, and the whole fit less.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The causal order puts the cause of
@@ -222,17 +219,16 @@ def direct_lingam(
     it. Drop the incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On simulated linear data with uniform noise from Erdos-Renyi graphs, its median
-    errors (SHD) stayed below the empty graph's, and its fits finished within 1 h, up to 400
-    variables with 2,000 rows at mean degree 1, 2, 4, or 8, and up to 200 with 500 or 10,000 rows;
-    the `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_ has
-    every size. Its time grows quickly with the number of variables, as it compares them in pairs:
-    on scale-free graphs with ten rows per variable, a fit took 545 s at 200 variables on 16 CPU
-    cores (the `0.1.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.1.0.html#directlingam>`_). ``"skew"`` and ``"tanh"``
-    make far more errors under noise they do not suit, such as uniform noise for both (see
-    ``measure``). The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    **Limitations.** On simulated linear data with uniform noise its errors stayed below the empty
+    graph's, and its fits finished within the time cap, on graphs of hundreds of variables at every
+    measured density; the
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_ has
+    every size. Its time grows quickly with the number of variables, as it compares them in pairs,
+    so large fits are slow even on many cores (the
+    `0.1.0 release card <https://andrey.abel.ai/docs/benchmarks/0.1.0.html#directlingam>`_).
+    ``"skew"`` and ``"tanh"`` make far more errors under noise they do not suit, such as uniform
+    noise for both (see ``measure``). The measured results are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -365,22 +361,21 @@ def ica_lingam(
     Drop the incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On simulated linear data with uniform noise from Erdos-Renyi graphs, its fits
-    finished within 1 h up to 400 variables, but its median errors (SHD) stayed below the empty
-    graph's only up to 50 variables with 2,000 rows (20 with 500 rows or at mean degree 4, none at
-    mean degree 8) and 100 with 10,000 rows; the `0.10.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_ has every size. On
-    scale-free graphs with ten rows per variable, its errors passed the empty graph's at every size
-    from 20 to 100 variables (the `0.1.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.1.0.html#ica-lingam>`_). Its causal order depends on
-    the columns' units, as its authors note [2]_: matching the unmixing matrix to the variables
-    assumes every noise term has the same scale [1]_. Standardizing the columns removes that
-    dependence but can make the order far less accurate: with 50 variables, mean degree 4, and 2,000
-    rows, its errors summed over 5 datasets rose from 9 to 1,784, against the empty graph's 500 (the
+    **Limitations.** On simulated linear data with uniform noise, its fits finished within the time
+    cap on graphs of hundreds of variables, but its errors stayed below the empty graph's only on
+    smaller graphs, smaller still with fewer rows or denser graphs, and at no size on the densest;
+    the `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_ has
+    every size. On scale-free graphs with few rows per variable, its errors passed the empty graph's
+    at every measured size (the
+    `0.1.0 release card <https://andrey.abel.ai/docs/benchmarks/0.1.0.html#ica-lingam>`_). Its
+    causal order depends on the columns' units, as its authors note [2]_: matching the unmixing
+    matrix to the variables assumes every noise term has the same scale [1]_. Standardizing the
+    columns removes that dependence but can make the order far less accurate: on dense graphs its
+    errors rose from few to far more than the empty graph's (the
     `0.11.0 release card <https://andrey.abel.ai/docs/benchmarks/0.11.0.html#limits>`__).
     :func:`~andrey.direct_lingam` finds the order in a way that does not depend on the scale [2]_.
-    The numbers are a reference, not a hard limit: they change with the data generator, the density,
-    the method's settings, and the machine.
+    The measured results are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------
@@ -490,8 +485,8 @@ def multi_group_direct_lingam(
     use :func:`~andrey.cdnod`.
 
     **Choosing the measure.** ``"skew"`` and ``"tanh"`` suit the noise they suit in
-    :func:`~andrey.direct_lingam`, whose Notes say when and whose ``measure`` entry gives the
-    numbers; each group is standardized, and for ``"skew"`` sign-corrected, on its own.
+    :func:`~andrey.direct_lingam`, whose Notes say when and whose ``measure`` entry compares them;
+    each group is standardized, and for ``"skew"`` sign-corrected, on its own.
 
     **Ties.** Each step sums the groups' scores and breaks ties as :func:`~andrey.direct_lingam`
     does, ranking each column by its data stacked over the groups. Columns that are copies in any
@@ -503,17 +498,16 @@ def multi_group_direct_lingam(
     it. Drop the incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On simulated linear data with uniform noise in 3 groups that share one
-    Erdos-Renyi graph, its median errors (SHD) stayed below the empty graph's, and its fits finished
-    within 1 h, at every measured size, up to 200 variables at mean degree 2 or 4 with 1,000 or
-    5,000 rows per group; the `0.10.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_ has every size. It assumes
-    linear effects and non-Gaussian noise in every group, and it gives every group the one shared
-    causal order, even when a group's own order differs. With true ``required_paths`` or
-    ``forbidden_paths``, its errors were higher in no setting that repeated (the
-    `0.17.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
+    **Limitations.** On simulated linear data with uniform noise in several groups that share one
+    graph, its errors stayed below the empty graph's, and its fits finished within the time cap, at
+    every measured size, into the hundreds of variables; the
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_ has
+    every size. It assumes linear effects and non-Gaussian noise in every group, and it gives every
+    group the one shared causal order, even when a group's own order differs. With true
+    ``required_paths`` or ``forbidden_paths``, its errors were higher in no setting that repeated
+    (`0.17.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The measured
+    results are a reference, not a hard limit: they change with the data generator, the density, the
     method's settings, and the machine.
 
     References

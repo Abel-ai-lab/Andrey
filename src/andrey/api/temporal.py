@@ -199,7 +199,7 @@ def varma_lingam(
     series, so no step is regressed on a later one.
 
     **Choosing the measure.** ``"skew"`` and ``"tanh"`` suit the noise they suit in
-    :func:`~andrey.direct_lingam`, whose ``measure`` entry gives the numbers; here they read the
+    :func:`~andrey.direct_lingam`, whose ``measure`` entry compares them; here they read the
     standardized innovations.
 
     **Column order.** The fit runs on the columns sorted by a rank computed from the data, as for
@@ -213,18 +213,19 @@ def varma_lingam(
     it.
 
     **Limitations.** It assumes linear effects and non-Gaussian noise, and with ``prune=False``
-    every lag graph is complete. With ``prune=True``, the median F1 score of its directed
-    cross-links, which is 0 for the empty graph, was at least 0.66 through 40 variables, or 20 with
-    series five times as long, where fits of the next size ran past 1 h on 4 cores (`0.10.0 release
-    card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#methods-on-their-own-axes>`_). With
-    ``order=(1, 1)``, its median errors stayed below the empty graph's from 300 time steps and
-    exceeded them at 100 steps from 10 variables on (`0.5.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.5.0.html#varma-lingam>`_). The likelihood fit can stop
-    short of convergence without a warning, as after a failed line search; a larger ``max_iter``
-    does not prevent this. Where it stops depends on the numerical libraries and the CPU's BLAS
-    kernels, so the same series can give a different graph on another machine. With ``criterion``
-    set, it fits one model for every ``(p, q)`` in the grid. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    every lag graph is complete. With ``prune=True``, the F1 score of its directed cross-links
+    stayed well above the empty graph's until its fits passed the time cap, which longer series
+    reach on smaller graphs (`0.10.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#methods-on-their-own-axes>`_). With
+    ``order=(1, 1)``, its errors stayed below the empty graph's on long series and exceeded them on
+    short series beyond the smallest graphs
+    (`0.5.0 release card <https://andrey.abel.ai/docs/benchmarks/0.5.0.html#varma-lingam>`_). The
+    likelihood fit can stop short of convergence without a warning, as after a failed line search; a
+    larger ``max_iter`` does not prevent this. Where it stops depends on the numerical libraries and
+    the CPU's BLAS kernels, so the same series can give a different graph on another machine. With
+    ``criterion`` set, it fits one model for every ``(p, q)`` in the grid. The measured results are
+    a reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -371,7 +372,7 @@ def longitudinal_lingam(
     orders unchanged.
 
     **Choosing the measure.** ``"skew"`` and ``"tanh"`` suit the noise they suit in
-    :func:`~andrey.direct_lingam`, whose ``measure`` entry gives the numbers; here they read the
+    :func:`~andrey.direct_lingam`, whose ``measure`` entry compares them; here they read the
     standardized columns of each time point.
 
     **Column order.** The fit runs on the variables sorted by a rank computed from the data over all
@@ -385,11 +386,10 @@ def longitudinal_lingam(
 
     **Limitations.** It assumes linear effects and non-Gaussian noise. Each time point's fit uses
     only the units' rows at that time, so its accuracy depends on the number of units, not on the
-    number of time points. On simulated panels of 20 time points, the median F1 score of its
-    directed cross-links, which is 0 for the empty graph, was 0.94 to 1 at every size through 40
-    variables, the largest planned, with 500 and 2,000 units (`0.10.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#methods-on-their-own-axes>`_). The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
+    number of time points. On simulated panels, the F1 score of its directed cross-links was close
+    to perfect at every measured size, with few and many units (`0.10.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#methods-on-their-own-axes>`_). The measured
+    results are a reference, not a hard limit: they change with the data generator, the density, the
     method's settings, and the machine.
 
     References
@@ -481,11 +481,10 @@ def pcmci(
         ``0``. ``"fdr_bh"`` favors fewer extra links; it gives up true links whose p-value is not
         small enough for the number of tests. ``"none"`` favors true links; it gives up control of
         the extra ones, which grow with the number of variables. On simulated linear-Gaussian VAR
-        series of 5 to 80 variables, 500 and 1,000 time steps, and ``tau_max`` of 1 and 2 (20
-        cells), ``"fdr_bh"`` had fewer mean errors (missing plus extra lagged links) than ``"none"``
-        in 16 cells and more in 1, with 5 variables; at 80 variables, 1,000 steps, and
-        ``tau_max=2``, ``"none"`` had 779 errors, above the empty graph's 481, with 616 extra links,
-        and ``"fdr_bh"`` had 252, with 13 extra and 239 missed (`0.12.0 release card
+        series, ``"fdr_bh"`` had fewer errors (missing plus extra lagged links) than ``"none"`` in
+        nearly every setting, more only on the smallest graphs; on the largest graphs ``"none"``
+        made more errors than the empty graph, nearly all of them extra links, while ``"fdr_bh"``
+        stayed far below it (`0.12.0 release card
         <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#fdr-control-in-pcmci-and-granger>`__).
         See Notes.
     indep_test : str or None, default=None
@@ -680,18 +679,18 @@ def pcmci(
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** With ``fdr_method="none"`` on simulated linear-Gaussian series and
-    ``tau_max=2``, its median errors (lag-resolved SHD) stayed below the empty graph's through 20
-    variables, with series of either length, and not from 40 (`0.10.0 release card
+    **Limitations.** With ``fdr_method="none"`` on simulated linear-Gaussian series, its errors
+    stayed below the empty graph's on small graphs, with series of either length, and not on larger
+    ones (`0.10.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#methods-on-their-own-axes>`_); the
-    ``fdr_method`` entry gives the default's errors. It assumes a stationary series, no hidden
-    common causes, and, with a partial-correlation test, linear effects; ``"cmiknn"`` and ``"gpdc"``
-    lift that assumption at a far higher cost per test and are not benchmarked yet. It does not test
+    ``fdr_method`` entry compares the default. It assumes a stationary series, no hidden common
+    causes, and, with a partial-correlation test, linear effects; ``"cmiknn"`` and ``"gpdc"`` lift
+    that assumption at a far higher cost per test and are not benchmarked yet. It does not test
     same-step (lag 0) links: an effect within one time step is missed and can show up as a false
     lagged link. An MCI test conditions on up to ``2 * n_variables * tau_max - 1`` lagged values, so
-    the series needs many more time steps than that. The MCI step alone runs ``n_variables ** 2 *
-    tau_max`` tests. Missing values are not benchmarked yet. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    the series needs many more time steps than that. Missing values are not benchmarked yet. The
+    measured results are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------
@@ -1055,9 +1054,9 @@ def pcmciplus(
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** On simulated linear-Gaussian series with lagged and same-step links and
-    ``tau_max=5``, its median errors (endpoint SHD) stayed below the empty graph's at every size
-    through 160 variables, the largest the data generator could draw (`0.10.0 release card
+    **Limitations.** On simulated linear-Gaussian series with lagged and same-step links, its errors
+    stayed below the empty graph's at every measured size, up to the largest the data generator
+    could draw (`0.10.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#methods-on-their-own-axes>`_). It assumes a
     stationary series, no hidden common causes, and, with a partial-correlation test, linear
     effects; ``"cmiknn"`` and ``"gpdc"`` lift that assumption at a far higher cost per test and are
@@ -1065,8 +1064,8 @@ def pcmciplus(
     same-step neighbors, so the number of tests grows exponentially with the same-step links at one
     variable. A test conditions on up to ``2 * n_variables * tau_max + n_variables - 2`` values, so
     the series needs many more time steps than that. Missing values are not benchmarked yet. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    measured results are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------
@@ -1189,10 +1188,10 @@ def jpcmciplus(
         dataset is always used. ``metadata["time_dummy"]`` says whether the fit used it. The dummy
         favors a graph without the links a hidden time context adds; it gives up time and memory, a
         column per step in the conditions of every test that takes it. Leaving it out favors long
-        series and more system variables; it gives up that stand-in for hidden time contexts. At 5
-        system variables and 1,600 steps, a fit took 7 s with it and 0.05 s without; on one core
-        with 10 datasets of 100 steps, a fit took 11.5 s with it and 1.5 s without at 15 system
-        variables, and at 20 it ran out of 12 GB with it and took 47 s without.
+        series and more system variables; it gives up that stand-in for hidden time contexts. Fits
+        with it took many times as long as without, and on the larger systems measured it ran out of
+        memory where the fit without it finished (the
+        `0.15.0 release card <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#j-pcmci>`__).
     tau_max : int, default=1
         The largest lag tested, at least ``1``: links at lags ``0`` to ``tau_max`` are tested.
     alpha : float, default=0.01
@@ -1328,24 +1327,23 @@ def jpcmciplus(
     :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, and :func:`~andrey.lpcmci` read one series, so
     drop the datasets that hold one.
 
-    **Limitations.** On the linear model of its authors' experiment script [1]_, 5 system variables
-    and 4 contexts, all or half of them observed, its mean errors stayed below the empty graph's in
-    every setting (`0.15.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#j-pcmci>`_). It assumes faithfulness, so a
-    missed dummy link can leave the links a hidden context adds. A dummy link needs one level that
-    stands out: a dataset effect far larger than the noise can hide behind the lagged values, and
-    the time dummy misses a smooth effect spread over the steps, which leaves false links; list such
-    a context if it is known. The lagged phase first tests each candidate without conditions, so an
-    autocorrelated target can hide a context link from it for good, and with few steps against many
-    datasets false positives stay high as the datasets grow [1]_. A time context that the lags of
-    the time contexts determine, such as a sine and cosine of one period, or a sine or a quadratic
-    trend alone from ``tau_max=2``, cannot be told apart from them: only the variables its context
-    links reach can be trusted, not the context or the lag they name. It tests and reports no link
-    between contexts [1]_. Under ``"majority"`` and ``"conservative"``, hidden contexts leave most
-    same-step links undirected, as a context cannot orient a link into a variable that has the
-    context's dummy as a parent. The cost grows fastest with the system variables (see
-    ``time_dummy``). The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    **Limitations.** On the linear model of its authors' experiment script [1]_, with every context
+    observed or some hidden, its errors stayed below the empty graph's in every setting
+    (`0.15.0 release card <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#j-pcmci>`_). It
+    assumes faithfulness, so a missed dummy link can leave the links a hidden context adds. A dummy
+    link needs one level that stands out: a dataset effect far larger than the noise can hide behind
+    the lagged values, and the time dummy misses a smooth effect spread over the steps, which leaves
+    false links; list such a context if it is known. The lagged phase first tests each candidate
+    without conditions, so an autocorrelated target can hide a context link from it for good, and
+    with few steps against many datasets false positives stay high as the datasets grow [1]_. A time
+    context that the lags of the time contexts determine, such as a sine and cosine of one period,
+    or a sine or a quadratic trend alone from ``tau_max=2``, cannot be told apart from them: only
+    the variables its context links reach can be trusted, not the context or the lag they name. It
+    tests and reports no link between contexts [1]_. Under ``"majority"`` and ``"conservative"``,
+    hidden contexts leave most same-step links undirected, as a context cannot orient a link into a
+    variable that has the context's dummy as a parent. The cost grows fastest with the system
+    variables (see ``time_dummy``). The measured results are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1675,20 +1673,19 @@ def lpcmci(
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** On simulated linear-Gaussian series with 30% of the series unobserved and
-    ``tau_max=3``, its median errors (endpoint SHD against the PAG of the observed series) stayed
-    below the empty graph's through 40 variables, the unobserved ones counted, where some fits
-    already ran past 1 h on 4 cores (`0.10.0 release card
+    **Limitations.** On simulated linear-Gaussian series with part of the series unobserved, its
+    errors stayed below the empty graph's at every measured size, up to a few dozen variables, where
+    some fits already ran past the time cap (`0.10.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#methods-on-their-own-axes>`_). It assumes a
     stationary series, no selection bias, and, with a partial-correlation test, linear effects;
     ``"cmiknn"`` and ``"gpdc"`` lift that assumption at a far higher cost per test and are not
     benchmarked yet. Hidden common causes are allowed, but the graph covers only ``tau_max + 1``
     time steps, and a hidden cause that acts through earlier steps can add links within that window.
     The removal and rule steps test subsets of a node's neighbors, so the number of tests grows
-    exponentially with the links at one node, and a test conditions on up to ``n_variables *
-    (tau_max + 1) - 2`` values, so the series needs many more time steps than that. Missing values
-    are not benchmarked yet. The numbers are a reference, not a hard limit: they change with the
-    data generator, the density, the method's settings, and the machine.
+    exponentially with the links at one node, and a test conditions on up to
+    ``n_variables * (tau_max + 1) - 2`` values, so the series needs many more time steps than that.
+    Missing values are not benchmarked yet. The measured results are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1809,12 +1806,11 @@ def granger(
         it is not counted and keeps p-value ``1``; a required link is counted with p-value ``0``.
         ``"fdr_bh"`` favors fewer extra edges; it gives up true edges whose p-value is not small
         enough for the number of tests. ``"none"`` favors true edges; it gives up control of the
-        extra ones, which grow with the number of variables. On simulated linear-Gaussian VAR series
-        of 5 to 80 variables, 500 and 1,000 time steps, and ``tau_max`` of 1 and 2 (20 cells),
-        ``"fdr_bh"`` had fewer mean errors (missing plus extra lagged edges) than ``"none"`` in 15
-        cells and more in 1, with 5 variables; at 80 variables, 1,000 steps, and ``tau_max=2``,
-        ``"none"`` had 768 errors, above the empty graph's 481, with 603 extra edges, and
-        ``"fdr_bh"`` had 256, with 13 extra and 243 missed (`0.12.0 release card
+        extra ones, which grow with the number of variables. On simulated linear-Gaussian VAR
+        series, ``"fdr_bh"`` had fewer errors (missing plus extra lagged edges) than ``"none"`` in
+        nearly every setting, more only on the smallest graphs; on the largest graphs ``"none"``
+        made more errors than the empty graph, nearly all of them extra edges, while ``"fdr_bh"``
+        stayed far below it (`0.12.0 release card
         <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#fdr-control-in-pcmci-and-granger>`__).
         See Notes.
     knowledge : Knowledge or None, default=None
@@ -1905,12 +1901,11 @@ def granger(
     rows per test and keep every time step, as dropping a step would join the steps around it.
 
     **Limitations.** It assumes linear effects and tests no same-step effects. On simulated
-    linear-Gaussian VAR series with 2 expected parents of each variable at each lag, from 5 to 160
-    variables, its errors stayed below the empty graph's in every setting with the default
-    ``fdr_method="fdr_bh"``; with ``"none"`` they exceeded them in 5 of the 20 settings up to 80
-    variables (see ``fdr_method``) and at 160. The work grows with ``tau_max`` and with the square
-    of the number of variables. The numbers are a reference, not a hard limit: they change with the
-    data generator, the density, the method's settings, and the machine.
+    linear-Gaussian VAR series, its errors stayed below the empty graph's in every measured setting
+    with the default ``fdr_method="fdr_bh"``; with ``"none"`` they exceeded them in some settings,
+    the largest graphs included (see ``fdr_method``). The work grows with ``tau_max`` and with the
+    square of the number of variables. The measured results are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -2018,9 +2013,8 @@ def dynotears(
         fit that no change of units moves; it gives up the gain the fit takes from the data's units
         on series whose variance grows along the causal order. ``False`` favors the data's units,
         the setting the paper's simulations measure; it gives up independence from the units. On the
-        paper's design with Gaussian noise and 500 time steps, at 5 to 50 variables, the errors
-        (SHD) were 0.15 to 1.75 in the data's units, against the empty graph's 13.5 to 144.6, and
-        8.30 to 82.60 with z-scored columns, against 14.6 to 147.2.
+        paper's design with Gaussian noise and long series, the errors (SHD) in the data's units
+        stayed far below the empty graph's, and with z-scored columns they came much closer to it.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
         variables over lags ``0`` to ``tau_max``: required and forbidden links, the pairs allowed
@@ -2079,8 +2073,8 @@ def dynotears(
     noise, with weights that do not change over time, same-step effects that form no cycle, and no
     unmeasured variable that causes two measured ones [1]_. Its ``l1`` penalty and both thresholds
     act on the weights in the data's units, so the columns should be in comparable units [4]_ [5]_:
-    a cause recorded in thousandths multiplies its weight by 1,000, and the penalty can then remove
-    a true edge, or every edge, without a warning; convert such columns to comparable units first.
+    rescaling a cause rescales its weight inversely, and the penalty can then remove a true edge, or
+    every edge, without a warning; convert such columns to comparable units first.
     ``standardize=True`` scales them to unit variance instead, which falls outside the setting the
     paper's simulations measure (see ``standardize``). It fits ``(tau_max + 1) * d * d`` weights
     under an acyclicity function that takes a matrix exponential, so it suits a moderate number of
@@ -2138,15 +2132,15 @@ def dynotears(
     **Limitations.** The ``l1`` penalty and the weight thresholds read the data's units, as in
     NOTEARS [4]_ [5]_: rescaling a column changes the fit, and on series whose variance grows along
     the causal order the fit gains from that order, which ``standardize=True`` gives up. On the
-    paper's design [1]_ with 500 time steps, its errors at the defaults stayed far below the empty
-    graph's from 5 to 100 variables. At 50 steps the defaults made more errors than the empty graph
-    from 20 variables on; short series should use ``lambda1=0.2`` and ``lag_threshold=0.2``, the
-    paper's settings for 50 steps. Its centering, which the paper's loss leaves out, costs errors on
-    short series whose noise has mean zero; the `0.14.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#dynotears>`_ has the numbers. The time grows
-    faster than the cube of the number of variables: at 500 steps on one core, the median fit took
-    about 30 s at 50 variables and 299 to 385 s at 100. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    paper's design [1]_ with long series, its errors at the defaults stayed far below the empty
+    graph's at every measured size. On short series the defaults made more errors than the empty
+    graph beyond small graphs; short series should use ``lambda1=0.2`` and ``lag_threshold=0.2``,
+    the paper's settings for its short series. Its centering, which the paper's loss leaves out,
+    costs errors on short series whose noise has mean zero; the
+    `0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#dynotears>`_ has the
+    numbers. The time grows faster than the cube of the number of variables, so fits of moderate
+    graphs take minutes on one core. The measured results are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -2377,17 +2371,16 @@ def rpcmci(
     :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete rows per test and keep
     every time step, as dropping a step would join the steps around it.
 
-    **Limitations.** Not benchmarked yet; the tests run it on 2 to 3 variables, 2 to 3 regimes, and
-    up to 1,000 time steps, and the `0.19.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#regime-pcmci>`_ compares it with its
-    authors' code. The nonconvex objective can leave a regime holding steps from several true
-    regimes, or too few to fit; more ``n_starts`` guard against it at a cost that grows linearly
-    with them [1]_. Regimes whose models differ little, such as one link's strength alone, are hard
-    to tell apart [1]_. On a series without regimes, a regime, most often a small one, can hold a
-    spurious link. The number of regimes and ``max_transitions`` are not learned. Each iteration
-    runs PCMCI once per regime and solves one linear program over ``2 * n_regimes * n_samples``
-    variables. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    **Limitations.** Not benchmarked yet; its tests run it only on small problems, and the
+    `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#regime-pcmci>`_
+    compares it with its authors' code. The nonconvex objective can leave a regime holding steps
+    from several true regimes, or too few to fit; more ``n_starts`` guard against it at a cost that
+    grows linearly with them [1]_. Regimes whose models differ little, such as one link's strength
+    alone, are hard to tell apart [1]_. On a series without regimes, a regime, most often a small
+    one, can hold a spurious link. The number of regimes and ``max_transitions`` are not learned.
+    Each iteration runs PCMCI once per regime and solves one linear program over
+    ``2 * n_regimes * n_samples`` variables. The measured results are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------

@@ -278,19 +278,17 @@ def mmhc(
     score of one dataset. Drop the incomplete rows yourself, which suits values missing completely
     at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On simulated linear-Gaussian data (20 to 100 variables, mean degree 2 and 4,
-    Fisher-z tests at alpha 0.05), its errors stayed below the empty graph's in every setting, the
-    closest at 20 variables and mean degree 4; the `0.12.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#mmhc>`_ has the numbers. An edge the MMPC
-    phase misses is never added, and the hill-climbing phase stops at a local optimum. MMPC tests
-    each candidate against every subset of the current members, so its cost grows exponentially with
-    the size of a variable's parents-and-children set. ``required_paths`` is experimental, and true
-    path claims can direct an edge of a wrong graph the wrong way, as 18.2% and 24.7% of the edges
-    they directed did, and cannot restore a missed edge: a known edge belongs in ``required``
-    (`0.17.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** On simulated linear-Gaussian data, its errors stayed below the empty graph's in
+    every measured setting, the closest on small, denser graphs; the
+    `0.12.0 release card <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#mmhc>`_ has the
+    numbers. An edge the MMPC phase misses is never added, and the hill-climbing phase stops at a
+    local optimum. MMPC tests each candidate against every subset of the current members, so its
+    cost grows exponentially with the size of a variable's parents-and-children set.
+    ``required_paths`` is experimental, and true path claims directed some edges of a wrong graph
+    the wrong way and cannot restore a missed edge: a known edge belongs in ``required`` (`0.17.0
+    release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_).
+    The measured results are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------
@@ -565,19 +563,19 @@ def rsmax2(
     one dataset. Drop the incomplete rows yourself, which suits values missing completely at random,
     or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On simulated linear-Gaussian data (20 to 100 variables, mean degree 2 and 4,
-    Fisher-z tests at alpha 0.05), with ``restrict="mmpc"`` and ``"iamb"`` and ``maximize="hc"``,
-    its errors stayed below the empty graph's in every setting, the closest at 20 variables and mean
-    degree 4; the `0.12.0 release card <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#rsmax2>`_
-    has the numbers. An edge the restrict phase misses is never added, and the maximize phase stops
-    at a local optimum. MMPC tests each candidate against every subset of the current members, so
-    its cost grows exponentially with the size of a variable's parents-and-children set; IAMB and
+    **Limitations.** On simulated linear-Gaussian data, with ``restrict="mmpc"`` and ``"iamb"`` and
+    ``maximize="hc"``, its errors stayed below the empty graph's in every measured setting, the
+    closest on small, denser graphs; the
+    `0.12.0 release card <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#rsmax2>`_ has the
+    numbers. An edge the restrict phase misses is never added, and the maximize phase stops at a
+    local optimum. MMPC tests each candidate against every subset of the current members, so its
+    cost grows exponentially with the size of a variable's parents-and-children set; IAMB and
     Inter-IAMB condition on the whole current blanket, so each of their tests needs more rows as the
-    blankets grow. ``required_paths`` is experimental, and true path claims can direct an edge of a
-    wrong graph the wrong way, as 18.2% and 24.7% of the edges they directed did, and cannot restore
-    a missed edge: a known edge belongs in ``required`` (`0.17.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
+    blankets grow. ``required_paths`` is experimental, and true path claims directed some edges of a
+    wrong graph the wrong way and cannot restore a missed edge: a known edge belongs in ``required``
+    (`0.17.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The measured
+    results are a reference, not a hard limit: they change with the data generator, the density, the
     method's settings, and the machine.
 
     References

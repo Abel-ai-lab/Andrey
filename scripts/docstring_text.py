@@ -340,8 +340,8 @@ SHARED = {
         "Notes",
         "**Limitations.**",
         "last",
-        "The numbers are a reference, not a hard limit: they change with the data generator, the "
-        "density, the method's settings, and the machine.",
+        "The measured results are a reference, not a hard limit: they change with the data "
+        "generator, the density, the method's settings, and the machine.",
         lambda m: True,
     ),
     "tie_break": Shared(

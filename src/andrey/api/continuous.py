@@ -107,15 +107,13 @@ def notears(
         Most accepted steps of the path, at least ``1``. Used only with ``robust``. Reaching it
         warns with :class:`~andrey.SearchLimitWarning`.
     standardize : bool, default=False
-        Scale each column to unit variance first, so the fit does not read the columns' units;
-        the weights are then those of the scaled columns. ``True`` favors a graph that does not
-        depend on the columns' units; it gives up the accuracy the default reads from units in
-        which a variable's variance grows along the causal order (varsortability [5]_). In the
-        0.17.0 NOTEARS benchmark (the paper's simulation in its own units: 1,000 rows, Gaussian,
-        exponential, and Gumbel noise, Erdos-Renyi graphs with twice as many edges as variables),
-        the mean errors were 2.5 and 14.4 at 10 and 50 variables by default and 18.5 and 87.2
-        with ``True``, against the empty graph's 20 and 100; on columns already of unit variance
-        the two differed by at most 0.7.
+        Scale each column to unit variance first, so the fit does not read the columns' units; the
+        weights are then those of the scaled columns. ``True`` favors a graph that does not depend
+        on the columns' units; it gives up the accuracy the default reads from units in which a
+        variable's variance grows along the causal order (varsortability [5]_). On the paper's
+        simulation in its own units, the default made far fewer errors than ``True``, whose errors
+        came close to the empty graph's; on columns already of unit variance the two gave nearly the
+        same errors.
     missing : {"em"} or None, default=None
         How missing values (``NaN``) are handled. ``"em"`` fits the method by structural
         expectation-maximization (EM) over the expected covariance of the data, which assumes values
@@ -253,15 +251,15 @@ def notears(
     Without ``"em"``, drop the incomplete rows yourself, which suits values missing completely at
     random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** The result depends on the data's scale (varsortability [5]_); the `0.18.0
-    release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#notears>`_ has the numbers.
-    With ``missing="em"``, in the setting of Gao et al. [8]_ (raw columns, 20 variables, 100 rows),
-    its errors stayed below the empty graph's in all 24 settings (`0.17.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#missing-data>`_). On standardized columns,
-    where the least-squares fit is weaker, its errors with EM were about those on complete data, and
-    :func:`~andrey.pc` with test-wise deletion made fewer. It has no guarantee under values missing
-    not at random. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    **Limitations.** The result depends on the data's scale (varsortability [5]_); the
+    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#notears>`_ has the
+    numbers. With ``missing="em"`` on raw columns, as Gao et al. [8]_ simulate them, its errors
+    stayed below the empty graph's in every setting
+    (`0.17.0 release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#missing-data>`_). On
+    standardized columns, where the least-squares fit is weaker, its errors with EM were about those
+    on complete data, and :func:`~andrey.pc` with test-wise deletion made fewer. It has no guarantee
+    under values missing not at random. The measured results are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -398,13 +396,13 @@ def dagma(
         Most accepted steps of the path, at least ``1``. Used only with ``robust``. Reaching it
         warns with :class:`~andrey.SearchLimitWarning`.
     standardize : bool, default=False
-        Scale each column to unit variance first, so the fit does not read the columns' units;
-        the weights are then those of the scaled columns. ``True`` favors a graph that does not
-        depend on the columns' units; it gives up the accuracy the default reads from units in
-        which a variable's variance grows along the causal order (varsortability [5]_). In the
-        0.18.0 DAGMA benchmark (the paper's simulation: 1,000 rows, 10 to 100 variables), the
-        default made fewer errors than the empty graph in all 18 settings in the simulation's own
-        units, and on z-scored columns, which ``True`` fits, in none of 24, with more in 16.
+        Scale each column to unit variance first, so the fit does not read the columns' units; the
+        weights are then those of the scaled columns. ``True`` favors a graph that does not depend
+        on the columns' units; it gives up the accuracy the default reads from units in which a
+        variable's variance grows along the causal order (varsortability [5]_). On the paper's
+        simulation, the default made fewer errors than the empty graph in every setting in the
+        simulation's own units, and on z-scored columns, which ``True`` fits, in none, often more
+        (`0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma>`__).
     missing : {"em"} or None, default=None
         How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by
         structural expectation-maximization (EM) over the expected covariance of the data, which
@@ -542,11 +540,11 @@ def dagma(
     incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** The result depends on the data's scale (varsortability [5]_); the `0.18.0
-    release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma>`_ has the numbers.
-    ``missing="em"`` is experimental and not benchmarked yet, and it has no guarantee under values
-    missing not at random. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    **Limitations.** The result depends on the data's scale (varsortability [5]_); the
+    `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma>`_ has the
+    numbers. ``missing="em"`` is experimental and not benchmarked yet, and it has no guarantee under
+    values missing not at random. The measured results are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------

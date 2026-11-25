@@ -379,21 +379,19 @@ def iamb(
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** On simulated linear-Gaussian data with Fisher-z tests, from 20 to 200
-    variables, the errors of its CPDAG, skeleton, and moral graph stay below the empty graph's in
-    every setting (`0.13.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#iamb>`_); the mixed-data tests and missing
-    values are not benchmarked yet. Each test conditions on the whole current blanket, so it needs
-    more rows as the blanket grows, and a candidate the grow step adds in error enlarges every later
-    conditioning set. The skeleton step then separates more true edges: about half the truly
-    adjacent pairs whose smaller blanket holds 7 to 9 variables, and more with required edges, which
-    enlarge the blankets. A triple whose smaller blanket holds ``m`` variables takes up to ``2**m``
-    tests. ``forbidden_paths`` is experimental. Its tests can contradict each other, and the graph
-    found then has no consistent extension and stands for no DAG, as on 106 of 240 simulated
-    datasets with 10 to 50 variables; a ``knowledge`` claim then acts only on an edge, and most
-    claims are dropped (`0.17.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
+    **Limitations.** On simulated linear-Gaussian data, the errors of its CPDAG, skeleton, and moral
+    graph stayed below the empty graph's in every measured setting
+    (`0.13.0 release card <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#iamb>`_); the
+    mixed-data tests and missing values are not benchmarked yet. Each test conditions on the whole
+    current blanket, so it needs more rows as the blanket grows, and a candidate the grow step adds
+    in error enlarges every later conditioning set; the skeleton step then removes many true edges
+    between variables with large blankets, more with required edges, and its tests grow
+    exponentially with a blanket's size. ``forbidden_paths`` is experimental. Tests that contradict
+    each other leave a graph with no consistent extension, which stands for no DAG and often
+    occurred on simulated data; a ``knowledge`` claim then acts only on an edge, and most claims are
+    dropped (`0.17.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The measured
+    results are a reference, not a hard limit: they change with the data generator, the density, the
     method's settings, and the machine.
 
     References
@@ -681,20 +679,18 @@ def inter_iamb(
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** On simulated linear-Gaussian data with Fisher-z tests, from 20 to 100
-    variables, the errors of its CPDAG, skeleton, and moral graph stay below the empty graph's in
-    every setting (`0.12.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#inter-iamb>`_); the mixed-data tests and
-    missing values are not benchmarked yet. Each test conditions on the whole current blanket, so it
-    needs more rows as the blanket grows, and the skeleton step separates more true edges: about
-    half the truly adjacent pairs whose smaller blanket holds 7 to 9 variables, and more with
-    required edges, which enlarge the blankets. A triple whose smaller blanket holds ``m`` variables
-    takes up to ``2**m`` tests. ``forbidden_paths`` is experimental. Its tests can contradict each
-    other, and the graph found then has no consistent extension and stands for no DAG, as on 105 of
-    240 simulated datasets with 10 to 50 variables; a ``knowledge`` claim then acts only on an edge,
-    and most claims are dropped (`0.17.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
+    **Limitations.** On simulated linear-Gaussian data, the errors of its CPDAG, skeleton, and moral
+    graph stayed below the empty graph's in every measured setting
+    (`0.12.0 release card <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#inter-iamb>`_); the
+    mixed-data tests and missing values are not benchmarked yet. Each test conditions on the whole
+    current blanket, so it needs more rows as the blanket grows; the skeleton step then removes many
+    true edges between variables with large blankets, more with required edges, and its tests grow
+    exponentially with a blanket's size. ``forbidden_paths`` is experimental. Tests that contradict
+    each other leave a graph with no consistent extension, which stands for no DAG and often
+    occurred on simulated data; a ``knowledge`` claim then acts only on an edge, and most claims are
+    dropped (`0.17.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The measured
+    results are a reference, not a hard limit: they change with the data generator, the density, the
     method's settings, and the machine.
 
     References
@@ -976,22 +972,20 @@ def mmpc(
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** On simulated linear-Gaussian data with Fisher-z tests, from 20 to 200
-    variables, its skeleton errors stay below the empty graph's wherever its fits finished (`0.13.0
-    release card <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#mmpc>`_); the mixed-data tests
-    and missing values are not benchmarked yet. Its cost grows exponentially with the size of a set,
-    and ``structure="cpdag"`` takes up to ``2**m`` tests for a triple whose smaller blanket, which
-    reaches two steps from a variable, holds ``m`` variables: a CPDAG fit reached the 600 s cap on
-    19 of 20 standardized datasets with 100 variables, mean degree 4, and 5,000 rows. At 200
-    variables and 5,000 rows, a few borderline false edges survive where the forward step admits the
-    strongest of candidates too dependent to rank by p-value (`0.13.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.13.0.html>`__).
-    ``forbidden_paths`` is experimental. Its tests can contradict each other, and the graph found
-    then has no consistent extension and stands for no DAG, as on 125 of 240 simulated datasets with
-    10 to 50 variables; a ``knowledge`` claim then acts only on an edge, and most claims are dropped
-    (`0.17.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
+    **Limitations.** On simulated linear-Gaussian data, its skeleton errors stayed below the empty
+    graph's wherever its fits finished
+    (`0.13.0 release card <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#mmpc>`_); the
+    mixed-data tests and missing values are not benchmarked yet. Its cost grows exponentially with
+    the size of a set, and ``structure="cpdag"`` adds tests that grow exponentially with each
+    triple's blankets, which reach two steps from a variable: on denser graphs with many rows, most
+    CPDAG fits did not finish within the time cap. On large graphs with many rows, a few borderline
+    false edges survive where the forward step admits the strongest of candidates too dependent to
+    rank by p-value (`0.13.0 release card <https://andrey.abel.ai/docs/benchmarks/0.13.0.html>`__).
+    ``forbidden_paths`` is experimental. Tests that contradict each other leave a graph with no
+    consistent extension, which stands for no DAG and often occurred on simulated data; a
+    ``knowledge`` claim then acts only on an edge, and most claims are dropped (`0.17.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The measured
+    results are a reference, not a hard limit: they change with the data generator, the density, the
     method's settings, and the machine.
 
     References

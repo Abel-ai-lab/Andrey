@@ -137,11 +137,13 @@ registry. Every facade docstring has, in order:
   setting. A **Missing values.** paragraph says whether a `NaN` is read or raises, why, and what
   to do instead. A **Limitations.** paragraph follows with the measured failures
   ([Add a method](#add-a-method), [Mark it supported](#6-mark-it-supported)) in a few plain
-  sentences, with at most one or two numbers and a link to the release card that holds the rest;
-  it keeps every case where a result is wrong, raises, or is worse than the empty graph. It and
-  **When to use.** do not repeat each other. Each behavior-selecting parameter says in its entry
-  what each value favors and what it gives up, with the measured numbers and their setting.
-  Limitations is the last paragraph of Notes.
+  sentences: in which kind of data it does better or worse, compared with which methods, and where
+  it fails, with a link to the release card that holds the numbers and the setting. It keeps every
+  case where a result is wrong, raises, or is worse than the empty graph. It and **When to use.**
+  do not repeat each other. Each behavior-selecting parameter says in its entry what each value
+  favors and what it gives up, in the same general terms. These paragraphs give no measured
+  numbers and no description of a paper's or a benchmark's setup; a value a user sets, such as a
+  default, may appear. Limitations is the last paragraph of Notes.
 - **References**: the papers the docstring cites.
 - **Examples**: a runnable doctest on tiny synthetic data that asserts a stable property (`kind`, a
   shape, `ordering`), never a repr. An example whose result depends on the seed at its settings
@@ -394,9 +396,9 @@ them):
 
 - `status="supported"` in its `MethodSpec`, with the docstring's `ExperimentalWarning` entry
   removed;
-- a **Limitations.** paragraph from the campaign: the data measured, the size where its median
-  errors reach the empty graph's or where it stops being practical, and a link to the card section
-  below, which holds the sizes, fit times, and core counts;
+- a **Limitations.** paragraph from the campaign: the kind of data where it beats the empty graph
+  and where it falls behind or stops being practical, without numbers, and a link to the card
+  section below, which holds the sizes, fit times, and core counts;
 - the method under "Supported methods" in `docs/docs/api.md`;
 - its rows in `benchmarks/published/<label>/summary.json` for the release that publishes it,
   generated from the campaign's records and passing `uv run python -m qa.reference_parity`;

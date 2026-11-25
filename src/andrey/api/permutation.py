@@ -349,28 +349,28 @@ def boss(
     :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** At the standard BIC (``ebic_gamma=0.0``) with ``penalty_discount=4.0``, on
-    simulated linear-Gaussian data from Erdos-Renyi graphs, its median errors (SHD) stayed below the
-    empty graph's, and most of its fits finished within 1 h, up to 1,600 variables at mean degree 1
-    or 2 and 800 at mean degree 4 or with 10,000 rows; at mean degree 8 its errors passed the empty
-    graph's at 20 variables, and its fits ran out of 28 GB past 400 (the `0.10.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_). At the standard BIC with
-    ``penalty_discount=1.0`` its errors passed the empty graph's on the 223-variable ANDES network
-    with 1,000 simulated rows (the `0.1.0 release card
+    simulated linear-Gaussian data, its errors stayed below the empty graph's, and most of its fits
+    finished within the time cap, on sparse graphs into the thousands of variables and on denser
+    ones into the hundreds; on the densest graphs its errors passed the empty graph's on the
+    smallest size, and its fits ran out of memory on the largest (the
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`_). At
+    the standard BIC with ``penalty_discount=1.0`` its errors passed the empty graph's on the ANDES
+    network (the `0.1.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.1.0.html#published-network-structures>`_). With fewer
     rows than columns the standard BIC is unreliable. With either categorical score its errors
-    stayed below the empty graph's on simulated categorical data from Erdos-Renyi graphs, and on the
-    diabetes network with BDeu but not with the multinomial BIC (the `0.8.0 release card
+    stayed below the empty graph's on simulated categorical data, and on the diabetes network with
+    BDeu but not with the multinomial BIC (the `0.8.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.8.0.html#boss-and-grasp-with-bdeu>`__). The mixed-data
-    scores and ``env`` are experimental. ``"bic"`` reads a numeric ``env`` as a number, so with
-    three or more environments a shift that does not follow the labels' values can go unnoticed.
-    With ``missing="em"``, its errors did not always stay below the empty graph's at 100 rows, and
-    the default ``ebic_gamma=1.0`` was measured only with an earlier EM scheme (the `0.17.0 release
-    card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#missing-data>`_); before EM, a column
-    that is a linear function of several others goes unchecked. A path claim cannot restore an edge
-    the search left out and can direct an edge the wrong way where the search's graph is wrong: a
-    known edge belongs in ``required`` (the `0.16.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.16.0.html#path-and-confounder-claims>`_). The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
+    scores and ``env`` are experimental. ``"bic"`` read a numeric ``env`` as a number, so with three
+    or more environments a shift that does not follow the labels' values can go unnoticed. With
+    ``missing="em"``, its errors did not always stay below the empty graph's with few rows, and the
+    default ``ebic_gamma=1.0`` was measured only with an earlier EM scheme (the
+    `0.17.0 release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#missing-data>`_);
+    before EM, a column that is a linear function of several others goes unchecked. A path claim
+    cannot restore an edge the search left out and can direct an edge the wrong way where the
+    search's graph is wrong: a known edge belongs in ``required`` (the `0.16.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.16.0.html#path-and-confounder-claims>`_). The measured
+    results are a reference, not a hard limit: they change with the data generator, the density, the
     method's settings, and the machine.
 
     References
@@ -521,10 +521,9 @@ def grasp(
         is the best-scoring search; a later one replaces an earlier one only when it scores better
         by more than ``1e-6``. Each search builds its own caches and drops the previous one's, so
         more starts take more time but little more memory. Raise it on dense graphs, where one
-        search can stop at a much worse order: with 50 variables, mean degree 4, and 500 rows at the
-        standard BIC, the mean errors (SHD) over 40 datasets were 29.6 with one start, 18.8 with 4,
-        and 16.3 with 8, and 4 starts took about 4 times as long as one and 8 about 8 times; at
-        mean degree 2, one start was enough. See Notes.
+        search can stop at a much worse order: on simulated dense graphs at the standard BIC, more
+        starts made clearly fewer errors, at a time that grows in proportion to the starts; on
+        sparse graphs one start was enough. See Notes.
     max_parents : int or None, default=None
         A cap on every node's parents, at least ``0``: the grow step of each variable's parent
         search adds no parent to a set that holds ``max_parents`` members, so no DAG the returned
@@ -760,31 +759,31 @@ def grasp(
     :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** At the standard BIC (``ebic_gamma=0.0``) with ``penalty_discount=4.0``, on
-    simulated linear-Gaussian data from Erdos-Renyi graphs, its median errors (SHD) stayed below the
-    empty graph's, and most of its fits finished within 1 h, up to 800 variables in every measured
-    setting, mean degree 1 to 8 and 500 to 10,000 rows (the `0.10.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__). On dense graphs one
-    search often stops at a DAG that scores worse than the true one, in 26 of 60 fits at mean degree
-    4 with 50 to 200 variables at the standard BIC with ``penalty_discount=1.0``: raise ``n_starts``
-    there. At the standard BIC with ``penalty_discount=1.0`` its errors passed the empty graph's on
-    the 223-variable ANDES network with 1,000 simulated rows (the `0.1.0 release card
+    simulated linear-Gaussian data, its errors stayed below the empty graph's, and most of its fits
+    finished within the time cap, at every measured density and row count, into the hundreds of
+    variables (the
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__). On
+    dense graphs one search often stops at a DAG that scores worse than the true one, at the
+    standard BIC with ``penalty_discount=1.0``: raise ``n_starts`` there. At the standard BIC with
+    ``penalty_discount=1.0`` its errors passed the empty graph's on the ANDES network (the `0.1.0
+    release card
     <https://andrey.abel.ai/docs/benchmarks/0.1.0.html#published-network-structures>`__). With fewer
     rows than columns the standard BIC is unreliable. With either categorical score its errors
-    stayed below the empty graph's on simulated categorical data from Erdos-Renyi graphs, and on the
-    diabetes network with BDeu but not with the multinomial BIC (the `0.8.0 release card
+    stayed below the empty graph's on simulated categorical data, and on the diabetes network with
+    BDeu but not with the multinomial BIC (the `0.8.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.8.0.html#boss-and-grasp-with-bdeu>`__). The mixed-data
-    scores and ``env`` are experimental. ``"bic"`` reads a numeric ``env`` as a number, so with
-    three or more environments a shift that does not follow the labels' values can go unnoticed.
-    With ``missing="em"``, its errors did not always stay below the empty graph's at 100 rows, the
-    default ``ebic_gamma=1.0`` was measured only with an earlier EM scheme, and one fit in five had
-    not settled after 10 rounds (the `0.17.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#missing-data>`__); before EM, a column that
-    is a linear function of several others goes unchecked. A path claim cannot restore an edge the
-    search left out and can direct an edge the wrong way where the search's graph is wrong: a known
-    edge belongs in ``required`` (the `0.17.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`__). The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    scores and ``env`` are experimental. ``"bic"`` read a numeric ``env`` as a number, so with three
+    or more environments a shift that does not follow the labels' values can go unnoticed. With
+    ``missing="em"``, its errors did not always stay below the empty graph's with few rows, the
+    default ``ebic_gamma=1.0`` was measured only with an earlier EM scheme, and some fits had not
+    settled within the default ``n_em_iterations`` (the
+    `0.17.0 release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#missing-data>`__);
+    before EM, a column that is a linear function of several others goes unchecked. A path claim
+    cannot restore an edge the search left out and can direct an edge the wrong way where the
+    search's graph is wrong: a known edge belongs in ``required`` (the `0.17.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`__). The
+    measured results are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------
@@ -920,10 +919,9 @@ def igsp(
         column's normal scores mix their distributions. ``None`` picks from the declared column
         types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are, else
         ``"fisherz"``. ``metadata["indep_test"]`` names the test the fit used. ``"kci"`` favors
-        nonlinear effects; it gives up time, and with few rows accuracy. On 10 variables with
-        additive nonlinear effects (20 datasets each), its SHD was 5.0 at 200 rows per setting and
-        1.15 at 500, against 2.05 and 2.3 with the Gaussian tests and the empty graph's 8, at a
-        median fit of 1.7 s and 13.8 s against 0.02 s.
+        nonlinear effects; it gives up time, and with few rows accuracy. On simulated data with
+        additive nonlinear effects, it made more errors than the Gaussian tests with few rows per
+        setting and fewer with more rows, at a far higher cost per fit.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
@@ -1021,14 +1019,12 @@ def igsp(
     targets are all known, with linear effects, Gaussian noise, and no unmeasured common causes [1]_
     [2]_. Its authors claim it for perfect interventions, which cut a variable from its causes, and
     for imperfect ones, which change its mechanism, such as a smaller weight on each cause or a
-    perfect intervention that succeeds on some rows only. Their simulations use 10 or 20 variables
-    with one or two settings of 4 to 10 targets and 1,000 to 100,000 rows per setting [1]_, or up to
-    20 single-variable or 45 two-variable settings [2]_. It returns the interventional essential
+    perfect intervention that succeeds on some rows only. It returns the interventional essential
     graph, the same kind of graph :func:`~andrey.gies` returns from the same inputs; the authors
-    show a 7-variable DAG where the score search of GIES is not consistent and IGSP is. In the
-    authors' settings, :func:`~andrey.gies` and :func:`~andrey.ut_igsp` told every target often had
-    a lower SHD (see Limitations). When some targets are unknown, use :func:`~andrey.ut_igsp`; with
-    no observational environment, use :func:`~andrey.gies`.
+    show a small DAG where the score search of GIES is not consistent and IGSP is. In the authors'
+    settings, :func:`~andrey.gies` and :func:`~andrey.ut_igsp` told every target often had a lower
+    SHD (see Limitations). When some targets are unknown, use :func:`~andrey.ut_igsp`; with no
+    observational environment, use :func:`~andrey.gies`.
 
     **Choosing alpha and n_starts.** The defaults come from simulated data in the authors' settings
     [1]_ [2]_: linear effects and Gaussian noise on 7 to 20 variables, with one or two settings of
@@ -1095,22 +1091,22 @@ def igsp(
     regresses or tests a variable on all of its conditioning variables in each environment. Drop
     the incomplete rows first.
 
-    **Limitations.** In its authors' settings (linear-Gaussian data on 7 to 20 variables, known
-    targets, 1,000 to 100,000 rows per setting), its errors (SHD) stayed below the empty graph's in
-    every group, but :func:`~andrey.gies` had fewer in 35 of the 87 groups and
-    :func:`~andrey.ut_igsp`, told every target, in 27. A perfect intervention that leaves its
-    target's distribution unchanged, such as cutting the causes of a variable that has none, orients
-    nothing, and the search then reverses some true edges out of that target. Where the objective
-    ties the true DAG with a wrong one, fits with few starts repeat one result. Its time grows with
-    the number of rows, fast with the number of variables, and on dense graphs with settings of more
-    than one target: with 10 single-variable settings of 1,000 rows, a median fit took 726 s at 200
-    variables, and at 400 none finished within an hour (the `0.14.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#limits>`_). Unmeasured common causes are
-    outside its model and not measured. One level serves both tests unless ``invariance_alpha`` is
-    given. In :func:`~andrey.bootstrap`, the averaged graph is made a CPDAG without the targets, so
-    an edge that only the settings orient comes back undirected there; each fit and the edge
-    frequencies keep its direction. The numbers are a reference, not a hard limit: they change with
-    the data generator, the density, the method's settings, and the machine.
+    **Limitations.** In its authors' settings, its errors stayed below the empty graph's in every
+    group, but :func:`~andrey.gies` and :func:`~andrey.ut_igsp`, told every target, often had fewer.
+    A perfect intervention that leaves its target's distribution unchanged, such as cutting the
+    causes of a variable that has none, orients nothing, and the search then reverses some true
+    edges out of that target. Where the objective ties the true DAG with a wrong one, fits with few
+    starts repeat one result. Its time grows with the number of rows, fast with the number of
+    variables, and on dense graphs with settings of more than one target: with many single-variable
+    settings, fits on hundreds of variables took many minutes, and on larger graphs none finished
+    within the time cap (the
+    `0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#limits>`_). Unmeasured
+    common causes are outside its model and not measured. One level serves both tests unless
+    ``invariance_alpha`` is given. In :func:`~andrey.bootstrap`, the averaged graph is made a CPDAG
+    without the targets, so an edge that only the settings orient comes back undirected there; each
+    fit and the edge frequencies keep its direction. The measured results are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------
@@ -1375,9 +1371,8 @@ def ut_igsp(
     settings' targets are known in part or not at all [1]_. Its authors claim it for perfect
     interventions, which cut a variable from its causes, and imperfect ones, which change its
     mechanism, such as a shift of its mean, a change of its noise variance, or a change of the
-    weights of its causes; their simulations use about 20 variables, 5 settings, and 1,000 or more
-    rows per setting. It returns the interventional essential graph and each setting's targets. When
-    every target is known, use :func:`~andrey.gies`; with no observational environment, or with
+    weights of its causes. It returns the interventional essential graph and each setting's targets.
+    When every target is known, use :func:`~andrey.gies`; with no observational environment, or with
     environments that differ in ways that are not interventions, use :func:`~andrey.cdnod`.
 
     **Choosing alpha and n_starts.** The defaults come from simulated data with linear effects,
@@ -1446,20 +1441,18 @@ def ut_igsp(
     regresses or tests a variable on all of its conditioning variables in each environment. Drop
     the incomplete rows first.
 
-    **Limitations.** In its authors' setting (20 variables, 5 experiments of 1,000 to 5,000 rows,
-    each with 0 to 3 targets it is not told), every fit finished, and in all 56 groups its errors
-    (SHD) stayed below the empty graph's and its target errors below those of the given targets
-    alone. With 100 rows per setting and no unknown targets it names false targets, 1.50 per
-    dataset. On a denser graph, 50 variables at mean degree 5 with 3 settings, it did not clearly
-    beat the empty graph (the `0.14.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#limits>`_). The search's cost grows with the
-    number of I-covered edges to the power of its depth, and each start tests every pair given all
-    other variables, so time grows fast with the number of variables: a median fit took 15.2 s at
-    100 variables. The objective counts targets, so a setting whose intervention leaves its target's
-    distribution unchanged orients nothing through that target. Unmeasured common causes are outside
-    its model and not measured. One level serves both tests unless ``invariance_alpha`` is given.
-    The numbers are a reference, not a hard limit: they change with the data generator, the density,
-    the method's settings, and the machine.
+    **Limitations.** In its authors' setting, every fit finished, and in every group its errors
+    stayed below the empty graph's and its target errors below those of the given targets alone.
+    With few rows per setting and no unknown targets it names false targets. On a larger, denser
+    graph with few settings, it did not clearly beat the empty graph (the
+    `0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#limits>`_). The
+    search's cost grows with the number of I-covered edges to the power of its depth, and each start
+    tests every pair given all other variables, so time grows fast with the number of variables. The
+    objective counts targets, so a setting whose intervention leaves its target's distribution
+    unchanged orients nothing through that target. Unmeasured common causes are outside its model
+    and not measured. One level serves both tests unless ``invariance_alpha`` is given. The measured
+    results are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -1675,12 +1668,12 @@ def boss_fci(
         option adds no dependence on the column order. ``"triangles"`` favors a strict penalty and
         alpha on dense graphs, where it keeps true edges a test would remove; it gives up removing
         the false edges in no triangle, so it hurts at the defaults on sparse graphs, and it saves
-        no time. On the authors' simulation [1]_ (see When to use), it lowered the mean endpoint
-        errors (SHD against the true PAG) with ``penalty_discount=2.0`` and ``alpha=0.01`` at every
-        mean degree and size, from 637 to 580 at 100 variables (with ``max_depth=7``); at the
-        defaults it raised them with mean degree 2, from 20.9 to 23.7 at 20 variables, where it kept
-        3.2 false edges per graph against 1.8, and lowered them with mean degree 6, from 121 to 119.
-        The median fit times differed by at most 0.01 s. See Notes.
+        no time. On the authors' simulation [1]_, with ``penalty_discount=2.0`` and ``alpha=0.01``
+        it lowered the endpoint errors (SHD against the true PAG) at every density and size; at the
+        defaults it raised them on sparse graphs, where it kept more false edges, and lowered them
+        slightly on dense ones. The fit times differed little (the
+        `0.15.0 release card <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#boss-fci>`__). See
+        Notes.
     confounded_index : bool, default=True
         With ``env``, whether a hidden variable may cause both the index and a data variable, as
         for :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as
@@ -1771,12 +1764,9 @@ def boss_fci(
     Notes
     -----
     **When to use.** BOSS-FCI suits i.i.d. observational continuous data with linear effects and
-    Gaussian noise where unmeasured common causes are plausible [1]_. Its authors simulate 20
-    measured variables with 0, 4, or 8 hidden common causes, mean degree 2 to 6, and 200 to 5,000
-    rows, and 100 measured variables with 10 hidden ones and 1,000 rows, scored by the BIC with a
-    penalty discount of 2 and tested by Fisher's z at an alpha of 0.01. They pick BOSS's search for
-    its accuracy on densely connected graphs. It returns a PAG, and with ``env`` takes data
-    from several environments, as :func:`~andrey.fci_jci` does. When no common cause is hidden, use
+    Gaussian noise where unmeasured common causes are plausible [1]_. They pick BOSS's search for
+    its accuracy on densely connected graphs. It returns a PAG, and with ``env`` takes data from
+    several environments, as :func:`~andrey.fci_jci` does. When no common cause is hidden, use
     :func:`~andrey.boss`; :func:`~andrey.grasp_fci` runs the same steps with GRaSP's search, and
     :func:`~andrey.gfci` runs them with GES's search and a possible-d-separation step.
 
@@ -1826,20 +1816,19 @@ def boss_fci(
     which suits values missing completely at random, or use :func:`~andrey.fci`, whose tests delete
     rows per test.
 
-    **Limitations.** On its authors' simulation [1]_ (see When to use), its errors (endpoint SHD
-    against the true PAG) stayed below the empty graph's in every setting, but much of the PAG stays
-    wrong on these data: at 20 measured variables and mean degree 6 its errors were about three
-    quarters of the empty graph's (the `0.15.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#boss-fci>`_). It runs a full
-    :func:`~andrey.boss` search before any test, so it takes at least as long as BOSS on the same
-    data. Without the possible-d-separation step, a pair that only a set outside both ends'
+    **Limitations.** On its authors' simulation [1]_, its errors stayed below the empty graph's in
+    every setting, but much of the PAG stays wrong on these data: on dense graphs its errors were
+    not far below the empty graph's (the
+    `0.15.0 release card <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#boss-fci>`_). It runs a
+    full :func:`~andrey.boss` search before any test, so it takes at least as long as BOSS on the
+    same data. Without the possible-d-separation step, a pair that only a set outside both ends'
     remaining neighbors separates keeps its edge, where :func:`~andrey.gfci` removes it, so the PAG
     can hold an edge too many. Its BIC score and Fisher's z test assume linear effects with Gaussian
-    noise. Its tests run it with the mixed-data score and test on 5 variables, and with ``env`` on
-    up to 12 measured variables. ``"bic"`` and ``"fisherz"`` read a numeric ``env`` as a number, so
-    with three or more environments a shift that does not follow the labels' values can go
-    unnoticed. The numbers are a reference, not a hard limit: they change with the data generator,
-    the density, the method's settings, and the machine.
+    noise. The mixed-data score and test and ``env`` are not benchmarked; its tests run them on
+    small graphs only. ``"bic"`` and ``"fisherz"`` read a numeric ``env`` as a number, so with three
+    or more environments a shift that does not follow the labels' values can go unnoticed. The
+    measured results are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------
@@ -2023,12 +2012,12 @@ def grasp_fci(
         option adds no dependence on the column order. ``"triangles"`` favors a strict penalty and
         alpha on dense graphs, where it keeps true edges a test would remove; it gives up removing
         the false edges in no triangle, so it hurts at the defaults on sparse graphs, and it saves
-        no time. On the authors' simulation [1]_ (see When to use), it lowered the mean endpoint
-        errors (SHD against the true PAG) with ``penalty_discount=2.0`` and ``alpha=0.01`` at every
-        mean degree and size, from 639 to 586 at 100 variables (with ``max_depth=7``); at the
-        defaults it raised them with mean degree 2, from 21.1 to 23.4 at 20 variables, where it kept
-        2.8 false edges per graph against 1.8, and lowered them with mean degree 6, from 121 to 119.
-        The median fit times differed by at most 0.01 s. See Notes.
+        no time. On the authors' simulation [1]_, with ``penalty_discount=2.0`` and ``alpha=0.01``
+        it lowered the endpoint errors (SHD against the true PAG) at every density and size; at the
+        defaults it raised them on sparse graphs, where it kept more false edges, and lowered them
+        slightly on dense ones. The fit times differed little (the
+        `0.15.0 release card <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#grasp-fci>`__). See
+        Notes.
     confounded_index : bool, default=True
         With ``env``, whether a hidden variable may cause both the index and a data variable, as
         for :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as
@@ -2119,14 +2108,12 @@ def grasp_fci(
     Notes
     -----
     **When to use.** GRaSP-FCI suits i.i.d. observational continuous data with linear effects and
-    Gaussian noise where unmeasured common causes are plausible [1]_. Its authors simulate it in the
-    setting of :func:`~andrey.boss_fci`: 20 measured variables with 0, 4, or 8 hidden common causes,
-    mean degree 2 to 6, and 200 to 5,000 rows, and 100 measured variables with 10 hidden ones and
-    1,000 rows. They describe GRaSP's search as favoring sparse graphs, a trade of accuracy against
-    time beside BOSS's. It returns a PAG, and with ``env`` takes data from several
-    environments, as :func:`~andrey.fci_jci` does. When no common cause is hidden, use
-    :func:`~andrey.grasp`; :func:`~andrey.boss_fci` runs the same steps with BOSS's search, and
-    :func:`~andrey.gfci` runs them with GES's search and a possible-d-separation step.
+    Gaussian noise where unmeasured common causes are plausible [1]_. They describe GRaSP's search
+    as favoring sparse graphs, a trade of accuracy against time beside BOSS's. It returns a PAG, and
+    with ``env`` takes data from several environments, as :func:`~andrey.fci_jci` does. When no
+    common cause is hidden, use :func:`~andrey.grasp`; :func:`~andrey.boss_fci` runs the same steps
+    with BOSS's search, and :func:`~andrey.gfci` runs them with GES's search and a
+    possible-d-separation step.
 
     The steps are :func:`~andrey.boss_fci`'s, which follow the authors' Algorithm 5 [1]_, with the
     CPDAG from :func:`~andrey.grasp`. As in Algorithm 5, they leave out GFCI's possible-d-separation
@@ -2162,23 +2149,21 @@ def grasp_fci(
     which suits values missing completely at random, or use :func:`~andrey.fci`, whose tests delete
     rows per test.
 
-    **Limitations.** On its authors' simulation [1]_ (see When to use), its errors (endpoint SHD
-    against the true PAG) stayed below the empty graph's in every setting, but much of the PAG stays
-    wrong on these data: at 20 measured variables and mean degree 6 its errors were about three
-    quarters of the empty graph's (the `0.15.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#grasp-fci>`_). It runs a full
-    :func:`~andrey.grasp` search before any test, so it takes at least as long as GRaSP on the same
-    data. Without the possible-d-separation step, a pair that only a set outside both ends'
+    **Limitations.** On its authors' simulation [1]_, its errors stayed below the empty graph's in
+    every setting, but much of the PAG stays wrong on these data: on dense graphs its errors were
+    not far below the empty graph's (the
+    `0.15.0 release card <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#grasp-fci>`_). It runs
+    a full :func:`~andrey.grasp` search before any test, so it takes at least as long as GRaSP on
+    the same data. Without the possible-d-separation step, a pair that only a set outside both ends'
     remaining neighbors separates keeps its edge, where :func:`~andrey.gfci` removes it, so the PAG
     can hold an edge too many. Its BIC score and Fisher's z test assume linear effects with Gaussian
-    noise. Its tests run it with the mixed-data score and test on 5 variables, and with ``env`` on
-    up to 12 measured variables. ``"bic"`` and ``"fisherz"`` read a numeric ``env`` as a number, so
-    with three or more environments a shift that does not follow the labels' values can go
-    unnoticed. A path claim cannot restore an edge the search left out: a known edge belongs in
-    ``required`` (the `0.17.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_). The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    noise. The mixed-data score and test and ``env`` are not benchmarked; its tests run them on
+    small graphs only. ``"bic"`` and ``"fisherz"`` read a numeric ``env`` as a number, so with three
+    or more environments a shift that does not follow the labels' values can go unnoticed. A path
+    claim cannot restore an edge the search left out: a known edge belongs in ``required`` (`0.17.0
+    release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#path-and-confounder-claims>`_).
+    The measured results are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------
