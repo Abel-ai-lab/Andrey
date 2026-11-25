@@ -1895,8 +1895,9 @@ def hc(
         time, with neither ahead at every size: on conditional linear Gaussian networks their median
         errors were 6 and 7 at 20 variables and 12.5 and 11 at 40, against the empty graph's 20 and
         40, and their median fits at 40 variables took 0.0936 s and 0.142 s. On categorical data
-        ``"bdeu"`` favors accuracy at about the same time: on discrete networks it made 5, 8, and 18
-        errors at 10, 20, and 40 variables, against 6, 8, and 20 with ``"discrete_bic"``.
+        ``"bdeu"`` favors accuracy at about the same time: on discrete networks (5 datasets per
+        size) it made 5, 8, and 18 errors at 10, 20, and 40 variables, against 6, 8, and 20 with
+        ``"discrete_bic"``.
         ``"normal_scores"``, experimental, is ``"bic"`` on each column's normal scores, for
         continuous data that are Gaussian only after an unknown increasing transformation of each
         column, as :func:`~andrey.ges` describes, with its limits; the consistency result for this
