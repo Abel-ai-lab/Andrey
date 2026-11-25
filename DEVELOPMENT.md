@@ -135,9 +135,18 @@ registry. Every facade docstring has, in order:
   series; observational, interventional, or multi-domain), the model assumptions that matter
   to a user, the scale it is designed for, what it returns, and the method to use outside that
   setting. A **Missing values.** paragraph says whether a `NaN` is read or raises, why, and what
-  to do instead. A **Limitations.** paragraph follows with the measured failures
-  ([Add a method](#add-a-method), [Mark it supported](#6-mark-it-supported)); it and
-  **When to use.** do not repeat each other. Limitations is the last paragraph of Notes.
+  to do instead. A **Limitations.** paragraph follows, from the measurements
+  ([Add a method](#add-a-method), [Mark it supported](#6-mark-it-supported)), in about 80 words:
+  one sentence on the kind of data where the method does well and compared with which methods or
+  the empty graph, one or two on where it does worse or fails and compared with whom, at most one
+  caveat a user needs to avoid a wrong result, and one link to the release card or comparison
+  page that holds the numbers. It and **When to use.** do not repeat each other, and it says
+  nothing of options that are not benchmarked; an option's assumptions go in that parameter's
+  entry. Each
+  behavior-selecting parameter says in its entry what each value favors and what it gives up,
+  one sentence per value. These paragraphs and entries give no measured numbers and no
+  description of a paper's or a benchmark's setup; a value a user sets, such as a default, may
+  appear. Limitations is the last paragraph of Notes.
 - **References**: the papers the docstring cites.
 - **Examples**: a runnable doctest on tiny synthetic data that asserts a stable property (`kind`, a
   shape, `ordering`), never a repr. An example whose result depends on the seed at its settings
@@ -147,8 +156,8 @@ A facade has no `See Also`: its **When to use.** paragraph names the methods to 
 
 The sentences that state one rule for many methods come from one table, `SHARED` in
 `scripts/docstring_text.py`: the openers of the Raises entries, the `seed`, `knowledge`, and `env`
-entries, the closing sentences of **Missing values.** and **Limitations.**, the `tie_break` record
-in Returns, and the shared Warns entries. To change one, edit the table and run
+entries, the closing sentence of **Missing values.**, the `tie_break` record in Returns, and the
+shared Warns entries. To change one, edit the table and run
 `uv run python scripts/docstring_text.py`, which rewrites every copy and names a method that should
 hold one and does not; `tests/unit/test_facade_docstrings.py` fails while a copy differs.
 
@@ -179,9 +188,8 @@ defines it, the existing implementations, and the setting the paper claims.
    tests and rules through `fci_hybrid` in `src/andrey/api/constraint.py`.
    Open the docstring's Notes with a **When to use.** paragraph, as the
    [docstring standard](#docstring-standard) describes, and end them with a **Limitations.**
-   paragraph: "Not benchmarked yet.", the largest problem its tests run it on (variables, and
-   rows where they matter), and any known structural limit, such as an assumption on the data or
-   a cost that grows fast with the size.
+   paragraph: "Not benchmarked yet." and any known structural limit, such as an assumption on the
+   data or a cost that grows fast with the size.
 2. Add one `MethodSpec` to `src/andrey/spec/registry.py` (copy the nearest sibling; keep defaults
    identical to the signature), with `status="experimental"` until the method is supported. A
    method whose tests delete rows per test sets `DataSpec(missing=True)` and passes `missing=True`
@@ -390,9 +398,9 @@ them):
 
 - `status="supported"` in its `MethodSpec`, with the docstring's `ExperimentalWarning` entry
   removed;
-- a **Limitations.** paragraph from the campaign: the data and sizes measured, the sizes where its
-  median errors reach the empty graph's, its fit times with the core count, and the size where it
-  stops being practical, if the report shows one;
+- a **Limitations.** paragraph from the campaign: the kind of data where it beats the empty graph
+  and where it falls behind or stops being practical, without numbers, and a link to the card
+  section below, which holds the sizes, fit times, and core counts;
 - the method under "Supported methods" in `docs/docs/api.md`;
 - its rows in `benchmarks/published/<label>/summary.json` for the release that publishes it,
   generated from the campaign's records and passing `uv run python -m qa.reference_parity`;

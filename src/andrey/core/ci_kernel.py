@@ -166,12 +166,10 @@ class KCI:
     more products for a new ``y`` with it; the test keeps up to 256 MB of each kind of matrix, at
     least one, except the kernels of single variables, which it keeps only when two fit. So time
     grows as the cube of the number of rows and memory as its square: thousands of rows are
-    practical, tens of thousands are not. The kernel widths follow the row count and the
-    size of the conditioning set, not the data. On simulated draws with up to three conditioning
-    variables and 500 rows, it rejected a true independence at rates between ``alpha`` and twice
-    ``alpha``; a test that rejects too often makes PC and FCI keep edges. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    practical, tens of thousands are not. The kernel widths follow the row count and the size of the
+    conditioning set, not the data. On simulated draws with up to three conditioning variables and
+    500 rows, it rejected a true independence at rates between ``alpha`` and twice ``alpha``; a test
+    that rejects too often makes PC and FCI keep edges.
 
     References
     ----------
@@ -470,23 +468,21 @@ class RCoT:
     median errors (SHD) stayed below the empty graph's at every size, such as 9.5 against 50 at 50
     variables and 5,000 rows. The median fit took 0.2 to 0.5 seconds at 5 variables, 0.4 to 1.2
     seconds at 10, 0.8 to 3.4 seconds at 20, and 3 to 15 seconds at 50, and the slowest took 70
-    seconds. Measured on columns independent of each other, its rate of rejecting a true
-    conditional independence with two conditioning variables was about twice ``alpha`` at 100 rows
-    and near ``alpha`` from 500 rows. With three, four, or six conditioning variables the rate
-    averaged about 1.3 times ``alpha`` from 500 to 2,000 rows, with no row count from which it held
-    at ``alpha``. The p-value is random through the features: a different seed moves it, most near
-    the threshold. The regression on the conditioning-set features removes a strong nonlinear effect
-    of that set only approximately, and what remains reads as dependence: with two or more
-    conditioning variables that drive both ``x`` and ``y``, the test rejects a true independence
-    more often than ``alpha``, increasingly so as the rows grow (on simulated data with three such
-    variables and 2,000 rows, nearly always). RCoT tests conditional uncorrelatedness of
-    ``n_features`` features per variable, which can miss a dependence the full kernel test finds,
-    such as one between an odd and an even function of the same cause on a few hundred rows.
-    Because the features are sampled for each conditioning set, PC tests a weak dependence against
-    every conditioning set with a new chance to miss it. On the datasets above, PC with RCoT missed
-    14 to 20% of the true edges at 500 rows and 1.5 to 4% at 5,000 rows, and 2 to 6% of the edges
-    it kept were not true edges. The numbers are a reference, not a hard limit: they change with the
-    data generator, the density, the method's settings, and the machine.
+    seconds. Measured on columns independent of each other, its rate of rejecting a true conditional
+    independence with two conditioning variables was about twice ``alpha`` at 100 rows and near
+    ``alpha`` from 500 rows. With three, four, or six conditioning variables the rate averaged about
+    1.3 times ``alpha`` from 500 to 2,000 rows, with no row count from which it held at ``alpha``.
+    The p-value is random through the features: a different seed moves it, most near the threshold.
+    The regression on the conditioning-set features removes a strong nonlinear effect of that set
+    only approximately, and what remains reads as dependence: with two or more conditioning
+    variables that drive both ``x`` and ``y``, the test rejects a true independence more often than
+    ``alpha``, increasingly so as the rows grow (on simulated data with three such variables and
+    2,000 rows, nearly always). RCoT tests conditional uncorrelatedness of ``n_features`` features
+    per variable, which can miss a dependence the full kernel test finds, such as one between an odd
+    and an even function of the same cause on a few hundred rows. Because the features are sampled
+    for each conditioning set, PC tests a weak dependence against every conditioning set with a new
+    chance to miss it. On the datasets above, PC with RCoT missed 14 to 20% of the true edges at 500
+    rows and 1.5 to 4% at 5,000 rows, and 2 to 6% of the edges it kept were not true edges.
 
     References
     ----------

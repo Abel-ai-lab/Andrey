@@ -68,7 +68,8 @@ method's boundary warns with a {py:class}`~andrey.BoundaryWarning`, and
 `tests/unit/test_boundary.py` fails when the table and the newest published boundary differ.
 
 **Exceptions.** The map covers the methods Andrey had at 0.10.0. A method added since has no map and
-no warning; its **Limitations.** paragraph gives the sizes its campaign measured.
+no warning; its **Limitations.** paragraph links the release card with the sizes its campaign
+measured.
 
 ## Column order
 
@@ -157,8 +158,9 @@ ranks computed from the data, and most methods run their linear algebra on one B
 host's thread count cannot change their result.
 
 **Exceptions.** [Across machines](guides/column-order.md#across-machines) names the methods whose
-result can change on another machine, and why. No check compares outputs across machines; the one
-published measurement is ICA-LiNGAM's, on six BLAS kernels, in the same guide.
+result can change on another machine, and why. No check compares outputs across machines; the
+published measurements are ICA-LiNGAM's, on six BLAS kernels, and those of NOTEARS with EM, on two
+types of CPU, in the same guide.
 
 ## Release checks
 

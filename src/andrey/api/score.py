@@ -100,12 +100,13 @@ def ges(
         column [13]_ [14]_. ``"bdeu"`` is the BDeu score [3]_ and ``"discrete_bic"`` the multinomial
         BIC [7]_, for categorical data coded by whole numbers. ``"degen_gauss"`` (degenerate
         Gaussian) [4]_ and ``"cond_gauss"`` (conditional Gaussian) [5]_ are BIC scores for mixed
-        data, continuous and categorical columns. ``None`` picks from the declared column types:
-        ``"bdeu"`` when every column is categorical, ``"cond_gauss"`` when some are, else ``"bic"``.
-        A column is declared categorical by ``categorical`` or by a DataFrame's ``category``,
-        ``bool``, or text type, never by its values. See Notes.
-        ``metadata["score_func"]`` names the score the fit used: the one picked from the
-        declared column types when this is ``None``.
+        data, continuous and categorical columns. ``"degen_gauss"`` favors time and accuracy on
+        smaller graphs; ``"cond_gauss"`` favors accuracy on larger graphs and gives up time.
+        ``None`` picks from the declared column types: ``"bdeu"`` when every column is categorical,
+        ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared categorical by
+        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
+        values. See Notes. ``metadata["score_func"]`` names the score the fit used: the one picked
+        from the declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is
@@ -144,14 +145,7 @@ def ges(
         ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
         fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
         ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
-        up time: each round runs the search again. In the 0.17.0 missing-data benchmark
-        (linear-Gaussian data, 10 to 50 variables, 100 to 2,000 rows, 10 to 50% missing; the
-        searches at ``ebic_gamma=0``), against dropping the incomplete rows, ``"em"`` made fewer
-        errors in 186 of the 225 settings judged with GES, BOSS, GRaSP, and NOTEARS, as many in 39,
-        and more in none, and in 204 more dropping the rows left too few to fit most datasets; HC
-        and Tabu were not compared with it. With the default 10 rounds, a setting's median fit in
-        the six searches took 2 to 72 times as long as the same search on the complete data. See
-        **Missing values.** in Notes.
+        up time: each round runs the search again. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
         least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
@@ -333,10 +327,14 @@ def ges(
     variables the environments shift together without an edge between them. After every move, the
     edges at the index are directed out of it and Meek's rules direct the edges that follow, so the
     search moves over partially directed graphs, and the result can direct edges that the CPDAG of
-    the pooled rows leaves undirected. Every move is then scored in this process. The index is
-    dropped from the graph. ``"bic"`` reads the index as a number; ``"degen_gauss"`` and
-    ``"cond_gauss"``, with ``categorical=[]`` for continuous data, and the categorical scores read
-    each label as a category. It assumes no hidden common cause; :func:`~andrey.gfci` allows them.
+    the pooled rows leaves undirected. Every move is then scored in this process. The conditions
+    under which an Insert or a Delete is valid are proved for CPDAGs [1]_; the search applies them
+    to these partially directed graphs. The index is dropped from the graph. ``"bic"`` reads the
+    index as a number, so with three or more environments a shift that does not follow the labels'
+    values, such as one in the middle environment of three coded ``0, 1, 2``, can go unnoticed, and
+    recoding the labels can change the result; ``"degen_gauss"`` and ``"cond_gauss"``, with
+    ``categorical=[]`` for continuous data, and the categorical scores read each label as a
+    category. It assumes no hidden common cause; :func:`~andrey.gfci` allows them.
 
     **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``. The
     score sums one term per variable over every row; terms over different rows do not sum to one
@@ -366,77 +364,17 @@ def ges(
     the result on the last round's expected covariance. EM holds when values are missing completely
     at random or at random given observed values; when missingness depends on the missing values
     themselves, the expected covariance is biased, and the data cannot show it. On complete data,
-    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows yourself,
-    which suits values missing completely at random, or use :func:`~andrey.pc` or
-    :func:`~andrey.fci`, whose tests delete rows per test.
+    ``"em"`` gives the complete-data result. Before EM, a column that is a linear function of
+    several others is not caught. Without ``"em"``, drop the incomplete rows yourself, which suits
+    values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose
+    tests delete rows per test.
 
-    **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
-    ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
-    ``max_parents=4``, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through
-    which its median errors (SHD) stayed below the empty graph's, and through which its fits
-    finished within the caps, were 50 and 200 variables at mean degree 1 with 2,000 rows and mean
-    degree 2 with 500 rows; 400 and 1,600 at mean degree 2 with 10,000 rows; 200 and 800 at mean
-    degree 2 with 2,000 rows; 800 and 3,200 at mean degree 4 with 2,000 rows; and none and 50 at
-    mean degree 8 with 2,000 rows. Every ladder ended after two sizes in a row did not beat the
-    empty graph. The median fit took 2,626 s at 3,200 variables (mean degree 4, 2,000 rows). The
-    measured build applied ``max_parents=4`` as a gate on the forward phase: a node holding 4
-    parents gained no new parent while edges were added, and one move could still give a node more.
-    On this release, ``max_parents=4`` caps every DAG of the returned class at 4 parents, a stricter
-    rule that is not benchmarked yet. With the same gate, mean degree 2, and ten rows per variable,
-    at 200 variables its median errors were 206 against the empty graph's 200 at
-    ``penalty_discount=1.0`` and 43 at ``penalty_discount=2.0``. On the 223-variable ANDES network
-    with 1,000 simulated rows and a forward-phase gate of ``n_variables / 2`` parents, its median
-    errors passed the empty graph's (612 against 338). With fewer rows than columns the standard BIC
-    is unreliable; the extended BIC made far fewer errors there (see Choosing the penalty). A parent
-    set of ``n_samples - 1`` or more variables fits its child exactly, so the search never selects
-    one, nor any parent set that leaves its child a residual variance of at most ``1e-12`` times its
-    variance. On simulated mixed data (conditional linear Gaussian networks on sparse random graphs,
-    the first half of the variables categorical with 2 to 5 categories), from 10 to 40 variables
-    with 2,000 rows, its median errors at 40 variables were 8 with ``"degen_gauss"`` and 6.5 with
-    ``"cond_gauss"``, against 40, and the median fit took 0.75 s and 1.2 s on 4 cores. On simulated
-    categorical networks with 2 or 3 categories per variable, of the same sizes and rows, ``"bdeu"``
-    gave 6 against 40 at 40 variables, in 0.60 s. The multinomial BIC is not benchmarked with GES
-    yet: its tests check it against the formula and run GES on small fixed categorical networks.
-    With ``env``, GES is experimental and not benchmarked yet; its tests run it on up to 12
-    variables with 2,000 rows from two environments, and on Sachs's 11 proteins, 7,466 cells from
-    nine conditions, with ``"cond_gauss"``. ``"bic"`` reads a numeric ``env`` as a number, so with
-    three or more environments a shift that does not follow the labels' values, such as one in the
-    middle environment of three coded ``0, 1, 2``, can go unnoticed, and recoding the labels can
-    change the result. ``max_parents`` counts the index as a parent of each variable it points into.
-    The conditions under which an Insert or a Delete is valid are proved for CPDAGs [1]_; with
-    ``env`` the search applies them to the partially directed graphs the index gives.
-    ``missing="em"`` was measured on simulated linear-Gaussian data with values missing completely
-    at random or at random given observed values, 20 datasets per setting, on one core. At the
-    default ``ebic_gamma=1.0`` (Erdos-Renyi graphs of mean degree 2 and 4, 10 to 100 variables, 100
-    to 2,000 rows, 10 to 30% missing), its mean errors stayed below the empty graph's in 161 of 216
-    settings, measured with one parameter refit per round in place of the 5 parameter steps. At the
-    standard BIC, ``ebic_gamma=0.0``, with 10 to 50 variables, they stayed below it in 50 of 54
-    settings at mean degree 2 and in 3 of 54 at mean degree 4, where the search on the complete data
-    is no better than the empty graph either (41.85 errors against 40 at 20 variables and 500 rows).
-    With 15 variables and 100 rows (10 to 50% missing) they stayed below it in 20 of 24 settings,
-    with 3 of the 4 misses at 50% missing. A reference implementation that estimates one covariance
-    by EM and then runs its search once ran at the standard BIC on those 132 settings, with two
-    sample sizes in its score. With every row counted, this search had fewer errors than it in 111
-    settings and tied in 21. With the mean number of rows on which a pair of variables is observed,
-    where the reference is more accurate, this search had fewer errors in 90 and tied in 42.
-    :func:`~andrey.pc`, whose tests delete rows per test, had fewer errors than it at the standard
-    BIC in 35 of the 132 settings and more in 9, comparisons not rerun on fresh seeds. EM runs the
-    search 10 times and the E-step 56 times: the median fit took 1.3 to 26 s, against 0.5 to 0.8 s
-    on the complete data. In 151 of the 2,640 fits the last round still changed the graph (43 of 240
-    with 50 variables and 100 rows), and each such fit logs a warning. Under values missing not at
-    random it has no guarantee. Before EM, only a column that repeats another up to scale and shift
-    where both are observed raises; a column that is a linear function of several others, which
-    raises on complete data, is not caught, and the fit runs. With true ``required_paths`` or
-    ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated linear-Gaussian data (10 to
-    50 variables, mean degree 2, 500 or 2,000 rows), its result was no farther from the true DAG
-    than without them in any setting. The claims direct edges of the graph the search found, as
-    their rules take the class as given: of the edges they directed, 1.1% with required paths and
-    1.7% with forbidden paths pointed against the true DAG, each in a fit whose graph had an edge
-    missing or extra or a collider wrong. A required path says less than a required edge and directs
-    less: it cannot restore an edge the search left out, and on simulated data a required edge,
-    which also states that the pair is adjacent, lowered the errors more. A known edge belongs in
-    ``required``. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    **Limitations.** At the standard BIC (``ebic_gamma=0.0``), on linear-Gaussian data it made fewer
+    errors than the empty graph on sparse graphs of hundreds of variables, but on dense graphs at no
+    size, where :func:`~andrey.boss` at ``penalty_discount=4.0`` made fewer on all but the smallest
+    graphs. The search never selects a parent set that fits its child exactly. The
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
+    every setting.
 
     References
     ----------
@@ -588,15 +526,14 @@ def ages(
     Notes
     -----
     **When to use.** AGES suits i.i.d. continuous observational data from a linear model with
-    Gaussian noise and no unmeasured common causes, when some effects are weak and the rows are
-    many enough for GES to find them [1]_. A weak edge that closes a triangle or shields a collider
-    can make the true CPDAG leave edges undirected that the graph without it directs; AGES keeps
-    the weak edge and takes those directions. The paper proves that it recovers its target graph
-    as the rows grow when, for each CPDAG of the path, every dependence in the true DAG restricted
-    to that CPDAG's skeleton is stronger than the partial correlation its penalty corresponds to
-    (path strong faithfulness), and shows it on 10 and 100 variables with 100 to 10,000 rows.
-    When no CPDAG of the path directs an edge the first leaves undirected, the result is the GES
-    CPDAG: use :func:`~andrey.ges` when only the equivalence class is wanted, and
+    Gaussian noise and no unmeasured common causes, when some effects are weak and the rows are many
+    enough for GES to find them [1]_. A weak edge that closes a triangle or shields a collider can
+    make the true CPDAG leave edges undirected that the graph without it directs; AGES keeps the
+    weak edge and takes those directions. The paper proves that it recovers its target graph as the
+    rows grow when, for each CPDAG of the path, every dependence in the true DAG restricted to that
+    CPDAG's skeleton is stronger than the partial correlation its penalty corresponds to (path
+    strong faithfulness). When no CPDAG of the path directs an edge the first leaves undirected, the
+    result is the GES CPDAG: use :func:`~andrey.ges` when only the equivalence class is wanted, and
     :func:`~andrey.direct_lingam` when the noise is non-Gaussian and every edge should be oriented.
 
     **The solution path.** The score is the linear-Gaussian BIC with one penalty per edge, ``n *
@@ -644,29 +581,13 @@ def ages(
     rows yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Measured on the paper's simulation at 10 variables only: 23 settings of strong
-    and weak edges with 100, 1,000, and 10,000 rows, 20 datasets each. The paper's 100-variable
-    setting uses a variant of the search that is not implemented here. With 10,000 rows AGES
-    directed more edges correctly than GES at the same penalty in 20 of the 23 settings and more
-    edges wrongly in the same 20: 49% of the true edges against 46%, with 49% of the directed edges
-    correct for both, so an added direction is about as reliable as one of GES and no more. The
-    three settings without a gain were the sparsest. With 1,000 rows it directed more edges
-    correctly in 13 settings, 44% of the true edges against 43%, and with 100 rows in 1: where GES
-    misses the weak edges the result is the GES CPDAG, as on 398 of the 460 datasets with 100 rows.
-    An orientation beyond the CPDAG is as reliable as the sparser CPDAG it comes from: when path
-    strong faithfulness fails, a CPDAG of the path can direct an edge against the true DAG. The
-    skeleton is that of GES at the minimum penalty, so its missing and extra edges stay: in 7 of
-    the 69 settings, dense graphs with few or no weak edges, the errors were not clearly below the
-    empty graph's. A CPDAG of the path can hold an unshielded collider that the first lacks, so the
-    DAGs the result stands for need not be in the equivalence class of the GES CPDAG: 8 of 460
-    graphs held one with 10,000 rows, 3 with 1,000, and none with 100. The backward phase runs once
-    per forward result, in one process, so a fit costs several times one of :func:`~andrey.ges`:
-    at 10 variables the median fit took 0.02 to 0.22 s on one core, 1.6 to 3.9 times that of GES,
-    with a peak of 110 MB of memory, and with 10,000 rows the median of five fits took 0.31 s
-    against 0.06 s at 20 variables and 1.2 s against 0.13 s at 50, with an average of 4 neighbors
-    per variable, half of them weak. The data were linear-Gaussian from the paper's simulation.
-    The numbers are a reference, not a hard limit: they change with
-    the data generator, the density, the method's settings, and the machine.
+    **Limitations.** With many rows it directed more edges correctly than :func:`~andrey.ges` at the
+    same penalty, and about as many more wrongly, so an added direction is about as reliable as one
+    of GES; with few rows the result is mostly the GES CPDAG. Its skeleton is that of GES, so on
+    dense graphs with few or no weak edges its errors were not clearly below the empty graph's. When
+    path strong faithfulness fails, it can direct an edge against the true DAG. The
+    `0.17.0 release card <https://andrey.abel.ai/docs/benchmarks/0.17.0.html#ages>`__ has the
+    numbers.
 
     References
     ----------
@@ -935,27 +856,13 @@ def gies(
     rows yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Measured at the standard BIC (``ebic_gamma=0.0``) on simulated linear-Gaussian
-    data from Erdos-Renyi graphs with single-variable interventions on 40% of the variables, the
-    rows split evenly between observation and each intervention, on 4 cores with a cap of 1 h and 28
-    GB per fit. The largest sizes through which its median errors (SHD against the interventional
-    essential graph) stayed below the empty graph's, and through which its fits finished within the
-    caps, were 50 and 200 variables at mean degree 1 with 2,000 rows; 400 and 1,600 at mean degree 2
-    with 10,000 rows; 200 and 800 at mean degree 2 with 2,000 rows; 100 and 400 at mean degree 2
-    with 500 rows; 400 and 800 at mean degree 4 with 2,000 rows; and 800 and 800 at mean degree 8
-    with 2,000 rows. The ladders ended after two sizes in a row did not beat the empty graph, except
-    at mean degree 4 or 8 with 2,000 rows, where they ended when three fits of the next size ran
-    past 1 h. The median fit took 1,231 s at 1,600 variables (mean degree 2, 10,000 rows in total).
-    Each distinct set of rows without an intervention on a variable keeps its own score over those
-    rows, under the BIC a covariance matrix of all the variables, so memory grows with the number
-    of intervened variables times the square of the variable count. A parent set of ``m - 1`` or
-    more variables, where ``m`` counts the rows without an intervention on the child, fits its
-    child exactly under the BIC, so the search never selects one, nor any parent set that leaves its
-    child a residual variance of at most ``1e-12`` times its variance. The categorical and
-    mixed-data scores are not benchmarked with GIES yet: its tests run them on small fixed
-    networks, with and without interventions. Every environment's targets must be known: GIES
-    reads no environment whose targets are unknown. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** At the standard BIC (``ebic_gamma=0.0``), on linear-Gaussian data with
+    single-variable interventions it made fewer errors than the empty graph on sparse graphs of
+    hundreds of variables. Each distinct set of rows without an intervention on a variable keeps its
+    own score, so memory grows with the number of intervened variables times the square of the
+    variable count. Every environment's intervention targets must be given. The
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
+    every setting.
 
     References
     ----------
@@ -1167,13 +1074,11 @@ def gnies(
     its targets, which it learns without being told them [1]_. It assumes no unmeasured common
     causes and a faithful distribution. It returns the learned targets and the interventional
     essential graph, which directs every edge at a target, so the environments can orient edges that
-    a CPDAG leaves undirected. Its authors simulate graphs of 10 variables and present it as most
-    useful with many environments of few rows each; measured with 100 or more rows per environment,
-    it learned graphs of 10 to 100 variables with errors far below the empty graph's, a fit taking
-    about a second at 10 variables and three minutes at 100 (see Limitations). When an intervention
-    replaces a variable's mechanism and the targets are known, use :func:`~andrey.gies`; when how
-    the environments differ is not linear and Gaussian, :func:`~andrey.cdnod`; and on observational
-    data alone, :func:`~andrey.ges`.
+    a CPDAG leaves undirected. Its authors present it as most useful with many environments of few
+    rows each; with more rows per environment it learned graphs with errors far below the empty
+    graph's (see Limitations). When an intervention replaces a variable's mechanism and the targets
+    are known, use :func:`~andrey.gies`; when how the environments differ is not linear and
+    Gaussian, :func:`~andrey.cdnod`; and on observational data alone, :func:`~andrey.ges`.
 
     **How it works.** Each environment's columns are centered by their own means. For a set of
     targets, a variable outside it is scored by the Gaussian likelihood of its regression on its
@@ -1218,37 +1123,12 @@ def gnies(
     rows yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Measured with the targets unknown on simulated data from the model above:
-    Erdos-Renyi graphs of 10 variables at mean degree 2.7 or 4, two to ten environments with 10 to
-    1,000 rows each, with or without an observational one, one or three targets per environment, 20
-    datasets per setting, one core per fit; errors count the SHD against the interventional
-    essential graph and the targets learned wrongly or missed. With 100 or more rows per environment
-    its errors were below the empty graph's on both counts in every setting. With 10 rows per
-    environment its target errors were 1.85 to 3 with 3 true targets and 4.35 and 7.7 with 9, and
-    its SHD was not reliably below the empty graph's at mean degree 4 (20 against 20) or with the
-    targets' noise variances set to 3 to 4 instead of 5 to 10 (11.9 against 14; the 95% interval of
-    the difference reached above 0 on both sets of 20 datasets). Outside its model, with 1,000 rows
-    per environment: after hard interventions, which replace a target's mechanism, its mean SHD was
-    3.75 against the empty graph's 14; a shifted mean alone is invisible to it, so it learned almost
-    no targets (3.1 target errors with 3 true targets) and returned close to the observational class
-    (SHD 2.55 against it); after a target's incoming weights were halved it beat the empty graph on
-    neither count (SHD 11.6 against 14, 3.05 target errors with 3 true targets); with Laplace noise
-    its SHD was 1.65, and with additive nonlinear relations 7.55. With 1,000 rows in each of four
-    environments, three of them with one target, its median SHD at 20, 30, 50, and 100 variables was
-    0, 0, 1, and 2.5, against the empty graph's 27, 40, 68, and 135, and its median fit took 3.5,
-    9.0, 30, and 176 s. At 10 variables its median fit took 0.3 to 1.3 s per setting. Each set of
-    targets it visits costs one search over graphs from the empty graph: each forward step scores
-    every variable not yet a target, and each backward step every target, about
-    ``(n_targets + 1) * n_variables - n_targets * (n_targets - 1) / 2`` searches per fit, with
-    ``n_targets`` the targets it returns. Given every environment's targets, one search over graphs
-    runs, and it can stop at a graph that scores worse than one the target search reaches: with the
-    true targets given, its mean SHD was higher than when it learned them in 17 of the 21 settings.
-    A target's coefficients are shared across environments and its variances are not, so a target
-    with ``k`` parents needs at least ``k + 2`` rows in every environment: no parent set larger than
-    the smallest environment's row count minus 2 is selected for a target, and a variable that the
-    required edges of ``knowledge`` give more parents than that is not learned as one. The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** With the targets unknown and enough rows per environment it made fewer errors
+    than the empty graph on small graphs, and far fewer on graphs of moderate size with many rows.
+    With few rows per environment, on denser graphs or when the targets' noise variances changed
+    little, it was not reliably better than the empty graph. A shift of the mean alone is invisible
+    to it. The `0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#gnies>`__
+    has the numbers.
 
     References
     ----------
@@ -1421,8 +1301,9 @@ def xges(
         search. A cap can stop the search short of the lowest-scoring graph. ``None`` sets no cap.
         See Notes.
     extended_search : bool, default=True
-        Run the extended search after the base search (see Notes). ``False`` returns the base
-        search's graph, which is faster.
+        Run the extended search after the base search (see Notes). ``True`` favors accuracy on
+        denser graphs; it gives up time. ``False`` returns the base search's graph and favors time;
+        it gives up that accuracy.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1438,9 +1319,7 @@ def xges(
         handling used and ``metadata["em"]`` the EM record, with the rows dropped for observing no
         value and the fewest rows two columns share; two columns that share no observed row raise
         ``ValueError``. ``"em"`` favors the partly observed rows, which dropping the incomplete rows
-        loses; it gives up time: each round runs the search again, so the default 10 rounds run it
-        10 times. Its time against complete data was not measured with this search. See **Missing
-        values.** in Notes.
+        loses; it gives up time: each round runs the search again. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
         least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
@@ -1563,46 +1442,18 @@ def xges(
     ``metadata["score"]`` is the score of the result on the last round's expected covariance. EM
     holds when values are missing completely at random or at random given observed values; when
     missingness depends on the missing values themselves, the expected covariance is biased, and the
-    data cannot show it. On complete data, ``"em"`` gives the complete-data result. Without
-    ``"em"``, drop the incomplete rows yourself, which suits values missing completely at random, or
-    use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    data cannot show it. On complete data, ``"em"`` gives the complete-data result. Before EM, a
+    column that is a linear function of several others is not caught. Without ``"em"``, drop the
+    incomplete rows yourself, which suits values missing completely at random, or use
+    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
-    ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4
-    cores with a cap of 1 h and 28 GB per fit. The largest sizes through which its median errors
-    (SHD) stayed below the empty graph's, and through which its fits finished within the caps, were
-    50 and 200 variables at mean degree 1 with 2,000 rows and mean degree 2 with 500 rows; 400 and
-    1,600 at mean degree 2 with 10,000 rows and mean degree 4 with 2,000 rows; 200 and 800 at mean
-    degree 2 with 2,000 rows; and none and 50 at mean degree 8 with 2,000 rows. Every ladder ended
-    after two sizes in a row did not beat the empty graph. The median fit took 828 s at 1,600
-    variables (mean degree 4, 2,000 rows). With ten rows per variable at mean degree 2, where its
-    errors exceeded the empty graph's from 500 variables, the BIC score still preferred the returned
-    graphs to the true one. At 1,000 variables with ten rows per variable, the median fit took under
-    a minute at mean degree 2 and under five minutes at mean degree 4, on one core, and a few
-    seconds with ``extended_search=False``. The extended search reruns the base search for each edge
-    it tries to delete and retries the edges after keeping a result, so its run time grows with the
-    number of edges and of results kept. Its BIC score assumes linear relations with Gaussian noise.
-    With fewer rows than columns the standard BIC is unreliable. A parent set of ``n_samples - 1``
-    or more variables fits its child exactly, so the search never selects one, nor any parent set
-    that leaves its child a residual variance of at most ``1e-12`` times its variance. The
-    categorical and mixed-data scores are not benchmarked with XGES yet: its tests run them on small
-    fixed networks. Under them, each candidate parent is scored by two full local scores rather than
-    a rank-one update. ``missing="em"`` is experimental and not benchmarked yet; its tests run it on
-    up to 10 variables with 500 rows and up to 30% of the values missing, completely at random or at
-    random given observed values. It runs the search 10 times, so it takes about 10 times as long,
-    and under values missing not at random it has no guarantee. Before EM, only a column that
-    repeats another up to scale and shift where both are observed raises; a column that is a linear
-    function of several others, which raises on complete data, is not caught, and the fit runs. With
-    true ``required_paths`` or ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated
-    linear-Gaussian data (10 to 50 variables, mean degree 2, 500 or 2,000 rows), its result was no
-    farther from the true DAG than without them in any setting, and closer in every one. The claims
-    direct edges of the graph the search found, as their rules take the class as given: of the edges
-    they directed, 0.1% with required paths and 0.4% with forbidden paths pointed against the true
-    DAG. No reference implementation takes these claims for this search, so they were compared with
-    the same fit without them. A required path says less than a required edge and directs less: it
-    cannot restore an edge the search left out. A known edge belongs in ``required``. The numbers
-    are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** At the standard BIC (``ebic_gamma=0.0``), on linear-Gaussian data it made fewer
+    errors than the empty graph on sparse graphs of hundreds of variables, but on dense graphs at no
+    size, and with few rows per variable its errors passed the empty graph's on large sparse graphs.
+    With fewer rows than columns the BIC is unreliable, and the search never selects a parent set
+    that fits its child exactly. The
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
+    every setting.
 
     References
     ----------
@@ -1750,13 +1601,7 @@ def lges(
         cover LGES-0) [1]_. ``"conservative"`` (ConservativeInsert) also leaves out a pair when any
         valid addition of the edge worsens the score; it made fewer errors in the paper's
         simulations, with no such proof. ``"safe"`` favors the proof of recovery; it gives up
-        accuracy. ``"conservative"`` favors fewer errors; it gives up that proof. On the paper's
-        linear-Gaussian simulation (the authors' generator; 10, 20, 50, and 100 variables at mean
-        degree 1 to 4, and 10, 20, and 50 at degree 6; 1,000 and 10,000 rows; 20 graphs per
-        setting), under ``schedule="lges"``, ``"conservative"`` had the lower mean error in 31 of 38
-        settings, the higher in 3 (by 0.1 to 1.15 edges, all at mean degree 4 and 6), and tied in 4;
-        over the 480 graphs of mean degree 1 to 3 it made 6,789 errors against 9,029, and its median
-        fit took 0.78 to 1.03 times as long (mean degree 2, 4, and 6).
+        accuracy. ``"conservative"`` favors fewer errors; it gives up that proof.
     schedule : {"lges", "lges0_released"}, default="lges"
         The order of the search's phases (see Notes). ``"lges"`` is the paper's main method, LGES
         (its Algorithm 1): before each single edge addition it deletes, then reverses, edges until
@@ -1764,16 +1609,7 @@ def lges(
         the paper's LGES-0 (its Algorithm 8) in the phase order of the code published with the
         paper: additions, then deletions, then reversals, each phase run once until no move improves
         the score. ``"lges"`` favors accuracy on denser graphs; it gives up time.
-        ``"lges0_released"`` favors time; it gives up accuracy on denser graphs. On the simulation
-        of ``insertion``, counting a schedule better in a setting and rule when its mean error is
-        lower and it is lower on more graphs than higher, LGES was better in 15 of 16 at mean degree
-        3 and 12 of 16 at mean degree 4, LGES-0 in 1 and 2. At mean degree 1 and 2 the two made
-        about as many errors, 457 against 459 summed over the 32 settings and rules of the mean
-        errors, with LGES-0 better in 12, LGES in 5, and 15 ties. LGES rescans the deletions and
-        reversals after every addition: where both ran in one process (the conservative rule at mean
-        degree 1 and 3; the safe fits there ran first and carry about 0.25 s of start-up), its
-        median fit took 1.0 to 1.33 times LGES-0's time; at mean degree 2, 4, and 6, timed in
-        separate runs, so small differences are noise, 0.9 to 1.8 times.
+        ``"lges0_released"`` favors time; it gives up accuracy on denser graphs.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
@@ -1879,17 +1715,13 @@ def lges(
     rows yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on up to 20 variables with 5,000 rows.
-    With the linear-Gaussian BIC, ``"lges0_released"`` was compared with the authors' code on the
-    paper's simulation up to 50 variables and 10,000 rows, and ``"lges"`` with the authors' step
-    functions run in Algorithm 1's order up to 35 variables; ``"lges0_released"`` was also compared
-    on the paper's Sachs data, continuous and discretized, the latter with the multinomial BIC.
-    BDeu and the mixed-data scores were not compared: the package's checks run them on small tables
-    only. The paper proves the recovery of the true class as the rows grow only for
-    ``insertion="safe"``. Each addition step scores every pair of non-adjacent variables, and every
-    valid addition for each pair it keeps, in one process; ``"lges"`` also rescans the deletions
-    and reversals after every addition. The numbers are a reference, not a hard limit: they change
-    with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** Not benchmarked yet. With ``schedule="lges0_released"`` and
+    ``andrey.config(tie_break="position")`` it returned the CPDAG of its authors' code on every
+    dataset of its paper's simulation. The paper proves that it recovers the true class as the rows
+    grow only under ``insertion="safe"``. Each addition step scores every pair of non-adjacent
+    variables in one process. The
+    `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#lges>`__ has the
+    comparison.
 
     References
     ----------
@@ -1983,17 +1815,18 @@ def hc(
         Local score objective: ``"bic"``, a covariance-based Gaussian BIC for continuous data;
         ``"bdeu"``, the BDeu score, or ``"discrete_bic"``, the multinomial BIC, for categorical data
         coded by whole numbers; or ``"degen_gauss"`` and ``"cond_gauss"``, the degenerate and
-        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``"normal_scores"``,
-        experimental, is ``"bic"`` on each column's normal scores, for continuous data that are
-        Gaussian only after an unknown increasing transformation of each column, as
-        :func:`~andrey.ges` describes, with its limits; the consistency result for this score covers
-        GES, so with this search it is the analogous construction, not a proven result. ``None``
-        picks from the declared column types: ``"bdeu"`` when every column is categorical,
-        ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared categorical by
-        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
-        values.
-        ``metadata["score_func"]`` names the score the fit used: the one picked from the
-        declared column types when this is ``None``.
+        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. On mixed data
+        ``"degen_gauss"`` favors time and ``"cond_gauss"`` gives up time, with neither ahead at
+        every size. On categorical data ``"bdeu"`` favors accuracy, at about the time of
+        ``"discrete_bic"``. ``"normal_scores"``, experimental, is ``"bic"`` on each column's normal
+        scores, for continuous data that are Gaussian only after an unknown increasing
+        transformation of each column, as :func:`~andrey.ges` describes, with its limits; the
+        consistency result for this score covers GES, so with this search it is the analogous
+        construction, not a proven result. ``None`` picks from the declared column types: ``"bdeu"``
+        when every column is categorical, ``"cond_gauss"`` when some are, else ``"bic"``. A column
+        is declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or
+        text type, never by its values. ``metadata["score_func"]`` names the score the fit used: the
+        one picked from the declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the
@@ -2049,14 +1882,7 @@ def hc(
         ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
         fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
         ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
-        up time: each round runs the search again. In the 0.17.0 missing-data benchmark
-        (linear-Gaussian data, 10 to 50 variables, 100 to 2,000 rows, 10 to 50% missing; the
-        searches at ``ebic_gamma=0``), against dropping the incomplete rows, ``"em"`` made fewer
-        errors in 186 of the 225 settings judged with GES, BOSS, GRaSP, and NOTEARS, as many in 39,
-        and more in none, and in 204 more dropping the rows left too few to fit most datasets; HC
-        and Tabu were not compared with it. With the default 10 rounds, a setting's median fit in
-        the six searches took 2 to 72 times as long as the same search on the complete data. See
-        **Missing values.** in Notes.
+        up time: each round runs the search again. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
         least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
@@ -2190,9 +2016,12 @@ def hc(
     variables the environments shift together without an edge between them. The edges at the index
     of the DAG found are then directed out of it, and Meek's rules direct the edges that follow, so
     the graph can direct edges that the CPDAG of the pooled rows leaves undirected. The index is
-    dropped from the graph. ``"bic"`` reads the index as a number; ``"degen_gauss"`` and
-    ``"cond_gauss"``, with ``categorical=[]`` for continuous data, and the categorical scores read
-    each label as a category. It assumes no hidden common cause; :func:`~andrey.gfci` allows them.
+    dropped from the graph. ``"bic"`` reads the index as a number, so with three or more
+    environments a shift that does not follow the labels' values, such as one in the middle
+    environment of three coded ``0, 1, 2``, can go unnoticed, and recoding the labels can change the
+    result; ``"degen_gauss"`` and ``"cond_gauss"``, with ``categorical=[]`` for continuous data, and
+    the categorical scores read each label as a category. It assumes no hidden common cause;
+    :func:`~andrey.gfci` allows them.
 
     Through the ties between the two directions of an edge, one climb can direct a chain against
     the index and then keep an edge from the index to each variable on it: no single move improves
@@ -2230,72 +2059,18 @@ def hc(
     the result on the last round's expected covariance. EM holds when values are missing completely
     at random or at random given observed values; when missingness depends on the missing values
     themselves, the expected covariance is biased, and the data cannot show it. On complete data,
-    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows yourself,
-    which suits values missing completely at random, or use :func:`~andrey.pc` or
-    :func:`~andrey.fci`, whose tests delete rows per test.
+    ``"em"`` gives the complete-data result. Before EM, a column that is a linear function of
+    several others is not caught. Without ``"em"``, drop the incomplete rows yourself, which suits
+    values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose
+    tests delete rows per test.
 
-    **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
-    ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
-    ``max_iter=100000``, on 4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through
-    which its median errors (SHD) stayed below the empty graph's, and through which its fits
-    finished within the caps, were 50 and 1,600 variables at mean degree 1 with 2,000 rows; 200 and
-    1,600 at mean degree 2 with 10,000 rows; 100 and 3,200 at mean degree 2 with 2,000 rows; 20 and
-    1,600 at mean degree 2 with 500 rows; none and 800 at mean degree 4 with 2,000 rows (below it
-    only at 100); and none and 800 at mean degree 8 with 2,000 rows. The ladders ended after two
-    sizes in a row did not beat the empty graph, except at mean degree 2 with 2,000 rows, where the
-    ladder ended at the largest planned size. Each accuracy stop was set after larger sizes had run.
-    The median fit took 148 s at 3,200 variables (mean degree 2, 2,000 rows). It has no move limit
-    by default; run time grows with the moves the search takes. A graph that no single move improves
-    need not be the best-scoring one. Its BIC score assumes linear relations with Gaussian noise.
-    With fewer rows than columns the standard BIC is unreliable. A parent set of ``n_samples - 1``
-    or more variables fits its child exactly, so the search never selects one, nor any parent set
-    that leaves its child a residual variance of at most ``1e-12`` times its variance. On simulated
-    mixed data (conditional linear Gaussian networks on sparse random graphs, the first half of the
-    variables categorical with 2 to 5 categories), from 10 to 40 variables with 2,000 rows, its
-    median errors at 40 variables were 12.5 with ``"degen_gauss"`` and 11 with ``"cond_gauss"``,
-    against 40. On simulated categorical networks with 2 or 3 categories per variable, of the same
-    sizes and rows, they were 18 with ``"bdeu"`` and 20 with ``"discrete_bic"``. Every median fit
-    took under 0.2 s at 40 variables, on 4 cores. With ``env``, hill climbing is experimental and
-    not benchmarked yet; its tests run it on up to 12 variables with 2,000 rows from two
-    environments, and on Sachs's 11 proteins, 7,466 cells from nine conditions, with
-    ``"cond_gauss"``. ``"bic"`` reads a numeric ``env`` as a number, so with three or more
-    environments a shift that does not follow the labels' values, such as one in the middle
-    environment of three coded ``0, 1, 2``, can go unnoticed, and recoding the labels can change the
-    result. ``max_parents`` counts the index as a parent of each variable it points into. At the
-    default ``n_starts=1``, ``changing_variables`` often lists variables the environments change
-    only through their causes (see **Several environments.**). With ``missing="em"``, measured on
-    simulated linear-Gaussian data with values missing completely at random or at random given
-    observed values, 20 datasets per setting, on one core, with errors as the SHD between
-    equivalence classes. On Erdos-Renyi graphs of mean degree 2 with 20 variables, 500 or 2,000
-    rows, and 10 to 30% missing, its mean errors stayed below the empty graph's in all 12 settings.
-    With 15 variables and 100 rows (Erdos-Renyi graphs of mean degree 1 and 2 and scale-free graphs
-    of mean degree 2, 10 to 50% missing), the result is often no better than the empty graph: its
-    mean errors stayed below the empty graph's in 10 of 24 settings (6, 4, and 0 of 8 on the three
-    graphs), with misses at every missing rate. The plain search at that sample size is the cause:
-    on the complete data its mean errors were 8.8, 13.3, and 13.05, against 8, 15, and 14 for the
-    empty graph. A reference implementation of structural EM, which fills each missing value with
-    its conditional mean before each of its 10 searches, ran at the standard BIC on those 36
-    settings: this search had fewer errors than it in 28 and tied in 8. EM runs the search 10 times
-    and the E-step 56 times: the median fit took 1.0 to 17 s, against 0.2 to 0.3 s on the complete
-    data. In 20 of the 900 fits the last round still changed the graph, and each such fit logs a
-    warning. At the default ``ebic_gamma=1.0``, with 20 variables, 500 rows, and 20% missing, its
-    mean errors were 11.1 and 11.3, against 10.75 on the complete data and 20 for the empty graph,
-    measured with one parameter refit per round in place of the 5 parameter steps.
-    :func:`~andrey.pc`, whose tests delete rows per test, had fewer errors than it at the standard
-    BIC in 30 of the 36 settings and at the default in both, comparisons not rerun on fresh seeds.
-    Under values missing not at random it has no guarantee. Before EM, only a column that repeats
-    another up to scale and shift where both are observed raises; a column that is a linear function
-    of several others, which raises on complete data, is not caught, and the fit runs. With true
-    ``required_paths`` or ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated
-    linear-Gaussian data (10 to 50 variables, mean degree 2, 500 or 2,000 rows), its result was no
-    farther from the true DAG than without them in any setting, and closer in every one. The claims
-    direct edges of the graph the search found, as their rules take the class as given: of the edges
-    they directed, 2.7% with required paths and 10.9% with forbidden paths pointed against the true
-    DAG. A required path says less than a required edge and directs less: it cannot restore an edge
-    the search left out, and on simulated data a required edge, which also states that the pair is
-    adjacent, lowered the errors more. A known edge belongs in ``required``. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    **Limitations.** At the standard BIC (``ebic_gamma=0.0``), on linear-Gaussian data it made fewer
+    errors than the empty graph on sparse graphs of moderate size, where :func:`~andrey.ges` reached
+    hundreds of variables, on denser graphs only at a single size, and on dense graphs at no size.
+    With fewer rows than columns the BIC is unreliable, and the search never selects a parent set
+    that fits its child exactly. The
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
+    every setting.
 
     References
     ----------
@@ -2475,14 +2250,7 @@ def tabu(
         ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
         fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
         ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
-        up time: each round runs the search again. In the 0.17.0 missing-data benchmark
-        (linear-Gaussian data, 10 to 50 variables, 100 to 2,000 rows, 10 to 50% missing; the
-        searches at ``ebic_gamma=0``), against dropping the incomplete rows, ``"em"`` made fewer
-        errors in 186 of the 225 settings judged with GES, BOSS, GRaSP, and NOTEARS, as many in 39,
-        and more in none, and in 204 more dropping the rows left too few to fit most datasets; HC
-        and Tabu were not compared with it. With the default 10 rounds, a setting's median fit in
-        the six searches took 2 to 72 times as long as the same search on the complete data. See
-        **Missing values.** in Notes.
+        up time: each round runs the search again. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
         least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
@@ -2616,9 +2384,12 @@ def tabu(
     variables the environments shift together without an edge between them. The edges at the index
     of the DAG found are then directed out of it, and Meek's rules direct the edges that follow, so
     the graph can direct edges that the CPDAG of the pooled rows leaves undirected. The index is
-    dropped from the graph. ``"bic"`` reads the index as a number; ``"degen_gauss"`` and
-    ``"cond_gauss"``, with ``categorical=[]`` for continuous data, and the categorical scores read
-    each label as a category. It assumes no hidden common cause; :func:`~andrey.gfci` allows them.
+    dropped from the graph. ``"bic"`` reads the index as a number, so with three or more
+    environments a shift that does not follow the labels' values, such as one in the middle
+    environment of three coded ``0, 1, 2``, can go unnoticed, and recoding the labels can change the
+    result; ``"degen_gauss"`` and ``"cond_gauss"``, with ``categorical=[]`` for continuous data, and
+    the categorical scores read each label as a category. It assumes no hidden common cause;
+    :func:`~andrey.gfci` allows them.
 
     **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``. The
     score sums one term per variable over every row; terms over different rows do not sum to one
@@ -2648,69 +2419,18 @@ def tabu(
     the result on the last round's expected covariance. EM holds when values are missing completely
     at random or at random given observed values; when missingness depends on the missing values
     themselves, the expected covariance is biased, and the data cannot show it. On complete data,
-    ``"em"`` gives the complete-data result. Without ``"em"``, drop the incomplete rows yourself,
-    which suits values missing completely at random, or use :func:`~andrey.pc` or
-    :func:`~andrey.fci`, whose tests delete rows per test.
+    ``"em"`` gives the complete-data result. Before EM, a column that is a linear function of
+    several others is not caught. Without ``"em"``, drop the incomplete rows yourself, which suits
+    values missing completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose
+    tests delete rows per test.
 
-    **Limitations.** The benchmark numbers in this paragraph are for the standard BIC,
-    ``ebic_gamma=0.0``. Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, with
-    ``max_iter=100000`` and ``max_tabu=10``, on 4 cores with a cap of 1 h and 28 GB per fit. The
-    largest sizes through which its median errors (SHD) stayed below the empty graph's, and through
-    which its fits finished within the caps, were 50 and 200 variables at mean degree 1 with 2,000
-    rows and mean degree 2 with 500 rows; 200 and 800 at mean degree 2 with 10,000 rows; 100 and 800
-    at mean degree 2 with 2,000 rows; 20 and 800 at mean degree 4 with 2,000 rows (also below it
-    from 100 through 200); and none and 50 at mean degree 8 with 2,000 rows. Every ladder ended
-    after two sizes in a row did not beat the empty graph. The accuracy stop at mean degree 2 with
-    2,000 rows was set after larger sizes had run. The median fit took 6.6 s at 800 variables (mean
-    degree 4, 2,000 rows). It takes hill climbing's moves plus up to ``max_tabu`` non-improving
-    moves between new best scores, with no move limit by default; run time grows with the moves
-    taken. It avoids only the last ``tabu_length`` DAGs, so a better DAG beyond that reach may be
-    missed. Its BIC score assumes linear relations with Gaussian noise. With fewer rows than columns
-    the standard BIC is unreliable. A parent set of ``n_samples - 1`` or more variables fits its
-    child exactly, so the search never selects one, nor any parent set that leaves its child a
-    residual variance of at most ``1e-12`` times its variance. With a categorical score, its tests
-    run it on small fixed categorical networks. With ``env``, Tabu search is experimental and not
-    benchmarked yet; its tests run it on up to 12 variables with 2,000 rows from two environments,
-    and on Sachs's 11 proteins, 7,466 cells from nine conditions, with ``"cond_gauss"``. ``"bic"``
-    reads a numeric ``env`` as a number, so with three or more environments a shift that does not
-    follow the labels' values, such as one in the middle environment of three coded ``0, 1, 2``, can
-    go unnoticed, and recoding the labels can change the result. ``max_parents`` counts the index as
-    a parent of each variable it points into. With ``missing="em"``, measured on simulated
-    linear-Gaussian data with values missing completely at random or at random given observed
-    values, 20 datasets per setting, on one core, with errors as the SHD between equivalence
-    classes. On Erdos-Renyi graphs of mean degree 2 with 20 variables, 500 or 2,000 rows, and 10 to
-    30% missing, its mean errors stayed below the empty graph's in all 12 settings. With 15
-    variables and 100 rows (Erdos-Renyi graphs of mean degree 1 and 2 and scale-free graphs of mean
-    degree 2, 10 to 50% missing), the result is often no better than the empty graph: its mean
-    errors stayed below the empty graph's in 17 of 24 settings (8, 7, and 2 of 8 on the three
-    graphs), with misses from 10% missing on. The plain search at that sample size is the cause: on
-    the complete data its mean errors were 8.45, 12.95, and 12.75, against 8, 15, and 14 for the
-    empty graph. A reference implementation of structural EM, which fills each missing value with
-    its conditional mean before each of its 10 searches, ran at the standard BIC on those 36
-    settings: this search had fewer errors than it in 31 and tied in 5. EM runs the search 10 times
-    and the E-step 56 times: the median fit took 1.1 to 16 s, against 0.3 s on the complete data. In
-    18 of the 900 fits the last round still changed the graph, and each such fit logs a warning. At
-    the default ``ebic_gamma=1.0``, with 20 variables, 500 rows, and 20% missing, its mean errors
-    were 6.4 and 5.85, against 5.7 on the complete data and 20 for the empty graph, measured with
-    one parameter refit per round in place of the 5 parameter steps. :func:`~andrey.pc`, whose tests
-    delete rows per test, had fewer errors than it at the standard BIC in 10 of the 36 settings and
-    tied in the others, and tied with it at the default, comparisons not rerun on fresh seeds. Under
-    values missing not at random it has no guarantee. Before EM, only a column that repeats another
-    up to scale and shift where both are observed raises; a column that is a linear function of
-    several others, which raises on complete data, is not caught, and the fit runs. With true
-    ``required_paths`` or ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated
-    linear-Gaussian data (10 to 50 variables, mean degree 2, 500 or 2,000 rows), its result was no
-    farther from the true DAG than without them in any setting, and closer in every one. The claims
-    direct edges of the graph the search found, as their rules take the class as given: of the edges
-    they directed, 1.8% with required paths and 7.2% with forbidden paths pointed against the true
-    DAG. ``required_paths`` is experimental: given the required edges those paths imply and the
-    standard BIC (``ebic_gamma=0``), it made more errors than a reference implementation given the
-    same edges in one of 18 settings (20 variables, 500 rows, 5% of the pairs claimed), on two sets
-    of 20 datasets. A required path says less than a required edge and directs less: it cannot
-    restore an edge the search left out, and on simulated data a required edge, which also states
-    that the pair is adjacent, lowered the errors more. A known edge belongs in ``required``. The
-    numbers are a reference, not a hard limit: they change with the data generator, the density, the
-    method's settings, and the machine.
+    **Limitations.** At the standard BIC (``ebic_gamma=0.0``), on linear-Gaussian data it made fewer
+    errors than the empty graph on sparse graphs of moderate size, where :func:`~andrey.ges` reached
+    hundreds of variables, on denser graphs only on small ones, and on dense graphs at no size. With
+    fewer rows than columns the BIC is unreliable, and the search never selects a parent set that
+    fits its child exactly. The
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
+    every setting.
 
     References
     ----------
@@ -2856,9 +2576,7 @@ def exact_search(
         handling used and ``metadata["em"]`` the EM record, with the rows dropped for observing no
         value and the fewest rows two columns share; two columns that share no observed row raise
         ``ValueError``. ``"em"`` favors the partly observed rows, which dropping the incomplete rows
-        loses; it gives up time: each round runs the search again, so the default 10 rounds run it
-        10 times. Its time against complete data was not measured with this search. See **Missing
-        values.** in Notes.
+        loses; it gives up time: each round runs the search again. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
         least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
@@ -2923,12 +2641,12 @@ def exact_search(
     **When to use.** With ``"bic"``, exact search makes the assumptions of :func:`~andrey.ges`:
     i.i.d. continuous observational data, no unmeasured common causes, and linear relations with
     Gaussian noise; the categorical and mixed-data scores below make theirs. Its run time grows
-    exponentially with the number of variables, so it suits a few variables, roughly 20 or fewer,
-    where it finds a DAG with the best score [1]_ [2]_ rather than a greedy search's local optimum.
-    It returns the CPDAG of that DAG's equivalence class and keeps the DAG in ``metadata["dag"]``.
-    With more variables, use :func:`~andrey.ges` or :func:`~andrey.boss`; when unmeasured common
-    causes are plausible, use :func:`~andrey.fci`. With values missing completely at random or at
-    random given observed values, ``missing="em"`` fits it on every row by structural EM [8]_ [9]_.
+    exponentially with the number of variables, so it suits few variables, where it finds a DAG with
+    the best score [1]_ [2]_ rather than a greedy search's local optimum. It returns the CPDAG of
+    that DAG's equivalence class and keeps the DAG in ``metadata["dag"]``. With more variables, use
+    :func:`~andrey.ges` or :func:`~andrey.boss`; when unmeasured common causes are plausible, use
+    :func:`~andrey.fci`. With values missing completely at random or at random given observed
+    values, ``missing="em"`` fits it on every row by structural EM [8]_ [9]_.
 
     **Tied DAGs.** Every DAG of the optimal equivalence class has the same score, so the search's
     own pick among them would follow last-bit rounding and the column order. The returned CPDAG
@@ -2987,40 +2705,18 @@ def exact_search(
     some graphs, while others keep changing; values other than 10 are not benchmarked. EM holds when
     values are missing completely at random or at random given observed values; when missingness
     depends on the missing values themselves, the expected covariance is biased, and the data cannot
-    show it. On complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the
-    incomplete rows yourself, which suits values missing completely at random, or use
-    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    show it. On complete data, ``"em"`` gives the complete-data result. Before EM, a column that is
+    a linear function of several others is not caught. Without ``"em"``, drop the incomplete rows
+    yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** The benchmark numbers in this paragraph are for ``ebic_gamma=0.0``. Measured on
-    simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores with a cap of 1 h and 28 GB
-    per fit. The largest sizes through which its median errors (SHD) stayed below the empty graph's,
-    and through which its fits finished within the caps, were 24 and 24 variables at mean degree 1
-    with 2,000 rows; and 22 and 22 at mean degree 2 with 500, 2,000, or 10,000 rows and mean degree
-    4 or 8 with 2,000 rows. Every ladder ended when three fits of the next size ran past 1 h. The
-    median fit took 1,457 s at 24 variables (mean degree 1, 2,000 rows). With a mixed-data or
-    categorical score it is not benchmarked yet: its tests run it with a mixed-data score on 5
-    variables with 3,000 rows, and with a categorical score on small fixed categorical networks. It
-    scores every possible parent set of every variable, so its run time at least doubles with each
-    added variable. The ``"dp"`` search also keeps one entry per subset of the variables, so its
-    memory doubles as well. With fewer rows than columns the standard BIC is unreliable. A parent
-    set of ``n_samples - 1`` or more variables fits its child exactly, so the search never selects
-    one, nor any parent set that leaves its child a residual variance of at most ``1e-12`` times its
-    variance. ``missing="em"`` is experimental and not benchmarked yet; its tests run it on up to 10
-    variables with 500 rows and up to 30% of the values missing, completely at random or at random
-    given observed values. It runs the search 10 times, so it takes about 10 times as long, and
-    under values missing not at random it has no guarantee. Before EM, only a column that repeats
-    another up to scale and shift where both are observed raises; a column that is a linear function
-    of several others, which raises on complete data, is not caught, and the fit runs. With true
-    ``required_paths`` or ``forbidden_paths`` on 5 to 30% of the variable pairs of simulated
-    linear-Gaussian data (10 variables with mean degree 2 or 4 and 20 variables with mean degree 2,
-    500 or 2,000 rows), its result was no farther from the true DAG than without them in any
-    setting. The claims direct edges of the graph the search found, as their rules take the class as
-    given: of the edges they directed, 0.7% with required paths and 1.4% with forbidden paths
-    pointed against the true DAG. No reference implementation takes these claims for this search, so
-    they were compared with the same fit without them. A required path says less than a required
-    edge and directs less: it cannot restore an edge the search left out. A known edge belongs in
-    ``required``. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    **Limitations.** At ``ebic_gamma=0.0`` on linear-Gaussian data it made fewer errors than the
+    empty graph at every size and density it finished, but it scores every possible parent set of
+    every variable, so its run time at least doubles with each added variable, and under ``"dp"`` so
+    does its memory. With fewer rows than columns the BIC is unreliable, and the search never
+    selects a parent set that fits its child exactly. The
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
+    every setting.
 
     References
     ----------
@@ -3200,9 +2896,7 @@ def calm(
         handling used and ``metadata["em"]`` the EM record, with the rows dropped for observing no
         value and the fewest rows two columns share; two columns that share no observed row raise
         ``ValueError``. ``"em"`` favors the partly observed rows, which dropping the incomplete rows
-        loses; it gives up time: each round runs the search again, so the default 10 rounds run it
-        10 times. Its time against complete data was not measured with this search. See **Missing
-        values.** in Notes.
+        loses; it gives up time: each round runs the search again. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
         least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
@@ -3330,37 +3024,20 @@ def calm(
     some graphs, while others keep changing; values other than 10 are not benchmarked. EM holds when
     values are missing completely at random or at random given observed values; when missingness
     depends on the missing values themselves, the expected covariance is biased, and the data cannot
-    show it. On complete data, ``"em"`` gives the complete-data result. Without ``"em"``, drop the
-    incomplete rows yourself, which suits values missing completely at random, or use
-    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    show it. On complete data, ``"em"`` gives the complete-data result. Under it the screen's
+    Fisher-Z tests read the expected correlations as if every row were observed, so the screen keeps
+    more candidate edges than ``screen_alpha`` implies. Without ``"em"``, drop the incomplete rows
+    yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from Erdos-Renyi graphs, on 4 cores
-    with a cap of 1 h and 28 GB per fit. The largest sizes through which its median errors (SHD)
-    stayed below the empty graph's, and through which its fits finished within the caps, were 200
-    and 200 variables at mean degree 1 with 2,000 rows; 400 and 400 at mean degree 2 with 500,
-    2,000, or 10,000 rows and mean degree 4 with 2,000 rows; and none and 400 at mean degree 8 with
-    2,000 rows (below it only from 50 through 400). At 400 variables at mean degree 2 with 500 rows
-    and mean degree 4 or 8 with 2,000 rows, 1 or 2 of 5 fits ran past 1 h. Every ladder ended when
-    three fits of the next size ran past 1 h. The median fit took 3,332 s at 400 variables (mean
-    degree 4, 2,000 rows). With mean degree 2 and ten rows per variable, the median fit took 18 s at
-    10 variables and 59 s at 50, where its median errors were 15; the paper's schedule
-    (``lr=0.001``, ``max_iter=100``, ``subproblem_iter=40000``, ``rho_init=1e-5``,
-    ``w_threshold=0.0``) took 174 s and 472 s for median errors of 6 and 12. Every optimizer step
-    computes a determinant and a matrix power of the full weight matrix, one row and one column per
-    variable, so a step's cost grows with the cube of the variable count; the defaults allow up to
-    75,000 steps (``max_iter`` times ``subproblem_iter``). The fit is nonconvex and can stop at a
-    local optimum: on a collider whose two parents are independent, it can return both edges
-    reversed and an edge between the parents, with the defaults and with the paper's schedule alike.
-    The weights, ``w_threshold``, and the optimizer's steps are in the data's units, so rescaling a
-    column can change the graph; with ``standardize=True`` the graph does not depend on the units.
-    ``missing="em"`` is experimental and not benchmarked yet; its tests run it on a collider of 3
-    variables with 1,000 rows and 30% of one variable's values missing at random, where a fit took
-    about 95 s, and on 5 variables with a shortened schedule. It runs the fit 10 times, so it takes
-    about 10 times as long, and under values missing not at random it has no guarantee. Under EM the
-    screen's Fisher-Z tests read the expected correlations as if every row were observed, so their
-    p-values are smaller than the observed values support, and the screen keeps more candidate edges
-    than ``screen_alpha`` implies. The numbers are a reference, not a hard limit: they change with
-    the data generator, the density, the method's settings, and the machine.
+    **Limitations.** On linear-Gaussian data it made fewer errors than the empty graph on sparse
+    graphs of hundreds of variables, and on dense graphs only on moderate and large ones. The cost
+    of each optimizer step grows with the cube of the number of variables, and the nonconvex fit can
+    stop at a local optimum: on an unshielded collider with independent parents, it can reverse both
+    edges and join the parents. Its result depends on the columns' units unless
+    ``standardize=True``. The
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
+    every setting.
 
     References
     ----------

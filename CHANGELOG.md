@@ -19,6 +19,13 @@ names its pull request.
 
 ### Changed
 
+- Each method's Limitations paragraph says in a few sentences where it does better or worse and
+  against which methods, without numbers, and links the release card that holds the measurements;
+  the detail moves to those cards. Options whose values were measured against each other say what
+  each value favors and what it gives up, among them `extended_search` in `xges`, `measure` in
+  `direct_lingam`, `fdr_method` in `pcmci` and `granger`, and `standardize` in `notears`, `dagma`,
+  and `dynotears`. The column-order guide says that `notears(missing="em")` can give another graph
+  on another type of CPU, and the score-based search post covers AGES. ([#1222])
 - For contributors, `benchmarks/start_regression_ci_r.sh` builds the GCM and PCM reference library
   in `ANDREY_BENCH_R_LIBS_GCM`, apart from the R lane's `ANDREY_BENCH_R_LIBS`, and prints the
   exports of both its libraries, which the `env.sh` of `benchmarks/run_tests.sh` records for
@@ -2969,5 +2976,6 @@ First alpha release.
 [#1215]: https://github.com/Abel-ai-lab/Andrey/pull/1215
 [#1217]: https://github.com/Abel-ai-lab/Andrey/pull/1217
 [#1221]: https://github.com/Abel-ai-lab/Andrey/pull/1221
+[#1222]: https://github.com/Abel-ai-lab/Andrey/pull/1222
 [#1224]: https://github.com/Abel-ai-lab/Andrey/pull/1224
 [#1232]: https://github.com/Abel-ai-lab/Andrey/pull/1232

@@ -159,14 +159,7 @@ def anm(
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
         handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
-        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
-        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
-        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
-        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
-        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
-        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
-        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
-        Not measured with this method. See **Missing values.** in Notes.
+        outside values missing completely at random. See **Missing values.** in Notes.
 
     Returns
     -------
@@ -252,17 +245,11 @@ def anm(
     reads are then a random sample of all rows, and otherwise they are a selected sample that more
     rows do not correct.
 
-    **Limitations.** Measured on simulated cause-effect pairs with a nonlinear additive-noise
-    mechanism and Gaussian noise, with rows doubling from 1,000, on 4 cores with a cap of 1 h and 28
-    GB per fit. It named the true direction on 95% to 100% of the 20 pairs at every size through
-    16,000 rows, the largest its fits finished within the caps. The ladder ended when three fits of
-    the next size ran out of the 28 GB. The median fit took 380 s at 8,000 rows. At 200 rows it
-    named the true direction on three pairs in four. Each regression and HSIC test builds matrices
-    with one row and one column per sample, so memory grows with the square of ``n_samples`` and the
-    regression's time with its cube. Missing values are not benchmarked yet; the tests run them on
-    pairs with up to a fifth of the values missing completely at random. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    **Limitations.** On cause-effect pairs with a nonlinear additive-noise mechanism it named the
+    true direction on nearly every pair with many rows, and less often with few rows. Each
+    regression and HSIC test builds matrices with one row and one column per sample, so memory grows
+    with the square of ``n_samples`` and the regression's time with its cube. The
+    `0.4.0 release card <https://andrey.abel.ai/docs/benchmarks/0.4.0.html#anm>`__ has the numbers.
 
     References
     ----------
@@ -319,14 +306,7 @@ def pnl(
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
         handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
-        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
-        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
-        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
-        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
-        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
-        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
-        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
-        Not measured with this method. See **Missing values.** in Notes.
+        outside values missing completely at random. See **Missing values.** in Notes.
 
     Returns
     -------
@@ -426,17 +406,11 @@ def pnl(
     reads are then a random sample of all rows, and otherwise they are a selected sample that more
     rows do not correct.
 
-    **Limitations.** Measured on simulated cause-effect pairs with a post-nonlinear mechanism, a
-    linear inner transform and an invertible nonlinear outer one, and Laplace noise, with rows
-    doubling from 1,000, on 4 cores with a cap of 1 h and 28 GB per fit. It named the true direction
-    on 100% of the 20 pairs at every size through 32,000 rows, the largest its fits finished within
-    the caps. The ladder ended when three fits of the next size ran out of the 28 GB. The median fit
-    took 80 s at 32,000 rows. At 200 rows it named the true direction on three pairs in four. Each
-    HSIC test builds kernel matrices with one row and one column per sample, so time and memory grow
-    with the square of the row count: each worker thread holds three such float64 matrices, 600 MB
-    at 5,000 rows. Missing values are not benchmarked yet; the tests run them on pairs with up to a
-    fifth of the values missing completely at random. The numbers are a reference, not a hard limit:
-    they change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** On post-nonlinear cause-effect pairs with Laplace noise it named the true
+    direction on every pair with many rows, and less often with few rows. Each HSIC test builds
+    kernel matrices with one row and one column per sample, so time and memory grow with the square
+    of the row count. The
+    `0.4.0 release card <https://andrey.abel.ai/docs/benchmarks/0.4.0.html#pnl>`__ has the numbers.
 
     References
     ----------
@@ -496,20 +470,15 @@ def loci(
     criterion : {"independence", "likelihood"}, default="independence"
         ``"independence"`` tests whether each direction's scaled residual is independent of its
         proposed cause; ``"likelihood"`` chooses the direction whose model has the larger
-        likelihood. See Notes.
+        likelihood. See Notes. ``"independence"`` favors any noise distribution; it gives up time
+        and memory, which grow with the square of ``n_samples``. ``"likelihood"`` favors Gaussian
+        noise and speed; it gives up accuracy under other noise, where its model is misspecified.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
         handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
-        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
-        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
-        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
-        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
-        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
-        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
-        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
-        Not measured with this method. See **Missing values.** in Notes.
+        outside values missing completely at random. See **Missing values.** in Notes.
 
     Returns
     -------
@@ -547,12 +516,12 @@ def loci(
     twice-differentiable log density and twice-differentiable ``f`` and ``g``; the cause must have
     unbounded support, which excludes a uniform cause [1]_. It is designed for one pair whose
     effect's spread changes with the cause, which the additive noise model of :func:`~andrey.anm`
-    does not allow, and it returns a two-node DAG whose edge depends on ``criterion``. For more
-    than two variables, use :func:`~andrey.cam`, whose Limitations give its errors under such
-    noise. Keep the default ``criterion="independence"`` unless the noise is known to be Gaussian:
-    it named the true direction on most pairs under every noise distribution measured, while
-    ``criterion="likelihood"`` was ahead of it under Gaussian noise and below one pair in two under
-    Gumbel noise (Limitations).
+    does not allow, and it returns a two-node DAG whose edge depends on ``criterion``. For more than
+    two variables, use :func:`~andrey.cam`, whose Limitations give its errors under such noise. Keep
+    the default ``criterion="independence"`` unless the noise is known to be Gaussian: it named the
+    true direction on most pairs under every noise distribution measured, while
+    ``criterion="likelihood"`` was ahead of it under Gaussian noise and right less often than a coin
+    flip under Gumbel noise (see ``criterion``).
 
     With ``criterion="independence"``, LOCI-H in [1]_, each direction's scaled residual
     ``(y - mu(x)) / sigma(x)`` is tested against the proposed cause by HSIC with Gaussian kernels,
@@ -593,32 +562,13 @@ def loci(
     reads are then a random sample of all rows, and otherwise they are a selected sample that more
     rows do not correct.
 
-    **Limitations.** Measured on simulated cause-effect pairs of 500, 1,000, and 2,000 rows, 100
-    pairs per setting, on one core: location-scale pairs with Gaussian, Gumbel, or Laplace noise,
-    additive-noise pairs with Gaussian noise, and, at 1,000 rows, the five synthetic sets of
-    Tagasovska et al. (2020) [5]_. With ``criterion="independence"`` it named the true direction on
-    79% to 86% of the pairs of each setting at 500 rows, 90% to 100% at 1,000, and 96% to 99% at
-    2,000, and the median fit took 0.07, 0.2, and 0.8 s. With ``criterion="likelihood"`` it named it
-    on every location-scale pair with Gaussian noise at each size and on 85%, 93%, and 99% of the
-    additive-noise pairs, in a median of at most 0.1 s. The model's noise is Gaussian, so under
-    other noise the likelihood criterion is misspecified: it named the true direction on 35% to 38%
-    of the pairs under Gumbel noise at every size, fewer than a coin flip, and under Laplace noise
-    on 37% at 500 rows, 44% to 47% at 1,000, and 57% to 59% at 2,000. On 20 location-scale pairs
-    with Gaussian noise of more rows, with a cap of 1 h and 28 GB per fit, both criteria named the
-    true direction on every pair they fitted; under ``criterion="independence"`` the median fit took
-    3.9 s and at most 0.8 GB at 4,000 rows, 15 s and 2.7 GB at 8,000, and 60 s and 10 GB at 16,000,
-    and every fit at 32,000 rows ran out of the 28 GB, while under ``criterion="likelihood"`` it
-    took 1.4 s and 0.2 GB at 32,000. Each HSIC test builds matrices with one row and one column per
-    sample, so under ``criterion="independence"`` time and memory grow with the square of
-    ``n_samples``; the likelihood fit grows linearly with it. It decides one pair: the paper defines
-    no procedure for more variables. A spline at either end of the cause's range covers few rows,
-    where the fitted variance can shrink toward zero as the likelihood grows, which only the prior
-    bounds. With columns in very different units, the two directions' log p-values of a table that
-    mirrors itself can differ by up to about ``6e-4``, relative to the larger of 1 and their
-    absolute values, through the solver's stopping tolerance, ``1e-6`` as in the paper, so a nearly
-    tied direction can follow that noise. Missing values are not benchmarked yet; the tests run them
-    on pairs with values missing completely at random. The numbers are a reference, not a hard
-    limit: they change with the data generator, the density, the method's settings, and the machine.
+    **Limitations.** Under ``criterion="independence"`` it named the true direction on most
+    location-scale and additive-noise pairs, those of [5]_ included, but its time and memory grow
+    with the square of ``n_samples``, and fits on the largest pairs ran out of memory.
+    ``criterion="likelihood"`` is far faster and right on nearly every pair with Gaussian noise, but
+    under Gumbel noise it was right less often than a coin flip. The
+    `0.16.0 release card <https://andrey.abel.ai/docs/benchmarks/0.16.0.html#loci>`__ has the
+    numbers.
 
     References
     ----------
@@ -707,26 +657,18 @@ def cpcm(
         edge when the two columns test independent at that level, and otherwise draws an edge only
         when exactly one direction's p-value exceeds it (the paper's conservative estimate).
         ``None`` favors a direction for every pair; it gives up the sign that a pair fits both ways
-        or neither. A level favors that sign; it gives up the pairs it leaves undecided. On the
-        paper's pairs at 1,000 and 2,000 rows the forced direction tied with the authors' code after
-        fresh seeds in every setting; on the first seeds it was right less often on Table 2's PARg
-        drawn as the paper's Appendix B.3 describes (wrong on 12 of 99 pairs against 8) and on model
-        (16) at ``gamma = 2`` with 2,000 rows (4 of 99 against 0). On the paper's model (16) at 500
-        rows under ``"pareto"``, the conservative estimate found both directions plausible, the
-        paper's outcome at ``gamma = 0``, on 73% and 78% of the pairs of two seed sets against that
-        code's 82% and 85%, so it is not supported there; at ``gamma = 1`` it named the true
-        direction on 55% and 64% of the pairs of the two seed sets, and both on 39% of the first.
-        The `0.19.0 release card
-        <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#the-conservative-estimate>`_ has the
-        numbers. See Notes.
+        or neither. A level favors that sign; it gives up the pairs it leaves undecided. On Pareto
+        pairs with few rows the conservative estimate is not supported. See Notes.
     family : str or list of str, default="gaussian"
         The family of each variable given the other, one name for both columns or a list of two
         names, one per column: ``"gaussian"`` (mean and scale change with the cause),
         ``"gaussian_fixed_scale"`` (the mean alone), ``"exponential"``, ``"pareto"`` (scale 1,
         values greater than 1), ``"poisson"``, ``"gamma"`` (mean and shape), ``"gamma_fixed_shape"``
-        (the mean alone), ``"gumbel"`` (location and scale), ``"gumbel_fixed_scale"`` (the
-        location alone), or ``"negative_binomial"`` (the mean, one size for all rows). See
-        **Families.** in Notes.
+        (the mean alone), ``"gumbel"`` (location and scale), ``"gumbel_fixed_scale"`` (the location
+        alone), or ``"negative_binomial"`` (the mean, one size for all rows). See **Families.** in
+        Notes. ``"gaussian"`` favors effects whose spread changes with the cause;
+        ``"gaussian_fixed_scale"``, an additive-noise family that models the mean alone, gives up
+        such effects.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of the count families,
@@ -767,19 +709,18 @@ def cpcm(
     Notes
     -----
     **When to use.** CPCM decides the direction between two variables observed i.i.d. when the
-    effect given its cause follows a known parametric family, with no hidden common cause of the
-    two [1]_. The direction is identifiable outside special cases tied to the family's sufficient
+    effect given its cause follows a known parametric family, with no hidden common cause of the two
+    [1]_. The direction is identifiable outside special cases tied to the family's sufficient
     statistics: under the Gaussian family with mean ``mu(x)`` and scale ``sigma(x)``, unless
     ``1 / sigma^2`` is quadratic and ``mu / sigma^2`` linear in the cause with a matching cause
     density; under a one-parameter exponential family, unless the parameter is linear in the
     sufficient statistic [1]_. It is designed for effects whose whole distribution, not only the
     mean and spread, changes with the cause, such as counts, positive or heavy-tailed effects, and
-    for mixed pairs where each column gets its own family. On the paper's pairs the forced
-    direction (``alpha=None``) is right as often as the code published with the paper, with the
-    family the paper's rule picks from each column's support, or the Gaussian location-scale
-    family given where the noise's scale changes with the cause. The paper's Pareto pairs (its
-    Table 2's PARg) and the conservative estimate (a level for ``alpha``) under ``"pareto"`` are
-    not supported (see Limitations). For an effect
+    for mixed pairs where each column gets its own family. On the paper's pairs the forced direction
+    (``alpha=None``) is right as often as the code published with the paper, with the family the
+    paper's rule picks from each column's support, or the Gaussian location-scale family given where
+    the noise's scale changes with the cause. The paper's Pareto pairs and the conservative estimate
+    (a level for ``alpha``) under ``"pareto"`` are not supported (see Limitations). For an effect
     with additive noise use :func:`~andrey.anm`; for more than two variables,
     :func:`~andrey.cpcm_graph`.
 
@@ -844,32 +785,13 @@ def cpcm(
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** On the paper's pairs of 1,000 and 2,000 rows, CPCM's forced direction was right
-    as often as the code published with the paper and more often than a coin flip or the majority
-    direction, except on Table 2's Pareto pairs drawn by the authors' generator, whose effect is a
-    Pareto of scale theta and shape 1, which neither family the support rule picks (exponential, or
-    Pareto of scale 1) holds: there it was right on 38% and 47% of the pairs of two seed sets, as
-    often as the authors' code and no better than a coin flip. The
-    `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm>`_ has the
-    numbers. The family must be chosen: the paper's rule that picks a family from each column's
-    support and its sequential choice between one- and two-parameter families are not offered; the
-    benchmark used the support rule's family. On location-scale and multiplicative pairs that rule
-    picks ``"gaussian_fixed_scale"``, an additive-noise family, which named the true direction on 0%
-    to 58% of them in both implementations, so pass ``"gaussian"`` there. On fresh multiplicative
-    pairs, :func:`~andrey.loci` was right more often, 98% against 84%, and faster. Under
-    ``"pareto"``, when the cause's largest value is thousands of times its median, the test of one
-    direction can reject where the authors' code does not. On the paper's model (16) at
-    ``gamma = 0`` the conservative estimate found both directions plausible, the paper's claim
-    there, on 73% and 78% of the pairs of two seed sets against the reference's 82% and 85%, fewer
-    on both, so the conservative estimate under ``"pareto"`` is unsupported because of the rank-10
-    thin plate spline of the cause on such values. At 2,000 rows the forced direction was wrong on 8
-    of the 199 pairs both fitted against 1 (the authors' code stopped with an error on one). Each
-    HSIC test builds matrices with one row and one column per sample, so time and memory grow with
-    the square of ``n_samples``. Under the count families the rank-10 spline must follow the mean to
-    within the counts' own noise, about ``1 / sqrt(mean)`` of it, which it does for means up to a
-    few hundred: from means of a few thousand that vary strongly with the cause, the true
-    direction's test rejects too. The numbers are a reference, not a hard limit: they change with
-    the data generator, the density, the method's settings, and the machine.
+    **Limitations.** On its paper's pairs the forced direction was right as often as with its
+    authors' code and more often than a coin flip, except on Pareto pairs whose effect follows none
+    of the families the support rule can pick, where both were right less often than a coin flip.
+    The family must be chosen, as the paper's support rule is not offered; on location-scale and
+    multiplicative pairs pass ``"gaussian"`` (see ``family``). The
+    `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#cpcm>`__ has the
+    numbers.
 
     References
     ----------
@@ -961,7 +883,11 @@ def skewd(
     criterion : {"likelihood", "independence"}, default="likelihood"
         ``"likelihood"`` chooses the direction whose model has the larger likelihood (SkewD-LL);
         ``"independence"`` tests whether each direction's scaled residual is independent of its
-        proposed cause (SkewD-IT). See Notes.
+        proposed cause (SkewD-IT). See Notes. ``"likelihood"`` favors accuracy on location-scale
+        pairs; it gives up a p-value and accuracy on pairs whose marginals are not Gaussian, as it
+        assumes Gaussian marginals of the standardized variables. ``"independence"`` favors
+        robustness across established pair benchmarks [1]_ and gives a p-value, which ``alpha`` can
+        test at a level; it gives up accuracy on Gaussian location-scale pairs.
     tuning_iter : int, default=60
         The penalty settings, at least 1, that the Bayesian optimization scores by
         cross-validation in each direction; the first two thirds, rounded up, are Latin hypercube
@@ -971,14 +897,10 @@ def skewd(
         each direction's fit.
     optimizer : {"cmaes", "lbfgs"}, default="cmaes"
         The optimizer of each search of the penalized likelihood, in the cross-validation and from
-        the final starts: ``"cmaes"`` is CMA-ES [4]_, the paper's heuristic; ``"lbfgs"`` is
-        L-BFGS-B [5]_ with the analytic gradient, from the same starts within the same bounds. See
-        Notes. ``"cmaes"`` favors the paper's optimizer; it gives up time. ``"lbfgs"`` favors time;
-        it gives up the paper's optimizer. On the paper's simulated pairs and graphs of 1,000 rows
-        (graphs of 6 and 10 variables; 20 seeds each, one worker), ``"lbfgs"`` decided worse than
-        ``"cmaes"`` in no setting by a paired bootstrap, at a median of 5.8 to 14.9 times less time
-        per pair and 2.4 times less per graph, and its penalized likelihood was lower in 306 of the
-        738 fitted models and higher in 233.
+        the final starts: ``"cmaes"`` is CMA-ES [4]_, the paper's heuristic; ``"lbfgs"`` is L-BFGS-B
+        [5]_ with the analytic gradient, from the same starts within the same bounds. See Notes.
+        ``"cmaes"`` favors the paper's optimizer; it gives up time. ``"lbfgs"`` favors time; it
+        gives up the paper's optimizer.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed of the random draws of the optimization.
@@ -987,14 +909,7 @@ def skewd(
         reads only the rows where all of its variables are observed. ``None`` picks the method's
         default, ``"testwise"``. On data with missing values, ``metadata["missing"]`` records the
         handling used. ``"testwise"`` favors every row each test can read; it gives up its guarantee
-        outside values missing completely at random. With PC at 20 variables and 1,000 rows, 10 to
-        30% of the values missing completely at random, test-wise deletion made median errors of 6.5
-        to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and
-        had no complete row at 30% (complete data: 4.0; 0.11.0 release card). Where values are
-        missing for a reason that other variables carry, on Erdos-Renyi graphs of 10 to 100
-        variables with one observed parent per indicator, ``pc``'s ``"mvpc"`` made fewer errors than
-        test-wise deletion in 14 of 72 settings at ``alpha=0.01`` and 28 at 0.05, and more in none.
-        Not measured with this method. See **Missing values.** in Notes.
+        outside values missing completely at random. See **Missing values.** in Notes.
 
     Returns
     -------
@@ -1032,13 +947,11 @@ def skewd(
     pairs whose noise is skewed, where a model with symmetric noise such as :func:`~andrey.loci` can
     misjudge the scale and the direction; with symmetric noise its model reduces to
     :func:`~andrey.loci`'s Gaussian one. It favors accuracy on such pairs and gives up time. On the
-    paper's skewed additive and location-scale pairs and on Gaussian location-scale pairs, 1,000
-    rows each, it named the direction as often as the code published with the paper, with either
-    criterion, and the likelihood criterion, the default, named all 160 right; :func:`~andrey.loci`
-    was as accurate by the paired interval on every set but the most skewed location-scale one, 15
-    of 20 against 20, in under a second. A pair took 15 to 22 CPU minutes on an AMD EPYC 9534 (the
-    median of each set); ``andrey.config(n_jobs)`` runs its searches on threads, which cuts the wall
-    time.
+    paper's skewed additive and location-scale pairs and on Gaussian location-scale pairs, it named
+    the direction as often as the code published with the paper, with either criterion, and the
+    likelihood criterion, the default, named every pair right; :func:`~andrey.loci` was as accurate
+    on every set but the most skewed location-scale one, in a fraction of the time. A pair is slow
+    to fit; ``andrey.config(n_jobs)`` runs its searches on threads, which cuts the wall time.
 
     In each direction, the effect given the cause is skew-normal with location ``f``, scale ``g``,
     and one shape ``lambda`` for every row; ``f`` is a cubic B-spline of 12 knots (14 columns) and
@@ -1067,15 +980,8 @@ def skewd(
     HSIC test of :func:`~andrey.loci`: Gaussian kernels, each bandwidth the median distance between
     the rows, and a gamma approximation of the null distribution [2]_. The larger p-value decides,
     as the paper says, and ``alpha`` acts as for :func:`~andrey.loci`. Both criteria read the same
-    two fits, so they cost the same. ``"likelihood"`` favors accuracy on location-scale pairs: it
-    was right on all 160 measured pairs, against 154 for ``"independence"``, which fell to 17 of 20
-    on Gaussian location-scale pairs; it gives up a p-value and accuracy on pairs whose marginals
-    are not Gaussian, as it assumes Gaussian marginals of the standardized variables: on the
-    paper's 13 established pair benchmarks the likelihood averaged 77% right against 85% for the
-    independence test, and 46% against 67% on the Tübingen pairs [1]_. ``"independence"`` favors
-    robustness across such benchmarks and gives a p-value, which ``alpha`` can test at a level.
-    Both directions draw their random numbers from the same ``seed``, so swapping the
-    columns swaps the fits.
+    two fits, so they cost the same; ``criterion`` gives what each favors. Both directions draw
+    their random numbers from the same ``seed``, so swapping the columns swaps the fits.
 
     ``n_jobs`` above 1 (``andrey.config`` or ``ANDREY_N_JOBS``) runs the two directions, and the
     searches of each, on that many threads. Each search draws from its own random stream,
@@ -1091,17 +997,13 @@ def skewd(
     no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
     they are a selected sample that more rows do not correct.
 
-    **Limitations.** A fit at the defaults runs about 490 searches in each direction, 8 folds for
-    each of the ``tuning_iter`` penalty settings and 9 final starts, so ``tuning_iter`` sets most of
-    its cost; the `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#skewd>`_
-    has the measured times. Each HSIC test builds matrices with one row and one column per sample.
-    The skew-normal's skewness lies within about -1 and 1, so noise more skewed than that is
-    misspecified [1]_. A change of units by a factor that is not a power of two changed no edge in
-    120 refits of 20 pairs (80 to 150 rows, ``tuning_iter=3``) and moved 2 of the 240 likelihoods by
-    more than ``1e-6`` (both by 0.014, on a pair with no direction), so an edge can change only
-    where the two directions already lie within what another ``seed`` changes. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    **Limitations.** It was ahead of :func:`~andrey.loci`, its model with Gaussian noise, only on
+    the most skewed location-scale pairs; on most other pair sets LOCI was as accurate, in a
+    fraction of the time. On established pair benchmarks, such as the Tübingen pairs, its paper
+    reports the default likelihood criterion right less often than ``criterion="independence"``
+    [1]_. ``tuning_iter`` sets most of its cost. The
+    `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#skewd>`__ has the
+    numbers.
 
     References
     ----------
@@ -1297,21 +1199,12 @@ def rcd(
     it. Drop the incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Measured on simulated linear data with uniform noise from Erdos-Renyi graphs in
-    which one node in five is hidden (at least one), the hidden ones counted among the variables, on
-    4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through which its median endpoint
-    errors against the PAG of the observed variables stayed below the empty graph's, and through
-    which its fits finished within the caps, were 30 and 40 variables at mean degree 2 with 10,000
-    rows; none and 60 at mean degree 2 with 2,000 rows (below it only from 10 through 30); none and
-    20 at mean degree 4 with 10,000 rows (below it only from 10 through 20); and none and 10 at mean
-    degree 4 with 2,000 rows. At 40 variables (mean degree 2, 10,000 rows), 2 of 10 fits ran out of
-    memory. The ladders ended after two sizes in a row did not beat the empty graph, except at mean
-    degree 2 with 10,000 rows, where the ladder ended when three fits of the next size ran out of
-    the 28 GB, and at mean degree 4 with 10,000 rows, where the ladder ended when three fits of the
-    next size ran past 1 h. The median fit took 45 s at 60 variables (mean degree 2, 2,000 rows).
-    The work grows with the number of variables and with ``max_depth``. The numbers are a
-    reference, not a hard limit: they change with the data generator, the density, the method's
-    settings, and the machine.
+    **Limitations.** On linear data with uniform noise in which some nodes are hidden it made fewer
+    errors than the empty graph on small sparse graphs, but on denser graphs only on small ones with
+    many rows, and its time and memory grow fast with the number of variables and with
+    ``max_depth``. The
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
+    every size.
 
     References
     ----------
@@ -1443,19 +1336,11 @@ def bottom_up_parce_lingam(
     it. Drop the incomplete rows yourself, which suits values missing completely at random, or use
     :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Measured on simulated linear data with uniform noise from Erdos-Renyi graphs in
-    which one node in five is hidden (at least one), the hidden ones counted among the variables, on
-    4 cores with a cap of 1 h and 28 GB per fit. The largest sizes through which its median endpoint
-    errors against the PAG of the observed variables stayed below the empty graph's, and through
-    which its fits finished within the caps, were 10 and 20 variables at mean degree 2 with 2,000 or
-    10,000 rows; none and 20 at mean degree 4 with 10,000 rows (below it only from 10 through 20);
-    and none and 20 at mean degree 4 with 2,000 rows (below it only at 10). The ladders ended after
-    two sizes in a row did not beat the empty graph, except at mean degree 4 with 10,000 rows, where
-    the ladder ended when three fits of the next size ran past 1 h. The median fit took 1,902 s at
-    20 variables (mean degree 4, 10,000 rows). On the same data with 2,000 rows, from 16 observed
-    variables it left none of the confounded pairs unordered. The numbers are a reference, not a
-    hard limit: they change with the data generator, the density, the method's settings, and the
-    machine.
+    **Limitations.** On linear data with uniform noise in which some nodes are hidden it made fewer
+    errors than the empty graph only on the smallest graphs, and a little further on denser graphs
+    with many rows. The
+    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
+    every size.
 
     References
     ----------
