@@ -1829,6 +1829,36 @@ html[data-theme="dark"] .bd-content div.cell_output img {
   font-weight: 500;
 }
 
+/* A notebook's dataframe keeps the documentation tables' spacing: every cell on one line with
+   room around it, and a table wider than the column scrolls inside its output, not squeezed. */
+.bd-content div.cell_output .text_html:has(table.dataframe) {
+  overflow-x: auto;
+}
+
+.bd-content div.cell_output table.dataframe {
+  width: auto;
+  margin: 0.25rem 0;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bd-content div.cell_output table.dataframe :is(th, td) {
+  padding: 0.4rem 0.75rem;
+}
+
+/* Values sit right, under their right-aligned column labels, so the digits line up. */
+.bd-content div.cell_output table.dataframe :is(td, thead th) {
+  text-align: right;
+}
+
+.bd-content div.cell_output table.dataframe tbody th {
+  color: var(--andrey-muted);
+  font-weight: 500;
+}
+
 /* ---------- the AI statement ---------- */
 /* The last paragraph of a post or a release card: how AI tools were used to write it
    (docs/conf.py, _ai_statement), in a box of the cards' surface, hairline, and radius. */
