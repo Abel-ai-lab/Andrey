@@ -473,6 +473,75 @@ def test_fast_iamb_keeps_a_dependent_candidate_whose_last_test_was_not_tested():
     assert not search.undecided
 
 
+def _sparse_chain(seed: int = 2, n: int = 55) -> pd.DataFrame:
+    """Binary ``T -> v2 -> v1`` and ``T -> v3``, with ``v4``, three levels, a parent of ``v2``;
+    ``v2`` is observed on the first 35 rows and ``v3`` on the others, so the two are never observed
+    together."""
+    rng = np.random.default_rng(seed)
+    t = rng.integers(0, 2, n)
+    v4 = rng.choice(3, n, p=[0.45, 0.4, 0.15])
+    v2 = t ^ (v4 == 2)
+    v1 = v2 ^ (rng.random(n) < 0.1)
+    v3 = t ^ (rng.random(n) < 0.15)
+    df = pd.DataFrame({"T": t, "v1": v1, "v2": v2, "v3": v3, "v4": v4}).astype(float)
+    df.loc[35:, "v2"] = np.nan
+    df.loc[:34, "v3"] = np.nan
+    return df
+
+
+def test_fast_iamb_keeps_a_candidate_not_tested_when_the_sparse_table_rule_ends_the_search():
+    """v3 tests dependent on T alone and is not tested given v2; v4, dependent given v2, fails the
+    sparse-table rule, which ends the search. No test with rows separated v3, so it stays, as in
+    IAMB; v4 is taken as independent, as the rule says."""
+    df = _sparse_chain()
+    fast = andrey.fast_iamb(df, target="T", indep_test="chisq").metadata
+    assert andrey.iamb(df, target="T", indep_test="chisq").metadata["markov_blanket"] == [
+        "v2",
+        "v4",
+        "v3",
+    ]
+    assert fast["markov_blanket"] == ["v2", "v3"]
+    assert fast["undecided_pairs"] == []
+
+
+def test_fast_iamb_keeps_a_candidate_not_tested_when_its_blanket_repeats():
+    """Binary columns, 50 rows: the sparse-table rule admits two members. Round one adds 1 and 2
+    and keeps 3 out; the shrinks then move the blanket from 2 to 4 to 5 and back to 2, which ends
+    the search. 3, dependent on 0 alone, is not tested given any of them, and no test separated
+    it: it stays."""
+    answers = {
+        **{(1, ()): 0.001, (2, ()): 0.002, (3, ()): 0.003, (4, ()): 0.01, (5, ()): 0.02},
+        **{(1, (2,)): 0.5, (4, (2,)): 0.001, (5, (2,)): 0.5},
+        **{(2, (4,)): 0.5, (5, (4,)): 0.001, (2, (5,)): 0.001, (4, (5,)): 0.5},
+    }
+    search = LocalSearch(_oracle(answers), range(6), 0.05, levels=np.full(6, 2), n=50)
+    assert search.run("fast_iamb", 0) == ([2, 3], {1: (2,), 4: (5,), 5: (2,)})
+    assert not search.undecided
+
+
+def test_inter_iamb_keeps_a_candidate_not_tested_when_its_blanket_repeats():
+    """2 joins; given 2, 3 joins and 1 is not tested; the shrink drops both, and 2 joins again,
+    which ends the search. 1 tests dependent on 0 alone and no test separated it: it stays, as in
+    IAMB."""
+    answers = {(1, ()): 0.0067, (2, ()): 0.0002, (3, ()): 0.0575, (3, (2,)): 0.0458}
+    answers[2, (3,)] = 0.2262
+    search = LocalSearch(_oracle(answers), range(4), 0.05)
+    assert search.run("inter_iamb", 0) == ([2, 1], {3: ()})
+    assert search.run("iamb", 0)[0] == [2, 3, 1]
+
+
+def test_inter_iamb_keeps_out_a_candidate_a_shrink_separated():
+    """1, 2, and 3 join; the shrink drops 1 given 2 and 3, then 2 given 3, and 1 is not tested
+    given 3 after: the shrink's test separated it, so it stays out, as in IAMB."""
+    answers = {
+        **{(1, ()): 0.001, (2, ()): 0.002, (3, ()): 0.003, (2, (1,)): 0.001, (1, (2,)): 0.001},
+        **{(3, (1, 2)): 0.001, (1, (2, 3)): 0.5, (2, (3,)): 0.5},
+    }
+    for name in ("inter_iamb", "iamb"):
+        search = LocalSearch(_oracle(answers), range(4), 0.05)
+        assert search.run(name, 0) == ([3], {1: (2, 3), 2: (3,)})
+
+
 def test_fast_iamb_leaves_out_a_candidate_no_test_with_rows_decided():
     """3 is never tested: it is undecided, and the member 1 is flagged beside it."""
     search = LocalSearch(_oracle({(1, ()): 0.0, (2, ()): 0.5}), [0, 1, 2, 3], 0.05)

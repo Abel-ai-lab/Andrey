@@ -240,10 +240,7 @@ def markov_blanket(
 
     Grow: add the candidate most dependent on ``target`` given the current blanket, among those
     whose p-value is at or below ``alpha``, until none is; a p-value strength is compared to
-    ``KEY_DP`` significant digits; then add, in rank order, each candidate whose test given the
-    blanket was not tested and that no earlier test separated, since a test without rows separates
-    no pair; a candidate with no test that had rows, as one never observed with ``target``, is
-    undecided and left out (:func:`_count_beside_undecided`).
+    ``KEY_DP`` significant digits.
     Shrink: visit the members in the order they joined and drop each one
     the test finds independent of ``target`` (a p-value above ``alpha``) given the other current
     members. IAMB
@@ -252,6 +249,11 @@ def markov_blanket(
     ends. Every grow test conditions on
     the whole blanket, so with ``max_depth`` the grow phase also stops once the blanket holds more
     than ``max_depth`` members, and every test conditions on at most ``max_depth`` variables.
+    When the grow stops short of that cap, each candidate whose test given the final blanket was
+    not tested and that no test with rows separated, a shrink's included, joins in rank order,
+    since a test without rows separates no pair; Inter-IAMB then shrinks once more. A candidate
+    with no test that had rows, as one never observed with ``target``, is undecided and left out
+    (:func:`_count_beside_undecided`).
     Returns the members in the order they joined.
 
     With ``constraints``, each variable a required edge joins to ``target`` is a member from the
@@ -284,8 +286,11 @@ def _grow_shrink(
     required = _required(constraints, target, search.ranks)
     blanket: list[int] = list(required)
     seen: set[frozenset[int]] = set()
-    separated: set[int] = set()
+    separated: set[int] = set()  # the candidates a test with rows found independent, a shrink's too
     decided: set[int] = set()  # the candidates with a test that had rows
+    # The candidates not tested given each blanket a grow step scanned.
+    untested: dict[frozenset[int], list[int]] = {}
+    capped = True
     while max_depth is None or len(blanket) <= max_depth:
         candidates = [x for x in range(search.d) if x != target and x not in blanket]
         strengths, pvalues = search.scan(target, candidates, blanket)
@@ -297,27 +302,28 @@ def _grow_shrink(
             sepsets.update((candidates[i], given) for i in apart)
         missing = not_tested(pvalues).tolist()
         decided.update(x for x, m in zip(candidates, missing, strict=True) if not m)
+        untested[frozenset(blanket)] = [x for x, m in zip(candidates, missing, strict=True) if m]
         if not dependent:
-            # A candidate whose blanket test was not tested stays if no earlier test separated it: a
-            # test without rows separates no pair. One with no tested query, such as a variable
-            # never observed with the target, is undecided and left out.
-            stay = [
-                x
-                for x, m in zip(candidates, missing, strict=True)
-                if m and x in decided and x not in separated
-            ]
-            blanket.extend(sorted(stay, key=lambda x: search.ranks[x]))
-            if interleaved and stay:
-                _shrink(search, target, blanket, required, sepsets)
+            capped = False
             break
         xs = [candidates[i] for i in dependent]
         blanket.append(search.by_strength(xs, strengths[dependent])[0])
         if interleaved:
-            _shrink(search, target, blanket, required, sepsets)
+            separated.update(_shrink(search, target, blanket, required, sepsets))
             state = frozenset(blanket)
             if state in seen:
+                capped = False
                 break
             seen.add(state)
+    if not capped:
+        # A candidate whose test given the final blanket was not tested stays if a test with rows
+        # asked it and none separated it: a test without rows separates no pair. One with no tested
+        # query, such as a variable never observed with the target, is undecided and left out. A
+        # repeated blanket was scanned when it first held, so its candidates' answers are known.
+        stay = [x for x in untested[frozenset(blanket)] if x in decided and x not in separated]
+        blanket.extend(sorted(stay, key=lambda x: search.ranks[x]))
+        if interleaved and stay:
+            _shrink(search, target, blanket, required, sepsets)
     if shrink and not interleaved:
         _shrink(search, target, blanket, required, sepsets)
     if sepsets is not None:
@@ -363,18 +369,21 @@ def _shrink(
     blanket: list[int],
     keep: Sequence[int] = (),
     sepsets: Sepsets | None = None,
-) -> None:
+) -> list[int]:
     """Drop, in place and in joining order, each member independent of ``target`` given the rest;
     the members in ``keep`` are not tested. With ``sepsets``, a dropped member's entry is set to the
-    rest."""
+    rest. Returns the members dropped."""
+    dropped = []
     for x in list(blanket):
         if x in keep:
             continue
         rest = [z for z in blanket if z != x]
         if search.scan(target, [x], rest)[1][0] > search.alpha:
             blanket.remove(x)
+            dropped.append(x)
             if sepsets is not None:
                 sepsets[x] = tuple(sorted(rest))
+    return dropped
 
 
 def _gs(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
@@ -507,11 +516,12 @@ def _fast_iamb(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     removals the paper does not guard against.
 
     A test without the rows it needs (:func:`~andrey.core.ci_missing.not_tested`) separates no pair
-    and adds no member, as in :func:`markov_blanket`: when no variable tests dependent, each
-    candidate whose test given the blanket was not tested, that a test with rows asked and none
-    separated, a shrink's included, joins in rank order while the blanket holds at most
-    ``max_depth`` members, and one shrink pass follows; a candidate with no test that had rows, as
-    one never observed with ``target``, is undecided and left out (:func:`_count_beside_undecided`).
+    and adds no member, as in :func:`markov_blanket`: when the search stops for any reason but the
+    ``max_depth`` cap, each candidate whose test given the final blanket was not tested, that a
+    test with rows asked and none separated, a shrink's included, joins in rank order while the
+    blanket holds at most ``max_depth`` members, and one shrink pass follows; a candidate with no
+    test that had rows, as one never observed with ``target``, is undecided and left out
+    (:func:`_count_beside_undecided`).
 
     ``max_depth``, ``constraints``, and ``sepsets`` act as in :func:`markov_blanket`: a batch stops
     once the blanket holds more than ``max_depth`` members, and the search stops while it does, so
@@ -527,6 +537,9 @@ def _fast_iamb(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     blanket: list[int] = list(required)
     seen: set[frozenset[int]] = set()
     decided: set[int] = set()  # the candidates with a test that had rows
+    # The candidates not tested given each blanket a round scanned.
+    untested: dict[frozenset[int], list[int]] = {}
+    stay: list[int] = []  # the candidates not tested given the blanket the search ends on
     while max_depth is None or len(blanket) <= max_depth:
         candidates = [x for x in range(search.d) if x != target and x not in blanket]
         strengths, pvalues = search.scan(target, candidates, blanket)
@@ -534,22 +547,12 @@ def _fast_iamb(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
         sepsets.update((candidates[i], given) for i in np.flatnonzero(pvalues > alpha).tolist())
         missing = not_tested(pvalues).tolist()
         decided.update(x for x, m in zip(candidates, missing, strict=True) if not m)
+        now = untested[frozenset(blanket)] = [
+            x for x, m in zip(candidates, missing, strict=True) if m
+        ]
         dependent = np.flatnonzero(pvalues <= alpha).tolist()
         if not dependent:
-            # A candidate whose test given the blanket was not tested stays if a test with rows
-            # asked it and none separated it, a shrink included (every such test set its entry in
-            # sepsets), as in markov_blanket; one with no test that had rows is undecided.
-            stay = [
-                x
-                for x, m in zip(candidates, missing, strict=True)
-                if m and x in decided and x not in sepsets
-            ]
-            for x in sorted(stay, key=lambda x: search.ranks[x]):
-                if max_depth is not None and len(blanket) > max_depth:
-                    break
-                blanket.append(x)
-            if stay:
-                _shrink(search, target, blanket, required, sepsets)
+            stay = now
             break
         batch = search.by_strength([candidates[i] for i in dependent], strengths[dependent])
         insufficient = False
@@ -564,11 +567,27 @@ def _fast_iamb(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
         before = len(blanket)
         _shrink(search, target, blanket, required, sepsets)
         if insufficient and len(blanket) == before:
+            # The blanket holds the round's and the batch's members: a query not tested given the
+            # round's blanket has fewer rows still given more.
+            stay = now
             break
         state = frozenset(blanket)
         if state in seen:
+            stay = untested[state]  # scanned when it first held
             break
         seen.add(state)
+    # A candidate whose test given the final blanket was not tested stays if a test with rows asked
+    # it and none separated it, a shrink included (every such test set its entry in sepsets), as in
+    # markov_blanket; one with no test that had rows is undecided. The max_depth cap keeps none.
+    joined = False
+    for x in sorted(stay, key=lambda x: search.ranks[x]):
+        if max_depth is not None and len(blanket) > max_depth:
+            break
+        if x in decided and x not in sepsets:
+            blanket.append(x)
+            joined = True
+    if joined:
+        _shrink(search, target, blanket, required, sepsets)
     for x in blanket:
         sepsets.pop(x, None)
     undecided = [
