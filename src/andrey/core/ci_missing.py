@@ -61,6 +61,7 @@ from .ci import (
     StudentT,
     _canonical,
     count_tests,
+    counting_tests,
     p_value_statistics,
     per_query,
 )
@@ -654,9 +655,11 @@ class TestwiseDeletion:
         ``test`` is the test over the query's block, and ``a``, ``b``, and ``s`` the query's
         columns as indices of that block; the answer's last entry is the p-value. The query's row
         count, and whether its p-value is ``1``, or that it was not tested, enter the running
-        :func:`rows_tested` counter once it is answered, the same for every test. A copies error
-        names the data's columns, and another error of the test on its block, or a p-value that is
-        not a number, raises ``ValueError`` saying how many rows the block holds.
+        :func:`rows_tested` counter once it is answered, the same for every test; a query not
+        tested, zero degrees of freedom included, counts in no
+        :func:`~andrey.core.ci.counting_tests` count. A copies error names the data's columns, and
+        another error of the test on its block, or a p-value that is not a number, raises
+        ``ValueError`` saying how many rows the block holds.
         """
         test, columns, rows = self._block_test(x, y, cond)
         counter = _ROWS.get()
@@ -666,13 +669,15 @@ class TestwiseDeletion:
             return untested
         at = {c: i for i, c in enumerate(columns)}
         try:
-            out = ask(test, at[x], at[y], [at[c] for c in cond])
+            with counting_tests() as computed:
+                out = ask(test, at[x], at[y], [at[c] for c in cond])
         except SingularCorrelationError as error:
             raise _in_data_columns(error, columns) from error
         except (ValueError, ArithmeticError) as error:
             raise self._failed(rows, f": {error}") from error
         p = np.asarray(out[-1] if isinstance(out, tuple) else out, dtype=np.float64)
         if not_tested(p).all() and hasattr(test, "zero_dof_pvalue"):  # zero degrees of freedom
+            count_tests(-computed.n)  # not tested: counted in not_tested only
             if counter is not None:
                 self._count(counter, [rows], [NOT_TESTED], np.array([[x, y]]), [cond])
             return untested
@@ -1065,10 +1070,10 @@ class GaussianDeletion(PartialCorrelationDeletion):
         and ``conds[k]`` its conditioning set. ``r`` and ``p`` hold fast answers, :data:`NOT_TESTED`
         for insufficient rows, replaced in place by exact answers; ``rows`` holds row counts.
         Queries are counted in order, so errors follow preceding queries as in the exact path's
-        loop. The fast answers count as tests here (:func:`count_tests`), and the exact path's test
-        counts its own.
+        loop. The fast answers that were tested count as tests here (:func:`count_tests`), and the
+        exact path's test counts its own; a query not tested counts in no test count.
         """
-        count_tests(len(flagged) - int(np.count_nonzero(flagged)))
+        count_tests(int(np.count_nonzero(~flagged & ~not_tested(p))))
         counter = _ROWS.get()
         start = 0
         for k in np.flatnonzero(flagged).tolist():

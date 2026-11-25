@@ -216,3 +216,64 @@ def test_the_count_does_not_depend_on_the_column_order(method):
     assert fit(x).metadata["n_tests"] == fit(x[:, order]).metadata["n_tests"]
     t = int(np.flatnonzero(order == 2)[0])
     assert fit(x, target=2).metadata["n_tests"] == fit(x[:, order], target=t).metadata["n_tests"]
+
+
+def _never_together(name: str) -> tuple[np.ndarray, np.ndarray | None]:
+    """``data_for(name, gaps=True)`` with columns 0 and 1 never observed together."""
+    x, mask = data_for(name, gaps=True)
+    x[: N // 2, 0] = np.nan
+    x[N // 2 :, 1] = np.nan
+    return x, mask
+
+
+@pytest.mark.filterwarnings("ignore::andrey.SampleSizeWarning")
+@pytest.mark.parametrize("name", SHIPPED_INDEP_TESTS)
+def test_a_query_not_tested_counts_in_no_test_count(name):
+    """A query without the rows its test needs is counted in ``not_tested`` alone, on every path;
+    the tested queries of the same call count one test each."""
+    if name in ("kci", "gpdc", "cmiknn"):
+        pytest.skip("slow on missing values; the wrapper is the one the other tests take")
+    x, mask = _never_together(name)
+    test = make_indep_test(name, x, categorical=mask, seed=0)
+    with counting_tests() as tests, rows_tested() as rows:
+        p = [test(0, 1, [2]), test(0, 2, [3])]
+    assert np.isnan(p[0]) and np.isfinite(p[1])
+    assert tests.n == 1 and rows.total_not_tested() == 1
+    for path, (call, queries) in PATHS.items():
+        if hasattr(test, path) and path != "residual_statistic_pvalues":
+            with counting_tests() as tests, rows_tested() as rows:
+                call(test)
+            assert tests.n == sum(rows.values()) == queries - rows.total_not_tested(), path
+
+
+@pytest.mark.parametrize("name", ["chisq", "gsq", "degen_gauss", "cond_gauss"])
+def test_a_query_with_zero_degrees_of_freedom_counts_in_no_test_count(name):
+    """A categorical column with one category on a query's rows leaves no degrees of freedom: the
+    query is not tested and counts in ``not_tested`` alone."""
+    x, mask = data_for(name, gaps=True)
+    x[: N // 2, 2] = x[N // 2, 2]  # one category of column 2 on the rows that observe column 3
+    x[N // 2 :, 3] = np.nan
+    test = make_indep_test(name, x, categorical=mask, seed=0)
+    with counting_tests() as tests, rows_tested() as rows:
+        p = test(2, 3)
+    assert np.isnan(p) and tests.n == 0 and rows.total_not_tested() == 1
+
+
+@pytest.mark.parametrize(
+    "method",
+    ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb", "pcmb"],
+)
+def test_a_search_counts_only_the_tests_that_ran(method):
+    """With a pair never observed together, a test-wise deletion search counts the queries it
+    tested, each of which read its rows once, and a target's ``n_tests`` is that count; the queries
+    not tested count in ``not_tested`` alone."""
+    x, _ = _never_together("fisherz")
+    with rows_tested() as rows, counting_tests() as tests:
+        local_structure(x, method, "moral", alpha=0.05, indep_test="fisherz")
+    assert rows.total_not_tested() > 0
+    assert tests.n == sum(rows.values())
+    with rows_tested() as rows, counting_tests() as tests:
+        local_set(x, method, 0, alpha=0.05, indep_test="fisherz")
+    out = getattr(andrey, method)(x, target=0, alpha=0.05, max_depth=None)
+    assert rows.total_not_tested() > 0
+    assert out.metadata["n_tests"] == tests.n == sum(rows.values())

@@ -1117,9 +1117,10 @@ likewise rebuilt for each query.
 `iamb`, `inter_iamb`, `gs`, `fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`,
 `cmb`, `mmb_by_mmb`, and `local_optimal_adjustment` record in `metadata["n_tests"]` how many tests
 the fit evaluated: one for each query whose p-value a test computed, so a query answered again from
-a kept answer, as the chi-square tests keep their marginal answers, is not a new test. A query a
-test computes together with others counts as well, even when the search reads only some of the
-answers. To count the tests in your own code, run it inside
+a kept answer, as the chi-square tests keep their marginal answers, is not a new test, and a query
+not tested, for too few rows or zero degrees of freedom, counts only in `metadata["not_tested"]`. A
+query a test computes together with others counts as well, even when the search reads only some of
+the answers. To count the tests in your own code, run it inside
 {py:func}`~andrey.core.ci.counting_tests`; a test you register counts the queries it reports through
 {py:func}`~andrey.core.ci.count_tests`.
 
