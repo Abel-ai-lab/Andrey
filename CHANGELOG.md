@@ -349,6 +349,13 @@ names its pull request.
 
 ### Fixed
 
+- `mmb_by_mmb`, and `mb_by_mb`, `ldecc`, and `local_optimal_adjustment` with
+  `blanket="total_conditioning"`, check their rows before any test when the test is a
+  partial-correlation test: total conditioning conditions every test on all the other variables, so
+  the data needs at least `d + 2` rows with every variable observed. Below that they raise a
+  `ValueError` that names the requirement and suggests another blanket learner, where they raised
+  the test's degrees-of-freedom message; a `max_depth` below `d - 2` runs no test and needs no rows.
+  ([#1081])
 - The treatment-outcome benchmark lane scores the effect error of the pair asked. For a method that
   answers both directions of a pair, the summary reads the record for the treatment and the outcome
   asked, not the last record of the fit, and a record that says the effect is zero estimates 0
@@ -3332,3 +3339,4 @@ First alpha release.
 [#1053]: https://github.com/Abel-ai-lab/Andrey/pull/1053
 [#1060]: https://github.com/Abel-ai-lab/Andrey/issues/1060
 [#1071]: https://github.com/Abel-ai-lab/Andrey/pull/1071
+[#1081]: https://github.com/Abel-ai-lab/Andrey/pull/1081

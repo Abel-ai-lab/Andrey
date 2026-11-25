@@ -163,9 +163,12 @@ observed value, or a constant one over its observed values, raises a `ValueError
 test needs, where its variables are observed, `|S| + 4` rows for `"fisherz"` and `"normal_scores"`,
 `|S| + 3` for `"student_t"` and `"cond_gauss"`, 4 for `"gcm"` and for `"wgcm"` with `variant="fix"`,
 17 for `"wgcm"`'s default `variant="est"`, 12 for `"pcm"`, and 2 for most other tests; a test with
-fewer is not tested. `cdnod` and `fci_jci` need a complete `env`. Every other method raises a
-`ValueError` that names it and says what to do instead, as the
-[Missing values](guides/missing-values.md) guide describes; each method's Notes say why.
+fewer is not tested. With a partial-correlation test (`"fisherz"`, `"student_t"`, or
+`"normal_scores"`), the `"total_conditioning"` blanket learner needs `d + 2` rows with every
+variable observed and raises before the fit without them, unless `max_depth` is below `d - 2` or
+there is one column, where it runs no such test. `cdnod` and `fci_jci` need a complete `env`. Every
+other method raises a `ValueError` that names it and says what to do instead, as the [Missing
+values](guides/missing-values.md) guide describes; each method's Notes say why.
 
 % concept: n_em_iterations
 `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm` take
