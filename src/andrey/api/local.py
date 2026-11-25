@@ -214,8 +214,8 @@ def mb_by_mb(
     -------
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
-        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
-        target's result counts. Otherwise, wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`
+        alone gives it, ``metadata["n_tests"]`` included. Otherwise, wraps a ``cpdag``
+        :class:`~andrey.core.GraphStructure`
         over every column holding only the
         edges at ``target``: ``x -> target`` for a direct cause, ``target -> x`` for a direct
         effect, and ``x - target`` where the CPDAG leaves the direction undecided. An absent edge
@@ -532,8 +532,8 @@ def mmb_by_mmb(
     -------
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
-        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
-        target's result counts. Otherwise, wraps a ``pag`` :class:`~andrey.core.GraphStructure`
+        alone gives it, ``metadata["n_tests"]`` included. Otherwise, wraps a ``pag``
+        :class:`~andrey.core.GraphStructure`
         over every column holding only the
         edges at ``target``, with their marks: ``x -> target`` for a direct cause, ``target -> x``
         for a direct effect, ``x <-> target`` where a hidden common cause joins them and neither
@@ -839,8 +839,8 @@ def cmb(
     -------
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
-        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
-        target's result counts. Otherwise, wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`
+        alone gives it, ``metadata["n_tests"]`` included. Otherwise, wraps a ``cpdag``
+        :class:`~andrey.core.GraphStructure`
         over every column holding only the
         edges at ``target``: ``x -> target`` for a direct cause, ``target -> x`` for a direct
         effect, and ``x - target`` where the direction is left undecided. An absent edge away from

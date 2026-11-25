@@ -280,8 +280,8 @@ def iamb(
     -------
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
-        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
-        target's result counts. Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
+        alone gives it, ``metadata["n_tests"]`` included. Without ``target``, wraps the graph
+        ``structure`` names: a ``cpdag``
         :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
         cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
         and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
@@ -607,8 +607,8 @@ def inter_iamb(
     -------
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
-        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
-        target's result counts. Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
+        alone gives it, ``metadata["n_tests"]`` included. Without ``target``, wraps the graph
+        ``structure`` names: a ``cpdag``
         :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
         cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
         and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
@@ -915,8 +915,8 @@ def gs(
     -------
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
-        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
-        target's result counts. Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
+        alone gives it, ``metadata["n_tests"]`` included. Without ``target``, wraps the graph
+        ``structure`` names: a ``cpdag``
         :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
         cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
         and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
@@ -1214,8 +1214,8 @@ def fast_iamb(
     -------
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
-        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
-        target's result counts. Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
+        alone gives it, ``metadata["n_tests"]`` included. Without ``target``, wraps the graph
+        ``structure`` names: a ``cpdag``
         :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
         cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
         and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
@@ -1528,8 +1528,8 @@ def mmpc(
     -------
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
-        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
-        target's result counts. Without ``target``, wraps the graph ``structure`` names: an
+        alone gives it, ``metadata["n_tests"]`` included. Without ``target``, wraps the graph
+        ``structure`` names: an
         ``undirected``
         :class:`~andrey.core.GraphStructure` for ``"skeleton"``, whose edges have no arrowhead and
         join each pair in each other's set, or a ``cpdag`` one for ``"cpdag"``, whose undirected
@@ -1842,8 +1842,8 @@ def hiton_pc(
     -------
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
-        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
-        target's result counts. Without ``target``, wraps the graph ``structure`` names: an
+        alone gives it, ``metadata["n_tests"]`` included. Without ``target``, wraps the graph
+        ``structure`` names: an
         ``undirected``
         :class:`~andrey.core.GraphStructure` for ``"skeleton"``, whose edges have no arrowhead and
         join each pair in each other's set, or a ``cpdag`` one for ``"cpdag"``, whose undirected
@@ -2148,8 +2148,8 @@ def hiton_mb(
     -------
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
-        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
-        target's result counts. Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
+        alone gives it, ``metadata["n_tests"]`` included. Without ``target``, wraps the graph
+        ``structure`` names: a ``cpdag``
         :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
         cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
         and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
@@ -2449,8 +2449,8 @@ def mmmb(
     -------
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
-        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
-        target's result counts. Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
+        alone gives it, ``metadata["n_tests"]`` included. Without ``target``, wraps the graph
+        ``structure`` names: a ``cpdag``
         :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
         cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
         and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
@@ -2753,8 +2753,8 @@ def pcmb(
     -------
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
-        alone gives it, except that ``metadata["n_tests"]`` counts only the tests no earlier
-        target's result counts. Without ``target``, wraps the graph ``structure`` names: a ``cpdag``
+        alone gives it, ``metadata["n_tests"]`` included. Without ``target``, wraps the graph
+        ``structure`` names: a ``cpdag``
         :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
         cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
         and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
