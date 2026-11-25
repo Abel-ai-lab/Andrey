@@ -1314,15 +1314,15 @@ def camuv(
     **When to use.** CAM-UV suits i.i.d. continuous observational data whose effects are nonlinear
     and additive in the causes, with independent noise of any distribution, where any number of
     causes may be unmeasured, none included [1]_; with none unmeasured every ``o-o`` pair it marks
-    is false. With many of the nodes hidden its directed edges were no better than the empty graph's
-    (**Limitations**). Its kernel independence tests compare every pair of rows, and its search
-    tests sets of up to ``max_depth + 1`` variables, so it suits a moderate number of variables and
-    rows. It returns a PAG: ``i -> j`` for a direct cause and ``i o-o j`` for a pair that shares a
-    hidden common cause or of which one causes the other through a hidden variable, which the method
-    does not tell apart. With linear effects, a path through a hidden variable can be regressed away
-    and the pairs are identified differently: use :func:`~andrey.rcd` for non-Gaussian noise and
-    :func:`~andrey.fci` for Gaussian noise. Without hidden variables, :func:`~andrey.cam` and
-    :func:`~andrey.resit` also give a causal order.
+    is false. With a sizable share of the nodes hidden, its directed edges were no better than the
+    empty graph's (**Limitations**). Its kernel independence tests compare every pair of rows, and
+    its search tests sets of up to ``max_depth + 1`` variables, so it suits a moderate number of
+    variables and rows. It returns a PAG: ``i -> j`` for a direct cause and ``i o-o j`` for a pair
+    that shares a hidden common cause or of which one causes the other through a hidden variable,
+    which the method does not tell apart. With linear effects, a path through a hidden variable can
+    be regressed away and the pairs are identified differently: use :func:`~andrey.rcd` for
+    non-Gaussian noise and :func:`~andrey.fci` for Gaussian noise. Without hidden variables,
+    :func:`~andrey.cam` and :func:`~andrey.resit` also give a causal order.
 
     **The steps.** Every pair of variables is first tested for dependence; then come the paper's
     three steps, with its settings [1]_:
@@ -1390,17 +1390,17 @@ def camuv(
     yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** With many of the nodes hidden it made no fewer errors than the empty graph on
-    small graphs; with no variable hidden, every pair it marks ``o-o`` is false; and with linear
-    Gaussian effects it made more errors than the empty graph. With few hidden variables its errors
-    stay below the empty graph's on graphs of a few dozen observed variables and rise back toward it
-    as the graph grows, reaching it on graphs of hundreds of variables. A cause with a long tail, or
-    a single extreme value, can turn an edge into an ``o-o`` mark; replacing a long-tailed cause by
-    its ranks before the fit found the edge again in most fits. A column with fewer than 3 distinct
-    values, binary columns included, raises ``ValueError``, and integer category codes are read as
-    numbers, with a :class:`~andrey.DataTypeWarning`. Its cost grows with the square of the number
-    of variables, so large graphs are slow, and the time and memory of its kernel tests grow with
-    the square of ``n_samples``. The
+    **Limitations.** With a sizable share of the nodes hidden it made no fewer errors than the empty
+    graph on small graphs; with no variable hidden, every pair it marks ``o-o`` is false; and with
+    linear Gaussian effects it made more errors than the empty graph. With few hidden variables its
+    errors stay below the empty graph's on graphs of a few dozen observed variables and rise back
+    toward it as the graph grows, reaching it on graphs of hundreds of variables. A cause with a
+    long tail, or a single extreme value, can turn an edge into an ``o-o`` mark; replacing a
+    long-tailed cause by its ranks before the fit found the edge again in most fits. A column with
+    fewer than 3 distinct values, binary columns included, raises ``ValueError``, and integer
+    category codes are read as numbers, with a :class:`~andrey.DataTypeWarning`. Its cost grows with
+    the square of the number of variables, so large graphs are slow, and the time and memory of its
+    kernel tests grow with the square of ``n_samples``. The
     `0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#cam-uv>`_ has the
     numbers. The measured results are a reference, not a hard limit: they change with the data
     generator, the density, the method's settings, and the machine.

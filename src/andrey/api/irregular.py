@@ -499,10 +499,10 @@ def loci(
         simulated location-scale and additive-noise pairs and the synthetic sets of Tagasovska et
         al. (2020) [5]_, ``"independence"`` named the true direction on most pairs of every setting,
         and ``"likelihood"`` on nearly every pair with Gaussian noise, in a fraction of the time,
-        but on far fewer under Gumbel and Laplace noise. On the largest pairs measured every
-        ``"independence"`` fit ran out of memory, while ``"likelihood"`` finished quickly (the
+        but on far fewer under Gumbel and Laplace noise (the
         `0.16.0 release card <https://andrey.abel.ai/docs/benchmarks/0.16.0.html#loci>`__ has the
-        numbers).
+        numbers). On the largest pairs measured every ``"independence"`` fit ran out of memory,
+        while ``"likelihood"`` finished quickly.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
@@ -1025,9 +1025,8 @@ def skewd(
     paper's skewed additive and location-scale pairs and on Gaussian location-scale pairs, it named
     the direction as often as the code published with the paper, with either criterion, and the
     likelihood criterion, the default, named every pair right; :func:`~andrey.loci` was as accurate
-    on every set but the most skewed location-scale one, in a fraction of the time. A pair takes
-    minutes of CPU time; ``andrey.config(n_jobs)`` runs its searches on threads, which cuts the wall
-    time.
+    on every set but the most skewed location-scale one, in a fraction of the time. A pair is slow
+    to fit; ``andrey.config(n_jobs)`` runs its searches on threads, which cuts the wall time.
 
     In each direction, the effect given the cause is skew-normal with location ``f``, scale ``g``,
     and one shape ``lambda`` for every row; ``f`` is a cubic B-spline of 12 knots (14 columns) and

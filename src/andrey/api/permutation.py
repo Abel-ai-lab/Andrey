@@ -1098,8 +1098,8 @@ def igsp(
     edges out of that target. Where the objective ties the true DAG with a wrong one, fits with few
     starts repeat one result. Its time grows with the number of rows, fast with the number of
     variables, and on dense graphs with settings of more than one target: with many single-variable
-    settings, fits on hundreds of variables took many minutes, and on larger graphs none finished
-    within the time cap (the
+    settings, fits on hundreds of variables were slow, and on larger graphs none finished within the
+    time cap (the
     `0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#limits>`_). Unmeasured
     common causes are outside its model and not measured. One level serves both tests unless
     ``invariance_alpha`` is given. In :func:`~andrey.bootstrap`, the averaged graph is made a CPDAG
@@ -1764,8 +1764,8 @@ def boss_fci(
     Notes
     -----
     **When to use.** BOSS-FCI suits i.i.d. observational continuous data with linear effects and
-    Gaussian noise where unmeasured common causes are plausible [1]_. They pick BOSS's search for
-    its accuracy on densely connected graphs. It returns a PAG, and with ``env`` takes data from
+    Gaussian noise where unmeasured common causes are plausible [1]_. Its authors pick BOSS's search
+    for its accuracy on densely connected graphs. It returns a PAG, and with ``env`` takes data from
     several environments, as :func:`~andrey.fci_jci` does. When no common cause is hidden, use
     :func:`~andrey.boss`; :func:`~andrey.grasp_fci` runs the same steps with GRaSP's search, and
     :func:`~andrey.gfci` runs them with GES's search and a possible-d-separation step.
@@ -2108,11 +2108,11 @@ def grasp_fci(
     Notes
     -----
     **When to use.** GRaSP-FCI suits i.i.d. observational continuous data with linear effects and
-    Gaussian noise where unmeasured common causes are plausible [1]_. They describe GRaSP's search
-    as favoring sparse graphs, a trade of accuracy against time beside BOSS's. It returns a PAG, and
-    with ``env`` takes data from several environments, as :func:`~andrey.fci_jci` does. When no
-    common cause is hidden, use :func:`~andrey.grasp`; :func:`~andrey.boss_fci` runs the same steps
-    with BOSS's search, and :func:`~andrey.gfci` runs them with GES's search and a
+    Gaussian noise where unmeasured common causes are plausible [1]_. Its authors describe GRaSP's
+    search as favoring sparse graphs, a trade of accuracy against time beside BOSS's. It returns a
+    PAG, and with ``env`` takes data from several environments, as :func:`~andrey.fci_jci` does.
+    When no common cause is hidden, use :func:`~andrey.grasp`; :func:`~andrey.boss_fci` runs the
+    same steps with BOSS's search, and :func:`~andrey.gfci` runs them with GES's search and a
     possible-d-separation step.
 
     The steps are :func:`~andrey.boss_fci`'s, which follow the authors' Algorithm 5 [1]_, with the

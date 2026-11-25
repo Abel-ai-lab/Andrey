@@ -1190,8 +1190,7 @@ def jpcmciplus(
         column per step in the conditions of every test that takes it. Leaving it out favors long
         series and more system variables; it gives up that stand-in for hidden time contexts. Fits
         with it took many times as long as without, and on the larger systems measured it ran out of
-        memory where the fit without it finished (the
-        `0.15.0 release card <https://andrey.abel.ai/docs/benchmarks/0.15.0.html#j-pcmci>`__).
+        memory where the fit without it finished.
     tau_max : int, default=1
         The largest lag tested, at least ``1``: links at lags ``0`` to ``tau_max`` are tested.
     alpha : float, default=0.01
@@ -2138,9 +2137,9 @@ def dynotears(
     the paper's settings for its short series. Its centering, which the paper's loss leaves out,
     costs errors on short series whose noise has mean zero; the
     `0.14.0 release card <https://andrey.abel.ai/docs/benchmarks/0.14.0.html#dynotears>`_ has the
-    numbers. The time grows faster than the cube of the number of variables, so larger graphs take
-    minutes on one core. The measured results are a reference, not a hard limit: they change with
-    the data generator, the density, the method's settings, and the machine.
+    numbers. The time grows faster than the cube of the number of variables, so larger graphs are
+    slow. The measured results are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
