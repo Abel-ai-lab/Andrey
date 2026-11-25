@@ -1546,11 +1546,13 @@ code.literal {
 
 /* ---------- the AI statement ---------- */
 /* The last paragraph of a post or a release card: how AI tools were used to write it
-   (docs/conf.py, _ai_statement). */
+   (docs/conf.py, _ai_statement), in a box of the cards' surface, hairline, and radius. */
 .bd-article p.ai-statement {
   margin: 2.5rem 0 0;
-  padding-top: 1rem;
-  border-top: 1px solid var(--andrey-line);
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-lg);
+  background: var(--andrey-surface);
   color: var(--andrey-muted);
   font-size: 0.85rem;
 }
@@ -1590,6 +1592,30 @@ code.literal {
 .sd-card-title {
   color: var(--andrey-ink);
   font-weight: 600;
+}
+
+/* ---------- back to top ---------- */
+/* The theme's Back to top button takes the cards' surface, hairline, radius, ink, and hover. Its
+   `rounded-pill` class sets the radius from `--bs-border-radius-pill` with !important, so the
+   radius goes through that variable, and the lift keeps the transform that centers it. */
+#pst-back-to-top {
+  --bs-border-radius-pill: var(--andrey-radius-lg);
+  border: 1px solid var(--andrey-line);
+  background: var(--andrey-surface);
+  color: var(--andrey-ink);
+  transition: border-color var(--andrey-dur) var(--andrey-ease),
+              transform var(--andrey-dur) var(--andrey-ease);
+}
+
+#pst-back-to-top:is(:hover, :focus-visible, :active) {
+  border-color: var(--andrey-accent);
+  background: var(--andrey-surface);
+  color: var(--andrey-ink);
+  text-decoration: none;
+}
+
+#pst-back-to-top:hover {
+  transform: translate(-50%, -2px);
 }
 
 /* ---------- rendered structures ---------- */
@@ -1641,12 +1667,17 @@ code.literal {
 
 /* ---------- motion ---------- */
 @media (prefers-reduced-motion: reduce) {
-  .sd-card {
+  .sd-card,
+  #pst-back-to-top {
     transition: none;
   }
 
   .sd-card:hover {
     transform: none;
+  }
+
+  #pst-back-to-top:hover {
+    transform: translate(-50%);
   }
 }
 
