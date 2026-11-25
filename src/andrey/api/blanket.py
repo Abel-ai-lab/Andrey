@@ -280,19 +280,18 @@ def iamb(
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
         alone gives it, ``metadata["n_tests"]`` included. Without ``target``, wraps the graph
-        ``structure`` names: a ``cpdag``
-        :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
-        cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
-        and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
-        member of its Markov blanket, which holds its parents, its children, and its children's
-        other parents; ``metadata["target"]`` names it and ``metadata["markov_blanket"]`` lists the
-        members in the order they joined, by column label or 0-based position.
-        ``metadata["algorithm"]`` is ``"iamb"``. Under a mixed-data setting,
+        ``structure`` names: a ``cpdag`` :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose
+        undirected edges the tests cannot orient, or an ``undirected`` one, whose edges have no
+        arrowhead, for ``"skeleton"`` and ``"moral"``. With ``target``, an ``undirected`` one whose
+        edges join ``target`` to each member of its Markov blanket, which holds its parents, its
+        children, and its children's other parents; ``metadata["target"]`` names it and
+        ``metadata["markov_blanket"]`` lists the members in the order they joined, by column label
+        or 0-based position. ``metadata["algorithm"]`` is ``"iamb"``. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
-        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the
-        number of conditional-independence tests the fit evaluated; a query answered again from a
-        kept answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the fit ran
-        under, ``andrey.config.tie_break``.
+        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the number
+        of conditional-independence tests the fit evaluated; a query answered again from a kept
+        answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -606,18 +605,17 @@ def inter_iamb(
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
         alone gives it, ``metadata["n_tests"]`` included. Without ``target``, wraps the graph
-        ``structure`` names: a ``cpdag``
-        :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
-        cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
-        and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
-        member of its Markov blanket, which holds its parents, its children, and its children's
-        other parents; ``metadata["target"]`` names it and ``metadata["markov_blanket"]`` lists the
-        members in the order they joined, by column label or 0-based position.
-        ``metadata["algorithm"]`` is ``"inter_iamb"``. Under a mixed-data setting,
-        ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
-        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the
-        number of conditional-independence tests the fit evaluated; a query answered again from a
-        kept answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the fit ran
+        ``structure`` names: a ``cpdag`` :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose
+        undirected edges the tests cannot orient, or an ``undirected`` one, whose edges have no
+        arrowhead, for ``"skeleton"`` and ``"moral"``. With ``target``, an ``undirected`` one whose
+        edges join ``target`` to each member of its Markov blanket, which holds its parents, its
+        children, and its children's other parents; ``metadata["target"]`` names it and
+        ``metadata["markov_blanket"]`` lists the members in the order they joined, by column label
+        or 0-based position. ``metadata["algorithm"]`` is ``"inter_iamb"``. Under a mixed-data
+        setting, ``metadata["categorical"]`` lists the categorical columns it read. With a
+        randomized ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is
+        the number of conditional-independence tests the fit evaluated; a query answered again from
+        a kept answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the fit ran
         under, ``andrey.config.tie_break``.
 
     Raises
@@ -913,19 +911,18 @@ def gs(
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
         alone gives it, ``metadata["n_tests"]`` included. Without ``target``, wraps the graph
-        ``structure`` names: a ``cpdag``
-        :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
-        cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
-        and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
-        member of its Markov blanket, which holds its parents, its children, and its children's
-        other parents; ``metadata["target"]`` names it and ``metadata["markov_blanket"]`` lists the
-        members in the order they joined, by column label or 0-based position.
-        ``metadata["algorithm"]`` is ``"gs"``. Under a mixed-data setting,
+        ``structure`` names: a ``cpdag`` :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose
+        undirected edges the tests cannot orient, or an ``undirected`` one, whose edges have no
+        arrowhead, for ``"skeleton"`` and ``"moral"``. With ``target``, an ``undirected`` one whose
+        edges join ``target`` to each member of its Markov blanket, which holds its parents, its
+        children, and its children's other parents; ``metadata["target"]`` names it and
+        ``metadata["markov_blanket"]`` lists the members in the order they joined, by column label
+        or 0-based position. ``metadata["algorithm"]`` is ``"gs"``. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
-        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the
-        number of conditional-independence tests the fit evaluated; a query answered again from a
-        kept answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the fit ran
-        under, ``andrey.config.tie_break``.
+        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the number
+        of conditional-independence tests the fit evaluated; a query answered again from a kept
+        answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -1211,18 +1208,17 @@ def fast_iamb(
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
         alone gives it, ``metadata["n_tests"]`` included. Without ``target``, wraps the graph
-        ``structure`` names: a ``cpdag``
-        :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
-        cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
-        and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
-        member of its Markov blanket, which holds its parents, its children, and its children's
-        other parents; ``metadata["target"]`` names it and ``metadata["markov_blanket"]`` lists the
-        members in the order they joined, by column label or 0-based position.
-        ``metadata["algorithm"]`` is ``"fast_iamb"``. Under a mixed-data setting,
-        ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
-        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the
-        number of conditional-independence tests the fit evaluated; a query answered again from a
-        kept answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the fit ran
+        ``structure`` names: a ``cpdag`` :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose
+        undirected edges the tests cannot orient, or an ``undirected`` one, whose edges have no
+        arrowhead, for ``"skeleton"`` and ``"moral"``. With ``target``, an ``undirected`` one whose
+        edges join ``target`` to each member of its Markov blanket, which holds its parents, its
+        children, and its children's other parents; ``metadata["target"]`` names it and
+        ``metadata["markov_blanket"]`` lists the members in the order they joined, by column label
+        or 0-based position. ``metadata["algorithm"]`` is ``"fast_iamb"``. Under a mixed-data
+        setting, ``metadata["categorical"]`` lists the categorical columns it read. With a
+        randomized ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is
+        the number of conditional-independence tests the fit evaluated; a query answered again from
+        a kept answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the fit ran
         under, ``andrey.config.tie_break``.
 
     Raises
@@ -1524,19 +1520,18 @@ def mmpc(
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
         alone gives it, ``metadata["n_tests"]`` included. Without ``target``, wraps the graph
-        ``structure`` names: an
-        ``undirected``
-        :class:`~andrey.core.GraphStructure` for ``"skeleton"``, whose edges have no arrowhead and
-        join each pair in each other's set, or a ``cpdag`` one for ``"cpdag"``, whose undirected
-        edges the tests cannot orient. With ``target``, an ``undirected`` one whose edges join
-        ``target`` to each of its parents and children; ``metadata["target"]`` names it and
-        ``metadata["parents_and_children"]`` lists the members in the order they joined, by column
-        label or 0-based position. ``metadata["algorithm"]`` is ``"mmpc"``. Under a mixed-data
-        setting, ``metadata["categorical"]`` lists the categorical columns it read. With a
-        randomized ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]``
-        is the number of conditional-independence tests the fit evaluated; a query answered again
-        from a kept answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the
-        fit ran under, ``andrey.config.tie_break``.
+        ``structure`` names: an ``undirected`` :class:`~andrey.core.GraphStructure` for
+        ``"skeleton"``, whose edges have no arrowhead and join each pair in each other's set, or a
+        ``cpdag`` one for ``"cpdag"``, whose undirected edges the tests cannot orient. With
+        ``target``, an ``undirected`` one whose edges join ``target`` to each of its parents and
+        children; ``metadata["target"]`` names it and ``metadata["parents_and_children"]`` lists the
+        members in the order they joined, by column label or 0-based position.
+        ``metadata["algorithm"]`` is ``"mmpc"``. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
+        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the number
+        of conditional-independence tests the fit evaluated; a query answered again from a kept
+        answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -1837,19 +1832,18 @@ def hiton_pc(
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
         alone gives it, ``metadata["n_tests"]`` included. Without ``target``, wraps the graph
-        ``structure`` names: an
-        ``undirected``
-        :class:`~andrey.core.GraphStructure` for ``"skeleton"``, whose edges have no arrowhead and
-        join each pair in each other's set, or a ``cpdag`` one for ``"cpdag"``, whose undirected
-        edges the tests cannot orient. With ``target``, an ``undirected`` one whose edges join
-        ``target`` to each of its parents and children; ``metadata["target"]`` names it and
-        ``metadata["parents_and_children"]`` lists the members in the order they joined, by column
-        label or 0-based position. ``metadata["algorithm"]`` is ``"hiton_pc"``. Under a mixed-data
-        setting, ``metadata["categorical"]`` lists the categorical columns it read. With a
-        randomized ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]``
-        is the number of conditional-independence tests the fit evaluated; a query answered again
-        from a kept answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the
-        fit ran under, ``andrey.config.tie_break``.
+        ``structure`` names: an ``undirected`` :class:`~andrey.core.GraphStructure` for
+        ``"skeleton"``, whose edges have no arrowhead and join each pair in each other's set, or a
+        ``cpdag`` one for ``"cpdag"``, whose undirected edges the tests cannot orient. With
+        ``target``, an ``undirected`` one whose edges join ``target`` to each of its parents and
+        children; ``metadata["target"]`` names it and ``metadata["parents_and_children"]`` lists the
+        members in the order they joined, by column label or 0-based position.
+        ``metadata["algorithm"]`` is ``"hiton_pc"``. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
+        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the number
+        of conditional-independence tests the fit evaluated; a query answered again from a kept
+        answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
+        ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -2142,11 +2136,10 @@ def hiton_mb(
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
         alone gives it, ``metadata["n_tests"]`` included. Without ``target``, wraps the graph
-        ``structure`` names: a ``cpdag``
-        :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
-        cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
-        and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
-        member of its Markov blanket; ``metadata["target"]`` names it,
+        ``structure`` names: a ``cpdag`` :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose
+        undirected edges the tests cannot orient, or an ``undirected`` one, whose edges have no
+        arrowhead, for ``"skeleton"`` and ``"moral"``. With ``target``, an ``undirected`` one whose
+        edges join ``target`` to each member of its Markov blanket; ``metadata["target"]`` names it,
         ``metadata["markov_blanket"]`` lists the members, the parents and children first, then the
         spouses, each in the order they joined, and ``metadata["parents_and_children"]`` lists the
         parents and children alone, by column label or 0-based position. ``metadata["algorithm"]``
@@ -2442,20 +2435,18 @@ def mmmb(
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
         alone gives it, ``metadata["n_tests"]`` included. Without ``target``, wraps the graph
-        ``structure`` names: a ``cpdag``
-        :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
-        cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
-        and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
-        member of its Markov blanket; ``metadata["target"]`` names it,
+        ``structure`` names: a ``cpdag`` :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose
+        undirected edges the tests cannot orient, or an ``undirected`` one, whose edges have no
+        arrowhead, for ``"skeleton"`` and ``"moral"``. With ``target``, an ``undirected`` one whose
+        edges join ``target`` to each member of its Markov blanket; ``metadata["target"]`` names it,
         ``metadata["markov_blanket"]`` lists the members, the parents and children first, then the
         spouses, each in the order they joined, and ``metadata["parents_and_children"]`` lists the
         parents and children alone, by column label or 0-based position. ``metadata["algorithm"]``
-        is ``"mmmb"``. Under a mixed-data setting, ``metadata["categorical"]`` lists the
-        categorical columns it read. With a randomized ``indep_test``, ``metadata["seed"]`` is the
-        seed used. ``metadata["n_tests"]`` is the number of conditional-independence tests the fit
-        evaluated; a query answered again from a kept answer is not a new test.
-        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
-        ``andrey.config.tie_break``.
+        is ``"mmmb"``. Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical
+        columns it read. With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+        ``metadata["n_tests"]`` is the number of conditional-independence tests the fit evaluated; a
+        query answered again from a kept answer is not a new test. ``metadata["tie_break"]`` is the
+        tie-break rule the fit ran under, ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -2745,20 +2736,18 @@ def pcmb(
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
         alone gives it, ``metadata["n_tests"]`` included. Without ``target``, wraps the graph
-        ``structure`` names: a ``cpdag``
-        :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose undirected edges the tests
-        cannot orient, or an ``undirected`` one, whose edges have no arrowhead, for ``"skeleton"``
-        and ``"moral"``. With ``target``, an ``undirected`` one whose edges join ``target`` to each
-        member of its Markov blanket; ``metadata["target"]`` names it,
+        ``structure`` names: a ``cpdag`` :class:`~andrey.core.GraphStructure` for ``"cpdag"``, whose
+        undirected edges the tests cannot orient, or an ``undirected`` one, whose edges have no
+        arrowhead, for ``"skeleton"`` and ``"moral"``. With ``target``, an ``undirected`` one whose
+        edges join ``target`` to each member of its Markov blanket; ``metadata["target"]`` names it,
         ``metadata["markov_blanket"]`` lists the members, the parents and children first, then the
         spouses, each in the order they joined, and ``metadata["parents_and_children"]`` lists the
         parents and children alone, by column label or 0-based position. ``metadata["algorithm"]``
-        is ``"pcmb"``. Under a mixed-data setting, ``metadata["categorical"]`` lists the
-        categorical columns it read. With a randomized ``indep_test``, ``metadata["seed"]`` is the
-        seed used. ``metadata["n_tests"]`` is the number of conditional-independence tests the fit
-        evaluated; a query answered again from a kept answer is not a new test.
-        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
-        ``andrey.config.tie_break``.
+        is ``"pcmb"``. Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical
+        columns it read. With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
+        ``metadata["n_tests"]`` is the number of conditional-independence tests the fit evaluated; a
+        query answered again from a kept answer is not a new test. ``metadata["tie_break"]`` is the
+        tie-break rule the fit ran under, ``andrey.config.tie_break``.
 
     Raises
     ------

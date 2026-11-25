@@ -215,21 +215,19 @@ def mb_by_mb(
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
         alone gives it, ``metadata["n_tests"]`` included. Otherwise, wraps a ``cpdag``
-        :class:`~andrey.core.GraphStructure`
-        over every column holding only the
-        edges at ``target``: ``x -> target`` for a direct cause, ``target -> x`` for a direct
-        effect, and ``x - target`` where the CPDAG leaves the direction undecided. An absent edge
-        away from the target means nothing. ``metadata["target"]`` names the target, and
-        ``metadata["parents"]``, ``metadata["children"]``, and ``metadata["undirected"]`` list
-        those columns, by column label or 0-based position. ``metadata["blankets_learned"]`` lists
-        the variables whose Markov blanket the search learned, in order, the target first, so its
-        length is the number of blankets the answer took. ``metadata["algorithm"]`` is
-        ``"mb_by_mb"``. Under a mixed-data setting, ``metadata["categorical"]`` lists the
-        categorical columns it read. With a randomized ``indep_test``, ``metadata["seed"]`` is the
-        seed used. ``metadata["n_tests"]`` is the number of conditional-independence tests the fit
-        evaluated; a query answered again from a kept answer is not a new test.
-        ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
-        ``andrey.config.tie_break``.
+        :class:`~andrey.core.GraphStructure` over every column holding only the edges at ``target``:
+        ``x -> target`` for a direct cause, ``target -> x`` for a direct effect, and ``x - target``
+        where the CPDAG leaves the direction undecided. An absent edge away from the target means
+        nothing. ``metadata["target"]`` names the target, and ``metadata["parents"]``,
+        ``metadata["children"]``, and ``metadata["undirected"]`` list those columns, by column label
+        or 0-based position. ``metadata["blankets_learned"]`` lists the variables whose Markov
+        blanket the search learned, in order, the target first, so its length is the number of
+        blankets the answer took. ``metadata["algorithm"]`` is ``"mb_by_mb"``. Under a mixed-data
+        setting, ``metadata["categorical"]`` lists the categorical columns it read. With a
+        randomized ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is
+        the number of conditional-independence tests the fit evaluated; a query answered again from
+        a kept answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the fit ran
+        under, ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -533,24 +531,22 @@ def mmb_by_mmb(
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
         alone gives it, ``metadata["n_tests"]`` included. Otherwise, wraps a ``pag``
-        :class:`~andrey.core.GraphStructure`
-        over every column holding only the
-        edges at ``target``, with their marks: ``x -> target`` for a direct cause, ``target -> x``
-        for a direct effect, ``x <-> target`` where a hidden common cause joins them and neither
-        causes the other, and a circle where the PAG leaves the mark undecided. An absent edge
-        away from the target means nothing. ``metadata["target"]`` names the target;
-        ``metadata["parents"]``, ``metadata["children"]``, and ``metadata["bidirected"]`` list the
-        columns of those edges, and ``metadata["undetermined"]`` those whose edge has a circle at
-        either end, by column label or 0-based position. ``metadata["markov_blanket"]`` lists the
-        target's Markov blanket as the ``blanket`` learner found it.
-        ``metadata["blankets_learned"]`` lists the variables whose Markov blanket the search
-        learned, in order, the target first, so its length is the number of blankets the answer
-        took. ``metadata["algorithm"]`` is ``"mmb_by_mmb"``. Under a mixed-data setting,
-        ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
-        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the
-        number of conditional-independence tests the fit evaluated; a query answered again from a
-        kept answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the fit ran
-        under, ``andrey.config.tie_break``.
+        :class:`~andrey.core.GraphStructure` over every column holding only the edges at ``target``,
+        with their marks: ``x -> target`` for a direct cause, ``target -> x`` for a direct effect,
+        ``x <-> target`` where a hidden common cause joins them and neither causes the other, and a
+        circle where the PAG leaves the mark undecided. An absent edge away from the target means
+        nothing. ``metadata["target"]`` names the target; ``metadata["parents"]``,
+        ``metadata["children"]``, and ``metadata["bidirected"]`` list the columns of those edges,
+        and ``metadata["undetermined"]`` those whose edge has a circle at either end, by column
+        label or 0-based position. ``metadata["markov_blanket"]`` lists the target's Markov blanket
+        as the ``blanket`` learner found it. ``metadata["blankets_learned"]`` lists the variables
+        whose Markov blanket the search learned, in order, the target first, so its length is the
+        number of blankets the answer took. ``metadata["algorithm"]`` is ``"mmb_by_mmb"``. Under a
+        mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it read. With
+        a randomized ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]``
+        is the number of conditional-independence tests the fit evaluated; a query answered again
+        from a kept answer is not a new test. ``metadata["tie_break"]`` is the tie-break rule the
+        fit ran under, ``andrey.config.tie_break``.
 
     Raises
     ------
@@ -840,22 +836,20 @@ def cmb(
     StructureOutput or list of StructureOutput
         With a list of targets, a list holding each target's result, in its order, as that target
         alone gives it, ``metadata["n_tests"]`` included. Otherwise, wraps a ``cpdag``
-        :class:`~andrey.core.GraphStructure`
-        over every column holding only the
-        edges at ``target``: ``x -> target`` for a direct cause, ``target -> x`` for a direct
-        effect, and ``x - target`` where the direction is left undecided. An absent edge away from
-        the target means nothing. ``metadata["target"]`` names the target, and
-        ``metadata["parents"]``, ``metadata["children"]``, and ``metadata["undirected"]`` list
-        those columns, by column label or 0-based position; ``metadata["markov_blanket"]`` lists
-        the target's Markov blanket as ``blanket`` learned it. ``metadata["blankets_learned"]``
-        lists the variables whose Markov blanket the fit learned, in order, the target first, so
-        its length is the number of blankets the answer took. ``metadata["algorithm"]`` is
-        ``"cmb"``. Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical
-        columns it read. With a randomized ``indep_test``, ``metadata["seed"]`` is the seed used.
-        ``metadata["n_tests"]`` is the number of conditional-independence tests the fit evaluated,
-        the blanket learner's included; a query answered again from a kept answer is not a new
-        test. ``metadata["tie_break"]`` is the tie-break rule the fit ran under,
-        ``andrey.config.tie_break``.
+        :class:`~andrey.core.GraphStructure` over every column holding only the edges at ``target``:
+        ``x -> target`` for a direct cause, ``target -> x`` for a direct effect, and ``x - target``
+        where the direction is left undecided. An absent edge away from the target means nothing.
+        ``metadata["target"]`` names the target, and ``metadata["parents"]``,
+        ``metadata["children"]``, and ``metadata["undirected"]`` list those columns, by column label
+        or 0-based position; ``metadata["markov_blanket"]`` lists the target's Markov blanket as
+        ``blanket`` learned it. ``metadata["blankets_learned"]`` lists the variables whose Markov
+        blanket the fit learned, in order, the target first, so its length is the number of blankets
+        the answer took. ``metadata["algorithm"]`` is ``"cmb"``. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read. With a randomized
+        ``indep_test``, ``metadata["seed"]`` is the seed used. ``metadata["n_tests"]`` is the number
+        of conditional-independence tests the fit evaluated, the blanket learner's included; a query
+        answered again from a kept answer is not a new test. ``metadata["tie_break"]`` is the
+        tie-break rule the fit ran under, ``andrey.config.tie_break``.
 
     Raises
     ------

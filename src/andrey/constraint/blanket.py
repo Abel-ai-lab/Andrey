@@ -441,6 +441,7 @@ def _gs(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
                 p = unconditional[y]
             if p <= alpha:
                 blanket.append(y)
+                untested.discard(y)  # an earlier size left it not tested, and it joins here
                 added = True
                 continue
             last[y] = len(blanket)

@@ -229,6 +229,22 @@ def test_gs_visits_a_candidate_without_an_ordering_test_last():
     assert LocalSearch(test, [0, 1, 2, 3], 0.05).run("gs", 0) == ([3, 1], {})
 
 
+def test_gs_adds_a_member_once_that_was_not_tested_at_an_earlier_blanket():
+    """1, 2, and 3 depend on 0 alone, in that order. Given {1}, 2 is not tested and 3 joins; given
+    {1, 3}, 2 tests dependent and joins. The not-tested 2 is not added again at the end, so the
+    blanket matches the one IAMB finds."""
+    strength = {1: 1e-9, 2: 1e-6, 3: 1e-3}
+
+    def test(x, y, cond=()):
+        other = max(x, y)
+        if not cond:
+            return strength[other]
+        return np.nan if other == 2 and tuple(cond) == (1,) else 1e-4
+
+    assert LocalSearch(test, [0, 1, 2, 3], 0.05).run("gs", 0) == ([1, 3, 2], {})
+    assert LocalSearch(test, [0, 1, 2, 3], 0.05).run("iamb", 0) == ([1, 3, 2], {})
+
+
 class _Independent:
     """A test that finds ``x`` independent of the target given exactly the sets listed for ``x`` and
     dependent given any other, and logs each query in the order asked."""
