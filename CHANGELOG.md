@@ -283,11 +283,11 @@ names its pull request.
   ([#1029])
 - The treatment-outcome benchmark lane counts the conditional-independence tests of its PC arm, PC
   read at the pair, so its cost sits beside the methods'. ([#1031])
-- The conditioning-set scans of the blanket learners, `mb_by_mb`, and `local_optimal_adjustment`
-  build each chunk of conditioning sets as the rows of an int array from cached combination tables,
-  where they built tuples and converted each chunk back. At 5,000 rows and 1,000 variables,
-  `mb_by_mb` at one target is 1.15 times faster and `local_optimal_adjustment` 1.08 times. Every
-  output, `metadata["n_tests"]` included, is the same bit for bit. ([#1036], [#1042])
+- The conditioning-set scans of `mb_by_mb` and `local_optimal_adjustment` build each chunk of
+  conditioning sets as the rows of an int array from cached combination tables, where they built
+  tuples and converted each chunk back. At 5,000 rows and 1,000 variables, `mb_by_mb` at one target
+  is 1.15 times faster and `local_optimal_adjustment` 1.08 times. Every output,
+  `metadata["n_tests"]` included, is the same bit for bit. ([#1036], [#1042])
 - The blanket engine behind `iamb`, `gs`, `hiton_mb`, `mmb_by_mmb`, and the other blanket learners
   computes the columns' tie ranks when a search first compares candidates whose keys tie, where it
   computed them when the search was built, so a fit that never compares tied candidates skips their
