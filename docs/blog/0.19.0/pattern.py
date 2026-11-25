@@ -10,7 +10,6 @@ Run with ``uv run python docs/blog/0.19.0/pattern.py``.
 
 from __future__ import annotations
 
-from itertools import combinations
 from pathlib import Path
 
 import numpy as np
@@ -96,12 +95,6 @@ def patterns() -> np.ndarray:
     return out
 
 
-def never_together(measured: np.ndarray) -> int:
-    """The number of pairs of columns that no cohort measures together."""
-    d = measured.shape[1]
-    return sum(not (measured[:, i] & measured[:, j]).any() for i, j in combinations(range(d), 2))
-
-
 def figure() -> str:
     """The small configuration's missingness pattern as HTML."""
     measured = patterns()
@@ -151,11 +144,11 @@ def figure() -> str:
         f"{''.join(parts)}</svg>"
     )
     caption = (
-        "<figcaption>The missingness pattern of the benchmark's smallest configuration. Each row "
-        "is a cohort, drawn as tall as its number of rows, and each column is one of the 20 "
-        "variables. A filled cell means that the cohort measured the variable; a hollow cell means "
-        "that it did not, so the stacked table is missing that whole block. The pattern leaves "
-        f"{never_together(measured)} pairs of variables never measured together.</figcaption>"
+        "<figcaption>The missingness pattern of the benchmark's smallest setup. Each row is a "
+        "cohort, drawn as tall as its number of rows, and each column is a variable. A filled cell "
+        "means that the cohort measured the variable; a hollow cell means that it did not, so the "
+        "stacked table is missing that whole block. Two variables with no row filled in both are "
+        "never jointly measured.</figcaption>"
     )
     return f'{style}<figure class="ov-figure">{svg}{caption}</figure>\n'
 
