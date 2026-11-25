@@ -170,7 +170,6 @@ there is one column, where it runs no such test. `cdnod` and `fci_jci` need a co
 other method raises a `ValueError` that names it and says what to do instead, as the [Missing
 values](guides/missing-values.md) guide describes; each method's Notes say why.
 
-
 % concept: n_em_iterations
 `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm` take
 `n_em_iterations`, the number of rounds `missing="em"` runs on data with missing values, each with
@@ -216,19 +215,6 @@ alone; it gives up the level: 11.1% and 21.7% of the same true independences wer
 time and power were not compared. `pcmb` and `mmmb` default to `"nonempty"`, the test their papers
 run. Only `"chisq"` and `"gsq"` read it, so passing `degrees_of_freedom` with another test raises a
 `ValueError`.
-
-% concept: degrees_of_freedom
-`pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
-`fast_iamb`, `mmpc`, `hiton_pc`, `hiton_mb`, `mmmb`, `pcmb`, `mb_by_mb`, `cmb`, `mmb_by_mmb`,
-`mmhc`, `rsmax2`, `igsp`, `ut_igsp`, `y_structures`, `ldp`, `ld3`, `ldecc`,
-`local_optimal_adjustment`, `locpc_cde`, `pcmci`, `pcmciplus`, and `lpcmci` take
-`degrees_of_freedom`, the degrees of freedom of the categorical tests, `"chisq"` and `"gsq"`:
-`"mean"`, the default, is the mean of the statistic when `y` is shuffled within each configuration
-of the conditioning set, and `"nonempty"` is `(r_x - 1) * (r_y - 1)` per configuration over the
-values of `x` and `y` present in it, the table's empty rows and columns struck (Spirtes, Glymour and
-Scheines 1993). The two differ only on sparse tables. `pcmb` and `mmmb` default to `"nonempty"`, the
-test their papers run. Only `"chisq"` and `"gsq"` read it, so passing `degrees_of_freedom` with
-another test raises a `ValueError`.
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `gs`,
