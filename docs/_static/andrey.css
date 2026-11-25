@@ -135,10 +135,15 @@ html .btn:focus-visible {
   box-shadow: none;
 }
 
-/* A card is one link stretched over it, so the ring goes around the card. */
+/* A card is one link stretched over it, so the ring goes around the card, in place of the theme's
+   3px ring on the link's stretched box. */
 .sd-card:has(.sd-stretched-link:focus-visible) {
   outline: 2px solid var(--andrey-accent);
   outline-offset: 2px;
+}
+
+html .bd-content .sd-card .sd-stretched-link:focus-visible::after {
+  outline: none;
 }
 
 /* A link's underline stays its resting weight under the pointer; only its color changes. */
