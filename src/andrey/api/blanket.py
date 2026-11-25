@@ -985,7 +985,7 @@ def mmpc(
     19 of 20 standardized datasets with 100 variables, mean degree 4, and 5,000 rows. At 200
     variables and 5,000 rows, a few borderline false edges survive where the forward step admits the
     strongest of candidates too dependent to rank by p-value (`0.13.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#where-bnlearn-makes-fewer-errors>`__).
+    <https://andrey.abel.ai/docs/benchmarks/0.13.0.html>`__).
     ``forbidden_paths`` is experimental. Its tests can contradict each other, and the graph found
     then has no consistent extension and stands for no DAG, as on 125 of 240 simulated datasets with
     10 to 50 variables; a ``knowledge`` claim then acts only on an edge, and most claims are dropped
