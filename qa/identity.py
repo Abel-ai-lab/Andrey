@@ -797,6 +797,10 @@ CI_QUERIES: dict[str, Callable[..., Iterable[tuple[int, int, Any, float]]]] = {
     "statistic_pvalues_given": lambda rp, test, x, ys, condition_set: [
         (x, y, condition_set, p) for y, p in zip(ys, rp[1])
     ],
+    "statistic_pvalues_given_rest": lambda rp, test, x, ys: [
+        (x, y, [z for z in range(len(test._matrix())) if z not in (x, y)], p)
+        for y, p in zip(ys, rp[1])
+    ],
     "pvalues_given": lambda ps, test, target, xs, condition_set=(): [
         (target, x, condition_set, p) for x, p in zip(xs, ps)
     ],

@@ -29,7 +29,7 @@ from andrey.fcm import cpcm
 from andrey.fcm.gam import MAX_KNOTS, SmoothBasis, fit_additive, tp_basis
 
 from . import stats
-from .ci import _canonical, per_query
+from .ci import _canonical, count_tests, per_query
 from .seeding import resolve_seed
 
 __all__ = ["GCM", "PCM", "WGCM"]
@@ -329,6 +329,7 @@ class _RegressionTest:
     ) -> tuple[float, float]:
         """The statistic and p-value of one query."""
         x_int, y_int, cond = _canonical(x, y, condition_set)
+        count_tests()
         if not (np.ptp(self._data[:, x_int]) > 0.0 and np.ptp(self._data[:, y_int]) > 0.0):
             return 0.0, 1.0  # a constant variable: no variation to depend on
         return self._answer(x_int, y_int, cond)
