@@ -655,12 +655,11 @@ def pcmci(
     depends on no value in the data; the rows a test reads are then a random sample of all rows, and
     otherwise they are a selected sample that more rows do not correct.
 
-    **Limitations.** On linear-Gaussian series with ``fdr_method="none"`` it made fewer errors than
-    the empty graph on small graphs but not on larger ones; the default ``"fdr_bh"`` made fewer
-    errors than ``"none"`` in most settings (see ``fdr_method``). It does not test same-step (lag 0)
-    links, so an effect within one time step is missed and can show up as a false lagged link. The
-    `0.10.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#methods-on-their-own-axes>`__ has the
+    **Limitations.** On linear-Gaussian VAR series with the default ``fdr_method="fdr_bh"`` it made
+    fewer errors than the empty graph in every setting, and with ``"none"`` more in some, the
+    largest graphs included. It does not test same-step (lag 0) links, so an effect within one time
+    step is missed and can show up as a false lagged link. The `0.12.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#fdr-control-in-pcmci-and-granger>`__ has the
     numbers.
 
     References
