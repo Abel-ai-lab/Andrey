@@ -17,13 +17,14 @@ import numpy as np
 import pytest
 
 import andrey
-import andrey.data
 from andrey.api import _boundary
+from andrey.api import _method as method_wrapper
 from andrey.api._method import warn_experimental
 from andrey.cli import main
 from andrey.core import backend, ci, warning_policy
 from andrey.core.ci_kernel import RCoT
 from andrey.core.warning_policy import held_records
+from andrey.spec import REGISTRY
 
 pc_module = importlib.import_module("andrey.constraint.pc")
 hc_module = importlib.import_module("andrey.search.hc")
@@ -104,13 +105,18 @@ def _category_code_hint(monkeypatch):
     return lambda: andrey.pc(data)
 
 
-def _deprecated_class(monkeypatch):
-    scm = andrey.data.SCM(
-        graph=andrey.data.graphs.erdos_renyi(4, 1.0),
-        functional=andrey.data.functional.linear(),
-        noise=andrey.data.noise.gaussian(),
+def _former_argument_name(monkeypatch):
+    spec = REGISTRY["pc"]
+    params = tuple(
+        p.model_copy(update={"aliases": ("significance",)}) if p.name == "alpha" else p
+        for p in spec.params
     )
-    return lambda: andrey.data.Ensemble(scms=[scm], seeds=[0], n=10)  # a dataclass's __init__
+    former = spec.model_copy(update={"params": params})
+    monkeypatch.setattr(
+        method_wrapper, "spec_of", lambda name: former if name == "pc" else REGISTRY[name]
+    )
+    data = np.random.default_rng(0).standard_normal((50, 4))
+    return lambda: andrey.pc(data, significance=0.05)
 
 
 TRIGGERS = {
@@ -123,7 +129,7 @@ TRIGGERS = {
     "RCoT few rows": (_rcot_few_rows, andrey.SampleSizeWarning),
     "no categorical column": (_no_categorical_column, andrey.DataTypeWarning),
     "category code hint": (_category_code_hint, andrey.DataTypeWarning),
-    "deprecated class": (_deprecated_class, andrey.DeprecatedArgumentWarning),
+    "former argument name": (_former_argument_name, andrey.DeprecatedArgumentWarning),
 }
 
 
