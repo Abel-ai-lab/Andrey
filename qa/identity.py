@@ -64,7 +64,7 @@ from threadpoolctl import threadpool_limits
 
 import andrey
 from andrey import GraphStructure, StructureOutput, TemporalStructure, data
-from andrey.core import ci, ci_cmiknn, ci_gpdc, ci_kernel, score, score_delta
+from andrey.core import ci, ci_cmiknn, ci_gpdc, ci_kernel, ci_missing, score, score_delta
 from andrey.search import hc, xges
 from qa import quality_gate as qg
 
@@ -469,8 +469,7 @@ def _nonempty_fits() -> dict[str, OptionFit]:
 
 #: The fits of the options 0.19.0 added, each named for its method and option:
 #: ``possibly_separable="ambiguous"`` (:func:`_ambiguous_fits`) and
-#: ``degrees_of_freedom="nonempty"`` (:func:`_nonempty_fits`). A fit on data with missing values
-#: records no query counts: the counter does not read the test-wise deletion tests.
+#: ``degrees_of_freedom="nonempty"`` (:func:`_nonempty_fits`).
 OPTIONS: dict[str, OptionFit] = {**_ambiguous_fits(), **_nonempty_fits()}
 FITS |= {name: option.fit for name, option in OPTIONS.items()}
 
@@ -926,6 +925,12 @@ CI_CLASSES = (
     ci_kernel.RCoT,
     ci_cmiknn.CMIknn,
     ci_gpdc.GPDC,
+    # The tests that delete rows per test, on data with missing values: a query of theirs counts
+    # in the data's columns, and the test they build for the rows of its block does not count again.
+    ci_missing.TestwiseDeletion,
+    ci_missing.PartialCorrelationDeletion,
+    ci_missing.GaussianDeletion,
+    ci_missing.BoundedDeletion,
 )
 #: The local scores' query methods and the score-delta functions, each with the parent sets one
 #: call scores, read from the call's result, the score, and the call's arguments. A delta scores
@@ -981,8 +986,30 @@ def counting(alpha: float | None) -> Generator[Counts]:
             setattr(owner, name, wrapped)
 
 
+def _in_data_columns(
+    queries: Callable[..., Iterable[tuple[int, int, Any, float]]],
+) -> Callable[..., list[tuple[int, int, Any, float]]]:
+    """Return ``queries`` reading each query of a test over reordered columns as its columns of the
+    data: a deletion test that ``from_columns`` maps to another matrix, as FCI's possible-d-sep
+    search does in rank order, records its queries as pairs of that matrix's columns."""
+
+    def read(
+        result: Any, test: Any, *args: Any, **kwargs: Any
+    ) -> list[tuple[int, int, Any, float]]:
+        rows = list(queries(result, test, *args, **kwargs))
+        source = getattr(test, "_source", None)
+        if source is None:
+            return rows
+        return [
+            (int(source[int(x)]), int(source[int(y)]), [int(source[int(z)]) for z in zs], p)
+            for x, y, zs, p in rows
+        ]
+
+    return read
+
+
 _RECORDERS: dict[str, tuple[Callable[..., Iterable[Any]], Callable[[Counts, Any], None]]] = {
-    **{name: (queries, Counts.ci) for name, queries in CI_QUERIES.items()},
+    **{name: (_in_data_columns(queries), Counts.ci) for name, queries in CI_QUERIES.items()},
     **{name: (queries, Counts.score) for name, queries in SCORE_QUERIES.items()},
 }
 

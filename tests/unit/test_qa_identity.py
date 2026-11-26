@@ -16,7 +16,7 @@ import pytest
 
 import andrey
 from andrey import GraphStructure, StructureOutput
-from andrey.core import ci, score_delta
+from andrey.core import ci, ci_missing, score_delta
 from andrey.core.ci import make_indep_test
 from andrey.core.score import BICScore
 from qa import identity
@@ -437,6 +437,75 @@ def test_counting_records_one_query_per_pvalue_of_a_batched_call(
     assert counts.summary()["ci_queries"] == len(p_values) == 3
     assert counts.separated == {(0, 2), (1, 3), (0, 3)}
     assert counts.summary()["ci_sets"] == ({"1": 3} if np.size(conditions) else {"0": 1})
+
+
+@pytest.mark.parametrize(
+    ("name", "kind"),
+    [
+        ("fisherz", ci_missing.GaussianDeletion),
+        ("chisq", ci_missing.TestwiseDeletion),
+        ("cmiknn", ci_missing.BoundedDeletion),
+    ],
+)
+def test_counting_records_the_queries_of_a_test_that_deletes_rows(
+    x: np.ndarray, name: str, kind: type
+) -> None:
+    """On data with missing values, each public p-value method of the test-wise deletion tests
+    records one query for each p-value, once, though the block test it builds answers it too."""
+    gapped = x[:200].copy()
+    gapped[::5, 3] = np.nan  # column 3 is missing on every fifth row
+    if name == "chisq":
+        gapped = np.where(np.isnan(gapped), np.nan, np.digitize(gapped, [-1.0, 1.0]))
+    test = make_indep_test(name, gapped)
+    assert type(test) is kind
+    with identity.counting(alpha=0.0) as counts:  # every p > 0 separates its pair
+        test(0, 3, (1,))
+        test(0, 3, (1, 2))
+        test.statistic_pvalues(np.array([0, 1, 0]), np.array([2, 3, 3]), [[1], [0], [2]])
+    assert counts.summary() == {
+        "ci_queries": 5,
+        "ci_after_separation": 2,  # (0, 3) is asked again twice after its first query
+        "ci_sets": {"1": 3, "2": 1},
+    }
+
+
+def test_a_query_that_is_not_tested_counts_and_separates_nothing(x: np.ndarray) -> None:
+    """A pair never observed together is asked, so the search's path is counted, and answers NaN."""
+    gapped = x.copy()
+    gapped[:250, 0] = np.nan
+    gapped[250:, 1] = np.nan
+    test = make_indep_test("fisherz", gapped)
+    with identity.counting(alpha=0.0) as counts:
+        assert np.isnan([test(0, 1), test(0, 1, (2,))]).all()
+    assert counts.separated == set()
+    assert counts.summary() == {
+        "ci_queries": 2,
+        "ci_after_separation": 0,
+        "ci_sets": {"0": 1, "1": 1},
+    }
+
+
+def test_a_deletion_test_over_reordered_columns_counts_in_the_columns_of_its_source(
+    x: np.ndarray,
+) -> None:
+    """FCI's possible-d-sep search asks a test over the columns in rank order, which
+    ``from_columns`` maps to the data's, so its queries count as pairs of the data's columns."""
+    gapped = x.copy()
+    gapped[::5, 3] = np.nan
+    test = make_indep_test("fisherz", gapped)
+    test.from_columns(np.array([3, 2, 1, 0]))  # column k of the test is column 3 - k of the data
+    with identity.counting(alpha=0.0) as counts:
+        test(0, 1, (2,))
+        test.statistic_pvalues(np.array([0]), np.array([3]), [[1]])
+    assert counts.separated == {(2, 3), (0, 3)}
+    assert counts.summary()["ci_sets"] == {"1": 2}
+    assert counts.ci_sets[1] == {frozenset({1}), frozenset({2})}
+
+
+def test_a_fit_on_data_with_missing_values_records_its_query_counts() -> None:
+    rows, findings = identity.run(["PC-ambiguous"], seeds=1)
+    assert findings == [] and rows[0]["ci_queries"] > 0
+    assert rows[0]["ci_sets"]
 
 
 def test_counting_wraps_every_public_pvalue_method_of_the_ci_tests() -> None:
