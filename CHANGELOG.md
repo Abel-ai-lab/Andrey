@@ -52,6 +52,9 @@ names its pull request.
   run records them and `--help` and `--help --json` show them, and the flags of `andrey bootstrap`
   and `andrey markov-check`, with the Python signatures. `andrey bootstrap` lists its default of
   `--n-resamples`, 100, as its other flags list theirs. ([#1243])
+- For contributors, `qa/identity.py` counts the CI queries of the tests that delete rows per test,
+  so its fits on data with missing values record their query counts, in the data's columns. Record
+  both manifests of a compare with one version of the gate. ([#1245])
 
 ### Fixed
 
@@ -3000,3 +3003,4 @@ First alpha release.
 [#1235]: https://github.com/Abel-ai-lab/Andrey/pull/1235
 [#1241]: https://github.com/Abel-ai-lab/Andrey/pull/1241
 [#1243]: https://github.com/Abel-ai-lab/Andrey/pull/1243
+[#1245]: https://github.com/Abel-ai-lab/Andrey/pull/1245
