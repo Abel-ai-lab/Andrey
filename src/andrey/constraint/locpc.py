@@ -25,6 +25,7 @@ import numpy as np
 
 from andrey.constraint.pc import knowledge_masks, orient_colliders, undirect_conflicts
 from andrey.core import ARROW, NULL, TAIL
+from andrey.core.ci_missing import not_tested
 from andrey.core.knowledge import orient as orient_knowledge
 from andrey.core.orient import meek
 
@@ -53,6 +54,13 @@ class Memory:
     sepsets: dict[Pair, tuple[int, ...]] = field(default_factory=dict)
     separated: dict[Pair, float] = field(default_factory=dict)
     pvalues: dict[tuple[int, int, tuple[int, ...]], float] = field(default_factory=dict)
+
+    def undecided(self) -> set[Pair]:
+        """The pairs asked whose every test was not tested
+        (:func:`~andrey.core.ci_missing.not_tested`), as a pair never observed together: no test
+        with rows decided them."""
+        asked = {(a, b) for a, b, _ in self.pvalues}
+        return asked - {(a, b) for (a, b, _), p in self.pvalues.items() if not not_tested(p)}
 
 
 @dataclass(frozen=True)
@@ -148,6 +156,9 @@ def _skeleton(
                             adjacent[b].discard(a)
                             break
             size += 1
+        for a, b in memory.undecided():  # neither adjacent nor apart: no separating set
+            adjacent[a].discard(b)
+            adjacent[b].discard(a)
         frontier = ordered({b for a in frontier for b in adjacent[a]})
     return adjacent, visited
 
@@ -185,6 +196,11 @@ def locpc(
     variable's edge to a variable the knowledge places before it, which cannot be a spurious
     neighbor (Appendix C.3). ``memory`` carries the separating sets and p-values of earlier runs;
     a pair separated before is never joined again.
+
+    A test without the rows it needs (:func:`~andrey.core.ci_missing.not_tested`) separates no
+    pair. A pair whose every test was not tested, as one never observed together, is undecided
+    (:meth:`Memory.undecided`): it leaves the skeleton at the end of its round with no separating
+    set, so no orientation reads it as adjacent or apart.
 
     Returns
     -------
@@ -242,12 +258,14 @@ class CDEAnswer:
     :data:`REASONS`: the treatment is not adjacent to the outcome or is its child (the controlled
     direct effect is zero), every edge at the outcome is oriented (its parents are known), or
     some edge at the outcome stays unoriented once a larger hop adds no variable or every
-    variable was visited.
+    variable was visited. ``undecided`` is whether a pair the search tested was undecided
+    (:meth:`Memory.undecided`), so an edge at the outcome may be missing.
     """
 
     graph: LocalEssentialGraph
     hop: int
     reason: str
+    undecided: bool = False
 
     @property
     def identifiable(self) -> bool:
@@ -300,4 +318,4 @@ def locpc_cde(search: LocalSearch, treatment: int, outcome: int) -> CDEAnswer:
         reason = "oriented"
     else:
         reason = "not orientable"
-    return CDEAnswer(graph, graph.hop, reason)
+    return CDEAnswer(graph, graph.hop, reason, bool(memory.undecided()))

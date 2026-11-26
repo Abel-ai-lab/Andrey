@@ -2065,7 +2065,8 @@ _CONCEPTS = (
         key="n_tests",
         summary="metadata['n_tests'] is the number of conditional-independence tests the fit "
         "evaluated, counted in the shared test layer (andrey.core.ci.counting_tests): one per "
-        "query whose p-value a test computed, none for a query answered from a kept answer.",
+        "query whose p-value a test computed, none for a query answered from a kept answer, and "
+        "none for a query not tested, which metadata['not_tested'] counts.",
         suitable=(
             *("iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb"),
             "pcmb",

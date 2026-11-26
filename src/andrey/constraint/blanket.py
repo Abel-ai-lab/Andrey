@@ -240,10 +240,7 @@ def markov_blanket(
 
     Grow: add the candidate most dependent on ``target`` given the current blanket, among those
     whose p-value is at or below ``alpha``, until none is; a p-value strength is compared to
-    ``KEY_DP`` significant digits; then add, in rank order, each candidate whose test given the
-    blanket was not tested and that no earlier test separated, since a test without rows separates
-    no pair; a candidate with no test that had rows, as one never observed with ``target``, is
-    undecided and left out (:func:`_count_beside_undecided`).
+    ``KEY_DP`` significant digits.
     Shrink: visit the members in the order they joined and drop each one
     the test finds independent of ``target`` (a p-value above ``alpha``) given the other current
     members. IAMB
@@ -252,6 +249,11 @@ def markov_blanket(
     ends. Every grow test conditions on
     the whole blanket, so with ``max_depth`` the grow phase also stops once the blanket holds more
     than ``max_depth`` members, and every test conditions on at most ``max_depth`` variables.
+    When the grow stops short of that cap, each candidate whose test given the final blanket was
+    not tested and that no test with rows separated, a shrink's included, joins in rank order,
+    since a test without rows separates no pair; Inter-IAMB then shrinks once more. A candidate
+    with no test that had rows, as one never observed with ``target``, is undecided and left out
+    (:func:`_count_beside_undecided`).
     Returns the members in the order they joined.
 
     With ``constraints``, each variable a required edge joins to ``target`` is a member from the
@@ -284,8 +286,11 @@ def _grow_shrink(
     required = _required(constraints, target, search.ranks)
     blanket: list[int] = list(required)
     seen: set[frozenset[int]] = set()
-    separated: set[int] = set()
+    separated: set[int] = set()  # the candidates a test with rows found independent, a shrink's too
     decided: set[int] = set()  # the candidates with a test that had rows
+    # The candidates not tested given each blanket a grow step scanned.
+    untested: dict[frozenset[int], list[int]] = {}
+    capped = True
     while max_depth is None or len(blanket) <= max_depth:
         candidates = [x for x in range(search.d) if x != target and x not in blanket]
         strengths, pvalues = search.scan(target, candidates, blanket)
@@ -297,27 +302,28 @@ def _grow_shrink(
             sepsets.update((candidates[i], given) for i in apart)
         missing = not_tested(pvalues).tolist()
         decided.update(x for x, m in zip(candidates, missing, strict=True) if not m)
+        untested[frozenset(blanket)] = [x for x, m in zip(candidates, missing, strict=True) if m]
         if not dependent:
-            # A candidate whose blanket test was not tested stays if no earlier test separated it: a
-            # test without rows separates no pair. One with no tested query, such as a variable
-            # never observed with the target, is undecided and left out.
-            stay = [
-                x
-                for x, m in zip(candidates, missing, strict=True)
-                if m and x in decided and x not in separated
-            ]
-            blanket.extend(sorted(stay, key=lambda x: search.ranks[x]))
-            if interleaved and stay:
-                _shrink(search, target, blanket, required, sepsets)
+            capped = False
             break
         xs = [candidates[i] for i in dependent]
         blanket.append(search.by_strength(xs, strengths[dependent])[0])
         if interleaved:
-            _shrink(search, target, blanket, required, sepsets)
+            separated.update(_shrink(search, target, blanket, required, sepsets))
             state = frozenset(blanket)
             if state in seen:
+                capped = False
                 break
             seen.add(state)
+    if not capped:
+        # A candidate whose test given the final blanket was not tested stays if a test with rows
+        # asked it and none separated it: a test without rows separates no pair. One with no tested
+        # query, such as a variable never observed with the target, is undecided and left out. A
+        # repeated blanket was scanned when it first held, so its candidates' answers are known.
+        stay = [x for x in untested[frozenset(blanket)] if x in decided and x not in separated]
+        blanket.extend(sorted(stay, key=lambda x: search.ranks[x]))
+        if interleaved and stay:
+            _shrink(search, target, blanket, required, sepsets)
     if shrink and not interleaved:
         _shrink(search, target, blanket, required, sepsets)
     if sepsets is not None:
@@ -329,24 +335,27 @@ def _grow_shrink(
     if constraints is not None:
         support = constraints.support()[target]
         blanket = [x for x in blanket if support[x]]
-    if undecided:
-        _count_beside_undecided(search.test, target, blanket, required, max_depth, undecided)
+    _count_beside_undecided(search, target, blanket, required, undecided)
     return blanket
 
 
 def _count_beside_undecided(
-    test: CITest,
+    search: LocalSearch,
     target: int,
     members: list[int],
     required: Sequence[int],
-    max_depth: int | None,
     undecided: list[int],
 ) -> None:
-    """For each of ``members`` outside ``required``, count one untested conditioning set with
-    ``target`` when a search omits ``undecided`` candidates: a set holding one of them was never
-    tested and might separate the member from ``target``. Required members are never tested, and
-    ``max_depth`` 0 permits no set, so neither counts one."""
-    if max_depth == 0 or not isinstance(test, TestwiseDeletion):
+    """Note in ``search.undecided`` that ``target``'s search left out the candidates
+    ``undecided``, which no test with rows decided, and, for each of ``members`` outside
+    ``required``, count one untested conditioning set with ``target``: a set holding one of them
+    was never tested and might separate the member from ``target``. Required members are never
+    tested, and ``max_depth`` 0 permits no set, so neither counts one."""
+    if not undecided:
+        return
+    search.undecided.update((target, u) for u in undecided)
+    test = search.test
+    if search.max_depth == 0 or not isinstance(test, TestwiseDeletion):
         return
     held = [[u] for u in undecided]
     for x in members:
@@ -360,18 +369,21 @@ def _shrink(
     blanket: list[int],
     keep: Sequence[int] = (),
     sepsets: Sepsets | None = None,
-) -> None:
+) -> list[int]:
     """Drop, in place and in joining order, each member independent of ``target`` given the rest;
     the members in ``keep`` are not tested. With ``sepsets``, a dropped member's entry is set to the
-    rest."""
+    rest. Returns the members dropped."""
+    dropped = []
     for x in list(blanket):
         if x in keep:
             continue
         rest = [z for z in blanket if z != x]
         if search.scan(target, [x], rest)[1][0] > search.alpha:
             blanket.remove(x)
+            dropped.append(x)
             if sepsets is not None:
                 sepsets[x] = tuple(sorted(rest))
+    return dropped
 
 
 def _gs(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
@@ -393,8 +405,8 @@ def _gs(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     and adds no member, as in :func:`markov_blanket`: when a pass adds nothing, each candidate
     whose last grow test was not tested, that a test with rows asked and none separated, joins in
     rank order before the shrink; a candidate with no test that had rows, as one never observed
-    with ``target``, is left out. A candidate whose ordering test was not tested has no strength
-    and is visited after the others, in rank order.
+    with ``target``, is undecided and left out (:func:`_count_beside_undecided`). A candidate whose
+    ordering test was not tested has no strength and is visited after the others, in rank order.
 
     ``max_depth``, ``constraints``, and ``sepsets`` act as in :func:`markov_blanket`: the grow
     stops once the blanket holds more than ``max_depth`` members, a member a required edge joins to
@@ -441,6 +453,7 @@ def _gs(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
                 p = unconditional[y]
             if p <= alpha:
                 blanket.append(y)
+                decided.add(y)
                 untested.discard(y)  # an earlier size left it not tested, and it joins here
                 added = True
                 continue
@@ -472,10 +485,12 @@ def _gs(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
                 break
     for x in blanket:
         sepsets.pop(x, None)
-    if constraints is None:
-        return blanket
-    support = constraints.support()[target]
-    return [x for x in blanket if support[x]]
+    undecided = [x for x in candidates if x not in decided and x not in blanket]
+    if constraints is not None:
+        support = constraints.support()[target]
+        blanket = [x for x in blanket if support[x]]
+    _count_beside_undecided(search, target, blanket, required, undecided)
+    return blanket
 
 
 #: Fast-IAMB's least average number of rows per cell of the table of a test it adds a member by
@@ -500,6 +515,14 @@ def _fast_iamb(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     a shrink repeats one it held after an earlier shrink, which ends a cycle of additions and
     removals the paper does not guard against.
 
+    A test without the rows it needs (:func:`~andrey.core.ci_missing.not_tested`) separates no pair
+    and adds no member, as in :func:`markov_blanket`: when the search stops for any reason but the
+    ``max_depth`` cap, each candidate whose test given the final blanket was not tested, that a
+    test with rows asked and none separated, a shrink's included, joins in rank order while the
+    blanket holds at most ``max_depth`` members, and one shrink pass follows; a candidate with no
+    test that had rows, as one never observed with ``target``, is undecided and left out
+    (:func:`_count_beside_undecided`).
+
     ``max_depth``, ``constraints``, and ``sepsets`` act as in :func:`markov_blanket`: a batch stops
     once the blanket holds more than ``max_depth`` members, and the search stops while it does, so
     no test conditions on more than ``max_depth`` variables.
@@ -513,13 +536,23 @@ def _fast_iamb(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     required = _required(constraints, target, search.ranks)
     blanket: list[int] = list(required)
     seen: set[frozenset[int]] = set()
+    decided: set[int] = set()  # the candidates with a test that had rows
+    # The candidates not tested given each blanket a round scanned.
+    untested: dict[frozenset[int], list[int]] = {}
+    stay: list[int] = []  # the candidates not tested given the blanket the search ends on
     while max_depth is None or len(blanket) <= max_depth:
         candidates = [x for x in range(search.d) if x != target and x not in blanket]
         strengths, pvalues = search.scan(target, candidates, blanket)
         given = tuple(sorted(blanket))
         sepsets.update((candidates[i], given) for i in np.flatnonzero(pvalues > alpha).tolist())
+        missing = not_tested(pvalues).tolist()
+        decided.update(x for x, m in zip(candidates, missing, strict=True) if not m)
+        now = untested[frozenset(blanket)] = [
+            x for x, m in zip(candidates, missing, strict=True) if m
+        ]
         dependent = np.flatnonzero(pvalues <= alpha).tolist()
         if not dependent:
+            stay = now
             break
         batch = search.by_strength([candidates[i] for i in dependent], strengths[dependent])
         insufficient = False
@@ -534,17 +567,37 @@ def _fast_iamb(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
         before = len(blanket)
         _shrink(search, target, blanket, required, sepsets)
         if insufficient and len(blanket) == before:
+            # The blanket holds the round's and the batch's members: a query not tested given the
+            # round's blanket has fewer rows still given more.
+            stay = now
             break
         state = frozenset(blanket)
         if state in seen:
+            stay = untested[state]  # scanned when it first held
             break
         seen.add(state)
+    # A candidate whose test given the final blanket was not tested stays if a test with rows asked
+    # it and none separated it, a shrink included (every such test set its entry in sepsets), as in
+    # markov_blanket; one with no test that had rows is undecided. The max_depth cap keeps none.
+    joined = False
+    for x in sorted(stay, key=lambda x: search.ranks[x]):
+        if max_depth is not None and len(blanket) > max_depth:
+            break
+        if x in decided and x not in sepsets:
+            blanket.append(x)
+            joined = True
+    if joined:
+        _shrink(search, target, blanket, required, sepsets)
     for x in blanket:
         sepsets.pop(x, None)
-    if constraints is None:
-        return blanket
-    support = constraints.support()[target]
-    return [x for x in blanket if support[x]]
+    undecided = [
+        x for x in range(search.d) if x != target and x not in decided and x not in blanket
+    ]
+    if constraints is not None:
+        support = constraints.support()[target]
+        blanket = [x for x in blanket if support[x]]
+    _count_beside_undecided(search, target, blanket, required, undecided)
+    return blanket
 
 
 def blanket_graph(
@@ -784,8 +837,7 @@ def _max_min(search: LocalSearch, target: int, sepsets: Sepsets | None) -> list[
                 if sepsets is not None:
                     sepsets[x] = found[0]
                 break
-    if undecided:
-        _count_beside_undecided(search.test, target, members, required, max_depth, undecided)
+    _count_beside_undecided(search, target, members, required, undecided)
     return members
 
 
@@ -834,7 +886,10 @@ def _hiton_pc(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     On categorical data a test runs only when the data hold at least ``HITON_CELL_ROWS`` rows per
     cell of its table (:func:`table_size`) [1]_: a candidate whose unconditional test fails the
     rule is taken as independent of ``target`` without a test, and a conditioning set that fails it
-    is not tested, so it removes nothing.
+    is not tested, so it removes nothing. A candidate whose unconditional test was not tested
+    (:func:`~andrey.core.ci_missing.not_tested`), as one never observed with ``target``, has no
+    test with rows, since no test given more can run on more rows: it is undecided and left out
+    (:func:`_count_beside_undecided`).
 
     ``constraints`` act as in :func:`parents_children`: each variable a required edge joins to
     ``target`` is a member from the start, in rank order, and never tested, and a pair the knowledge
@@ -887,11 +942,14 @@ def _hiton_pc(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
         else:
             sepsets[x] = ()
     keys: dict[int, tuple[float, float]] = {}
+    undecided = []  # no test given more can run on more rows than the test given none
     for x, (p, strength) in zip(others, search.weakest(target, others, [()]), strict=True):
         if p <= alpha:
             keys[x] = (float(f"{p:.{KEY_DP}g}"), -round(strength, KEY_DP))
         elif p > alpha:
             sepsets[x] = ()
+        else:
+            undecided.append(x)
     order = search.ordered(keys)
     members = list(required)
     # The members each candidate was tested against when it joined.
@@ -911,6 +969,7 @@ def _hiton_pc(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
         if found is not None:
             members.remove(x)
             sepsets[x] = found
+    _count_beside_undecided(search, target, members, required, undecided)
     return members
 
 
@@ -943,7 +1002,9 @@ def _get_pcd(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
     On categorical data a test runs only when the data hold at least ``PCMB_DF_ROWS`` rows per
     degree of freedom of its table (:func:`table_size` with ``df=True``) [1]_: a subset that fails
     the rule is not tested and takes no part, and a candidate whose unconditional test fails it is
-    never tested and never joins.
+    never tested and never joins. A candidate whose unconditional test was not tested
+    (:func:`~andrey.core.ci_missing.not_tested`), as one never observed with ``target``, is
+    undecided and left out (:func:`_count_beside_undecided`).
 
     ``constraints`` act as in :func:`parents_children`: each variable a required edge joins to
     ``target`` is a member from the start, in rank order, and never tested, and a pair the knowledge
@@ -1004,7 +1065,9 @@ def _get_pcd(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
         return found
 
     measure(candidates, None)
-    candidates = [x for x in candidates if not np.isnan(tested[x][()][0])]
+    # No test given more can run on more rows than the test given none.
+    undecided = [x for x in candidates if not_tested(tested[x][()][0])]
+    candidates = [x for x in candidates if x not in undecided]
     while True:
         dropped = {x: z for x in candidates if (z := separating(x)) is not None}
         sepsets.update(dropped)
@@ -1012,6 +1075,7 @@ def _get_pcd(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
         for x in dropped:
             del tested[x]
         if not candidates:
+            _count_beside_undecided(search, target, members, required, undecided)
             return members
         keys = {}
         for x in candidates:
@@ -1372,7 +1436,8 @@ def _total_conditioning(search: LocalSearch, target: int, sepsets: Sepsets) -> l
     finds independent keeps all the rest as its separating set. A variable whose test was not
     tested, for want of rows (:func:`~andrey.core.ci_missing.not_tested`), has no test that had
     rows: it is undecided, left out with no separating set, as :func:`markov_blanket` leaves one
-    out. A member a required edge joins to ``target`` is in
+    out, and noted in :attr:`LocalSearch.undecided`; every member's test conditioned on it, so no
+    member is flagged beside it. A member a required edge joins to ``target`` is in
     the blanket from the start and never tested, and a pair the knowledge makes non-adjacent is
     tested, since it may be a child's other parent, and left out of the returned set, as in
     :func:`markov_blanket`. Every test conditions on ``d - 2`` variables, so with ``max_depth``
@@ -1400,6 +1465,8 @@ def _total_conditioning(search: LocalSearch, target: int, sepsets: Sepsets) -> l
                 strengths.append(strength)
             elif pvalue > search.total_alpha:
                 sepsets[x] = tuple(z for z in range(search.d) if z not in (target, x))
+            else:  # not tested: undecided; each member's test conditioned on it, so none is flagged
+                search.undecided.add((target, x))
         blanket = required + search.by_strength(dependent, np.asarray(strengths))
     if search.constraints is None:
         return blanket
@@ -1535,7 +1602,9 @@ class LocalSearch:
     :meth:`separating`, and picks between candidates with :meth:`strongest`, which reads ``ranks``
     only when two candidates tie; it reads neither the test's internals nor ``ranks`` itself.
     ``counts`` (:class:`SearchCounts`) adds up the queries and the time; with ``trace``, it also
-    keeps the distinct queries, which costs memory in proportion to their number.
+    keeps the distinct queries, which costs memory in proportion to their number. ``undecided``
+    holds each pair of a target and a candidate that a run left out because no test with rows
+    decided it (:func:`_count_beside_undecided`).
     """
 
     def __init__(
@@ -1561,6 +1630,9 @@ class LocalSearch:
         self.levels = levels
         self.n = n
         self.counts = SearchCounts(queries=set() if trace else None)
+        #: Each ``(target, candidate)`` a learner's run left out undecided: no test with rows
+        #: decided it, as when the two are never observed together.
+        self.undecided: set[tuple[int, int]] = set()
         # Whether a scan's strengths are negated p-values, as for a test without statistic_pvalue.
         self._pvalue_strengths = getattr(test, "statistic_pvalue", None) is None
         self._measuring = False

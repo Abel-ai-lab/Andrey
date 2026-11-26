@@ -301,11 +301,13 @@ def mb_by_mb(
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
-    tested, including sets skipped because no row can test them. A continuous column constant on a
-    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
-    completely at random, which means that whether a value is missing depends on no value in the
-    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
-    selected sample that more rows do not correct.
+    tested, including sets skipped because no row can test them. A pair no tested query could
+    decide, as a pair never observed together, is undecided and listed in
+    ``metadata["undecided_pairs"]``; on merged cohorts, pairs measured only in different cohorts are
+    undecided. A continuous column constant on a test's rows raises ``ValueError``. Test-wise
+    deletion is valid when values are missing completely at random, which means that whether a value
+    is missing depends on no value in the data; the rows a test reads are then a random sample of
+    all rows, and otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** At its paper's settings (Alarm and Hailfinder samples at 500 to 5,000 rows, a
     45 x 45 chessboard) it made fewer errors at the target than the empty answer, with a small
@@ -368,7 +370,7 @@ def mb_by_mb(
     def output(t: int, edges: _Edges, n: int, rows: Mapping[int, int]) -> StructureOutput:
         metadata = target_metadata(t, _edge_sets(edges.marks), name)
         metadata["blankets_learned"] = [name(x) for x in edges.learned]
-        metadata |= fit_metadata(mask, data, rows, n)
+        metadata |= fit_metadata(mask, data, rows, n, name)
         return structure_output(_star(edges.marks, t, d, "cpdag"), labels=labels, metadata=metadata)
 
     with copies_named(labels):
@@ -640,11 +642,13 @@ def mmb_by_mmb(
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
-    tested, including sets skipped because no row can test them. A continuous column constant on a
-    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
-    completely at random, which means that whether a value is missing depends on no value in the
-    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
-    selected sample that more rows do not correct.
+    tested, including sets skipped because no row can test them. A pair no tested query could
+    decide, as a pair never observed together, is undecided and listed in
+    ``metadata["undecided_pairs"]``; on merged cohorts, pairs measured only in different cohorts are
+    undecided. A continuous column constant on a test's rows raises ``ValueError``. Test-wise
+    deletion is valid when values are missing completely at random, which means that whether a value
+    is missing depends on no value in the data; the rows a test reads are then a random sample of
+    all rows, and otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** On the paper's four networks with hidden nodes, at 1,000 and 5,000 rows and the
     paper's targets, its edges and marks were better than those of the authors' code in five of
@@ -708,7 +712,7 @@ def mmb_by_mmb(
         sets = {"markov_blanket": edges.blanket, **_pag_sets(edges.marks)}
         metadata = target_metadata(t, sets, name)
         metadata["blankets_learned"] = [name(x) for x in edges.learned]
-        metadata |= fit_metadata(mask, data, rows, n)
+        metadata |= fit_metadata(mask, data, rows, n, name)
         return structure_output(_star(edges.marks, t, d, "pag"), labels=labels, metadata=metadata)
 
     with copies_named(labels):
@@ -921,11 +925,13 @@ def cmb(
     ``"fisherz"`` and ``"normal_scores"``, ``|S| + 3`` for ``"student_t"`` and ``"cond_gauss"``, and
     2 for most other tests), or with no degrees of freedom left, is not tested: it never separates a
     pair and never confirms a link, and ``metadata["not_tested"]`` counts the conditioning sets not
-    tested, including sets skipped because no row can test them. A continuous column constant on a
-    test's rows raises ``ValueError``. Test-wise deletion is valid when values are missing
-    completely at random, which means that whether a value is missing depends on no value in the
-    data; the rows a test reads are then a random sample of all rows, and otherwise they are a
-    selected sample that more rows do not correct.
+    tested, including sets skipped because no row can test them. A pair no tested query could
+    decide, as a pair never observed together, is undecided and listed in
+    ``metadata["undecided_pairs"]``; on merged cohorts, pairs measured only in different cohorts are
+    undecided. A continuous column constant on a test's rows raises ``ValueError``. Test-wise
+    deletion is valid when values are missing completely at random, which means that whether a value
+    is missing depends on no value in the data; the rows a test reads are then a random sample of
+    all rows, and otherwise they are a selected sample that more rows do not correct.
 
     **Limitations.** Measured on samples of the Alarm network (37 variables) at 1,000 rows with
     G-square tests at alpha 0.02, every variable a target, as its paper ran it: its edges at the
@@ -987,7 +993,7 @@ def cmb(
         sets = {"markov_blanket": result.blanket, **_edge_sets(marks)}
         metadata = target_metadata(t, sets, name)
         metadata["blankets_learned"] = [name(x) for x in result.learned]
-        metadata |= fit_metadata(mask, data, rows, n)
+        metadata |= fit_metadata(mask, data, rows, n, name)
         return structure_output(_star(marks, t, d, "cpdag"), labels=labels, metadata=metadata)
 
     with copies_named(labels):

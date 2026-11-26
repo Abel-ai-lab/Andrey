@@ -20,9 +20,9 @@ import pytest
 
 import andrey
 from andrey.api._method import _not_tested_notice
-from andrey.constraint.blanket import LocalSearch
+from andrey.constraint.blanket import LocalSearch, local_search
 from andrey.core import ARROW, ci
-from andrey.core.ci_missing import NOT_TESTED
+from andrey.core.ci_missing import NOT_TESTED, rows_tested
 from andrey.temporal.pcmci import pc1
 
 COHORT = 300
@@ -252,6 +252,7 @@ def test_total_conditioning_leaves_a_variable_not_tested_given_the_rest_undecide
 
     search = LocalSearch(test, [0, 1, 2, 3], 0.05)
     assert search.run("total_conditioning", 0) == ([1], {2: (1, 3)})
+    assert search.undecided == {(0, 3)}
 
 
 class _InfiniteStatistic:
@@ -450,3 +451,321 @@ def test_lpcmci_conditions_no_test_on_a_link_never_observed_together(monkeypatch
     (search,) = set(searches)
     # Only the tests of A and B lack rows: no test of another link conditions on A given B.
     assert search.skipped and all({i, j} == {a, b} for i, j, _ in search.skipped)
+
+
+def _oracle(answers: dict) -> object:
+    """A test of target 0 answering ``answers[(candidate, sorted set)]``, any other query not
+    tested."""
+
+    def test(x, y, condition_set=()):
+        return answers.get((max(x, y), tuple(sorted(condition_set))), NOT_TESTED)
+
+    return test
+
+
+def test_fast_iamb_keeps_a_dependent_candidate_whose_last_test_was_not_tested():
+    """1, 2, and 3 test dependent on 0 alone; the sparse-table rule admits 1 and 2, the shrink drops
+    1 given 2, and 3 is not tested given 2. No test with rows separated 3, so it stays, as in IAMB,
+    and the shrink keeps both."""
+    answers = {(1, ()): 0.0, (2, ()): 0.001, (3, ()): 0.01, (1, (2,)): 0.5, (2, (3,)): 0.001}
+    search = LocalSearch(_oracle(answers), [0, 1, 2, 3], 0.05, levels=np.full(4, 2), n=50)
+    assert search.run("fast_iamb", 0) == ([2, 3], {1: (2,)})
+    assert not search.undecided
+
+
+def _sparse_chain(seed: int = 2, n: int = 55) -> pd.DataFrame:
+    """Binary ``T -> v2 -> v1`` and ``T -> v3``, with ``v4``, three levels, a parent of ``v2``;
+    ``v2`` is observed on the first 35 rows and ``v3`` on the others, so the two are never observed
+    together."""
+    rng = np.random.default_rng(seed)
+    t = rng.integers(0, 2, n)
+    v4 = rng.choice(3, n, p=[0.45, 0.4, 0.15])
+    v2 = t ^ (v4 == 2)
+    v1 = v2 ^ (rng.random(n) < 0.1)
+    v3 = t ^ (rng.random(n) < 0.15)
+    df = pd.DataFrame({"T": t, "v1": v1, "v2": v2, "v3": v3, "v4": v4}).astype(float)
+    df.loc[35:, "v2"] = np.nan
+    df.loc[:34, "v3"] = np.nan
+    return df
+
+
+def test_fast_iamb_keeps_a_candidate_not_tested_when_the_sparse_table_rule_ends_the_search():
+    """v3 tests dependent on T alone and is not tested given v2; v4, dependent given v2, fails the
+    sparse-table rule, which ends the search. No test with rows separated v3, so it stays, as in
+    IAMB; v4 is taken as independent, as the rule says."""
+    df = _sparse_chain()
+    fast = andrey.fast_iamb(df, target="T", indep_test="chisq").metadata
+    assert andrey.iamb(df, target="T", indep_test="chisq").metadata["markov_blanket"] == [
+        "v2",
+        "v4",
+        "v3",
+    ]
+    assert fast["markov_blanket"] == ["v2", "v3"]
+    assert fast["undecided_pairs"] == []
+
+
+def test_fast_iamb_keeps_a_candidate_not_tested_when_its_blanket_repeats():
+    """Binary columns, 50 rows: the sparse-table rule admits two members. Round one adds 1 and 2
+    and keeps 3 out; the shrinks then move the blanket from 2 to 4 to 5 and back to 2, which ends
+    the search. 3, dependent on 0 alone, is not tested given any of them, and no test separated
+    it: it stays."""
+    answers = {
+        **{(1, ()): 0.001, (2, ()): 0.002, (3, ()): 0.003, (4, ()): 0.01, (5, ()): 0.02},
+        **{(1, (2,)): 0.5, (4, (2,)): 0.001, (5, (2,)): 0.5},
+        **{(2, (4,)): 0.5, (5, (4,)): 0.001, (2, (5,)): 0.001, (4, (5,)): 0.5},
+    }
+    search = LocalSearch(_oracle(answers), range(6), 0.05, levels=np.full(6, 2), n=50)
+    assert search.run("fast_iamb", 0) == ([2, 3], {1: (2,), 4: (5,), 5: (2,)})
+    assert not search.undecided
+
+
+def test_inter_iamb_keeps_a_candidate_not_tested_when_its_blanket_repeats():
+    """2 joins; given 2, 3 joins and 1 is not tested; the shrink drops both, and 2 joins again,
+    which ends the search. 1 tests dependent on 0 alone and no test separated it: it stays, as in
+    IAMB."""
+    answers = {(1, ()): 0.0067, (2, ()): 0.0002, (3, ()): 0.0575, (3, (2,)): 0.0458}
+    answers[2, (3,)] = 0.2262
+    search = LocalSearch(_oracle(answers), range(4), 0.05)
+    assert search.run("inter_iamb", 0) == ([2, 1], {3: ()})
+    assert search.run("iamb", 0)[0] == [2, 3, 1]
+
+
+def test_inter_iamb_keeps_out_a_candidate_a_shrink_separated():
+    """1, 2, and 3 join; the shrink drops 1 given 2 and 3, then 2 given 3, and 1 is not tested
+    given 3 after: the shrink's test separated it, so it stays out, as in IAMB."""
+    answers = {
+        **{(1, ()): 0.001, (2, ()): 0.002, (3, ()): 0.003, (2, (1,)): 0.001, (1, (2,)): 0.001},
+        **{(3, (1, 2)): 0.001, (1, (2, 3)): 0.5, (2, (3,)): 0.5},
+    }
+    for name in ("inter_iamb", "iamb"):
+        search = LocalSearch(_oracle(answers), range(4), 0.05)
+        assert search.run(name, 0) == ([3], {1: (2, 3), 2: (3,)})
+
+
+def test_fast_iamb_leaves_out_a_candidate_no_test_with_rows_decided():
+    """3 is never tested: it is undecided, and the member 1 is flagged beside it."""
+    search = LocalSearch(_oracle({(1, ()): 0.0, (2, ()): 0.5}), [0, 1, 2, 3], 0.05)
+    assert search.run("fast_iamb", 0) == ([1], {2: ()})
+    assert search.undecided == {(0, 3)}
+
+
+@pytest.mark.parametrize(
+    "name", ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "get_pcd"]
+)
+def test_a_run_flags_each_member_beside_an_undecided_candidate(name):
+    """B's run never tests A, which it never observes: A is undecided, and a set holding A, never
+    tested, might separate B from its member S1, so the pair counts a set not tested."""
+    x = _cohorts(0).to_numpy()  # columns S1, S2, S3, A, B
+    search = local_search(x, alpha=0.05, indep_test="fisherz")
+    with rows_tested() as rows:
+        members, _ = search.run(name, 4)
+    assert 0 in members and 3 not in members
+    assert (0, 4) in rows.possibly_separable(np.ones((5, 5), dtype=bool))
+    assert search.undecided == {(4, 3)}
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["iamb", "inter_iamb", "gs", "fast_iamb", "mmpc", "hiton_pc", "hiton_mb", "mmmb", "pcmb"],
+)
+def test_a_target_set_lists_undecided_pairs_and_flags_its_members_beside_them(name):
+    out = getattr(andrey, name)(_cohorts(0), target="B")
+    assert ["A", "B"] in out.metadata["undecided_pairs"]
+    assert ["B", "S1"] in out.metadata["possibly_separable"]
+
+
+#: The local facades, each on ``_pair_never_together()`` around ``x1``.
+LOCAL_FACADES = {
+    "mb_by_mb": lambda df: andrey.mb_by_mb(df, target="x1", blanket="iamb"),
+    "mb_by_mb_gs": lambda df: andrey.mb_by_mb(df, target="x1", blanket="gs"),
+    "cmb": lambda df: andrey.cmb(df, target="x1"),
+    "mmb_by_mmb": lambda df: andrey.mmb_by_mmb(df, target="x1", blanket="iamb"),
+    "ldecc": lambda df: andrey.ldecc(df, treatment="x1", outcome="x0"),
+    "local_optimal_adjustment": lambda df: andrey.local_optimal_adjustment(
+        df, variables=["x1", "x0"]
+    ),
+    "ldp": lambda df: andrey.ldp(df, treatment="x1", outcome="x0"),
+    "ld3": lambda df: andrey.ld3(df, treatment="x1", outcome="x0"),
+    "locpc_cde": lambda df: andrey.locpc_cde(df, treatment="x1", outcome="x0"),
+    "y_structures": lambda df: andrey.y_structures(df),
+}
+
+
+def _pair_never_together() -> pd.DataFrame:
+    """``x1 -> x0 <- x2`` and an independent ``x3``, with ``x1`` and ``x2`` never observed
+    together."""
+    rng = np.random.default_rng(0)
+    n = 600
+    x1, x2, noise = rng.normal(size=(3, n))
+    df = pd.DataFrame({"x0": x1 + x2 + noise, "x1": x1, "x2": x2, "x3": rng.normal(size=n)})
+    df.loc[: n // 2 - 1, "x1"] = np.nan
+    df.loc[n // 2 :, "x2"] = np.nan
+    return df
+
+
+@pytest.mark.parametrize("name", list(LOCAL_FACADES))
+def test_a_local_facade_lists_the_pair_no_test_decided(name):
+    """Its notice names the undecided pair rather than saying no pair is undecided."""
+    out = LOCAL_FACADES[name](_pair_never_together())
+    assert out.metadata["not_tested"] > 0
+    assert ["x1", "x2"] in out.metadata["undecided_pairs"]
+    notice = _not_tested_notice(out.metadata)
+    assert "x1 and x2" in notice and "No pair is undecided" not in notice
+
+
+@pytest.mark.parametrize("k", [0, 2])
+def test_load_and_ldecc_leave_the_effect_undecided_when_no_test_decided_a_pair(k):
+    """A and B share fewer rows than a test needs, so B's blanket leaves A undecided and no test
+    reads their relation: neither method reads the effect, though each did before, LOAD as no
+    effect, identified by the empty set."""
+    out = andrey.local_optimal_adjustment(_cohorts(k), variables=["B", "A"])
+    assert out.metadata["undecided_pairs"] == [["A", "B"]]
+    for record in out.metadata["effects"]:
+        assert (record["nonzero"], record["identifiable"], record["adjustment_sets"]) == (
+            None,
+            None,
+            [],
+        )
+    out = andrey.ldecc(_cohorts(k), treatment="A", outcome="B")
+    assert out.metadata["undecided_pairs"] == [["A", "B"]]
+    (record,) = out.metadata["effects"]
+    assert (record["nonzero"], record["identifiable"], record["adjustment_sets"]) == (
+        None,
+        None,
+        [],
+    )
+
+
+def test_load_and_ldecc_leave_the_effect_undecided_when_total_conditioning_left_one_undecided():
+    """``a -> b -> c`` and ``v``, categorical, ``v`` one category on the rows that observe ``c``:
+    every chi-square test of ``v`` given all the rest has no degrees of freedom, so total
+    conditioning leaves ``v`` undecided, and neither method reads the effect of ``a`` on ``b``."""
+    rng = np.random.default_rng(0)
+    n = 600
+    a = rng.integers(0, 2, n)
+    b = a ^ (rng.random(n) < 0.1)
+    c = b ^ (rng.random(n) < 0.1)
+    df = pd.DataFrame({"a": a, "b": b, "c": c, "v": rng.integers(0, 2, n)}).astype(float)
+    df.loc[: n // 2 - 1, "c"] = np.nan
+    df.loc[n // 2 :, "v"] = 0.0
+    fit = partial(andrey.ldecc, df, treatment="a", outcome="b", indep_test="chisq")
+    out = fit(blanket="total_conditioning")
+    assert ["a", "v"] in out.metadata["undecided_pairs"]
+    (record,) = out.metadata["effects"]
+    assert (record["nonzero"], record["identifiable"], record["adjustment_sets"]) == (
+        None,
+        None,
+        [],
+    )
+    out = andrey.local_optimal_adjustment(
+        df, variables=["a", "b"], blanket="total_conditioning", indep_test="chisq"
+    )
+    assert ["a", "v"] in out.metadata["undecided_pairs"]
+    for record in out.metadata["effects"]:
+        assert (record["nonzero"], record["identifiable"], record["adjustment_sets"]) == (
+            None,
+            None,
+            [],
+        )
+
+
+def _five(n: int = 1200) -> pd.DataFrame:
+    """``x0 -> x1 -> x3 <- x2 <- x0`` and an independent ``x4``."""
+    rng = np.random.default_rng(0)
+    x0, e1, e2, e3, x4 = rng.normal(size=(5, n))
+    x1, x2 = x0 + e1, x0 + e2
+    return pd.DataFrame({"x0": x0, "x1": x1, "x2": x2, "x3": x1 + x2 + e3, "x4": x4})
+
+
+def _own_rows(df: pd.DataFrame) -> pd.DataFrame:
+    """Each column observed on its own block of rows: no pair is ever observed together."""
+    x = df.to_numpy().copy()
+    block = np.arange(len(x)) // (len(x) // x.shape[1])
+    x[block[:, None] != np.arange(x.shape[1])] = np.nan
+    return pd.DataFrame(x, columns=df.columns)
+
+
+def _alone(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    """``column`` observed only on the first quarter of the rows, where every other column is
+    missing."""
+    out = df.copy()
+    quarter = len(df) // 4
+    out.loc[quarter:, column] = np.nan
+    out.loc[: quarter - 1, [c for c in df.columns if c != column]] = np.nan
+    return out
+
+
+#: Data on which a pair the direct effect of x1 on x3 rests on has no test with rows.
+NEVER_TESTED = {
+    "no pair observed together": _own_rows,
+    "treatment alone": partial(_alone, column="x1"),
+    "outcome alone": partial(_alone, column="x3"),
+}
+
+
+@pytest.mark.parametrize("case", list(NEVER_TESTED))
+@pytest.mark.parametrize("name", ["ld3", "locpc_cde", "ldp"])
+def test_an_effect_resting_on_a_pair_no_test_decided_is_undecided(name, case):
+    out = getattr(andrey, name)(NEVER_TESTED[case](_five()), treatment="x1", outcome="x3")
+    (record,) = out.metadata["effects"]
+    assert (record["nonzero"], record["identifiable"], record["adjustment_sets"]) == (
+        None,
+        None,
+        [],
+    )
+    assert out.metadata["undecided_pairs"]
+
+
+def test_ld3_draws_no_edge_from_a_pair_no_test_decided():
+    """x3 is never observed with another column: no test confirms a parent."""
+    out = andrey.ld3(_alone(_five(), "x3"), treatment="x1", outcome="x3")
+    assert not any(_adjacent(out, c, "x3") for c in ("x0", "x1", "x2", "x4"))
+
+
+def test_locpc_cde_leaves_a_pair_no_test_decided_out_of_its_graph():
+    """x1 is never observed with another column: its edge to x3 is undecided, not adjacent."""
+    out = andrey.locpc_cde(_alone(_five(), "x1"), treatment="x1", outcome="x3")
+    assert ["x1", "x3"] in out.metadata["undecided_pairs"]
+    assert not _adjacent(out, "x1", "x3")
+
+
+def test_ldp_and_ld3_read_no_dependence_from_a_query_not_tested():
+    """The treatment 0 and the outcome 1 test dependent and every query of 2 is not tested: 2 is
+    no parent and takes no label, and both answers are undecided."""
+    from andrey.constraint import partition
+
+    def test(x, y, condition_set=()):
+        return 0.0 if {x, y} == {0, 1} else NOT_TESTED
+
+    ld3 = partition.ld3(LocalSearch(test, [0, 1, 2], 0.05), 0, 1, [2])
+    assert (ld3.parents, ld3.partition["unlabeled"], ld3.direct, ld3.undecided) == (
+        [],
+        [2],
+        True,
+        True,
+    )
+    ldp = partition.ldp(LocalSearch(test, [0, 1, 2], 0.05), 0, 1, [2])
+    assert (ldp.partition["unlabeled"], ldp.valid, ldp.undecided) == ([2], False, True)
+
+
+def test_ldecc_reads_no_dependence_from_a_query_not_tested():
+    """UCChildren marks the neighbor 1 a child when the spouse 2, separated from 0 by no set, is
+    dependent on 1; a query of 1 and 2 not tested marks nothing."""
+    from andrey.constraint.ldecc import Tests, uc_children
+
+    def test(x, y, condition_set=()):
+        return 0.5 if {x, y} == {0, 2} and not condition_set else NOT_TESTED
+
+    search = LocalSearch(test, [0, 1, 2], 0.05)
+    assert uc_children(Tests(search), 0, [1, 2], [1]) == set()
+
+
+def test_load_reads_no_ancestry_from_a_query_not_tested():
+    """Whether 0 is an explicit ancestor of 1 is a test of the two given 0's parents; a query not
+    tested decides neither."""
+    from andrey.constraint.local_optimal_adjustment import NotTested, explicit_ancestor
+    from andrey.constraint.sequential import Network
+
+    search = LocalSearch(_oracle({}), [0, 1], 0.05)
+    with pytest.raises(NotTested):
+        explicit_ancestor(search, 0, 1, Network(2))

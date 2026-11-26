@@ -104,14 +104,24 @@ class Tests:
         for b, p in zip(bs, pvalues, strict=True):
             table[self.pair(a, b)] = float(p)
 
-    def independent(self, a: int, b: int, cond: Sequence[int] = ()) -> bool:
-        """Whether ``a`` and ``b`` test independent given ``cond``: a p-value above ``alpha``."""
+    def pvalue(self, a: int, b: int, cond: Sequence[int] = ()) -> float:
+        """The p-value of ``a`` and ``b`` given ``cond``, asked once."""
         table = self.table(cond)
         pair = self.pair(a, b)
         if pair not in table:
             low, high = (a, b) if self.ranks[a] < self.ranks[b] else (b, a)
             self._scan(table, low, [high], cond)
-        return table[pair] > self.alpha
+        return table[pair]
+
+    def independent(self, a: int, b: int, cond: Sequence[int] = ()) -> bool:
+        """Whether ``a`` and ``b`` test independent given ``cond``: a p-value above ``alpha``."""
+        return self.pvalue(a, b, cond) > self.alpha
+
+    def dependent(self, a: int, b: int, cond: Sequence[int] = ()) -> bool:
+        """Whether ``a`` and ``b`` test dependent given ``cond``: a p-value at or below ``alpha``.
+        A query not tested (:func:`~andrey.core.ci_missing.not_tested`) is neither independent
+        nor dependent."""
+        return self.pvalue(a, b, cond) <= self.alpha
 
     def by_rank(self, nodes: Iterable[int]) -> list[int]:
         return sorted(nodes, key=self.ranks.__getitem__)
@@ -137,6 +147,9 @@ class Result:
     the pairs of neighbors marked as a non-collider at the treatment, and ``parent_sets`` the
     locally valid parent sets: the parents with each subset of the unoriented neighbors that holds
     no marked pair (Fig. 5, lines 24-28), each sorted, the sets in the order of their sizes.
+    ``undecided`` is whether the blanket's search left a candidate out because no test with rows
+    decided it (:attr:`~andrey.constraint.blanket.LocalSearch.undecided`), so a variable left out
+    may be a neighbor.
     """
 
     blanket: tuple[int, ...]
@@ -146,6 +159,7 @@ class Result:
     unoriented: frozenset[int]
     non_colliders: frozenset[frozenset[int]]
     parent_sets: tuple[tuple[int, ...], ...]
+    undecided: bool = False
 
 
 def neighbors(
@@ -196,7 +210,7 @@ def uc_children(tests: Tests, x: int, mb: Sequence[int], ne: Sequence[int]) -> s
             )
             marked = False
             for cond in separators:
-                marked = c not in cond and not tests.independent(c, d, cond)
+                marked = c not in cond and tests.dependent(c, d, cond)
                 if not marked:
                     break
             if marked:
@@ -291,17 +305,17 @@ def ldecc(
         held = set(cond)
         if a in ne_set and b in ne_set and x not in held:
             wider = (*cond, x)
-            if tests.allowed(len(wider)) and not tests.independent(a, b, wider):
+            if tests.allowed(len(wider)) and tests.dependent(a, b, wider):
                 parents.update((a, b), held & ne_set)
         elif a in ne_set and b in ne_set:
             marked.add(frozenset((a, b)))
             for v in tests.by_rank(unoriented() - held - {a, b}):
                 wider = (*cond, v)
-                if tests.allowed(len(wider)) and not tests.independent(a, b, wider):
+                if tests.allowed(len(wider)) and tests.dependent(a, b, wider):
                     children.add(v)
         elif x not in held:
             wider = (*cond, x)
-            if tests.allowed(len(wider)) and not tests.independent(a, b, wider):
+            if tests.allowed(len(wider)) and tests.dependent(a, b, wider):
                 parents.update(ecc_parents(tests, x, a, b, ne, check, cache))
         open_ = unoriented()
         for pair in marked:
@@ -363,4 +377,5 @@ def ldecc(
         unoriented=frozenset(open_),
         non_colliders=frozenset(marked),
         parent_sets=tuple(sets),
+        undecided=bool(search.undecided),
     )

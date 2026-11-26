@@ -164,6 +164,7 @@ class Scripted:
         self.ranks = list(range(d))
         self.independent = independent
         self.blanket = blanket
+        self.undecided: set[tuple[int, int]] = set()
 
     def local(self, learner, x):
         return None, self.blanket, {}

@@ -157,11 +157,13 @@ def counting_tests() -> Generator[CountedTests]:
     the search stops reading, such as the sets after the first separating one, counts too. A query
     answered from a kept answer, as the chi-square tests keep their marginal answers, counts
     nothing, and so does a search step that reuses a run made before. A test-wise deletion test
-    counts each query once, as the test it runs on the query's rows counts it. The shipped tests
-    count themselves; a test added with :func:`register_indep_test` counts what it reports through
-    :func:`count_tests`. When the block ends, its count is added to the enclosing block's, so a
-    search run inside another counts in both. The count is the calling process's: tests run in
-    another process reach it only through :meth:`CountedTests.add`.
+    counts each query once, as the test it runs on the query's rows counts it, and counts none it
+    does not test, for too few rows or zero degrees of freedom: those count only in
+    ``metadata["not_tested"]``. The shipped tests count themselves; a test added with
+    :func:`register_indep_test` counts what it reports through :func:`count_tests`. When the block
+    ends, its count is added to the enclosing block's, so a search run inside another counts in
+    both. The count is the calling process's: tests run in another process reach it only through
+    :meth:`CountedTests.add`.
     """
     counter = CountedTests()
     token = _TESTS.set(counter)

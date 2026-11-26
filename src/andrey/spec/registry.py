@@ -4642,7 +4642,10 @@ _METADATA: dict[str, tuple[str, ...]] = {
 # The methods with missing values whose searches remove pairs by conditioning sets, which list the
 # drawn edges a set not tested might have removed.
 _SEPARATING_SEARCHES = frozenset(
-    ("pc", "fci", "cdnod", "fci_jci", "iamb", "inter_iamb", "mmpc", "pcmci", "pcmciplus", "lpcmci")
+    (
+        *("pc", "fci", "cdnod", "fci_jci", "iamb", "inter_iamb", "gs", "fast_iamb", "mmpc"),
+        *("hiton_pc", "hiton_mb", "mmmb", "pcmb", "pcmci", "pcmciplus", "lpcmci"),
+    )
 )
 # The shared keys: the name, the seed of a seeded fit, the changes before each later start, the
 # test and the score it used with the score's penalties, the configuration's tie-break rule, the

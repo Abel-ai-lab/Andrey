@@ -379,6 +379,21 @@ names its pull request.
   test included, as the paper's search does. Such a pair could keep an edge, and a v-structure that
   named it could direct a neighbor's other edge. On samples of the paper's networks the answers
   change, mostly on Hailfinder, where the errors at the target fall in most settings. ([#1030])
+- The local-discovery learners follow the not-tested rule on data with missing values.
+  `metadata["n_tests"]` counts only the tests that ran, so a query without the rows its test needs,
+  or with zero degrees of freedom, counts in `metadata["not_tested"]` alone. `fast_iamb` and
+  `inter_iamb` keep a candidate that a test with rows found dependent and none separated when its
+  later test was not tested, on every stop but the `max_depth` cap, as `iamb` does; `gs`,
+  `fast_iamb`, `hiton_pc`, `hiton_mb`, `mmmb`, and `pcmb` list in `metadata["possibly_separable"]`
+  the members a set holding an undecided candidate might separate; and `mb_by_mb`, `cmb`,
+  `mmb_by_mmb`, `ldecc`, `local_optimal_adjustment`, `ldp`, `ld3`, `locpc_cde`, and `y_structures`
+  list `metadata["undecided_pairs"]`, which their notice names. `local_optimal_adjustment` leaves
+  both effects undecided, `nonzero` and `identifiable` `None`, when a blanket it learned left a
+  candidate undecided or a test its answer reads was not tested, and `ldecc` when its blanket left
+  one undecided, where they read such a candidate as not adjacent. `ldp` and `ld3` read a query not
+  tested as neither dependence nor independence and leave the effect undecided when their answer
+  read one; `locpc_cde` leaves an undecided pair out of its graph, as `pc` does, and the effect
+  undecided when its search met one. ([#1233])
 
 ## [0.19.0] - 2026-11-24
 
@@ -3353,3 +3368,4 @@ First alpha release.
 [#1071]: https://github.com/Abel-ai-lab/Andrey/pull/1071
 [#1081]: https://github.com/Abel-ai-lab/Andrey/pull/1081
 [#1086]: https://github.com/Abel-ai-lab/Andrey/pull/1086
+[#1233]: https://github.com/Abel-ai-lab/Andrey/pull/1233
