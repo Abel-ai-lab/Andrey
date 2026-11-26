@@ -3784,12 +3784,14 @@ for _name in EM_METHODS:
 #: The path and confounder parts a method honors as supported: the method ran in the lanes of
 #: benchmarks/knowledge_paths.py, and the part passed them, against the same fit without the claims
 #: and, where a reference package takes the same knowledge, against it. A part a method honors
-#: beyond the edge parts and does not list here is experimental: tabu, mmhc, and rsmax2 made more
-#: errors than their reference given the required edges, on repeated seeds, and iamb, inter_iamb,
-#: and mmpc with forbidden paths alone were farther from the class the claims leave at 50
-#: variables, over two seed groups pooled. In pc, cdnod, iamb, inter_iamb, and mmpc the parts were
-#: measured with the rule for a graph with no consistent extension, on which a claim acts on an
-#: edge and most claims are dropped.
+#: beyond the edge parts and does not list here is experimental: tabu made more errors than its
+#: reference given the required edges, on repeated seeds, and iamb, inter_iamb, and mmpc with
+#: forbidden paths alone were farther from the class the claims leave at 50 variables, over two
+#: seed groups pooled. mmhc and rsmax2 are supported in both parts: with the plain BIC and most
+#: true edges required, their fits keep a few more false edges than the reference's, because their
+#: candidate search tests every subset of the current members. In pc, cdnod, iamb, inter_iamb, and
+#: mmpc the parts were measured with the rule for a graph with no consistent extension, on which a
+#: claim acts on an edge and most claims are dropped.
 _SUPPORTED_PARTS: dict[str, tuple[KnowledgePart, ...]] = {
     "pc": PATH_PARTS,
     "cdnod": PATH_PARTS,
@@ -3797,8 +3799,8 @@ _SUPPORTED_PARTS: dict[str, tuple[KnowledgePart, ...]] = {
     "xges": PATH_PARTS,
     "hc": PATH_PARTS,
     "tabu": ("forbidden_paths",),
-    "mmhc": ("forbidden_paths",),
-    "rsmax2": ("forbidden_paths",),
+    "mmhc": PATH_PARTS,
+    "rsmax2": PATH_PARTS,
     "boss": PATH_PARTS,
     "grasp": PATH_PARTS,
     "exact_search": PATH_PARTS,

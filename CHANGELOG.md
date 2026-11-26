@@ -59,6 +59,15 @@ names its pull request.
   authors' code does. For contributors, `DEVELOPMENT.md` and `CONTRIBUTING.md` give the pytest flags
   CI runs, `-n logical --dist loadfile`, and the `calm` required-edge cell of the concepts test and
   one drawing test skip when torch or pygraphviz is missing. ([#1247])
+- `required_paths` is supported in `mmhc` and `rsmax2`, so a fit with it no longer warns
+  `ExperimentalWarning`; `forbidden_paths` already was. Their restrict phase has read the knowledge
+  since 0.17.0, and a rerun on the 0.20.0 branch passes every check of the 0.17.0 rule with the
+  default score. With the plain BIC (`ebic_gamma=0`) and most true edges given as required, a few
+  more false edges can stay than in bnlearn's fit, because the candidate search tests every subset
+  of the current members, as the MMPC paper defines. The docstrings say so, the [comparison
+  page][kp-paths] has the status, and `benchmarks/published/0.20.0/knowledge-paths.json` holds the
+  rows. For contributors, the lane's `mmhc_bic` and `rsmax2_bic` run these methods with the plain
+  BIC beside bnlearn's. ([#1249])
 
 ### Fixed
 
@@ -3009,3 +3018,4 @@ First alpha release.
 [#1243]: https://github.com/Abel-ai-lab/Andrey/pull/1243
 [#1245]: https://github.com/Abel-ai-lab/Andrey/pull/1245
 [#1247]: https://github.com/Abel-ai-lab/Andrey/pull/1247
+[#1249]: https://github.com/Abel-ai-lab/Andrey/pull/1249

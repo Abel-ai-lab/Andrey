@@ -420,6 +420,12 @@ is unverified. For `xges`, `grasp`, `exact_search`, `mmpc`, and `fci_jci` the co
 same fit without the claims only, as it is for `confounded` everywhere. With its default phases
 `rsmax2` is the same search as `mmhc`, and their rows are equal.
 
+`mmhc` and `rsmax2` ran again on the 0.20.0 release branch, after their restrict phase began to read
+the knowledge, with `mmhc_bic` and `rsmax2_bic` (`ebic_gamma=0`, the plain BIC of bnlearn's
+`bic-g`) beside them like `hc_bic` and `tabu_bic`. Their rows in
+[`published/0.20.0/knowledge-paths.json`](../published/0.20.0/knowledge-paths.json) replace the rows
+below, which are those of 0.17.0.
+
 ```shell
 $ANDREY_BENCH_PYTHON benchmarks/knowledge_paths.py run --lane cpdag --seeds 0 20 \
     --methods hc hc_bic tabu tabu_bic mmhc rsmax2 iamb inter_iamb bnlearn.hc bnlearn.tabu \
@@ -435,7 +441,15 @@ $ANDREY_BENCH_PYTHON benchmarks/knowledge_paths.py run --lane multigroup --seeds
 `--lane jci --methods fci_jci`, `--lane pag --methods grasp_fci tetrad.grasp_fci`, and `--lane cpdag
 --methods grasp xges mmpc exact_search` run the rest; `--part` and `--cell` select as above, and
 `--seeds 100 120` gives the fresh seeds. bnlearn needs R with the package on `R_LIBS_USER`, and
-causal-learn and lingam the benchmark environment.
+causal-learn and lingam the benchmark environment. The rerun of `mmhc` and `rsmax2` is
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/knowledge_paths.py run --lane cpdag --seeds 0 20 \
+    --methods mmhc mmhc_bic rsmax2 rsmax2_bic bnlearn.mmhc bnlearn.rsmax2 \
+    --arms bare true edges false --out outputs/kp-mmhc-cpdag
+```
+
+and `--part required_paths` and `--part forbidden_paths` give the parts alone.
 
 ### One part at a time, the other methods
 
@@ -575,10 +589,11 @@ and were worse in no row that repeated. With its default score `hc` made fewer e
 plain BIC, the like-for-like arm, `hc` was worse in no row that repeated. `tabu` with the plain BIC
 was, in one row with the required edges alone (20 variables, 500 samples, 5 % of the pairs; 3.55
 more errors per graph on seeds 0 to 19 and 3.15 on fresh seeds), so `required_paths` fails this
-comparison in `tabu`. `mmhc` and `rsmax2` made more errors than bnlearn's given the same required
-edges at expected degree 4, in 2 of 36 rows with required paths alone and 4 of 36 with all parts
-that repeated, by 1.75 to 4.9 per graph, so `required_paths` fails it in both; with forbidden paths
-they were worse in no row.
+comparison in `tabu`. In 0.17.0, `mmhc` and `rsmax2` made more errors than bnlearn's given the same
+required edges at expected degree 4, in 2 of 36 rows with required paths alone and 4 of 36 with all
+parts that repeated, by 1.75 to 4.9 per graph, so `required_paths` failed it in both; with
+forbidden paths they were worse in no row. The rerun of 0.20.0 passes it with the default score,
+and with the plain BIC leaves a few more false edges than bnlearn's fit in two cells (Status).
 
 With the plain BIC, `hc` and `tabu` are not below the empty graph at 50 variables, 500 samples, and
 expected degree 2, with the claims or without, and neither is bnlearn there: in 2 rows of `hc` and 1
@@ -789,16 +804,23 @@ row that repeats. Where no reference takes the knowledge, the first two decide.
 
 | Part | Supported in | Experimental in |
 |---|---|---|
-| `required_paths` | `pc`, `cdnod`, `ges`, `xges`, `hc`, `boss`, `grasp`, `exact_search`, `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, `lpcmci`, `direct_lingam`, `multi_group_direct_lingam`, `iamb`, `inter_iamb`, `mmpc` | `tabu`, `mmhc`, `rsmax2` |
-| `forbidden_paths` | the same without `iamb`, `inter_iamb`, `mmpc`, and `tabu`, `mmhc`, `rsmax2` | `iamb`, `inter_iamb`, `mmpc` |
+| `required_paths` | `pc`, `cdnod`, `ges`, `xges`, `hc`, `boss`, `grasp`, `exact_search`, `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, `lpcmci`, `direct_lingam`, `multi_group_direct_lingam`, `mmhc`, `rsmax2`, `iamb`, `inter_iamb`, `mmpc` | `tabu` |
+| `forbidden_paths` | the same without `iamb`, `inter_iamb`, `mmpc`, and with `tabu` | `iamb`, `inter_iamb`, `mmpc` |
 | `confounded` | `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, `lpcmci` | |
 
 Why a part is experimental: in `iamb`, `inter_iamb`, and `mmpc`, forbidden paths alone left the
 CPDAG 0.65 to 1.95 edges farther from the class the claims define at 50 variables and expected
 degree 2, over two sets of seeds pooled, because on a graph with no consistent extension about 96 %
 of them are dropped (`metadata["unmet_knowledge"]` lists them); in `tabu` with the
-plain BIC, and in `mmhc` and `rsmax2` at expected degree 4, the reference given the required edges
-the paths imply made fewer errors in rows that repeated.
+plain BIC, the reference given the required edges the paths imply made fewer errors in rows that
+repeated.
+
+`mmhc` and `rsmax2` are supported with a difference. In the rerun of 0.20.0, the default score
+passed every check. With the plain BIC and most true edges given as required, the same edges leave a
+few more false edges than bnlearn's fit, in the cells at 50 variables and expected degree 2. The
+difference lies in the candidate search: Andrey tests every subset of the current members, as the
+MMPC paper defines, and bnlearn's forward phase, which starts each target's candidate set from its
+whitelisted neighbors, tests only the sets that hold the last of them.
 
 The limits the measurements show:
 
@@ -822,6 +844,8 @@ The limits the measurements show:
 - `iamb`, `inter_iamb`, and `mmpc` take the path parts only in their CPDAG output.
 
 `pc`'s status is unchanged under the rule (`no_consistent_extension`, `pc_from_0_17_0` in the 0.17.0
-file). `published/0.16.0/knowledge-paths.json` and `published/0.17.0/knowledge-paths.json` hold each
-part's status under `references`, `status`, the first with the rows of the path-against-edge comparison
-that repeated in `path_claims_against_reference_edges`.
+file). `published/0.16.0/knowledge-paths.json`, `published/0.17.0/knowledge-paths.json`, and
+`published/0.20.0/knowledge-paths.json` hold each part's status under `references`, `status`, the
+first with the rows of the path-against-edge comparison that repeated in
+`path_claims_against_reference_edges`. In the 0.20.0 file, `bar_met` is whether the rule's checks
+all passed, and `gap` says what a part supported with a difference differs in.

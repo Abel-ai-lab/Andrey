@@ -533,14 +533,16 @@ narrow the causal order, as their paper describes (Shimizu et al., 2011). Every 
 supported wherever true claims [measured no
 worse](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
 than the same fit without them and than a reference package given the same knowledge, which is every
-method that honors them except six. Required paths are experimental in Tabu search, MMHC, and
-RSMAX2, where a reference package given the edges those paths imply made fewer errors. Forbidden
-paths are experimental in IAMB, Inter-IAMB, and MMPC, where the graph found at 50 variables often
-has no consistent extension: a claim there acts only on an edge, the fits we measured dropped about
-96% of the forbidden paths on such a graph, and with forbidden paths alone the CPDAG was 0.65 to 1.95
-edges farther from the class the claims define. A path claim says less than an edge and so directs
-less: a required path cannot restore an edge the search left out. When you know the edge itself,
-state it as `required`.
+method that honors them except four. Required paths are experimental in Tabu search, where a
+reference package given the edges those paths imply made fewer errors. Forbidden paths are
+experimental in IAMB, Inter-IAMB, and MMPC, where the graph found at 50 variables often has no
+consistent extension: a claim there acts only on an edge, the fits we measured dropped about 96% of
+the forbidden paths on such a graph, and with forbidden paths alone the CPDAG was 0.65 to 1.95 edges
+farther from the class the claims define. MMHC and RSMAX2 support both parts with one difference:
+with the plain BIC (`ebic_gamma=0`) and most true edges given as required, a few more false edges
+can stay than in a reference package's fit. A path claim says less than an edge and so directs less:
+a required path cannot restore an edge the search left out. When you know the edge itself, state it
+as `required`.
 
 Knowledge that no graph meets, such as `required_paths` that lead in a cycle, raises a `ValueError`
 before the search. A true claim can still be one the graph a fit finds does not meet: on finite

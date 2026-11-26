@@ -189,14 +189,16 @@ def mmhc(
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Both phases read them. The MMPC
-        phase reads them as :func:`~andrey.mmpc` does: each end of a required edge is in the
-        other's set from the start, so it conditions the tests of the other candidates, and a pair
-        the knowledge makes non-adjacent is never a candidate. The score search considers the pairs
-        of that skeleton, and then honors the knowledge as :func:`~andrey.hc` does. In a CPDAG,
-        ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph stands for in which each
-        listed path holds or does not, as :class:`~andrey.Knowledge` describes; a claim no such DAG
-        meets is dropped with a :class:`~andrey.KnowledgeWarning` and listed in
-        ``metadata["unmet_knowledge"]``.
+        phase reads them as :func:`~andrey.mmpc` does: each end of a required edge is in the other's
+        set from the start, so it conditions the tests of the other candidates, and a pair the
+        knowledge makes non-adjacent is never a candidate. The candidate search follows [1]_: it
+        tests each other candidate against every subset of the current members, required ones
+        included. The score search considers the pairs of that skeleton, and then honors the
+        knowledge as :func:`~andrey.hc` does. ``required_paths`` and ``forbidden_paths`` are both
+        supported. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the DAGs the graph
+        stands for in which each listed path holds or does not, as :class:`~andrey.Knowledge`
+        describes; a claim no such DAG meets is dropped with a :class:`~andrey.KnowledgeWarning` and
+        listed in ``metadata["unmet_knowledge"]``.
 
     Returns
     -------
@@ -279,7 +281,8 @@ def mmhc(
     setting, by the least margin on small, denser graphs. An edge the MMPC phase misses is never
     recovered, hill climbing stops at a local optimum, and MMPC's cost grows exponentially with the
     size of a parents-and-children set. A true path claim cannot restore a missed edge and can
-    direct an edge of a wrong graph the wrong way; a known edge belongs in ``required``. The
+    direct an edge of a wrong graph the wrong way; a known edge belongs in ``required``. With
+    ``ebic_gamma=0.0`` and most true edges given as required, a few more false edges can stay. The
     `0.12.0 release card <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#mmhc>`__ has the
     numbers.
 
@@ -444,23 +447,26 @@ def rsmax2(
         ``"pc"``, the restrict phase reads them as :func:`~andrey.mmpc` and :func:`~andrey.pc` do:
         the pair of a required edge is kept without a test and conditions the tests of the other
         pairs, and a pair the knowledge makes non-adjacent is never a candidate. With
+        ``restrict="mmpc"``, the candidate search follows [2]_: it tests each other candidate
+        against every subset of the current members, required ones included. With
         ``restrict="iamb"`` or ``"inter_iamb"``, the restrict phase reads the data alone. For every
         ``restrict``, the maximize phase considers the pairs the restrict phase keeps and the pairs
         of the required edges, less the pairs the knowledge makes non-adjacent, and then honors the
         knowledge as :func:`~andrey.hc` does. The blanket restricts are left out for a measured
         reason: required edges enlarge the Markov blankets, the step that drops a pair some subset
-        of the smaller blanket separates then drops more true pairs, and their skeleton holds
-        almost no false pair for the knowledge to remove. On simulated linear-Gaussian graphs of
-        mean degree 4 with 10 to 50 variables and required edges taken from the true graph, 240
-        datasets per setting, passing the knowledge to the blanket restricts gave 0.3 to 0.5 more
-        errors against the true DAG on average (a missing, extra, or reversed edge counts 2, an
-        undirected one 1) with up to about four in ten of the true edges required, and as many
-        with most of them required. Over 120 of those datasets ``"mmpc"`` made 1.0 to 1.5 fewer
-        errors with the knowledge in its restrict phase, and ``"pc"`` 0.9 to 1.9 fewer over 30
-        with 20 and 50 variables. In a CPDAG, ``required_paths`` and ``forbidden_paths`` keep the
-        DAGs the graph stands for in which each listed path holds or does not, as
-        :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped with a
-        :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``.
+        of the smaller blanket separates then drops more true pairs, and their skeleton holds almost
+        no false pair for the knowledge to remove. On simulated linear-Gaussian graphs of mean
+        degree 4 with 10 to 50 variables and required edges taken from the true graph, 240 datasets
+        per setting, passing the knowledge to the blanket restricts gave 0.3 to 0.5 more errors
+        against the true DAG on average (a missing, extra, or reversed edge counts 2, an undirected
+        one 1) with up to about four in ten of the true edges required, and as many with most of
+        them required. Over 120 of those datasets ``"mmpc"`` made 1.0 to 1.5 fewer errors with the
+        knowledge in its restrict phase, and ``"pc"`` 0.9 to 1.9 fewer over 30 with 20 and 50
+        variables. ``required_paths`` and ``forbidden_paths`` are both supported with
+        ``restrict="mmpc"`` and ``maximize="hc"``. In a CPDAG, ``required_paths`` and
+        ``forbidden_paths`` keep the DAGs the graph stands for in which each listed path holds or
+        does not, as :class:`~andrey.Knowledge` describes; a claim no such DAG meets is dropped with
+        a :class:`~andrey.KnowledgeWarning` and listed in ``metadata["unmet_knowledge"]``.
 
     Returns
     -------
@@ -551,7 +557,9 @@ def rsmax2(
     linear-Gaussian data it made fewer errors than the empty graph in every setting, by the least
     margin on small, denser graphs. An edge the restrict phase misses is never recovered, and the
     maximize phase stops at a local optimum. A true path claim cannot restore a missed edge and can
-    direct an edge of a wrong graph the wrong way; a known edge belongs in ``required``. The
+    direct an edge of a wrong graph the wrong way; a known edge belongs in ``required``. With
+    ``restrict="mmpc"``, ``ebic_gamma=0.0``, and most true edges given as required, a few more
+    false edges can stay. The
     `0.12.0 release card <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#rsmax2>`__ has the
     numbers.
 
