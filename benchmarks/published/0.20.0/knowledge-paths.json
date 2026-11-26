@@ -24355,7 +24355,7 @@
       "with ebic_gamma=0, same_edges against bnlearn.mmhc (required_paths): 4 of 36 rows worse again",
       "with ebic_gamma=0, same_edges against bnlearn.mmhc (all parts): 4 of 36 rows worse again"
      ],
-     "gap": "With ebic_gamma=0 and most true edges given as required, the fit keeps a few more false edges than bnlearn's fit given the same edges, in the rows worse_again_rows lists for the ebic_gamma=0 arm under references.against; with the default score no row is worse again. The difference lies in the candidate search. Andrey tests each candidate against every subset of the current members, as the MMPC paper defines. bnlearn's forward phase starts each target's candidate set from its whitelisted neighbors and tests only the sets that hold the last of them.",
+     "gap": "With ebic_gamma=0 and most true edges given as required, the fit keeps a few more false edges than bnlearn's fit given the same edges, in the rows worse_again_rows lists for the ebic_gamma=0 arm under references.against; with the default score no row is worse again. The difference lies in the candidate search: Andrey tests each candidate against every subset of the current members, as the MMPC paper defines.",
      "reference": [
       "bnlearn.mmhc"
      ],
@@ -24385,7 +24385,7 @@
       "with ebic_gamma=0, same_edges against bnlearn.rsmax2 (required_paths): 4 of 36 rows worse again",
       "with ebic_gamma=0, same_edges against bnlearn.rsmax2 (all parts): 4 of 36 rows worse again"
      ],
-     "gap": "With ebic_gamma=0 and most true edges given as required, the fit keeps a few more false edges than bnlearn's fit given the same edges, in the rows worse_again_rows lists for the ebic_gamma=0 arm under references.against; with the default score no row is worse again. The difference lies in the candidate search. Andrey tests each candidate against every subset of the current members, as the MMPC paper defines. bnlearn's forward phase starts each target's candidate set from its whitelisted neighbors and tests only the sets that hold the last of them.",
+     "gap": "With ebic_gamma=0 and most true edges given as required, the fit keeps a few more false edges than bnlearn's fit given the same edges, in the rows worse_again_rows lists for the ebic_gamma=0 arm under references.against; with the default score no row is worse again. The difference lies in the candidate search: Andrey tests each candidate against every subset of the current members, as the MMPC paper defines.",
      "reference": [
       "bnlearn.rsmax2"
      ],
