@@ -868,7 +868,8 @@ _add(
         "LGES (Algorithm 1), deleting and reversing before each addition; "
         "schedule=lges0_released is its LGES-0 in the authors' code's order (additions, "
         "deletions, then reversals). "
-        "insertion=conservative also skips a pair when any of its additions worsens the score. "
+        "insertion=conservative (default) also skips a pair when any of its additions worsens "
+        "the score; insertion=safe, which the paper's recovery proof covers, does not. "
         "The standard BIC by default, BDeu when every column is categorical, conditional Gaussian "
         "when some are. Returns a CPDAG + score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
@@ -890,16 +891,16 @@ _add(
             ParamSpec(
                 name="insertion",
                 type="str",
-                default="safe",
-                choices=("safe", "conservative"),
-                doc="Which pairs an edge addition skips: safe (SafeInsert) skips a pair when one "
-                "graph of the current class scores better without the edge, and the paper proves "
-                "that it recovers the true class as the rows grow; conservative "
-                "(ConservativeInsert) also skips it when any valid addition of the edge worsens "
-                "the score, with fewer errors in the paper's simulations and no such proof. safe "
-                "favors the proof and gives up accuracy; conservative favors fewer errors (the "
-                "lower mean error in 31 of 38 settings of the paper's simulation) and gives up "
-                "the proof.",
+                default="conservative",
+                choices=("conservative", "safe"),
+                doc="Which pairs an edge addition skips: conservative (ConservativeInsert) skips a "
+                "pair when one graph of the current class scores better without the edge, or when "
+                "any valid addition of the edge worsens the score; safe (SafeInsert) skips it only "
+                "in the first case. conservative favors fewer errors at the sample sizes "
+                "measured, adding fewer wrong edges and reversing fewer, more so the more "
+                "variables and the fewer rows, and takes no longer; it gives up the proof of "
+                "recovery. safe favors that proof: the paper proves that LGES recovers the true "
+                "class as the rows grow; it gives up accuracy on finite data.",
             ),
             ParamSpec(
                 name="schedule",
