@@ -574,6 +574,7 @@ def test_a_target_no_arrowhead_points_into_is_a_square_alone() -> None:
     svg = viz.draw(g, targets=[0], engine="builtin")
     minidom.parseString(svg)
     assert svg.count('class="intervened"') == 1 and "intervention" not in svg
+    pytest.importorskip("pygraphviz")
     assert sorted(viz.to_graphviz(g, targets=["x"]).nodes()) == ["0", "1"]
 
 
