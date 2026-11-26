@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import functools
+
 import numpy as np
 import pytest
 
@@ -137,6 +139,10 @@ def test_the_rank_based_score_recovers_gaussian_data_and_ignores_a_monotone_dist
     the empty graph; after a strictly increasing map of each column the BIC's errors grow past the
     empty graph's, and the rank-based score returns the same result as on the Gaussian data."""
     fit = getattr(andrey, name)
+    if name == "lges":
+        # The test compares two scores within one search; it pins the insertion rule its counts
+        # below were measured with, so a change of the default rule cannot move them.
+        fit = functools.partial(fit, insertion="safe")
     rank = {"score_func": "normal_scores"}
     if name == "gfci":
         rank["indep_test"] = "normal_scores"
