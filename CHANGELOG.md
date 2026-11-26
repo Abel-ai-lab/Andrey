@@ -48,6 +48,10 @@ names its pull request.
   colors come from the palette, each at 4.5:1 or more on the code block in both themes; code that
   links to the API reference is cobalt; a soft amber tint marks a link's target and a searched
   word, and a cobalt tint selected text; and one 2px cobalt ring marks keyboard focus. ([#1232])
+- For contributors, a test compares the defaults of every registered method's parameters, as a
+  run records them and `--help` and `--help --json` show them, and the flags of `andrey bootstrap`
+  and `andrey markov-check`, with the Python signatures. `andrey bootstrap` lists its default of
+  `--n-resamples`, 100, as its other flags list theirs. ([#1243])
 
 ### Fixed
 
@@ -57,6 +61,11 @@ names its pull request.
   shrink ended the search without the keep step, which dropped such a candidate with no trace, and
   the keep step counted only the grow tests as separating, so a member a shrink dropped could join
   again. ([#1235])
+- With pandas 3.1, a missing value in an integer `category` column of a DataFrame whose columns
+  have different categories is read as missing. It was read as `-2**63`: every categorical setting
+  (`chisq`, `gsq`, `bdeu`, and `discrete_bic`) refused it as a code of "2**53 or more", and reading
+  the columns as numbers (`categorical=[]`) kept it as a value and returned another graph.
+  ([#1241])
 
 ## [0.19.0] - 2026-11-24
 
@@ -2989,3 +2998,5 @@ First alpha release.
 [#1224]: https://github.com/Abel-ai-lab/Andrey/pull/1224
 [#1232]: https://github.com/Abel-ai-lab/Andrey/pull/1232
 [#1235]: https://github.com/Abel-ai-lab/Andrey/pull/1235
+[#1241]: https://github.com/Abel-ai-lab/Andrey/pull/1241
+[#1243]: https://github.com/Abel-ai-lab/Andrey/pull/1243

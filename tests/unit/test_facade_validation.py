@@ -651,6 +651,55 @@ def test_a_categorical_setting_reads_or_names_a_missing_category(setting):
         CATEGORICAL[setting](frame)
 
 
+def _integer_categories_with_gaps():
+    """Return a float frame of codes with ``NaN`` gaps and the same data as ``category`` columns.
+
+    The category columns hold integers and different categories (column ``c`` has four, ``a`` and
+    ``b`` three), the frame on which ``np.asarray`` turns a gap into ``-2**63`` with pandas 3.1.
+    """
+    pd = pytest.importorskip("pandas")
+    codes = _categories(n=400)
+    codes[:, 2] += np.arange(400) % 2
+    codes[:, 1] = np.where(np.random.default_rng(1).random(400) < 0.8, codes[:, 0], codes[:, 1])
+    gaps = np.zeros(codes.shape, dtype=bool)
+    gaps[::17, 0] = gaps[5::23, 1] = True
+    as_codes = pd.DataFrame(np.where(gaps, np.nan, codes), columns=["a", "b", "c"])
+    as_categories = pd.DataFrame(
+        {
+            name: pd.Categorical([None if gap else int(v) for gap, v in zip(g, c)])
+            for name, g, c in zip(as_codes, gaps.T, codes.T)
+        }
+    )
+    assert {str(dtype.categories.dtype) for dtype in as_categories.dtypes} == {"int64"}
+    return as_codes, as_categories
+
+
+@pytest.mark.parametrize("setting", list(CATEGORICAL), ids="-".join)
+def test_a_categorical_setting_reads_a_gap_in_integer_categories_as_missing(setting):
+    """A gap in integer ``category`` columns is a missing value, as it is in float codes, not a code
+    of ``2**53`` or more."""
+    as_codes, as_categories = _integer_categories_with_gaps()
+    fit = CATEGORICAL[setting]
+    if REGISTRY[setting[0]].data.missing:  # a missing value, deleted per test
+        read = fit(as_categories)
+        assert np.array_equal(read.structure.to_numpy(), fit(as_codes).structure.to_numpy())
+        assert read.metadata["rows_tested"]["min"] < len(as_codes)
+        return
+    with pytest.raises(ValueError, match=r"holds NaN in \d+ cells, the first at row 0, column 0"):
+        fit(as_categories)
+
+
+def test_integer_categories_read_as_numbers_keep_a_gap_as_missing():
+    """With ``categorical=[]`` the columns are numbers, and a gap is ``NaN``, not ``-2**63``."""
+    as_codes, as_categories = _integer_categories_with_gaps()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", andrey.DataTypeWarning)  # whole numbers may be codes
+        read = andrey.pc(as_categories, categorical=[], indep_test="fisherz")
+        expected = andrey.pc(as_codes, indep_test="fisherz")
+    assert np.array_equal(read.structure.to_numpy(), expected.structure.to_numpy())
+    assert read.metadata["rows_tested"]["min"] < len(as_codes)
+
+
 @pytest.mark.parametrize(("score_func", "indep_test"), [("bdeu", "fisherz"), ("bic", "chisq")])
 def test_gfci_rejects_a_score_and_test_that_read_the_data_differently(score_func, indep_test):
     with pytest.raises(ValueError, match="score and test must read the data alike"):
