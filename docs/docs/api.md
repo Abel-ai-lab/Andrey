@@ -787,15 +787,16 @@ in a process.
 
 LGES, less greedy equivalence search (Ejaz and Bareinboim 2025), {py:func}`~andrey.lges`, is GES
 with fewer edge additions: it adds no edge between two variables when one graph of the current class
-scores better without it (SafeInsert), and with `insertion="conservative"` also when any valid
-addition of the edge worsens the score (ConservativeInsert). It also deletes and reverses edges as
-GES and GIES do, and returns a CPDAG. `schedule` picks the order of these moves: `"lges"`, the
-default, is the paper's main method, LGES (its Algorithm 1), which deletes and reverses edges before
-each single addition; `"lges0_released"` is its LGES-0 variant (Algorithm 8) with the phases in the
-order of the authors' code: additions, deletions, then reversals, once. With the standard BIC, its
-default, each schedule returns the CPDAGs of the authors' code run in its order on the paper's
-linear-Gaussian simulation when both read the same graph of each class; it is experimental until it
-is benchmarked in that setting.
+scores better without it (SafeInsert) and, by default (`insertion="conservative"`), also when any
+valid addition of the edge worsens the score (ConservativeInsert); `insertion="safe"` skips that
+second check, and the paper proves that the search recovers the true class as the rows grow only
+under it. It also deletes and reverses edges as GES and GIES do, and returns a CPDAG. `schedule`
+picks the order of these moves: `"lges"`, the default, is the paper's main method, LGES (its
+Algorithm 1), which deletes and reverses edges before each single addition; `"lges0_released"` is
+its LGES-0 variant (Algorithm 8) with the phases in the order of the authors' code: additions,
+deletions, then reversals, once. With the standard BIC, its default, each schedule returns the
+CPDAGs of the authors' code run in its order on the paper's linear-Gaussian simulation when both
+read the same graph of each class; it is experimental until it is benchmarked in that setting.
 
 Choosing an option, on that simulation (the authors' generator; 10 to 100 variables at mean degree
 1, 2, 3, 4, and 6; 1,000 and 10,000 rows; 20 graphs per setting). A schedule is better in a setting
@@ -806,8 +807,8 @@ insertion rule counts as a setting of its own.
 |---|---|---|---|
 | `schedule="lges"` (default) | Accuracy on denser graphs | Time | Better in 15 of 16 settings at mean degree 3 and 12 of 16 at degree 4; where both ran in one process (the conservative rule at mean degree 1 and 3; the safe fits there ran first and carry about 0.25 s of start-up), median fits took 1.0 to 1.33 times as long as LGES-0's; at mean degree 2, 4, and 6, timed in separate runs, so small differences are noise, 0.9 to 1.8 times |
 | `schedule="lges0_released"` | Time | Accuracy on denser graphs | Better in 1 of 16 settings at mean degree 3; at mean degree 1 and 2 about as many errors as LGES (mean errors summed over 32 settings, 459 against 457), better in 12, LGES in 5, with 15 ties |
-| `insertion="safe"` (default) | The paper's proof that the search recovers the true class as the rows grow | Accuracy | 9,029 errors over the 480 graphs of mean degree 1 to 3, under `schedule="lges"` |
-| `insertion="conservative"` | Fewer errors | That proof | 6,789 errors on those graphs; the lower mean error in 31 of 38 settings, the higher in 3 |
+| `insertion="conservative"` (default) | Fewer errors at the sample sizes measured | The proof of recovery | 6,789 errors over the 480 graphs of mean degree 1 to 3, under `schedule="lges"`; the lower mean error in 31 of 38 settings, the higher in 3 |
+| `insertion="safe"` | The paper's proof that the search recovers the true class as the rows grow | Accuracy on finite data | 9,029 errors on those graphs |
 
 Regime-PCMCI (Saggioro et al. 2020), {py:func}`~andrey.rpcmci`, takes one time series whose lagged
 links switch between a few persistent regimes. Each start draws random regime weights, then

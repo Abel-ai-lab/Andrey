@@ -1545,7 +1545,7 @@ def lges(
     penalty_discount: float = 1.0,
     ebic_gamma: float = 0.0,
     equivalent_sample_size: float = 1.0,
-    insertion: str = "safe",
+    insertion: str = "conservative",
     schedule: str = "lges",
     categorical: Sequence[str | int] | None = None,
 ) -> StructureOutput:
@@ -1594,14 +1594,17 @@ def lges(
         variable's conditional distributions is worth. A larger value weighs the prior more
         against the data, and the graph can change with it. Must be finite and positive. Only
         ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
-    insertion : {"safe", "conservative"}, default="safe"
-        Which pairs of variables an edge addition leaves out (see Notes). ``"safe"`` (SafeInsert)
-        leaves out a pair when one graph of the current class scores better without the edge; the
-        paper proves that LGES then recovers the true class as the rows grow (its Corollary 1; Notes
-        cover LGES-0) [1]_. ``"conservative"`` (ConservativeInsert) also leaves out a pair when any
-        valid addition of the edge worsens the score; it made fewer errors in the paper's
-        simulations, with no such proof. ``"safe"`` favors the proof of recovery; it gives up
-        accuracy. ``"conservative"`` favors fewer errors; it gives up that proof.
+    insertion : {"conservative", "safe"}, default="conservative"
+        Which pairs of variables an edge addition leaves out (see Notes). ``"conservative"``
+        (ConservativeInsert) leaves out a pair when one graph of the current class scores better
+        without the edge, or when any valid addition of the edge worsens the score. ``"safe"``
+        (SafeInsert) leaves out a pair only in the first case [1]_. ``"conservative"`` favors fewer
+        errors at the sample sizes measured: it adds fewer wrong edges and reverses fewer, more so
+        the more variables there are and the fewer rows, and it takes no longer; it gives up the
+        proof of recovery. ``"safe"`` favors that proof: the paper proves that LGES recovers the
+        true class as the rows grow (its Corollary 1; Notes cover LGES-0); it gives up accuracy on
+        finite data. On small graphs with many rows, and on dense small graphs, the two make about
+        as many errors.
     schedule : {"lges", "lges0_released"}, default="lges"
         The order of the search's phases (see Notes). ``"lges"`` is the paper's main method, LGES
         (its Algorithm 1): before each single edge addition it deletes, then reverses, edges until
@@ -1675,13 +1678,14 @@ def lges(
     the current class and, for each pair ``(x, y)`` of non-adjacent variables, compares the score of
     ``y`` given its parents in ``G`` with the score given those parents and ``x``. When the edge
     worsens the score, the score holds ``y`` independent of ``x`` given those parents, and the step
-    adds no edge between ``x`` and ``y`` (SafeInsert). With ``insertion="conservative"`` it also
-    adds no edge between them when any valid addition ``x -> y`` of GES worsens the score
-    (ConservativeInsert). Of the additions left, the step takes the one that improves the score
-    most, as GES does. ``G`` is the DAG that orients the class by removing, while one is left, the
-    first sink whose neighbors are adjacent to each other, in the order of the columns' ranks
-    (:doc:`column-order guide </docs/guides/column-order>`), so the result does not depend on the
-    column order; moves whose score changes are equal after rounding are taken in that order too.
+    adds no edge between ``x`` and ``y`` (SafeInsert). By default (``insertion="conservative"``) it
+    also adds no edge between them when any valid addition ``x -> y`` of GES worsens the score
+    (ConservativeInsert); ``insertion="safe"`` skips that check. Of the additions left, the step
+    takes the one that improves the score most, as GES does. ``G`` is the DAG that orients the
+    class by removing, while one is left, the first sink whose neighbors are adjacent to each
+    other, in the order of the columns' ranks (:doc:`column-order guide
+    </docs/guides/column-order>`), so the result does not depend on the column order; moves whose
+    score changes are equal after rounding are taken in that order too.
 
     The two schedules order these moves differently. LGES (``schedule="lges"``, the paper's
     Algorithm 1) repeats: deletions until none improves the score, reversals until none improves it,
@@ -1718,8 +1722,8 @@ def lges(
     **Limitations.** Not benchmarked yet. With ``schedule="lges0_released"`` and
     ``andrey.config(tie_break="position")`` it returned the CPDAG of its authors' code on every
     dataset of its paper's simulation. The paper proves that it recovers the true class as the rows
-    grow only under ``insertion="safe"``. Each addition step scores every pair of non-adjacent
-    variables in one process. The
+    grow only under ``insertion="safe"``, not under the default. Each addition step scores every
+    pair of non-adjacent variables in one process. The
     `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#lges>`__ has the
     comparison.
 

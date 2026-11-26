@@ -1,16 +1,15 @@
 """Less greedy equivalence search over a decomposable score, the engine behind :func:`andrey.lges`.
 
-The Insert phase is less greedy than that of GES: at each step it reads one DAG ``G`` of the
-current class and leaves out every pair ``(x, y)`` for which ``G`` scores better than ``G`` with
-``x -> y`` added (SafeInsert); under ``insertion="conservative"`` it also leaves out a pair when
+The Insert phase is less greedy than that of GES: at each step it reads one DAG ``G`` of the current
+class and leaves out every pair ``(x, y)`` for which ``G`` scores better than ``G`` with ``x -> y``
+added (SafeInsert); under ``insertion="conservative"``, the default, it also leaves out a pair when
 any valid ``Insert(x, y, T)`` worsens the score (ConservativeInsert). The Delete phase is that of
-GES (:func:`~andrey.search._parallel_ges.backward_chunk_best`) and the turning phase that of GIES
-on observational data (:func:`~andrey.search.gies._turning_best`). Two schedules run them: LGES
+GES (:func:`~andrey.search._parallel_ges.backward_chunk_best`) and the turning phase that of GIES on
+observational data (:func:`~andrey.search.gies._turning_best`). Two schedules run them: LGES
 (``schedule="lges"``) deletes, then turns, until neither improves the score, before each single
 Insert, and stops when no move improves it; LGES-0 in the phase order of the released code
-(``schedule="lges0_released"``) runs Insert, Delete, then turning once, each until no move
-improves the score. The algorithm, its settings, and its reference are described on
-:func:`andrey.lges`.
+(``schedule="lges0_released"``) runs Insert, Delete, then turning once, each until no move improves
+the score. The algorithm, its settings, and its reference are described on :func:`andrey.lges`.
 """
 
 from __future__ import annotations
@@ -31,7 +30,7 @@ from andrey.search.ges import recompute_objective
 from andrey.search.gies import FamilyScore, _turn, _turning_best
 
 #: The insertion strategies of :func:`lges`.
-INSERTIONS: tuple[str, ...] = ("safe", "conservative")
+INSERTIONS: tuple[str, ...] = ("conservative", "safe")
 
 #: The schedules of :func:`lges`: the paper's Algorithm 1, and LGES-0 in the released code's order.
 SCHEDULES: tuple[str, ...] = ("lges", "lges0_released")
@@ -106,7 +105,7 @@ def lges(
     penalty_discount: float = 1.0,
     ebic_gamma: float = 0.0,
     equivalent_sample_size: float = 1.0,
-    insertion: str = "safe",
+    insertion: str = "conservative",
     schedule: str = "lges",
     categorical: np.ndarray | None = None,
 ) -> tuple[GraphStructure, float]:
@@ -128,7 +127,7 @@ def lges(
         Local score, as for :func:`~andrey.search.ges.ges`.
     penalty_discount, ebic_gamma, equivalent_sample_size : float
         The score's settings, as for :func:`~andrey.search.ges.ges`.
-    insertion : {"safe", "conservative"}
+    insertion : {"conservative", "safe"}
         The rule that leaves pairs out of the Insert phase (:func:`insert_moves`).
     schedule : {"lges", "lges0_released"}
         The order of the phases, as above.
