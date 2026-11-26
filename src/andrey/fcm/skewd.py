@@ -539,8 +539,9 @@ def _load_linalg(device: str) -> None:
     library lazily, and two threads making that first call at once fail ("lazy wrapper should be
     called at most once"); the fits of several directions or models run :func:`_lockstep` on
     threads of their own."""
-    import torch
+    from andrey.core import backend
 
+    torch = backend.torch()
     torch.linalg.eigh(torch.eye(2, dtype=torch.float64, device=device))
 
 
