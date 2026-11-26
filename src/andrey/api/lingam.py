@@ -123,9 +123,9 @@ def direct_lingam(
         ``"tanh"`` favors logistic-like noise, symmetric with tails a little heavier than the
         Gaussian's: there it orders more edges correctly than ``"pwling"`` with few rows or with
         added measurement noise, and matches it on a larger graph at a fraction of the time; it
-        gives up the other kinds of noise, orienting most edges backwards when the tails are
-        lighter than the Gaussian's, as for uniform noise, and doing worse than ``"pwling"`` under
-        skewed noise. ``"skew"`` favors skewed noise with rare large values, such as a mixture that
+        gives up noise with tails lighter than the Gaussian's, such as uniform noise, where it
+        orients most edges backwards, and skewed noise, where it does worse than ``"pwling"``.
+        ``"skew"`` favors skewed noise with rare large values, such as a mixture that
         adds a large shock now and then, on small graphs: there it orders more edges correctly than
         ``"pwling"``, most clearly with added measurement noise; it gives up symmetric noise, where
         it orients edges about at random, and does a little worse than ``"pwling"`` under skewed
