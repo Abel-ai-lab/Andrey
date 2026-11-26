@@ -119,7 +119,9 @@ reproduces. The path and confounder claims are in no release
 summary: [`published/0.16.0/knowledge-paths.json`](published/0.16.0/knowledge-paths.json) holds the
 rows of the first eight methods and
 [`published/0.17.0/knowledge-paths.json`](published/0.17.0/knowledge-paths.json) those of the other
-14, which their [comparison page](comparisons/knowledge-paths.md) presents. The missing-data lanes'
+14, which their [comparison page](comparisons/knowledge-paths.md) presents.
+[`published/0.20.0/knowledge-paths.json`](published/0.20.0/knowledge-paths.json) holds the rerun of
+`mmhc` and `rsmax2`, whose rows replace theirs in the 0.17.0 file. The missing-data lanes'
 rows are in [`published/0.16.0/missing-data.json`](published/0.16.0/missing-data.json) and, for GES,
 BOSS, and GRaSP with EM against Tetrad's EM covariance policy, in
 [`published/0.17.0/missing-data-em.json`](published/0.17.0/missing-data-em.json), which holds the

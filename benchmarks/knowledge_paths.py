@@ -57,14 +57,15 @@ once as ``no_dataset`` and left out.
 The other methods that take the path parts run beside these (:data:`EXTRA_METHODS`, :data:`KIND`):
 on the ``cpdag`` cells with ``--methods`` (``hc``, ``tabu``, ``mmhc``, ``rsmax2``, ``grasp``,
 ``xges``, ``exact_search``, ``iamb``, ``inter_iamb``, ``mmpc`` returning its CPDAG, and the plain
-BIC variants ``hc_bic`` and ``tabu_bic``) and in ``pag`` (``grasp_fci``), and in lanes of their own
-where the data differ. ``cdnod`` draws the domain-shift data of CD-NOD over four domains and scores
-a fit against the CPDAG the domain index identifies, which the claims restrict as they restrict a
-CPDAG, and against the true DAG. ``jci`` draws the simulation of Mooij et al. (2020) with one
-context variable and hidden confounders, the columns permuted, and scores ``fci_jci`` over the
-system variables against their true MAG, as ``pag`` does. ``multigroup`` draws three groups that
-share one DAG and scores ``multi_group_direct_lingam`` by the sum of its groups' errors. The default
-methods of the first lanes are unchanged, and ``--fractions`` keeps only some claim fractions.
+BIC variants ``hc_bic``, ``tabu_bic``, ``mmhc_bic``, and ``rsmax2_bic``) and in ``pag``
+(``grasp_fci``), and in lanes of their own where the data differ. ``cdnod`` draws the
+domain-shift data of CD-NOD over four domains and scores a fit against the CPDAG the domain index
+identifies, which the claims restrict as they restrict a CPDAG, and against the true DAG. ``jci``
+draws the simulation of Mooij et al. (2020) with one context variable and hidden confounders, the
+columns permuted, and scores ``fci_jci`` over the system variables against their true MAG, as
+``pag`` does. ``multigroup`` draws three groups that share one DAG and scores
+``multi_group_direct_lingam`` by the sum of its groups' errors. The default methods of the first
+lanes are unchanged, and ``--fractions`` keeps only some claim fractions.
 
 ``run --methods`` also fits the reference packages (:data:`REFERENCES`), each unmodified in its own
 environment, without knowledge and with the same true knowledge. tigramite's LPCMCI takes the
@@ -255,7 +256,9 @@ REFERENCES = {
     "tabu": ("bnlearn.tabu",),
     "tabu_bic": ("bnlearn.tabu",),
     "mmhc": ("bnlearn.mmhc",),
+    "mmhc_bic": ("bnlearn.mmhc",),
     "rsmax2": ("bnlearn.rsmax2",),
+    "rsmax2_bic": ("bnlearn.rsmax2",),
     "iamb": ("bnlearn.iamb",),
     "inter_iamb": ("bnlearn.inter_iamb",),
     "grasp_fci": ("tetrad.grasp_fci",),
@@ -285,14 +288,16 @@ LANE_REFERENCES["cpdag"] += (
 )
 LANE_REFERENCES["pag"] += ("tetrad.grasp_fci",)
 #: Andrey methods at settings other than their defaults, run with ``--methods``. ``ges_bic`` is
-#: ``ges`` with the plain BIC (``ebic_gamma=0``), the score of the FGES reference arm; ``hc_bic``
-#: and ``tabu_bic`` are the same score for the searches whose reference (bnlearn's ``bic-g``)
-#: scores with it. ``mmpc`` returns its skeleton by default, which takes no path claim; its variant
-#: returns the CPDAG, which does.
+#: ``ges`` with the plain BIC (``ebic_gamma=0``), the score of the FGES reference arm; ``hc_bic``,
+#: ``tabu_bic``, ``mmhc_bic``, and ``rsmax2_bic`` are the same score for the searches whose
+#: reference (bnlearn's ``bic-g``) scores with it. ``mmpc`` returns its skeleton by default, which
+#: takes no path claim; its variant returns the CPDAG, which does.
 VARIANTS = {
     "ges_bic": ("ges", {"ebic_gamma": 0.0}),
     "hc_bic": ("hc", {"ebic_gamma": 0.0}),
     "tabu_bic": ("tabu", {"ebic_gamma": 0.0}),
+    "mmhc_bic": ("mmhc", {"ebic_gamma": 0.0}),
+    "rsmax2_bic": ("rsmax2", {"ebic_gamma": 0.0}),
     "mmpc": ("mmpc", {"structure": "cpdag"}),
 }
 

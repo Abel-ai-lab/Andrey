@@ -231,17 +231,19 @@ order search's prior knowledge (Shimizu et al. 2011, Section 3.4).
 These parts are supported wherever [true claims measured no
 worse](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
 than the same fit without them and than a reference package given the same knowledge: in every
-method that honors them except six. `required_paths` is experimental in `tabu`, `mmhc`, and
-`rsmax2`, where a reference package given the required edges those paths imply made fewer errors,
-and `forbidden_paths` is experimental in `iamb`, `inter_iamb`, and `mmpc`, where the graph found at
-50 variables often has no consistent extension: a claim there acts only on an edge, the fits we
-measured dropped about 96% of the forbidden paths on such a graph, and with forbidden paths alone
-the CPDAG was 0.65 to 1.95 edges farther from the class the claims define. An
-experimental part warns with
-{py:class}`~andrey.ExperimentalWarning`, and its meaning may change without deprecation. A CPDAG
-method reads the claims on the graph it found, so where that graph is wrong, a true claim can direct
-an edge the wrong way, and a required path cannot restore an edge the search left out. A path claim
-says less than an edge and so directs less: when you know the edge itself, state it as `required`.
+method that honors them except four. `required_paths` is experimental in `tabu`, where a reference
+package given the required edges those paths imply made fewer errors, and `forbidden_paths` is
+experimental in `iamb`, `inter_iamb`, and `mmpc`, where the graph found at 50 variables often has no
+consistent extension: a claim there acts only on an edge, the fits we measured dropped about 96% of
+the forbidden paths on such a graph, and with forbidden paths alone the CPDAG was 0.65 to 1.95 edges
+farther from the class the claims define. An experimental part warns with
+{py:class}`~andrey.ExperimentalWarning`, and its meaning may change without deprecation. `mmhc` and
+`rsmax2` support both parts with one difference: with the plain BIC (`ebic_gamma=0`) and most true
+edges given as required, a few more false edges can stay than in a reference package's fit; with the
+default score no such difference was measured. A CPDAG method reads the claims on the graph it
+found, so where that graph is wrong, a true claim can direct an edge the wrong way, and a required
+path cannot restore an edge the search left out. A path claim says less than an edge and so directs
+less: when you know the edge itself, state it as `required`.
 
 Knowledge that no graph meets, such as required paths that form a cycle with the required edges,
 raises `ValueError` before the search. A claim the rest of the knowledge allows can still be one the

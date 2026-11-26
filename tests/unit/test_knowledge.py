@@ -688,7 +688,7 @@ def test_a_part_warns_exactly_where_it_is_experimental(data):
     forbidden = Knowledge(forbidden_paths=[("f", "a")])
     experimental = [
         *((name, "forbidden_paths") for name in ("iamb", "inter_iamb")),
-        *((name, "required_paths") for name in ("tabu", "mmhc", "rsmax2")),
+        ("tabu", "required_paths"),
     ]
     for name, part in experimental:
         knowledge = required if part == "required_paths" else forbidden
@@ -699,12 +699,11 @@ def test_a_part_warns_exactly_where_it_is_experimental(data):
     with warnings.catch_warnings():
         warnings.simplefilter("error", andrey.ExperimentalWarning)
         warnings.simplefilter("ignore", andrey.KnowledgeWarning)
-        both = ("pc", "ges", "xges", "hc", "boss", "grasp", "exact_search")
+        both = ("pc", "ges", "xges", "hc", "mmhc", "rsmax2", "boss", "grasp", "exact_search")
         for name in (*both, "fci", "gfci", "boss_fci", "grasp_fci", "direct_lingam"):
             getattr(andrey, name)(data, knowledge=required)
             getattr(andrey, name)(data, knowledge=forbidden)
-        for name in ("tabu", "mmhc", "rsmax2"):
-            getattr(andrey, name)(data, knowledge=forbidden)
+        andrey.tabu(data, knowledge=forbidden)
         for name in ("iamb", "inter_iamb"):
             getattr(andrey, name)(data, knowledge=required)
         for name in ("fci", "gfci", "boss_fci", "grasp_fci"):

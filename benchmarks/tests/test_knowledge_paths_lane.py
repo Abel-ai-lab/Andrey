@@ -7,6 +7,7 @@ import json
 
 import knowledge_paths as kp
 import numpy as np
+import pytest
 
 
 def _dag(d: int, arrows) -> np.ndarray:
@@ -240,3 +241,10 @@ def test_a_variant_is_an_andrey_method_at_its_settings_with_every_arm():
     assert {row["status"] for row in rows} == {"ok"}
     assert {row["arm"] for row in rows} == {"bare", "true", "edges"}
     assert kp.REFERENCES["ges_bic"] == kp.REFERENCES["ges"]
+
+
+@pytest.mark.parametrize("variant", ["hc_bic", "tabu_bic", "mmhc_bic", "rsmax2_bic"])
+def test_a_plain_bic_variant_is_its_method_with_ebic_gamma_zero(variant):
+    method = variant.removesuffix("_bic")
+    assert kp.VARIANTS[variant] == (method, {"ebic_gamma": 0.0})
+    assert kp.REFERENCES[variant] == kp.REFERENCES[method]
