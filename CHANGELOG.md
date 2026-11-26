@@ -55,6 +55,10 @@ names its pull request.
 - For contributors, `qa/identity.py` counts the CI queries of the tests that delete rows per test,
   so its fits on data with missing values record their query counts, in the data's columns. Record
   both manifests of a compare with one version of the gate. ([#1245])
+- `rpcmci`'s `fdr_method` says that its default `"none"` keeps each p-value as tested, as the
+  authors' code does. For contributors, `DEVELOPMENT.md` and `CONTRIBUTING.md` give the pytest flags
+  CI runs, `-n logical --dist loadfile`, and the `calm` required-edge cell of the concepts test and
+  one drawing test skip when torch or pygraphviz is missing. ([#1247])
 
 ### Fixed
 
@@ -3004,3 +3008,4 @@ First alpha release.
 [#1241]: https://github.com/Abel-ai-lab/Andrey/pull/1241
 [#1243]: https://github.com/Abel-ai-lab/Andrey/pull/1243
 [#1245]: https://github.com/Abel-ai-lab/Andrey/pull/1245
+[#1247]: https://github.com/Abel-ai-lab/Andrey/pull/1247

@@ -593,6 +593,8 @@ def unsupported_data(kind: str, rng: np.random.Generator) -> pd.DataFrame:
 
 def required_edge_is_kept(method: str, kind: str) -> bool:
     """Whether a fit with the required edge x -> y keeps it on data that do not support it."""
+    if method == "calm":
+        pytest.importorskip("torch")
     spec = REGISTRY[method]
     series = spec.output.structure_type == "temporal"
     knowledge = andrey.Knowledge(required=[("x", "y", 1) if series else ("x", "y")])

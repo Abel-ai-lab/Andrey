@@ -2161,11 +2161,11 @@ def rpcmci(
         returned links: a link is in a regime's graph when its p-value is at most ``alpha``.
     fdr_method : {"none", "fdr_bh"}, default="none"
         How each regime's MCI p-values are corrected for the number of links tested. ``"none"``
-        keeps each p-value as tested; ``"fdr_bh"`` replaces them with their Benjamini-Hochberg
-        adjusted values [3]_ over all of the regime's links together, and a link is then in the
-        graph when its adjusted p-value is at most ``alpha``. ``"none"`` favors true links; it gives
-        up control of the extra ones. ``"fdr_bh"`` favors fewer extra links; it gives up some true
-        ones.
+        keeps each p-value as tested, as the authors' code does; ``"fdr_bh"`` replaces them with
+        their Benjamini-Hochberg adjusted values [3]_ over all of the regime's links together, and a
+        link is then in the graph when its adjusted p-value is at most ``alpha``. ``"none"`` favors
+        true links; it gives up control of the extra ones. ``"fdr_bh"`` favors fewer extra links; it
+        gives up some true ones.
     indep_test : {"student_t", "fisherz"}, default="student_t"
         The conditional-independence test behind every p-value, a partial-correlation test for
         linear effects: ``"student_t"`` takes the p-value from the Student-t distribution,
