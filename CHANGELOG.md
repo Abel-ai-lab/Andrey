@@ -16,6 +16,10 @@ names its pull request.
   in 0.16.0. A loop over `SCM.sample` draws the same datasets:
   `[scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]` replaces
   `generate(Ensemble(scms=scms, seeds=range(10), n=500))`. ([#1221])
+- `lges` defaults to `insertion="conservative"` (ConservativeInsert), which made fewer errors than
+  `"safe"` (SafeInsert) at the sample sizes measured, under both schedules, by adding and reversing
+  fewer edges. `insertion="safe"` gives the former default; the paper's proof that LGES recovers
+  the true class as the rows grow covers only that value. ([#1239])
 
 ### Changed
 
@@ -2989,3 +2993,4 @@ First alpha release.
 [#1224]: https://github.com/Abel-ai-lab/Andrey/pull/1224
 [#1232]: https://github.com/Abel-ai-lab/Andrey/pull/1232
 [#1235]: https://github.com/Abel-ai-lab/Andrey/pull/1235
+[#1239]: https://github.com/Abel-ai-lab/Andrey/pull/1239
