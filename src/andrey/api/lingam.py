@@ -117,9 +117,19 @@ def direct_lingam(
         entropy of each variable and of each regression residual. ``"tanh"`` and ``"skew"`` replace
         them by a correlation of nonlinear functions of the standardized variables, ``tanh`` for
         sparse (heavy-tailed) noise and the square after a sign correction for skewed noise, which
-        costs far less; the Notes say when each applies. ``"pwling"`` favors accuracy under any
-        non-Gaussian noise; it gives up time. ``"skew"`` and ``"tanh"`` favor time; they give up
-        accuracy outside the noise each suits.
+        costs far less; the Notes say when each applies. ``"pwling"`` favors any non-Gaussian
+        noise: it is the only one of the three that did not fail under any noise measured; it gives
+        up time, and a little accuracy to each of the others in the setting that one suits.
+        ``"tanh"`` favors logistic-like noise, symmetric with tails a little heavier than the
+        Gaussian's: there it orders more edges correctly than ``"pwling"`` with few rows or with
+        added measurement noise, and matches it on a larger graph at a fraction of the time; it
+        gives up the other kinds of noise, orienting most edges backwards when the tails are
+        lighter than the Gaussian's, as for uniform noise, and doing worse than ``"pwling"`` under
+        skewed noise. ``"skew"`` favors skewed noise with rare large values, such as a mixture that
+        adds a large shock now and then, on small graphs: there it orders more edges correctly than
+        ``"pwling"``, most clearly with added measurement noise; it gives up symmetric noise, where
+        it orients edges about at random, and does a little worse than ``"pwling"`` under skewed
+        noise without heavy tails.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. The causal order puts the cause of
