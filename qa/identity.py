@@ -986,8 +986,30 @@ def counting(alpha: float | None) -> Generator[Counts]:
             setattr(owner, name, wrapped)
 
 
+def _in_data_columns(
+    queries: Callable[..., Iterable[tuple[int, int, Any, float]]],
+) -> Callable[..., list[tuple[int, int, Any, float]]]:
+    """Return ``queries`` reading each query of a test over reordered columns as its columns of the
+    data: a deletion test that ``from_columns`` maps to another matrix, as FCI's possible-d-sep
+    search does in rank order, records its queries as pairs of that matrix's columns."""
+
+    def read(
+        result: Any, test: Any, *args: Any, **kwargs: Any
+    ) -> list[tuple[int, int, Any, float]]:
+        rows = list(queries(result, test, *args, **kwargs))
+        source = getattr(test, "_source", None)
+        if source is None:
+            return rows
+        return [
+            (int(source[int(x)]), int(source[int(y)]), [int(source[int(z)]) for z in zs], p)
+            for x, y, zs, p in rows
+        ]
+
+    return read
+
+
 _RECORDERS: dict[str, tuple[Callable[..., Iterable[Any]], Callable[[Counts, Any], None]]] = {
-    **{name: (queries, Counts.ci) for name, queries in CI_QUERIES.items()},
+    **{name: (_in_data_columns(queries), Counts.ci) for name, queries in CI_QUERIES.items()},
     **{name: (queries, Counts.score) for name, queries in SCORE_QUERIES.items()},
 }
 

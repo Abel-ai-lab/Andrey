@@ -485,6 +485,23 @@ def test_a_query_that_is_not_tested_counts_and_separates_nothing(x: np.ndarray) 
     }
 
 
+def test_a_deletion_test_over_reordered_columns_counts_in_the_columns_of_its_source(
+    x: np.ndarray,
+) -> None:
+    """FCI's possible-d-sep search asks a test over the columns in rank order, which
+    ``from_columns`` maps to the data's, so its queries count as pairs of the data's columns."""
+    gapped = x.copy()
+    gapped[::5, 3] = np.nan
+    test = make_indep_test("fisherz", gapped)
+    test.from_columns(np.array([3, 2, 1, 0]))  # column k of the test is column 3 - k of the data
+    with identity.counting(alpha=0.0) as counts:
+        test(0, 1, (2,))
+        test.statistic_pvalues(np.array([0]), np.array([3]), [[1]])
+    assert counts.separated == {(2, 3), (0, 3)}
+    assert counts.summary()["ci_sets"] == {"1": 2}
+    assert counts.ci_sets[1] == {frozenset({1}), frozenset({2})}
+
+
 def test_a_fit_on_data_with_missing_values_records_its_query_counts() -> None:
     rows, findings = identity.run(["PC-ambiguous"], seeds=1)
     assert findings == [] and rows[0]["ci_queries"] > 0
