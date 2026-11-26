@@ -48,6 +48,10 @@ names its pull request.
   colors come from the palette, each at 4.5:1 or more on the code block in both themes; code that
   links to the API reference is cobalt; a soft amber tint marks a link's target and a searched
   word, and a cobalt tint selected text; and one 2px cobalt ring marks keyboard focus. ([#1232])
+- For contributors, a test compares the defaults of every registered method's parameters, as a
+  run records them and `--help` and `--help --json` show them, and the flags of `andrey bootstrap`
+  and `andrey markov-check`, with the Python signatures. `andrey bootstrap` lists its default of
+  `--n-resamples`, 100, as its other flags list theirs. ([#1243])
 
 ### Fixed
 
@@ -2995,3 +2999,4 @@ First alpha release.
 [#1232]: https://github.com/Abel-ai-lab/Andrey/pull/1232
 [#1235]: https://github.com/Abel-ai-lab/Andrey/pull/1235
 [#1241]: https://github.com/Abel-ai-lab/Andrey/pull/1241
+[#1243]: https://github.com/Abel-ai-lab/Andrey/pull/1243

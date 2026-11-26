@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import io
 import json
 import re
@@ -16,11 +17,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+import typer.main
 
 import andrey
-from andrey.cli import graph_view, main, render_method_help
+from andrey import cli
+from andrey.cli import graph_view, main, render_method_help, resolve_params
 from andrey.core.removed import REMOVED, removal_hint
-from andrey.spec import REGISTRY, SCHEMA_VERSION, get_spec
+from andrey.spec import REGISTRY, SCHEMA_VERSION, get_spec, help_schema
+from andrey.spec.generate import grammar_default
 
 
 @pytest.fixture
@@ -1526,3 +1530,73 @@ def test_a_p_value_not_tested_is_null_in_strict_json(tmp_path, capsys, monkeypat
     assert code == 0
     env = json.loads(out, parse_constant=lambda token: pytest.fail(f"non-standard {token}"))
     assert None in [p for lag in env["metadata"]["p_values"] for row in lag for p in row]
+
+
+def _same_default(cli_default, python_default) -> bool:
+    """Whether two defaults are one value of one type; a list and a tuple are one, as JSON has no
+    tuple."""
+    if isinstance(cli_default, (list, tuple)) and isinstance(python_default, (list, tuple)):
+        return len(cli_default) == len(python_default) and all(
+            _same_default(a, b) for a, b in zip(cli_default, python_default)
+        )
+    return type(cli_default) is type(python_default) and cli_default == python_default
+
+
+@pytest.mark.parametrize("name", sorted(REGISTRY))
+def test_a_methods_cli_defaults_are_its_python_defaults(name):
+    """Each default the CLI gives a method's parameter is the facade's own: a run passes none of
+    them, and the one it records in its manifest, the one ``--help --json`` lists, and the one
+    ``--help`` prints, read back as ``key=value`` through the CLI's own grammar, equal the
+    facade's."""
+    spec = get_spec(name)
+    python = {
+        p.name: p.default
+        for p in inspect.signature(getattr(andrey, name)).parameters.values()
+        if p.kind is p.KEYWORD_ONLY
+    }
+    passed, manifest = resolve_params(spec, {}, [])
+    assert passed == {}  # a run passes only what it sets, so the facade's own default applies
+    listed = help_schema(name)["method"]["params"]["properties"]
+    assert set(manifest) == set(listed) == set(python)
+    shown = {p.name: cli._coerce(grammar_default(p), p) for p in spec.params}
+    for source, defaults in (
+        ("manifest", manifest),
+        ("--help --json", {k: v["default"] for k, v in listed.items()}),
+        ("--help", shown),
+    ):
+        differs = {
+            k: (defaults[k], python[k]) for k in python if not _same_default(defaults[k], python[k])
+        }
+        assert not differs, f"{name} {source} differs from the facade (CLI, Python): {differs}"
+
+
+#: The Python parameters with a default that a flag of the command does not take, and why.
+PYTHON_ONLY = {
+    "bootstrap": {
+        "keep_fits": "an object the Python call returns beside the result; no file holds it",
+    },
+}
+
+
+@pytest.mark.parametrize(
+    ("command", "function"),
+    [("bootstrap", andrey.bootstrap), ("markov-check", andrey.markov_check)],
+)
+def test_a_commands_flags_default_to_the_python_defaults(command, function):
+    """A flag of ``andrey bootstrap`` or ``andrey markov-check`` that a Python parameter names
+    defaults to that parameter's default, and every Python parameter with a default has a flag
+    unless :data:`PYTHON_ONLY` says why not."""
+    flags = {p.name: p.default for p in typer.main.get_command(cli.app).commands[command].params}
+    python = {
+        name: p.default
+        for name, p in inspect.signature(function).parameters.items()
+        if p.default is not p.empty and p.kind is not p.VAR_KEYWORD
+    }
+    left_out = {name for name in python if name not in flags}
+    assert left_out == set(PYTHON_ONLY.get(command, {}))
+    differs = {
+        k: (flags[k], python[k])
+        for k in python
+        if k in flags and not _same_default(flags[k], python[k])
+    }
+    assert not differs, f"andrey {command} differs from the facade (CLI, Python): {differs}"

@@ -2087,11 +2087,11 @@ def cmd_bootstrap(
     ),
     data: DataOption = None,
     env: EnvOption = None,
-    n_resamples: int | None = typer.Option(
-        None,
+    n_resamples: int = typer.Option(
+        BOOTSTRAP_DEFAULTS["n_resamples"],
         "--n-resamples",
         metavar="N",
-        help=f"Number of resamples and fits. Default {BOOTSTRAP_DEFAULTS['n_resamples']}.",
+        help="Number of resamples and fits.",
     ),
     seed: int | None = typer.Option(
         None,
@@ -2151,7 +2151,7 @@ def cmd_bootstrap(
         fkwargs,
         resolved,
         labels=labels,
-        n_resamples=BOOTSTRAP_DEFAULTS["n_resamples"] if n_resamples is None else n_resamples,
+        n_resamples=n_resamples,
         seed=seed,
         threshold=threshold,
         strict=strict,
