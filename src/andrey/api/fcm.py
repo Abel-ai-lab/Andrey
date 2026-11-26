@@ -1521,7 +1521,8 @@ def skewd_mv(
     with the paper, and fewer than the empty graph and than :func:`~andrey.pc` (KCI),
     :func:`~andrey.cam`, :func:`~andrey.nogam`, :func:`~andrey.score_matching`, and
     :func:`~andrey.resit`, all five faster; ``andrey.config(n_jobs)`` runs its conditional models
-    and their searches on threads, which cuts the wall time.
+    and their searches on threads, and ``andrey.config(backend="cuda")`` the searches on a GPU,
+    which cuts the wall time.
 
     Each column is standardized first [1]_. PC, order-independent [2]_, gives the class. Its DAGs
     orient the undirected edges with no directed cycle and no new collider [1]_, and are every
@@ -1548,9 +1549,19 @@ def skewd_mv(
 
     ``n_jobs`` above 1 (``andrey.config`` or ``ANDREY_N_JOBS``) runs the conditional models, and
     the searches of each, on that many threads. Each search draws from its own random
-    stream, split from ``seed`` in a fixed order, so the DAG and its likelihoods are the same bit
-    for bit with any number of workers. The models are fitted on one BLAS thread with any number of
-    workers, so the result does not depend on the machine's BLAS thread count either.
+    stream, split from ``seed`` in a fixed order, so on NumPy and on a GPU the DAG and its
+    likelihoods are the same bit for bit with any number of workers. The models are fitted on one
+    BLAS thread with any number of workers, so the result does not depend on the machine's BLAS
+    thread count either.
+
+    ``backend="cuda"`` (``andrey.config`` or ``ANDREY_BACKEND``) runs the CMA-ES searches of each
+    conditional model together on a GPU with PyTorch, as in :func:`~andrey.skewd`, and
+    ``backend="cpu"`` runs them the same way with PyTorch on the CPU; ``"auto"``, the default, and
+    ``optimizer="lbfgs"`` keep NumPy. PC's tests follow the backend as in :func:`~andrey.pc`. The
+    GPU favors time, with one worker, as more threads only compete for the device. It gives up bit
+    identity with NumPy: the device rounds differently, so the likelihoods differ from NumPy's in
+    their last digits, or more where the rounding moves a chosen penalty; the DAGs were NumPy's in
+    every case measured.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every fit reads every row of
     its variables, so a row with a missing value has no place in it. Drop the incomplete rows
