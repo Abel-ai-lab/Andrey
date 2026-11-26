@@ -19,6 +19,8 @@ names its pull request.
 
 ### Changed
 
+- `direct_lingam`'s `measure` states what each value favors and gives up, as measured in the
+  settings its paper claims. ([#1237])
 - Each method's Limitations paragraph says in a few sentences where it does better or worse and
   against which methods, without numbers, and links the release card that holds the measurements;
   the detail moves to those cards. Options whose values were measured against each other say what
@@ -2979,3 +2981,4 @@ First alpha release.
 [#1222]: https://github.com/Abel-ai-lab/Andrey/pull/1222
 [#1224]: https://github.com/Abel-ai-lab/Andrey/pull/1224
 [#1232]: https://github.com/Abel-ai-lab/Andrey/pull/1232
+[#1237]: https://github.com/Abel-ai-lab/Andrey/pull/1237
