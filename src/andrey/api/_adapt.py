@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
+import sys
 from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -119,7 +120,7 @@ def data_matrix(
     """
     column_labels(data)
     try:
-        X = np.asarray(data, dtype=np.float64)
+        X = _numbers(data)
     except (TypeError, ValueError) as error:
         try:  # a pandas column of a nullable type marks a missing value with NA
             to_numpy = data.to_numpy  # ty: ignore[unresolved-attribute]  # caught when absent
@@ -157,6 +158,19 @@ def data_matrix(
         if not reads_categories:
             warn_category_codes(X, data, method, name=name)
     return X
+
+
+def _numbers(data: npt.ArrayLike) -> np.ndarray:
+    """Return ``data`` as a float64 array, with ``NaN`` for each missing value of a pandas frame.
+
+    A frame converts through ``to_numpy(dtype=float64, na_value=nan)``, not ``np.asarray``: with
+    pandas 3.1, ``np.asarray`` turns a missing value of a frame of integer-valued ``category``
+    columns that have different categories into ``-2**63``.
+    """
+    pandas = sys.modules.get("pandas")
+    if pandas is not None and isinstance(data, pandas.DataFrame):
+        return np.asarray(data.to_numpy(dtype=np.float64, na_value=np.nan))
+    return np.asarray(data, dtype=np.float64)
 
 
 def warn_category_codes(
