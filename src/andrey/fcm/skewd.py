@@ -520,6 +520,8 @@ def search_pool(workers: int, device: str = "numpy") -> Generator[Run]:
 
     With a PyTorch ``device`` (from :func:`search_device`), the CMA-ES searches of each call run
     together by :func:`_lockstep` instead, and the ``workers`` threads draw their populations."""
+    if device != "numpy":
+        _load_linalg(device)
     if workers <= 1:
         yield _serial if device == "numpy" else (lambda searches: _lockstep(searches, device, map))
         return
@@ -530,6 +532,16 @@ def search_pool(workers: int, device: str = "numpy") -> Generator[Run]:
             yield lambda searches: list(pool.map(_run_search, searches))
         else:
             yield lambda searches: _lockstep(searches, device, pool.map)
+
+
+def _load_linalg(device: str) -> None:
+    """Load PyTorch's linear-algebra library for ``device`` in this thread. Its first call loads the
+    library lazily, and two threads making that first call at once fail ("lazy wrapper should be
+    called at most once"); the fits of several directions or models run :func:`_lockstep` on
+    threads of their own."""
+    import torch
+
+    torch.linalg.eigh(torch.eye(2, dtype=torch.float64, device=device))
 
 
 #: Generations of each search's draws taken from its stream at once by :func:`_lockstep`: one
