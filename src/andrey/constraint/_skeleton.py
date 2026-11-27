@@ -863,7 +863,11 @@ def _pair_chunks(
 ) -> Iterator[_Chunk]:
     """Yield ``(i, x, y, chunk)``, ``x < y``, for each chunk of subsets the per-pair scan of
     :func:`scan_pairs` evaluates in one call, in its order; ``i`` is the pair's position. With
-    ``test``, each side leaves out the candidates :func:`kept_apart` drops."""
+    ``test``, each side leaves out the candidates :func:`kept_apart` drops. Size 0 under test-wise
+    deletion reads them from arrays (:func:`_marginal_chunks`)."""
+    if size == 0 and isinstance(test, TestwiseDeletion):
+        yield from _marginal_chunks(pairs, test)
+        return
     for i, (a, b) in enumerate(pairs):
         x, y = min(a, b), max(a, b)
         for side_a, side_b, candidates, seen in _sides(neighbors, a, b, size):
@@ -874,6 +878,33 @@ def _pair_chunks(
                 [(candidates, seen)] = kept
             for chunk in subset_rows(candidates, size, seen):
                 yield i, x, y, chunk
+
+
+# The one set of size 0, as the rows of an ``(N, 0)`` int array; never written.
+_NO_SET = np.empty((1, 0), dtype=np.intp)
+_NO_SET.flags.writeable = False
+
+
+def _marginal_chunks(pairs: list[tuple[int, int]], test: TestwiseDeletion) -> Iterator[_Chunk]:
+    """:func:`_pair_chunks` at size 0 under test-wise deletion, from the matrix ``test.together()``
+    that is read once.
+
+    A pair some row observes together yields the empty set as its one chunk: the first endpoint
+    tests it, and the second skips what the first tested. Any other pair is counted as one query
+    not tested, as :func:`kept_apart` counts it, when the scan reaches it, so the counts and the
+    chunks interleave as the per-pair scan's do.
+    """
+    if not pairs:
+        return
+    together = test.together()
+    flat = np.fromiter(chain.from_iterable(pairs), np.intp, 2 * len(pairs))
+    a, b = flat[0::2], flat[1::2]
+    observed = (together[a, a] & together[b, a] & together[a, b] & together[b, b]).tolist()
+    for i, ((x, y), seen) in enumerate(zip(pairs, observed)):
+        if seen:
+            yield (i, x, y, _NO_SET) if x < y else (i, y, x, _NO_SET)
+        else:
+            test.count_not_tested(x, y, 1, [[]])
 
 
 def _stacks(

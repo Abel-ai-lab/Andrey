@@ -129,9 +129,11 @@ def _dependence_scan(test: CITest, *, significant: bool = False) -> _Scan | None
 
     A partial-correlation test on complete data (``statistic_pvalue`` and
     ``statistic_pvalues_given``) answers two or more candidates from one factor of the set's
-    correlation block, matching separate calls up to rounding. A test with ``pvalues_given`` but no
-    ``statistic_pvalue`` scans candidates together, giving the same p-values as separate calls and
-    the key :func:`_dependence` derives from them.
+    correlation block, matching separate calls up to rounding. The test-wise deletion test of
+    :class:`~andrey.core.ci_missing.GaussianDeletion` answers them in one call, with the bits of
+    separate calls. A test with ``pvalues_given`` but no ``statistic_pvalue`` scans candidates
+    together, giving the same p-values as separate calls and the key :func:`_dependence` derives
+    from them.
     """
     given = getattr(test, "statistic_pvalues_given", None)
     if given is not None and getattr(test, "statistic_pvalue", None) is not None:

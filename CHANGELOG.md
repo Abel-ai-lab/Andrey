@@ -86,6 +86,32 @@ names its pull request.
   holds the candidates the empty set separates from its target the same way. Where it separates
   few pairs, the search keeps a separating set and a p-value for each, as before. On a sparse graph
   of 2,000 variables and 300 rows, the peak memory `pc` adds falls to about a third. ([#1277])
+- `ges`, `gfci`, and `ages` return the same results with less memory, because GES's forward phase
+  keeps the screening delta and bound of each candidate it scored in two arrays of floats, 16 bytes
+  for each candidate, where it kept a set and two dictionaries. On a sparse graph of 1,000
+  variables, a serial `ges` adds about a quarter of the memory it added before, and with
+  `n_jobs=4` each worker holds less than half as much. ([#1278])
+- `boss`, `grasp`, `boss_fci`, and `grasp_fci` take less memory on large graphs: without
+  knowledge, each variable's grow-shrink tree no longer stores a list of every other variable,
+  which took memory quadratic in the number of variables; the trees of a search share one tuple of
+  the variables. Results are unchanged, bit for bit. ([#1274])
+- With more than one worker on Linux, the workers of GES, of the skeleton and possible-d-separation
+  searches (PC, FCI, FCI-JCI, GFCI, CD-NOD, and RSMAX2 with `restrict="pc"`), and of a list of
+  targets (IAMB, Inter-IAMB, and MMPC) read one shared copy of the covariance or correlation matrix
+  in `/dev/shm` instead of a copy each, and starting them no longer holds a copy per worker in the
+  caller. The copy has no name in `/dev/shm`, so its memory goes back when the last worker exits,
+  even when a fit is killed. Where `/dev/shm` cannot hold the matrix, each worker gets its own copy
+  as before. The results are the same bit for bit. For contributors, the benchmark harness's `poll`
+  route caps on the process tree's Pss, which counts a shared page once, once the tree's RSS sum
+  passes the cap, and records it as `tree_peak_pss_mb`; the tree's sums leave out a child started by
+  `vfork` that has not yet called exec. ([#1276])
+- Methods that check their data for copied columns, those with a partial-correlation test or the
+  linear-Gaussian BIC among them, return the same results while the check holds less memory on data
+  with many columns. It reads the correlation matrix in blocks of rows instead of making three
+  temporary copies of it, and the BIC's check keeps the whole correlation matrix only when the data
+  have more rows than columns, for its eigenvalue test. On 4,000 variables and 300 rows, the BIC's
+  check peaks at about 17 MB instead of 488 MB, and an `hc` fit at about 537 MB instead of 637 MB.
+  ([#1275])
 - The grow step of `iamb` and `inter_iamb`, and so of `calm` and `rsmax2` with `restrict="iamb"`,
   reads the p-values of a scan as one array where the test answers a scan at once, so with
   `fisherz`, `student_t`, or `normal_scores` on complete data these searches run faster on hundreds
@@ -100,6 +126,20 @@ names its pull request.
   `score_matching`, `das`, `nogam`, `skewd` with `criterion="independence"`, and the queries of
   `indep_test="kci"` without a conditioning set build their Gaussian kernel matrices faster, with the
   same output bit for bit. ([#1290])
+- For contributors, git and CI enforce LF line endings: `.gitattributes` stores text files with LF,
+  and `ruff format --check` fails a Python file that has CRLF. ([#1293])
+- `bdeu` and `discrete_bic` count each family's table faster, and `bdeu` scores a batch of tables
+  together, so `exact_search`, `hc`, `tabu`, `ges`, `xges`, `lges`, `boss`, `grasp`, `boss_fci`,
+  `grasp_fci`, `gfci`, `mmhc`, `rsmax2`, and `gies` run faster with either score, with the same
+  scores and graphs bit for bit. ([#1284])
+- `pc`, `fci`, `cdnod`, and `fci_jci` with `fisherz` or `student_t` on data with missing values
+  build the conditioning-size-0 pass from arrays, and so does the search for the separating sets of
+  the pairs that knowledge makes non-adjacent, so they run faster on many variables, with the same
+  output bit for bit and the same counts of the queries not tested. ([#1296])
+- `iamb` and `inter_iamb` on data with missing values and `fisherz` or `student_t`, the default
+  test, ask the test-wise deletion test for each grow scan at once and read its p-values as one
+  array, so these searches run faster on tens of variables, with the same output bit for bit.
+  ([#1299])
 
 ### Fixed
 
@@ -3058,7 +3098,15 @@ First alpha release.
 [#1257]: https://github.com/Abel-ai-lab/Andrey/pull/1257
 [#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
+[#1274]: https://github.com/Abel-ai-lab/Andrey/pull/1274
+[#1275]: https://github.com/Abel-ai-lab/Andrey/pull/1275
+[#1276]: https://github.com/Abel-ai-lab/Andrey/pull/1276
 [#1277]: https://github.com/Abel-ai-lab/Andrey/pull/1277
+[#1278]: https://github.com/Abel-ai-lab/Andrey/pull/1278
+[#1284]: https://github.com/Abel-ai-lab/Andrey/pull/1284
 [#1287]: https://github.com/Abel-ai-lab/Andrey/pull/1287
 [#1289]: https://github.com/Abel-ai-lab/Andrey/pull/1289
 [#1290]: https://github.com/Abel-ai-lab/Andrey/pull/1290
+[#1293]: https://github.com/Abel-ai-lab/Andrey/pull/1293
+[#1296]: https://github.com/Abel-ai-lab/Andrey/pull/1296
+[#1299]: https://github.com/Abel-ai-lab/Andrey/pull/1299
