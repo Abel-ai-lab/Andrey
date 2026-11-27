@@ -153,6 +153,21 @@ names its pull request.
   neighbors, and `fci`, `fci_jci`, and `gfci` search possible-d-sep sets over sets of each node's
   arrowheads and neighbors, so they run faster on many variables, with the same output bit for bit.
   ([#1303])
+- `camuv` keeps each residual its sink tests fit, so it fits each variable on each set of
+  regressors once, with the same output bit for bit. ([#1306])
+- `iamb` and `inter_iamb` on data with missing values and `chisq` or `gsq` code each column once and
+  answer each grow scan against one conditioning set together, reading its p-values as one array,
+  so these searches run faster on tens of variables, with the same output bit for bit.
+  `make_indep_test` with `chisq` or `gsq` on data with missing values raises for an unknown
+  `degrees_of_freedom` when it builds the test, not at its first query. ([#1307])
+- `ages` runs faster, with the same output bit for bit: its backward phases share the covariance
+  inverses, each remove's penalty-free score change, and each target's Delete candidates across the
+  penalties of the solution path. The consistent DAG extension of a PDAG, the objective that `ges`,
+  `gies`, `lges`, `xges`, and `ages` report, and the neighborhoods the `ges`, `gies`, `lges`, and
+  `ages` scans read take each row's nodes of a graph from one `np.nonzero`. ([#1311])
+- `pcmci` and `pcmciplus` on data with missing values stop the scan that picks each candidate's
+  conditions once it has the ones the PC1 rounds keep, so they run faster on tens of variables,
+  with the same output bit for bit. ([#1315])
 - The `gcm` test and the `pcm` test with `regression="boosting"` tune their boosted trees faster:
   each cross-validation fold grows only through the round where its early stop cuts it, and the
   repeated input checks of the many small fits are skipped, so the methods that take them as
@@ -3130,4 +3145,8 @@ First alpha release.
 [#1299]: https://github.com/Abel-ai-lab/Andrey/pull/1299
 [#1302]: https://github.com/Abel-ai-lab/Andrey/pull/1302
 [#1303]: https://github.com/Abel-ai-lab/Andrey/pull/1303
+[#1306]: https://github.com/Abel-ai-lab/Andrey/pull/1306
+[#1307]: https://github.com/Abel-ai-lab/Andrey/pull/1307
 [#1309]: https://github.com/Abel-ai-lab/Andrey/pull/1309
+[#1311]: https://github.com/Abel-ai-lab/Andrey/pull/1311
+[#1315]: https://github.com/Abel-ai-lab/Andrey/pull/1315
