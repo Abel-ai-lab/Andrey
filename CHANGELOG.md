@@ -78,6 +78,11 @@ names its pull request.
 - For contributors, a test lists every module-level cache and checks each cache whose result can
   change while its key does not, and registry-driven tests check that a wrong type of a parameter of
   column labels, of `knowledge`, of `targets`, and of `bootstrap` and `markov_check` raises. ([#1259])
+- `ges`, `gfci`, and `ages` return the same results with less memory. GES's forward phase keeps each
+  candidate's screening delta and bound in two arrays of floats, 16 bytes for each ordered pair of
+  variables, where it kept a set and two dictionaries. On a sparse graph of 1,000 variables, a
+  serial `ges` peaks 72 MB above its starting memory instead of 306 MB, and with `n_jobs=4` each
+  worker holds at most 53 MB instead of 118 MB. ([#1278])
 
 ### Fixed
 
@@ -3036,3 +3041,4 @@ First alpha release.
 [#1257]: https://github.com/Abel-ai-lab/Andrey/pull/1257
 [#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
+[#1278]: https://github.com/Abel-ai-lab/Andrey/pull/1278
