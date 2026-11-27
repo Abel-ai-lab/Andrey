@@ -84,6 +84,10 @@ names its pull request.
   list the sets of a small neighborhood at once, so they run faster on many variables, with the
   same output bit for bit. The size-1 pass holds a boolean matrix of the variables' adjacency.
   ([#1287])
+- `pc`, `fci`, `cdnod`, and `fci_jci` with `missing="testwise"` and `fisherz` or `student_t`
+  build the conditioning-size-0 pass from arrays, and so does the search for the separating sets of
+  the pairs that knowledge makes non-adjacent, so they run faster on many variables, with the same
+  output bit for bit and the same counts of the queries not tested. ([#1296])
 
 ### Fixed
 
@@ -3043,3 +3047,4 @@ First alpha release.
 [#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
 [#1287]: https://github.com/Abel-ai-lab/Andrey/pull/1287
+[#1296]: https://github.com/Abel-ai-lab/Andrey/pull/1296
