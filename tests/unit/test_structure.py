@@ -1066,7 +1066,10 @@ def test_far_marks_decline_an_indptr_that_does_not_fit_the_store():
     assert _far_marks(5, indptr + 1, indices, marks) is None  # does not start at 0
     assert _far_marks(5, indptr, indices[:-1], marks[:-1]) is None  # ends past the entries
     assert _far_marks(5, indptr, indices, marks[:-1]) is None  # marks and indices differ
-    assert _far_marks(5, indptr[::-1].copy(), indices, marks) is None  # counts below zero
+    steps_down = indptr.copy()
+    steps_down[2] = steps_down[3] + 1  # starts at 0 and ends at the entry count, but steps down
+    assert (np.diff(steps_down) < 0).any()
+    assert _far_marks(5, steps_down, indices, marks) is None
 
 
 def test_validate_raises_the_first_error_of_the_edge_by_edge_reference():
