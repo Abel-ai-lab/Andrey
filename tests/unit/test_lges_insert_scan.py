@@ -16,7 +16,7 @@ from collections.abc import Iterator
 import numpy as np
 import pytest
 
-from andrey.core import ARROW, TAIL
+from andrey.core import ARROW, TAIL, _bitset
 from andrey.core.orient import dag2cpdag
 from andrey.core.score import BICScore, LocalScore, make_score
 from andrey.core.ties import EPS_IMPROVE
@@ -26,7 +26,7 @@ from andrey.search.gies import _neighborhoods, _turning_best
 from andrey.search.lges import extension, insert_best, insert_moves
 
 Move = tuple[float, int, int, tuple[int, ...]]
-Verdicts = dict[tuple[int, tuple[int, ...]], frozenset[int]]
+Verdicts = dict[tuple[int, tuple[int, ...]], int]
 Turn = tuple[int, int, set[int], bool]
 
 
@@ -204,7 +204,8 @@ def test_a_verdict_is_kept_for_a_target_and_its_parents_in_the_dag():
             for v in range(d)
             if v != y and v not in parents and not score.score(y, sorted({*parents, v})) > base
         }
-        assert safe == expect
+        assert isinstance(safe, int)
+        assert set(_bitset.nodes(safe)) == expect
 
 
 def _turn_delta(adj: np.ndarray, score: BICScore, move: Turn) -> float:

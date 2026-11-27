@@ -56,7 +56,7 @@ def insert_moves(
     n: int,
     ranks: Sequence[int],
     conservative: bool,
-    verdicts: dict[tuple[int, tuple[int, ...]], frozenset[int]] | None = None,
+    verdicts: dict[tuple[int, tuple[int, ...]], int] | None = None,
 ) -> Iterator[tuple[float, int, int, tuple[int, ...]]]:
     """Yield every valid ``Insert(x, y, T)`` the less greedy rule keeps, as ``(delta, x, y, T)``.
 
@@ -68,12 +68,14 @@ def insert_moves(
     (ConservativeInsert). ``delta`` is the change in score; lower is better.
 
     ``verdicts``, when given, keeps the SafeInsert verdict of each target by ``(y, Pa_G(y))``: the
-    nodes ``x`` for which ``G`` does not score better without ``x -> y``. A verdict depends on the
-    score alone, so one dict serves every state of a search with the same score.
+    nodes ``x`` for which ``G`` does not score better without ``x -> y``, as a bitmask
+    (:func:`~andrey.core._bitset.bitmask`). A verdict depends on the score alone, so one dict
+    serves every state of a search with the same score.
     """
     dag = extension(adj, ranks)
     adj_sets, par_of, nbr = neighborhood_state(adj)
     succ = _bitset.row_masks(adj == ops.TAIL)
+    adjacent = _bitset.row_masks(adj != ops.NULL)
     dag_parents = [np.flatnonzero(row).tolist() for row in (dag == ops.ARROW)]
     for y in range(n):
         dag_pa_list = dag_parents[y]
@@ -82,7 +84,7 @@ def insert_moves(
         if safe is None:
             dag_pa = set(dag_pa_list)
             dag_base = score.score(y, dag_pa_list)
-            safe = frozenset(
+            safe = _bitset.bitmask(
                 x
                 for x in range(n)
                 if x != y
@@ -96,7 +98,7 @@ def insert_moves(
         extensions: dict[frozenset[int], list[tuple[tuple[int, ...], int, list[int]]]] = {}
         reach: dict[int, int] = {}
         base_score: dict[tuple[int, ...], float] = {}
-        for x in sorted(safe - adj_sets[y]):
+        for x in _bitset.nodes(safe & ~adjacent[y]):
             na = frozenset(nbr_y & adj_sets[x])
             ext = extensions.get(na)
             if ext is None:
@@ -130,7 +132,7 @@ def insert_best(
     n: int,
     ranks: Sequence[int],
     conservative: bool,
-    verdicts: dict[tuple[int, tuple[int, ...]], frozenset[int]] | None = None,
+    verdicts: dict[tuple[int, tuple[int, ...]], int] | None = None,
 ) -> tuple[float, int, int, tuple[int, ...]] | None:
     """The best of :func:`insert_moves` by :func:`~andrey.search._parallel_ges.move_key`, or None
     when none lowers the score by more than :data:`~andrey.core.ties.EPS_IMPROVE`; ``verdicts``
@@ -213,7 +215,7 @@ def lges(
         # The turning scan reads only the score's local scores, not its batched additions.
         family = cast(FamilyScore, score)
         kept: dict[tuple[int, tuple[int, ...], int], float] = {}
-        verdicts: dict[tuple[int, tuple[int, ...]], frozenset[int]] = {}
+        verdicts: dict[tuple[int, tuple[int, ...]], int] = {}
 
         def deletes(adj: np.ndarray) -> np.ndarray:
             while (
