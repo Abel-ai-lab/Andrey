@@ -85,6 +85,20 @@ names its pull request.
   have more rows than columns, for its eigenvalue test. On 4,000 variables and 300 rows, the BIC's
   check peaks at about 17 MB instead of 488 MB, and an `hc` fit at about 537 MB instead of 637 MB.
   ([#1275])
+- The grow step of `iamb` and `inter_iamb`, and so of `calm` and `rsmax2` with `restrict="iamb"`,
+  reads the p-values of a scan as one array where the test answers a scan at once, so with
+  `fisherz`, `student_t`, or `normal_scores` on complete data these searches run faster on hundreds
+  of variables, with the same output bit for bit. ([#1289])
+- `pc`, `fci`, `cdnod`, `fci_jci`, `rsmax2`, and the other methods that run the PC family's skeleton
+  search with `fisherz`, `student_t`, or `normal_scores` on complete data build the queries of the
+  conditioning-size-1 pass from arrays, and the scans of conditioning sets of two or more variables
+  list the sets of a small neighborhood at once, so they run faster on many variables, with the
+  same output bit for bit. The size-1 pass holds a boolean matrix of the variables' adjacency.
+  ([#1287])
+- `resit`, `camuv`, `loci`, `anm`, `pnl`, `rcd`, `bottom_up_parce_lingam`, `gin`, `cpcm`,
+  `score_matching`, `das`, `nogam`, `skewd` with `criterion="independence"`, and the queries of
+  `indep_test="kci"` without a conditioning set build their Gaussian kernel matrices faster, with the
+  same output bit for bit. ([#1290])
 
 ### Fixed
 
@@ -3044,3 +3058,6 @@ First alpha release.
 [#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
 [#1275]: https://github.com/Abel-ai-lab/Andrey/pull/1275
+[#1287]: https://github.com/Abel-ai-lab/Andrey/pull/1287
+[#1289]: https://github.com/Abel-ai-lab/Andrey/pull/1289
+[#1290]: https://github.com/Abel-ai-lab/Andrey/pull/1290
