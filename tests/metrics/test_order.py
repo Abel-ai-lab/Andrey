@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 from andrey.metrics import (
@@ -42,3 +43,24 @@ def test_empty_dag_has_no_comparable_pairs():
 def test_non_permutation_order_raises():
     with pytest.raises(ValueError):
         causal_order_accuracy([0, 0, 1], CHAIN)
+
+
+def test_structure_output_order_matches_the_same_list_order():
+    from andrey.core import GraphStructure, StructureOutput
+
+    g = GraphStructure.from_numpy(
+        np.array([[0, 1, 0], [2, 0, 1], [0, 2, 0]], dtype=np.int8), kind="dag"
+    )
+    out = StructureOutput.new(g, ordering=[0, 1, 2])
+    assert causal_order_scores(out, CHAIN) == causal_order_scores([0, 1, 2], CHAIN)
+
+
+def test_structure_output_without_ordering_raises():
+    from andrey.core import GraphStructure, StructureOutput
+
+    g = GraphStructure.from_numpy(
+        np.array([[0, 1, 0], [2, 0, 1], [0, 2, 0]], dtype=np.int8), kind="dag"
+    )
+    out = StructureOutput.new(g)
+    with pytest.raises(ValueError, match="carries no ordering"):
+        causal_order_scores(out, CHAIN)

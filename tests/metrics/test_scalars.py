@@ -36,6 +36,20 @@ def test_coefficient_mae_from_structure_output():
     assert coefficient_mae(est, true) == pytest.approx(0.2)
 
 
+def test_coefficient_mae_structure_output_without_weights_raises():
+    from andrey.core import GraphStructure, StructureOutput
+
+    g = GraphStructure.from_numpy(np.array([[0, 1], [2, 0]], dtype=np.int8), kind="dag")
+    out = StructureOutput.new(g)
+    with pytest.raises(ValueError, match="carries no edge weights"):
+        coefficient_mae(out, [[0.0, 1.0], [0.0, 0.0]])
+
+
+def test_coefficient_mae_weight_shape_mismatch_raises():
+    with pytest.raises(ValueError, match="weight-shape mismatch"):
+        coefficient_mae(np.zeros((2, 2)), np.zeros((3, 3)))
+
+
 # ---- direction accuracy -------------------------------------------------------------------------
 
 
