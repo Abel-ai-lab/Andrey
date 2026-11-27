@@ -294,3 +294,21 @@ def test_a_list_raises_the_error_of_its_first_failing_target(method):
     messages = [raised(t) for t in targets]
     first = next(message for message in messages if message is not None)
     assert raised(targets) == first
+
+
+def test_counted_refuses_a_search_that_made_a_run_before_its_first_call():
+    """A run made before the first call has no counter, so the call raises; a search that made none
+    counts each run it makes later, however many calls read it."""
+    x = _apart(_gaussian().to_numpy())
+    settings = {"alpha": 0.05, "indep_test": "fisherz"}
+    made = local_search(x, **settings)
+    made.run("mmpc", 0)
+    with pytest.raises(ValueError, match="no run before its first call"):
+        made.counted(lambda: made.run("mmpc", 0))
+
+    search = local_search(x, **settings)
+    search.counted(lambda: None)
+    search.run("mmpc", 0)  # made between two calls
+    _, first = search.counted(lambda: search.run("mmpc", 0))
+    _, again = search.counted(lambda: search.run("mmpc", 0))
+    assert first and _counts(first) == _counts(again)

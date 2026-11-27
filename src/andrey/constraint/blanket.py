@@ -984,9 +984,14 @@ class LocalSearch:
         Each run counts its own rows and keeps them with the run. The counter returned merges those
         of the runs ``answer`` read, each once, in the order it first read them, and then the
         tests ``answer`` made outside any run, as a new search that runs only ``answer`` counts
-        them. A run made before the first call has no counter.
+        them. A search counts every run it makes after its first call, so a search that made a run
+        before it, which has no counter, raises ``ValueError``.
         """
         if self._run_rows is None:
+            if self._runs:
+                raise ValueError(
+                    "counted needs a search that has made no run before its first call"
+                )
             self._run_rows = {}
         self._read = {}
         try:
