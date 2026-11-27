@@ -48,24 +48,13 @@ def test_partial_correlation_misses_the_nonmonotone_links():
 # RCoT is left out: at this case's 400 rows, below the 500 its warning names, a true independence
 # falls below 0.05 for some feature seeds, so the graph follows the seed; the many-graph test
 # below checks RCoT.
-# GPDC with the majority rule leaves the case's collider undirected: at its 400 rows both the empty
-# set and the middle node separate the ends of the triple, so exactly half of the separating subsets
-# contain it and the vote calls the triple ambiguous.
 RECOVERY = [
-    pytest.param(
-        name,
-        rule,
-        marks=pytest.mark.xfail(
-            strict=True,
-            raises=AssertionError,
-            reason="the vote leaves the collider undirected",
-        )
-        if (name, rule) == ("GPDC", "majority")
-        else (),
-    )
+    (name, rule)
     for name in CI_TESTS
     if name != "RCoT"
     for rule in ("sepsets", "majority")
+    # The tie below: the majority rule marks its triple ambiguous.
+    if (name, rule) != ("GPDC", "majority")
 ]
 
 
@@ -73,6 +62,24 @@ RECOVERY = [
 def test_pc_recovers_the_nonmonotone_graph(indep_test, collider_rule):
     out = andrey.pc(datagen.generate(CASE), indep_test=indep_test, collider_rule=collider_rule)
     assert datagen.to_variables(CASE, out.structure).oriented_edges() == TRUE_EDGES
+
+
+@pytest.mark.parametrize("indep_test", ["GPDC"], indirect=True)
+def test_the_majority_rule_reports_a_tie_in_the_gpdc_graph_as_ambiguous(indep_test):
+    # At this case's 400 rows, GPDC separates the ends of the triple x0, x2, x1 given the empty set
+    # and given x2, so exactly half of the separating subsets contain the middle node. Colombo and
+    # Maathuis's majority rule calls such a triple ambiguous, so the collider stays unoriented and
+    # Meek's rules have no arrowhead to extend: every edge of the case stays undirected.
+    out = andrey.pc(datagen.generate(CASE), indep_test=indep_test, collider_rule="majority")
+    order = datagen.column_order(CASE)
+    triples = [
+        (int(order[b]), sorted(int(order[v]) for v in (a, c)))
+        for a, b, c in out.metadata["ambiguous_triples"]
+    ]
+    assert triples == [(2, [0, 1])]
+    assert datagen.to_variables(CASE, out.structure).oriented_edges() == [
+        (i, j, "undirected") for i, j, _ in TRUE_EDGES
+    ]
 
 
 @pytest.mark.parametrize("indep_test", CI_TESTS, indirect=True)

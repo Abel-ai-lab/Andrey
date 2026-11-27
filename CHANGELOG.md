@@ -97,6 +97,11 @@ names its pull request.
   (`chisq`, `gsq`, `bdeu`, and `discrete_bic`) refused it as a code of "2**53 or more", and reading
   the columns as numbers (`categorical=[]`) kept it as a value and returned another graph.
   ([#1241])
+- `pc(missing="mvpc")` with `collider_rule="conservative"` or `"majority"` decides each unshielded
+  triple with the tests of the skeleton search, the corrected ones for a pair the correction
+  retests. The vote ran the test-wise deletion tests, which find a pair dependent through the
+  selection the correction removed, so no subset separated it and the collider of Figure 1b of the
+  MVPC paper stayed unoriented; it is now oriented, as under `collider_rule="sepsets"`. ([#1266])
 
 ## [0.19.0] - 2026-11-24
 

@@ -408,14 +408,14 @@ def pc(
     of ``W``: ``metadata["corrected_edges"]["rows_tested"]`` gives the fewest and the median rows
     the corrected tests read, where ``metadata["rows_tested"]`` counts the tests that delete rows,
     and is absent when no test was corrected. The colliders follow the corrected separating sets;
-    ``"conservative"`` and ``"majority"`` vote with the test-wise tests, as the correction applies
-    to the skeleton search, and their Algorithm 1 orients the corrected skeleton with PC's rules.
-    Each regression has an intercept, where their Eq. (2) has none and so assumes that every
-    variable has mean 0: with the intercept, the regressions fit data whose means are not 0, and a
-    p-value does not change when a column is shifted. The permutations draw from ``seed`` and from
-    where the queried columns' values are missing, so a result depends on neither the column order,
-    nor a column's units or origin, nor the number of workers. On complete data, ``"mvpc"`` gives
-    the result of ``"testwise"``.
+    ``"conservative"`` and ``"majority"`` vote with the same tests as the skeleton search, the
+    corrected ones for a pair the correction retests, and their Algorithm 1 orients the corrected
+    skeleton with PC's rules. Each regression has an intercept, where their Eq. (2) has none and so
+    assumes that every variable has mean 0: with the intercept, the regressions fit data whose means
+    are not 0, and a p-value does not change when a column is shifted. The permutations draw from
+    ``seed`` and from where the queried columns' values are missing, so a result depends on neither
+    the column order, nor a column's units or origin, nor the number of workers. On complete data,
+    ``"mvpc"`` gives the result of ``"testwise"``.
 
     **Limitations.** On linear-Gaussian data it made fewer errors than the empty graph on sparse
     graphs of up to hundreds of variables. On larger sparse graphs its errors passed the empty

@@ -98,8 +98,9 @@ def pc(
     (:data:`~andrey.core.ci.STOCHASTIC_INDEP_TESTS`) and of MVPC's permutations; ``None`` uses
     ``ANDREY_SEED``. ``degrees_of_freedom`` reaches a categorical ``indep_test``
     (:class:`~andrey.core.ci.ChiSquare`). ``missing="mvpc"`` corrects the skeleton of data with
-    ``NaN`` before the orientation (:func:`correct_skeleton`); every other value, and data without
-    ``NaN``, keep the test-wise deletion skeleton. Returns the CPDAG, or the MPDAG with
+    ``NaN`` before the orientation (:func:`correct_skeleton`) and runs the collider vote with the
+    corrected tests; every other value, and data without ``NaN``, keep the test-wise deletion
+    skeleton and votes. Returns the CPDAG, or the MPDAG with
     ``constraints``, as a ``GraphStructure`` of kind ``"cpdag"``.
 
     The private ``_trace`` sink receives one record per step, in the order the steps run: each
@@ -135,8 +136,9 @@ def pc(
         trace=_trace,
         undecided=undecided,
     )
+    correction = None
     if missing == "mvpc" and np.isnan(X).any():
-        skeleton, sepsets, pvalues = correct_skeleton(
+        skeleton, sepsets, pvalues, correction = correct_skeleton(
             X,
             skeleton,
             sepsets,
@@ -155,13 +157,15 @@ def pc(
     adjacency = skeleton != NULL
     ambiguous = unseparated_triples(adjacency, sepsets, constraints, undecided)
     if collider_rule != "sepsets":
-        # Under missing="mvpc" too, the votes read the test-wise tests, as the authors' code does.
-        test = make_indep_test(
+        # The votes run the test the skeleton search last ran: under missing="mvpc", the correction.
+        test = correction or make_indep_test(
             indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
         )
         ambiguous |= vote_triples(
             skeleton, test, alpha, sepsets, collider_rule, max_depth=max_depth, skip=ambiguous
         )
+        if correction is not None and _mvpc is not None:
+            _mvpc["uncorrected"] = sorted(correction.uncorrected)
     # The votes run the same tests as on unflagged data; a flag overrides the result.
     ambiguous |= flagged_triples(adjacency, running_flags(adjacency))
     if _ambiguous is not None:
@@ -200,7 +204,12 @@ def correct_skeleton(
     record_pvalues: bool,
     trace: list[dict] | None,
     sink: dict | None,
-) -> tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]], dict[tuple[int, int], float]]:
+) -> tuple[
+    np.ndarray,
+    dict[tuple[int, int], tuple[int, ...]],
+    dict[tuple[int, int], float],
+    PermutationCorrection,
+]:
     """Correct the test-wise deletion ``skeleton`` of ``X`` with MVPC's Steps 2 to 4.
 
     Tu et al. (2019), Algorithm 1. Step 2 finds the parents of each column's missingness indicator
@@ -215,7 +224,9 @@ def correct_skeleton(
     indicator that has any, ``retested``, the candidates, ``removed``, those Step 4 removed, and
     ``uncorrected``, those with a test too short of rows to correct, as ``(x, y)`` pairs with
     ``x < y`` in ascending order, and ``rows``, the counter of the rows the corrected tests read.
-    Returns the skeleton, the separating sets, and the p-values.
+    Returns the skeleton, the separating sets, the p-values, and the correction, the test the
+    collider vote runs next (:func:`~andrey.constraint._skeleton.vote_triples`), whose tests then
+    add to ``rows`` and ``uncorrected``.
     """
     d = X.shape[1]
     adjacent = skeleton != NULL
@@ -242,7 +253,7 @@ def correct_skeleton(
         sink["removed"] = adjacent_pairs(retested & (corrected == NULL))
         sink["uncorrected"] = sorted(correction.uncorrected)
         sink["rows"] = correction.rows
-    return corrected, {**sepsets, **more_sepsets}, {**pvalues, **more_pvalues}
+    return corrected, {**sepsets, **more_sepsets}, {**pvalues, **more_pvalues}, correction
 
 
 def indicator_parents(
