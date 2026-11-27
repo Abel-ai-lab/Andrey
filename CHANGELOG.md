@@ -223,6 +223,12 @@ names its pull request.
   that they return the bytes of `scipy.linalg.expm`, which computes it for any other SciPy, for a
   diagonal or triangular matrix, and for any error. These fits run faster, with the same output bit
   for bit. ([#1339])
+- The shrink step of `iamb` and `inter_iamb`, and so of `calm` and `rsmax2` with `restrict="iamb"`,
+  asks every member it has not visited in one call where the test answers many queries at once: with
+  `fisherz`, `student_t`, or `normal_scores` on complete data, it drops the first member found
+  independent and asks the members after it again given the smaller blanket, so these searches run
+  faster, with the same output bit for bit and the same queries. For contributors, `DEVELOPMENT.md`
+  says that tests a speed change computes ahead and discards do not count. ([#1347])
 
 ### Fixed
 
@@ -3217,3 +3223,4 @@ First alpha release.
 [#1331]: https://github.com/Abel-ai-lab/Andrey/pull/1331
 [#1339]: https://github.com/Abel-ai-lab/Andrey/pull/1339
 [#1341]: https://github.com/Abel-ai-lab/Andrey/pull/1341
+[#1347]: https://github.com/Abel-ai-lab/Andrey/pull/1347
