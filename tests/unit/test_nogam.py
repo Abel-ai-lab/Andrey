@@ -229,7 +229,7 @@ def layouts(n: int, d: int, seed: int = 0) -> dict[str, np.ndarray]:
 
 @pytest.mark.parametrize("dtype", [np.float64, np.float32])
 @pytest.mark.parametrize("y_dtype", [np.float64, np.float32])
-@pytest.mark.parametrize("n", [0, 1, 2, 3, 4, 5, 6, 7, 9, 11, 13, 64, 101, 1001])
+@pytest.mark.parametrize("n", [*range(14), 64, 101, 1001])
 def test_cross_predict_equals_the_gathered_folds(n, y_dtype, dtype):
     """Each fold's system and held-out rows are slices of the kernel, at fold sizes that differ by
     one, with no row in some folds, and with a kernel or a response of single precision."""
