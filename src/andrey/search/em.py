@@ -74,6 +74,7 @@ if TYPE_CHECKING:
 __all__ = [
     "ITERATIONS",
     "PARAMETER_STEPS",
+    "PLAN_CELLS",
     "STACK_LIMIT",
     "Patterns",
     "expected_moments",
@@ -94,8 +95,12 @@ ITERATIONS = 10
 #: 2,000 rows; with none it was still changing in most. Stopping the steps earlier, once a step
 #: gains less than 0.01 or 0.0001 in log-likelihood, returned another graph in 8 and 2 of 360 fits.
 PARAMETER_STEPS = 5
-#: The most patterns one stack solves in a call, which bounds the stack's temporary arrays.
+#: The most patterns one stack solves in a call.
 STACK_LIMIT = 256
+#: The most entries each array of a stack holds, so a stack over wide columns has fewer patterns,
+#: and the most entries of covariance shares a plan indexes. When the shares of all patterns would
+#: hold more, each pattern is solved alone and adds its own share.
+PLAN_CELLS = 2**22
 
 # A node's noise variance is at least this share of its expected variance, so the precision stays
 # finite when a fitted node is a near copy of its parents.
@@ -109,8 +114,10 @@ class Patterns:
 
     Patterns come in the order of :func:`numpy.unique` over the observed masks. The patterns that
     hold one row and miss the same number of columns are solved as stacks of at most
-    :data:`STACK_LIMIT` patterns; every other pattern is solved alone. Either way each pattern's
-    arithmetic is the one it has alone.
+    :data:`STACK_LIMIT` patterns, fewer when :data:`PLAN_CELLS` bounds their arrays; every other
+    pattern is solved alone, and so is every pattern when the shares of ``K_mm^-1`` of all of them
+    hold more than :data:`PLAN_CELLS` entries. Either way each pattern's arithmetic is the one it
+    has alone.
     """
 
     def __init__(self, X: np.ndarray) -> None:
@@ -123,50 +130,49 @@ class Patterns:
         self.shape = (n, d)
         self.n_patterns = len(patterns)
         self.filled = np.where(observed, X, 0.0)
+        # The shares of K_mm^-1 add into the expected covariance in pattern order. Over the budget
+        # each pattern adds its own in the loop; otherwise one np.add.at adds them all.
+        shares = int(((d - patterns.sum(axis=1, dtype=np.int64)) ** 2).sum())
+        self.direct_adds = shares > PLAN_CELLS
+        stack_limit = max(1, min(STACK_LIMIT, PLAN_CELLS // max(d * d, 1)))
         self.alone = []  # (k, rows, o, m, X block, (rows, m), (m, m), (o, o))
         by_size: dict[int, list[tuple]] = {}
         for k, pattern in enumerate(patterns):
             rows = order[bounds[k] : bounds[k + 1]]
             o, m = np.flatnonzero(pattern), np.flatnonzero(~pattern)
-            if rows.size == 1 and m.size and o.size:
+            if rows.size == 1 and m.size and o.size and not self.direct_adds:
                 by_size.setdefault(int(m.size), []).append((k, int(rows[0]), o, m))
             else:
                 self.alone.append(
                     (k, rows, o, m, X[np.ix_(rows, o)], np.ix_(rows, m), np.ix_(m, m), np.ix_(o, o))
                 )
         self.stacks = []
-        for size, all_items in by_size.items():
-            for start in range(0, len(all_items), STACK_LIMIT):
-                items = all_items[start : start + STACK_LIMIT]
+        for all_items in by_size.values():
+            for start in range(0, len(all_items), stack_limit):
+                items = all_items[start : start + stack_limit]
                 ks = np.array([it[0] for it in items])
                 rows = np.array([it[1] for it in items])
                 os_ = np.stack([it[2] for it in items])
                 ms = np.stack([it[3] for it in items])
                 block = X[rows[:, None], os_][:, None, :]  # (K, 1, |o|)
-                shape = (len(items), size, size)
-                mm_r = np.broadcast_to(ms[:, :, None], shape).reshape(len(items), -1)
-                mm_c = np.broadcast_to(ms[:, None, :], shape).reshape(len(items), -1)
-                self.stacks.append((ks, rows, os_, ms, block, mm_r, mm_c))
-        # Where each pattern's K_mm^-1 adds into the expected covariance: the stacks' patterns, then
-        # the others', reordered to pattern order so every cell sums its shares in that order.
-        keys, cells_r, cells_c = [], [], []
-        for ks, *_, mm_r, mm_c in self.stacks:
-            keys.append(np.repeat(ks, mm_r.shape[1]))
-            cells_r.append(mm_r.ravel())
-            cells_c.append(mm_c.ravel())
-        for k, rows, o, m, *_ in self.alone:
+                self.stacks.append((ks, rows, os_, ms, block))
+        self.add_order = None
+        if self.direct_adds or not shares:
+            return
+        # Where each pattern's K_mm^-1 adds into the expected covariance, as a flat cell index: the
+        # stacks' patterns, then the others', reordered to pattern order so that every cell sums
+        # its shares in that order.
+        cell_type = np.int32 if d * d < 2**31 else np.int64
+        keys, cells = [], []
+        for ks, _, _, ms, _ in self.stacks:
+            keys.append(np.repeat(ks, ms.shape[1] ** 2))
+            cells.append((ms[:, :, None] * d + ms[:, None, :]).astype(cell_type).ravel())
+        for k, _, _, m, *_ in self.alone:
             if m.size:
                 keys.append(np.full(m.size * m.size, k))
-                cells_r.append(np.repeat(m, m.size))
-                cells_c.append(np.tile(m, m.size))
-        if keys:
-            self.add_order = np.argsort(np.concatenate(keys), kind="stable")
-            self.add_cells = (
-                np.concatenate(cells_r)[self.add_order],
-                np.concatenate(cells_c)[self.add_order],
-            )
-        else:
-            self.add_order = None
+                cells.append((np.repeat(m, m.size) * d + np.tile(m, m.size)).astype(cell_type))
+        self.add_order = np.argsort(np.concatenate(keys), kind="stable")
+        self.add_cells = np.concatenate(cells)[self.add_order]
 
 
 def expected_moments(
@@ -189,8 +195,9 @@ def expected_moments(
     log_2pi = np.log(2 * np.pi)
     terms = np.zeros(plan.n_patterns)  # each pattern's share of -2 * loglik, in pattern order
     has_term = np.zeros(plan.n_patterns, dtype=bool)
+    extra = np.zeros((d, d))
     added: list[np.ndarray] = []  # each K_mm^-1 share, stacks first, as Patterns lays them out
-    for ks, rows, os_, ms, block, mm_r, mm_c in plan.stacks:
+    for ks, rows, os_, ms, block in plan.stacks:
         resid = block - mean[os_][:, None, :]
         k_mm = precision[ms[:, :, None], ms[:, None, :]]
         k_mo = precision[ms[:, :, None], os_[:, None, :]]
@@ -221,16 +228,18 @@ def expected_moments(
             filled[rows_m] = mean[m] - resid @ solved.T
             inverse = np.linalg.inv(factor)
             cov_m = rows.size * (inverse.T @ inverse)  # rows * K_mm^-1
-            added.append(cov_m.ravel())
+            if plan.direct_adds:
+                extra[mm] += cov_m
+            else:
+                added.append(cov_m.ravel())
             inner = precision[oo] - k_mo.T @ solved
             log_det_o = log_det - 2.0 * float(np.log(np.diagonal(factor)).sum())
         if o.size:
             quadratic = float(np.einsum("ij,jk,ik->", resid, inner, resid))
             terms[k] = quadratic + rows.size * (o.size * log_2pi - log_det_o)
             has_term[k] = True
-    extra = np.zeros((d, d))
     if plan.add_order is not None:  # each pattern's share in pattern order
-        np.add.at(extra, plan.add_cells, np.concatenate(added)[plan.add_order])
+        np.add.at(extra.reshape(-1), plan.add_cells, np.concatenate(added)[plan.add_order])
     loglik = 0.0
     for term in terms[has_term]:
         loglik -= 0.5 * term

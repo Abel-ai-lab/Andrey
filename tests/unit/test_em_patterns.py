@@ -159,6 +159,31 @@ def test_patterns_on_each_side_of_the_stack_limit_match_the_loop(patterns):
     check(X, mean, precision)
 
 
+def test_a_plan_over_its_cell_budget_solves_each_pattern_alone(mixed, monkeypatch):
+    X, mean, precision = mixed
+    patterns = np.unique(~np.isnan(X), axis=0)
+    shares = int(((X.shape[1] - patterns.sum(axis=1)) ** 2).sum())
+    for budget, direct in [(shares, False), (shares - 1, True), (1, True)]:
+        monkeypatch.setattr(em_module, "PLAN_CELLS", budget)
+        plan = Patterns(X)
+        assert plan.direct_adds is direct
+        assert bool(plan.stacks) is not direct
+        check(X, mean, precision)
+
+
+def test_a_stack_holds_no_more_cells_than_the_budget(monkeypatch):
+    # 100 one-row patterns of nine missing columns among 14, which add up to 8,100 shares: the
+    # budget lets a stack hold 41 patterns, of 14 * 14 entries each in its widest array.
+    rng = np.random.default_rng(2)
+    mean, precision = model(14, rng)
+    X = rows_observing(14, 5, 100, rng)
+    monkeypatch.setattr(em_module, "PLAN_CELLS", 8100)
+    plan = Patterns(X)
+    assert not plan.direct_adds
+    assert sorted(len(ks) for ks, *_ in plan.stacks) == [18, 41, 41]
+    check(X, mean, precision)
+
+
 def test_a_plan_serves_every_model_and_is_not_changed_by_a_call(mixed):
     X, mean, precision = mixed
     before = X.copy()
