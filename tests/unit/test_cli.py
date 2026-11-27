@@ -1117,7 +1117,7 @@ def test_config_report_separates_preference_availability_and_raw_values(capsys, 
 @pytest.mark.parametrize(
     "args", [["config", "--json"], ["config", "--help", "--json"], ["--help", "--json"]]
 )
-@pytest.mark.parametrize("method", ["skeleton", "rcot", "possible_dsep"])
+@pytest.mark.parametrize("method", ["skeleton", "rcot", "possible_dsep", "blanket"])
 def test_the_json_introspection_lists_the_measured_cutoffs(args, method, capsys, monkeypatch):
     """An agent reads the variable, its default, and the command that measures it, from the CLI."""
     from andrey.search.calibrate import METHODS

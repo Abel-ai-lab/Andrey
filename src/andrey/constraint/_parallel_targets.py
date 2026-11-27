@@ -15,10 +15,18 @@ targets. A test-wise deletion test, which counts the rows each test reads
 search, which keeps each run's rows with the run (:meth:`~LocalSearch.counted`), so each answer
 counts the rows of the runs it read, as a call for that target alone counts them. Any other test
 answers in this process with the one search.
+
+A full-graph fit of IAMB, Inter-IAMB, or MMPC (:meth:`~LocalSearch.structure`) runs the search of
+every variable: with more than one worker, a test of that kind, and at least
+:data:`MIN_POOL_BLANKET_WORK` target and candidate pairs, or the
+``ANDREY_BLANKET_PARALLEL_MIN_WORK`` that overrides it, the runs are made on the workers the same
+way and come back in the order of the variables (:func:`pooled_runs`). The pruning of spouses and
+the collider tests of that fit stay in this process.
 """
 
 from __future__ import annotations
 
+import os
 from collections import Counter
 from collections.abc import Callable, Sequence
 from concurrent.futures import ProcessPoolExecutor
@@ -27,16 +35,25 @@ from typing import TYPE_CHECKING, TypeVar, cast
 
 from andrey.constraint._skeleton import canonical_capable
 from andrey.constraint.blanket import LocalSearch
+from andrey.core import backend, env
 from andrey.core.ci_missing import TestwiseDeletion
 
 if TYPE_CHECKING:
     import numpy as np
 
+    from andrey.constraint.blanket import RunSepsets
     from andrey.core.ci import PartialCorrelationTest
     from andrey.core.knowledge import Constraints
     from andrey.search._parallel import SharedMatrix
 
 T = TypeVar("T")
+
+#: The default for the fewest target and candidate pairs, ``d * (d - 1)`` over the ``d`` variables
+#: of the data, a full-graph fit of IAMB, Inter-IAMB, or MMPC needs to make its runs on the worker
+#: pool; a smaller fit makes them in the caller's process. ``ANDREY_BLANKET_PARALLEL_MIN_WORK``
+#: overrides it (0 sends every fit to the pool), and a fit with workers warns once on the default
+#: when it nears it; ``andrey calibrate --method blanket`` measures the value for a machine.
+MIN_POOL_BLANKET_WORK: int = 10_000
 
 #: Chunks per worker: smaller chunks balance unequal target costs; workers keep searches across
 #: chunks, so only runs two workers both need are made twice.
@@ -87,14 +104,21 @@ def _rebuild(
     )
 
 
-def _init_worker(*seed) -> None:
+def _init_worker(shared_scan_min_work: int | None, *seed) -> None:
     """Rebuild the caller's search from its :func:`_seed` and keep it, with BLAS on one thread and
-    the NumPy backend, for the life of the worker."""
+    the NumPy backend, for the life of the worker.
+
+    ``shared_scan_min_work`` is the caller's ``ANDREY_SHARED_SCAN_MIN_WORK`` (``None``: unset). It
+    chooses between two paths whose p-values differ in the last bits, so the worker reads the value
+    the caller reads, not the one the forkserver started with.
+    """
     global _WORKER_SEARCH, _WORKER_BLAS
     from threadpoolctl import threadpool_limits
 
-    from andrey.core import backend
-
+    if shared_scan_min_work is None:
+        os.environ.pop(env.SHARED_SCAN_MIN_WORK.name, None)
+    else:
+        os.environ[env.SHARED_SCAN_MIN_WORK.name] = str(shared_scan_min_work)
     _WORKER_BLAS = threadpool_limits(limits=1)
     backend.config.backend = "numpy"
     _WORKER_SEARCH = _rebuild(*seed)
@@ -147,7 +171,7 @@ def _pooled(
             max_workers=min(workers, len(chunks)),
             mp_context=context,
             initializer=_init_worker,
-            initargs=_seed(search, shared.payload),
+            initargs=(env.SHARED_SCAN_MIN_WORK.read(), *_seed(search, shared.payload)),
         ) as pool,
     ):
         futures = [
@@ -155,3 +179,37 @@ def _pooled(
         ]
         results = collect(futures, ordered=True)
     return [found for chunk in results for found in chunk]
+
+
+def _run(method: str, search: LocalSearch, target: int) -> tuple[list[int], RunSepsets]:
+    """Worker side of :func:`pooled_runs`: ``target``'s run by the learner ``method``."""
+    return search.run(method, target)
+
+
+def pooled_runs(
+    search: LocalSearch, method: str, targets: Sequence[int]
+) -> list[tuple[list[int], RunSepsets]] | None:
+    """The runs of the learner ``method`` (:meth:`~LocalSearch.run`) for ``targets``, in order, made
+    on the workers, or ``None`` when the fit makes them in this process.
+
+    A fit makes them on the workers when it has more than one worker, at least two ``targets``, a
+    :func:`~andrey.constraint._skeleton.canonical_capable` test, and ``len(targets) * (d - 1)``
+    target and candidate pairs reaching :data:`MIN_POOL_BLANKET_WORK`, or the
+    ``ANDREY_BLANKET_PARALLEL_MIN_WORK`` that overrides it. With more than one worker and the
+    default cutoff, the first fit that reaches a tenth of it warns once. Each run is the one a
+    search that makes it alone returns, so a fit gives the same sets and bits with any number of
+    workers.
+    """
+    from andrey.search import calibrate
+    from andrey.search._parallel import min_work
+
+    workers = backend.worker_count()
+    if workers < 2 or len(targets) < 2 or not canonical_capable(search.test):
+        return None
+    pairs = len(targets) * (search.d - 1)
+    cutoff = min_work(env.BLANKET_PARALLEL_MIN_WORK, MIN_POOL_BLANKET_WORK)
+    if pairs >= calibrate.WARN_FRACTION * cutoff and calibrate.cutoff_is_default("blanket"):
+        calibrate.warn_default_cutoff("blanket", cutoff)
+    if pairs < cutoff:
+        return None
+    return _pooled(search, partial(_run, method), targets, workers)

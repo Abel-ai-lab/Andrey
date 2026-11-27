@@ -299,7 +299,7 @@ def cli_meta() -> dict:
             "environment": "andrey config --help --json -- environment defaults and effects",
             "calibrate": (
                 "andrey calibrate -- measure the worker-pool cutoffs (GES, skeleton, RCoT, "
-                "possible-d-separation) here"
+                "possible-d-separation, IAMB-family full-graph search) here"
             ),
             "skill": "andrey --skill -- the SKILL.md guide",
         },
@@ -662,7 +662,8 @@ def render_skill() -> str:
         "installs it, and why each unavailable backend is off. Suggest a missing extra to the user "
         "rather than installing it. On many cores, `ANDREY_N_JOBS=-1` runs GES on all "
         "of them, and `andrey calibrate` measures the pool cutoffs of GES, the skeleton "
-        "search, and the possible-d-separation search on this machine. Set "
+        "search, the possible-d-separation search, and the full-graph search of IAMB, "
+        "Inter-IAMB, and MMPC on this machine. Set "
         "`ANDREY_SEED` when a stochastic method's result must repeat."
     )
     a("")

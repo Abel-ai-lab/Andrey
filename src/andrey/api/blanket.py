@@ -177,7 +177,10 @@ def iamb(
         target's set in one search, setting up the test once, on ``andrey.config.n_jobs`` worker
         processes for a partial-correlation ``indep_test``; with missing values, in the calling
         process. ``None`` learns every variable's set and keeps a pair when each variable is in the
-        other's set.
+        other's set; with a partial-correlation ``indep_test`` on complete data, the search of
+        every variable runs on the same workers once the data hold at least
+        ``ANDREY_BLANKET_PARALLEL_MIN_WORK`` target and candidate pairs, ``d * (d - 1)`` for ``d``
+        variables.
     structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
@@ -452,7 +455,10 @@ def inter_iamb(
         target's set in one search, setting up the test once, on ``andrey.config.n_jobs`` worker
         processes for a partial-correlation ``indep_test``; with missing values, in the calling
         process. ``None`` learns every variable's set and keeps a pair when each variable is in the
-        other's set.
+        other's set; with a partial-correlation ``indep_test`` on complete data, the search of
+        every variable runs on the same workers once the data hold at least
+        ``ANDREY_BLANKET_PARALLEL_MIN_WORK`` target and candidate pairs, ``d * (d - 1)`` for ``d``
+        variables.
     structure : {"cpdag", "skeleton", "moral"}, default="cpdag"
         The graph returned when ``target`` is ``None``. ``"cpdag"``: the CPDAG, the causal graphs
         the tests cannot tell apart, whose directed edges they all share. ``"skeleton"``: the same
@@ -728,7 +734,10 @@ def mmpc(
         target's set in one search, setting up the test and learning any set shared by two targets'
         symmetry checks once, on ``andrey.config.n_jobs`` worker processes for a partial-correlation
         ``indep_test``; with missing values, in the calling process. ``None`` learns every
-        variable's set and keeps a pair when each variable is in the other's set.
+        variable's set and keeps a pair when each variable is in the other's set; with a
+        partial-correlation ``indep_test`` on complete data, the search of every variable runs on
+        the same workers once the data hold ``ANDREY_BLANKET_PARALLEL_MIN_WORK`` target and
+        candidate pairs, ``d * (d - 1)`` for ``d`` variables.
     structure : {"skeleton", "cpdag"}, default="skeleton"
         The graph returned when ``target`` is ``None``. ``"skeleton"``: the adjacencies with no
         directions, each variable joined to its parents and children, the graph the sets give.
