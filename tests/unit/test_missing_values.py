@@ -23,6 +23,7 @@ import pytest
 
 import andrey
 from andrey.cli import main
+from andrey.constraint import blanket
 from andrey.core import ci, ci_missing, warning_policy
 from andrey.core.ci import (
     FisherZ,
@@ -37,6 +38,7 @@ from andrey.core.ci_missing import (
     MISSING_GUIDE,
     MORE_ROWS,
     TESTWISE_CLAIM,
+    reading_flags,
     rows_metadata,
     rows_tested,
 )
@@ -44,6 +46,7 @@ from andrey.core.score import CopiedColumnsError
 from andrey.spec import REGISTRY
 from andrey.spec.generate import render_skill
 from andrey.temporal.pcmci import design_test, lagged_design
+from qa import identity
 from tests.recovery.helpers.ci_tests import PValueOnly
 from tests.release import release_cases
 from tests.unit.methods import SHORT
@@ -206,6 +209,228 @@ def test_every_query_path_of_a_partial_correlation_gives_the_same_bits():
     mixed = make_indep_test("fisherz", x).batched_call(0, 3, [(2, 1), (), (1,), (2,)])
     assert mixed[0] == alone[0]
     assert mixed[1:] == [make_indep_test("fisherz", x)(0, 3, cond) for cond in [(), (1,), (2,)]]
+
+
+#: The gaps of :func:`_scan_data`, each sending the queries of a scan down one path of
+#: :class:`~andrey.core.ci_missing.GaussianDeletion`.
+SCAN_KINDS = ["cells", "blocks", "few", "tied", "near", "copy", "apart"]
+
+
+def _scan_data(kind: str, seed: int, d: int = 24, n: int = 1200) -> np.ndarray:
+    """Data of ``d`` columns with gaps of one kind.
+
+    ``cells`` are missing completely at random. ``blocks`` come from four sources with a few
+    patterns, which the grouped sums read. ``few`` has few rows and many gaps, so queries are not
+    tested. ``tied`` has columns of three levels, one of them most of the rows, so a block may be
+    constant. In ``near``, column 7 is a hair from a copy of column 3, within the copy margin, so
+    the exact path answers; in ``copy`` it is a copy up to rounding, which the exact path raises on.
+    In ``apart``, columns 2 and 9 are never observed together.
+    """
+    rng = np.random.default_rng(seed)
+    x = np.array(andrey.data.sample_scm(d=d, n=n, seed=seed, density=2.0).data, dtype=np.float64)
+    rate = 0.05
+    if kind == "blocks":
+        own = np.array_split(np.arange(5, d), 4)
+        for source, rows in enumerate(np.array_split(rng.permutation(n), 4)):
+            hidden = np.concatenate([own[other] for other in range(4) if other != source])
+            x[np.ix_(rows, hidden)] = np.nan
+        rate = 0.01
+    elif kind == "few":
+        rate = 0.45
+    elif kind == "tied":
+        x[:, ::3] = np.round(x[:, ::3] / (3 * x[:, ::3].std(axis=0)))
+        rate = 0.08
+    elif kind in ("near", "copy"):
+        x[:, 7] = (
+            2.0 * x[:, 3] + 1.0 + (1.1e-5 if kind == "near" else 1e-9) * rng.standard_normal(n)
+        )
+    elif kind == "apart":
+        x[: n // 2, 2] = np.nan
+        x[n // 2 :, 9] = np.nan
+    x[rng.random(x.shape) < rate] = np.nan
+    return x
+
+
+def _scans(d: int, rng: np.random.Generator, always: tuple[int, ...] = (3, 7, 2)):
+    """Scans ``(target, candidates, conditioning set)`` of every size from 0 to 6: for the targets
+    ``always`` and four more, the set unsorted as a blanket is and the candidates in any order."""
+    targets = [*always, *rng.choice([c for c in range(d) if c not in always], 4, replace=False)]
+    for target in targets:
+        for size in (0, 1, 2, 3, 4, 6):
+            others = [c for c in range(d) if c != target]
+            cond = rng.choice(others, size=size, replace=False).tolist()
+            ys = [c for c in others if c not in cond]
+            rng.shuffle(ys)
+            yield int(target), ys, cond
+
+
+def _counted(counter: ci_missing.RowCounts) -> tuple:
+    """Everything a :class:`~andrey.core.ci_missing.RowCounts` holds, its row counts and its
+    untested queries in the order they were added."""
+    return (
+        list(counter.items()),
+        counter.p_one,
+        list(counter.not_tested.items()),
+        counter.largest,
+        counter.untested_sets,
+        counter.not_tested_elsewhere,
+    )
+
+
+@pytest.mark.parametrize("flags", [False, True], ids=["no_flags", "flags"])
+@pytest.mark.parametrize("name", GAUSSIAN)
+@pytest.mark.parametrize("kind", SCAN_KINDS)
+def test_a_scan_on_missing_values_is_each_candidate_asked_alone_bit_for_bit(
+    kind, name, flags, monkeypatch
+):
+    """``statistic_pvalues_given`` gives each candidate the partial correlation and p-value of the
+    same query asked alone, bit for bit and NaN for NaN, counts the rows and the untested queries as
+    the separate calls do, and raises where they raise, the same error with the same queries counted
+    before it, whichever path the query takes: per-row or grouped sums, the exact path, or not
+    tested."""
+    x = _scan_data(kind, seed=1, d=14 if kind == "few" else 24, n=60 if kind == "few" else 1200)
+    scanned, alone = make_indep_test(name, x), make_indep_test(name, x)
+    assert type(scanned) is ci_missing.GaussianDeletion
+    exact = [0]
+    fast = scanned._fast
+
+    def counting_fast(*args):
+        out = fast(*args)
+        exact[0] += int(out[3].sum())  # the queries the exact path answers
+        return out
+
+    monkeypatch.setattr(scanned, "_fast", counting_fast)
+    raised = untested = 0
+    for target, ys, cond in _scans(x.shape[1], np.random.default_rng(1)):
+        got_error = want_error = None
+        with reading_flags(flags), rows_tested() as got_counter:
+            try:
+                got = scanned.statistic_pvalues_given(target, ys, cond)
+            except ValueError as error:
+                got_error = error
+        with reading_flags(flags), rows_tested() as want_counter:
+            try:
+                want = [alone.statistic_pvalue(target, y, cond) for y in ys]
+            except ValueError as error:
+                want_error = error
+        assert _counted(got_counter) == _counted(want_counter)
+        if got_error is not None or want_error is not None:
+            assert type(got_error) is type(want_error)
+            assert str(got_error) == str(want_error)
+            raised += 1
+            continue
+        r, p = got
+        np.testing.assert_array_equal(r, [a for a, _ in want])
+        np.testing.assert_array_equal(p, [b for _, b in want])
+        untested += int(np.isnan(p).sum())
+    # Each kind reaches the path it is named for.
+    assert raised or kind != "copy"
+    assert exact[0] or kind not in ("near", "copy", "tied")
+    assert untested or kind not in ("blocks", "few", "apart")
+    assert scanned._grouped is not None or kind != "blocks"
+
+
+@pytest.mark.parametrize("kind", ["cells", "blocks", "few", "copy"])
+def test_a_scan_in_chunks_is_the_scan_at_once_bit_for_bit(kind, monkeypatch):
+    """A scan whose candidates go in chunks, as a large conditioning set makes it, gives the
+    answers, the rows counted, and the error of the scan at once, whatever the chunk."""
+    x = _scan_data(kind, seed=4, d=14 if kind == "few" else 24, n=60 if kind == "few" else 1200)
+    scans = list(_scans(x.shape[1], np.random.default_rng(4)))
+
+    def run(entries: int):
+        monkeypatch.setattr(ci_missing, "FALLBACK_STACK_ENTRIES", entries)
+        test, out = make_indep_test("fisherz", x), []
+        for target, ys, cond in scans:
+            with rows_tested() as counter:
+                try:
+                    out.append(test.statistic_pvalues_given(target, ys, cond))
+                except ValueError as error:
+                    out.append((type(error), str(error)))
+            out.append(_counted(counter))
+        return out
+
+    once = run(1 << 20)
+    for entries in (1, 50, 300):  # chunks of one, a few, and about a dozen candidates
+        chunked = run(entries)
+        for want, got in zip(once, chunked, strict=True):
+            if isinstance(want, tuple) and isinstance(want[0], np.ndarray):
+                for a, b in zip(want, got, strict=True):
+                    np.testing.assert_array_equal(a, b)
+            else:
+                assert got == want
+    assert any(isinstance(out, tuple) and isinstance(out[0], type) for out in once) == (
+        kind == "copy"
+    )
+
+
+def test_a_scan_takes_its_conditioning_set_as_one_query_does():
+    """The set may be unsorted, repeat a column, or come from a generator; a candidate or ``x`` in
+    it raises the assertion a query raises; no candidate gives no answer."""
+    x = _gaps(_continuous(), 0.1)
+    test = make_indep_test("fisherz", x)
+    want = test.statistic_pvalues_given(0, [1, 4], [2, 3])
+    for cond in ([3, 2], [2, 3, 3, 2], (c for c in (3, 2)), np.array([3, 2])):
+        r, p = test.statistic_pvalues_given(0, np.array([1, 4]), cond)
+        assert (r.tolist(), p.tolist()) == (want[0].tolist(), want[1].tolist())
+    assert [test.statistic_pvalue(0, y, [2, 3]) for y in (1, 4)] == list(zip(*map(list, want)))
+    for target, ys, cond in [(0, [1, 2], [2]), (2, [1, 4], [2])]:
+        with pytest.raises(AssertionError) as scan:
+            test.statistic_pvalues_given(target, ys, cond)
+        with pytest.raises(AssertionError) as alone:
+            test.statistic_pvalue(target, 2 if 2 in ys else ys[0], cond)
+        assert str(scan.value) == str(alone.value)
+    for cond in ([], [2, 3]):
+        r, p = test.statistic_pvalues_given(0, [], cond)
+        assert r.shape == p.shape == (0,)
+
+
+def _blanket_search_digest(fit, x, options):
+    """The digest of ``fit(x, **options)``'s output, or the type and message of its error."""
+    try:
+        return identity.digest(fit(x, **options))
+    except ValueError as error:
+        return type(error), str(error)
+
+
+@pytest.mark.parametrize("options", [{}, {"target": [1, 6]}], ids=["graph", "targets"])
+@pytest.mark.parametrize("fit", [andrey.iamb, andrey.inter_iamb], ids=["iamb", "inter_iamb"])
+@pytest.mark.parametrize("kind", SCAN_KINDS)
+def test_a_blanket_search_on_missing_values_is_the_search_asking_one_query_at_a_time(
+    kind, fit, options, monkeypatch
+):
+    """``iamb`` and ``inter_iamb`` on data with gaps return the blanket, the separating sets, the
+    rows counted, and every metadata value of the search that asks each candidate alone, or raise
+    its error."""
+    x = _scan_data(kind, seed=2, d=10 if kind == "few" else 18, n=60 if kind == "few" else 500)
+    got = _blanket_search_digest(fit, x, options)
+    assert blanket._dependence_scan(make_indep_test("fisherz", x)) is not None
+    with monkeypatch.context() as asking_alone:
+        asking_alone.setattr(ci_missing.GaussianDeletion, "statistic_pvalues_given", None)
+        assert blanket._dependence_scan(make_indep_test("fisherz", x)) is None
+        assert _blanket_search_digest(fit, x, options) == got
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"indep_test": "student_t"},
+        {"max_depth": 2},
+        {"possibly_separable": "ambiguous"},
+        {"knowledge": andrey.Knowledge(required=[(0, 5)], forbidden=[(2, 3), (3, 2)])},
+    ],
+    ids=["student_t", "max_depth", "ambiguous", "knowledge"],
+)
+@pytest.mark.parametrize("fit", [andrey.iamb, andrey.inter_iamb], ids=["iamb", "inter_iamb"])
+@pytest.mark.parametrize("kind", ["cells", "apart"])
+def test_a_blanket_search_with_an_option_on_missing_values_is_the_search_asking_one_query_at_a_time(
+    kind, fit, options, monkeypatch
+):
+    """The options the grow step reads, each with untested queries among the scans or without."""
+    x = _scan_data(kind, seed=3, d=14, n=400)
+    got = _blanket_search_digest(fit, x, options)
+    with monkeypatch.context() as asking_alone:
+        asking_alone.setattr(ci_missing.GaussianDeletion, "statistic_pvalues_given", None)
+        assert _blanket_search_digest(fit, x, options) == got
 
 
 @pytest.mark.parametrize("name", GAUSSIAN)

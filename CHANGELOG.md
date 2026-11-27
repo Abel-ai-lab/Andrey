@@ -78,6 +78,10 @@ names its pull request.
 - For contributors, a test lists every module-level cache and checks each cache whose result can
   change while its key does not, and registry-driven tests check that a wrong type of a parameter of
   column labels, of `knowledge`, of `targets`, and of `bootstrap` and `markov_check` raises. ([#1259])
+- `boss`, `grasp`, `boss_fci`, and `grasp_fci` take less memory on large graphs: without
+  knowledge, each variable's grow-shrink tree no longer stores a list of every other variable,
+  which took memory quadratic in the number of variables; the trees of a search share one tuple of
+  the variables. Results are unchanged, bit for bit. ([#1274])
 - With more than one worker on Linux, the workers of GES, of the skeleton and possible-d-separation
   searches (PC, FCI, FCI-JCI, GFCI, CD-NOD, and RSMAX2 with `restrict="pc"`), and of a list of
   targets (IAMB, Inter-IAMB, and MMPC) read one shared copy of the covariance or correlation matrix
@@ -124,6 +128,10 @@ names its pull request.
   sources that share them, reads one reachability search per clique, and scores each base once.
   The turning scan of `gies` and `lges` builds the sort key of a turn only for a turn that improves
   the score. ([#1302])
+- `iamb` and `inter_iamb` on data with missing values and `fisherz` or `student_t`, the default
+  test, ask the test-wise deletion test for each grow scan at once and read its p-values as one
+  array, so these searches run faster on tens of variables, with the same output bit for bit.
+  ([#1299])
 
 ### Fixed
 
@@ -3082,6 +3090,7 @@ First alpha release.
 [#1257]: https://github.com/Abel-ai-lab/Andrey/pull/1257
 [#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
+[#1274]: https://github.com/Abel-ai-lab/Andrey/pull/1274
 [#1275]: https://github.com/Abel-ai-lab/Andrey/pull/1275
 [#1276]: https://github.com/Abel-ai-lab/Andrey/pull/1276
 [#1284]: https://github.com/Abel-ai-lab/Andrey/pull/1284
@@ -3090,4 +3099,5 @@ First alpha release.
 [#1290]: https://github.com/Abel-ai-lab/Andrey/pull/1290
 [#1293]: https://github.com/Abel-ai-lab/Andrey/pull/1293
 [#1296]: https://github.com/Abel-ai-lab/Andrey/pull/1296
+[#1299]: https://github.com/Abel-ai-lab/Andrey/pull/1299
 [#1302]: https://github.com/Abel-ai-lab/Andrey/pull/1302
