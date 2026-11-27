@@ -618,7 +618,12 @@ def _forward_task(
         raise RuntimeError("GES worker pool reused across runs (cov/token mismatch)")
     assert _WORKER_DELTA is not None  # _init_worker runs before any task
     n = _WORKER_N
-    if _WORKER_SCAN is None or _WORKER_SCAN.targets != list(targets) or _WORKER_SCAN.cover != cover:
+    if (
+        _WORKER_SCAN is None
+        or _WORKER_SCAN.targets != list(targets)
+        or _WORKER_SCAN.cover != cover
+        or _WORKER_SCAN.screen != screen
+    ):
         forbidden = None if constraints is None else constraints.forbidden
         _WORKER_SCAN = _ForwardScan(
             targets,
@@ -867,6 +872,7 @@ def run_ges(
     cap: float | None = None,
     sources: tuple[int, ...] = (),
     one_edge: bool = False,
+    all_pairs: bool = False,
 ) -> np.ndarray:
     """Both GES phases with per-pass parallelism: a pass fans out only above the fixed work gate.
 
@@ -897,7 +903,9 @@ def run_ges(
     ``one_edge`` limits the first forward phase to the pairs :func:`one_edge_screen` admits, which
     the backward phase does not read: it can still remove an edge that a required edge or an
     earlier move put on a screened pair. A second forward and backward pass then takes, per target,
-    the sources of :func:`cover_sources` on the graph at hand.
+    the sources of :func:`cover_sources` on the graph at hand. With ``all_pairs``, a third forward
+    and backward pass scans every pair on the graph the first two reached, which drops the one-edge
+    assumption: an edge between variables that show no link on their own can still be added.
     """
     global largest_pass_work
     workers = 1 if sources else max(1, min(workers, n))
@@ -924,8 +932,11 @@ def run_ges(
     forbidden = None if constraints is None else constraints.forbidden
     targets = [y for y in range(n) if y not in sources]
     # Each phase is a forward then a backward pass. One-edge faithfulness follows its screen with
-    # the cover phase, which has no screen and takes the sources of ``cover_sources`` on the graph.
+    # the cover phase, which has no screen and takes the sources of ``cover_sources`` on the graph;
+    # ``all_pairs`` then adds a phase over every pair, the search of ges from the graph reached.
     phases = [(one_edge_screen(engine, n), False), (None, True)] if one_edge else [(None, False)]
+    if one_edge and all_pairs:
+        phases.append((None, False))
     kept: dict[tuple[int, tuple[int, ...], int], float] = {}  # the in-process backward deltas
     excluded: set[tuple[int, int, tuple[int, ...]]] = (
         set()

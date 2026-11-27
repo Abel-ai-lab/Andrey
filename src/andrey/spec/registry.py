@@ -715,6 +715,19 @@ _add(
                 "columns a mixed-data setting read",
             ),
             "status": "experimental",
+            "params": (
+                *REGISTRY["ges"].params,
+                ParamSpec(
+                    name="one_edge_faithfulness",
+                    type="bool",
+                    default=True,
+                    doc="Assume one-edge faithfulness: no edge between two variables whose "
+                    "one-edge graph does not improve the score over the empty graph, unless the "
+                    "pass that covers the unshielded noncolliders adds it. false adds a third "
+                    "forward and backward pass over every pair on the graph the first two "
+                    "reached, as GES does; it takes longer.",
+                ),
+            ),
             "references": ("Ramsey et al. 2017", "Chickering 2002"),
         }
     )

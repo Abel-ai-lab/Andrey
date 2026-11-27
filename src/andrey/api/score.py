@@ -642,6 +642,7 @@ def fges(
     equivalent_sample_size: float = 1.0,
     max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
+    one_edge_faithfulness: bool = True,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with fast greedy equivalence search (FGES).
@@ -698,6 +699,12 @@ def fges(
         categorical, and a continuous score raises ``ValueError`` on a declared column, named here
         or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
+    one_edge_faithfulness : bool, default=True
+        Assume one-edge faithfulness [2]_: no edge is added between two variables whose one-edge
+        graph does not improve the score over the empty graph, unless the pass that covers the
+        unshielded noncolliders adds it. ``False`` drops the assumption: a third forward and
+        backward pass then scans every pair on the graph the first two passes reached, as GES
+        does, so such an edge can still be added. It takes longer. See Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -839,6 +846,7 @@ def fges(
             max_parents=max_parents,
             categorical=mask,
             constraints=constraints,
+            one_edge_faithfulness=one_edge_faithfulness,
         )
     return structure_output(
         cpdag,

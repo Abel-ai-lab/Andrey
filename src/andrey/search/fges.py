@@ -30,12 +30,15 @@ def fges(
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
     workers: int | None = None,
+    one_edge_faithfulness: bool = True,
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by Greedy Equivalence Search with one-edge faithfulness.
 
     The parameters are those of :func:`andrey.search.ges.ges`; the first forward phase scans only
     the pairs whose one-edge graph improves the score, and a second forward and backward pass
-    covers the unshielded noncolliders. Returns the CPDAG (``kind="cpdag"``) and its total score.
+    covers the unshielded noncolliders. With ``one_edge_faithfulness=False``, a third forward and
+    backward pass scans every pair on the graph the first two reached. Returns the CPDAG
+    (``kind="cpdag"``) and its total score.
     """
     return ges(
         data,
@@ -48,4 +51,5 @@ def fges(
         constraints=constraints,
         workers=workers,
         one_edge=True,
+        all_pairs=not one_edge_faithfulness,
     )
