@@ -608,7 +608,12 @@ class _CountScore:
         Every other setting is kept, the multinomial BIC's ``log(n)`` of all rows included.
         """
         out = copy.copy(self)
-        out._codes = np.asfortranarray(self._codes[rows])
+        mask = np.asarray(rows)
+        if mask.dtype == np.bool_:
+            if mask.shape != (self.n,):
+                raise IndexError(f"rows marks {mask.size} rows of {self.n}")
+            mask = np.flatnonzero(mask)
+        out._codes = self._codes.T.take(mask, axis=1).T  # each column of the rows stays contiguous
         out.n = out._codes.shape[0]
         out._memo = _LRU(cache_size)
         return out
@@ -680,8 +685,7 @@ class BDeuScore(_CountScore):
         self.n: int = arr.shape[0]
         self.equivalent_sample_size = float(equivalent_sample_size)
         self.structure_prior = float(structure_prior)
-        codes, self._cardinalities = categorical.encode(arr)
-        self._codes = np.asfortranarray(codes)
+        self._codes, self._cardinalities = categorical.encode(arr, order="F")
         others = arr.shape[1] - 1
         p = self.structure_prior / others if others > 0 else 1.0
         # Per-parent and per-non-parent log prior, or none when p is not a probability below 1.
@@ -817,8 +821,7 @@ class CategoricalBICScore(_CountScore):
         self.n: int = arr.shape[0]
         self.penalty_discount = penalty_weight(penalty_discount)
         self.log_n = float(np.log(self.n))
-        codes, self._cardinalities = categorical.encode(arr)
-        self._codes = np.asfortranarray(codes)
+        self._codes, self._cardinalities = categorical.encode(arr, order="F")
         self._memo = _LRU(cache_size)
 
     def _local(self, node: int, parents: tuple[int, ...], counts: np.ndarray) -> float:

@@ -11,17 +11,21 @@ parent sets at once.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Literal
 
 import numpy as np
 
 
-def encode(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def encode(data: np.ndarray, *, order: Literal["C", "F"] = "C") -> tuple[np.ndarray, np.ndarray]:
     """Return each column's category codes and the number of categories per column.
 
     Parameters
     ----------
     data : ndarray, shape (n_samples, n_features)
         Finite values; each distinct value of a column is one category.
+    order : {"C", "F"}, default="C"
+        The memory layout of ``codes``; ``"F"`` stores each column contiguously, the layout
+        :func:`table_counts` reads fastest.
 
     Returns
     -------
@@ -31,7 +35,7 @@ def encode(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         ``k_j``, the number of distinct values in column ``j``.
     """
     arr = np.asarray(data)
-    codes = np.empty(arr.shape, dtype=np.int64)
+    codes = np.empty(arr.shape, dtype=np.int64, order=order)
     for j in range(arr.shape[1]):
         codes[:, j] = np.unique(arr[:, j], return_inverse=True)[1].reshape(-1)
     cardinalities = codes.max(axis=0) + 1 if arr.shape[0] else np.zeros(arr.shape[1], np.int64)

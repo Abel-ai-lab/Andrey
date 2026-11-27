@@ -800,6 +800,32 @@ def test_a_bdeu_batch_takes_the_log_gamma_of_at_most_batch_cells_at_a_time(monke
     assert _exact(got) == _exact(BDeuScore(x).score_many(0, sets))
 
 
+def test_codes_in_either_layout_are_the_same_codes():
+    """``encode`` numbers the categories alike in either layout, and ``order="F"`` stores each
+    column contiguously."""
+    x = _mixed_tables()
+    by_rows, cards = categorical.encode(x)
+    by_columns, same_cards = categorical.encode(x, order="F")
+    np.testing.assert_array_equal(by_rows, by_columns)
+    np.testing.assert_array_equal(cards, same_cards)
+    assert by_columns.dtype == by_rows.dtype
+    assert by_columns.flags["F_CONTIGUOUS"]
+
+
+@pytest.mark.parametrize("make", SCORES)
+def test_a_count_score_holds_one_copy_of_the_codes_while_it_is_built(make):
+    """Building a score allocates its codes once, not as a row-major matrix and then a copy."""
+    n, d = 20000, 20
+    x = np.random.default_rng(0).integers(0, 4, (n, d)).astype(np.float64)
+    tracemalloc.start()
+    try:
+        make(x)
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+    assert peak < 1.6 * 8 * n * d  # a second copy of the codes would reach 2
+
+
 @pytest.mark.parametrize("make", SCORES)
 def test_on_rows_scores_the_rows_with_the_categories_of_all_rows(make):
     """``on_rows`` by a mask or by indices scores the selected rows over the categories of all
@@ -820,6 +846,8 @@ def test_on_rows_scores_the_rows_with_the_categories_of_all_rows(make):
             ]
             assert _exact(selected.score_many(node, sets)) == _exact(expected)
             assert _exact(selected.score(node, s) for s in sets) == _exact(expected)
+    with pytest.raises(IndexError):
+        whole.on_rows(mask[:-1])
     everything = whole.on_rows(np.ones(len(x), dtype=bool))
     for node in range(x.shape[1]):
         sets = _parent_sets(x.shape[1], node)
