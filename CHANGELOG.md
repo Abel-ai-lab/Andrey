@@ -188,6 +188,9 @@ names its pull request.
   fewer temporary arrays and keeps each vertex's penalty and rounding terms for the fit. `grasp`,
   `boss_fci`, `grasp_fci`, and `gfci` score their added parents the same way and return the same
   output bit for bit. ([#1320])
+- `iamb`, `inter_iamb`, and `mmpc` with `structure="cpdag"` build the conditioning sets of their
+  collider test as int arrays and hand them as they are to a test that answers a set of queries at
+  once, so they run faster, with the same output bit for bit and the same queries. ([#1327])
 - Every fit reads its data with fewer passes and builds its result with NumPy, so a fit on many rows
   starts its search sooner and a bootstrap on a few variables builds each resample's graph sooner,
   with the same output bit for bit. The input check takes each column's maximum and minimum first
@@ -3178,3 +3181,4 @@ First alpha release.
 [#1320]: https://github.com/Abel-ai-lab/Andrey/pull/1320
 [#1322]: https://github.com/Abel-ai-lab/Andrey/pull/1322
 [#1325]: https://github.com/Abel-ai-lab/Andrey/pull/1325
+[#1327]: https://github.com/Abel-ai-lab/Andrey/pull/1327

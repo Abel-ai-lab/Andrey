@@ -41,7 +41,7 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from functools import partial
-from itertools import combinations, islice
+from itertools import chain, combinations
 from typing import Literal, TypeVar
 
 import numpy as np
@@ -49,10 +49,12 @@ import numpy as np
 from andrey.constraint._skeleton import (
     CHUNK,
     MaskedMapping,
+    _runs,
     adjacent_pairs,
     flagged_triples,
     kept_apart,
     scan_conditioning_sets,
+    subset_rows,
 )
 from andrey.core import ARROW, NULL, TAIL, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
@@ -375,7 +377,7 @@ def _weakest(
     test: CITest,
     target: int,
     xs: list[int],
-    conds: list[tuple[int, ...]],
+    conds: list[tuple[int, ...]] | np.ndarray,
     sets: list[tuple[int, ...]] | None = None,
     ranks: Sequence[int] = (),
     alpha: float | None = None,
@@ -390,11 +392,17 @@ def _weakest(
     absolute partial correlation for a test with ``statistic_pvalues``, evaluated for every query
     of one conditioning-set size in one call, else the negated p-value from ``batched_call`` or the
     scalar test. With ``sets``, each candidate's set with the largest p-value is appended to it
-    (:func:`_largest_sets`, which reads ``ranks``).
+    (:func:`_largest_sets`, which reads ``ranks``). ``conds`` is a list of tuples or an ``(N, m)``
+    int array of the sets of one size; one candidate and an array go to the test as they are
+    (:func:`_weakest_rows`), and any other array is read as the tuples of its rows.
     """
     if not xs:
         return []
     batch = getattr(test, "statistic_pvalues", None)
+    if isinstance(conds, np.ndarray):
+        if batch is not None and len(xs) == 1 and sets is None and len(conds):
+            return [_weakest_rows(batch, target, xs[0], conds, alpha)]
+        conds = [tuple(row) for row in conds.tolist()]
     if batch is None:
         batched = getattr(test, "batched_call", None)
         out = []
@@ -437,6 +445,23 @@ def _weakest(
     if alpha is not None:
         pmax[skipped & ~(pmax > alpha)] = NOT_TESTED
     return list(zip(pmax.tolist(), rmin.tolist(), strict=True))
+
+
+def _weakest_rows(
+    batch: Callable, target: int, x: int, rows: np.ndarray, alpha: float | None
+) -> tuple[float, float]:
+    """:func:`_weakest` of the one candidate ``x`` over the sets in the rows, at least one, of the
+    ``(N, m)`` int array ``rows``, by one call of ``batch``, the test's ``statistic_pvalues``."""
+    n = len(rows)
+    r, p = batch(np.full(n, target, dtype=np.intp), np.full(n, x, dtype=np.intp), rows)
+    p = np.asarray(p, dtype=np.float64)
+    pmax = float(np.fmax(-np.inf, np.fmax.reduce(p)))
+    rmin = float(np.fmin(np.inf, np.fmin.reduce(np.abs(np.asarray(r)))))
+    if math.isinf(pmax):
+        pmax = NOT_TESTED
+    if alpha is not None and not_tested(p).any() and not pmax > alpha:
+        pmax = NOT_TESTED
+    return pmax, rmin
 
 
 def _weaker(p: float, skipped: bool, alpha: float) -> float:
@@ -691,19 +716,27 @@ def prune_spouses(
 
 
 def _side_sets(sides: list[list[int]]) -> list[tuple[list[int], set[int] | None]]:
-    """The sides of :func:`_collider_sets` as :func:`~andrey.constraint._skeleton.kept_apart`
+    """The sides of :func:`_collider_rows` as :func:`~andrey.constraint._skeleton.kept_apart`
     reads them: each later side skips the subsets the first side holds."""
     return [(side, None if n == 0 else set(sides[0])) for n, side in enumerate(sides)]
 
 
-def _collider_sets(sides: list[list[int]], size: int, middle: int) -> Iterator[tuple[int, ...]]:
-    """The conditioning sets of a collider test, each once: ``middle`` with every size-``size``
-    subset of ``sides[0]``, then of the other side, less the subsets the first side holds."""
-    first = set(sides[0])
-    for n, side in enumerate(sides):
-        for rest in combinations(side, size):
-            if n == 0 or not first.issuperset(rest):
-                yield tuple(sorted((*rest, middle)))
+def _collider_rows(
+    kept: list[tuple[list[int], set[int] | None]], size: int, middle: int, first: int
+) -> Iterator[np.ndarray]:
+    """The conditioning sets of a collider test, each once, as the sorted rows of ``(N, size + 1)``
+    int arrays: ``middle`` with every size-``size`` subset of the first side of ``kept``, then of
+    each other side, in the order of :func:`itertools.combinations`, less the subsets the side's
+    skip set holds (:func:`_side_sets`, :func:`~andrey.constraint._skeleton.subset_rows`). The
+    arrays hold ``first`` rows, then twice as many each time, at most ``CHUNK``, and the last one
+    fewer."""
+    subsets = chain.from_iterable(subset_rows(side, size, skip) for side, skip in kept)
+    for rest in _runs([subsets], first, CHUNK):
+        rows = np.empty((len(rest), size + 1), dtype=np.intp)
+        rows[:, :size] = rest
+        rows[:, size] = middle
+        rows.sort(axis=1)
+        yield rows
 
 
 def blanket_colliders(
@@ -759,14 +792,16 @@ def blanket_colliders(
             p, strength = -np.inf, np.inf
             for size in range(top + 1):
                 kept, left = kept_apart(test, (a, c, b), _side_sets(sides), size)
-                conds = iter(()) if kept is None else _collider_sets([s for s, _ in kept], size, b)
-                width = CHUNK if every else min(_FIRST_CHUNK, CHUNK)
-                while (every or p <= alpha) and (chunk := list(islice(conds, width))):
+                chunks = (
+                    iter(())
+                    if kept is None
+                    else _collider_rows(kept, size, b, CHUNK if every else min(_FIRST_CHUNK, CHUNK))
+                )
+                while (every or p <= alpha) and (chunk := next(chunks, None)) is not None:
                     [(p_chunk, strength_chunk)] = _weakest(test, a, [c], chunk, alpha=alpha)
                     skipped = bool(not_tested([p, p_chunk]).any())
                     p = _weaker(float(np.fmax(p, p_chunk)), skipped, alpha)
                     strength = float(np.fmin(strength, strength_chunk))
-                    width = min(2 * width, CHUNK)
                 if left:  # a set left out keeps no rows: not tested
                     p = _weaker(p, True, alpha)
                 if p > alpha:
