@@ -26,7 +26,7 @@ from andrey.search.gies import _neighborhoods, _turning_best
 from andrey.search.lges import extension, insert_best, insert_moves
 
 Move = tuple[float, int, int, tuple[int, ...]]
-Verdicts = dict[tuple[int, tuple[int, ...]], int]
+Verdicts = dict[tuple[int, tuple[int, ...]], tuple[int, int]]
 Turn = tuple[int, int, set[int], bool]
 
 
@@ -120,6 +120,20 @@ def _gaussian_data(rng: np.random.Generator, dag: np.ndarray, n: int) -> np.ndar
     return rng.standard_normal((n, d)) @ np.linalg.inv(np.eye(d) - weights)
 
 
+class _Recording:
+    """A local score that records the families it is asked for."""
+
+    def __init__(self, inner: LocalScore) -> None:
+        self.inner = inner
+        self.families: set[tuple[int, tuple[int, ...]]] = set()
+        self.calls = 0
+
+    def score(self, node: int, parents: list[int]) -> float:
+        self.families.add((int(node), tuple(sorted(int(p) for p in parents))))
+        self.calls += 1
+        return self.inner.score(node, parents)
+
+
 def _same_moves(a: list[Move], b: list[Move]) -> bool:
     return len(a) == len(b) and all(
         float(x[0]).hex() == float(y[0]).hex() and x[1:] == y[1:] for x, y in zip(a, b, strict=True)
@@ -167,7 +181,7 @@ def test_a_search_picks_the_same_inserts_with_one_cache_for_all_its_states(d, se
     rng = np.random.default_rng(seed)
     x = _gaussian_data(rng, _dag(rng, d, "er"), 300)
     ranks = rng.permutation(d).tolist()
-    kept, plain = make_score("bic", x), make_score("bic", x)
+    kept, plain = _Recording(make_score("bic", x)), _Recording(make_score("bic", x))
     verdicts: Verdicts = {}
     adj_new = np.zeros((d, d), dtype=np.int8)
     adj_old = adj_new.copy()
@@ -177,6 +191,8 @@ def test_a_search_picks_the_same_inserts_with_one_cache_for_all_its_states(d, se
         got = insert_best(adj_new, kept, d, ranks, conservative, verdicts)
         assert _same_best(want, got)
         assert np.array_equal(adj_new, adj_old)
+        # The scan asks for no family that the plain one does not ask for.
+        assert kept.families <= plain.families
         if want is None or got is None:
             break
         adj_old = ops.insert_cpdag(adj_old, want[1], want[2], want[3])
@@ -184,6 +200,7 @@ def test_a_search_picks_the_same_inserts_with_one_cache_for_all_its_states(d, se
         steps += 1
     assert steps >= 2
     assert verdicts
+    assert kept.calls < plain.calls
 
 
 def test_a_verdict_is_kept_for_a_target_and_its_parents_in_the_dag():
@@ -197,14 +214,13 @@ def test_a_verdict_is_kept_for_a_target_and_its_parents_in_the_dag():
     list(insert_moves(adj, score, d, ranks, False, verdicts))
     dag = extension(adj, ranks)
     assert set(verdicts) == {(y, tuple(np.flatnonzero(dag[y] == ARROW).tolist())) for y in range(d)}
-    for (y, parents), safe in verdicts.items():
+    for (y, parents), (known, safe) in verdicts.items():
+        # A state scores the non-adjacent sources of a target, and keeps each verdict.
+        assert set(_bitset.nodes(known)) == set(range(d)) - set(np.flatnonzero(adj[y])) - {y}
         base = score.score(y, list(parents))
         expect = {
-            v
-            for v in range(d)
-            if v != y and v not in parents and not score.score(y, sorted({*parents, v})) > base
+            v for v in _bitset.nodes(known) if not score.score(y, sorted({*parents, v})) > base
         }
-        assert isinstance(safe, int)
         assert set(_bitset.nodes(safe)) == expect
 
 
