@@ -92,7 +92,7 @@ names its pull request.
   `score_matching`, `das`, `nogam`, `skewd` with `criterion="independence"`, and the queries of
   `indep_test="kci"` without a conditioning set build their Gaussian kernel matrices faster, with the
   same output bit for bit. ([#1290])
-- `pc`, `fci`, `cdnod`, and `fci_jci` with `missing="testwise"` and `fisherz` or `student_t`
+- `pc`, `fci`, `cdnod`, and `fci_jci` with `fisherz` or `student_t` on data with missing values
   build the conditioning-size-0 pass from arrays, and so does the search for the separating sets of
   the pairs that knowledge makes non-adjacent, so they run faster on many variables, with the same
   output bit for bit and the same counts of the queries not tested. ([#1296])
