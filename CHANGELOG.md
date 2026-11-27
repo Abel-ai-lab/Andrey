@@ -78,6 +78,10 @@ names its pull request.
 - For contributors, a test lists every module-level cache and checks each cache whose result can
   change while its key does not, and registry-driven tests check that a wrong type of a parameter of
   column labels, of `knowledge`, of `targets`, and of `bootstrap` and `markov_check` raises. ([#1259])
+- `bdeu` and `discrete_bic` count each family's table faster, and `bdeu` scores a batch of tables
+  together, so `exact_search`, `hc`, `tabu`, `ges`, `xges`, `lges`, `boss`, `grasp`, `boss_fci`,
+  `grasp_fci`, `gfci`, `mmhc`, `rsmax2`, and `gies` run faster with either score, with the same
+  scores and graphs bit for bit. ([#1284])
 
 ### Fixed
 
@@ -3036,3 +3040,4 @@ First alpha release.
 [#1257]: https://github.com/Abel-ai-lab/Andrey/pull/1257
 [#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
+[#1284]: https://github.com/Abel-ai-lab/Andrey/pull/1284
