@@ -1447,7 +1447,7 @@ class ChiSquareDeletion(TestwiseDeletion):
         """The p-value of the first two columns of the encoded block ``coded``, given its third
         column when ``given``; the answer of :meth:`_query` on a block it builds, ``NaN`` for zero
         degrees of freedom, and the same error."""
-        test = ChiSquare.from_codes(coded, cardinalities, **self._settings)
+        test = ChiSquare._from_codes(coded, cardinalities, **self._settings)
         test.zero_dof_pvalue = NOT_TESTED
         try:
             p = float(test(0, 1, [2] if given else []))

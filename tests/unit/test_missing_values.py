@@ -499,13 +499,13 @@ def test_a_chi_square_scan_numbers_each_block_as_the_test_numbers_a_block_it_is_
     where the block lost a category or a configuration the other candidates have."""
     x = _discrete_scan_data(kind, seed=8)
     seen = []
-    real = ci.ChiSquare.from_codes.__func__  # ty: ignore[unresolved-attribute]
+    real = ci.ChiSquare._from_codes.__func__  # ty: ignore[unresolved-attribute]
 
     def capture(cls, codes, cardinalities, **options):
         seen.append((codes.copy(), cardinalities.copy()))
         return real(cls, codes, cardinalities, **options)
 
-    monkeypatch.setattr(ci.ChiSquare, "from_codes", classmethod(capture))
+    monkeypatch.setattr(ci.ChiSquare, "_from_codes", classmethod(capture))
     lost = checked = 0
     for target, xs, cond in _scans(x.shape[1], np.random.default_rng(8)):
         seen.clear()

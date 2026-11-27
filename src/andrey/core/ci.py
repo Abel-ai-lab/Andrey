@@ -1090,7 +1090,7 @@ class ChiSquare:
         self._set_codes(codes, cardinalities, g_square, nonempty)
 
     @classmethod
-    def from_codes(
+    def _from_codes(
         cls,
         codes: np.ndarray,
         cardinalities: np.ndarray,
@@ -1131,7 +1131,7 @@ class ChiSquare:
     def _set_codes(
         self, codes: np.ndarray, cardinalities: np.ndarray, g_square: bool, nonempty: bool
     ) -> None:
-        """Set the test over the encoded data, for the constructor and :meth:`from_codes`."""
+        """Set the test over the encoded data, for the constructor and :meth:`_from_codes`."""
         self._n: int = codes.shape[0]
         self._codes, self._cardinalities = codes, cardinalities
         # Each column's codes as one contiguous row, for the batched counts and for numbering
