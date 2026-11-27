@@ -7,6 +7,11 @@ on:
   pull_request:
     paths: [.github/workflows/cross-platform.yml]
   workflow_dispatch:
+    inputs:
+      release:
+        description: Also run the release-marked unit tests, the heavy accuracy checks
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -129,9 +134,9 @@ jobs:
         shell: bash
     env:
       ANDREY_DEVICE: cpu  # the CPU float64 path; never MPS
-      # As in ci.yml: a pull request into a release or topic branch deselects the heavy checks, the
-      # tests marked `release`; a manual run keeps them.
-      TEST_MARKS: ${{ github.event_name == 'pull_request' && github.base_ref != 'main' && 'not release' || '' }}
+      # The unit job takes a CPU core's time, so it deselects the heavy checks, the tests marked
+      # `release`, unless a manual run asks for them; the Linux jobs run them at the release gates.
+      RUN_RELEASE: ${{ inputs.release }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
@@ -143,4 +148,7 @@ jobs:
         # Without torch the torch-path tests skip, and the job would pass with torch broken.
         run: uv run --no-sync python -c "import torch, andrey; print('torch', torch.__version__); print(andrey.describe().as_dict())"
       - name: Unit tests
-        run: uv run --no-sync python -m pytest tests/unit -m "$TEST_MARKS" -q -rs --durations=15
+        run: |
+          marks="not release"
+          if [ "$RUN_RELEASE" = true ]; then marks=""; fi
+          uv run --no-sync python -m pytest tests/unit -m "$marks" -q -rs --durations=15

@@ -315,26 +315,30 @@ def test_skewd_needs_a_complete_row_for_each_cross_validation_fold():
         skewd(data, **SHORT_PAIR)
 
 
-def test_skewd_mv_reads_columns_whose_moments_overflow():
+@pytest.mark.parametrize("optimizer", OPTIMIZERS)
+def test_skewd_mv_reads_columns_whose_moments_overflow(optimizer):
     # Every value is near 1e308 in magnitude, so a plain mean or variance overflows.
     data = pd.DataFrame(_chain(), columns=["x", "y", "z"])
-    huge = skewd_mv((data + 4.0) * 1e307, **FAST, **SHORT_GRAPH)
-    plain = skewd_mv(data, **FAST, **SHORT_GRAPH)
+    short = {"optimizer": optimizer, **SHORT_GRAPH}
+    huge = skewd_mv((data + 4.0) * 1e307, **short)
+    plain = skewd_mv(data, **short)
     assert huge.structure.oriented_edges() == plain.structure.oriented_edges()
 
 
-def test_skewd_mv_breaks_ties_without_overflowing_on_two_huge_columns():
+@pytest.mark.parametrize("optimizer", OPTIMIZERS)
+def test_skewd_mv_breaks_ties_without_overflowing_on_two_huge_columns(optimizer):
     # The tie ranks standardize the raw columns they compare: values near 1e308 overflow the sums.
     data = pd.DataFrame(_chain(), columns=["x", "y", "z"])[["x", "y"]]
     with warnings.catch_warnings():
         warnings.simplefilter("error", RuntimeWarning)
-        huge = skewd_mv((data + 4.0) * 1e307, **FAST, **SHORT_GRAPH)
-    plain = skewd_mv(data, **FAST, **SHORT_GRAPH)
+        huge = skewd_mv((data + 4.0) * 1e307, optimizer=optimizer, **SHORT_GRAPH)
+    plain = skewd_mv(data, optimizer=optimizer, **SHORT_GRAPH)
     assert huge.structure.oriented_edges() == plain.structure.oriented_edges()
 
 
 @pytest.mark.parametrize("missing_cell", [False, True])
-def test_a_column_that_spans_the_float_range_is_read_without_overflow(missing_cell):
+@pytest.mark.parametrize("optimizer", OPTIMIZERS)
+def test_a_column_that_spans_the_float_range_is_read_without_overflow(missing_cell, optimizer):
     # Column 0 holds both signs up to 1.7e308, so its largest value less its smallest overflows.
     data = _pair()
     huge = data.copy()
@@ -343,9 +347,9 @@ def test_a_column_that_spans_the_float_range_is_read_without_overflow(missing_ce
         data[3, 1] = huge[3, 1] = np.nan
     with warnings.catch_warnings():
         warnings.simplefilter("error", RuntimeWarning)
-        pair = skewd(huge, criterion="independence", **FAST, **SHORT_PAIR)
-        graph = skewd_mv(huge[~np.isnan(huge).any(axis=1)], **FAST, **SHORT_GRAPH)
-    plain = skewd(data, criterion="independence", **FAST, **SHORT_PAIR)
+        pair = skewd(huge, criterion="independence", optimizer=optimizer, **SHORT_PAIR)
+        graph = skewd_mv(huge[~np.isnan(huge).any(axis=1)], optimizer=optimizer, **SHORT_GRAPH)
+    plain = skewd(data, criterion="independence", optimizer=optimizer, **SHORT_PAIR)
     assert pair.structure.oriented_edges() == plain.structure.oriented_edges()
     assert len(graph.structure.oriented_edges()) == 1
 
