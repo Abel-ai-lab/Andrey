@@ -123,7 +123,8 @@ jobs:
     # The unit suite with the torch extra on the CPU: torch's results must equal numpy's and repeat
     # exactly. Windows joins once its Linux-only tests are fixed.
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 40
+    # A run without the `release` checks takes about 22 minutes; one that asks for them has more.
+    timeout-minutes: ${{ inputs.release && 90 || 40 }}
     strategy:
       fail-fast: false
       matrix:
