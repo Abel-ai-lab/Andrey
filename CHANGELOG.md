@@ -229,6 +229,13 @@ names its pull request.
   each cross-validation fold grows only through the round where its early stop cuts it, and the
   repeated input checks of the many small fits are skipped, so the methods that take them as
   `indep_test` run faster, with the same output bit for bit. ([#1309])
+- The collider vote of `pc`, `fci`, `fci_jci`, `cdnod`, `gfci`, `boss_fci`, and `grasp_fci` with
+  `collider_rule="conservative"` or `"majority"` and `fisherz`, `student_t`, `normal_scores`, or
+  `degen_gauss`, and the separating sets that `gfci`, `boss_fci`, and `grasp_fci` search for the
+  pairs their score search leaves non-adjacent, evaluate the conditioning subsets of every pair
+  together instead of one pair at a time, so these searches run faster on many variables, with the
+  same output bit for bit and the same queries. A test that raises, or deletes rows per test, still
+  votes pair by pair. ([#1338])
 
 ### Fixed
 
@@ -3221,3 +3228,4 @@ First alpha release.
 [#1327]: https://github.com/Abel-ai-lab/Andrey/pull/1327
 [#1329]: https://github.com/Abel-ai-lab/Andrey/pull/1329
 [#1331]: https://github.com/Abel-ai-lab/Andrey/pull/1331
+[#1338]: https://github.com/Abel-ai-lab/Andrey/pull/1338

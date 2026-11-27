@@ -403,7 +403,7 @@ def separating_unions(
     if pvalues is None:
         return None
     firsts, seconds = xs.tolist(), ys.tolist()
-    unions = {k: () for k in np.flatnonzero(separated).tolist()}
+    unions: dict[int, tuple[int, ...]] = {k: () for k in np.flatnonzero(separated).tolist()}
     pending = np.flatnonzero(~separated).tolist()
     size = 1
     while pending:
@@ -1383,7 +1383,7 @@ def vote_triples(
     if not firsts:
         return frozenset()
     ambiguous: set[tuple[int, int, int]] = set()
-    pvalues = None if isinstance(test, TestwiseDeletion) else _canonical_route(test)  # ty: ignore[invalid-argument-type]
+    pvalues = None if isinstance(test, TestwiseDeletion) else _canonical_route(test)
     counts = None
     if pvalues is not None:
         neighbors = [np.flatnonzero(row) for row in adjacency]
@@ -1447,7 +1447,7 @@ def _unshielded_triples(
             a, c = a[kept], c[kept]
         found.append((a, np.full(len(a), b, dtype=np.intp), c))
     if not found:
-        return (np.empty(0, dtype=np.intp),) * 3
+        return np.empty(0, dtype=np.intp), np.empty(0, dtype=np.intp), np.empty(0, dtype=np.intp)
     a, b, c = (np.concatenate(column) for column in zip(*found))
     return a, b, c
 
