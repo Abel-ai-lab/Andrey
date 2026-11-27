@@ -1,10 +1,11 @@
 """Fast Greedy Equivalence Search, the engine behind :func:`andrey.fges`.
 
-FGES (Ramsey et al. 2017) is GES with one-edge faithfulness: its first forward phase adds an edge
-between two variables only when the graph of that single edge scores better than the empty graph,
-and a second pass then covers the unshielded noncolliders (steps fGES.9-11 of the pseudocode in
-Supplement 1). The search is :func:`andrey.search.ges.ges`, with its cached candidate scans and its
-worker processes; the first phase reads the screen that
+FGES (Ramsey et al. 2017) is GES arranged for large sparse graphs. Its first forward phase adds an
+edge between two variables only when the graph of that single edge scores better than the empty
+graph (one-edge faithfulness), and a second pass then covers the unshielded noncolliders (steps
+fGES.9-11 of the pseudocode in Supplement 1). Without the one-edge assumption, a third forward and
+backward pass scans every pair. The search is :func:`andrey.search.ges.ges`, with its cached
+candidate scans and its worker processes; the first phase reads the screen that
 :func:`~andrey.search._parallel_ges.one_edge_screen` builds, so each target scans the sources that
 pass it, and the second the sources of :func:`~andrey.search._parallel_ges.cover_sources`. The
 algorithm, its settings, and its reference are described on :func:`andrey.fges`.
@@ -30,14 +31,14 @@ def fges(
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
     workers: int | None = None,
-    one_edge_faithfulness: bool = True,
+    one_edge_faithfulness: bool = False,
 ) -> tuple[GraphStructure, float]:
-    """Discover a CPDAG by Greedy Equivalence Search with one-edge faithfulness.
+    """Discover a CPDAG by fast Greedy Equivalence Search.
 
-    The parameters are those of :func:`andrey.search.ges.ges`; the first forward phase scans only
+    The parameters are those of :func:`andrey.search.ges.ges`. The first forward phase scans only
     the pairs whose one-edge graph improves the score, and a second forward and backward pass
-    covers the unshielded noncolliders. With ``one_edge_faithfulness=False``, a third forward and
-    backward pass scans every pair on the graph the first two reached. Returns the CPDAG
+    covers the unshielded noncolliders. Unless ``one_edge_faithfulness`` is true, a third forward
+    and backward pass then scans every pair on the graph the first two reached. Returns the CPDAG
     (``kind="cpdag"``) and its total score.
     """
     return ges(

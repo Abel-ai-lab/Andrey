@@ -788,8 +788,11 @@ in a process.
 
 FGES, fast greedy equivalence search (Ramsey et al. 2017), {py:func}`~andrey.fges`, is GES for large
 sparse graphs: its first forward phase adds an edge only between variables whose one-edge graph
-scores better than the empty graph, and a second pass covers the unshielded noncolliders. It is
-experimental until its large-graph benchmark is published.
+scores better than the empty graph, a second pass covers the unshielded noncolliders, and a third
+pass scans every pair, which drops the one-edge assumption. `one_edge_faithfulness=True` keeps the
+assumption and skips the third pass: it favors time and memory on large sparse graphs and gives up
+the edges the one-edge screen skips. It is experimental until its large-graph benchmark is
+published.
 
 LGES, less greedy equivalence search (Ejaz and Bareinboim 2025), {py:func}`~andrey.lges`, is GES
 with fewer edge additions: it adds no edge between two variables when one graph of the current class

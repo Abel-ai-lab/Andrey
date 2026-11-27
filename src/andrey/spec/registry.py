@@ -701,12 +701,13 @@ _add(
     REGISTRY["ges"].model_copy(
         update={
             "name": "fges",
-            "summary": "Fast greedy equivalence search: GES with one-edge faithfulness, which adds "
-            "an edge in the first forward phase only between variables whose one-edge graph "
-            "scores better than the empty graph, then covers the unshielded noncolliders in a "
-            "second pass. Takes the scores, penalties, max_parents, and knowledge of ges. Can "
-            "miss an edge between variables that are independent in the data and linked through "
-            "canceling paths. The score is in metadata['score'].",
+            "summary": "Fast greedy equivalence search: GES arranged for large sparse graphs. Its "
+            "first forward phase adds an edge only between variables whose one-edge graph scores "
+            "better than the empty graph, a second pass covers the unshielded noncolliders, and a "
+            "third pass scans every pair. one_edge_faithfulness=true skips the third pass, which "
+            "saves time and memory and can miss an edge between variables that are independent "
+            "in the data and linked through canceling paths. Takes the scores, penalties, "
+            "max_parents, and knowledge of ges. The score is in metadata['score'].",
             "data": DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
             "output": OutputSpec(
                 structure_type="graph",
@@ -720,12 +721,14 @@ _add(
                 ParamSpec(
                     name="one_edge_faithfulness",
                     type="bool",
-                    default=True,
+                    default=False,
                     doc="Assume one-edge faithfulness: no edge between two variables whose "
                     "one-edge graph does not improve the score over the empty graph, unless the "
-                    "pass that covers the unshielded noncolliders adds it. false adds a third "
-                    "forward and backward pass over every pair on the graph the first two "
-                    "reached, as GES does; it takes longer.",
+                    "pass that covers the unshielded noncolliders adds it. true favors time and "
+                    "memory on large sparse graphs and gives up the edges the one-edge screen "
+                    "skips; false, the default, adds a third forward and backward pass over every "
+                    "pair on the graph the first two reached, as GES scans it, and favors the "
+                    "graphs GES finds.",
                 ),
             ),
             "references": ("Ramsey et al. 2017", "Chickering 2002"),

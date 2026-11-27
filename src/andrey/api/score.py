@@ -642,16 +642,16 @@ def fges(
     equivalent_sample_size: float = 1.0,
     max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
-    one_edge_faithfulness: bool = True,
+    one_edge_faithfulness: bool = False,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with fast greedy equivalence search (FGES).
 
-    FGES is GES with one-edge faithfulness [2]_: its first forward phase adds an edge between two
-    variables only when the graph of that single edge scores better than the empty graph, and a
-    second pass then covers the unshielded noncolliders that phase left. It returns the same kind
-    of result as :func:`~andrey.ges`, from the same scores and the same search, which skips the
-    pairs the data show no marginal link between.
+    FGES is GES arranged for large sparse graphs [2]_: its first forward phase adds an edge between
+    two variables only when the graph of that single edge scores better than the empty graph, a
+    second pass covers the unshielded noncolliders that phase left, and by default a third pass
+    scans every pair. It returns the same kind of result as :func:`~andrey.ges`, from the same
+    scores and the same search.
 
     Parameters
     ----------
@@ -699,12 +699,14 @@ def fges(
         categorical, and a continuous score raises ``ValueError`` on a declared column, named here
         or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
-    one_edge_faithfulness : bool, default=True
-        Assume one-edge faithfulness [2]_: no edge is added between two variables whose one-edge
-        graph does not improve the score over the empty graph, unless the pass that covers the
-        unshielded noncolliders adds it. ``False`` drops the assumption: a third forward and
-        backward pass then scans every pair on the graph the first two passes reached, as GES
-        does, so such an edge can still be added. It takes longer. See Notes.
+    one_edge_faithfulness : bool, default=False
+        Whether to assume one-edge faithfulness [2]_: no edge is added between two variables whose
+        one-edge graph does not improve the score over the empty graph, unless the pass that covers
+        the unshielded noncolliders adds it. ``False``, the default, drops the assumption: a third
+        forward and backward pass scans every pair on the graph the first two passes reached, as
+        GES does, so such an edge can still be added. It favors the graphs GES finds and gives up
+        part of the time and memory ``True`` saves. ``True`` favors time and memory on large sparse
+        graphs and gives up the edges the one-edge screen skips. See Notes.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -762,14 +764,13 @@ def fges(
     -----
     **When to use.** FGES suits data with no unmeasured common causes, as GES does, and takes
     its scores, penalties, ``max_parents``, and background knowledge (see :func:`~andrey.ges` for
-    the scores and how to choose ``penalty_discount``). It is for runs where the number of
-    variables makes GES's first forward passes the cost, and for readers who want the algorithm of
-    [2]_ by name. It returns the equivalence class. When variables can be linked by canceling
-    paths, so that a pair is independent in the data while its edge improves the score once other
-    variables are in the graph, FGES adds that edge only if the pair ends a path of two edges that
-    is not a collider in the graph the first pass returned; GES can add it anywhere, so use
-    :func:`~andrey.ges` there, or ``one_edge_faithfulness=False``. When unmeasured common causes
-    are plausible, use :func:`~andrey.fci`.
+    the scores and how to choose ``penalty_discount``). It is for runs where GES takes longer than
+    you can wait, for its first two passes scan fewer candidate edges than GES's first forward
+    phase, and for readers who want the algorithm of [2]_ by name. It returns the equivalence
+    class. When the variables are so many that time and memory decide, and a pair that is
+    independent in the data while its edge improves the score once other variables are in the graph
+    can be left out, use ``one_edge_faithfulness=True``, which skips the third pass. When
+    unmeasured common causes are plausible, use :func:`~andrey.fci`.
 
     **How it works.** FGES scores the one-edge graph of every pair against the empty graph under
     the plain BIC (the likelihood and the ``penalty_discount`` penalty, without the extended-BIC
@@ -783,13 +784,12 @@ def fges(
     path ``m *-* n *-* y`` that is not a collider. They are recomputed from the graph after each
     applied move, and a target whose sources changed is scanned again. The pass runs a forward
     phase over these candidates without the marginal screen, then the backward phase again, so a
-    pair that was married to orient a collider can be divorced. With
-    ``one_edge_faithfulness=False``, a third forward and backward pass scans every pair on the graph
+    pair that was married to orient a collider can be divorced. Unless
+    ``one_edge_faithfulness=True``, a third forward and backward pass scans every pair on the graph
     the second pass returned, as GES does, which drops the assumption; [2]_ reports that this mode
-    runs considerably longer. The paper [2]_ also gives FGES a
-    parallel and cached scoring scheme, which GES here shares, and fixes the BIC penalty at 4 times
-    the standard one for continuous data; ``penalty_discount`` keeps the default of ``1.0`` that
-    every method shares.
+    runs considerably longer. The paper [2]_ also gives FGES a parallel and cached scoring scheme,
+    which GES here shares, and fixes the BIC penalty at 4 times the standard one for continuous
+    data; ``penalty_discount`` keeps the default of ``1.0`` that every method shares.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score sums one term per
     variable over every row; terms over different rows do not sum to one dataset's score, so the
@@ -797,7 +797,13 @@ def fges(
     rows yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** Not benchmarked yet.
+    **Limitations.** The third pass scans every pair, as GES does, so with the default the time and
+    memory of a fit grow with the number of variables much as GES's do, and it saves less of both
+    than ``one_edge_faithfulness=True``. With ``True``, a pair whose variables show no link on their
+    own is not added in the first phase, so an edge whose effect shows only once other variables
+    are in the graph can be missed, as it is in the authors' implementation; with the standard BIC
+    at a large ``penalty_discount``, as in [2]_, and on denser graphs, it was less accurate than
+    GES.
 
     References
     ----------

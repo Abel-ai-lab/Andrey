@@ -17,6 +17,15 @@ names its pull request.
   `[scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]` replaces
   `generate(Ensemble(scms=scms, seeds=range(10), n=500))`. ([#1221])
 
+### Added
+
+- `fges`, fast greedy equivalence search (Ramsey et al. 2017), is experimental. It is GES arranged
+  for large sparse graphs: a first forward phase that adds an edge only between variables whose
+  one-edge graph scores better than the empty graph, a pass that covers the unshielded noncolliders,
+  and, by default, a pass over every pair, which drops the one-edge assumption.
+  `one_edge_faithfulness=True` skips that last pass: it favors time and memory on large sparse
+  graphs and gives up the edges the one-edge screen skips. ([#TBD])
+
 ### Changed
 
 - Each method's Limitations paragraph says in a few sentences where it does better or worse and

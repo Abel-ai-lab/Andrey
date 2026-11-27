@@ -57,9 +57,11 @@ def test_fges_recovery():
     )
 
 
-def test_fges_equals_ges_on_faithful_data():
+@pytest.mark.parametrize("one_edge_faithfulness", [True, False])
+def test_fges_equals_ges_on_faithful_data(one_edge_faithfulness: bool):
     x = _chain_data()
-    assert np.array_equal(andrey.fges(x).structure.to_numpy(), andrey.ges(x).structure.to_numpy())
+    fges = andrey.fges(x, one_edge_faithfulness=one_edge_faithfulness)
+    assert np.array_equal(fges.structure.to_numpy(), andrey.ges(x).structure.to_numpy())
 
 
 def test_fges_screened_pass_adds_edges_only_between_pairs_whose_one_edge_graph_improves(
@@ -74,7 +76,7 @@ def test_fges_screened_pass_adds_edges_only_between_pairs_whose_one_edge_graph_i
     rows = one_edge_screen(DeltaBICScore(score), d)
     admitted = np.array([[(rows[i] >> j) & 1 for j in range(d)] for i in range(d)], dtype=bool)
     assert np.array_equal(admitted, admitted.T)
-    assert not (_adjacent(andrey.fges(x)) & ~admitted).any()
+    assert not (_adjacent(andrey.fges(x, one_edge_faithfulness=True)) & ~admitted).any()
 
 
 def test_fges_covers_a_pair_the_screen_rejects(monkeypatch: pytest.MonkeyPatch):
@@ -93,40 +95,40 @@ def test_fges_covers_a_pair_the_screen_rejects(monkeypatch: pytest.MonkeyPatch):
         x.shape[1],
     )
     assert not (rows[0] >> 3) & 1  # the screen rejects x0 - x3
-    full = andrey.fges(x)
+    full = andrey.fges(x, one_edge_faithfulness=True)
     assert _adjacent(full)[0, 3]
     assert np.array_equal(full.structure.to_numpy(), andrey.ges(x).structure.to_numpy())
     _screen_only(monkeypatch)
-    assert not _adjacent(andrey.fges(x))[0, 3]
+    assert not _adjacent(andrey.fges(x, one_edge_faithfulness=True))[0, 3]
 
 
 def test_fges_cover_pass_does_not_worsen_the_score(monkeypatch: pytest.MonkeyPatch):
     for x in (_canceling_data(), _chain_data(seed=4)):
-        full = andrey.fges(x).metadata["score"]
+        full = andrey.fges(x, one_edge_faithfulness=True).metadata["score"]
         with monkeypatch.context() as screened:
             _screen_only(screened)
-            screen_only = andrey.fges(x).metadata["score"]
+            screen_only = andrey.fges(x, one_edge_faithfulness=True).metadata["score"]
         assert full <= screen_only + 1e-9
 
 
-def test_fges_without_one_edge_faithfulness_adds_a_pair_both_passes_miss(
-    monkeypatch: pytest.MonkeyPatch,
-):
+def test_fges_by_default_adds_a_pair_both_passes_miss(monkeypatch: pytest.MonkeyPatch):
     x = _canceling_data()
     _screen_only(monkeypatch)
-    assert not _adjacent(andrey.fges(x))[0, 3]
-    unfaithful = andrey.fges(x, one_edge_faithfulness=False)
-    assert _adjacent(unfaithful)[0, 3]
-    assert np.array_equal(unfaithful.structure.to_numpy(), andrey.ges(x).structure.to_numpy())
+    assert not _adjacent(andrey.fges(x, one_edge_faithfulness=True))[0, 3]
+    by_default = andrey.fges(x)
+    assert _adjacent(by_default)[0, 3]
+    assert np.array_equal(by_default.structure.to_numpy(), andrey.ges(x).structure.to_numpy())
+    explicit = andrey.fges(x, one_edge_faithfulness=False)
+    assert np.array_equal(by_default.structure.to_numpy(), explicit.structure.to_numpy())
 
 
-def test_fges_without_one_edge_faithfulness_does_not_worsen_the_score():
+def test_fges_third_pass_does_not_worsen_the_score():
     for x in (_canceling_data(), _chain_data(seed=4), _chain_data(n=300, d=12, seed=5)):
-        faithful = andrey.fges(x, penalty_discount=4.0, ebic_gamma=0.0).metadata["score"]
-        unfaithful = andrey.fges(
-            x, penalty_discount=4.0, ebic_gamma=0.0, one_edge_faithfulness=False
-        )
-        assert unfaithful.metadata["score"] <= faithful + 1e-9
+        assumed = andrey.fges(
+            x, penalty_discount=4.0, ebic_gamma=0.0, one_edge_faithfulness=True
+        ).metadata["score"]
+        by_default = andrey.fges(x, penalty_discount=4.0, ebic_gamma=0.0).metadata["score"]
+        assert by_default <= assumed + 1e-9
 
 
 def test_cover_sources_are_the_two_step_noncolliders():
