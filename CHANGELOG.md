@@ -83,7 +83,7 @@ names its pull request.
   reads the correlation matrix in blocks of rows instead of making three temporary copies of it,
   and the BIC's check keeps the whole correlation matrix only when the data have more rows than
   columns, for its eigenvalue test. On 4,000 variables and 300 rows, the BIC's check peaks at about
-  17 MB instead of 488 MB, and an `hc` fit at about 530 MB instead of 634 MB. ([#1275])
+  17 MB instead of 488 MB, and an `hc` fit at about 537 MB instead of 637 MB. ([#1275])
 
 ### Fixed
 
