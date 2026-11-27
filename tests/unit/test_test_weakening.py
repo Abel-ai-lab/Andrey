@@ -6,6 +6,7 @@ import importlib.util
 import os
 import subprocess
 import textwrap
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -231,6 +232,123 @@ FLAGGED = {
             assert err < 10**-3
         """,
         "bound loosened",
+    ),
+    "chained upper bound": (
+        """
+        def test_fit():
+            assert 0 <= score <= 1
+        """,
+        """
+        def test_fit():
+            assert 0 <= score <= 2
+        """,
+        "bound loosened from 1 to 2",
+    ),
+    "chained lower bound": (
+        """
+        def test_fit():
+            assert 0.5 < score < 1
+        """,
+        """
+        def test_fit():
+            assert 0.1 < score < 1
+        """,
+        "bound loosened from 0.5 to 0.1",
+    ),
+    "strict bound made non-strict": (
+        """
+        def test_fit():
+            assert score < 1
+            assert score > 0
+        """,
+        """
+        def test_fit():
+            assert score <= 1
+            assert score >= 0
+        """,
+        "loosened from strict to non-strict at 1",
+    ),
+    "strict bound moved and made non-strict": (
+        """
+        def test_fit():
+            assert score < 1
+        """,
+        """
+        def test_fit():
+            assert score <= 2
+        """,
+        "bound loosened from 1 to 2",
+    ),
+    "lower strict bound moved and made non-strict": (
+        """
+        def test_fit():
+            assert score > 1
+        """,
+        """
+        def test_fit():
+            assert score >= 0
+        """,
+        "bound loosened from 1 to 0",
+    ),
+    "range of parametrize cases shortened": (
+        """
+        @pytest.mark.parametrize("seed", range(6))
+        def test_fit(seed):
+            assert fit(seed)
+        """,
+        """
+        @pytest.mark.parametrize("seed", range(1))
+        def test_fit(seed):
+            assert fit(seed)
+        """,
+        "5 parametrize case(s) removed",
+    ),
+    "range with a start shortened": (
+        """
+        SEEDS = list(range(2, 8))
+
+        @pytest.mark.parametrize("seed", SEEDS)
+        def test_fit(seed):
+            assert fit(seed)
+        """,
+        """
+        SEEDS = list(range(2, 4))
+
+        @pytest.mark.parametrize("seed", SEEDS)
+        def test_fit(seed):
+            assert fit(seed)
+        """,
+        "4 parametrize case(s) removed",
+    ),
+    "list cut to a range": (
+        """
+        @pytest.mark.parametrize("seed", [0, 1, 2, 3])
+        def test_fit(seed):
+            assert fit(seed)
+        """,
+        """
+        @pytest.mark.parametrize("seed", range(2))
+        def test_fit(seed):
+            assert fit(seed)
+        """,
+        "2 parametrize case(s) removed",
+    ),
+    "xfail in a case list an existing test uses": (
+        """
+        CASES = [pytest.param(1), pytest.param(2)]
+
+        @pytest.mark.parametrize("n", CASES)
+        def test_fit(n):
+            assert fit(n)
+        """,
+        """
+        CASES = [pytest.param(1), pytest.param(2, marks=pytest.mark.xfail)]
+
+        @pytest.mark.parametrize("n", CASES)
+        def test_fit(n):
+            assert fit(n)
+        """,
+        "pytest.mark.xfail added to a test that existed",
     ),
     "module constant": (
         """
@@ -598,6 +716,74 @@ NOT_FLAGGED = {
             assert fit()
         """,
     ),
+    "tighter chained bound": (
+        """
+        def test_fit():
+            assert 0 <= score <= 2
+        """,
+        """
+        def test_fit():
+            assert 0 <= score <= 1
+        """,
+    ),
+    "non-strict bound made strict": (
+        """
+        def test_fit():
+            assert score <= 1
+            assert score >= 0
+        """,
+        """
+        def test_fit():
+            assert score < 1
+            assert score > 0
+        """,
+    ),
+    "range of parametrize cases grown": (
+        """
+        @pytest.mark.parametrize("seed", range(3))
+        def test_fit(seed):
+            assert fit(seed)
+        """,
+        """
+        @pytest.mark.parametrize("seed", range(6))
+        def test_fit(seed):
+            assert fit(seed)
+        """,
+    ),
+    "xfail in a case list only an added test uses": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        NEW_CASES = [pytest.param(1), pytest.param(2, marks=pytest.mark.xfail)]
+
+        def test_fit():
+            assert fit()
+
+        @pytest.mark.parametrize("n", NEW_CASES)
+        def test_new(n):
+            assert fit(n)
+        """,
+    ),
+    "xfail in a case list only an added method uses": (
+        """
+        class TestFit:
+            def test_fit(self):
+                assert fit()
+        """,
+        """
+        CASES = [pytest.param(1, marks=pytest.mark.skip)]
+
+        class TestFit:
+            def test_fit(self):
+                assert fit()
+
+            @pytest.mark.parametrize("n", CASES)
+            def test_new(self, n):
+                assert fit(n)
+        """,
+    ),
     "added parametrize cases": (
         """
         @pytest.mark.parametrize("n", [1, 2])
@@ -720,6 +906,56 @@ def test_a_test_that_moved_and_loosened_is_flagged(check):
     ]
     found = [finding.reason for finding in check.analyze(changes)]
     assert any("rtol loosened" in reason for reason in found), found
+
+
+def test_a_test_moved_into_a_new_file_is_not_flagged(check):
+    body = """
+    def test_fit():
+        assert fit() == 3
+    """
+    other = """
+    def test_other():
+        assert other()
+    """
+    a, b = "tests/unit/test_a.py", "tests/unit/test_b.py"
+    changes = [
+        check.Change(a, a, textwrap.dedent(body + other), textwrap.dedent(other)),
+        check.Change(b, b, None, textwrap.dedent(body)),
+    ]
+    assert check.analyze(changes) == []
+
+
+def test_a_test_moved_into_a_new_file_and_loosened_is_flagged(check):
+    old = "def test_fit():\n    np.testing.assert_allclose(a, b, rtol=1e-8)\n"
+    new = "def test_fit():\n    np.testing.assert_allclose(a, b, rtol=1e-2)\n"
+    other = "def test_other():\n    assert other()\n"
+    a, b = "tests/unit/test_a.py", "tests/unit/test_b.py"
+    changes = [check.Change(a, a, old + other, other), check.Change(b, b, None, new)]
+    found = [finding.reason for finding in check.analyze(changes)]
+    assert any("rtol loosened" in reason for reason in found), found
+
+
+def test_a_file_renamed_out_of_the_collected_names_loses_its_tests(check):
+    source = "def test_fit():\n    assert fit()\n\n\ndef helper():\n    return 1\n"
+    old, new = "tests/unit/test_fit.py", "tests/unit/fit.py"
+    found = check.analyze([check.Change(new, old, source, source)])
+    assert [(f.path, f.unit, f.reason) for f in found] == [
+        (old, "test_fit", f"test no longer collected: the file was renamed to {new}")
+    ]
+
+
+@pytest.mark.parametrize("new", ["tests/unit/fit_test.py", "tests/unit/test_other.py"])
+def test_a_file_renamed_within_the_collected_names_is_not_flagged(check, new):
+    source = "def test_fit():\n    assert fit()\n"
+    assert check.analyze([check.Change(new, "tests/unit/test_fit.py", source, source)]) == []
+
+
+def test_a_file_renamed_into_the_collected_names_is_not_flagged(check):
+    source = "def test_fit():\n    assert fit()\n"
+    assert (
+        check.analyze([check.Change("tests/unit/test_fit.py", "tests/unit/fit.py", source, source)])
+        == []
+    )
 
 
 def test_a_flag_names_the_file_the_test_and_the_code(check):
@@ -883,17 +1119,44 @@ def test_a_renamed_file_is_compared_with_its_old_content(check, repo):
     assert baselines == []
 
 
+def test_a_baseline_moved_out_of_its_folder_is_a_deletion(check, repo):
+    (repo / "tests/recovery/data").mkdir()
+    git(repo, "mv", "tests/recovery/baselines/PC/gauss.json", "tests/recovery/data/gauss.json")
+    commit(repo)
+    changes, baselines = check.load("main", "HEAD", str(repo))
+    assert [(f.path, f.reason) for f in baselines] == [
+        ("tests/recovery/baselines/PC/gauss.json", "baseline deleted")
+    ]
+    assert changes == []
+
+
+def test_a_baseline_moved_within_its_folder_is_not_flagged(check, repo):
+    (repo / "tests/recovery/baselines/FCI").mkdir()
+    git(repo, "mv", "tests/recovery/baselines/PC/gauss.json", "tests/recovery/baselines/FCI/g.json")
+    commit(repo)
+    assert check.load("main", "HEAD", str(repo)) == ([], [])
+
+
 def test_a_change_outside_tests_and_qa_is_not_read(check, repo):
     write(repo, {"src/andrey/__init__.py": "x = 3\n", "tests/unit/data.json": '{"x": 9}'})
     commit(repo)
     assert check.main(["--base", "main"]) == 0
 
 
+SINCE = "2026-11-20T12:00:00Z"
+FLAGGED_CHANGE = {"tests/unit/test_a.py": "def test_a():\n    assert a() == 1\n"}
+
+
+def when(text: str) -> datetime:
+    return datetime.fromisoformat(text.replace("Z", "+00:00"))
+
+
 def test_a_flagged_change_fails_without_the_label(check, repo, monkeypatch, capsys):
-    write(repo, {"tests/unit/test_a.py": "def test_a():\n    assert a() == 1\n"})
+    write(repo, FLAGGED_CHANGE)
     commit(repo)
-    monkeypatch.setattr(check, "labels", lambda repository, pull_request: ["chore"])
-    assert check.main(["--base", "main", "--pr", "7", "--repo", "o/r"]) == 1
+    monkeypatch.setattr(check, "label_applied", lambda repository, pull_request, label: None)
+    argv = ["--base", "main", "--pr", "7", "--since", SINCE, "--repo", "o/r"]
+    assert check.main(argv) == 1
     output = capsys.readouterr().out
     assert "tests/unit/test_a.py:1: test_a: 2 assertions removed" in output
     assert (
@@ -901,25 +1164,51 @@ def test_a_flagged_change_fails_without_the_label(check, repo, monkeypatch, caps
         in output
     )
     assert "test-change-approved" in output
+    assert "::warning" not in output
 
 
-def test_a_flagged_change_passes_with_the_label(check, repo, monkeypatch, capsys):
-    write(repo, {"tests/unit/test_a.py": "def test_a():\n    assert a() == 1\n"})
+def test_a_flagged_change_passes_with_a_label_set_after_the_head_changed(
+    check, repo, monkeypatch, capsys
+):
+    write(repo, FLAGGED_CHANGE)
     commit(repo)
     seen = []
 
-    def labels(repository, pull_request):
-        seen.append((repository, pull_request))
-        return ["chore", "test-change-approved"]
+    def label_applied(repository, pull_request, label):
+        seen.append((repository, pull_request, label))
+        return when("2026-11-20T12:30:00Z")
 
-    monkeypatch.setattr(check, "labels", labels)
-    assert check.main(["--base", "main", "--pr", "7", "--repo", "o/r"]) == 0
-    assert seen == [("o/r", "7")]
+    monkeypatch.setattr(check, "label_applied", label_applied)
+    assert check.main(["--base", "main", "--pr", "7", "--since", SINCE, "--repo", "o/r"]) == 0
+    assert seen == [("o/r", "7", "test-change-approved")]
     assert "2 assertions removed" in capsys.readouterr().out
 
 
+@pytest.mark.parametrize("applied", ["2026-11-20T11:59:59Z", SINCE])
+def test_a_label_set_before_the_head_changed_does_not_approve(
+    check, repo, monkeypatch, capsys, applied
+):
+    write(repo, FLAGGED_CHANGE)
+    commit(repo)
+    monkeypatch.setattr(check, "label_applied", lambda *args: when(applied))
+    argv = ["--base", "main", "--pr", "7", "--since", SINCE, "--repo", "o/r"]
+    assert check.main(argv) == 1
+    output = capsys.readouterr().out
+    assert "::warning::The label test-change-approved was set before" in output
+    assert "title=Weakened test::2 assertions removed" in output
+
+
+def test_a_pull_request_needs_the_time_of_its_last_head_change(check, repo, capsys):
+    write(repo, FLAGGED_CHANGE)
+    commit(repo)
+    with pytest.raises(SystemExit) as stop:
+        check.main(["--base", "main", "--pr", "7", "--repo", "o/r"])
+    assert stop.value.code == 2
+    assert "--pr needs --since" in capsys.readouterr().err
+
+
 def test_a_flagged_change_without_a_pull_request_fails(check, repo):
-    write(repo, {"tests/unit/test_a.py": "def test_a():\n    assert a() == 1\n"})
+    write(repo, FLAGGED_CHANGE)
     commit(repo)
     assert check.main(["--base", "main"]) == 1
 
@@ -928,23 +1217,82 @@ def test_a_clean_change_never_asks_for_the_label(check, repo, monkeypatch):
     write(repo, {"tests/unit/test_f.py": "def test_f():\n    assert f()\n"})
     commit(repo)
 
-    def labels(repository, pull_request):
+    def label_applied(repository, pull_request, label):
         raise AssertionError("a clean change needs no label")
 
-    monkeypatch.setattr(check, "labels", labels)
-    assert check.main(["--base", "main", "--pr", "7", "--repo", "o/r"]) == 0
+    monkeypatch.setattr(check, "label_applied", label_applied)
+    argv = ["--base", "main", "--pr", "7", "--since", SINCE, "--repo", "o/r"]
+    assert check.main(argv) == 0
 
 
-def test_a_failed_label_lookup_fails_the_check(check, repo, monkeypatch, capsys):
-    write(repo, {"tests/unit/test_a.py": "def test_a():\n    assert a() == 1\n"})
+@pytest.mark.parametrize("stderr", ["HTTP 403", b"HTTP 403"])
+def test_a_failed_label_lookup_fails_the_check(check, repo, monkeypatch, capsys, stderr):
+    write(repo, FLAGGED_CHANGE)
     commit(repo)
 
-    def labels(repository, pull_request):
-        raise subprocess.CalledProcessError(1, ["gh"], stderr=b"HTTP 403")
+    def label_applied(repository, pull_request, label):
+        raise subprocess.CalledProcessError(1, ["gh"], stderr=stderr)
 
-    monkeypatch.setattr(check, "labels", labels)
-    assert check.main(["--base", "main", "--pr", "7", "--repo", "o/r"]) == 2
+    monkeypatch.setattr(check, "label_applied", label_applied)
+    argv = ["--base", "main", "--pr", "7", "--since", SINCE, "--repo", "o/r"]
+    assert check.main(argv) == 2
+    output = capsys.readouterr().out
+    assert "could not run" in output
+    assert "HTTP 403" in output
+    assert "b'" not in output
+
+
+def test_a_malformed_time_fails_the_check(check, repo, capsys):
+    write(repo, FLAGGED_CHANGE)
+    commit(repo)
+    assert check.main(["--base", "main", "--pr", "7", "--since", "yesterday"]) == 2
     assert "could not run" in capsys.readouterr().out
+
+
+def events(*rows: tuple[str, str, str]) -> str:
+    """What ``gh api`` prints for the events of a pull request: event, label, time per line."""
+    return "".join("\t".join(row) + "\n" for row in rows)
+
+
+@pytest.mark.parametrize(
+    ("rows", "expected"),
+    [
+        ([], None),
+        ([("labeled", "chore", "2026-11-20T10:00:00Z")], None),
+        ([("assigned", "", "2026-11-20T10:00:00Z")], None),
+        (
+            [("labeled", "test-change-approved", "2026-11-20T10:00:00Z")],
+            "2026-11-20T10:00:00Z",
+        ),
+        (
+            [
+                ("labeled", "test-change-approved", "2026-11-20T10:00:00Z"),
+                ("unlabeled", "test-change-approved", "2026-11-20T11:00:00Z"),
+            ],
+            None,
+        ),
+        (
+            [
+                ("labeled", "test-change-approved", "2026-11-20T10:00:00Z"),
+                ("unlabeled", "test-change-approved", "2026-11-20T11:00:00Z"),
+                ("labeled", "chore", "2026-11-20T11:30:00Z"),
+                ("labeled", "test-change-approved", "2026-11-20T12:00:00Z"),
+            ],
+            "2026-11-20T12:00:00Z",
+        ),
+    ],
+)
+def test_the_label_time_is_the_last_time_it_was_set(check, monkeypatch, rows, expected):
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout=events(*rows))
+
+    monkeypatch.setattr(check.subprocess, "run", run)
+    applied = check.label_applied("o/r", "7", "test-change-approved")
+    assert applied == (when(expected) if expected else None)
+    assert calls[0][:4] == ["gh", "api", "--paginate", "repos/o/r/issues/7/events"]
 
 
 def test_an_unknown_base_fails_the_check(check, repo, capsys):
