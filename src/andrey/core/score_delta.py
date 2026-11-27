@@ -27,6 +27,7 @@ import contextlib
 import math
 from collections import OrderedDict
 from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 from typing import Any, cast
 from weakref import WeakKeyDictionary
 
@@ -420,6 +421,23 @@ def local_score_bic_delta(
 _INV_CACHES: WeakKeyDictionary[BICScore, _InvCache] = WeakKeyDictionary()
 
 
+@dataclass(slots=True)
+class _AddConstants:
+    """What a batch of adds reads that depends on the vertex and the base size alone."""
+
+    var_v: float  #: ``cov[v, v]``
+    floor: float  #: the zero-residual floor of ``var_v``
+    penalty: float  #: the penalty of a family with one more parent
+    rounding: float | None = None  #: :func:`_score_rounding`, set by the first batch that keeps one
+
+
+# The constants of a batch of adds, per score object and per ``(vertex, base size)``. They read the
+# score's penalty, which scores sharing one inv-cov cache do not share, so they are not kept there.
+_ADD_CONSTANTS: WeakKeyDictionary[BICScore, dict[tuple[int, int], _AddConstants]] = (
+    WeakKeyDictionary()
+)
+
+
 def _inv_cache(score_obj: BICScore) -> _InvCache:
     """Return the inv-cov cache of ``score_obj``, created on first use."""
     cache = _INV_CACHES.get(score_obj)
@@ -479,7 +497,8 @@ def _add_error_bounds(
     q = t_U / R_uU
     bound = np.sqrt(q)
     bound *= 2 * de
-    bound += q * dR_u
+    q *= dR_u
+    bound += q
     bound += de + dR_floor
     bound *= n
     bound /= R_v_new
@@ -571,6 +590,134 @@ def score_many_with_base(
     unchanged, and scores the rest in full. The inv-cov cache (capped at 200k entries) is keyed to
     ``score_obj`` and created on first use; :class:`BICScore` is unchanged.
     """
+    if not deltas:
+        if bounds is not None:
+            bounds[:] = []
+        return []
+    k = len(deltas)
+    i = int(i)
+    S_base_sorted: tuple[int, ...] = tuple(sorted(int(x) for x in base_parents))
+    ops, moves = zip(*deltas)
+    if ops.count("add") == k and i not in moves and set(S_base_sorted).isdisjoint(moves):
+        scores = _score_adds_with_base(
+            score_obj, i, S_base_sorted, moves, cond_threshold=cond_threshold, bounds=bounds
+        )
+        if scores is not None:
+            return scores
+    return _score_many_with_base_general(
+        score_obj, i, base_parents, deltas, cond_threshold=cond_threshold, bounds=bounds
+    )
+
+
+def _score_adds_with_base(
+    score_obj: BICScore,
+    i: int,
+    base: tuple[int, ...],
+    moves: Sequence[int],
+    *,
+    cond_threshold: float,
+    bounds: list[float] | None,
+) -> list[float] | None:
+    """Scores and bounds of adding each of ``moves`` to the sorted ``base`` of ``i``, or ``None``.
+
+    ``moves`` are variables outside ``base`` and other than ``i``. This runs the add block
+    of :func:`_score_many_with_base_general` with the same operations in the same order, with the
+    constants of the batch kept in ``_ADD_CONSTANTS`` and fewer temporaries and index gathers. It
+    returns ``None``, leaving ``bounds`` alone, wherever the general path would not keep every
+    move's update: an ill or unusable base, a base too large for the rows, or a failed guard.
+    """
+    s = len(base)
+    cov = score_obj.cov
+    n = score_obj.n
+    cov_diag = score_obj._cov_diag
+    inv_cov_cache = _inv_cache(score_obj)
+
+    per_score = _ADD_CONSTANTS.get(score_obj)
+    if per_score is None:
+        per_score = _ADD_CONSTANTS[score_obj] = {}
+    constants = per_score.get((i, s))
+    if constants is None:
+        var_v = float(cov_diag[i])
+        pen_add = score_obj.log_n * (s + 1) * score_obj.penalty_discount
+        if score_obj.ebic_gamma:
+            pen_add += ebic_penalty(s + 1, cov.shape[0], score_obj.ebic_gamma)
+        constants = per_score[(i, s)] = _AddConstants(var_v, ZERO_RESIDUAL * var_v, pen_add)
+    var_v = constants.var_v
+    floor = constants.floor
+
+    R_v_old = var_v
+    if base:
+        S_list = list(base)
+        M, ill = _get_inv_with_cond(inv_cov_cache, base, cov, S_list, cond_threshold)
+        entry = inv_cov_cache[base]  # the call above stored it
+        inv_cov_cache.move_to_end(base)
+        if len(inv_cov_cache) > _INV_CACHE_CAP or inv_cov_cache.nbytes > _INV_CACHE_BYTE_CAP:
+            _evict_inv(inv_cov_cache)
+        if ill or M is None:
+            return None
+        proxy = entry[1]  # ||A||_inf ||M||_inf
+        rows = cov.take(S_list, 0)
+        cs_v = rows[:, i]
+        b = cs_v @ M
+        R_v_old = float(var_v - b @ cs_v)
+        g = 4 * (s + 2) * _EPS
+        b_1 = float(np.abs(b).sum())
+    if not R_v_old > floor:
+        return None
+    rounding = constants.rounding
+    if rounding is None:
+        rounding = constants.rounding = _score_rounding(n, _penalty_size(score_obj, s), var_v)
+    diag_range = inv_cov_cache.diag_range
+    if diag_range is None:
+        diag_range = inv_cov_cache.diag_range = (float(cov_diag.min()), float(cov_diag.max()))
+    if s + 1 > n - 2:
+        return None
+
+    us_arr = np.fromiter(moves, np.intp, len(moves))
+    if base:
+        cs_U = rows.T.take(us_arr, 0).T  # the layout of ``rows[:, us_arr]``
+        e_vU = cov[i].take(us_arr)
+        e_vU -= b @ cs_U
+        R_uU = cov_diag.take(us_arr)
+        R_uU -= np.einsum("ij,ij->j", cs_U, M @ cs_U)
+    else:
+        e_vU = cov[i].take(us_arr)
+        R_uU = cov_diag.take(us_arr)
+    R_u_min = float(R_uU.min())
+    if not R_u_min > 0.0:
+        return None
+    t_U = e_vU / R_uU
+    t_U *= e_vU
+    R_v_new = R_v_old - t_U
+    if not float(R_v_new.min()) > 2 * floor:
+        return None
+    values = np.log(R_v_new)
+    values *= n
+    values += constants.penalty
+    if base:
+        bound, dR_u = _add_error_bounds(
+            n, g, proxy, b_1, (g + rounding) * var_v, diag_range, s, t_U, R_uU, R_v_new
+        )
+    else:
+        bound = (n * (4 * _EPS + rounding) * var_v) / R_v_new
+        dR_u = 0.0
+    if not (dR_u < 0.5 * R_u_min and float(bound.max()) < 0.5 * n):
+        return None
+    if bounds is not None:
+        bounds[:] = bound.tolist()
+    return values.tolist()
+
+
+def _score_many_with_base_general(
+    score_obj: BICScore,
+    i: int,
+    base_parents: Sequence[int],
+    deltas: Sequence[tuple[str, int]],
+    *,
+    cond_threshold: float = _COND_THRESHOLD,
+    bounds: list[float] | None = None,
+) -> list[float]:
+    """:func:`score_many_with_base` for any batch, with every guard and the full-score fallback."""
     k = len(deltas)
     results: list[float | None] = [None] * k
     out_bounds = [0.0] * k
