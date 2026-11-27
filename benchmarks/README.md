@@ -492,11 +492,15 @@ so a page the processes share, such as a matrix the workers read from shared mem
 per process. Once the tree's sum passes the cap, `--mem-route poll` reads the tree's Pss, which
 counts such a page once, about once a second, and caps on it where Linux reports it;
 `tree_peak_pss_mb` records the largest Pss read, and is null for a tree that stayed under the cap.
-Pss is read only then, and only that often, because reading it slows the fit. Pss counts only the
-pages a process maps: a page of a shared-memory file that no process has read yet takes memory but
-counts in no Pss, so the Pss of a tree whose workers have read only part of a shared matrix is low
-by the rest of it, at most the matrix. A child started by `vfork` reports its parent's memory until
-it calls exec, and no sum counts it.
+Pss is read only then, and only that often, because reading it slows the fit. Between two reads,
+a second apart or 20 times a read's duration if that is longer, the cap takes the last read plus
+the growth of the RSS sum, which is not a bound: Pss can grow while the RSS sum does not, as when a
+forked worker writes to pages it shares with its parent, so a tree can pass the cap unseen for up
+to that interval, or end within it. Pss counts only the pages a process maps: a page of a
+shared-memory file that no process has read yet takes memory but counts in no Pss, so the Pss of a
+tree whose workers have read only part of a shared matrix is low by the rest of it, at most the
+matrix. A child started by `vfork` reports its parent's memory until it calls exec, and no sum
+counts it.
 
 `device_id` records `cpu` or the CUDA device index and name. The backend determines the device, so a
 pin inside `fit` outranks `ANDREY_DEVICE`; the record keeps the request separately as `device`.

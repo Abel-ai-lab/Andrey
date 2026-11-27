@@ -227,8 +227,11 @@ class TreeMemoryPoller(threading.Thread):
     which decides where Linux reports it: Pss is at most the RSS sum, so a tree under the cap by
     RSS is under it by Pss, and the slow Pss read (:func:`pss_kb`) stays out of a fit under the cap.
     Over the cap, a read is repeated after :data:`PSS_INTERVAL_S`, or sooner once the last read
-    plus the RSS sum's growth since it passes the cap; in between, that sum stands for the Pss. Only
-    a fresh read, or the RSS sum where Pss cannot be read, breaches the cap. ``breached`` records a
+    plus the RSS sum's growth since it passes the cap; in between, that sum stands for the Pss. It
+    is not a bound: Pss can grow while the RSS sum does not, as when a forked worker writes to pages
+    it shares with its parent, or a process exits while another grows, so a tree can pass the cap
+    unseen for up to that interval, or end within it. Only a fresh read, or the RSS sum where Pss
+    cannot be read, breaches the cap. ``breached`` records a
     cap violation; ``peak_mb`` (RSS) may underestimate the true peak, and ``peak_pss_mb`` is the
     largest Pss read, ``None`` while the RSS sum stays under the cap.
     """
