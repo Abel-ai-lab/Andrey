@@ -1099,3 +1099,22 @@ def test_a_stacked_shrink_leaves_every_blanket_and_separating_set_as_the_loop_do
             want = _blankets(test, 16, alpha, interleaved, ranks, **options)
         assert got == want
     assert any(found < stack for stack, found in spy.calls)
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "student_t", "normal_scores"])
+def test_a_p_value_equal_to_alpha_does_not_separate_in_a_stacked_shrink(kind):
+    """Orthogonal columns have every partial correlation zero, so every p-value is exactly 1: a
+    shrink at ``alpha`` 1 drops no member, as the loop does, and at the float below 1 drops the
+    first and then the next, as the loop does."""
+    columns = [  # four rows of an 8 x 8 Hadamard matrix, with no constant row
+        [1, -1, 1, -1, 1, -1, 1, -1],
+        [1, 1, -1, -1, 1, 1, -1, -1],
+        [1, -1, -1, 1, 1, -1, -1, 1],
+        [1, 1, 1, 1, -1, -1, -1, -1],
+    ]
+    test = make_indep_test(kind, np.array(columns, dtype=float).T)
+    assert test(0, 1, [2]) == 1.0
+    for alpha, dropped in ((1.0, []), (float(np.nextafter(1.0, 0.0)), [1, 2, 3])):
+        got, want = [1, 2, 3], [1, 2, 3]
+        assert blanket._shrink(test, 0, alpha, got) == _loop_shrink(test, 0, alpha, want) == dropped
+        assert got == want == [x for x in [1, 2, 3] if x not in dropped]

@@ -196,6 +196,23 @@ def test_pvalues_until_separated_is_the_scalar_loops_prefix_bit_for_bit(test_cla
 
 
 @pytest.mark.parametrize("test_class", [FisherZ, StudentT, NormalScores])
+def test_a_p_value_equal_to_alpha_does_not_end_the_prefix(test_class):
+    """Orthogonal columns give every query the p-value 1 exactly, which ``alpha`` 1 does not
+    exceed, so all the queries answer; the float below 1 ends the prefix at the first."""
+    columns = [  # four rows of an 8 x 8 Hadamard matrix, with no constant row
+        [1, -1, 1, -1, 1, -1, 1, -1],
+        [1, 1, -1, -1, 1, 1, -1, -1],
+        [1, -1, -1, 1, 1, -1, -1, 1],
+        [1, 1, 1, 1, -1, -1, -1, -1],
+    ]
+    test = test_class(np.array(columns, dtype=float).T)
+    x, y, conditions = _stack([(0, 1, [2]), (0, 3, [2]), (0, 2, [1])])
+    assert test.pvalues_until_separated(x, y, conditions, 1.0).tolist() == [1.0, 1.0, 1.0]
+    below = float(np.nextafter(1.0, 0.0))
+    assert test.pvalues_until_separated(x, y, conditions, below).tolist() == [1.0]
+
+
+@pytest.mark.parametrize("test_class", [FisherZ, StudentT, NormalScores])
 @pytest.mark.parametrize("alpha", [-1.0, 1.0])
 def test_a_stack_with_a_singular_row_answers_as_the_scalar_loop_does(test_class, alpha):
     """A stacked call that raises on a singular row is replaced by scalar calls that stop at the
