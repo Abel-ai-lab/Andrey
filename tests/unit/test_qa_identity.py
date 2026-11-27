@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import contextlib
 import importlib
+import json
 import pkgutil
+import re
 import struct
 import sys
 from collections.abc import Callable
@@ -749,11 +751,12 @@ def test_counting_records_the_exact_search_scores(x: np.ndarray) -> None:
 
 
 def test_every_supported_method_is_fitted_on_its_datasets() -> None:
-    extra = set(identity.TARGET_LISTS) | set(identity.OPTIONS)
+    extra = set(identity.TARGET_LISTS) | set(identity.OPTIONS) | set(identity.EM_FITS)
     assert set(identity.FITS) - extra == set(qg.SUPPORTED)
     assert set(identity.TARGET_LISTS.values()) <= set(qg.SUPPORTED)
     assert set(identity.TARGET_LISTS) <= set(identity.WORKER_METHODS)
-    fitted = [identity.TARGET_LISTS.get(m, m) for m in identity.FITS if m not in identity.OPTIONS]
+    own = set(identity.OPTIONS) | set(identity.EM_FITS)
+    fitted = [identity.TARGET_LISTS.get(m, m) for m in identity.FITS if m not in own]
     assert all(m in identity.LARGER or m in identity.UNKNOWN_TARGETS for m in fitted)
 
 
@@ -836,3 +839,515 @@ def test_compare_ignores_the_package_header(capsys) -> None:
     after["header"].update(andrey_path="/b/src/andrey", andrey_commit=None)
     assert identity.compare(before, after) == 0
     assert "0 with a different graph, 0 with only different bits" in capsys.readouterr().out
+
+
+# ---- checkpoints -----------------------------------------------------------------------------
+
+pc_module = importlib.import_module("andrey.constraint.pc")
+
+#: Each family's fit on a dataset where it makes every stage listed, as the harness fits it.
+FAMILY_STAGES: dict[str, tuple[str, set[str]]] = {
+    "PC": ("asia_gauss", {"skeleton.size", "skeleton.end", "pc.colliders", "pc.meek"}),
+    "FCI": (
+        "asia_gauss",
+        {"skeleton.size", "skeleton.end", "fci.colliders", "fci.possible_dsep", "fci.rules"},
+    ),
+    "CDNOD": ("domain_shift_er_d20", {"skeleton.size", "skeleton.end", "pc.colliders"}),
+    "GFCI": ("asia_gauss", {"ges.forward", "skeleton.end", "gfci.sepsets", "fci.rules"}),
+    "GES": ("linear_gauss_er_d20", {"ges.forward", "ges.backward"}),
+    "AGES": ("ages_paper_qs0.3_qw0.3_n10000", {"ages.forward", "ages.backward"}),
+    "XGES": ("asia_gauss", {"xges.move", "xges.branch", "xges.accept"}),
+    "GIES": ("interventional_gauss_er_d20", {"gies.step"}),
+    "HC": ("asia_gauss", {"hc.climb"}),
+    "Tabu": ("asia_gauss", {"tabu.move"}),
+    "IAMB": ("asia_gauss", {"blanket.grow", "blanket.shrink", "blanket.structure"}),
+    "InterIAMB": ("asia_gauss", {"blanket.grow", "blanket.shrink", "blanket.structure"}),
+    "MMPC": ("asia_gauss", {"blanket.grow", "blanket.shrink", "blanket.structure"}),
+    "NOTEARS": ("notears_paper_raw_d10", {"notears.solve", "notears.dual"}),
+    "DAGMA": ("notears_paper_raw_d10", {"dagma.stage"}),
+    "GES-em": ("linear_gauss_er_d10", {"em.round", "ges.forward"}),
+}
+
+
+def _fit_on(name: str, dataset: str, *, checkpoints: bool) -> tuple[Any, dict, list]:
+    x = np.ascontiguousarray(identity.draws(dataset)[0].data)
+    fit = identity.FITS[name]
+    with identity.counting(fit.alpha) as counts, identity.checkpointing(checkpoints) as recorder:
+        out = fit.call(x)
+    return out, counts.summary(), [] if recorder is None else recorder.records
+
+
+def _same_arrays(a: list, b: list) -> bool:
+    pieces = [p for records in (a, b) for r in records for p in r.pieces]
+    half = len(pieces) // 2
+    return all(
+        x.digest == y.digest and np.array_equal(x.array, y.array)
+        for x, y in zip(pieces[:half], pieces[half:], strict=True)
+    )
+
+
+def test_the_checkpoint_block_sets_the_sink_and_resets_it_on_exit_and_on_an_exception() -> None:
+    sink = importlib.import_module("andrey.core._checkpoint")
+    assert sink.TAKE.get() is None
+    with identity.checkpointing(True) as recorder:
+        assert sink.TAKE.get() is recorder
+    assert sink.TAKE.get() is None
+    with pytest.raises(RuntimeError, match="inside"), identity.checkpointing(True):
+        raise RuntimeError("inside")
+    assert sink.TAKE.get() is None
+    with identity.checkpointing(False) as nothing:
+        assert nothing is None and sink.TAKE.get() is None
+
+
+@pytest.mark.parametrize("name", list(FAMILY_STAGES))
+def test_a_checkpointed_fit_gives_the_answer_and_counts_of_the_plain_fit_and_the_same_records(
+    name: str,
+) -> None:
+    dataset, stages = FAMILY_STAGES[name]
+    plain, plain_counts, none = _fit_on(name, dataset, checkpoints=False)
+    first, first_counts, records = _fit_on(name, dataset, checkpoints=True)
+    _, _, again = _fit_on(name, dataset, checkpoints=True)
+    assert none == []
+    assert identity.digest(first) == identity.digest(plain)
+    assert first_counts == plain_counts
+    assert stages <= {r.stage for r in records}
+    assert identity.labels(records) == identity.labels(again)
+    assert _same_arrays(records, again)
+
+
+@pytest.mark.parametrize("name", ["PC", "FCI", "CDNOD", "GFCI", "BOSS-FCI", "FCI-JCI"])
+def test_a_skeleton_search_records_every_size_from_zero_in_order_and_then_its_end(
+    name: str,
+) -> None:
+    dataset = min(identity.datasets(name), key=lambda d: identity.draws(d)[0].data.shape[1])
+    _, _, records = _fit_on(name, dataset, checkpoints=True)
+    skeleton = [(r.stage, r.level) for r in records if r.stage.startswith("skeleton.")]
+    sizes = [level for stage, level in skeleton if stage == "skeleton.size"]
+    assert sizes == list(range(len(sizes))) and sizes
+    assert skeleton[-1] == ("skeleton.end", None)
+    assert [stage for stage, _ in skeleton].count("skeleton.end") == 1
+
+
+def test_hc_records_its_perturbations_and_climbs(x: np.ndarray) -> None:
+    with identity.checkpointing(True) as recorder:
+        andrey.hc(x, n_starts=2, n_perturbations=2, seed=0)
+    assert {"hc.climb", "hc.perturb"} <= {r.stage for r in recorder.records}
+
+
+@pytest.mark.filterwarnings("ignore::andrey.SearchLimitWarning")
+def test_calm_records_each_outer_round_without_changing_the_answer(x: np.ndarray) -> None:
+    pytest.importorskip("torch")
+
+    def fit() -> Any:
+        return andrey.calm(x, seed=0, max_iter=2, subproblem_iter=60)
+
+    plain = fit()
+    with identity.checkpointing(True) as recorder:
+        checkpointed = fit()
+    assert identity.digest(checkpointed) == identity.digest(plain)
+    assert [r.stage for r in recorder.records].count("calm.outer") == 2
+
+
+def test_the_refits_run_with_the_sink_unset(monkeypatch) -> None:
+    sink = importlib.import_module("andrey.core._checkpoint")
+    seen: list[bool] = []
+
+    def call(x: np.ndarray) -> StructureOutput:
+        seen.append(sink.TAKE.get() is not None)
+        return andrey.ges(x)
+
+    monkeypatch.setitem(identity.FITS, "GES", identity.Fit(call))
+    monkeypatch.setattr(identity, "datasets", lambda method: ("asia_gauss",))
+    identity.run(["GES"], seeds=1, shuffle=2, checkpoints={})
+    assert seen == [True, False, False]
+
+
+def test_a_piece_is_serialized_at_once_so_a_later_change_does_not_reach_its_record() -> None:
+    marks, sets = np.zeros((3, 3), dtype=np.int8), {(0, 1): (2,)}
+    recorder = identity.Checkpoints()
+    recorder("stage", 1, marks=marks, sepsets=sets, parents=[0b110, 0, 0])
+    before = [p.digest for p in recorder.records[0].pieces]
+    marks[1, 2] = 2
+    sets[(0, 1)] = ()
+    assert [p.digest for p in recorder.records[0].pieces] == before
+
+
+def test_a_checkpoint_site_reads_the_sink_once_and_builds_nothing_when_it_is_unset() -> None:
+    """Each site is ``if (take := _checkpoint.TAKE.get()) is not None:``, so no argument is built
+    unless the harness is recording."""
+    guard = "if (take := _checkpoint.TAKE.get()) is not None:"
+    for path in sorted(Path(andrey.__file__).parent.rglob("*.py")):
+        text = path.read_text()
+        if path.name == "_checkpoint.py":
+            continue
+        assert text.count("_checkpoint.TAKE.get()") == text.count(guard), path.name
+        assert len(re.findall(re.escape(guard) + r"\n\s+take\(", text)) == text.count(guard), (
+            path.name
+        )
+
+
+def test_no_module_of_the_package_imports_the_quality_tools() -> None:
+    import ast
+
+    for path in sorted(Path(andrey.__file__).parent.rglob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text())):
+            if isinstance(node, ast.Import):
+                names = [a.name for a in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.level == 0:
+                names = [node.module or ""]
+            else:
+                continue
+            assert not any(n == "qa" or n.startswith("qa.") for n in names), path.name
+
+
+# ---- forms and the element an index reads ----------------------------------------------------
+
+
+def _piece(name: str, value: Any) -> tuple[Any, identity.Label]:
+    recorder = identity.Checkpoints()
+    recorder("stage", None, **{name: value})
+    (piece,) = recorder.records[0].pieces
+    label = identity.Label(0, "stage", None, name, piece.form, piece.width, piece.digest, 0)
+    return piece, label
+
+
+def test_a_symmetric_adjacency_is_its_upper_triangle_and_an_index_reads_as_a_pair() -> None:
+    support = np.zeros((4, 4), dtype=bool)
+    support[1, 3] = support[3, 1] = True
+    piece, label = _piece("adjacency", support)
+    assert piece.form == "pairs" and piece.width == 4 and piece.array.tolist() == [0, 0, 0, 0, 1, 0]
+    assert identity._element(label, piece.array, 5) == "pair (2, 3)"
+    assert identity._element(label, piece.array, 4) == "pair (1, 3)"
+
+
+def test_a_matrix_is_row_major_and_an_index_reads_as_an_entry() -> None:
+    piece, label = _piece("cpdag", np.arange(6, dtype=np.int8).reshape(2, 3))
+    assert piece.form == "matrix" and piece.array.tolist() == [0, 1, 2, 3, 4, 5]
+    assert identity._element(label, piece.array, 4) == "entry (1, 1)"
+
+
+def test_separating_sets_are_rows_in_key_order_and_an_index_reads_as_a_pair() -> None:
+    piece, label = _piece("sepsets", {(2, 4): frozenset(), (0, 1): frozenset({3, 2})})
+    assert piece.form == "sets" and piece.array.tolist() == [0, 1, 2, 2, 3, 2, 4, 0]
+    assert identity._element(label, piece.array, 3) == "pair (0, 1)"
+    assert identity._element(label, piece.array, 6) == "pair (2, 4)"
+
+
+def test_values_are_rows_of_a_key_and_a_float_and_an_index_reads_as_a_pair() -> None:
+    piece, label = _piece("pvalues", {(2, 3): 0.5, (0, 1): 0.25})
+    assert piece.form == "values" and piece.width == 3
+    assert piece.array.tolist() == [0.0, 1.0, 0.25, 2.0, 3.0, 0.5]
+    assert identity._element(label, piece.array, 4) == "pair (2, 3)"
+
+
+def test_a_sequence_a_scalar_and_a_string_read_by_position_value_and_character() -> None:
+    sequence, listed = _piece("members", [3, (1, 2), frozenset({9, 4})])
+    assert sequence.form == "list" and sequence.array.tolist() == [3, 1, 2, 4, 9]
+    assert identity._element(listed, sequence.array, 3) == "position 3"
+    scalar, valued = _piece("total", 1.5)
+    assert scalar.form == "scalar" and identity._element(valued, scalar.array, 0) == "value"
+    text, written = _piece("phase", "add")
+    assert text.form == "text" and identity._element(written, text.array, 1) == "character 1"
+
+
+def test_a_wide_integer_is_its_limbs_and_a_bitset_row_is_a_matrix_of_children() -> None:
+    wide, _ = _piece("graph_key", (1 << 70) + 5)
+    assert wide.array.tolist() == [5, 64]
+    parents, _ = _piece("parents", [0b110, 0b100, 0])
+    assert parents.form == "matrix" and parents.array.tolist() == [0, 1, 1, 0, 0, 1, 0, 0, 0]
+
+
+def test_a_mapping_that_is_empty_or_a_piece_that_is_none_records_no_elements() -> None:
+    recorder = identity.Checkpoints()
+    recorder("stage", None, sepsets={}, undecided=None)
+    (piece,) = recorder.records[0].pieces
+    assert piece.name == "sepsets" and piece.array.size == 0
+
+
+def test_a_skeleton_size_record_holds_only_the_pairs_that_size_removed() -> None:
+    recorder = identity.Checkpoints()
+    support = np.ones((4, 4), dtype=bool)
+    sepsets: dict[tuple[int, int], tuple[int, ...]] = {(0, 1): ()}
+    recorder("skeleton.size", 0, adjacency=support, sepsets=sepsets, pvalues={(0, 1): 0.5})
+    sepsets[(2, 3)] = (0,)
+    recorder("skeleton.size", 1, adjacency=support, sepsets=sepsets, pvalues={(0, 1): 0.5})
+    recorder("skeleton.end", adjacency=support, sepsets=sepsets, pvalues={}, undecided=None)
+    recorder("skeleton.size", 0, adjacency=support, sepsets={(1, 2): ()}, pvalues={})
+    by_name = [{p.name: p.array.tolist() for p in r.pieces} for r in recorder.records]
+    assert by_name[0]["sepsets"] == [0, 1, 0] and by_name[1]["sepsets"] == [2, 3, 1, 0]
+    assert by_name[1]["pvalues"] == []
+    assert by_name[2]["sepsets"] == [0, 1, 0, 2, 3, 1, 0]
+    assert by_name[3]["sepsets"] == [1, 2, 0]
+
+
+# ---- the first stage where two builds part ---------------------------------------------------
+
+
+def _fit_record(stage_pieces: list[tuple[str, int | None, dict[str, Any]]]) -> list:
+    recorder = identity.Checkpoints()
+    for stage, level, pieces in stage_pieces:
+        recorder(stage, level, **pieces)
+    return recorder.records
+
+
+def _row(method: str, dataset: str, records: list, output: str = "h") -> dict:
+    return {
+        "method": method,
+        "dataset": dataset,
+        "seed": 0,
+        "permutation": 0,
+        "workers": 1,
+        "hash": output,
+        "graph_hash": output,
+        **identity.checkpoint_fields(records),
+    }
+
+
+def _compared(before: list, after: list, capsys, *, outputs=("h", "h2")) -> tuple[int, str]:
+    rows = [[_row("GES", "d", fit, out)] for fit, out in zip((before, after), outputs, strict=True)]
+    stages = tuple(
+        {tuple(r[k] for k in identity.KEY): identity.stages_of(fit)}
+        for r, fit in zip((rows[0][0], rows[1][0]), (before, after), strict=True)
+    )
+    rc = identity.compare(
+        {"header": {}, "rows": rows[0]}, {"header": {}, "rows": rows[1]}, stages=stages
+    )
+    return rc, capsys.readouterr().out
+
+
+def test_a_perturbed_stage_is_the_first_difference_and_later_ones_are_not_reported(capsys) -> None:
+    move = [("ges.forward", None, {"move": (0, 1, ()), "total": 1.0})]
+    base = _fit_record([*move, ("ges.forward", None, {"move": (1, 2, ()), "total": 2.0})])
+    head = _fit_record(
+        [("ges.forward", None, {"move": (0, 1, ()), "total": 1.5}), *move[:0]]
+        + [("ges.forward", None, {"move": (9, 9, ()), "total": 7.0})]
+    )
+    rc, out = _compared(base, head, capsys)
+    assert rc == 1
+    assert "first checkpoint difference: GES d 0 0 1: record 1 of 2, ges.forward, total:" in out
+    assert "element 0 = value, 1 -> 1.5" in out and out.count("first checkpoint difference") == 1
+    assert "fingerprint 1 rows: GES ges.forward total value 0 1 1" in out
+
+
+def test_bits_are_told_from_values_sequences_and_missing_records(capsys) -> None:
+    one = _fit_record([("a", None, {"total": 1.0})])
+    nudged = _fit_record([("a", None, {"total": float(np.nextafter(1.0, 2.0))})])
+    other = _fit_record([("b", None, {"total": 1.0})])
+    longer = _fit_record([("a", None, {"total": 1.0}), ("a", None, {"total": 2.0})])
+    kinds = {}
+    for name, after in (("bits", nudged), ("sequence", other), ("missing", longer)):
+        found = identity.first_difference(identity.stages_of(one), identity.stages_of(after))
+        assert found is not None
+        kinds[name] = found.kind
+    assert kinds == {"bits": "bits", "sequence": "sequence", "missing": "missing"}
+    assert identity.first_difference(identity.stages_of(one), identity.stages_of(one)) is None
+    rc, out = _compared(one, nudged, capsys)
+    assert "(bits)" in out and rc == 1
+
+
+def test_two_fits_that_part_alike_group_under_one_fingerprint_and_one_stage(capsys) -> None:
+    def fit(total: float) -> list:
+        return _fit_record([("ges.forward", None, {"move": (0, 1, ()), "total": total})])
+
+    rows, stages = [[], []], [{}, {}]
+    for side, total in enumerate((1.0, 2.0)):
+        for dataset in ("a", "b"):
+            records = fit(total)
+            rows[side].append(_row("GES", dataset, records, f"h{side}"))
+            stages[side][tuple(rows[side][-1][k] for k in identity.KEY)] = identity.stages_of(
+                records
+            )
+    identity.compare(
+        {"header": {}, "rows": rows[0]}, {"header": {}, "rows": rows[1]}, stages=tuple(stages)
+    )
+    out = capsys.readouterr().out
+    assert out.count("fingerprint ") == 1
+    assert "fingerprint 2 rows: GES ges.forward total value 0 1 1" in out
+    assert "by stage 2 rows: ges.forward total value -- GES (a, b)" in out
+
+
+def test_a_row_with_equal_output_and_different_checkpoints_is_listed_as_information(
+    capsys,
+) -> None:
+    base = _fit_record([("ges.forward", None, {"total": 1.0})])
+    head = _fit_record([("ges.forward", None, {"total": 2.0})])
+    rc, out = _compared(base, head, capsys, outputs=("h", "h"))
+    assert rc == 0
+    assert (
+        "checkpoints differ, output equal: GES d 0 0 1: record 1, ges.forward total (value)" in out
+    )
+    assert "first checkpoint difference" not in out and "fingerprint" not in out
+
+
+def test_the_exit_status_ignores_the_checkpoint_report(capsys) -> None:
+    base = _fit_record([("a", None, {"total": 1.0})])
+    head = _fit_record([("a", None, {"total": 2.0})])
+    for outputs, status in ((("h", "h"), 0), (("h", "other"), 1)):
+        rc, _ = _compared(base, head, capsys, outputs=outputs)
+        assert rc == status
+
+
+def test_compare_says_so_when_only_one_manifest_has_checkpoints(capsys) -> None:
+    with_records = _row("GES", "d", _fit_record([("a", None, {"total": 1.0})]))
+    without = {k: v for k, v in with_records.items() if not k.startswith("checkpoint")}
+    rc = identity.compare({"header": {}, "rows": [with_records]}, {"header": {}, "rows": [without]})
+    assert rc == 0
+    assert "checkpoints: only one manifest has them" in capsys.readouterr().out
+
+
+# ---- a stage a planted change reaches --------------------------------------------------------
+
+
+def _recorded(method, datasets, monkeypatch, *patches, seeds=1) -> tuple[dict, dict]:
+    """The manifest and the stages of ``method`` on ``datasets`` with ``patches`` applied."""
+    with monkeypatch.context() as patched:
+        patched.setattr(identity, "datasets", lambda _method: datasets)
+        for patch in patches:
+            patch(patched)
+        records: dict[tuple, list] = {}
+        rows, _ = identity.run([method], seeds, checkpoints=records)
+    return {"header": {}, "rows": rows}, {k: identity.stages_of(v) for k, v in records.items()}
+
+
+def _keep_the_last_pair_removed_at_size_two(patched) -> None:
+    """Drop the last removal of conditioning size two and every later removal of that pair, so the
+    pair stays in the skeleton."""
+    scan, kept = pc_module.scan_pairs, set()
+
+    def keeping(test, pairs, neighbors, size, *args, **kwargs):
+        removals = scan(test, pairs, neighbors, size, *args, **kwargs)
+        if size == 2:
+            kept.add(removals[-1][:2])
+            return removals[:-1]
+        return [r for r in removals if r[:2] not in kept]
+
+    patched.setattr(pc_module, "scan_pairs", keeping)
+
+
+def _end_the_first_directed_edge_after_meek(patched) -> None:
+    meek = pc_module.meek
+
+    def ending(*args, **kwargs):
+        cpdag = np.array(meek(*args, **kwargs))
+        i, j = np.argwhere(cpdag == andrey.core.ARROW)[0]
+        cpdag[i, j] = andrey.core.TAIL
+        return cpdag
+
+    patched.setattr(pc_module, "meek", ending)
+
+
+D50 = ("linear_gauss_er_d50",)
+
+
+def test_a_dropped_removal_is_the_first_stage_that_differs_with_the_pair_that_stayed(
+    monkeypatch, capsys
+) -> None:
+    base, base_stages = _recorded("PC", D50, monkeypatch)
+    sizes = [lab for lab in next(iter(base_stages.values())).labels if lab.stage == "skeleton.size"]
+    removed = [lab for lab in sizes if lab.level == 2 and lab.piece == "sepsets" and lab.length]
+    assert removed, "the unperturbed fit removes a pair at size 2, so the patch has an effect"
+    head, head_stages = _recorded("PC", D50, monkeypatch, _keep_the_last_pair_removed_at_size_two)
+    rc = identity.compare(base, head, stages=(base_stages, head_stages))
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert "skeleton.size level 2, adjacency: element " in out and "0 -> 1" in out
+    assert out.count("first checkpoint difference") == 1
+    assert "pc.colliders" not in out and "pc.meek" not in out
+    assert "fingerprint 1 rows: PC skeleton.size level 2 adjacency value" in out
+
+
+def test_the_front_most_difference_hides_the_one_behind_it_until_it_is_fixed(
+    monkeypatch, capsys
+) -> None:
+    base, base_stages = _recorded("PC", D50, monkeypatch)
+    both, both_stages = _recorded(
+        "PC",
+        D50,
+        monkeypatch,
+        _keep_the_last_pair_removed_at_size_two,
+        _end_the_first_directed_edge_after_meek,
+    )
+    identity.compare(base, both, stages=(base_stages, both_stages))
+    first = capsys.readouterr().out
+    assert "skeleton.size level 2" in first and "pc.meek" not in first
+    behind, behind_stages = _recorded(
+        "PC", D50, monkeypatch, _end_the_first_directed_edge_after_meek
+    )
+    identity.compare(base, behind, stages=(base_stages, behind_stages))
+    second = capsys.readouterr().out
+    assert "skeleton.size" not in second
+    assert "fingerprint 1 rows: PC pc.meek cpdag value" in second
+
+
+def test_one_planted_change_on_two_datasets_gives_two_fingerprints_and_one_stage(
+    monkeypatch, capsys
+) -> None:
+    sets = ("linear_gauss_er_d20", "asia_gauss")
+    base, base_stages = _recorded("PC", sets, monkeypatch)
+    head, head_stages = _recorded("PC", sets, monkeypatch, _end_the_first_directed_edge_after_meek)
+    identity.compare(base, head, stages=(base_stages, head_stages))
+    out = capsys.readouterr().out
+    assert out.count("\nfingerprint 1 rows: PC pc.meek cpdag value") == 2
+    assert out.count("\nby stage ") == 1
+    assert "by stage 2 rows: pc.meek cpdag value -- PC (asia_gauss, linear_gauss_er_d20)" in out
+
+
+def test_one_planted_change_on_two_fits_of_one_draw_gives_one_fingerprint(
+    monkeypatch, capsys
+) -> None:
+    monkeypatch.setitem(identity.LARGER_DATASETS, "again", lambda: identity.draws("asia_gauss"))
+    pair = ("asia_gauss", "again")
+    base, base_stages = _recorded("PC", pair, monkeypatch)
+    head, head_stages = _recorded("PC", pair, monkeypatch, _end_the_first_directed_edge_after_meek)
+    identity.compare(base, head, stages=(base_stages, head_stages))
+    out = capsys.readouterr().out
+    assert out.count("\nfingerprint ") == 1
+    assert "\nfingerprint 2 rows: PC pc.meek cpdag value" in out
+
+
+# ---- the manifest and the sidecar ------------------------------------------------------------
+
+
+def test_with_the_mode_off_a_row_gains_nothing_and_with_it_on_only_the_two_fields(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(identity, "datasets", lambda method: ("asia_gauss",))
+    for method in ("PC", "GES", "IAMB"):
+        plain, _ = identity.run([method], seeds=1)
+        records: dict[tuple, list] = {}
+        recorded, _ = identity.run([method], seeds=1, checkpoints=records)
+        assert all(not k.startswith("checkpoint") for r in plain for k in r)
+        fields = ("checkpoints", "checkpoint_records")
+        assert [{k: v for k, v in r.items() if k not in fields} for r in recorded] == plain
+        assert all(r["checkpoint_records"] > 0 for r in recorded)
+        assert identity.header({}, 1, 0, 1).keys() == identity.header({}, 1, 0, 1, None).keys()
+    assert "checkpoints" in identity.header({}, 1, 0, 1, "m.json.checkpoints.npz")
+
+
+def test_a_manifest_and_its_sidecar_compare_end_to_end(tmp_path, monkeypatch, capsys) -> None:
+    monkeypatch.setattr(identity, "datasets", lambda method: ("asia_gauss",))
+    base, head = tmp_path / "base.json", tmp_path / "head.json"
+    assert identity.main(["PC", "-o", str(base), "--checkpoints", "--seeds", "1"]) == 0
+    with monkeypatch.context() as patched:
+        _end_the_first_directed_edge_after_meek(patched)
+        assert identity.main(["PC", "-o", str(head), "--checkpoints", "--seeds", "1"]) == 0
+    sidecar = tmp_path / "base.json.checkpoints.npz"
+    assert (
+        sidecar.is_file() and json.loads(base.read_text())["header"]["checkpoints"] == sidecar.name
+    )
+    capsys.readouterr()
+    assert identity.main(["--compare", str(base), str(base)]) == 0
+    assert "first checkpoint difference" not in capsys.readouterr().out
+    assert identity.main(["--compare", str(base), str(head)]) == 1
+    out = capsys.readouterr().out
+    assert "first checkpoint difference: PC asia_gauss 0 0 1: record " in out and "pc.meek" in out
+
+
+def test_the_checkpoint_mode_needs_a_manifest_and_a_package_that_has_the_sink(
+    tmp_path, monkeypatch
+) -> None:
+    with pytest.raises(SystemExit):
+        identity.main(["PC", "--checkpoints"])
+    monkeypatch.setitem(sys.modules, "andrey.core._checkpoint", None)
+    with pytest.raises(SystemExit):
+        identity.main(["PC", "--checkpoints", "-o", str(tmp_path / "m.json")])

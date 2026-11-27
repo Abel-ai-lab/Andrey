@@ -1329,7 +1329,8 @@ def write_checkpoints(path: Path, records: Mapping[tuple, list[Record]]) -> None
         arrays[f"{name}/labels"] = np.array(json.dumps([list(label) for label in labels(fit)]))
         for i, array in enumerate(p.array for r in fit for p in r.pieces):
             arrays[f"{name}/{i}"] = array
-    np.savez_compressed(path, **arrays)
+    # The array names are the keyword arguments.
+    np.savez_compressed(path, **arrays)  # ty: ignore[invalid-argument-type]
 
 
 @dataclass(frozen=True)
@@ -2021,7 +2022,7 @@ def main(argv: list[str] | None = None) -> int:
     code = commit()
     records: dict[tuple, list[Record]] | None = {} if args.checkpoints else None
     rows, findings = run(
-        args.methods or list(FITS), args.seeds, args.shuffle, args.workers, checkpoints=records
+        args.methods or list(FITS), args.seeds, args.shuffle, args.workers, records
     )
     if args.out:
         name = sidecar_name(args.out) if args.checkpoints else None

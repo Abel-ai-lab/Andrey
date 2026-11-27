@@ -1023,7 +1023,7 @@ def fci_orient(
             _rule_r10(marks, False, ambiguous, out=implied)
             changed = implied.apply(marks)
             if (take := _checkpoint.TAKE.get()) is not None:
-                take("fci.rules", marks=marks, implied=implied)
+                take("fci.rules", marks=marks, implied=implied.marks)
             if not changed:
                 return
     change = True
