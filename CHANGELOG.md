@@ -78,6 +78,10 @@ names its pull request.
 - For contributors, a test lists every module-level cache and checks each cache whose result can
   change while its key does not, and registry-driven tests check that a wrong type of a parameter of
   column labels, of `knowledge`, of `targets`, and of `bootstrap` and `markov_check` raises. ([#1259])
+- `resit`, `camuv`, `loci`, `anm`, `pnl`, `rcd`, `bottom_up_parce_lingam`, `gin`, `cpcm`,
+  `score_matching`, `das`, `nogam`, `skewd` with `criterion="independence"`, and the queries of
+  `indep_test="kci"` without a conditioning set build their Gaussian kernel matrices faster, with the
+  same output bit for bit. ([#1290])
 
 ### Fixed
 
@@ -3036,3 +3040,4 @@ First alpha release.
 [#1257]: https://github.com/Abel-ai-lab/Andrey/pull/1257
 [#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
+[#1290]: https://github.com/Abel-ai-lab/Andrey/pull/1290
