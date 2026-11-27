@@ -178,8 +178,12 @@ def markov_check(
         The data to check against, as the methods take it. When the graph and the data both have
         labels (a DataFrame's column names), a node is read from the column of its label and the
         two must name the same columns; otherwise the n-th node is the n-th column, and the counts
-        must agree. Missing values (``NaN``) are deleted test by test, assuming they are missing
-        completely at random.
+        must agree. Missing values (``NaN``) are deleted test by test, from the rows each test
+        draws: a test reads the drawn rows where all of its variables are observed, and
+        ``metadata["rows_tested"]`` counts them. Test-wise deletion is valid when values are
+        missing completely at random, which means that whether a value is missing depends on no
+        value in the data; the rows a test reads are then a random sample of all rows, and
+        otherwise they are a selected sample that more rows do not correct.
     indep_test : str or None, default=None
         The conditional-independence test, as ``pc`` takes it. ``None`` picks from the declared
         column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are,
@@ -205,7 +209,8 @@ def markov_check(
         The uniformity p-value, the verdict ``passed``, and the p-value of every tested
         independence (``table()``). ``metadata`` records ``indep_test``, ``seed``,
         ``sample_fraction``, ``rows_per_test``, the topological ``order`` that fixed the
-        independences, and ``rows_tested`` when missing values were deleted.
+        independences, and ``rows_tested`` when missing values were deleted. ``rows_per_test`` is
+        the rows each test draws, counted before missing values are deleted.
 
     Raises
     ------
