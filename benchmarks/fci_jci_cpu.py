@@ -306,9 +306,11 @@ def projected_pag(graph, p: int, confounded_index: bool) -> tuple[np.ndarray, in
     mark_index(marks, p, confounded_index)
     fci.orient_colliders(marks, sepsets)
     neighbors, reach = fci._neighbor_lists(marks), fci._semidirected_reach(marks)
+    into = [set(fci._into(marks, b, ARROW)) for b in range(len(marks))]
+    near = [set(nodes) for nodes in neighbors]
     largest = max(
         (
-            len(fci._possible_dsep(marks, x, y, neighbors, reach))
+            len(fci._possible_dsep(x, y, neighbors, reach, into, near))
             for a, b in zip(*np.nonzero(np.triu(marks)))
             for x, y in ((int(a), int(b)), (int(b), int(a)))
         ),
