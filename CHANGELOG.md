@@ -79,11 +79,12 @@ names its pull request.
   change while its key does not, and registry-driven tests check that a wrong type of a parameter of
   column labels, of `knowledge`, of `targets`, and of `bootstrap` and `markov_check` raises. ([#1259])
 - Methods that check their data for copied columns, those with a partial-correlation test or the
-  linear-Gaussian BIC among them, return the same results while the check holds less memory. It
-  reads the correlation matrix in blocks of rows instead of making three temporary copies of it,
-  and the BIC's check keeps the whole correlation matrix only when the data have more rows than
-  columns, for its eigenvalue test. On 4,000 variables and 300 rows, the BIC's check peaks at about
-  17 MB instead of 488 MB, and an `hc` fit at about 537 MB instead of 637 MB. ([#1275])
+  linear-Gaussian BIC among them, return the same results while the check holds less memory on data
+  with many columns. It reads the correlation matrix in blocks of rows instead of making three
+  temporary copies of it, and the BIC's check keeps the whole correlation matrix only when the data
+  have more rows than columns, for its eigenvalue test. On 4,000 variables and 300 rows, the BIC's
+  check peaks at about 17 MB instead of 488 MB, and an `hc` fit at about 537 MB instead of 637 MB.
+  ([#1275])
 
 ### Fixed
 
