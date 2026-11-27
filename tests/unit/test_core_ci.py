@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import re
 import sys
+import warnings
 from itertools import combinations
 
 import numpy as np
@@ -143,6 +144,92 @@ def test_many_query_path_error_paths(test_class):
         test_class(X).statistic_pvalues(one, one + 1, np.array([[0, 4]]))
     with pytest.raises(ValueError, match="degrees of freedom"):
         test_class(X[:3]).statistic_pvalues(one, one + 1, np.array([[0, 3]]))
+
+
+def _loop_until_separated(test, x, y, conditions, alpha):
+    """The p-values of scalar calls that stop at the first one above ``alpha``: the reference."""
+    out = []
+    for a, b, condition_set in zip(x.tolist(), y.tolist(), conditions.tolist(), strict=True):
+        out.append(test(a, b, condition_set))
+        if out[-1] > alpha:
+            break
+    return out
+
+
+def _stack(rows):
+    """The arrays of ``(x, y, condition_set)`` rows whose sets share one size."""
+    size = len(rows[0][2])
+    x = np.array([row[0] for row in rows], dtype=np.intp)
+    y = np.array([row[1] for row in rows], dtype=np.intp)
+    return x, y, np.array([row[2] for row in rows], dtype=np.intp).reshape(len(rows), size)
+
+
+def _outcome(run):
+    """What ``run`` returns, or the type and message of the error it raises, and every warning."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        try:
+            value = run()
+        except Exception as error:
+            value = (type(error), str(error))
+    return value, [str(w.message) for w in caught]
+
+
+@pytest.mark.parametrize("test_class", [FisherZ, StudentT, NormalScores])
+@pytest.mark.parametrize("size", [0, 1, 2, 3])
+@pytest.mark.parametrize("alpha", [-1.0, 0.0, 0.05, 0.5, 1.0])
+def test_pvalues_until_separated_is_the_scalar_loops_prefix_bit_for_bit(test_class, size, alpha):
+    """The p-values up to and including the first above ``alpha``, or all of them when none is, are
+    the scalar loop's, bit for bit, for conditioning sets of each size, from a first query that
+    separates to none that does."""
+    test = test_class(sample_scm(graph="erdos_renyi", d=12, n=250, seed=4, density=3.0).data)
+    rng = np.random.default_rng(size)
+    rows = []
+    for _ in range(40):
+        y, *cond = (int(v) for v in rng.permutation(np.arange(1, 12))[: 1 + size])
+        rows.append((0, y, cond))
+    x, y, conditions = _stack(rows)
+    got = test.pvalues_until_separated(x, y, conditions, alpha)
+    want = _loop_until_separated(test, x, y, conditions, alpha)
+    assert got.tolist() == want
+    assert len(want) == {-1.0: 1, 1.0: len(rows)}.get(alpha, len(want))
+
+
+@pytest.mark.parametrize("test_class", [FisherZ, StudentT, NormalScores])
+@pytest.mark.parametrize("alpha", [-1.0, 1.0])
+def test_a_stack_with_a_singular_row_answers_as_the_scalar_loop_does(test_class, alpha):
+    """A stacked call that raises on a singular row is replaced by scalar calls that stop at the
+    first separating query: the rows before it answer, and the error is that of a row the scalar
+    loop reaches (column 4 repeats column 1, so a set of columns 1 and 4 is singular)."""
+    X = np.random.default_rng(2).standard_normal((200, 5))
+    X[:, 4] = X[:, 1]
+    test = test_class(X)
+    x, y, conditions = _stack([(0, 2, [1, 3]), (0, 2, [1, 4]), (0, 3, [2, 1])])
+    got = _outcome(lambda: test.pvalues_until_separated(x, y, conditions, alpha).tolist())
+    want = _outcome(lambda: _loop_until_separated(test, x, y, conditions, alpha))
+    assert got == want
+    # With alpha -1 the first row separates and the singular row is never asked; with 1, none does.
+    assert isinstance(got[0], list) == (alpha == -1.0)
+    if alpha != -1.0:
+        assert got[0][0] is ci.SingularCorrelationError
+
+
+@pytest.mark.parametrize("alpha", [-1.0, 0.05, 1.0])
+def test_a_stack_that_divides_by_zero_answers_as_the_scalar_loop_does(alpha):
+    """NormalScores' first-order query of a copy divides by zero: a scalar call raises
+    ``ZeroDivisionError``, and the stack gives NaN with a warning. The stacked answer is the scalar
+    loop's, the first row alone and without a warning when it separates (column 0 repeats column 2,
+    so the second row, ``0`` and ``1`` given ``2``, divides by zero)."""
+    X = np.random.default_rng(1).standard_normal((150, 4))
+    X[:, 0] = X[:, 2] - 3.0
+    test = NormalScores(X)
+    x, y, conditions = _stack([(0, 2, [1]), (0, 1, [2])])
+    assert _outcome(lambda: test(0, 1, [2]))[0] == (ZeroDivisionError, "division by zero")
+    got = _outcome(lambda: test.pvalues_until_separated(x, y, conditions, alpha).tolist())
+    want = _outcome(lambda: _loop_until_separated(test, x, y, conditions, alpha))
+    assert got == want
+    assert got[1] == []
+    assert isinstance(got[0], list) == (alpha == -1.0)
 
 
 @pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)

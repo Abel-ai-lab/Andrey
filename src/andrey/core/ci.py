@@ -336,6 +336,22 @@ class PartialCorrelationTest:
         """
         return _separating_prefix(self, x, y, condition_sets, alpha)
 
+    def pvalues_until_separated(
+        self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray, alpha: float
+    ) -> np.ndarray:
+        """Return the p-values of the stacked queries of :meth:`statistic_pvalues`, in order, up to
+        and including the first above ``alpha``: the answers a loop of scalar calls that stops at
+        the first separating query gets.
+
+        ``x`` and ``y`` are ``(N,)`` int arrays and ``conditions`` the ``(N, m)`` int array of
+        :meth:`statistic_pvalues`. The queries are evaluated together, and those after the first
+        separating one are computed and dropped. When the stacked call raises, or divides by zero,
+        overflows, or makes an invalid value, where a scalar call raises or answers otherwise, the
+        queries are tested one scalar call at a time, stopping at the first separating one, so an
+        error surfaces only from a query that loop reaches. Each p-value equals :meth:`__call__`'s.
+        """
+        return _pvalues_until_separated(self, x, y, conditions, alpha)
+
     def _pvalues(self, x_int: int, y_int: int, conds: list[list[int]]) -> np.ndarray:
         """P-values for stacked queries on one pair sharing one conditioning-set size.
 
@@ -2243,6 +2259,36 @@ def _separating_prefix(
         if out[-1] > alpha:
             break
     return out
+
+
+def _pvalues_until_separated(
+    test: Any, x: np.ndarray, y: np.ndarray, conditions: np.ndarray, alpha: float
+) -> np.ndarray:
+    """``test``'s p-values of the stacked queries ``x``, ``y``, and ``conditions`` up to and
+    including the first above ``alpha``.
+
+    One ``statistic_pvalues`` call evaluates every query, and the queries after the first
+    separating one are computed and dropped. A call that raises, or that divides by zero,
+    overflows, or makes an invalid value, where a scalar call raises or answers otherwise, is
+    replaced by scalar calls that stop at the first separating query.
+    """
+    x = np.asarray(x, dtype=np.intp)
+    y = np.asarray(y, dtype=np.intp)
+    conditions = np.asarray(conditions, dtype=np.intp).reshape(len(x), -1)
+    try:
+        with np.errstate(divide="raise", over="raise", invalid="raise"):
+            pvalues = np.asarray(test.statistic_pvalues(x, y, conditions)[1], dtype=np.float64)
+    except Exception:
+        pvalues = None
+    if pvalues is not None:
+        above = np.flatnonzero(pvalues > alpha)
+        return pvalues[: above[0] + 1] if above.size else pvalues
+    out: list[float] = []
+    for a, b, condition_set in zip(x.tolist(), y.tolist(), conditions.tolist(), strict=True):
+        out.append(test(a, b, condition_set))
+        if out[-1] > alpha:
+            break
+    return np.array(out, dtype=np.float64)
 
 
 def _canonical(x: int, y: int, condition_set: Iterable[int]) -> tuple[int, int, list[int]]:
