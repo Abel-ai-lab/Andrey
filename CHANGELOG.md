@@ -59,6 +59,8 @@ names its pull request.
   authors' code does. For contributors, `DEVELOPMENT.md` and `CONTRIBUTING.md` give the pytest flags
   CI runs, `-n logical --dist loadfile`, and the `calm` required-edge cell of the concepts test and
   one drawing test skip when torch or pygraphviz is missing. ([#1247])
+- The 0.3.0 post's method table lists GIES, exact search, and CALM as supported, as they have
+  been since 0.7.0, and an update note points to the 0.7.0 release card. ([#1254])
 - The `missing` concept gives each method that refuses the argument its own reason, from what its
   fit reads, where twenty shared one. `anm`, `pnl`, `loci`, and `skewd` say that a gap in one column
   that depends on the other selects the rows on the effect, so their direction is evidence under
@@ -3015,4 +3017,5 @@ First alpha release.
 [#1243]: https://github.com/Abel-ai-lab/Andrey/pull/1243
 [#1245]: https://github.com/Abel-ai-lab/Andrey/pull/1245
 [#1247]: https://github.com/Abel-ai-lab/Andrey/pull/1247
+[#1254]: https://github.com/Abel-ai-lab/Andrey/pull/1254
 [#1256]: https://github.com/Abel-ai-lab/Andrey/pull/1256
