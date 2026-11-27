@@ -235,6 +235,11 @@ names its pull request.
 - `calm` runs faster, with the same output bit for bit: each Adam step of its optimizer is applied
   as the in-place tensor operations of `torch.optim.Adam`, so the first fit in a process no
   longer builds an optimizer, which imports `torch._dynamo` and its dependencies. ([#1343])
+- For contributors, the lint job of a pull request into a release or topic branch runs
+  `scripts/test_weakening.py`, which flags a removed assertion or `pytest.raises` check, a looser
+  tolerance or bound, a `skip`, `skipif`, `xfail`, or `release` marker added to a test that existed,
+  a deleted test or `parametrize` case, and a re-recorded baseline file in `tests/` and `qa/`. The
+  job fails until a maintainer sets the label `test-change-approved`. ([#1358])
 
 ### Fixed
 
@@ -3232,3 +3237,4 @@ First alpha release.
 [#1341]: https://github.com/Abel-ai-lab/Andrey/pull/1341
 [#1343]: https://github.com/Abel-ai-lab/Andrey/pull/1343
 [#1347]: https://github.com/Abel-ai-lab/Andrey/pull/1347
+[#1358]: https://github.com/Abel-ai-lab/Andrey/pull/1358
