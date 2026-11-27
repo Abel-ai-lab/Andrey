@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable
 
 import numpy as np
@@ -368,7 +369,20 @@ def special_matrices() -> dict[str, np.ndarray]:
     }
 
 
-@pytest.mark.parametrize("name", list(special_matrices()))
+#: On macOS with Accelerate, the squaring of a matrix with an infinite entry does not finish, in
+#: ``scipy.linalg.expm`` itself as in the kernel path.
+skip_infinite_on_macos = pytest.mark.skipif(
+    sys.platform == "darwin", reason="the matrix product of an infinite entry does not finish"
+)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        pytest.param(name, marks=skip_infinite_on_macos if name == "infinite" else ())
+        for name in special_matrices()
+    ],
+)
 def test_the_exponential_equals_scipys_on_any_array(name) -> None:
     a = special_matrices()[name]
     assert same(continuous._expm(a), scipy.linalg.expm(a))
