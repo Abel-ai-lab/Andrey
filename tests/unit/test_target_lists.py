@@ -7,6 +7,10 @@ import pandas as pd
 import pytest
 
 import andrey
+from andrey.constraint._parallel_targets import answers
+from andrey.constraint.blanket import local_search
+from andrey.core import ci_missing
+from andrey.core.ci_missing import RowCounts, rows_tested
 
 SET_LEARNERS = ("iamb", "inter_iamb", "mmpc")
 TARGETS = [5, 0, 3, 7]
@@ -158,3 +162,135 @@ def test_a_randomized_test_with_a_seed_answers_as_separate_calls(n_jobs):
         outs = andrey.mmpc(data, target=["c", "b"], indep_test="gcm", seed=7)
     for out, t in zip(outs, ["c", "b"], strict=True):
         _same(out, andrey.mmpc(data, target=t, indep_test="gcm", seed=7))
+
+
+def _bits(out) -> tuple:
+    """A result as bytes: its graph, kind, and labels, and its metadata as printed, float bits
+    included."""
+    graph = out.structure
+    adjacency = np.asarray(graph.to_numpy())
+    return adjacency.tobytes(), adjacency.shape, graph.kind, graph.labels, repr(dict(out.metadata))
+
+
+def _apart(data: np.ndarray, seed: int = 0) -> np.ndarray:
+    """``data`` with some values missing, columns 0 and 1 never observed together, and column 2
+    observed with column 0 on eight rows only."""
+    x = np.array(data, dtype=float)
+    rng = np.random.default_rng(seed)
+    x[rng.random(x.shape) < 0.05] = np.nan
+    half = rng.permutation(len(x))
+    x[half[: len(x) // 2], 0] = np.nan
+    x[half[len(x) // 2 :], 1] = np.nan
+    x[half[len(x) // 2 + 8 :], 2] = np.nan
+    return x
+
+
+def _counts(rows: RowCounts) -> tuple:
+    """Every count of a counter: its rows, ``p = 1`` answers, queries not tested by pair, largest
+    p-values, and untested sets."""
+    return (
+        dict(rows),
+        rows.p_one,
+        dict(rows.not_tested),
+        rows.not_tested_elsewhere,
+        rows.largest,
+        rows.untested_sets,
+    )
+
+
+@pytest.mark.parametrize("seed", [0, 1, 2])
+@pytest.mark.parametrize("method", SET_LEARNERS)
+@pytest.mark.parametrize("kind", ["gaussian", "chisq"])
+def test_a_list_over_columns_never_observed_together_is_each_call_alone_bit_for_bit(
+    kind, method, seed
+):
+    """The list's one search answers each target with the rows, the queries not tested, and the
+    undecided pairs of the call for that target alone, in any order of the targets."""
+    if kind == "gaussian":
+        x, kwargs = _apart(_gaussian(seed=seed).to_numpy(), seed), {}
+    else:
+        x, kwargs = _apart(_discrete(seed=seed), seed), {"indep_test": "chisq"}
+    targets = [3, 0, 4, 1, 2][: x.shape[1]]
+    outs = _fit(method, x, targets, missing="testwise", **kwargs)
+    assert len(outs) == len(targets)
+    for out, t in zip(outs, targets, strict=True):
+        assert _bits(out) == _bits(_fit(method, x, t, missing="testwise", **kwargs))
+    assert any("undecided_pairs" in out.metadata for out in outs)
+    assert any("not_tested" in out.metadata for out in outs)
+
+
+@pytest.mark.parametrize("method", ["mmpc", "iamb"])
+def test_a_list_runs_each_learner_run_once_and_counts_it_for_each_target_that_reads_it(method):
+    """MMPC's targets read each other's runs in the symmetry check, so a target's counter holds the
+    rows of runs another target's answer made."""
+    x = _apart(_gaussian().to_numpy())
+    settings = {"alpha": 0.05, "indep_test": "fisherz"}
+    targets = [3, 0, 4, 1, 2, 5]
+    searches: list = []
+
+    def search_of():
+        searches.append(local_search(x, **settings))
+        return searches[-1]
+
+    def members(search, t):
+        pc, mb, _ = search.local(method, t)
+        return pc if mb is None else mb
+
+    found = answers(search_of, members, targets)
+    assert len(searches) == 1
+    assert isinstance(searches[0].test, ci_missing.TestwiseDeletion)
+    read = 0
+    for (members_of, rows), t in zip(found, targets, strict=True):
+        alone = local_search(x, **settings)
+        with alone.pinned(), rows_tested() as expected:
+            expected_members = members(alone, t)
+        assert members_of == expected_members
+        assert _counts(rows) == _counts(expected)
+        read += len(alone._runs)
+    if method == "mmpc":
+        assert len(searches[0]._runs) < read
+
+
+def test_the_tests_an_answer_makes_outside_any_run_are_counted_for_it():
+    """A test an answer asks itself, as a learner's spouse step does, counts after the runs it
+    read, and a run another answer made counts again for the answer that reads it."""
+    x = _apart(_gaussian().to_numpy())
+    settings = {"alpha": 0.05, "indep_test": "fisherz"}
+
+    def answer(search, target):
+        search.run("mmpc", target)
+        search.test(3, 5, [4])
+        return target
+
+    shared = local_search(x, **settings)
+    with shared.pinned():
+        got = [shared.counted(lambda t=t: answer(shared, t)) for t in (4, 5)]
+    for (found, rows), t in zip(got, (4, 5), strict=True):
+        alone = local_search(x, **settings)
+        with alone.pinned(), rows_tested() as expected:
+            answer(alone, t)
+        assert found == t
+        assert _counts(rows) == _counts(expected)
+
+
+@pytest.mark.parametrize("method", SET_LEARNERS)
+def test_a_list_raises_the_error_of_its_first_failing_target(method):
+    """A column constant where another is observed raises in the targets that test the pair; the
+    list raises what the first of them raises alone."""
+    x = _apart(_gaussian().to_numpy())
+    seen = ~np.isnan(x[:, 3])
+    x[seen, 2] = 1.5
+    x[np.random.default_rng(0).random(len(x)) < 0.5, 3] = np.nan
+    x[~np.isnan(x[:, 3]), 2] = 1.5
+    targets = [5, 0, 2, 3]
+
+    def raised(target):
+        try:
+            _fit(method, x, target, missing="testwise")
+        except ValueError as error:
+            return str(error)
+        return None
+
+    messages = [raised(t) for t in targets]
+    first = next(message for message in messages if message is not None)
+    assert raised(targets) == first

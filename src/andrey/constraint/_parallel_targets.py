@@ -11,8 +11,9 @@ any run, from its settings and its test's correlation matrix (one shared copy wh
 :class:`~andrey.search._parallel.PoolMatrix` makes one), and pins BLAS to one thread, as the
 caller's search does inside :meth:`~LocalSearch.pinned`. The answers come back in the order of the
 targets. A test-wise deletion test, which counts the rows each test reads
-(:func:`~andrey.core.ci_missing.rows_tested`), answers each target with a search of its own in this
-process, so each answer counts the rows a call for that target alone counts. Any other test
+(:func:`~andrey.core.ci_missing.rows_tested`), answers every target in this process with the one
+search, which keeps each run's rows with the run (:meth:`~LocalSearch.counted`), so each answer
+counts the rows of the runs it read, as a call for that target alone counts them. Any other test
 answers in this process with the one search.
 """
 
@@ -21,11 +22,12 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Callable, Sequence
 from concurrent.futures import ProcessPoolExecutor
+from functools import partial
 from typing import TYPE_CHECKING, TypeVar, cast
 
 from andrey.constraint._skeleton import canonical_capable
 from andrey.constraint.blanket import LocalSearch
-from andrey.core.ci_missing import TestwiseDeletion, rows_tested
+from andrey.core.ci_missing import TestwiseDeletion
 
 if TYPE_CHECKING:
     import numpy as np
@@ -119,12 +121,8 @@ def answers(
     """
     search = search_of()
     if isinstance(search.test, TestwiseDeletion):
-        out = []
-        for i, t in enumerate(targets):
-            own = search if i == 0 else search_of()
-            with own.pinned(), rows_tested() as rows:
-                out.append((answer(own, t), rows))
-        return out
+        with search.pinned():
+            return [search.counted(partial(answer, search, t)) for t in targets]
     if workers > 1 and len(targets) > 1 and canonical_capable(search.test):
         return [(found, Counter()) for found in _pooled(search, answer, targets, workers)]
     with search.pinned():

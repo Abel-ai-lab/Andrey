@@ -42,7 +42,7 @@ from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from functools import partial
 from itertools import combinations, islice
-from typing import Literal
+from typing import Literal, TypeVar
 
 import numpy as np
 
@@ -58,9 +58,11 @@ from andrey.core import ARROW, NULL, TAIL, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
 from andrey.core.ci_missing import (
     NOT_TESTED,
+    RowCounts,
     TestwiseDeletion,
     counts_its_tests,
     not_tested,
+    rows_tested,
     running_flags,
 )
 from andrey.core.knowledge import Constraints, orient
@@ -72,6 +74,8 @@ from andrey.core.ties import (
     tie_mask,
     tie_ranks,
 )
+
+_T = TypeVar("_T")
 
 # The sets of one size a collider test asks first; each later chunk is twice as large.
 _FIRST_CHUNK = 32
@@ -934,6 +938,10 @@ class LocalSearch:
         self.n = n
         self._runs: dict[tuple[str, int], tuple[list[int], RunSepsets]] = {}
         self._spouses: dict[tuple[str, int], list[int]] = {}
+        # Each run's row counts, kept once :meth:`counted` has been called, and the runs the answer
+        # it is running has read, in the order it first read them.
+        self._run_rows: dict[tuple[str, int], RowCounts] | None = None
+        self._read: dict[tuple[str, int], None] | None = None
 
     def pinned(self) -> AbstractContextManager:
         """BLAS limited to one thread when the test needs it (:func:`~andrey.core.ci.pins_blas`),
@@ -957,11 +965,40 @@ class LocalSearch:
             sepsets: RunSepsets = (
                 MaskedMapping(np.zeros(self.d, dtype=bool)) if search is _mmpc else {}
             )
-            members = search(self, target, sepsets)
+            if self._run_rows is None:
+                members = search(self, target, sepsets)
+            else:
+                with rows_tested() as rows:
+                    members = search(self, target, sepsets)
+                self._run_rows[key] = rows
             if isinstance(sepsets, MaskedMapping):
                 sepsets = sepsets.compact()
             self._runs[key] = (members, sepsets)
+        if self._read is not None:
+            self._read.setdefault(key)
         return self._runs[key]
+
+    def counted(self, answer: Callable[[], _T]) -> tuple[_T, RowCounts]:
+        """``answer()`` and the rows its tests read (:func:`~andrey.core.ci_missing.rows_tested`).
+
+        Each run counts its own rows and keeps them with the run. The counter returned merges those
+        of the runs ``answer`` read, each once, in the order it first read them, and then the
+        tests ``answer`` made outside any run, as a new search that runs only ``answer`` counts
+        them. A run made before the first call has no counter.
+        """
+        if self._run_rows is None:
+            self._run_rows = {}
+        self._read = {}
+        try:
+            with rows_tested() as own:
+                found = answer()
+            rows = RowCounts()
+            for key in self._read:
+                rows.merge(self._run_rows[key])
+            rows.merge(own)
+        finally:
+            self._read = None
+        return found, rows
 
     def parents_children(self, method: str, target: int) -> list[int]:
         """``target``'s parents and children by the ``"pc"`` learner ``method``: the members of its

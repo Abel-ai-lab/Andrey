@@ -653,10 +653,10 @@ a call for that target alone. The three share one search and test setup across t
 a variable's set once for shared symmetry checks. With `andrey.config(n_jobs=...)` above 1 and a
 partial-correlation `indep_test` (`"fisherz"`, `"student_t"`, `"normal_scores"`), they split the
 targets over that many worker processes, with the same results for any number of workers. With
-missing values, each target has a search of its own in the calling process. `icp` also takes a list
-of targets and answers each in turn. On the command line, `'target=[a,b]'` names the columns by
-header or position, and the JSON result holds `multi: true` and `results`, one entry per target in
-the list's order, in place of `structure` and `metadata`. MMHC learns a skeleton with MMPC's
+missing values, they answer every target in the calling process. `icp` also takes a list of targets
+and answers each in turn. On the command line, `'target=[a,b]'` names the columns by header or
+position, and the JSON result holds `multi: true` and `results`, one entry per target in the list's
+order, in place of `structure` and `metadata`. MMHC learns a skeleton with MMPC's
 conditional-independence tests, then runs hill climbing that joins only the skeleton's pairs. RSMAX2
 generalizes it: its restrict phase keeps the pairs of the skeleton of MMPC, IAMB, or Inter-IAMB, or
 of PC's skeleton, and its maximize phase runs hill climbing or tabu search among them.
