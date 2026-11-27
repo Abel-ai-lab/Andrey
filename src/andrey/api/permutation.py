@@ -1033,9 +1033,9 @@ def igsp(
     change nothing for the tests that draw no random numbers. The
     :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps.
 
-    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every invariance test
-    regresses or tests a variable on all of its conditioning variables in each environment. Drop
-    the incomplete rows first.
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every invariance test compares
+    the observational rows with one setting's, and regresses or tests a variable on its
+    conditioning variables over all of them. Drop the incomplete rows first.
 
     **Limitations.** On linear-Gaussian data with known targets it made fewer errors than the empty
     graph in every setting, but :func:`~andrey.gies` and :func:`~andrey.ut_igsp`, told every target,
@@ -1371,9 +1371,9 @@ def ut_igsp(
     change nothing for the tests that draw no random numbers. The
     :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps.
 
-    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every invariance test
-    regresses or tests a variable on all of its conditioning variables in each environment. Drop
-    the incomplete rows first.
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every invariance test compares
+    the observational rows with one setting's, and regresses or tests a variable on its
+    conditioning variables over all of them. Drop the incomplete rows first.
 
     **Limitations.** With targets given in part or not at all, it made no more errors than its
     authors' code and fewer than the empty graph in every setting, and fewer target errors than the
