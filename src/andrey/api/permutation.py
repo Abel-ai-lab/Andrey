@@ -905,12 +905,13 @@ def igsp(
         others. ``None`` picks ``"gaussian"`` under ``"fisherz"`` and ``"student_t"``, else
         ``"indicator"``. ``"gaussian"`` reads every column as numbers, so with a categorical or
         mixed-data ``indep_test`` it raises ``ValueError``. ``"gaussian"`` favors interventions that
-        change a variable's mechanism, such as a new noise variance or weaker causes, whether or
-        not they move its mean; in ``ut_igsp`` it gives up a few more false targets on data where
-        they keep it. ``"indicator"`` with ``"fisherz"`` or ``"student_t"`` raises ``ValueError``:
-        it sees only a shift of the mean, so it gives about the graph of ``"gaussian"`` when
-        interventions shift it and gives up the edges and the exact class when they keep it.
-        ``metadata["invariance_test"]`` names the test the fit used. See Notes.
+        change a variable's mechanism, such as a new noise variance or weaker causes, whether or not
+        they move its mean; in ``ut_igsp`` it gives up a few more false targets on data where they
+        keep it. ``"indicator"`` with ``"fisherz"`` or ``"student_t"`` raises ``ValueError``: it
+        sees only a shift of the mean, so it gives about the graph of ``"gaussian"`` when
+        interventions shift it, and gives up the edges and the exact class when they keep it, and in
+        ``ut_igsp`` some unknown targets of perfect interventions. ``metadata["invariance_test"]``
+        names the test the fit used. See Notes.
     n_starts : int, default=10
         Number of searches, at least ``1``, each from a minimum-degree order of the variables:
         the first breaks ties by each column's rank, and each later one draws them, and the order
@@ -1233,12 +1234,13 @@ def ut_igsp(
         others. ``None`` picks ``"gaussian"`` under ``"fisherz"`` and ``"student_t"``, else
         ``"indicator"``. ``"gaussian"`` reads every column as numbers, so with a categorical or
         mixed-data ``indep_test`` it raises ``ValueError``. ``"gaussian"`` favors interventions that
-        change a variable's mechanism, such as a new noise variance or weaker causes, whether or
-        not they move its mean; in ``ut_igsp`` it gives up a few more false targets on data where
-        they keep it. ``"indicator"`` with ``"fisherz"`` or ``"student_t"`` raises ``ValueError``:
-        it sees only a shift of the mean, so it gives about the graph of ``"gaussian"`` when
-        interventions shift it and gives up the edges and the exact class when they keep it.
-        ``metadata["invariance_test"]`` names the test the fit used. See Notes.
+        change a variable's mechanism, such as a new noise variance or weaker causes, whether or not
+        they move its mean; in ``ut_igsp`` it gives up a few more false targets on data where they
+        keep it. ``"indicator"`` with ``"fisherz"`` or ``"student_t"`` raises ``ValueError``: it
+        sees only a shift of the mean, so it gives about the graph of ``"gaussian"`` when
+        interventions shift it, and gives up the edges and the exact class when they keep it, and in
+        ``ut_igsp`` some unknown targets of perfect interventions. ``metadata["invariance_test"]``
+        names the test the fit used. See Notes.
     n_starts : int, default=10
         Number of searches, at least ``1``, each from a minimum-degree order of the variables:
         the first breaks ties by each column's rank, and each later one draws them, and the order
