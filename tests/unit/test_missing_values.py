@@ -330,6 +330,39 @@ def test_a_scan_on_missing_values_is_each_candidate_asked_alone_bit_for_bit(
     assert scanned._grouped is not None or kind != "blocks"
 
 
+@pytest.mark.parametrize("kind", ["cells", "blocks", "few", "copy"])
+def test_a_scan_in_chunks_is_the_scan_at_once_bit_for_bit(kind, monkeypatch):
+    """A scan whose candidates go in chunks, as a large conditioning set makes it, gives the
+    answers, the rows counted, and the error of the scan at once, whatever the chunk."""
+    x = _scan_data(kind, seed=4, d=14 if kind == "few" else 24, n=60 if kind == "few" else 1200)
+    scans = list(_scans(x.shape[1], np.random.default_rng(4)))
+
+    def run(entries: int):
+        monkeypatch.setattr(ci_missing, "FALLBACK_STACK_ENTRIES", entries)
+        test, out = make_indep_test("fisherz", x), []
+        for target, ys, cond in scans:
+            with rows_tested() as counter:
+                try:
+                    out.append(test.statistic_pvalues_given(target, ys, cond))
+                except ValueError as error:
+                    out.append((type(error), str(error)))
+            out.append(_counted(counter))
+        return out
+
+    once = run(1 << 20)
+    for entries in (1, 50, 300):  # chunks of one, a few, and about a dozen candidates
+        chunked = run(entries)
+        for want, got in zip(once, chunked, strict=True):
+            if isinstance(want, tuple) and isinstance(want[0], np.ndarray):
+                for a, b in zip(want, got, strict=True):
+                    np.testing.assert_array_equal(a, b)
+            else:
+                assert got == want
+    assert any(isinstance(out, tuple) and isinstance(out[0], type) for out in once) == (
+        kind == "copy"
+    )
+
+
 def test_a_scan_takes_its_conditioning_set_as_one_query_does():
     """The set may be unsorted, repeat a column, or come from a generator; a candidate or ``x`` in
     it raises the assertion a query raises; no candidate gives no answer."""

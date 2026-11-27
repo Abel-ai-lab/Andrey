@@ -49,6 +49,7 @@ import numpy.typing as npt
 from . import backend
 from .ci import (
     BOUND_MARGIN,
+    FALLBACK_STACK_ENTRIES,
     ONE_MINUS_EPS,
     SINGULAR_RTOL,
     CGTest,
@@ -1011,7 +1012,9 @@ class GaussianDeletion(PartialCorrelationDeletion):
         Entry ``i`` equals ``statistic_pvalue(x, ys[i], condition_set)`` bit for bit, and the rows
         each query counts are those of that call. A query the exact path raises on raises its error
         after the queries before it are counted, as separate calls do. A repeated column of the set
-        counts once. ``ys`` excludes ``x`` and the set's members.
+        counts once. ``ys`` excludes ``x`` and the set's members. The candidates go in chunks whose
+        correlation blocks hold at most ``FALLBACK_STACK_ENTRIES`` entries, so a large set does not
+        hold every candidate's block at once.
         """
         cond = sorted(set(map(int, condition_set)))
         cols = np.asarray(ys, dtype=np.intp).reshape(-1)
@@ -1021,7 +1024,13 @@ class GaussianDeletion(PartialCorrelationDeletion):
         assert not in_set, "x, y cannot be in condition_set."
         xs = np.full(len(cols), int(x), dtype=np.intp)
         sets = np.tile(np.asarray(cond, dtype=np.intp), (len(cols), 1))
-        return self._answer(np.minimum(xs, cols), np.maximum(xs, cols), sets)
+        lo, hi = np.minimum(xs, cols), np.maximum(xs, cols)
+        step = max(1, FALLBACK_STACK_ENTRIES // (len(cond) + 2) ** 2)
+        parts = [
+            self._answer(lo[i : i + step], hi[i : i + step], sets[i : i + step])
+            for i in range(0, len(cols), step)
+        ]
+        return np.concatenate([r for r, _ in parts]), np.concatenate([p for _, p in parts])
 
     def _canonical_pvalues(
         self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
