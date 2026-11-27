@@ -829,8 +829,10 @@ def _fold_searches(parents: int, candidates: int) -> list:
     ]
 
 
-def test_only_a_pinned_torch_backend_moves_the_searches_off_numpy():
+def test_only_a_pinned_torch_backend_moves_the_searches_off_numpy(monkeypatch):
     pytest.importorskip("torch")
+    monkeypatch.delenv("ANDREY_BACKEND", raising=False)
+    monkeypatch.delenv("ANDREY_DEVICE", raising=False)
     assert native.search_device("cmaes") == "numpy"  # auto keeps the NumPy path
     with andrey.config(backend="cpu"):
         assert native.search_device("cmaes") == "cpu"
