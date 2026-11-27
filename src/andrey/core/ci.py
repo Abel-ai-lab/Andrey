@@ -8,8 +8,10 @@ through the :class:`CITest` contract: an object constructed once over the data a
 the sample correlation matrix once, then answers each query from the conditioned partial
 correlation of columns ``x`` and ``y`` given ``condition_set``. Empty and single-element
 conditioning sets -- the bulk of a constraint-based search -- use the closed-form (first-order)
-partial correlation and skip the matrix inversion entirely; larger sets invert the correlation
-submatrix. numpy float64 is the oracle. A query is canonicalized (``x``, ``y`` ordered, the
+partial correlation and need no matrix at all; a set of two takes the second-order closed form, and
+larger sets the Cholesky factor of the correlation submatrix. A submatrix that neither shows to be
+well conditioned goes to its inverse, which the eigenvalues check for singularity. numpy float64 is
+the oracle. A query is canonicalized (``x``, ``y`` ordered, the
 conditioning set sorted unique) so its p-value does not depend on argument order, and nothing is
 memoized: a test object holds the correlation matrix and the sample size, whatever it is asked.
 The scalar path, the batched path (:meth:`~PartialCorrelationTest.batched_call`), the all-pairs
@@ -114,6 +116,14 @@ SINGULAR_RTOL = 1e-12
 # How far the inverse bound in _invert_nonsingular stays above that threshold; the factor absorbs
 # the rounding of the computed inverse and of the eigenvalues.
 BOUND_MARGIN = 1e4
+# The bound on the 2-norm of the inverse of a 4 x 4 block [x, y, s1, s2] below which the
+# second-order closed form settles it as nonsingular: its smallest eigenvalue is then above 1e-3,
+# orders above the threshold of the inverse bound, and the recursion loses at most about 1e-14 of
+# the partial correlation to it.
+SECOND_ORDER_LIMIT = 1e3
+# Stacks of at most this many conditioning sets of size 2 take the closed form one query at a time:
+# up to about 30 queries the vector form's fixed cost per call is the larger.
+SECOND_ORDER_LOOP_ROWS = 24
 # The smallest number of candidates times the block size, len(ys) * (|S| + 2), that
 # statistic_pvalues_given answers from one factor, unless ANDREY_SHARED_SCAN_MIN_WORK sets another.
 # On one core the factor is slower than the per-query inversions below a work of about 64 and faster
@@ -125,6 +135,31 @@ FALLBACK_STACK_ENTRIES = 1 << 20
 # The LAPACK Cholesky factor and triangular solve of statistic_pvalues_given, called directly: on
 # the small scans it serves, the checks of scipy.linalg's wrappers would take most of the time.
 _POTRF, _TRTRS = get_lapack_funcs(("potrf", "trtrs"), (np.empty((1, 1)),))
+
+
+def _private_cholesky() -> Callable[..., np.ndarray] | None:
+    """NumPy's lower Cholesky gufunc, which gives each matrix that is not positive definite a factor
+    of NaN instead of raising for the whole stack, or ``None`` when this NumPy does not have one
+    that does (:func:`_cholesky_lower` then takes the public ``np.linalg.cholesky``)."""
+    try:
+        from numpy.linalg import _umath_linalg
+
+        gufunc = _umath_linalg.cholesky_lo
+        probe = np.stack([np.eye(2), np.array([[1.0, 2.0], [2.0, 1.0]]), 2.0 * np.eye(2)])
+        with np.errstate(invalid="ignore"):
+            factors = gufunc(probe, signature="d->d")
+        if (
+            np.isnan(factors[1]).all()
+            and np.array_equal(factors[0], np.linalg.cholesky(probe[0]))
+            and np.array_equal(factors[2], np.linalg.cholesky(probe[2]))
+        ):
+            return gufunc
+    except Exception:  # noqa: BLE001 - a private API: any failure means the public route
+        pass
+    return None
+
+
+_CHOLESKY_LO = _private_cholesky()
 
 
 class SingularCorrelationError(ValueError):
@@ -158,12 +193,19 @@ class PartialCorrelationTest:
 
     ``__init__`` records the sample size and precomputes the full column correlation matrix once.
     Each call forms the partial correlation ``r`` of ``x`` and ``y`` given the conditioning set --
-    directly (``|S| == 0``), by the first-order closed form (``|S| == 1``), or by inverting the
-    ``[x, y, *S]`` correlation submatrix (``|S| >= 2``) -- clamps it just inside ``(-1, 1)``, and
-    reports the subclass's p-value for ``r`` on ``n - |S| - k`` degrees of freedom. The ``|S| <= 1``
-    closed forms do not invert a submatrix, so on exactly-collinear columns they return a finite
-    (near-1) partial correlation where an always-invert path would instead raise on a singular
-    matrix.
+    directly (``|S| == 0``), by the first-order closed form (``|S| == 1``), by the second-order
+    closed form (``|S| == 2``), or from the Cholesky factor of the ``[*S, x, y]`` correlation
+    submatrix (``|S| >= 3``) -- clamps it just inside ``(-1, 1)``, and reports the subclass's
+    p-value for ``r`` on ``n - |S| - k`` degrees of freedom. The ``|S| <= 1`` closed forms look at
+    no submatrix, so on exactly-collinear columns they return a finite (near-1) partial correlation
+    where a path that checks the submatrix would instead raise on a singular matrix. For ``|S| >=
+    2`` the closed form and the factor each settle a submatrix only when it is far from singular
+    (:func:`_second_order`, :func:`_cholesky_partial_correlations`); any other submatrix takes the
+    inverse and its eigenvalue test, so it raises :class:`SingularCorrelationError` exactly when
+    its smallest eigenvalue is at most ``SINGULAR_RTOL`` times its largest. Each query's partial
+    correlation depends on its own submatrix only, not on the other queries of its call. The two
+    forms agree with the inverse to rounding: about ``1e-14`` in the partial correlation of a
+    well-conditioned submatrix.
 
     Queries are canonicalized (``x``, ``y`` ordered, ``condition_set`` sorted unique), so the
     p-value is independent of argument order. No query is memoized: the skeleton tests each
@@ -233,10 +275,36 @@ class PartialCorrelationTest:
             ryz = float(corr[y_int, z_idx])
             r = (rxy - rxz * ryz) / math.sqrt((1.0 - rxz * rxz) * (1.0 - ryz * ryz))
         else:
-            var = np.array((x_int, y_int, *cond), dtype=np.intp)
-            inv = self._invert_one(corr[var[:, None], var])
-            r = -inv.item(0, 1) / math.sqrt(abs(inv.item(0, 0) * inv.item(1, 1)))
+            r = self._second_or_higher_order(x_int, y_int, cond)
         return -ONE_MINUS_EPS if r < -ONE_MINUS_EPS else ONE_MINUS_EPS if r > ONE_MINUS_EPS else r
+
+    def _second_or_higher_order(self, x_int: int, y_int: int, cond: list[int]) -> float:
+        """The unclamped partial correlation of ``x_int`` and ``y_int`` given the two or more
+        columns of ``cond``, with the bits of a stack of one: the second-order closed form for two
+        columns, else the Cholesky factor of ``[*cond, x, y]``. A block those do not settle as
+        nonsingular takes the inverse (:meth:`_invert_one`)."""
+        corr = self._corr
+        if len(cond) == 2:
+            s1, s2 = cond
+            rx, ry = corr[x_int], corr[y_int]
+            closed = _second_order_float(
+                rx.item(y_int),
+                rx.item(s1),
+                rx.item(s2),
+                ry.item(s1),
+                ry.item(s2),
+                corr.item(s1, s2),
+            )
+            if closed is not None:
+                return closed
+        else:
+            order = np.array((*cond, x_int, y_int), dtype=np.intp)
+            factored = _cholesky_partial_correlation(corr[order[:, None], order])
+            if factored is not None:
+                return factored
+        var = np.array((x_int, y_int, *cond), dtype=np.intp)
+        inv = self._invert_one(corr[var[:, None], var])
+        return -inv.item(0, 1) / math.sqrt(abs(inv.item(0, 0) * inv.item(1, 1)))
 
     def copies(self) -> tuple[tuple[int, ...], ...]:
         """The groups of data columns that repeat one another up to scale and shift.
@@ -266,6 +334,8 @@ class PartialCorrelationTest:
         """:meth:`_invert` of the one ``(k, k)`` submatrix ``matrix``, with the bits of a stack of
         one: the same ``np.linalg.inv`` call and the same bound as :func:`_invert_nonsingular`. A
         matrix the bound does not settle, or that ``np.linalg.inv`` rejects, takes :meth:`_invert`.
+        The inverse serves a submatrix that the closed form and the Cholesky factor do not settle
+        (:meth:`_second_or_higher_order`).
         """
         try:
             inv = np.linalg.inv(matrix)
@@ -355,9 +425,10 @@ class PartialCorrelationTest:
         row ``i`` is the conditioning set of query ``i``: distinct columns that exclude ``x[i]``
         and ``y[i]``. Entry ``i`` of each result matches ``statistic_pvalue(x[i], y[i],
         conditions[i])`` exactly. Empty and single conditioners use the closed-form partial
-        correlation; larger sets build the ``(N, m + 2, m + 2)`` stack of correlation submatrices
-        and invert it once. Raises :class:`ValueError` when the degrees of freedom are unusable or
-        any submatrix is singular.
+        correlation; two conditioners use the second-order closed form; larger sets factor the
+        ``(N, m + 2, m + 2)`` stack of correlation submatrices ``[*S, x, y]`` once. A submatrix
+        neither shows to be well conditioned is inverted. Raises :class:`ValueError` when the
+        degrees of freedom are unusable or any submatrix is singular.
         """
         x = np.asarray(x, dtype=np.intp)
         y = np.asarray(y, dtype=np.intp)
@@ -392,14 +463,69 @@ class PartialCorrelationTest:
             ryz = corr[hi, z_idx]
             r = (corr[lo, hi] - rxz * ryz) / np.sqrt((1.0 - rxz * rxz) * (1.0 - ryz * ryz))
         else:
-            var = np.empty((len(lo), 2 + conds.shape[1]), dtype=np.intp)
-            var[:, 0] = lo
-            var[:, 1] = hi
-            var[:, 2:] = conds
-            inv = self._invert(corr[var[:, :, None], var[:, None, :]])
-            r = -inv[:, 0, 1] / np.sqrt(np.abs(inv[:, 0, 0] * inv[:, 1, 1]))
+            r = self._second_or_higher_order_stack(lo, hi, conds)
         r = np.clip(r, -ONE_MINUS_EPS, ONE_MINUS_EPS)
         return r, np.asarray(self._pvalue(r, df))
+
+    def _second_or_higher_order_stack(
+        self, lo: np.ndarray, hi: np.ndarray, conds: np.ndarray
+    ) -> np.ndarray:
+        """The unclamped partial correlations of canonical queries whose conditioning sets hold two
+        or more columns, each with the bits of :meth:`_second_or_higher_order`: the second-order
+        closed form for two columns (row by row up to ``SECOND_ORDER_LOOP_ROWS`` queries), else the
+        Cholesky factors of the ``[*S, x, y]`` blocks. The queries those do not settle as
+        nonsingular take the inverse (:meth:`_invert`) together, which raises when one is singular.
+        """
+        corr = self._corr
+        size = conds.shape[1]
+        if size == 2 and len(lo) <= SECOND_ORDER_LOOP_ROWS:
+            r = np.empty(len(lo), dtype=np.float64)
+            unsettled = []
+            for i, (x, y, s1, s2) in enumerate(
+                zip(lo.tolist(), hi.tolist(), conds[:, 0].tolist(), conds[:, 1].tolist())
+            ):
+                rx, ry = corr[x], corr[y]
+                closed = _second_order_float(
+                    rx.item(y),
+                    rx.item(s1),
+                    rx.item(s2),
+                    ry.item(s1),
+                    ry.item(s2),
+                    corr.item(s1, s2),
+                )
+                if closed is None:
+                    unsettled.append(i)
+                else:
+                    r[i] = closed
+            rest = np.array(unsettled, dtype=np.intp)
+        else:
+            if size == 2:
+                s1, s2 = conds[:, 0], conds[:, 1]
+                r, settled = _second_order(
+                    corr[lo, hi],
+                    corr[lo, s1],
+                    corr[lo, s2],
+                    corr[hi, s1],
+                    corr[hi, s2],
+                    corr[s1, s2],
+                )
+            else:
+                order = np.empty((len(lo), size + 2), dtype=np.intp)
+                order[:, :size] = conds
+                order[:, size] = lo
+                order[:, size + 1] = hi
+                r, settled = _cholesky_partial_correlations(
+                    corr[order[:, :, None], order[:, None, :]]
+                )
+            rest = np.flatnonzero(~settled)
+        if len(rest):
+            var = np.empty((len(rest), size + 2), dtype=np.intp)
+            var[:, 0] = lo[rest]
+            var[:, 1] = hi[rest]
+            var[:, 2:] = conds[rest]
+            inv = self._invert(corr[var[:, :, None], var[:, None, :]])
+            r[rest] = -inv[:, 0, 1] / np.sqrt(np.abs(inv[:, 0, 0] * inv[:, 1, 1]))
+        return r
 
     def statistic_pvalues_given(
         self, x: int, ys: Sequence[int], condition_set: Iterable[int]
@@ -413,10 +539,10 @@ class PartialCorrelationTest:
         ``0`` factors every such scan), one Cholesky factor ``L`` of the set's correlation block
         ``R_SS`` serves every candidate: with ``w_a = L^-1 R_Sa``, the Schur complement
         ``P_ab = R_ab - w_a . w_b`` gives the partial correlation ``P_xy / sqrt(P_xx P_yy)``, where
-        :meth:`statistic_pvalue` inverts each ``[x, y, *S]`` block. The two agree to about ``1e-10``
-        relative in the p-value, so a p-value on a rounding boundary can differ in its ninth
-        significant digit, and a candidate's last bits can change with the other candidates of the
-        call. Every entry of the correlation matrix is read as ``corr[min, max]`` of its two
+        :meth:`statistic_pvalue` takes each ``[x, y, *S]`` block on its own. The two agree to about
+        ``1e-10`` relative in the p-value, so a p-value on a rounding boundary can differ in its
+        ninth significant digit, and a candidate's last bits can change with the other candidates of
+        the call. Every entry of the correlation matrix is read as ``corr[min, max]`` of its two
         columns, so a matrix that is not exactly symmetric gives each pair one answer whichever
         column is ``x``.
 
@@ -500,9 +626,9 @@ class PartialCorrelationTest:
         partial correlation is the correlation of the residuals of ``x`` and of ``y`` after a
         least-squares fit on the conditioning columns, clamped just inside ``(-1, 1)``, and the
         p-value uses the degrees of freedom of :meth:`statistic_pvalues`. Without rounding it
-        equals the partial correlation :meth:`statistic_pvalues` takes from the inverse of the
-        correlation submatrix. It stays defined when the conditioning columns are collinear, where
-        that inverse does not exist, because the residuals of a least-squares fit do not depend
+        equals the partial correlation :meth:`statistic_pvalues` takes from the correlation
+        submatrix. It stays defined when the conditioning columns are collinear, where that
+        submatrix has no inverse, because the residuals of a least-squares fit do not depend
         on which of the equivalent solutions it returns. Raises :class:`SingularCorrelationError`
         when the residual norm of ``x`` or ``y`` is at most ``eps * max(n, k)`` times the column's
         norm, for ``n`` rows, ``k`` conditioning columns, and the float64 machine epsilon
@@ -2166,6 +2292,149 @@ def pins_blas(test: CITest) -> bool:
     if pin is not None:
         return bool(pin)
     return callable(getattr(test, "to_seed", None)) or isinstance(test, (DGTest, CGTest))
+
+
+def _second_order(
+    rxy: np.ndarray,
+    rx1: np.ndarray,
+    rx2: np.ndarray,
+    ry1: np.ndarray,
+    ry2: np.ndarray,
+    r12: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """The partial correlations of ``x`` and ``y`` given ``s1`` and ``s2`` by the first-order
+    recursion, from the six correlations of the block ``[x, y, s1, s2]``, and which blocks the
+    result settles as nonsingular.
+
+    ``r_xy.s1``, ``r_x2.s1`` and ``r_y2.s1`` are first-order partial correlations, and
+    ``r_xy.s1s2 = (r_xy.s1 - r_x2.s1 r_y2.s1) / sqrt((1 - r_x2.s1^2) (1 - r_y2.s1^2))``. A block
+    is settled when the bound ``g + (1 + 2 g) / lambda`` on ``||A^-1||_2`` is below
+    ``SECOND_ORDER_LIMIT``, where ``A`` is the block, ``g = 2 / (1 - r12^2)`` bounds the inverse of
+    its ``[s1, s2]`` block, and ``lambda = det(M) / trace(M)`` bounds the smallest eigenvalue of the
+    2 x 2 Schur complement ``M`` of ``[x, y]``, whose diagonal is ``Var(x | s1, s2)`` and
+    ``Var(y | s1, s2)`` (the argument of ``_schur_partial_correlations``). A block whose inverse has
+    a 2-norm below ``SECOND_ORDER_LIMIT`` has a smallest eigenvalue far above the threshold of
+    :func:`_invert_nonsingular`, so it passes the eigenvalue test; a NaN or a nonpositive variance
+    fails the comparison. Unsettled entries of the result are not to be read.
+    :func:`_second_order_float` computes the same bits one query at a time.
+    """
+    with np.errstate(all="ignore"):
+        d1 = 1.0 - r12 * r12
+        ax = 1.0 - rx1 * rx1
+        ay = 1.0 - ry1 * ry1
+        rxy1 = (rxy - rx1 * ry1) / np.sqrt(ax * ay)
+        rx21 = (rx2 - rx1 * r12) / np.sqrt(ax * d1)
+        ry21 = (ry2 - ry1 * r12) / np.sqrt(ay * d1)
+        bx = 1.0 - rx21 * rx21
+        by = 1.0 - ry21 * ry21
+        r = (rxy1 - rx21 * ry21) / np.sqrt(bx * by)
+        pxx = ax * bx
+        pyy = ay * by
+        smallest = pxx * pyy * (1.0 - r * r) / (pxx + pyy)
+        g = 2.0 / d1
+        bound = g + (1.0 + 2.0 * g) / smallest
+        settled = (
+            (d1 > 0.0)
+            & (ax > 0.0)
+            & (ay > 0.0)
+            & (bx > 0.0)
+            & (by > 0.0)
+            & (smallest > 0.0)
+            & (bound < SECOND_ORDER_LIMIT)
+        )
+    return r, settled
+
+
+def _second_order_float(
+    rxy: float, rx1: float, rx2: float, ry1: float, ry2: float, r12: float
+) -> float | None:
+    """:func:`_second_order` of one block of Python floats, with its bits: the partial correlation,
+    or ``None`` when the block is not settled."""
+    d1 = 1.0 - r12 * r12
+    ax = 1.0 - rx1 * rx1
+    ay = 1.0 - ry1 * ry1
+    if not (d1 > 0.0 and ax > 0.0 and ay > 0.0):
+        return None
+    rxy1 = (rxy - rx1 * ry1) / math.sqrt(ax * ay)
+    rx21 = (rx2 - rx1 * r12) / math.sqrt(ax * d1)
+    ry21 = (ry2 - ry1 * r12) / math.sqrt(ay * d1)
+    bx = 1.0 - rx21 * rx21
+    by = 1.0 - ry21 * ry21
+    if not (bx > 0.0 and by > 0.0):
+        return None
+    r = (rxy1 - rx21 * ry21) / math.sqrt(bx * by)
+    pxx = ax * bx
+    pyy = ay * by
+    smallest = pxx * pyy * (1.0 - r * r) / (pxx + pyy)
+    if not smallest > 0.0:
+        return None
+    g = 2.0 / d1
+    if not g + (1.0 + 2.0 * g) / smallest < SECOND_ORDER_LIMIT:
+        return None
+    return r
+
+
+def _cholesky_lower(blocks: np.ndarray) -> np.ndarray:
+    """The lower Cholesky factors of a ``(k, k)`` matrix or an ``(N, k, k)`` stack, with every entry
+    of NaN for a matrix that is not positive definite. Each factor is that of its matrix alone.
+    The caller ignores the invalid-value warning that NumPy's gufunc raises for such a matrix."""
+    if _CHOLESKY_LO is not None:
+        return _CHOLESKY_LO(blocks, signature="d->d")
+    try:
+        return np.linalg.cholesky(blocks)
+    except np.linalg.LinAlgError:
+        flat = blocks.reshape(-1, *blocks.shape[-2:])
+        out = np.empty_like(flat)
+        for i, matrix in enumerate(flat):
+            try:
+                out[i] = np.linalg.cholesky(matrix)
+            except np.linalg.LinAlgError:
+                out[i] = np.nan
+        return out.reshape(blocks.shape)
+
+
+def _cholesky_partial_correlations(blocks: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """The partial correlations of the last two variables given the others, from each block's
+    Cholesky factor, and which blocks the factor settles as nonsingular.
+
+    ``blocks`` is an ``(N, k, k)`` stack of correlation submatrices ordered ``[*S, x, y]``; its
+    diagonals are overwritten. The last row of the factor ``L`` of a block holds the factor of the
+    2 x 2 Schur complement of ``x`` and ``y`` given ``S`` in its last two entries, ``l21`` and
+    ``l22``, so ``r = l21 / sqrt(l21^2 + l22^2)``. A block is settled when the factor of the block
+    less ``tau I`` exists and has a positive last pivot, with ``tau = BOUND_MARGIN * SINGULAR_RTOL *
+    k``: a Cholesky factor that exists certifies a positive definite matrix up to rounding far
+    below ``tau``, so the smallest eigenvalue is above ``tau``, which is ``BOUND_MARGIN *
+    SINGULAR_RTOL`` times a bound of the largest eigenvalue, ``k``, and the block passes the
+    eigenvalue test of :func:`_invert_nonsingular`. A block that is not positive definite, or that
+    the shift rejects, is unsettled. Each result depends on its own block only. Unsettled entries
+    of the partial correlations are not to be read. :func:`_cholesky_partial_correlation` computes
+    the same bits for one block.
+    """
+    k = blocks.shape[-1]
+    diagonal = np.arange(k)
+    with np.errstate(all="ignore"):
+        low = _cholesky_lower(blocks)
+        blocks[:, diagonal, diagonal] -= BOUND_MARGIN * SINGULAR_RTOL * k
+        shifted = _cholesky_lower(blocks)
+        l21 = low[:, k - 1, k - 2]
+        l22 = low[:, k - 1, k - 1]
+        r = l21 / np.sqrt(l21 * l21 + l22 * l22)
+        return r, (shifted[:, k - 1, k - 1] > 0.0) & (l22 > 0.0)
+
+
+def _cholesky_partial_correlation(block: np.ndarray) -> float | None:
+    """:func:`_cholesky_partial_correlations` of one ``(k, k)`` block, with its bits: the partial
+    correlation of a settled block as a float, ``None`` when it is not settled."""
+    k = block.shape[0]
+    with np.errstate(all="ignore"):
+        low = _cholesky_lower(block)
+        block.flat[:: k + 1] -= BOUND_MARGIN * SINGULAR_RTOL * k
+        shifted = _cholesky_lower(block)
+    l21 = low.item(k - 1, k - 2)
+    l22 = low.item(k - 1, k - 1)
+    if shifted.item(k - 1, k - 1) > 0.0 and l22 > 0.0:
+        return l21 / math.sqrt(l21 * l21 + l22 * l22)
+    return None
 
 
 def _invert_nonsingular(stack: np.ndarray) -> np.ndarray:

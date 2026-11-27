@@ -654,7 +654,7 @@ def jpcmciplus(
     test = ContextTest(built, nodes, fixed, tau_max, len(design))
     ranks = np.zeros(nodes.count, dtype=np.intp)
     ranks[:n_series] = tie_ranks(np.vstack(blocks))
-    with backend.one_blas_thread():  # the stacked inversions then give the same bits on any host
+    with backend.one_blas_thread():  # the stacked kernels then give the same bits on any host
         return run_phases(
             test,
             nodes,

@@ -659,7 +659,7 @@ def pcmciplus(
         seed=seed,
         degrees_of_freedom=degrees_of_freedom,
     )
-    with backend.one_blas_thread():  # the stacked inversions then give the same bits on any host
+    with backend.one_blas_thread():  # the stacked kernels then give the same bits on any host
         return run_phases(
             test,
             data.shape[1],

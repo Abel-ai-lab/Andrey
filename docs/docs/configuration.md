@@ -104,11 +104,11 @@ matrix, each worker gets its own copy. The results do not change.
   grow scan of `iamb` or `inter_iamb` (also as the restrict phase of `rsmax2` with `restrict="iamb"`
   or `"inter_iamb"`) of two or more candidates against one conditioning set of two or more variables
   uses one Cholesky factor of the set's correlation block only when its candidates times the block
-  size (the set plus two) reach this value; otherwise each candidate inverts its submatrix. The
-  default is `128`, measured on an AMD EPYC 7713 server running Linux on one core, where the factor
-  was slower below about 64 and faster from 128 for every set size sampled. The two paths agree to
-  about 1e-10 relative in the p-value; the per-query path is the exact one, and `0` factors every
-  such scan.
+  size (the set plus two) reach this value; otherwise each candidate is tested on its own
+  submatrix. The default is `128`, measured on an AMD EPYC 7713 server running Linux on one core,
+  where the factor was slower below about 64 and faster from 128 for every set size sampled. The
+  two paths agree to about 1e-10 relative in the p-value; the per-query path is the exact one, and
+  `0` factors every such scan.
 - `ANDREY_LINGAM_PRUNE_MIN_WORK`: a step of the `pwling` order search (DirectLiNGAM and the methods
   built on it) stops scoring a candidate that can no longer be picked only when its rows times
   ordered pairs of candidates reach this value (default `100000`, about the break-even on one core
