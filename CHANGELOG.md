@@ -216,6 +216,9 @@ names its pull request.
   each cross-validation fold grows only through the round where its early stop cuts it, and the
   repeated input checks of the many small fits are skipped, so the methods that take them as
   `indep_test` run faster, with the same output bit for bit. ([#1309])
+- `calm` runs faster, with the same output bit for bit: each Adam step of its optimizer is applied
+  as the in-place tensor operations of `torch.optim.Adam`, so the first fit in a process no
+  longer builds an optimizer, which imports `torch._dynamo` and its dependencies. ([#1343])
 
 ### Fixed
 
@@ -3202,3 +3205,4 @@ First alpha release.
 [#1327]: https://github.com/Abel-ai-lab/Andrey/pull/1327
 [#1329]: https://github.com/Abel-ai-lab/Andrey/pull/1329
 [#1331]: https://github.com/Abel-ai-lab/Andrey/pull/1331
+[#1343]: https://github.com/Abel-ai-lab/Andrey/pull/1343
