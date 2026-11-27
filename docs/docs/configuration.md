@@ -68,9 +68,9 @@ the same in every case we measured. `cpu` runs the same searches with PyTorch on
   float64 matrices; when the threads you ask for would hold more than 4 GiB, fewer run, with a
   `PerformanceWarning`. `skewd` runs its two directions and their searches on the threads,
   and `skewd_mv` its conditional models and their searches; every search draws from its own random
-  stream, so on NumPy and on a GPU the results are the same bit for bit with any number of workers. Unlike `pnl`, both run
-  on one BLAS thread with any number of workers, so their results do not depend on the BLAS thread
-  count either; the limit applies to the whole process while a fit runs.
+  stream, so on NumPy and on a GPU the results are the same bit for bit with any number of workers.
+  Unlike `pnl`, both run on one BLAS thread with any number of workers, so their results do not
+  depend on the BLAS thread count either; the limit applies to the whole process while a fit runs.
 - `ANDREY_GES_PARALLEL_MIN_WORK`: a GES pass uses the workers only when it expects to evaluate more
   candidates than this. The default is `10000`; `0` always uses them.
 - `ANDREY_SKELETON_PARALLEL_MIN_WORK`: a conditioning-size pass of the skeleton search of PC, FCI,

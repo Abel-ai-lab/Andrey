@@ -44,8 +44,10 @@ not fail the gate; the release checklist reviews every flag.
 ## GPUs
 
 No hosted runner has a GPU, so the CUDA paths are checked on our own machines: a parity suite
-compares the GPU with NumPy, in float64 to about `1e-9`. To run it on a machine with a CUDA GPU and
-a [GPU build of PyTorch](guides/getting-started.md#pytorch-for-a-gpu):
+compares the GPU with NumPy, in float64 to about `1e-9`. SkewD's searches carry the GPU's rounding
+through many generations, so for SkewD it checks instead that a fit repeats bit for bit with one
+worker or four and makes NumPy's decision. To run it on a machine with a CUDA GPU and a
+[GPU build of PyTorch](guides/getting-started.md#pytorch-for-a-gpu):
 
 ```shell
 ANDREY_DEVICE=cuda ANDREY_REQUIRE_GPU=1 CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run --no-sync pytest tests/gpu -ra

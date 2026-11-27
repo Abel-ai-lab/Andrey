@@ -23,6 +23,15 @@ SHORT_PAIR = {"tuning_iter": 1, "max_iter": 5}
 SHORT_GRAPH = {**SHORT_PAIR, "indep_test": "fisherz"}
 
 
+@pytest.fixture(autouse=True)
+def default_backend(monkeypatch):
+    """Fit on the default backend whatever ``ANDREY_BACKEND`` or ``ANDREY_DEVICE`` pins: a pinned
+    ``cpu`` or ``cuda`` moves the searches to PyTorch, which the tests of that path ask for in
+    ``andrey.config``."""
+    monkeypatch.delenv("ANDREY_BACKEND", raising=False)
+    monkeypatch.delenv("ANDREY_DEVICE", raising=False)
+
+
 def _marks(d: int, lines=(), arrows=()) -> np.ndarray:
     marks = np.full((d, d), NULL, dtype=np.int8)
     for i, j in lines:
@@ -829,10 +838,8 @@ def _fold_searches(parents: int, candidates: int) -> list:
     ]
 
 
-def test_only_a_pinned_torch_backend_moves_the_searches_off_numpy(monkeypatch):
+def test_only_a_pinned_torch_backend_moves_the_searches_off_numpy():
     pytest.importorskip("torch")
-    monkeypatch.delenv("ANDREY_BACKEND", raising=False)
-    monkeypatch.delenv("ANDREY_DEVICE", raising=False)
     assert native.search_device("cmaes") == "numpy"  # auto keeps the NumPy path
     with andrey.config(backend="cpu"):
         assert native.search_device("cmaes") == "cpu"
@@ -900,5 +907,8 @@ def test_a_fit_on_the_torch_path_repeats_and_reads_the_torch_device():
         before = backend.dispatch_stats().get(("skewd", "cpu"), 0)
         first = skewd(data, **SHORT_PAIR)
         again = skewd(data, **SHORT_PAIR)
-        assert backend.dispatch_stats().get(("skewd", "cpu"), 0) == before + 2
+        with andrey.config(n_jobs=4):
+            threaded = skewd(data, **SHORT_PAIR)
+        assert backend.dispatch_stats().get(("skewd", "cpu"), 0) == before + 3
     assert again.metadata == first.metadata
+    assert threaded.metadata == first.metadata

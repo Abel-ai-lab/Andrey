@@ -21,9 +21,10 @@ names its pull request.
 
 - `skewd` and `skewd_mv` run their CMA-ES searches on a GPU with `andrey.config(backend="cuda")`,
   or with PyTorch on the CPU with `backend="cpu"`; the paper's CMA-ES is unchanged, and `"auto"`
-  and `optimizer="lbfgs"` keep NumPy. The GPU favors time, with one worker, as more workers only
-  compete for it; it gives up bit identity with NumPy, as the log-likelihoods differ in their last
-  digits or more, and the decisions were NumPy's in every case measured. ([#1251])
+  and `optimizer="lbfgs"` keep NumPy. A `cuda` or `cpu` pin set for other operations now moves
+  these searches too. The GPU favors time, with one worker, as more workers only compete for it; it
+  gives up bit identity with NumPy, as the log-likelihoods differ in their last digits or more, and
+  the decisions were NumPy's in every case measured. ([#1251])
 
 ### Changed
 
