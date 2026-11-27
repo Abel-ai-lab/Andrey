@@ -395,10 +395,11 @@ def _discrete_scan_data(kind: str, seed: int, d: int = 10, n: int | None = None)
     ``cells`` are missing completely at random. In ``rare``, columns 1 and 4 hold a level that three
     rows have, so a block can lose it, column 0 holds non-integer values, and a fifth of the cells
     are missing. ``few`` has few rows and many gaps, so queries are not tested. In ``apart``,
-    columns 2 and 6 are never observed together; in ``pair``, only on two rows, the fewest a query
-    is tested on. In ``flat``, column 5 holds one category, so a query over it has no degrees of
-    freedom. In ``levels``, columns 3 and 6 hold a hundred levels on few rows with many gaps, so a
-    block has more of them than four for each of its rows.
+    columns 2 and 6 are never observed together, and column 4 is never observed; in ``pair``,
+    columns 2 and 6 are observed together on two rows only, the fewest a query is tested on. In
+    ``flat``, column 5 holds one category, so a query over it has no degrees of freedom. In
+    ``levels``, columns 3 and 6 hold a hundred levels on few rows with many gaps, so a block has
+    more of them than four for each of its rows.
     """
     n = n or {"few": 40, "levels": 150}.get(kind, 600)
     rng = np.random.default_rng(seed)
@@ -416,6 +417,8 @@ def _discrete_scan_data(kind: str, seed: int, d: int = 10, n: int | None = None)
     elif kind in ("apart", "pair"):
         x[: n // 2, 2] = np.nan
         x[n // 2 :, 6] = np.nan
+        if kind == "apart":
+            x[:, 4] = np.nan
     elif kind == "flat":
         x[:, 5] = 1.0
     elif kind == "levels":
