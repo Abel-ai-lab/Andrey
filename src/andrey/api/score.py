@@ -1458,7 +1458,8 @@ def xges(
     incomplete rows wherever enough rows remain to fit, and no more than the same search inside the
     structural EM of Gao et al. [6]_, in every setting measured. With few rows and about half of
     the values missing it was no better than the empty graph on denser graphs, as that EM was, and
-    test-wise deletion in :func:`~andrey.pc` made fewer errors in some settings on sparse graphs.
+    test-wise deletion in :func:`~andrey.pc` made fewer errors in some settings, mostly on sparse
+    graphs.
     The
     `0.20.0 release card <https://andrey.abel.ai/docs/benchmarks/0.20.0.html#missing-data>`__ has
     the settings.
@@ -2729,7 +2730,8 @@ def exact_search(
     incomplete rows wherever enough rows remain to fit, and no more than the same search inside the
     structural EM of Gao et al. [9]_, in every setting measured. With few rows and about half of
     the values missing it was no better than the empty graph on denser graphs, as that EM was, and
-    test-wise deletion in :func:`~andrey.pc` made fewer errors in some settings on sparse graphs.
+    test-wise deletion in :func:`~andrey.pc` made fewer errors in some settings, mostly on sparse
+    graphs.
     The
     `0.20.0 release card <https://andrey.abel.ai/docs/benchmarks/0.20.0.html#missing-data>`__ has
     the settings.

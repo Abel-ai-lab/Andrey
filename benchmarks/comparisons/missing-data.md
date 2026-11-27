@@ -868,9 +868,10 @@ repeats, and below the empty graph in its claimed setting.
   and `grasp` is better in its own.
 - `xges`, `exact_search`, and `dagma` with `missing="em"` are supported against the same search as
   the M-step of MissDAG's EM (Gao et al., 2022): none is worse in any cell that repeats on fresh
-  datasets, each gives the same answer on the real rows and on rows rebuilt from the expected
-  covariance, and each meets the floor wherever it decides a cell. The glue is ours: rows rebuilt
-  from the expected covariance, and least-squares weights for the two BIC searches.
+  datasets, the reference's search gives the same SHD on the real rows and on rows rebuilt from
+  their covariance on every complete dataset, and each meets the floor wherever it decides a cell.
+  The glue is ours: rows rebuilt from the expected covariance, and least-squares weights for the
+  two BIC searches.
 - `calm` with `missing="em"` is supported against the floor and the complete-data fit, as MissDAG's
   EM around `calm` did not finish within the cost limit and no reference exists to compare it with.
   It runs with `w_threshold=0.0`, the value of the paper and the authors' code, which keeps an edge

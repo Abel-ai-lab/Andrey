@@ -17,9 +17,9 @@ names its pull request.
   `[scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]` replaces
   `generate(Ensemble(scms=scms, seeds=range(10), n=500))`. ([#1221])
 - `calm`'s `w_threshold` defaults to 0.0, not 0.3: with no weight threshold, an edge is kept wherever
-  its gate reaches `gate_threshold`, as in the paper and the authors' code. A fit keeps more edges
-  than before, with `missing="em"` and on complete data. `w_threshold=0.3` gives the old behavior.
-  ([#1286])
+  its gate reaches `gate_threshold`, as in the paper and the authors' code. A fit can keep more
+  edges than before, with `missing="em"` and on complete data. `w_threshold=0.3` gives the old
+  behavior. ([#1286])
 
 ### Added
 

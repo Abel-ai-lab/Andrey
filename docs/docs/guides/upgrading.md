@@ -42,7 +42,7 @@ datasets = [scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]
 ### The weight threshold of `calm`
 
 `calm` keeps an edge wherever its gate reaches `gate_threshold`, with `w_threshold=0.0`, the value of
-the paper and the authors' code, where 0.19 used 0.3. Its graphs keep more edges, with
+the paper and the authors' code, where 0.19 used 0.3. Its graphs can keep more edges, with
 `missing="em"` and on complete data. To get the former graphs, pass the former value:
 
 ```python
