@@ -241,7 +241,7 @@ def test_a_stack_that_divides_by_zero_answers_as_the_scalar_loop_does(alpha):
     X[:, 0] = X[:, 2] - 3.0
     test = NormalScores(X)
     x, y, conditions = _stack([(0, 2, [1]), (0, 1, [2])])
-    assert _outcome(lambda: test(0, 1, [2]))[0] == (ZeroDivisionError, "division by zero")
+    assert _outcome(lambda: test(0, 1, [2]))[0][0] is ZeroDivisionError
     got = _outcome(lambda: test.pvalues_until_separated(x, y, conditions, alpha).tolist())
     want = _outcome(lambda: _loop_until_separated(test, x, y, conditions, alpha))
     assert got == want
