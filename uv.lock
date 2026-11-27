@@ -135,11 +135,11 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2" },
     { name = "pygraphviz", marker = "extra == 'viz'", specifier = ">=2" },
     { name = "pyyaml", specifier = ">=6" },
-    { name = "scikit-learn", specifier = ">=1.5" },
+    { name = "scikit-learn", specifier = ">=1.9" },
     { name = "scipy", specifier = ">=1.13" },
     { name = "statsmodels", specifier = ">=0.14" },
     { name = "threadpoolctl", specifier = ">=3" },
-    { name = "torch", marker = "extra == 'torch'", specifier = ">=2.2", index = "https://download.pytorch.org/whl/cpu", conflict = { package = "andrey-core", extra = "torch" } },
+    { name = "torch", marker = "extra == 'torch'", specifier = ">=2.5", index = "https://download.pytorch.org/whl/cpu", conflict = { package = "andrey-core", extra = "torch" } },
     { name = "typer", specifier = ">=0.12.4" },
 ]
 provides-extras = ["torch", "viz", "all"]

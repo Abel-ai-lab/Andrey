@@ -12,6 +12,9 @@ names its pull request.
 
 ### Breaking
 
+- Andrey needs scikit-learn 1.9 or later (it was 1.5), and the `torch` extra needs PyTorch 2.5 or
+  later (it was 2.2). An environment that pins an older version of either must upgrade it before it
+  installs this release. ([#1336])
 - `andrey.data.generate` and `andrey.data.Ensemble` are removed, as their warning said they would be
   in 0.16.0. A loop over `SCM.sample` draws the same datasets:
   `[scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]` replaces
@@ -216,6 +219,19 @@ names its pull request.
   each cross-validation fold grows only through the round where its early stop cuts it, and the
   repeated input checks of the many small fits are skipped, so the methods that take them as
   `indep_test` run faster, with the same output bit for bit. ([#1309])
+- `dagma`, and `notears` with `robust=True`, take each Adam step from the gradient of the loss and
+  of the penalty alone, without computing their values, and `dagma` forms `s * I` once per stage.
+  `notears`, with and without `robust=True`, and `dynotears` compute the matrix exponential of the
+  acyclicity constraint through SciPy's own kernels on SciPy 1.15 and later, after a check at import
+  that they return the bytes of `scipy.linalg.expm`, which computes it for any other SciPy, for a
+  diagonal or triangular matrix, and for any error. These fits run faster, with the same output bit
+  for bit. ([#1339])
+- The shrink step of `iamb` and `inter_iamb`, and so of `calm` and `rsmax2` with `restrict="iamb"`,
+  asks every member it has not visited in one call where the test answers many queries at once: with
+  `fisherz`, `student_t`, or `normal_scores` on complete data, it drops the first member found
+  independent and asks the members after it again given the smaller blanket, so these searches run
+  faster, with the same output bit for bit and the same queries. For contributors, `DEVELOPMENT.md`
+  says that tests a speed change computes ahead and discards do not count. ([#1347])
 - `calm` runs faster, with the same output bit for bit: each Adam step of its optimizer is applied
   as the in-place tensor operations of `torch.optim.Adam`, so the first fit in a process no
   longer builds an optimizer, which imports `torch._dynamo` and its dependencies. ([#1343])
@@ -3211,5 +3227,8 @@ First alpha release.
 [#1327]: https://github.com/Abel-ai-lab/Andrey/pull/1327
 [#1329]: https://github.com/Abel-ai-lab/Andrey/pull/1329
 [#1331]: https://github.com/Abel-ai-lab/Andrey/pull/1331
+[#1336]: https://github.com/Abel-ai-lab/Andrey/pull/1336
+[#1339]: https://github.com/Abel-ai-lab/Andrey/pull/1339
 [#1341]: https://github.com/Abel-ai-lab/Andrey/pull/1341
 [#1343]: https://github.com/Abel-ai-lab/Andrey/pull/1343
+[#1347]: https://github.com/Abel-ai-lab/Andrey/pull/1347
