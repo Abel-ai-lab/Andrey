@@ -205,6 +205,13 @@ names its pull request.
   groups of one row that miss the same number of columns are solved together, so a fit whose rows
   mostly differ in their pattern, as with values missing completely at random, spends much less time
   in the E-step. ([#1329])
+- `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` search the
+  causal order faster with `measure="skew"` or `"tanh"`, and return the same output bit for bit
+  with every measure. With `"skew"`, each column's sign comes from the mean of `x * x * x` when that
+  mean is clear of the rounding of either computation, and from `np.mean(x**3, axis=0)` on every
+  column when any column's mean is not. Every measure residualizes the columns that remain after
+  each pick with the picked column's variance taken once per step, which is what `compute_residual`
+  computes column by column. ([#1331])
 
 ### Fixed
 
@@ -3189,3 +3196,4 @@ First alpha release.
 [#1325]: https://github.com/Abel-ai-lab/Andrey/pull/1325
 [#1327]: https://github.com/Abel-ai-lab/Andrey/pull/1327
 [#1329]: https://github.com/Abel-ai-lab/Andrey/pull/1329
+[#1331]: https://github.com/Abel-ai-lab/Andrey/pull/1331

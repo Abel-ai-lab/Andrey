@@ -275,8 +275,27 @@ def score_skew(X: np.ndarray, U: list[int]) -> np.ndarray:
     if len(U) < 2:
         return np.zeros(len(U), dtype=np.float64)
     x = _standardized(X, U)
-    x = x * np.where(np.mean(x**3, axis=0) < 0, -1.0, 1.0)
+    x = x * _skew_signs(x)
     return _violations(x, _negative_square)
+
+
+def _skew_signs(x: np.ndarray) -> np.ndarray:
+    """The sign of each column's third moment, ``-1.0`` where ``np.mean(x**3, axis=0) < 0``, else
+    ``1.0``.
+
+    The mean of ``x * x * x`` takes the sign when it lies farther from zero than the rounding of
+    either computation can move a mean of ``n`` cubes: ``2 * (n + 3) * eps * mean(|x * x * x|)``,
+    for any order of summation. When any column lies within that bound, or holds a ``NaN``, every
+    column takes the expression above, so each sign is the one that expression gives.
+    """
+    cube = x * x
+    cube *= x
+    mean = cube.mean(axis=0)
+    np.abs(cube, out=cube)
+    bound = 2.0 * (len(x) + 3.0) * np.finfo(np.float64).eps * cube.mean(axis=0)
+    if not np.all(np.abs(mean) > bound):
+        mean = np.mean(x**3, axis=0)
+    return np.where(mean < 0, -1.0, 1.0)
 
 
 def scorer(measure: str) -> Callable[[np.ndarray, list[int]], np.ndarray]:
@@ -416,7 +435,25 @@ def find_causal_order(
                 m = pick(values[allowed], [c for c, ok in zip(candidates, allowed) if ok], ranks)
         placed = [m, *copies[m]]
         remaining = [u for u in remaining if u not in placed]
-        for i in remaining:
-            residualized[:, i] = compute_residual(residualized[:, i], residualized[:, m])
+        residualize(residualized, remaining, m)
         order += placed
     return order
+
+
+def residualize(X: np.ndarray, remaining: list[int], m: int) -> None:
+    """Replace each column ``remaining`` of ``X`` by its :func:`compute_residual` on column ``m``.
+
+    In place. The variance of column ``m`` is taken once, and each covariance runs the operations
+    of ``np.cov`` for ``ddof=0``, so every column has the bits :func:`compute_residual` gives.
+    """
+    if not remaining:
+        return
+    b = X[:, m]
+    var_b = np.var(b)
+    inv_n = np.true_divide(1, len(b))
+    for i in remaining:
+        centered = np.array([X[:, i], b])
+        centered -= centered.mean(axis=1)[:, None]
+        cov = np.dot(centered, centered.T.conj())
+        cov *= inv_n
+        X[:, i] = X[:, i] - (cov[0, 1] / var_b) * b
