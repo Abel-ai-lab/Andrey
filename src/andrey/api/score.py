@@ -768,8 +768,8 @@ def fges(
     paths, so that a pair is independent in the data while its edge improves the score once other
     variables are in the graph, FGES adds that edge only if the pair ends a path of two edges that
     is not a collider in the graph the first pass returned; GES can add it anywhere, so use
-    :func:`~andrey.ges` there. When unmeasured common causes are plausible, use
-    :func:`~andrey.fci`.
+    :func:`~andrey.ges` there, or ``one_edge_faithfulness=False``. When unmeasured common causes
+    are plausible, use :func:`~andrey.fci`.
 
     **How it works.** FGES scores the one-edge graph of every pair against the empty graph under
     the plain BIC (the likelihood and the ``penalty_discount`` penalty, without the extended-BIC
@@ -783,7 +783,10 @@ def fges(
     path ``m *-* n *-* y`` that is not a collider. They are recomputed from the graph after each
     applied move, and a target whose sources changed is scanned again. The pass runs a forward
     phase over these candidates without the marginal screen, then the backward phase again, so a
-    pair that was married to orient a collider can be divorced. The paper [2]_ also gives FGES a
+    pair that was married to orient a collider can be divorced. With
+    ``one_edge_faithfulness=False``, a third forward and backward pass scans every pair on the graph
+    the second pass returned, as GES does, which drops the assumption; [2]_ reports that this mode
+    runs considerably longer. The paper [2]_ also gives FGES a
     parallel and cached scoring scheme, which GES here shares, and fixes the BIC penalty at 4 times
     the standard one for continuous data; ``penalty_discount`` keeps the default of ``1.0`` that
     every method shares.

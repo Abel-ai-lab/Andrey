@@ -109,6 +109,26 @@ def test_fges_cover_pass_does_not_worsen_the_score(monkeypatch: pytest.MonkeyPat
         assert full <= screen_only + 1e-9
 
 
+def test_fges_without_one_edge_faithfulness_adds_a_pair_both_passes_miss(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    x = _canceling_data()
+    _screen_only(monkeypatch)
+    assert not _adjacent(andrey.fges(x))[0, 3]
+    unfaithful = andrey.fges(x, one_edge_faithfulness=False)
+    assert _adjacent(unfaithful)[0, 3]
+    assert np.array_equal(unfaithful.structure.to_numpy(), andrey.ges(x).structure.to_numpy())
+
+
+def test_fges_without_one_edge_faithfulness_does_not_worsen_the_score():
+    for x in (_canceling_data(), _chain_data(seed=4), _chain_data(n=300, d=12, seed=5)):
+        faithful = andrey.fges(x, penalty_discount=4.0, ebic_gamma=0.0).metadata["score"]
+        unfaithful = andrey.fges(
+            x, penalty_discount=4.0, ebic_gamma=0.0, one_edge_faithfulness=False
+        )
+        assert unfaithful.metadata["score"] <= faithful + 1e-9
+
+
 def test_cover_sources_are_the_two_step_noncolliders():
     # 0 - 1 - 2 -> 3 <- 4: the collider at 3 does not make 2 and 4 candidates for each other.
     adj = np.zeros((5, 5), dtype=np.int8)
@@ -152,11 +172,14 @@ def test_fges_screen_is_the_plain_bic_bump_of_each_pair(ebic_gamma: float):
 @pytest.mark.parametrize(
     "x", [_chain_data(n=500, d=10), _canceling_data()], ids=["chain", "cancel"]
 )
-def test_fges_is_the_same_graph_in_worker_processes(monkeypatch: pytest.MonkeyPatch, x: np.ndarray):
-    serial = andrey.fges(x).structure.to_numpy()
+@pytest.mark.parametrize("one_edge_faithfulness", [True, False])
+def test_fges_is_the_same_graph_in_worker_processes(
+    monkeypatch: pytest.MonkeyPatch, x: np.ndarray, one_edge_faithfulness: bool
+):
+    serial = andrey.fges(x, one_edge_faithfulness=one_edge_faithfulness).structure.to_numpy()
     monkeypatch.setenv("ANDREY_GES_PARALLEL_MIN_WORK", "0")
     with andrey.config(n_jobs=2):
-        pooled = andrey.fges(x).structure.to_numpy()
+        pooled = andrey.fges(x, one_edge_faithfulness=one_edge_faithfulness).structure.to_numpy()
     assert np.array_equal(serial, pooled)
 
 
