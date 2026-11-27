@@ -137,7 +137,9 @@ example `uv run pytest tests/unit -k <name>`; a pull request's CI runs every tes
 `release`.
 
 `prek install` (or `pre-commit install`) adds the hooks in `.pre-commit-config.yaml` to your
-checkout, so formatting, lint, and a scan for secrets run on every commit.
+checkout, so formatting, lint, line endings, and a scan for secrets run on every commit. Text files
+use LF line endings: git stores them with LF whatever your editor saves, and
+`ruff format --check` fails a Python file that has CRLF.
 
 ### 6. Open the pull request
 

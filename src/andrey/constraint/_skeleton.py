@@ -54,6 +54,18 @@ _VOTE_CHUNK = 64
 #: How the PC and FCI families and PCMCI+ decide an unshielded triple (:func:`vote_triples`).
 COLLIDER_RULES: tuple[str, ...] = ("sepsets", "conservative", "majority")
 
+# The most candidates whose membership in a skip set :func:`subset_rows` reads one by one in Python;
+# past it, ``np.isin`` on the whole array is faster.
+_SET_LOOKUP_LABELS = 300
+
+# The most entries of the ``(pairs, d)`` candidate mask that one block of the size-1 pass
+# (:func:`first_order_removals`) builds.
+_FIRST_ORDER_MASK_ENTRIES = 1 << 18
+
+# A block of the size-1 pass lists its candidates from the endpoints' neighbor lists, not from the
+# mask, when this many times the listed neighbors are fewer than the mask's entries.
+_LISTED_FACTOR = 8
+
 # The most bytes of correlation submatrices one stacked evaluation of scan_pairs holds: a stack of
 # B queries of conditioning size k takes 8 * B * (k + 2) ** 2 bytes, and holds at least one chunk.
 # Its inverse and index arrays take about twice as much again, in each process that scans.
@@ -145,14 +157,23 @@ def subset_rows(
     entirely inside ``skip_within`` when it is given and holds ``size`` members or more, as the
     rows of ``(N, size)`` int arrays of ``CHUNK`` rows each, the last one fewer and none empty.
 
-    The rows come from the cached position tables a block at a time (:func:`blocks`,
-    :func:`block_positions`), so no subset passes through a tuple.
+    The rows come from the cached position tables, so no subset passes through a tuple: all of a
+    size of two or more at once when they fit in one chunk, else a block at a time
+    (:func:`blocks`, :func:`block_positions`). Each yielded array is a copy; the tables are never
+    written.
     """
     labels = np.asarray(candidates, dtype=np.intp)
     n = len(labels)
     inside = None
     if skip_within is not None and len(skip_within) >= size:
-        inside = np.isin(labels, np.fromiter(skip_within, np.intp, len(skip_within)))
+        inside = _members(labels, skip_within)
+    if 1 < size <= n and comb(n, size) <= CHUNK:
+        rows = _combination_table(n, size)
+        if inside is not None:
+            rows = rows[~inside[rows].all(axis=1)]
+        if len(rows):
+            yield labels[rows]
+        return
     held: list[np.ndarray] = []
     count = 0
     for block in blocks(n, size, CHUNK):
@@ -169,6 +190,14 @@ def subset_rows(
             held, count = [rows[CHUNK:]], count - CHUNK
     if count:
         yield labels[np.concatenate(held)]
+
+
+def _members(labels: np.ndarray, members: set[int]) -> np.ndarray:
+    """Whether each of ``labels`` is in ``members``: a set lookup for up to
+    ``_SET_LOOKUP_LABELS`` labels, ``np.isin`` for more."""
+    if len(labels) > _SET_LOOKUP_LABELS:
+        return np.isin(labels, np.fromiter(members, np.intp, len(members)))
+    return np.fromiter((label in members for label in labels.tolist()), bool, len(labels))
 
 
 def kept_apart(
@@ -411,15 +440,24 @@ def first_order_removals(
     Each pair ``x < y`` is tested against its start-of-size snapshot conditioners: either
     endpoint's ``neighbors`` minus the pair, in PC and FCI alike. ``separating`` holds the
     conditioners whose test separates the pair, ascending (the separating-set key order), and ``p``
-    is the largest p-value among the pair's tests, or ``None`` when ``record_pvalues`` is false. A
-    FisherZ or StudentT test evaluates the queries of consecutive pairs in one stack
-    (:func:`_stacked_first_order`); another test evaluates each pair's candidates in one
-    ``first_order_pvalues`` call. The queries are built as they are evaluated, so the pass holds
-    one stack however many pairs and conditioners it tests. With ``trace`` given, every test is
-    recorded, pair by pair.
+    is the largest p-value among the pair's tests, or ``None`` when ``record_pvalues`` is false.
+
+    Without a ``trace``, a test that takes canonical query arrays (:func:`_canonical_route`) and
+    deletes no rows per test has its queries built from arrays (:func:`_array_first_order`): the
+    pass holds a ``(d, d)`` boolean adjacency matrix, a candidate mask of at most
+    ``_FIRST_ORDER_MASK_ENTRIES`` entries, and one stack, however many pairs and conditioners it
+    tests. Any other pass goes pair by pair, building the queries as it evaluates them, so it holds
+    one stack however many pairs and conditioners it tests: a FisherZ or StudentT test evaluates
+    the queries of consecutive pairs in one stack (:func:`_stacked_first_order`), another test
+    each pair's candidates in one ``first_order_pvalues`` call. With ``trace`` given, every test
+    is recorded, pair by pair.
     """
-    queries = _first_order_queries(pairs, neighbors, test if trace is None else None)
     canonical = _canonical_route(test)
+    if trace is None and canonical is not None and not isinstance(test, TestwiseDeletion):
+        found = _array_first_order(canonical, pairs, neighbors, alpha, record_pvalues)
+        if found is not None:
+            return found
+    queries = _first_order_queries(pairs, neighbors, test if trace is None else None)
     tested = (
         _stacked_first_order(canonical, queries)
         if canonical is not None
@@ -438,6 +476,101 @@ def first_order_removals(
             p = max(pvals[passing].tolist()) if record_pvalues else None
             removals.append((x, y, tuple(candidates[k] for k in passing.tolist()), p))
     return removals
+
+
+def _array_first_order(
+    pvalues: Callable[..., np.ndarray],
+    pairs: list[tuple[int, int]],
+    neighbors: list[np.ndarray],
+    alpha: float,
+    record_pvalues: bool,
+) -> list[Removal] | None:
+    """:func:`first_order_removals` from arrays, for ``pvalues`` that take canonical query arrays.
+
+    A block of pairs takes its queries from the candidates of both endpoints less the pair, pair
+    by pair and each pair's candidates ascending (:func:`_mask_candidates`, or
+    :func:`_listed_candidates` when the neighbor lists are short against the block's mask),
+    evaluates them in stacks of ``_STACK_BYTES`` of submatrices, and cuts each pair's separating
+    candidates and largest p-value from the results. Each p-value is the one
+    :func:`_stacked_first_order` gets, as the first-order closed form is elementwise, so the
+    removals are the same. ``None`` when an evaluation raises, so the caller's pair-by-pair pass
+    raises the error it raises.
+    """
+    d = len(neighbors)
+    adjacent = np.zeros((d, d), dtype=bool)
+    for i, nb in enumerate(neighbors):
+        adjacent[i, nb] = True
+    both = np.array(pairs, dtype=np.intp).reshape(-1, 2)
+    sizes = np.fromiter((nb.size for nb in neighbors), np.intp, d)
+    flat = np.concatenate(neighbors) if sizes.sum() else np.empty(0, dtype=np.intp)
+    offsets = np.concatenate(([0], np.cumsum(sizes)[:-1]))
+    step = max(1, _FIRST_ORDER_MASK_ENTRIES // max(d, 1))
+    limit = max(1, _STACK_BYTES // (8 * 3**2))
+    removals: list[Removal] = []
+    for start in range(0, len(both), step):
+        xs, ys = both[start : start + step, 0], both[start : start + step, 1]
+        listed = int(sizes[xs].sum() + sizes[ys].sum())
+        if _LISTED_FACTOR * listed < len(xs) * d:
+            which, zs = _listed_candidates(flat, offsets, sizes, xs, ys, d)
+        else:
+            which, zs = _mask_candidates(adjacent, xs, ys)
+        if not which.size:
+            continue
+        qx, qy = xs[which], ys[which]
+        values = np.empty(which.size, dtype=np.float64)
+        try:
+            for at in range(0, which.size, limit):
+                cut = slice(at, at + limit)
+                values[cut] = pvalues(qx[cut], qy[cut], zs[cut].reshape(-1, 1))
+        except Exception:
+            return None
+        passing = values > alpha
+        if not passing.any():
+            continue
+        which, zs, values = which[passing], zs[passing], values[passing]
+        starts = np.flatnonzero(np.diff(which, prepend=-1))
+        stops = np.append(starts[1:], which.size).tolist()
+        tops = np.maximum.reduceat(values, starts).tolist() if record_pvalues else None
+        members = zs.tolist()
+        for k, (i, a, b) in enumerate(zip(which[starts].tolist(), starts.tolist(), stops)):
+            x, y = pairs[start + i]
+            removals.append((x, y, tuple(members[a:b]), None if tops is None else tops[k]))
+    return removals
+
+
+def _mask_candidates(
+    adjacent: np.ndarray, xs: np.ndarray, ys: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """``(pair index, candidate)`` of each query of the pairs ``(xs[i], ys[i])``, in pair order and
+    candidates ascending: the rows of ``adjacent[xs] | adjacent[ys]`` less ``xs[i]`` and
+    ``ys[i]``."""
+    mask = adjacent[xs] | adjacent[ys]
+    rows = np.arange(len(xs))
+    mask[rows, xs] = False
+    mask[rows, ys] = False
+    which, zs = np.nonzero(mask)
+    return which, zs
+
+
+def _listed_candidates(
+    flat: np.ndarray, offsets: np.ndarray, sizes: np.ndarray, xs: np.ndarray, ys: np.ndarray, d: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """:func:`_mask_candidates` from the neighbor lists, concatenated in ``flat`` with the start of
+    column ``i``'s at ``offsets[i]`` and its length ``sizes[i]``: both endpoints' lists, less the
+    pair, sorted by ``pair * d + candidate`` and deduplicated, so a block of pairs in a wide, sparse
+    graph costs its listed neighbors, not ``len(xs) * d`` mask entries."""
+    ends = np.concatenate((xs, ys))
+    owner = np.concatenate((np.arange(len(xs)), np.arange(len(ys))))
+    lens = sizes[ends]
+    total = int(lens.sum())
+    if not total:
+        return np.empty(0, dtype=np.intp), np.empty(0, dtype=np.intp)
+    first = np.repeat(offsets[ends] - (np.cumsum(lens) - lens), lens) + np.arange(total)
+    zs = flat[first]
+    pair = np.repeat(owner, lens)
+    keep = (zs != xs[pair]) & (zs != ys[pair])
+    keys = np.unique(pair[keep] * d + zs[keep])
+    return keys // d, keys % d
 
 
 def _first_order_queries(
@@ -583,7 +716,11 @@ def _pair_chunks(
 ) -> Iterator[_Chunk]:
     """Yield ``(i, x, y, chunk)``, ``x < y``, for each chunk of subsets the per-pair scan of
     :func:`scan_pairs` evaluates in one call, in its order; ``i`` is the pair's position. With
-    ``test``, each side leaves out the candidates :func:`kept_apart` drops."""
+    ``test``, each side leaves out the candidates :func:`kept_apart` drops. Size 0 under test-wise
+    deletion reads them from arrays (:func:`_marginal_chunks`)."""
+    if size == 0 and isinstance(test, TestwiseDeletion):
+        yield from _marginal_chunks(pairs, test)
+        return
     for i, (a, b) in enumerate(pairs):
         x, y = min(a, b), max(a, b)
         for side_a, side_b, candidates, seen in _sides(neighbors, a, b, size):
@@ -594,6 +731,33 @@ def _pair_chunks(
                 [(candidates, seen)] = kept
             for chunk in subset_rows(candidates, size, seen):
                 yield i, x, y, chunk
+
+
+# The one set of size 0, as the rows of an ``(N, 0)`` int array; never written.
+_NO_SET = np.empty((1, 0), dtype=np.intp)
+_NO_SET.flags.writeable = False
+
+
+def _marginal_chunks(pairs: list[tuple[int, int]], test: TestwiseDeletion) -> Iterator[_Chunk]:
+    """:func:`_pair_chunks` at size 0 under test-wise deletion, from the matrix ``test.together()``
+    that is read once.
+
+    A pair some row observes together yields the empty set as its one chunk: the first endpoint
+    tests it, and the second skips what the first tested. Any other pair is counted as one query
+    not tested, as :func:`kept_apart` counts it, when the scan reaches it, so the counts and the
+    chunks interleave as the per-pair scan's do.
+    """
+    if not pairs:
+        return
+    together = test.together()
+    flat = np.fromiter(chain.from_iterable(pairs), np.intp, 2 * len(pairs))
+    a, b = flat[0::2], flat[1::2]
+    observed = (together[a, a] & together[b, a] & together[a, b] & together[b, b]).tolist()
+    for i, ((x, y), seen) in enumerate(zip(pairs, observed)):
+        if seen:
+            yield (i, x, y, _NO_SET) if x < y else (i, y, x, _NO_SET)
+        else:
+            test.count_not_tested(x, y, 1, [[]])
 
 
 def _stacks(
