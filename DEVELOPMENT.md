@@ -428,6 +428,18 @@ release or topic branch it deselects the heavy accuracy checks with `-m "not rel
 pull request into `main` runs every test, the `release`-marked ones included, and so do CI's other
 triggers: a push to `main`, a manual run, and the tag's site deploy.
 
+At each release's freeze the test suite also runs, outside CI, on the oldest versions
+`pyproject.toml` allows: Python 3.11 with every direct dependency at its declared floor. It must
+pass; a failure raises that floor to the oldest version that passes. The pytest tools install
+apart, since `--resolution lowest-direct` would give them their oldest releases too:
+
+```shell
+uv venv --python 3.11 .venv-lowest
+uv pip install -p .venv-lowest --resolution lowest-direct -e ".[torch,viz]"
+uv pip install -p .venv-lowest pytest pytest-xdist
+.venv-lowest/bin/python -m pytest -m "not release" -n auto --dist loadfile
+```
+
 At each release's freeze the benchmark harness's own tests run too, outside CI: CI runs only the two
 endpoint-conversion files of `benchmarks/tests`, and the rest, which need the harness environments,
 drift when nothing runs them. `benchmarks/run_tests.sh` builds every environment (the
