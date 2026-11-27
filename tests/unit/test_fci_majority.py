@@ -131,9 +131,14 @@ def test_majority_runs_after_possible_dsep_only(engine, monkeypatch):
         )
     events.clear()
     implicit = fit(arr).structure.to_numpy()
-    assert "majority" not in events
-    explicit = fit(arr, collider_rule="sepsets").structure.to_numpy()
+    default = "majority" if engine == "fci" else "sepsets"  # gfci keeps the separating sets
+    assert ("majority" in events) == (default == "majority")
+    events.clear()
+    explicit = fit(arr, collider_rule=default).structure.to_numpy()
     np.testing.assert_array_equal(implicit, explicit)
+    events.clear()
+    fit(arr, collider_rule="sepsets")
+    assert "majority" not in events
 
 
 @pytest.mark.parametrize("rule", ["r0", "r1", "r3", "r7", "r9", "r10"])

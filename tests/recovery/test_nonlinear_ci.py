@@ -48,9 +48,29 @@ def test_partial_correlation_misses_the_nonmonotone_links():
 # RCoT is left out: at this case's 400 rows, below the 500 its warning names, a true independence
 # falls below 0.05 for some feature seeds, so the graph follows the seed; the many-graph test
 # below checks RCoT.
-@pytest.mark.parametrize("indep_test", [a for a in CI_TESTS if a != "RCoT"], indirect=True)
-def test_pc_recovers_the_nonmonotone_graph(indep_test):
-    out = andrey.pc(datagen.generate(CASE), indep_test=indep_test)
+# GPDC with the majority rule leaves the case's collider undirected: at its 400 rows the vote does
+# not separate the ends of the triple.
+RECOVERY = [
+    pytest.param(
+        name,
+        rule,
+        marks=pytest.mark.xfail(
+            strict=True,
+            raises=AssertionError,
+            reason="the vote leaves the collider undirected",
+        )
+        if (name, rule) == ("GPDC", "majority")
+        else (),
+    )
+    for name in CI_TESTS
+    if name != "RCoT"
+    for rule in ("sepsets", "majority")
+]
+
+
+@pytest.mark.parametrize(("indep_test", "collider_rule"), RECOVERY, indirect=["indep_test"])
+def test_pc_recovers_the_nonmonotone_graph(indep_test, collider_rule):
+    out = andrey.pc(datagen.generate(CASE), indep_test=indep_test, collider_rule=collider_rule)
     assert datagen.to_variables(CASE, out.structure).oriented_edges() == TRUE_EDGES
 
 
