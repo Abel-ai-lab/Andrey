@@ -200,11 +200,12 @@ names its pull request.
   with one `searchsorted` in `validate` and in the check that halves a `dag` or `cpdag` store, and
   a store loaded with its entries out of order or repeated takes the earlier code. ([#1325])
 - `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` search the
-  causal order faster, with the same output bit for bit. With `measure="skew"`, each column's sign
-  comes from the mean of `x * x * x` when that mean is clear of the rounding of either computation,
-  and from `np.mean(x**3, axis=0)` on every column when any column's mean is not. Every measure
-  residualizes the columns that remain after each pick with the picked column's variance taken once
-  per step, which is what `compute_residual` computes column by column. ([#1331])
+  causal order faster with `measure="skew"` or `"tanh"`, and return the same output bit for bit
+  with every measure. With `"skew"`, each column's sign comes from the mean of `x * x * x` when that
+  mean is clear of the rounding of either computation, and from `np.mean(x**3, axis=0)` on every
+  column when any column's mean is not. Every measure residualizes the columns that remain after
+  each pick with the picked column's variance taken once per step, which is what `compute_residual`
+  computes column by column. ([#1331])
 
 ### Fixed
 
