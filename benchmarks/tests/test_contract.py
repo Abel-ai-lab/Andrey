@@ -50,7 +50,7 @@ def test_the_row_schema_is_what_it_says():
         "run_id",
         "scheduler", "setup_s", "shuffle",
         "standardize", "status", "structure_hash", "tau_max", "threads", "times", "topology",
-        "tree_peak_mem_mb",
+        "tree_peak_mem_mb", "tree_peak_pss_mb",
         "varsortability", "wall_s", "warmup", "warmup_s",
     )  # fmt: skip
 

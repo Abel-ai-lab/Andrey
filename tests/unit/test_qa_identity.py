@@ -469,6 +469,31 @@ def test_counting_records_the_queries_of_a_test_that_deletes_rows(
     }
 
 
+def test_counting_records_one_query_per_candidate_of_a_scan_on_missing_values(
+    x: np.ndarray,
+) -> None:
+    """A scan of one conditioning set on data with missing values counts as the separate queries
+    it answers, in the data's columns and in the order of its candidates."""
+    gapped = x[:200].copy()
+    gapped[::5, 3] = np.nan
+    scanned, alone = make_indep_test("fisherz", gapped), make_indep_test("fisherz", gapped)
+    with identity.counting(alpha=0.0) as together:  # every p > 0 separates its pair
+        scanned.statistic_pvalues_given(0, [3, 2], [1])
+    with identity.counting(alpha=0.0) as apart:
+        alone.statistic_pvalue(0, 3, [1])
+        alone.statistic_pvalue(0, 2, [1])
+    assert (
+        together.summary()
+        == apart.summary()
+        == {
+            "ci_queries": 2,
+            "ci_after_separation": 0,
+            "ci_sets": {"1": 1},
+        }
+    )
+    assert together.separated == apart.separated == {(0, 3), (0, 2)}
+
+
 def test_a_query_that_is_not_tested_counts_and_separates_nothing(x: np.ndarray) -> None:
     """A pair never observed together is asked, so the search's path is counted, and answers NaN."""
     gapped = x.copy()
