@@ -165,6 +165,9 @@ names its pull request.
   penalties of the solution path. The consistent DAG extension of a PDAG, the objective that `ges`,
   `gies`, `lges`, `xges`, and `ages` report, and the neighborhoods the `ges`, `gies`, `lges`, and
   `ages` scans read take each row's nodes of a graph from one `np.nonzero`. ([#1311])
+- `pcmci` and `pcmciplus` on data with missing values stop the scan that picks each candidate's
+  conditions once it has the ones the PC1 rounds keep, so they run faster on tens of variables,
+  with the same output bit for bit. ([#1315])
 
 ### Fixed
 
@@ -3141,3 +3144,4 @@ First alpha release.
 [#1306]: https://github.com/Abel-ai-lab/Andrey/pull/1306
 [#1307]: https://github.com/Abel-ai-lab/Andrey/pull/1307
 [#1311]: https://github.com/Abel-ai-lab/Andrey/pull/1311
+[#1315]: https://github.com/Abel-ai-lab/Andrey/pull/1315
