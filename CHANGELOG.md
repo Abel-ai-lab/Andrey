@@ -88,6 +88,10 @@ names its pull request.
   list the sets of a small neighborhood at once, so they run faster on many variables, with the
   same output bit for bit. The size-1 pass holds a boolean matrix of the variables' adjacency.
   ([#1287])
+- `resit`, `camuv`, `loci`, `anm`, `pnl`, `rcd`, `bottom_up_parce_lingam`, `gin`, `cpcm`,
+  `score_matching`, `das`, `nogam`, `skewd` with `criterion="independence"`, and the queries of
+  `indep_test="kci"` without a conditioning set build their Gaussian kernel matrices faster, with the
+  same output bit for bit. ([#1290])
 - `pc`, `fci`, `cdnod`, and `fci_jci` with `missing="testwise"` and `fisherz` or `student_t`
   build the conditioning-size-0 pass from arrays, and so does the search for the separating sets of
   the pairs that knowledge makes non-adjacent, so they run faster on many variables, with the same
@@ -3052,4 +3056,5 @@ First alpha release.
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
 [#1287]: https://github.com/Abel-ai-lab/Andrey/pull/1287
 [#1289]: https://github.com/Abel-ai-lab/Andrey/pull/1289
+[#1290]: https://github.com/Abel-ai-lab/Andrey/pull/1290
 [#1296]: https://github.com/Abel-ai-lab/Andrey/pull/1296
