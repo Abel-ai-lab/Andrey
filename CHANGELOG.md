@@ -240,6 +240,12 @@ names its pull request.
 - `calm` runs faster, with the same output bit for bit: each Adam step of its optimizer is applied
   as the in-place tensor operations of `torch.optim.Adam`, so the first fit in a process no
   longer builds an optimizer, which imports `torch._dynamo` and its dependencies. ([#1343])
+- `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `bottom_up_parce_lingam`,
+  `varma_lingam`, `longitudinal_lingam`, and `rcd` run faster, with the same output bit for bit: the
+  least-squares fits of their adaptive Lasso weights, refits, and residuals solve a finite float64
+  design with the steps of scikit-learn's `LinearRegression` (centering, `scipy.linalg.lstsq` with
+  its `tol` as `cond`, and its intercept) without the estimator's input checks, and any other input
+  still goes through it. ([#1359])
 
 ### Fixed
 
@@ -3238,3 +3244,4 @@ First alpha release.
 [#1343]: https://github.com/Abel-ai-lab/Andrey/pull/1343
 [#1347]: https://github.com/Abel-ai-lab/Andrey/pull/1347
 [#1352]: https://github.com/Abel-ai-lab/Andrey/pull/1352
+[#1359]: https://github.com/Abel-ai-lab/Andrey/pull/1359
