@@ -92,6 +92,10 @@ names its pull request.
   `score_matching`, `das`, `nogam`, `skewd` with `criterion="independence"`, and the queries of
   `indep_test="kci"` without a conditioning set build their Gaussian kernel matrices faster, with the
   same output bit for bit. ([#1290])
+- `iamb` and `inter_iamb` on data with missing values and `fisherz` or `student_t`, the default
+  test, ask the test-wise deletion test for each grow scan at once and read its p-values as one
+  array, so these searches run faster on tens of variables, with the same output bit for bit.
+  ([#1299])
 
 ### Fixed
 
@@ -3053,3 +3057,4 @@ First alpha release.
 [#1287]: https://github.com/Abel-ai-lab/Andrey/pull/1287
 [#1289]: https://github.com/Abel-ai-lab/Andrey/pull/1289
 [#1290]: https://github.com/Abel-ai-lab/Andrey/pull/1290
+[#1299]: https://github.com/Abel-ai-lab/Andrey/pull/1299
