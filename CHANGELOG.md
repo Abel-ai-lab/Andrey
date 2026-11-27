@@ -24,7 +24,7 @@ names its pull request.
   one-edge graph scores better than the empty graph, a pass that covers the unshielded noncolliders,
   and, by default, a pass over every pair, which drops the one-edge assumption.
   `one_edge_faithfulness=True` skips that last pass: it favors time and memory on large sparse
-  graphs and gives up the edges the one-edge screen skips. ([#TBD])
+  graphs and gives up the edges the one-edge screen skips. ([#1324])
 
 ### Changed
 
@@ -3163,3 +3163,4 @@ First alpha release.
 [#1311]: https://github.com/Abel-ai-lab/Andrey/pull/1311
 [#1314]: https://github.com/Abel-ai-lab/Andrey/pull/1314
 [#1315]: https://github.com/Abel-ai-lab/Andrey/pull/1315
+[#1324]: https://github.com/Abel-ai-lab/Andrey/pull/1324
