@@ -120,6 +120,7 @@ CI_SEARCHES = (
 PCMCI_FAMILY = ("pcmci", "pcmciplus", "lpcmci")
 SCORE_SEARCHES = (
     "ges",
+    "fges",
     "gies",
     "xges",
     "hc",
@@ -133,7 +134,7 @@ SCORE_SEARCHES = (
     "boss_fci",
     "grasp_fci",
 )
-PURE_SCORE = ("ges", "gies", "xges", "lges", "hc", "tabu", "exact_search", "boss", "grasp")
+PURE_SCORE = ("ges", "fges", "gies", "xges", "lges", "hc", "tabu", "exact_search", "boss", "grasp")
 CONTINUOUS = ("notears", "dagma")
 LINGAM = (
     "direct_lingam",
@@ -1226,6 +1227,7 @@ _CONCEPTS = (
         suitable=(
             *CI_SEARCHES,
             "ges",
+            "fges",
             "hc",
             "exact_search",
             "boss",
@@ -1300,6 +1302,7 @@ _CONCEPTS = (
                 "Not taken yet: the paper defines the search for complete data; structural EM "
                 "would suit it as it suits ges.",
                 "lges",
+                "fges",
             ),
             *_exempt(
                 "Its regressions on the other variables, and the tests of their smooth terms, "
@@ -1558,6 +1561,7 @@ _CONCEPTS = (
                 "Not taken yet: the paper defines the search for data from one environment; ges "
                 "is the score search that takes env.",
                 "lges",
+                "fges",
             ),
             *_exempt(
                 "Its model reads the noise of continuous variables, which an environment label "

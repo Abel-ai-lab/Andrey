@@ -698,6 +698,44 @@ _add(
     )
 )
 _add(
+    REGISTRY["ges"].model_copy(
+        update={
+            "name": "fges",
+            "summary": "Fast greedy equivalence search: GES arranged for large sparse graphs. Its "
+            "first forward phase adds an edge only between variables whose one-edge graph scores "
+            "better than the empty graph, a second pass covers the unshielded noncolliders, and a "
+            "third pass scans every pair. one_edge_faithfulness=true skips the third pass, which "
+            "saves time and memory and can miss an edge between variables that are independent "
+            "in the data and linked through canceling paths. Takes the scores, penalties, "
+            "max_parents, and knowledge of ges. The score is in metadata['score'].",
+            "data": DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+            "output": OutputSpec(
+                structure_type="graph",
+                graph_kind="cpdag",
+                doc="score in metadata['score']; metadata['categorical'] lists the categorical "
+                "columns a mixed-data setting read",
+            ),
+            "status": "experimental",
+            "params": (
+                *REGISTRY["ges"].params,
+                ParamSpec(
+                    name="one_edge_faithfulness",
+                    type="bool",
+                    default=False,
+                    doc="Assume one-edge faithfulness: no edge between two variables whose "
+                    "one-edge graph does not improve the score over the empty graph, unless the "
+                    "pass that covers the unshielded noncolliders adds it. true favors time and "
+                    "memory on large sparse graphs and gives up the edges the one-edge screen "
+                    "skips; false, the default, adds a third forward and backward pass over every "
+                    "pair on the graph the first two reached, as GES scans it, and favors the "
+                    "graphs GES finds.",
+                ),
+            ),
+            "references": ("Ramsey et al. 2017", "Chickering 2002"),
+        }
+    )
+)
+_add(
     MethodSpec(
         name="gies",
         family="score",
@@ -3573,6 +3611,7 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "grasp_fci": "The GRaSP phase searches as grasp does; the test phase starts from the "
     "adjacencies GRaSP found and never removes a required pair. " + _PAG_MARKS + _ENV_FREE,
     "ges": _MOVE_RULE + _CLASS_RULE + " " + _ENV_FREE,
+    "fges": _MOVE_RULE + _CLASS_RULE,
     "gies": _MOVE_RULE + _CLASS_RULE,
     "gnies": _MOVE_RULE + _CLASS_RULE,
     "xges": _MOVE_RULE + _CLASS_RULE,
@@ -3877,7 +3916,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "iamb": ("target", "markov_blanket"),
     "inter_iamb": ("target", "markov_blanket"),
     "mmpc": ("target", "parents_and_children"),
-    **dict.fromkeys(("gies", "xges", "lges", "mmhc", "rsmax2"), ("score",)),
+    **dict.fromkeys(("fges", "gies", "xges", "lges", "mmhc", "rsmax2"), ("score",)),
     **dict.fromkeys(
         ("ges", "hc", "tabu", "boss", "grasp"), ("score", "index_edges", "changing_variables")
     ),

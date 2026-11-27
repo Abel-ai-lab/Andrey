@@ -383,7 +383,8 @@ def ges(
     .. [2] Ramsey, J., Glymour, M., Sanchez-Romero, R., and Glymour, C. (2017). A million variables
        and more: the Fast Greedy Equivalence Search algorithm for learning high-dimensional
        graphical causal models, with an application to functional magnetic resonance images.
-       International Journal of Data Science and Analytics 3(2), 121-129.
+       International Journal of Data Science and Analytics 3(2), 121-129. The pseudocode is in
+       Supplement 1 of the article.
     .. [3] Heckerman, D., Geiger, D., and Chickering, D. M. (1995). Learning Bayesian networks:
        the combination of knowledge and statistical data. Machine Learning 20(3), 197-243.
     .. [4] Andrews, B., Ramsey, J., and Cooper, G. F. (2019). Learning high-dimensional directed
@@ -629,6 +630,242 @@ def ages(
         graph, penalties, taken = _ages(X, penalty_discount=penalty_discount)
     metadata = {"path_penalties": penalties, "path_aggregated": taken}
     return structure_output(graph, labels=labels, metadata=metadata)
+
+
+@method_spec("fges")
+def fges(
+    data: npt.ArrayLike,
+    *,
+    score_func: str | None = None,
+    penalty_discount: float = 1.0,
+    ebic_gamma: float = 1.0,
+    equivalent_sample_size: float = 1.0,
+    max_parents: int | None = None,
+    categorical: Sequence[str | int] | None = None,
+    one_edge_faithfulness: bool = False,
+    knowledge: Knowledge | None = None,
+) -> StructureOutput:
+    """Learn a CPDAG from observational data with fast greedy equivalence search (FGES).
+
+    FGES is GES [1]_ arranged for large sparse graphs [2]_: its first forward phase adds an edge
+    between two variables only when the graph of that single edge scores better than the empty
+    graph, a second pass covers the unshielded noncolliders that phase left, and by default a third
+    pass scans every pair. It returns the same kind of result as :func:`~andrey.ges`, from the same
+    scores and the same search.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    score_func : str or None, default=None
+        Local score objective: ``"bic"``, the linear-Gaussian BIC, for continuous data.
+        ``"normal_scores"``, experimental, is ``"bic"`` on each column's normal scores, for
+        continuous data that are Gaussian only after an unknown increasing transformation of each
+        column. ``"bdeu"`` is the BDeu score [3]_ and ``"discrete_bic"`` the multinomial BIC [6]_,
+        for categorical data coded by whole numbers. ``"degen_gauss"`` (degenerate Gaussian) [4]_
+        and ``"cond_gauss"`` (conditional Gaussian) [5]_ are BIC scores for mixed data, continuous
+        and categorical columns. ``None`` picks from the declared column types: ``"bdeu"`` when
+        every column is categorical, ``"cond_gauss"`` when some are, else ``"bic"``. A column is
+        declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
+        type, never by its values. See Notes. ``metadata["score_func"]`` names the score the fit
+        used: the one picked from the declared column types when this is ``None``.
+    penalty_discount : float, default=1.0
+        Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
+        linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is
+        the standard BIC. Must be finite and non-negative. BDeu ignores it; for the multinomial BIC
+        it weighs ``log(n)`` per free parameter of a variable's conditional probability table.
+    ebic_gamma : float, default=1.0
+        Weight on the extended-BIC term [7]_ of the linear-Gaussian BIC: each variable's score adds
+        ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
+        parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` and ``"normal_scores"`` use it: passing it
+        with another score raises ``ValueError``. See Notes.
+    equivalent_sample_size : float, default=1.0
+        The equivalent sample size of the BDeu score: how many rows the uniform prior over each
+        variable's conditional distributions is worth. A larger value weighs the prior more
+        against the data, and the graph can change with it. Must be finite and positive. Only
+        ``"bdeu"`` uses it: passing it with another score raises ``ValueError``.
+    max_parents : int or None, default=None
+        A cap on every node's parents, at least ``0``: no DAG the returned CPDAG represents gives a
+        node more than ``max_parents`` parents, and some DAG reaches each node's count. A move whose
+        CPDAG would break the cap, in either phase, is skipped for the next best move. A cap can
+        stop the search short of the lowest-scoring graph, which GES otherwise finds. ``None`` sets
+        no cap; the forward phase then keeps its gate of ``n_variables / 2``. See Notes.
+    categorical : sequence of str or int, optional
+        The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
+        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and text columns,
+        never a column by its values. ``[]`` marks none. A categorical score reads every column as
+        categorical, and a continuous score raises ``ValueError`` on a declared column, named here
+        or by its type. See *Data types* in the
+        :doc:`getting-started guide </docs/guides/getting-started>`.
+    one_edge_faithfulness : bool, default=False
+        Whether to assume one-edge faithfulness [2]_: no edge is added between two variables whose
+        one-edge graph does not improve the score over the empty graph, unless the pass that covers
+        the unshielded noncolliders adds it. ``False``, the default, drops the assumption: a third
+        forward and backward pass scans every pair on the graph the first two passes reached, as
+        GES does, so such an edge can still be added. It favors the graphs GES finds and gives up
+        part of the time and memory ``True`` saves. ``True`` favors time and memory on large sparse
+        graphs and gives up the edges the one-edge screen skips. See Notes.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
+        removes a required one, and the search starts from the required edges. The result directs
+        every edge the knowledge decides, then Meek's rules direct the edges that follow, as
+        :class:`~andrey.Knowledge` describes.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
+        ``"fges"`` and ``metadata["score"]`` the score of the result; lower is better. For BIC, it
+        is the sum over variables of ``n * log(residual variance) + penalty_discount * log(n) *
+        n_parents + 2 * ebic_gamma * log C(n_variables - 1, n_parents)``; for BDeu, ``-2`` times the
+        log of the structure prior times the marginal likelihood; for the multinomial BIC and the
+        mixed-data scores, see Notes. Directed marks
+        (``->``) are oriented edges, undirected (``--``) the ones the equivalence class leaves open.
+        Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it
+        read, by name or 0-based position. ``metadata["tie_break"]`` is the tie-break rule the fit
+        ran under, ``andrey.config.tie_break``, and ``metadata`` also records the penalties its
+        score used, under their parameter names.
+
+    Raises
+    ------
+    TypeError
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
+    ValueError
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a 2-D numeric
+        matrix with at least two rows and no ``NaN`` or ``inf``, or if a column is constant; if a
+        given ``max_parents`` is below the parents some graph of the required edges of
+        ``knowledge`` gives a node; with a categorical score, if ``data`` holds a number that is not
+        whole; or, with a mixed-data score, if ``categorical`` names a column ``data`` lacks, or if
+        a categorical column holds a number that is not whole. Also if a continuous score meets
+        a column declared categorical, by ``categorical`` or by its type. With the BIC score, also
+        if a column repeats another up to scale and shift given more than two rows or, with more
+        rows than columns, is a linear function of other columns. One message names every group of
+        copies and says to keep one column per group. Also if ``knowledge`` names a column ``data``
+        lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a mixed-data score finds no declared categorical column and so runs as the
+        linear-Gaussian form, or when a setting reads columns that look like category codes as
+        numbers. Each message warns once per process.
+    ExperimentalWarning
+        On the first call in a process: the method is not supported (see Limitations), and its
+        API may change without deprecation.
+
+    Notes
+    -----
+    **When to use.** FGES makes the assumptions of GES: i.i.d. observational data, no unmeasured
+    common causes, and, with the BIC score on continuous data, linear relations with Gaussian noise.
+    It takes the scores, penalties, ``max_parents``, and background knowledge of :func:`~andrey.ges`
+    (see it for the scores and how to choose ``penalty_discount``) and returns the equivalence
+    class. Use it instead of GES on sparse graphs with many variables, where it takes less time.
+    When time and memory decide and the graph is large and sparse, use
+    ``one_edge_faithfulness=True``, which skips the pass over every pair. When unmeasured common
+    causes are plausible, use :func:`~andrey.fci`.
+
+    **How it works.** FGES scores the one-edge graph of every pair against the empty graph under
+    the plain BIC (the likelihood and the ``penalty_discount`` penalty, without the extended-BIC
+    term of ``ebic_gamma``, as in [2]_). A pair whose one-edge graph does not improve that score by
+    the margin a move needs gets no edge in the first forward phase, in either direction. That
+    phase and a backward phase are the search of :func:`~andrey.ges` otherwise: each target scans
+    only the sources that pass, with the same cached candidates and worker processes, and the
+    backward phase considers every edge. The second pass is steps fGES.9-11 of the pseudocode in
+    Supplement 1 of [2]_. For each target ``y``, the candidate sources are the nodes ``m`` not
+    adjacent to ``y`` that share a neighbor ``n`` with it unless ``m -> n <- y``: the ends of a
+    path ``m *-* n *-* y`` that is not a collider. They are recomputed from the graph after each
+    applied move, and a target whose sources changed is scanned again. The pass runs a forward
+    phase over these candidates without the marginal screen, then the backward phase again, so a
+    pair that was married to orient a collider can be divorced. Unless
+    ``one_edge_faithfulness=True``, a third forward and backward pass scans every pair on the graph
+    the second pass returned, as GES does, which drops the assumption; [2]_ reports that this mode
+    runs considerably longer. The paper [2]_ also gives FGES a parallel and cached scoring scheme,
+    which GES here shares, and fixes the BIC penalty at 4 times the standard one for continuous
+    data; ``penalty_discount`` keeps the default of ``1.0`` that every method shares.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score sums one term per
+    variable over every row; terms over different rows do not sum to one dataset's score, so the
+    search cannot delete rows per test as conditional-independence searches do. Drop the incomplete
+    rows yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
+
+    **Limitations.** By default FGES makes no more errors than :func:`~andrey.ges`, and often
+    fewer on denser graphs, in less time. Its time and memory still grow with the number of
+    variables much as GES's do, because the third pass scans every pair, so very large graphs can
+    exceed practical time for this implementation. ``one_edge_faithfulness=True`` trades accuracy
+    for speed and memory: it takes less time and holds less memory on large sparse graphs, and
+    makes more errors than GES, because a pair whose variables show no link on their own is not
+    added in the first phase, so an edge whose effect shows only once other variables are in the
+    graph can be missed, more so with the standard BIC at a large ``penalty_discount``, as in
+    [2]_, and on denser graphs. The
+    `0.20.0 release card <https://andrey.abel.ai/docs/benchmarks/0.20.0.html#fges>`__ has the
+    measurements.
+
+    References
+    ----------
+    .. [1] Chickering, D. M. (2002). Optimal structure identification with greedy search. JMLR 3,
+       507-554.
+    .. [2] Ramsey, J., Glymour, M., Sanchez-Romero, R., and Glymour, C. (2017). A million variables
+       and more: the Fast Greedy Equivalence Search algorithm for learning high-dimensional
+       graphical causal models, with an application to functional magnetic resonance images.
+       International Journal of Data Science and Analytics 3(2), 121-129. The pseudocode is in
+       Supplement 1 of the article.
+    .. [3] Heckerman, D., Geiger, D., and Chickering, D. M. (1995). Learning Bayesian networks:
+       the combination of knowledge and statistical data. Machine Learning 20(3), 197-243.
+    .. [4] Andrews, B., Ramsey, J., and Cooper, G. F. (2019). Learning high-dimensional directed
+       acyclic graphs with mixed data-types. Proceedings of Machine Learning Research 104, 4-21.
+    .. [5] Andrews, B., Ramsey, J., and Cooper, G. F. (2018). Scoring Bayesian networks of mixed
+       variables. International Journal of Data Science and Analytics 6(1), 3-18.
+    .. [6] Schwarz, G. (1978). Estimating the dimension of a model. Annals of Statistics 6(2),
+       461-464.
+    .. [7] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
+       selection with large model spaces. Biometrika 95(3), 759-771.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from andrey import fges
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(500)
+    >>> y = rng.standard_normal(500)
+    >>> z = x + y + 0.5 * rng.standard_normal(500)
+    >>> fges(pd.DataFrame({"x": x, "y": y, "z": z})).structure.oriented_edges()
+    [('x', 'z', 'directed'), ('y', 'z', 'directed')]
+    """
+    from andrey.search.fges import fges as _fges
+
+    assert score_func is not None  # method_spec picks it from the column types
+    X, mask, labels, constraints = fit_inputs(
+        data, "score_func", score_func, categorical, knowledge, method="fges"
+    )
+    with copies_named(labels):
+        cpdag, score = _fges(
+            X,
+            score_func=score_func,
+            penalty_discount=penalty_discount,
+            ebic_gamma=ebic_gamma,
+            equivalent_sample_size=equivalent_sample_size,
+            max_parents=max_parents,
+            categorical=mask,
+            constraints=constraints,
+            one_edge_faithfulness=one_edge_faithfulness,
+        )
+    return structure_output(
+        cpdag,
+        labels=labels,
+        metadata={
+            "score": json_safe(score),
+            **categorical_metadata(mask, data),
+        },
+    )
 
 
 @method_spec("gies")

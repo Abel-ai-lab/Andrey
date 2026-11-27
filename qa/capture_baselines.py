@@ -113,6 +113,7 @@ ALGORITHMS = {
     "FCIJCI": (_run_fci_jci, "gauss_5v"),
     "ICP": (_run_icp, "gauss_5v"),
     "GES": (_facade("ges", penalty_discount=2.0), "gauss_5v"),
+    "FGES": (_facade("fges", penalty_discount=2.0), "gauss_5v"),
     "GIES": (_facade("gies", penalty_discount=2.0), "gauss_5v"),
     "GnIES": (_run_gnies, "gauss_5v_noise_shift"),
     "IGSP": (_run_igsp, "gauss_5v_noise_shift"),

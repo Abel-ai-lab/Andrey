@@ -81,6 +81,8 @@ def ges(
     workers: int | None = None,
     sources: tuple[int, ...] = (),
     cov: np.ndarray | None = None,
+    one_edge: bool = False,
+    all_pairs: bool = False,
     _parent_rule: str = "cap",
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by Greedy Equivalence Search over a BIC, categorical, or mixed-data score.
@@ -143,6 +145,16 @@ def ges(
         ``data``, such as the expected covariance of data with missing values
         (:mod:`andrey.search.em`); ``data`` then sets only the rows and the tie-break ranks
         (:func:`~andrey.core.ties.tie_ranks`), and may hold ``NaN``. ``None`` reads the data's.
+    one_edge : bool
+        One-edge faithfulness, the search of :func:`~andrey.search.fges.fges`: the first forward
+        phase adds an edge only between variables whose one-edge graph scores better than the empty
+        graph under the plain BIC, without the extended-BIC term
+        (:func:`~andrey.search._parallel_ges.one_edge_screen`); a second forward and backward pass
+        then adds edges between the ends of paths of two edges that are not colliders
+        (:func:`~andrey.search._parallel_ges.cover_sources`).
+    all_pairs : bool
+        With ``one_edge``, a third forward and backward pass over every pair on the graph the first
+        two reached, which drops the one-edge assumption. Without ``one_edge`` it changes nothing.
     _parent_rule : {"cap", "gate"}
         Private lever for the benchmark harness: ``"gate"`` reads ``max_parents`` as the forward
         phase's gate, the rule of the default of ``n_features / 2``: a node that holds more than
@@ -188,6 +200,8 @@ def ges(
             constraints=constraints,
             cap=cap,
             sources=sources,
+            one_edge=one_edge,
+            all_pairs=all_pairs,
         )
         total = recompute_objective(adj, score, n)
     if constraints is not None:
