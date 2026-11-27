@@ -9,6 +9,7 @@ one table, a per-configuration loop for a conditional test, the BDeu formula wri
 from __future__ import annotations
 
 import math
+import tracemalloc
 from itertools import combinations, permutations
 
 import numpy as np
@@ -668,6 +669,29 @@ def test_table_counts_reuse_the_code_of_shared_first_parents(monkeypatch, batch,
                 for table, reference in zip(got, expected, strict=True):
                     assert table.dtype == reference.dtype
                     np.testing.assert_array_equal(table, reference)
+
+
+def test_table_counts_hold_the_codes_of_few_prefixes_of_a_long_set(monkeypatch):
+    """A set of many parents that do not grow its table, here constant columns, is counted with the
+    codes of at most ``BATCH_CELLS`` entries held for shared prefixes, and its table is the one
+    :func:`configurations` numbers."""
+    n = 2000
+    monkeypatch.setattr(categorical, "BATCH_CELLS", 3 * n)
+    rng = np.random.default_rng(4)
+    x = np.column_stack([rng.integers(0, 3, n), rng.integers(0, 2, n), np.zeros((n, 300))])
+    codes, cards = categorical.encode(x)
+    sets = [tuple(range(1, 302)), tuple(range(1, 301)), (1, *range(2, 302, 2)), (1, 2)]
+    expected = [_counts_by_configurations(codes, cards, 0, s) for s in sets]
+    tracemalloc.start()
+    try:
+        got = categorical.table_counts(codes, cards, 0, sets)
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+    for table, reference in zip(got, expected, strict=True):
+        assert table.dtype == reference.dtype
+        np.testing.assert_array_equal(table, reference)
+    assert peak < 40 * n * 8  # a prefix per parent would hold 300 arrays of n integers
 
 
 def _mixed_tables(seed: int = 0, n: int = 400) -> np.ndarray:
