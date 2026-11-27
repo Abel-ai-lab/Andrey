@@ -59,6 +59,8 @@ names its pull request.
   authors' code does. For contributors, `DEVELOPMENT.md` and `CONTRIBUTING.md` give the pytest flags
   CI runs, `-n logical --dist loadfile`, and the `calm` required-edge cell of the concepts test and
   one drawing test skip when torch or pygraphviz is missing. ([#1247])
+- The 0.3.0 post's method table lists GIES, exact search, and CALM as supported, as they have
+  been since 0.7.0, and an update note points to the 0.7.0 release card. ([#1254])
 - For contributors, SkewD's tests of a property that holds for every optimizer run on L-BFGS-B in
   pull requests, and their CMA-ES cases, with the CMA-ES recovery tests, carry the `release` mark, so
   the unit tests of `tests/unit/test_skewd.py` take 140 s on one core instead of 625 s, and the macOS
@@ -3013,4 +3015,5 @@ First alpha release.
 [#1243]: https://github.com/Abel-ai-lab/Andrey/pull/1243
 [#1245]: https://github.com/Abel-ai-lab/Andrey/pull/1245
 [#1247]: https://github.com/Abel-ai-lab/Andrey/pull/1247
+[#1254]: https://github.com/Abel-ai-lab/Andrey/pull/1254
 [#1257]: https://github.com/Abel-ai-lab/Andrey/pull/1257
