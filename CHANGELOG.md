@@ -92,6 +92,9 @@ names its pull request.
   `score_matching`, `das`, `nogam`, `skewd` with `criterion="independence"`, and the queries of
   `indep_test="kci"` without a conditioning set build their Gaussian kernel matrices faster, with the
   same output bit for bit. ([#1290])
+- `nogam` runs faster: each fold of its cross-validated kernel regressions is assembled from slices
+  of the kernel, the kernels are built in place, and the repeated non-finite checks of the Cholesky
+  steps are skipped, with the same output bit for bit. ([#1298])
 
 ### Fixed
 
@@ -3053,3 +3056,4 @@ First alpha release.
 [#1287]: https://github.com/Abel-ai-lab/Andrey/pull/1287
 [#1289]: https://github.com/Abel-ai-lab/Andrey/pull/1289
 [#1290]: https://github.com/Abel-ai-lab/Andrey/pull/1290
+[#1298]: https://github.com/Abel-ai-lab/Andrey/pull/1298
