@@ -73,24 +73,21 @@ def least_squares(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]
 def _float_target(scaled: np.ndarray, y: np.ndarray) -> np.ndarray | None:
     """``y`` as float64 when :func:`least_squares` solves the pair directly, else ``None``.
 
-    That is a finite float64 ``scaled`` with at least one row and one column, and a real-number
-    ``y`` of one or two dimensions with the rows of ``scaled`` and, when two-dimensional, at least
-    one column, whose float64 values are finite.
+    That is a finite float64 ``scaled`` and a ``y`` of real numbers whose float64 values are finite,
+    both plain arrays, with ``scaled`` of at least one row and one column and ``y`` of one or two
+    dimensions, at least one column when two, and the rows of ``scaled``.
     """
     if not (
-        isinstance(scaled, np.ndarray)
+        type(scaled) is np.ndarray
         and scaled.dtype == np.float64
         and scaled.ndim == 2
         and scaled.shape[0] >= 1
         and scaled.shape[1] >= 1
-    ):
-        return None
-    y = np.asarray(y)
-    if (
-        y.dtype.kind not in "fiu"
-        or y.ndim not in (1, 2)
-        or y.shape[0] != scaled.shape[0]
-        or y.size == 0
+        and type(y) is np.ndarray
+        and y.dtype.kind in "fiu"
+        and y.ndim in (1, 2)
+        and y.shape[0] == scaled.shape[0]
+        and y.size > 0
     ):
         return None
     target = np.array(y, dtype=np.float64)

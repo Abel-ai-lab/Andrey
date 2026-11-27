@@ -178,6 +178,8 @@ def invalid_inputs():
         "object y": (X[:, :3], X[:, 3].astype(object)),
         "complex y": (X[:, :3], X[:, 3].astype(complex)),
         "string y": (X[:, :3], np.array(["a"] * 30)),
+        "masked y": (X[:, :3], np.ma.masked_array(X[:, 3], mask=np.arange(30) == 4)),
+        "list y": (X[:, :3], X[:, 3].tolist()),
     }
 
 
