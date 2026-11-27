@@ -2,9 +2,11 @@
 
 A cache that answers a call with the entry of an earlier call that differed in a setting its key
 leaves out returns a stale result. The module-level caches are listed in ``MODULE_CACHES``, so a
-new one fails here until its key is checked; the tests below check each cache whose result can
-change while its key does not: the library pools a BLAS limit reaches, a conditioning threshold,
-the environment columns of a test, and the rows of a score.
+new one fails here until its key is checked. Of the caches inside objects, the tests below cover
+the ones with a setting that can change after the object is built or differ between calls: the
+library pools a BLAS limit reaches, a conditioning threshold, the environment columns of a test,
+and the rows of a score. The others, which hold the result of data and settings fixed when the
+object is built, are not checked here.
 """
 
 from __future__ import annotations

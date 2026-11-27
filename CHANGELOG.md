@@ -76,9 +76,9 @@ names its pull request.
   (`chisq`, `gsq`, `bdeu`, and `discrete_bic`) refused it as a code of "2**53 or more", and reading
   the columns as numbers (`categorical=[]`) kept it as a value and returned another graph.
   ([#1241])
-- The limit to one BLAS thread that a fit runs under reaches a library imported after the first fit,
-  such as torch's OpenMP pool, which it missed because the pools were found once per process.
-  ([#1259])
+- The limit to one BLAS thread that a fit runs under reaches a library imported before the fit starts
+  and after the first fit of the process, such as torch's OpenMP pool, which it missed because the
+  pools were found once per process. ([#1259])
 
 ## [0.19.0] - 2026-11-24
 
