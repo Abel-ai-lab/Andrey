@@ -55,13 +55,14 @@ from __future__ import annotations
 
 import copy
 import math
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from functools import lru_cache
 from typing import Protocol, Self, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
 from scipy.linalg import get_lapack_funcs
+from scipy.sparse import csr_array
 from scipy.sparse.csgraph import connected_components
 from scipy.special import gammaln
 
@@ -215,21 +216,51 @@ def copy_groups(corr: np.ndarray, n: int) -> tuple[tuple[int, ...], ...]:
     Parameters
     ----------
     corr : ndarray, shape (d, d)
-        Correlation matrix of the data's columns.
+        Correlation matrix of the data's columns. It is read in blocks of whole rows of at most
+        ``COPY_BLOCK_ENTRIES`` entries, so the check holds about one such block beyond it.
     n : int
         Sample count.
     """
-    if n <= 2 or corr.shape[0] < 2:
+    d = corr.shape[0]
+    if n <= 2 or d < 2:
         return ()
-    alike = np.abs(corr)
-    np.fill_diagonal(alike, 0.0)
-    copies = 1.0 - alike**2 <= ZERO_RESIDUAL
-    if not copies.any():
+    return _connected_copies([_copy_pairs(corr[rows], rows) for rows in _row_blocks(d)], d)
+
+
+#: Correlation entries the copy check holds at once, 8 MB of float64.
+COPY_BLOCK_ENTRIES = 1 << 20
+
+
+def _row_blocks(d: int) -> Iterator[slice]:
+    """The rows ``0, ..., d - 1`` in order, in blocks of at most ``COPY_BLOCK_ENTRIES`` entries."""
+    step = max(1, COPY_BLOCK_ENTRIES // d)
+    return (slice(start, min(start + step, d)) for start in range(0, d, step))
+
+
+def _copy_pairs(block: np.ndarray, rows: slice) -> tuple[np.ndarray, np.ndarray]:
+    """Positions ``(i, j)``, ``i != j``, of the copies in ``block``, correlation rows ``rows``."""
+    alike = np.abs(block)
+    alike[np.arange(alike.shape[0]), np.arange(rows.start, rows.stop)] = 0.0
+    np.square(alike, out=alike)
+    np.subtract(1.0, alike, out=alike)
+    i, j = np.nonzero(alike <= ZERO_RESIDUAL)
+    return i + rows.start, j
+
+
+def _connected_copies(
+    pairs: Sequence[tuple[np.ndarray, np.ndarray]], d: int
+) -> tuple[tuple[int, ...], ...]:
+    """The groups of :func:`copy_groups` for the copies at positions ``pairs`` of ``d`` columns."""
+    i = np.concatenate([rows for rows, _ in pairs])
+    if not i.size:
         return ()
-    _, component = connected_components(copies, directed=False)
+    j = np.concatenate([columns for _, columns in pairs])
+    _, component = connected_components(
+        csr_array((np.ones(i.size), (i, j)), shape=(d, d)), directed=False
+    )
     members: dict[int, list[int]] = {}
-    for j, label in enumerate(component.tolist()):
-        members.setdefault(label, []).append(j)
+    for column, label in enumerate(component.tolist()):
+        members.setdefault(label, []).append(column)
     return tuple(tuple(group) for group in members.values() if len(group) > 1)
 
 
@@ -307,11 +338,18 @@ def check_columns(cov: np.ndarray, n: int, name: Callable[[int], str] | None = N
     if d < 2 or n <= 2:
         return
     sd = np.sqrt(variance)
-    corr = cov / np.outer(sd, sd)
-    groups = copy_groups(corr, n)
+    corr = np.empty((d, d), dtype=np.result_type(cov, sd)) if n > d else None
+    pairs = []
+    for rows in _row_blocks(d):
+        block = np.outer(sd[rows], sd)
+        np.divide(cov[rows], block, out=block)
+        if corr is not None:
+            corr[rows] = block
+        pairs.append(_copy_pairs(block, rows))
+    groups = _connected_copies(pairs, d)
     if groups:
         raise copies_error(groups)
-    if n <= d:
+    if corr is None:
         return
     if np.linalg.eigvalsh(corr)[0] > ZERO_RESIDUAL:
         return

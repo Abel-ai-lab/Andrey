@@ -9,16 +9,21 @@ from __future__ import annotations
 
 import itertools
 import re
+import tracemalloc
 
 import numpy as np
 import pytest
+from scipy.sparse.csgraph import connected_components
 from scipy.special import ndtri
 from scipy.stats import rankdata
 
+from andrey.core import score as score_module
 from andrey.core.score import (
+    ZERO_RESIDUAL,
     BICScore,
     CopiedColumnsError,
     Score,
+    check_columns,
     copy_groups,
     local_score_bic,
     make_score,
@@ -312,6 +317,92 @@ def test_copy_groups_joins_copies_of_copies_into_one_group():
 @pytest.mark.parametrize(("n", "d"), [(60, 8), (2, 3)])
 def test_copy_groups_is_empty_without_copies_or_with_two_rows(n, d):
     assert copy_groups(np.corrcoef(_columns(n, d), rowvar=False), n) == ()
+
+
+def _copies_by_definition(corr, n):
+    """The groups of copies from the whole matrix ``1 - corr**2 <= ZERO_RESIDUAL`` at once."""
+    alike = np.abs(corr)
+    np.fill_diagonal(alike, 0.0)
+    copies = 1.0 - alike**2 <= ZERO_RESIDUAL
+    if n <= 2 or not copies.any():
+        return ()
+    _, component = connected_components(copies, directed=False)
+    members = {}
+    for j, label in enumerate(component.tolist()):
+        members.setdefault(label, []).append(j)
+    return tuple(tuple(group) for group in members.values() if len(group) > 1)
+
+
+def _correlations(kind, n=80, d=40):
+    """Correlation matrices of the kinds the callers pass, with copies near the threshold."""
+    x = _columns(n, d, seed=3)
+    x[:, 30] = 3.0 * x[:, 4] - 1.0  # a chain 4 - 30 - 17 - 39 with a sign flip
+    x[:, 17] = -x[:, 30]
+    x[:, 39] = 2.0 * x[:, 17]
+    x[:, 9] = -0.5 * x[:, 25]
+    x[:, 12] = x[:, 11] + 1e-7 * x[:, 12]  # 1 - corr**2 near the threshold
+    x[:, 14] = x[:, 13] + 1e-6 * x[:, 14]
+    if kind == "corrcoef":
+        return np.corrcoef(x, rowvar=False)
+    if kind == "cov_over_sd":
+        cov = np.cov(x, rowvar=False)
+        sd = np.sqrt(np.diag(cov))
+        return cov / np.outer(sd, sd)
+    if kind == "pairwise":  # an identity filled pair by pair, with a pair that is not a number
+        corr = np.eye(d)
+        for (i, j), value in {(3, 9): 1.0 - 4e-13, (5, 6): 1.0 - 6e-13, (7, 8): np.nan}.items():
+            corr[i, j] = corr[j, i] = value
+        corr[3, 5] = corr[5, 3] = -(1.0 - 1e-13)
+        return corr
+    return np.corrcoef(_columns(n, d, seed=4), rowvar=False)
+
+
+@pytest.mark.parametrize("kind", ["corrcoef", "cov_over_sd", "pairwise", "no_copies"])
+@pytest.mark.parametrize("rows", [1, 7, 41])
+def test_copy_groups_in_any_block_of_rows_is_the_whole_matrix_definition(monkeypatch, kind, rows):
+    corr = _correlations(kind)
+    monkeypatch.setattr(score_module, "COPY_BLOCK_ENTRIES", rows * corr.shape[0])
+    before = corr.copy()
+    assert copy_groups(corr, 80) == _copies_by_definition(corr, 80)
+    assert corr.tobytes() == before.tobytes()
+
+
+@pytest.mark.parametrize("rows", [1, 7, 41])
+def test_check_columns_in_any_block_of_rows_finds_the_same_copies(monkeypatch, rows):
+    monkeypatch.setattr(score_module, "COPY_BLOCK_ENTRIES", rows * 8)
+    with pytest.raises(CopiedColumnsError) as error:
+        BICScore(_two_groups())
+    assert error.value.groups == ((1, 2, 7), (3, 5))
+
+
+@pytest.mark.parametrize("rows", [1, 7, 41])
+def test_check_columns_sends_the_whole_correlation_matrix_to_the_eigenvalue_check(
+    monkeypatch, rows
+):
+    cov = np.cov(_columns(200, 40), rowvar=False)
+    sd = np.sqrt(np.diag(cov))
+    seen = []
+    eigvalsh = np.linalg.eigvalsh
+    monkeypatch.setattr(score_module, "COPY_BLOCK_ENTRIES", rows * 40)
+    monkeypatch.setattr(np.linalg, "eigvalsh", lambda a: seen.append(a.copy()) or eigvalsh(a))
+    check_columns(cov, 200)
+    assert len(seen) == 1
+    assert seen[0].tobytes() == (cov / np.outer(sd, sd)).tobytes()
+
+
+@pytest.mark.parametrize(("check", "blocks"), [("copy_groups", 2), ("check_columns", 3)])
+def test_the_copy_check_holds_a_few_blocks_beyond_its_input(check, blocks):
+    n, d = 300, 1500
+    x = _columns(n, d)
+    matrix = np.corrcoef(x, rowvar=False) if check == "copy_groups" else np.cov(x, rowvar=False)
+    tracemalloc.start()
+    try:
+        start = tracemalloc.get_traced_memory()[0]
+        getattr(score_module, check)(matrix, n)
+        peak = tracemalloc.get_traced_memory()[1] - start
+    finally:
+        tracemalloc.stop()
+    assert peak < blocks * score_module.COPY_BLOCK_ENTRIES * matrix.itemsize
 
 
 def test_check_columns_names_every_group_of_copies_and_the_fix():
