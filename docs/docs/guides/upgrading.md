@@ -39,6 +39,19 @@ datasets = data.generate(data.Ensemble(scms=scms, seeds=range(10), n=500))
 datasets = [scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]
 ```
 
+### The weight threshold of `calm`
+
+`calm` keeps an edge wherever its gate reaches `gate_threshold`, with `w_threshold=0.0`, the value of
+the paper and the authors' code, where 0.19 used 0.3. Its graphs keep more edges, with
+`missing="em"` and on complete data. To get the former graphs, pass the former value:
+
+```python
+# 0.19
+out = andrey.calm(data)
+# 0.20
+out = andrey.calm(data, w_threshold=0.3)
+```
+
 ## From 0.14 to 0.15
 
 ### Former names from 0.12 and 0.14
