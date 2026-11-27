@@ -443,7 +443,8 @@ def test_counting_records_one_query_per_pvalue_of_a_batched_call(
     ("name", "kind"),
     [
         ("fisherz", ci_missing.GaussianDeletion),
-        ("chisq", ci_missing.TestwiseDeletion),
+        ("chisq", ci_missing.ChiSquareDeletion),
+        ("cond_gauss", ci_missing.TestwiseDeletion),
         ("cmiknn", ci_missing.BoundedDeletion),
     ],
 )
@@ -482,6 +483,32 @@ def test_counting_records_one_query_per_candidate_of_a_scan_on_missing_values(
     with identity.counting(alpha=0.0) as apart:
         alone.statistic_pvalue(0, 3, [1])
         alone.statistic_pvalue(0, 2, [1])
+    assert (
+        together.summary()
+        == apart.summary()
+        == {
+            "ci_queries": 2,
+            "ci_after_separation": 0,
+            "ci_sets": {"1": 1},
+        }
+    )
+    assert together.separated == apart.separated == {(0, 3), (0, 2)}
+
+
+def test_counting_records_one_query_per_candidate_of_a_chi_square_scan_on_missing_values(
+    x: np.ndarray,
+) -> None:
+    """A scan of one conditioning set on discrete data with missing values counts as the separate
+    queries it answers, in the data's columns and in the order of its candidates, though the
+    scan builds no test for most of them."""
+    gapped = np.digitize(x[:200], [-1.0, 1.0]).astype(np.float64)
+    gapped[::5, 3] = np.nan
+    scanned, alone = make_indep_test("chisq", gapped), make_indep_test("chisq", gapped)
+    with identity.counting(alpha=0.0) as together:  # every p > 0 separates its pair
+        scanned.pvalues_given(0, [3, 2], [1])
+    with identity.counting(alpha=0.0) as apart:
+        alone(0, 3, [1])
+        alone(0, 2, [1])
     assert (
         together.summary()
         == apart.summary()
