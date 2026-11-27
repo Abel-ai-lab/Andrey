@@ -152,7 +152,7 @@ the p-value that separated each pair under `rank`, in column order under `positi
 `collider_order` argument, `"p_value"` or `"column"`, overrides it for one call. Their
 `collider_rule="conservative"` and `"majority"`, and those of `fci`, `gfci`, `boss_fci`,
 `grasp_fci`, and `fci_jci`, decide each collider by a vote over the final skeleton's adjacencies,
-which does not read the column order.
+which does not read the column order. `pc` and `fci` take `"majority"` by default.
 
 The orientation rules of `pc`, `cdnod`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, and `fci_jci`,
 Meek's rules and FCI's R1-R10, run in rounds under `rank`: each round sets together everything the

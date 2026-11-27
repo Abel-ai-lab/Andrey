@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+from functools import partial
 
 import numpy as np
 import pandas as pd
@@ -376,6 +377,8 @@ def test_tie_break_position_fires_the_orientation_rules_in_column_order(name):
     # possible-d-separation step.
     kwargs = dict(collider_order="p_value") if name in ("pc", "cdnod") else {}
     kwargs |= dict(possible_dsep="fast") if name in ("fci", "gfci") else {}
+    # The draws are ones on which the rules disagree under the separating-set rule.
+    kwargs |= dict(collider_rule="sepsets") if name in ("pc", "fci") else {}
     module = "andrey.search.gfci" if name == "gfci" else f"andrey.constraint.{name}"
     engine = getattr(importlib.import_module(module), name)
     facade = getattr(andrey, name)
@@ -514,7 +517,8 @@ def test_pag_orientations_are_invariant_to_column_order(module, draw):
     """Seeds on which FCI's rules mark one endpoint both ways."""
     x = data.sample_scm(d=6, density=3.0, latents=1, **draw, scale="raw").data
     fit = getattr(importlib.import_module(module), module.rsplit(".", 1)[1])
-    assert _invariant_to_column_order(fit, x)
+    # The seeds are ones on which the rules disagree under the separating-set rule.
+    assert _invariant_to_column_order(partial(fit, collider_rule="sepsets"), x)
 
 
 @pytest.mark.parametrize("module", ["andrey.constraint.fci", "andrey.search.gfci"])

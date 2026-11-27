@@ -53,7 +53,7 @@ def pc(
     indep_test: str | None = None,
     degrees_of_freedom: str = "mean",
     collider_order: str | None = None,
-    collider_rule: str = "sepsets",
+    collider_rule: str = "majority",
     possibly_separable: str = "orient",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
@@ -80,23 +80,27 @@ def pc(
         Conditional-independence test. ``"fisherz"`` and ``"student_t"`` test partial correlation,
         for continuous data: ``"fisherz"`` applies Fisher's z-transform and the normal distribution;
         ``"student_t"`` applies the Student-t distribution, which is exact for Gaussian data at any
-        sample size. ``"normal_scores"`` applies ``"fisherz"`` to the normal scores of each column,
-        for data whose columns are monotone transformations of Gaussian variables: its p-values do
-        not change under a strictly increasing transformation of a column. ``"chisq"`` (Pearson's
-        chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by
-        whole numbers. ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional
-        Gaussian) test mixed data, continuous and categorical columns, by a likelihood ratio. Seven
-        more tests detect nonlinear dependence in continuous data, at a far higher cost per test:
-        ``"kci"`` is the kernel test; ``"rcot"`` its random-feature approximation; ``"cmiknn"`` a
-        nearest-neighbor conditional mutual information test; ``"gpdc"`` Gaussian-process regression
-        with a distance correlation test; and ``"gcm"``, ``"wgcm"``, and ``"pcm"`` the generalized,
-        weighted generalized, and projected covariance measures, which test the covariance of
-        regression residuals. ``None`` picks from the declared column types: ``"gsq"`` when every
-        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
-        declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
-        type, never by its values. See **Categorical data.** and **Mixed data.** in Notes. On mixed
-        data ``"cond_gauss"`` favors accuracy at about the time of ``"degen_gauss"``.
-        ``metadata["indep_test"]`` names the test used, including the choice for ``None``.
+        sample size; it favors exact p-values when the rows barely exceed the conditioning set, and
+        otherwise gives the graphs of ``"fisherz"``. ``"normal_scores"`` applies ``"fisherz"`` to
+        the normal scores of each column, for data whose columns are monotone transformations of
+        Gaussian variables: its p-values do not change under a strictly increasing transformation of
+        a column. It favors columns that are monotone transformations of Gaussian variables and data
+        with heavy-tailed noise; it gives up some adjacencies on Gaussian data with few rows.
+        ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test
+        categorical data, coded by whole numbers. ``"degen_gauss"`` (degenerate Gaussian) and
+        ``"cond_gauss"`` (conditional Gaussian) test mixed data, continuous and categorical columns,
+        by a likelihood ratio. Seven more tests detect nonlinear dependence in continuous data, at a
+        far higher cost per test: ``"kci"`` is the kernel test; ``"rcot"`` its random-feature
+        approximation; ``"cmiknn"`` a nearest-neighbor conditional mutual information test;
+        ``"gpdc"`` Gaussian-process regression with a distance correlation test; and ``"gcm"``,
+        ``"wgcm"``, and ``"pcm"`` the generalized, weighted generalized, and projected covariance
+        measures, which test the covariance of regression residuals. ``None`` picks from the
+        declared column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when
+        some are, else ``"fisherz"``. A column is declared categorical by ``categorical`` or by a
+        DataFrame's ``category``, ``bool``, or text type, never by its values. See **Categorical
+        data.** and **Mixed data.** in Notes. On mixed data ``"cond_gauss"`` favors accuracy at
+        about the time of ``"degen_gauss"``. ``metadata["indep_test"]`` names the test used,
+        including the choice for ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
@@ -111,20 +115,31 @@ def pc(
     collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, which decides between two colliders that would
         orient one edge in opposite directions. ``"p_value"`` orients first the collider whose
-        endpoints were separated with the largest p-value, so the colliders do not depend on the
-        column order. ``"column"`` orients them in column order and keeps the first of two that
-        conflict. ``None`` follows ``andrey.config.tie_break``: ``"p_value"`` under ``"rank"``,
-        ``"column"`` under ``"position"``. See Notes.
-    collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
+        endpoints were separated with the largest p-value; it favors fewer orientation errors than
+        orienting in column order, and colliders that do not depend on the column order.
+        ``"column"`` orients them in column order and keeps the first of two that conflict; it
+        favors matching position-ordered PC (``andrey.config.tie_break="position"``) and gives up
+        orientation accuracy. ``None`` follows ``andrey.config.tie_break``: ``"p_value"`` under
+        ``"rank"``, ``"column"`` under ``"position"``. See Notes.
+    collider_rule : {"sepsets", "conservative", "majority"}, default="majority"
         How PC decides whether ``z`` is a collider ``x -> z <- y`` on a triple ``x - z - y`` whose
-        ends are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the
-        separating set that removed the edge ``x - y``. ``"conservative"`` [11]_ and
-        ``"majority"`` [3]_ test ``x`` and ``y`` again given every subset of ``x``'s neighbors and
-        every subset of ``y``'s neighbors, and count the subsets that separate them
-        (``p >= alpha``). If at least one does, ``"conservative"`` makes ``z`` a collider when none
-        of them contains it and a non-collider when all do; ``"majority"`` when fewer than half
-        contain it and when more than half do. Any other triple is ambiguous, and no rule orients
-        through it. Both run up to ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
+        ends are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating
+        set that removed the edge ``x - y``. ``"conservative"`` [11]_ and ``"majority"`` [3]_ test
+        ``x`` and ``y`` again given every subset of ``x``'s neighbors and every subset of ``y``'s
+        neighbors, and count the subsets that separate them (``p >= alpha``). If at least one does,
+        ``"conservative"`` makes ``z`` a collider when none of them contains it and a non-collider
+        when all do; ``"majority"`` when fewer than half contain it and when more than half do. Any
+        other triple is ambiguous, and no rule orients through it. Both run up to
+        ``2**degree(x) + 2**degree(y)`` extra tests per pair. ``"sepsets"`` favors orienting more
+        edges when effects are weak and rows are few compared with the variables; it gives up the
+        most false arrowheads, from colliders that one test error creates. ``"conservative"`` favors
+        the fewest false arrowheads in every setting measured; it gives up true arrowheads on sparse
+        graphs with weak effects, which it leaves undirected. ``"majority"`` favors fewer errors
+        overall than ``"sepsets"`` in most settings measured, with far fewer false arrowheads, and
+        more true arrowheads than ``"conservative"`` on sparse graphs with weak effects; it gives up
+        more false arrowheads than ``"conservative"`` everywhere, and trails ``"sepsets"`` with many
+        variables and few rows. Against ``"conservative"`` its errors overall are lower in some
+        settings and higher in others. See Notes.
     possibly_separable : {"orient", "ambiguous"}, default="orient"
         How the orientation rules read a triple ``x - z - y`` with a side listed in
         ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
@@ -393,14 +408,14 @@ def pc(
     of ``W``: ``metadata["corrected_edges"]["rows_tested"]`` gives the fewest and the median rows
     the corrected tests read, where ``metadata["rows_tested"]`` counts the tests that delete rows,
     and is absent when no test was corrected. The colliders follow the corrected separating sets;
-    ``"conservative"`` and ``"majority"`` vote with the test-wise tests, as the correction applies
-    to the skeleton search, and their Algorithm 1 orients the corrected skeleton with PC's rules.
-    Each regression has an intercept, where their Eq. (2) has none and so assumes that every
-    variable has mean 0: with the intercept, the regressions fit data whose means are not 0, and a
-    p-value does not change when a column is shifted. The permutations draw from ``seed`` and from
-    where the queried columns' values are missing, so a result depends on neither the column order,
-    nor a column's units or origin, nor the number of workers. On complete data, ``"mvpc"`` gives
-    the result of ``"testwise"``.
+    ``"conservative"`` and ``"majority"`` vote with the same tests as the skeleton search, the
+    corrected ones for a pair the correction retests, and their Algorithm 1 orients the corrected
+    skeleton with PC's rules. Each regression has an intercept, where their Eq. (2) has none and so
+    assumes that every variable has mean 0: with the intercept, the regressions fit data whose means
+    are not 0, and a p-value does not change when a column is shifted. The permutations draw from
+    ``seed`` and from where the queried columns' values are missing, so a result depends on neither
+    the column order, nor a column's units or origin, nor the number of workers. On complete data,
+    ``"mvpc"`` gives the result of ``"testwise"``.
 
     **Limitations.** On linear-Gaussian data it made fewer errors than the empty graph on sparse
     graphs of up to hundreds of variables. On larger sparse graphs its errors passed the empty
@@ -581,7 +596,7 @@ def fci(
     alpha: float = 0.05,
     indep_test: str | None = None,
     degrees_of_freedom: str = "mean",
-    collider_rule: str = "sepsets",
+    collider_rule: str = "majority",
     possibly_separable: str = "orient",
     categorical: Sequence[str | int] | None = None,
     missing: str | None = None,
@@ -609,22 +624,25 @@ def fci(
         Conditional-independence test. ``"fisherz"`` and ``"student_t"`` test partial correlation,
         for continuous data: ``"fisherz"`` applies Fisher's z-transform and the normal distribution;
         ``"student_t"`` applies the Student-t distribution, which is exact for Gaussian data at any
-        sample size. ``"normal_scores"`` applies ``"fisherz"`` to the normal scores of each column,
-        for data whose columns are monotone transformations of Gaussian variables: its p-values do
-        not change under a strictly increasing transformation of a column. ``"chisq"`` (Pearson's
-        chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by
-        whole numbers. ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional
-        Gaussian) test mixed data, continuous and categorical columns. Seven more tests detect
-        nonlinear dependence in continuous data, at a far higher cost per test: ``"kci"`` is the
-        kernel test; ``"rcot"`` its random-feature approximation; ``"cmiknn"`` a nearest-neighbor
-        conditional mutual information test; ``"gpdc"`` Gaussian-process regression with a distance
-        correlation test; and ``"gcm"``, ``"wgcm"``, and ``"pcm"`` the generalized, weighted
-        generalized, and projected covariance measures, which test the covariance of regression
-        residuals. ``None`` picks from the declared column types: ``"gsq"`` when every column is
-        categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared
-        categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type,
-        never by its values. See Notes. ``metadata["indep_test"]`` names the test used, including
-        the choice for ``None``.
+        sample size; it favors exact p-values when the rows barely exceed the conditioning set, and
+        otherwise gives the graphs of ``"fisherz"``. ``"normal_scores"`` applies ``"fisherz"`` to
+        the normal scores of each column, for data whose columns are monotone transformations of
+        Gaussian variables: its p-values do not change under a strictly increasing transformation of
+        a column. It favors columns that are monotone transformations of Gaussian variables and data
+        with heavy-tailed noise; it gives up some adjacencies on Gaussian data with few rows.
+        ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test
+        categorical data, coded by whole numbers. ``"degen_gauss"`` (degenerate Gaussian) and
+        ``"cond_gauss"`` (conditional Gaussian) test mixed data, continuous and categorical columns.
+        Seven more tests detect nonlinear dependence in continuous data, at a far higher cost per
+        test: ``"kci"`` is the kernel test; ``"rcot"`` its random-feature approximation;
+        ``"cmiknn"`` a nearest-neighbor conditional mutual information test; ``"gpdc"``
+        Gaussian-process regression with a distance correlation test; and ``"gcm"``, ``"wgcm"``, and
+        ``"pcm"`` the generalized, weighted generalized, and projected covariance measures, which
+        test the covariance of regression residuals. ``None`` picks from the declared column types:
+        ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are, else
+        ``"fisherz"``. A column is declared categorical by ``categorical`` or by a DataFrame's
+        ``category``, ``bool``, or text type, never by its values. See Notes.
+        ``metadata["indep_test"]`` names the test used, including the choice for ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
@@ -636,16 +654,25 @@ def fci(
         Glymour and Scheines (1993) count them; it gives up the level, as it rejects true
         independences more often than the nominal rate. Only ``"chisq"`` and ``"gsq"`` read it:
         passing it with another test raises ``ValueError``.
-    collider_rule : {"sepsets", "conservative", "majority"}, default="sepsets"
+    collider_rule : {"sepsets", "conservative", "majority"}, default="majority"
         How FCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
         that removed the edge ``x - y``. ``"conservative"`` [4]_ [5]_ and ``"majority"`` [4]_ test
         ``x`` and ``y`` again given every subset of ``x``'s neighbors and every subset of ``y``'s
-        neighbors, and count the subsets that separate them (``p >= alpha``). If at least one
-        does, ``"conservative"`` makes ``z`` a collider when none of them contains it and a
-        non-collider when all do; ``"majority"`` when fewer than half contain it and when more
-        than half do. Any other triple is ambiguous, and no rule orients through it. Both run up
-        to ``2**degree(x) + 2**degree(y)`` extra tests per pair. See Notes.
+        neighbors, and count the subsets that separate them (``p >= alpha``). If at least one does,
+        ``"conservative"`` makes ``z`` a collider when none of them contains it and a non-collider
+        when all do; ``"majority"`` when fewer than half contain it and when more than half do. Any
+        other triple is ambiguous, and no rule orients through it. Both run up to
+        ``2**degree(x) + 2**degree(y)`` extra tests per pair. ``"sepsets"`` favors orienting more
+        edges when effects are weak and rows are few compared with the variables; it gives up the
+        most false arrowheads, from colliders that one test error creates. ``"conservative"`` favors
+        the fewest false arrowheads in every setting measured; it gives up true arrowheads on sparse
+        graphs with weak effects, which it leaves undirected. ``"majority"`` favors fewer errors
+        overall than ``"sepsets"`` in most settings measured, with far fewer false arrowheads, and
+        more true arrowheads than ``"conservative"`` on sparse graphs with weak effects; it gives up
+        more false arrowheads than ``"conservative"`` everywhere, and trails ``"sepsets"`` with many
+        variables and few rows. Against ``"conservative"`` its errors overall are lower in some
+        settings and higher in others. See Notes.
     possibly_separable : {"orient", "ambiguous"}, default="orient"
         How the orientation rules read a triple ``x - z - y`` with a side listed in
         ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as
@@ -1036,16 +1063,15 @@ def gfci(
         Local score driving the GES skeleton phase, as for :func:`~andrey.ges`: ``"bic"``, the
         linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"`` for categorical data, coded by whole
         numbers; or ``"degen_gauss"`` or ``"cond_gauss"``, the degenerate or conditional Gaussian
-        BIC for mixed data. ``"normal_scores"``, experimental, is ``"bic"`` on each column's normal
-        scores, for continuous data that are Gaussian only after an unknown increasing
-        transformation of each column, as :func:`~andrey.ges` describes, with its limits. With
+        BIC for mixed data. ``"normal_scores"`` is ``"bic"`` on each column's normal scores, for
+        continuous data that are Gaussian only after an unknown increasing transformation of each
+        column, as :func:`~andrey.ges` describes, with its limits. With
         ``indep_test="normal_scores"`` both phases read one nonparanormal model, and a strictly
         increasing transformation of any column leaves the graph unchanged; the consistency results
         for the rank-based test and score cover PC, GES, and ARGES, so with this search it is the
         analogous construction, not a proven result. ``None`` picks from the declared column types,
-        as for :func:`~andrey.ges`.
-        ``metadata["score_func"]`` names the score the fit used: the one picked from the
-        declared column types when this is ``None``.
+        as for :func:`~andrey.ges`. ``metadata["score_func"]`` names the score the fit used: the one
+        picked from the declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter in the GES phase. Larger
         values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the standard BIC. Must be

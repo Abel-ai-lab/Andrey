@@ -39,6 +39,20 @@ datasets = data.generate(data.Ensemble(scms=scms, seeds=range(10), n=500))
 datasets = [scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]
 ```
 
+### The collider rule of PC and FCI
+
+`pc` and `fci` decide the colliders of an unshielded triple with `collider_rule="majority"`, where
+0.19 used `"sepsets"`. Their graphs can differ, and `metadata["ambiguous_triples"]` is now present.
+`cdnod`, `gfci`, `boss_fci`, `grasp_fci`, and `fci_jci` keep `"sepsets"`. To get the former graphs,
+pass the former value:
+
+```python
+# 0.19
+out = andrey.pc(data)
+# 0.20
+out = andrey.pc(data, collider_rule="sepsets")
+```
+
 ## From 0.14 to 0.15
 
 ### Former names from 0.12 and 0.14

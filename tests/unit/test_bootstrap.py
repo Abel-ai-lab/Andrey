@@ -292,7 +292,9 @@ def test_pc_resamples_that_no_dag_extends_do_not_become_the_averaged_graph():
     columns = [f"x{i}" for i in range(10)]
     data = np.exp(pd.DataFrame(truth.data, columns=columns)).iloc[:2000]
     with andrey.config(n_jobs=1), pytest.warns(andrey.AndreyWarning, match="no valid cpdag"):
-        out = bootstrap("pc", data, n_resamples=100, seed=0, indep_test="normal_scores")
+        out = bootstrap(
+            "pc", data, n_resamples=100, seed=0, indep_test="normal_scores", collider_rule="sepsets"
+        )
     assert out.metadata["averaged_graph"] == "nearest_resample"  # the vote has no valid cpdag
     assert is_valid(out.structure)
     assert out.structure.markov_blanket("x0")
@@ -310,7 +312,7 @@ def test_fci_resamples_that_are_not_pags_do_not_become_the_averaged_graph():
 
 def test_the_pag_the_check_rejects_holds_an_almost_directed_cycle_from_test_errors():
     ds = andrey.data.sample_scm(d=8, n=1000, seed=16, density=3.0)
-    marks = andrey.fci(ds.data).structure.to_numpy()
+    marks = andrey.fci(ds.data, collider_rule="sepsets").structure.to_numpy()
     assert not is_valid(GraphStructure.from_numpy(marks, kind="pag"))
     # The marks contradict each other, whatever MAG is built from them: a tail at a on a directed
     # path to b makes a an ancestor of b in every MAG of the class, and a <-> b says it is not.

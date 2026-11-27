@@ -6,6 +6,8 @@ the final skeleton and decides the middle node from the share of separating subs
 
 from __future__ import annotations
 
+import inspect
+
 import networkx as nx
 import numpy as np
 import pytest
@@ -111,8 +113,40 @@ def test_a_pair_no_neighbor_subset_separates_leaves_its_triple_ambiguous(monkeyp
     assert out.metadata["ambiguous_triples"] == [[0, 1, 2]]
     assert marks[1, 0] != ARROW and marks[1, 2] != ARROW
     # The recorded set, (3,), leaves out 1, so the standard rule orients the collider.
-    standard = getattr(andrey, method)(x, indep_test="scripted-out-of-reach").structure.to_numpy()
+    standard = getattr(andrey, method)(
+        x, indep_test="scripted-out-of-reach", collider_rule="sepsets"
+    ).structure.to_numpy()
     assert standard[1, 0] == standard[1, 2] == ARROW
+
+
+def test_pc_and_fci_default_to_majority_and_the_methods_not_measured_to_sepsets():
+    """The rule was measured in pc and fci; the other methods keep the separating sets until it is
+    measured in them, and the two temporal methods vote."""
+    methods = ("pc", "fci", "gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci")
+    methods += ("pcmciplus", "jpcmciplus")
+    defaults = {
+        name: inspect.signature(getattr(andrey, name)).parameters["collider_rule"].default
+        for name in methods
+    }
+    assert defaults == {
+        "pc": "majority",
+        "fci": "majority",
+        "gfci": "sepsets",
+        "boss_fci": "sepsets",
+        "grasp_fci": "sepsets",
+        "cdnod": "sepsets",
+        "fci_jci": "sepsets",
+        "pcmciplus": "majority",
+        "jpcmciplus": "majority",
+    }
+
+
+@pytest.mark.parametrize("method", ["pc", "fci"])
+def test_the_default_rule_votes_on_the_triples(method):
+    """At the default a fit lists its ambiguous triples, as a vote does; ``"sepsets"`` none."""
+    x = np.random.default_rng(0).standard_normal((200, 4))
+    assert "ambiguous_triples" in getattr(andrey, method)(x).metadata
+    assert "ambiguous_triples" not in getattr(andrey, method)(x, collider_rule="sepsets").metadata
 
 
 @pytest.mark.parametrize("rule", RULES)

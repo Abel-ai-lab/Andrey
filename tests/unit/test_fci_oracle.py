@@ -131,7 +131,9 @@ def test_possible_dsep_tests_every_subset(monkeypatch):
             [_, _, A, _, T, A, _],
         ]
     )
-    np.testing.assert_array_equal(_oracle_fci(monkeypatch, 7, edges), truth)
+    np.testing.assert_array_equal(
+        _oracle_fci(monkeypatch, 7, edges, collider_rule="sepsets"), truth
+    )
 
 
 # Seven observed nodes 0-6 with hidden common causes from node 7 up; R8 fires on each.

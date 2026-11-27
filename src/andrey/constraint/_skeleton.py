@@ -12,7 +12,9 @@ scans every pair of one conditioning size; for FisherZ, StudentT, RCoT, and the 
 Gaussian test it stacks the chunks of consecutive pairs into one evaluation, up to
 ``_STACK_BYTES`` of submatrices; RCoT evaluates a stack one conditioning set at a time, and the
 degenerate Gaussian test regresses on each conditioning set once. :func:`vote_triples` decides the
-unshielded triples of a final skeleton by the conservative or majority collider rule.
+unshielded triples of a final skeleton by the conservative or majority collider rule, and
+:func:`separating_unions` finds GFCI's separating sets; for a FisherZ, StudentT, NormalScores, or
+degenerate Gaussian test each stacks the subsets of every pair, as :func:`scan_pairs` does.
 """
 
 from __future__ import annotations
@@ -62,8 +64,9 @@ _Chunk = tuple[int, int, int, np.ndarray]
 # is computed independently, so the chunk boundary never changes a result.
 CHUNK = 4096
 
-# Conditioning sets per test call in a collider vote (:func:`vote_triples`). A vote keeps only the
-# separating subsets, so the tests of a pair hold one chunk however large the endpoint degrees are.
+# Conditioning sets per test call in the pair-by-pair collider vote (:func:`vote_triples`). It keeps
+# only the separating subsets, so the tests of a pair hold one chunk however large the endpoint
+# degrees are.
 _VOTE_CHUNK = 64
 
 #: How the PC and FCI families and PCMCI+ decide an unshielded triple (:func:`vote_triples`).
@@ -372,6 +375,78 @@ def separating_subsets(
             pvalues = [test(x, y, cond) for cond in chunk]
         found.extend(cond for cond, p in zip(chunk, pvalues) if p > alpha)
     return found
+
+
+def separating_unions(
+    test: CITest,
+    adjacent: np.ndarray,
+    xs: np.ndarray,
+    ys: np.ndarray,
+    separated: np.ndarray,
+    alpha: float,
+    max_depth: int | None = None,
+) -> dict[int, tuple[int, ...]] | None:
+    """The separating set of each non-adjacent pair ``(xs[k], ys[k])``, ``xs[k] < ys[k]``, keyed by
+    ``k``: the union of the subsets of the first size that separate it (``p > alpha``), by
+    increasing size from 1, drawn from the other nodes of ``adjacent[x] | adjacent[y]`` and at most
+    ``max_depth`` members when one is given. A pair no size separates has no entry. ``separated``
+    marks the pairs the empty set separates, whose set is ``()``.
+
+    The subsets of every pair still unseparated at a size are the chunks of one stream
+    (:func:`subset_rows`), built as the stream reaches the pair, that :func:`_stacks` evaluates
+    through the canonical route of ``test``. Each pair's chunks are the ones
+    :func:`separating_subsets` evaluates, in its order, so the sets are the pair-by-pair search's.
+    ``None`` when ``test`` has no canonical route, deletes rows per test, or raises in a stack: the
+    caller searches pair by pair.
+    """
+    pvalues = None if isinstance(test, TestwiseDeletion) else _canonical_route(test)
+    if pvalues is None:
+        return None
+    firsts, seconds = xs.tolist(), ys.tolist()
+    unions: dict[int, tuple[int, ...]] = {k: () for k in np.flatnonzero(separated).tolist()}
+    pending = np.flatnonzero(~separated).tolist()
+    size = 1
+    while pending:
+        remaining: list[int] = []
+        members: dict[int, set[int]] = {}
+        chunks = _pool_chunks(adjacent, pending, firsts, seconds, size, max_depth, remaining)
+        for item in _guarded(_stacks(pvalues, size, chunks)):
+            if item is None:
+                return None
+            stack, values = item
+            bounds = np.cumsum([0, *(len(rows) for _, _, _, rows in stack)]).tolist()
+            passing = values > alpha
+            for at in np.flatnonzero(np.logical_or.reduceat(passing, bounds[:-1])).tolist():
+                k, _, _, rows = stack[at]
+                hit = passing[bounds[at] : bounds[at + 1]]
+                members.setdefault(k, set()).update(rows[hit].ravel().tolist())
+        unions.update({k: tuple(sorted(found)) for k, found in members.items()})
+        pending = [k for k in remaining if k not in members]
+        size += 1
+    return unions
+
+
+def _pool_chunks(
+    adjacent: np.ndarray,
+    pending: list[int],
+    firsts: list[int],
+    seconds: list[int],
+    size: int,
+    max_depth: int | None,
+    remaining: list[int],
+) -> Iterator[_Chunk]:
+    """The chunks :func:`separating_unions` tests at ``size``: for each pair ``k`` of ``pending``
+    (``(firsts[k], seconds[k])``) with a pool of at least ``size`` nodes, within ``max_depth``, the
+    size-``size`` subsets of the pool, which is built as the stream reaches the pair. Each such
+    pair is appended to ``remaining`` as its chunks start."""
+    for k in pending:
+        x, y = firsts[k], seconds[k]
+        pool = np.flatnonzero(adjacent[x] | adjacent[y])
+        pool = pool[(pool != x) & (pool != y)]
+        if (len(pool) if max_depth is None else min(len(pool), max_depth)) >= size:
+            remaining.append(k)
+            for rows in subset_rows(pool, size, None):
+                yield k, x, y, rows
 
 
 def record_tests(
@@ -1223,22 +1298,35 @@ def collider_verdict(
     separating, with those holding ``b``, and with those without it, the least and the most share
     of subsets holding ``b`` they allow; otherwise the triple is ambiguous.
     """
-    verdict = _verdict(separating, b, rule)
+    return count_verdict(
+        len(separating),
+        sum(b in subset for subset in separating),
+        rule,
+        len(skipped),
+        sum(b in subset for subset in skipped),
+    )
+
+
+def count_verdict(
+    separating: int, holding: int, rule: str, skipped: int = 0, skipped_holding: int = 0
+) -> str:
+    """:func:`collider_verdict` from the counts of the subsets: ``separating`` of them separate the
+    ends and ``holding`` of those contain the middle node, and ``skipped`` were not tested,
+    ``skipped_holding`` of them containing it."""
+    verdict = _share_verdict(separating, holding, rule)
     if not skipped or verdict == "ambiguous":
         return verdict
-    holding = [subset for subset in skipped if b in subset]
-    lacking = [subset for subset in skipped if b not in subset]
-    for extra in (holding, lacking):
-        if _verdict([*separating, *extra], b, rule) != verdict:
+    for more, more_holding in ((skipped_holding, skipped_holding), (skipped - skipped_holding, 0)):
+        if _share_verdict(separating + more, holding + more_holding, rule) != verdict:
             return "ambiguous"
     return verdict
 
 
-def _verdict(separating: Sequence[Collection[Hashable]], b: Hashable, rule: str) -> str:
-    """:func:`collider_verdict` from the ``separating`` subsets alone."""
+def _share_verdict(separating: int, holding: int, rule: str) -> str:
+    """:func:`count_verdict` from the separating subsets alone."""
     if not separating:
         return "ambiguous"
-    share = sum(b in subset for subset in separating) / len(separating)
+    share = holding / separating
     if rule == "conservative":
         return "collider" if share == 0 else "non-collider" if share == 1 else "ambiguous"
     return "collider" if share < 0.5 else "non-collider" if share > 0.5 else "ambiguous"
@@ -1272,35 +1360,199 @@ def vote_triples(
     as they are. A triple in ``skip``, keyed ``(a, b, c)`` with ``a < c``, is neither voted nor
     returned.
 
-    Each pair is tested once, however many middle nodes it has, in chunks of ``_VOTE_CHUNK``
-    subsets, through the test's ``batched_call`` when it has one. The chunks do not depend on the
-    middle node, so every middle node counts the p-values one test of the pair gives. The cost
-    grows as ``2**degree`` per pair.
+    Each pair is tested once, however many middle nodes it has, so every middle node counts the
+    p-values one test of the pair gives. A FisherZ, StudentT, NormalScores, or degenerate Gaussian
+    test, exactly, evaluates the subsets of every pair as canonical query arrays in stacks
+    (:func:`_stacks`), each endpoint's subsets by increasing size, and keeps for each pair the
+    number of subsets that separate it and that were not tested, and how many of each hold each
+    middle node (:func:`count_verdict`); nothing is written to ``sepsets`` until every pair is
+    counted. Any other test, a test that deletes rows per test, and a test that raises in a stack
+    take the per-pair path: chunks of ``_VOTE_CHUNK`` subsets, through the test's ``batched_call``
+    when it has one, with a triple decided as soon as its pair is tested, so the error is the one
+    the pair-by-pair vote raises, after the same ``sepsets`` rewrites. The cost grows as
+    ``2**degree`` per pair.
 
     References
     ----------
     .. [1] Colombo, D., and Maathuis, M. H. (2014). Order-independent constraint-based causal
        structure learning. JMLR 15, 3921-3962.
     """
-    neighbors = [np.flatnonzero(row).tolist() for row in marks != NULL]
+    adjacency = marks != NULL
+    triples = _unshielded_triples(adjacency, skip)
+    firsts, middles, seconds = (column.tolist() for column in triples)
+    if not firsts:
+        return frozenset()
+    ambiguous: set[tuple[int, int, int]] = set()
+    pvalues = None if isinstance(test, TestwiseDeletion) else _canonical_route(test)
+    counts = None
+    if pvalues is not None:
+        neighbors = [np.flatnonzero(row) for row in adjacency]
+        counts = _stacked_counts(pvalues, neighbors, triples, alpha, max_depth)
+    if counts is not None:
+        tallies = zip(*(count.tolist() for count in counts))
+        for a, b, c, (separating, holding, skipped, skipped_holding) in zip(
+            firsts, middles, seconds, tallies
+        ):
+            verdict = count_verdict(separating, holding, rule, skipped, skipped_holding)
+            _record_verdict(sepsets, ambiguous, a, b, c, verdict)
+        return frozenset(ambiguous)
+    neighbor_lists = [np.flatnonzero(row).tolist() for row in adjacency]
     votes: dict[tuple[int, int], tuple[list[tuple[int, ...]], list[tuple[int, ...]]]] = {}
-    ambiguous = set()
-    for b, adjacent in enumerate(neighbors):
-        for a, c in combinations(adjacent, 2):
-            if marks[a, c] != NULL or (a, b, c) in skip:
-                continue
-            if (a, c) not in votes:
-                votes[a, c] = _separating_votes(test, a, c, neighbors, alpha, max_depth)
-            found, skipped = votes[a, c]
-            verdict = collider_verdict(found, b, rule, skipped)
-            if verdict == "ambiguous":
-                ambiguous.add((a, b, c))
-                continue
-            for pair in ((a, c), (c, a)):
-                recorded = separating_set(sepsets, *pair) or frozenset()
-                updated = recorded | {b} if verdict == "non-collider" else recorded - {b}
-                sepsets[pair] = tuple(sorted(updated))
+    for a, b, c in zip(firsts, middles, seconds):
+        if (a, c) not in votes:
+            votes[a, c] = _separating_votes(test, a, c, neighbor_lists, alpha, max_depth)
+        found, skipped_subsets = votes[a, c]
+        verdict = collider_verdict(found, b, rule, skipped_subsets)
+        _record_verdict(sepsets, ambiguous, a, b, c, verdict)
     return frozenset(ambiguous)
+
+
+def _record_verdict(
+    sepsets: SeparatingSets,
+    ambiguous: set[tuple[int, int, int]],
+    a: int,
+    b: int,
+    c: int,
+    verdict: str,
+) -> None:
+    """Apply the ``verdict`` on the triple ``(a, b, c)`` as :func:`vote_triples` does: an ambiguous
+    triple joins ``ambiguous``; a collider removes ``b`` from the separating sets of the pair, under
+    both key orders, and a non-collider adds it."""
+    if verdict == "ambiguous":
+        ambiguous.add((a, b, c))
+        return
+    for pair in ((a, c), (c, a)):
+        recorded = separating_set(sepsets, *pair) or frozenset()
+        updated = recorded | {b} if verdict == "non-collider" else recorded - {b}
+        sepsets[pair] = tuple(sorted(updated))
+
+
+def _unshielded_triples(
+    adjacency: np.ndarray, skip: Collection[tuple[int, int, int]]
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """The unshielded triples ``(a, b, c)``, ``a < c``, of the boolean ``adjacency`` that are not in
+    ``skip``, as three int arrays: by increasing middle node ``b``, then by the neighbors' pairs in
+    ``combinations`` order."""
+    found: list[tuple[np.ndarray, np.ndarray, np.ndarray]] = []
+    for b in range(len(adjacency)):
+        around = np.flatnonzero(adjacency[b])
+        first, second = np.triu_indices(len(around), 1)
+        a, c = around[first], around[second]
+        kept = ~adjacency[a, c]
+        a, c = a[kept], c[kept]
+        if skip and len(a):
+            kept = np.fromiter(
+                ((x, b, y) not in skip for x, y in zip(a.tolist(), c.tolist())), bool
+            )
+            a, c = a[kept], c[kept]
+        found.append((a, np.full(len(a), b, dtype=np.intp), c))
+    if not found:
+        return np.empty(0, dtype=np.intp), np.empty(0, dtype=np.intp), np.empty(0, dtype=np.intp)
+    a, b, c = (np.concatenate(column) for column in zip(*found))
+    return a, b, c
+
+
+def _guarded(
+    stacks: Iterator[tuple[list[_Chunk], np.ndarray]],
+) -> Iterator[tuple[list[_Chunk], np.ndarray] | None]:
+    """The ``stacks`` of :func:`_stacks`, then ``None`` in place of the error a test raises."""
+    while True:
+        try:
+            item = next(stacks)
+        except StopIteration:
+            return
+        except Exception:
+            yield None
+            return
+        yield item
+
+
+def _tally(
+    flagged: np.ndarray,
+    owners: np.ndarray,
+    rows: np.ndarray,
+    pairs: np.ndarray,
+    holding: np.ndarray,
+    keys: np.ndarray,
+    nodes: int,
+) -> None:
+    """Add the ``flagged`` queries of a stack to the counts of :func:`_stacked_counts`.
+
+    Query ``i`` asks the pair ``owners[i]`` given the sorted row ``rows[i]``. ``pairs[p]`` counts
+    the flagged queries of pair ``p``, and ``holding`` the flagged queries holding a middle node:
+    ``keys``, ascending, are ``pair * nodes + middle`` of each triple, in the order of ``holding``.
+    """
+    chosen = np.flatnonzero(flagged)
+    if not chosen.size:
+        return
+    owner = owners[chosen]
+    ids, hits = np.unique(owner, return_counts=True)
+    pairs[ids] += hits
+    if rows.shape[1]:
+        members = owner[:, None] * nodes + rows[chosen]
+        at = np.searchsorted(keys, members)
+        found = keys[np.minimum(at, len(keys) - 1)] == members
+        ids, hits = np.unique(at[found], return_counts=True)
+        holding[ids] += hits
+
+
+def _stacked_counts(
+    pvalues: Callable[..., np.ndarray],
+    neighbors: list[np.ndarray],
+    triples: tuple[np.ndarray, np.ndarray, np.ndarray],
+    alpha: float,
+    max_depth: int | None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None:
+    """The counts :func:`count_verdict` takes for each triple of :func:`_unshielded_triples`, in
+    its order: ``(separating, holding, skipped, skipped_holding)``, or ``None`` when a test raises.
+
+    Each pair ``(a, c)`` of the triples is tested once. The subsets of ``a``'s neighbors of every
+    pair come first, then those of ``c``'s, each side by increasing size up to the side's degree, or
+    ``max_depth``. The subsets of a size are the chunks of one stream (:func:`subset_rows`), which
+    :func:`_stacks` evaluates through ``pvalues``, the canonical route of the test, so each pair's
+    queries come in the order of the pair-by-pair vote, a subset both sides offer counted twice. A
+    subset separates its pair when its p-value is at least ``alpha`` and was not tested when it is
+    NaN.
+    """
+    a, b, c = triples
+    nodes = len(neighbors)
+    ends, pair_of = np.unique(a * nodes + c, return_inverse=True)  # each triple's pair
+    firsts, seconds = (ends // nodes).tolist(), (ends % nodes).tolist()
+    # The triples of each pair together, each pair's in the order of the middle nodes.
+    grouped = np.argsort(pair_of, kind="stable")
+    place = np.empty(len(grouped), dtype=np.intp)
+    place[grouped] = np.arange(len(grouped))
+    keys = pair_of[grouped] * nodes + b[grouped]
+    separating, skipped = np.zeros(len(ends), dtype=np.intp), np.zeros(len(ends), dtype=np.intp)
+    holding, skipped_holding = np.zeros(len(b), dtype=np.intp), np.zeros(len(b), dtype=np.intp)
+    degrees = np.fromiter((len(row) for row in neighbors), np.intp, nodes)
+    if max_depth is not None:
+        degrees = np.minimum(degrees, max_depth)
+    for side in (firsts, seconds):
+        reach = degrees[side]
+        for size in range(int(reach.max()) + 1):
+            chunks = (
+                (i, firsts[i], seconds[i], rows)
+                for i in np.flatnonzero(reach >= size).tolist()
+                for rows in subset_rows(neighbors[side[i]], size, None)
+            )
+            for item in _guarded(_stacks(pvalues, size, chunks)):
+                if item is None:
+                    return None
+                stack, values = item
+                owners = np.repeat(
+                    np.fromiter((i for i, _, _, _ in stack), np.intp, len(stack)),
+                    [len(rows) for _, _, _, rows in stack],
+                )
+                rows = np.concatenate([rows for _, _, _, rows in stack])
+                _tally(values >= alpha, owners, rows, separating, holding, keys, nodes)
+                _tally(np.isnan(values), owners, rows, skipped, skipped_holding, keys, nodes)
+    return (
+        separating[pair_of],
+        holding[place],
+        skipped[pair_of],
+        skipped_holding[place],
+    )
 
 
 def _separating_votes(

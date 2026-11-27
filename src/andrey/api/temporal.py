@@ -478,7 +478,9 @@ def pcmci(
         test partial correlation, for linear effects in continuous data: ``"fisherz"`` applies
         Fisher's z-transform and the normal distribution, ``"student_t"`` the Student-t
         distribution. ``"normal_scores"`` applies ``"fisherz"`` to the normal scores of each column
-        of the lagged values, for monotone effects. ``"chisq"`` (Pearson's chi-square) and ``"gsq"``
+        of the lagged values, for monotone effects. It favors columns that are monotone
+        transformations of Gaussian variables and data with heavy-tailed noise; it gives up some
+        adjacencies on Gaussian data with few rows. ``"chisq"`` (Pearson's chi-square) and ``"gsq"``
         (G-square, the likelihood ratio) test categorical series, coded by whole numbers.
         ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
         mixed series, continuous and categorical columns, by a likelihood ratio. Seven more tests
@@ -806,7 +808,9 @@ def pcmciplus(
         test partial correlation, for linear effects in continuous data: ``"fisherz"`` applies
         Fisher's z-transform and the normal distribution, ``"student_t"`` the Student-t
         distribution. ``"normal_scores"`` applies ``"fisherz"`` to the normal scores of each column
-        of the lagged values, for monotone effects. ``"chisq"`` (Pearson's chi-square) and ``"gsq"``
+        of the lagged values, for monotone effects. It favors columns that are monotone
+        transformations of Gaussian variables and data with heavy-tailed noise; it gives up some
+        adjacencies on Gaussian data with few rows. ``"chisq"`` (Pearson's chi-square) and ``"gsq"``
         (G-square, the likelihood ratio) test categorical series, coded by whole numbers.
         ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
         mixed series, continuous and categorical columns, by a likelihood ratio. Seven more tests
@@ -1398,20 +1402,23 @@ def lpcmci(
         test partial correlation, for linear effects in continuous data: ``"fisherz"`` applies
         Fisher's z-transform and the normal distribution, ``"student_t"`` the Student-t
         distribution. ``"normal_scores"`` applies ``"fisherz"`` to the normal scores of each column
-        of the lagged values, for monotone effects. ``"chisq"`` (Pearson's chi-square) and ``"gsq"``
-        (G-square, the likelihood ratio) test categorical series, coded by whole numbers.
-        ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
-        mixed series, continuous and categorical columns, by a likelihood ratio. Seven more tests
-        detect nonlinear dependence in continuous data, at a far higher cost per test: ``"cmiknn"``,
-        a nearest-neighbor conditional mutual information test, and ``"gpdc"``, Gaussian-process
-        regression with a distance correlation test, the nonlinear tests the method was published
-        with; ``"kci"``, the kernel test; ``"rcot"``, its random-feature approximation; and
-        ``"gcm"``, ``"wgcm"``, and ``"pcm"``, the generalized, weighted generalized, and projected
-        covariance measures of regression residuals. ``None`` picks from the declared column types:
-        ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are, else
-        ``"fisherz"``. A column is declared categorical by ``categorical`` or by a DataFrame's
-        ``category``, ``bool``, or text type, never by its values. ``metadata["indep_test"]`` names
-        the test used, including the choice for ``None``.
+        of the lagged values, for monotone effects. It favors columns that are monotone
+        transformations of Gaussian variables and data with heavy-tailed noise; it gives up some
+        adjacencies on Gaussian data with few rows. Here the test is experimental: its graph did not
+        always equal the graph of ``"fisherz"`` on the normal scores of the data. ``"chisq"``
+        (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical
+        series, coded by whole numbers. ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"``
+        (conditional Gaussian) test mixed series, continuous and categorical columns, by a
+        likelihood ratio. Seven more tests detect nonlinear dependence in continuous data, at a far
+        higher cost per test: ``"cmiknn"``, a nearest-neighbor conditional mutual information test,
+        and ``"gpdc"``, Gaussian-process regression with a distance correlation test, the nonlinear
+        tests the method was published with; ``"kci"``, the kernel test; ``"rcot"``, its
+        random-feature approximation; and ``"gcm"``, ``"wgcm"``, and ``"pcm"``, the generalized,
+        weighted generalized, and projected covariance measures of regression residuals. ``None``
+        picks from the declared column types: ``"gsq"`` when every column is categorical,
+        ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
+        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
+        values. ``metadata["indep_test"]`` names the test used, including the choice for ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning

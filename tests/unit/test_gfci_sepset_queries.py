@@ -1,9 +1,10 @@
 """GFCI's separating-set search takes the canonical query path with unchanged results.
 
 For FisherZ and StudentT, ``_derive_sepsets`` answers the size-0 queries of all the pairs in one
-canonical query array and evaluates each nonempty size's subsets of a pair in chunks of them. It
-asks the queries of the scalar loop, which a subclass of either test takes, and records the same
-separating sets; a singular query raises the scalar loop's error.
+canonical query array and evaluates each nonempty size's subsets of all the pairs still unseparated
+in stacks of them. It asks the queries of the scalar loop, which a subclass of either test takes,
+and records the same separating sets; a singular query raises the scalar loop's error, after the
+tests of the other pairs.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import pytest
 from andrey.constraint import _skeleton
 from andrey.core import TAIL
 from andrey.core.ci import FisherZ, SingularCorrelationError, StudentT
+from andrey.search import gfci
 from andrey.search.gfci import _derive_sepsets
 
 ALPHA = 0.2
@@ -122,8 +124,82 @@ def test_a_singular_query_raises_the_scalar_error(canonical, scalar) -> None:
         logs.append(log)
     assert errors[0] == errors[1]
     assert logs[1], "the singular query must come after other queries"
-    # The canonical path asks the scalar loop's queries, and the size-0 queries of the pairs the
-    # scalar loop never reached.
+    # The stacked search asks the other pairs' queries of the sizes below the singular query's
+    # (size 3) before the stack that holds it raises, and the pair-by-pair search then asks the
+    # scalar loop's queries again; no larger query is asked.
+    singular = 3
     extra = Counter(logs[0]) - Counter(logs[1])
     assert not Counter(logs[1]) - Counter(logs[0])
-    assert all(cond == () for _, _, cond in extra)
+    assert all(len(cond) < singular for _, _, cond in extra)
+    assert any(cond and (x, y) != (3, 4) for x, y, cond in extra)
+
+
+def _refuse_pair_by_pair(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make the pair-by-pair search raise, so a search that completes ran on the stacked route."""
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("the pair-by-pair search ran")
+
+    monkeypatch.setattr(gfci, "separating_subsets", refuse)
+
+
+@pytest.mark.parametrize(("canonical", "scalar"), TESTS)
+@pytest.mark.parametrize(("stack_bytes", "chunk"), [(1, 2), (2048, 5), (None, None)])
+@pytest.mark.parametrize("max_depth", [None, 1, 2])
+@pytest.mark.parametrize("seed", range(3))
+def test_the_stacked_search_records_the_pair_by_pair_sets_in_the_same_order(
+    monkeypatch: pytest.MonkeyPatch, canonical, scalar, stack_bytes, chunk, max_depth, seed
+) -> None:
+    """Every cap on a stack and on a chunk gives the separating sets of the pair-by-pair search,
+    the keys in its order."""
+    X, cpdag = _case(seed)
+    want = _derive_sepsets(cpdag, scalar(X), ALPHA, max_depth=max_depth)
+    if stack_bytes is not None:
+        monkeypatch.setattr(_skeleton, "_STACK_BYTES", stack_bytes)
+        monkeypatch.setattr(_skeleton, "CHUNK", chunk)
+    _refuse_pair_by_pair(monkeypatch)
+    got = _derive_sepsets(cpdag, canonical(X), ALPHA, max_depth=max_depth)
+    assert list(got.items()) == list(want.items())
+    assert any(len(found) >= 2 for found in want.values()) or max_depth == 1
+
+
+@pytest.mark.parametrize(("canonical", "scalar"), TESTS)
+def test_every_stacked_p_value_is_the_scalar_one(
+    monkeypatch: pytest.MonkeyPatch, canonical, scalar
+) -> None:
+    X, cpdag = _case(1)
+    monkeypatch.setattr(_skeleton, "_STACK_BYTES", 4096)
+    test = canonical(X)
+    inner = test._canonical_pvalues
+    asked: list[tuple[int, int, tuple[int, ...], float]] = []
+
+    def values(xs, ys, conditions):
+        found = inner(xs, ys, conditions)
+        asked.extend(zip(xs.tolist(), ys.tolist(), map(tuple, conditions.tolist()), found.tolist()))
+        return found
+
+    test._canonical_pvalues = values
+    _refuse_pair_by_pair(monkeypatch)
+    _derive_sepsets(cpdag, test, ALPHA)
+    reference = scalar(X)
+    assert any(len(cond) >= 2 for _, _, cond, _ in asked)
+    assert all(p == reference(x, y, cond) for x, y, cond, p in asked)
+
+
+@pytest.mark.parametrize(("canonical", "scalar"), TESTS)
+def test_a_search_whose_stacks_raise_searches_pair_by_pair(canonical, scalar) -> None:
+    """A test whose canonical call raises for the sets of a stack gives the scalar loop's sets."""
+    X, cpdag = _case(0)
+    want = _derive_sepsets(cpdag, scalar(X), ALPHA)
+    test = canonical(X)
+    inner = test._canonical_pvalues
+
+    def refuse_nonempty(xs, ys, conditions):
+        if conditions.shape[1]:
+            raise FloatingPointError("stack")
+        return inner(xs, ys, conditions)
+
+    test._canonical_pvalues = refuse_nonempty
+    got = _derive_sepsets(cpdag, test, ALPHA)
+    assert list(got.items()) == list(want.items())
+    assert any(len(found) for found in want.values())

@@ -27,6 +27,7 @@ from andrey.constraint._skeleton import (
     check_collider_rule,
     marginal_separated,
     separating_subsets,
+    separating_unions,
     vote_triples,
 )
 from andrey.constraint.fci import (
@@ -450,17 +451,27 @@ def _derive_sepsets(
     subset found in column order is recorded instead, and no subset after it is tested. The
     orientation rules that read a separating set use these for the pairs GES left non-adjacent.
 
-    A FisherZ, StudentT, or degenerate Gaussian test answers the size-0 query of every pair in one
-    canonical query array (:func:`~andrey.constraint._skeleton.marginal_separated`) and evaluates
-    each nonempty size's subsets in chunks of them
-    (:func:`~andrey.constraint._skeleton.separating_subsets`), with the p-values of the scalar
-    calls. Every query of another test, or of ``in_column_order``, is a
+    A FisherZ, StudentT, NormalScores, or degenerate Gaussian test answers the size-0 query of every
+    pair in one canonical query array (:func:`~andrey.constraint._skeleton.marginal_separated`) and
+    evaluates each nonempty size's subsets of all the pairs still unseparated in stacks of them
+    (:func:`~andrey.constraint._skeleton.separating_unions`), with the p-values of the scalar
+    calls. A test that deletes rows per test, and a test that raises in a stack, evaluate each
+    pair's subsets in chunks of canonical queries
+    (:func:`~andrey.constraint._skeleton.separating_subsets`), pair by pair, which raises the error
+    of the first pair that fails. Every query of another test, or of ``in_column_order``, is a
     scalar call.
     """
     adjacent = cpdag != NULL
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
     xs, ys = np.nonzero(np.triu(~adjacent, 1))
     marginal = None if in_column_order else marginal_separated(test, xs, ys, alpha)
+    if marginal is not None:
+        unions = separating_unions(test, adjacent, xs, ys, marginal, alpha, max_depth)
+        if unions is not None:
+            for k, union in sorted(unions.items()):
+                x, y = int(xs[k]), int(ys[k])
+                sepsets[(x, y)] = sepsets[(y, x)] = union
+            return sepsets
     for k, (x, y) in enumerate(zip(xs.tolist(), ys.tolist())):
         pool = [v for v in np.flatnonzero(adjacent[x] | adjacent[y]).tolist() if v != x and v != y]
         for size in range(_largest_size(len(pool), max_depth) + 1):

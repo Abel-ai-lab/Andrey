@@ -153,15 +153,15 @@ def test_four_rows_observing_every_column_decide_the_pair_on_those_rows_alone(me
     fork reads as a collider, while each edge stays flagged. Read as ambiguous, the flagged sides,
     which no row tests given the third column, make the fork no collider."""
     df = _hand("fork", extra=4)
-    out = FITS[method](df, max_depth=3)
+    out = FITS[method](df, max_depth=3, collider_rule="sepsets")
     assert "undecided_pairs" not in out.metadata or not out.metadata["undecided_pairs"]
     assert _skeleton(out) == {("X", "Z"), ("Y", "Z")}
     assert _pairs(out, "possibly_separable") == {("X", "Z"), ("Y", "Z")}
     assert _arrowheads(out) == {("X", "Z"), ("Y", "Z")}
-    on = FITS[method](df, max_depth=3, **AMBIGUOUS)
+    on = FITS[method](df, max_depth=3, collider_rule="sepsets", **AMBIGUOUS)
     assert _skeleton(on) == _skeleton(out)
     assert not _arrowheads(on)
-    triples, *_ = _ambiguous(method, df, max_depth=3)
+    triples, *_ = _ambiguous(method, df, max_depth=3, collider_rule="sepsets")
     assert triples == {("X", "Z", "Y")}
 
 
@@ -596,10 +596,10 @@ def test_a_search_called_directly_reads_its_own_flags():
     for core in (pc_core, fci_core):
         sink: set[tuple[int, int, int]] = set()
         with ci_missing.reading_flags():
-            core(X, max_depth=3, _ambiguous=sink)
+            core(X, max_depth=3, collider_rule="sepsets", _ambiguous=sink)
         assert (0, 2, 1) in sink
         sink.clear()
-        core(X, max_depth=3, _ambiguous=sink)
+        core(X, max_depth=3, collider_rule="sepsets", _ambiguous=sink)
         assert (0, 2, 1) not in sink
 
 

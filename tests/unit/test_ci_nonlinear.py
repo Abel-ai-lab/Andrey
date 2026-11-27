@@ -804,7 +804,10 @@ def test_skeleton_pins_blas_as_the_test_sets(method, pin_blas, monkeypatch):
     with threadpool_limits(limits=2, user_api="blas"):
         if _blas_threads() < 2:
             pytest.skip("threadpoolctl finds no BLAS library that runs more than one thread")
-        getattr(andrey, method)(_common_cause(seed=0, n=60, n_cond=2), indep_test="recording")
+        # The skeleton scan alone: the tests of the majority rule's vote run on every thread.
+        getattr(andrey, method)(
+            _common_cause(seed=0, n=60, n_cond=2), indep_test="recording", collider_rule="sepsets"
+        )
     assert seen and set(seen) == {1 if pin_blas else 2}
 
 

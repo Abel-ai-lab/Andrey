@@ -129,7 +129,7 @@ that take both read the values, so a monotone transform can change their graph e
 rank-based test. The file also refits every method that takes `"chisq"` or `"gsq"` with each
 column's categories recoded in order. A method that scores categorical data without a test, such as
 `ges` with `score_func="bdeu"`, is checked through its score alone. Both `"normal_scores"` options
-are experimental and take no `env`.
+take no `env`.
 
 ## Faster paths, the same output
 

@@ -48,7 +48,8 @@ def test_keeps_the_recorded_pag(method, possible_dsep):
     if possible_dsep == "order_free":
         i, j = ORDER_FREE_REMOVES[method]
         recorded[i, j] = recorded[j, i] = NULL
-    fit = getattr(andrey, method)(x, possible_dsep=possible_dsep)
+    # The PAGs were recorded under the separating-set rule.
+    fit = getattr(andrey, method)(x, possible_dsep=possible_dsep, collider_rule="sepsets")
     np.testing.assert_array_equal(fit.structure.to_numpy(), recorded)
 
 
