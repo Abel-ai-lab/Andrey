@@ -199,6 +199,12 @@ names its pull request.
   the rest. The graph's sparse store is built with `np.nonzero`, its partner marks are looked up
   with one `searchsorted` in `validate` and in the check that halves a `dag` or `cpdag` store, and
   a store loaded with its entries out of order or repeated takes the earlier code. ([#1325])
+- `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` search the
+  causal order faster, with the same output bit for bit. With `measure="skew"`, each column's sign
+  comes from the mean of `x * x * x` when that mean is clear of the rounding of either computation,
+  and from `np.mean(x**3, axis=0)` on every column when any column's mean is not. Every measure
+  residualizes the columns that remain after each pick with the picked column's variance taken once
+  per step, which is what `compute_residual` computes column by column. ([#1331])
 
 ### Fixed
 
@@ -3182,3 +3188,4 @@ First alpha release.
 [#1322]: https://github.com/Abel-ai-lab/Andrey/pull/1322
 [#1325]: https://github.com/Abel-ai-lab/Andrey/pull/1325
 [#1327]: https://github.com/Abel-ai-lab/Andrey/pull/1327
+[#1331]: https://github.com/Abel-ai-lab/Andrey/pull/1331
