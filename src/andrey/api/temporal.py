@@ -2048,10 +2048,10 @@ def dynotears(
     instead. The fit draws no random numbers and runs on one BLAS thread, so the host's thread count
     does not change it.
 
-    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the loss fits every step on the
-    steps before it, so a step with a missing value has no place in it. Use :func:`~andrey.pcmci`,
-    :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete rows per test and keep
-    every time step, as dropping a step would join the steps around it.
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: each row of the loss reads a
+    step and the steps before it, so a step with a missing value has no place in it. Use
+    :func:`~andrey.pcmci`, :func:`~andrey.pcmciplus`, or :func:`~andrey.lpcmci`, whose tests delete
+    rows per test and keep every time step, as dropping a step would join the steps around it.
 
     **Limitations.** On long series it made far fewer errors than the empty graph at every size, but
     on short series its defaults made more errors than the empty graph beyond small graphs; there
