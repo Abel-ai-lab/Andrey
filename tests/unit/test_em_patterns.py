@@ -7,12 +7,18 @@ as stacks, so each case compares the mean, the covariance, and the log-likelihoo
 and the log-likelihood's type. A total can hide a pattern term that moved by one rounding, so the
 random cases hold two or three rows, where a moved term moves the total, with one, two, and three
 observed columns: the stacked einsum of two observed columns sums in another order than a single
-call, which only such a case shows. The sizes sit at the edges of the code: a stack of one pattern,
-the stack limit and the patterns on each side of it, and the patterns that stay alone (a pattern of
-several rows, a complete row, a row that observes nothing).
+call, which only such a case shows. A pattern that observes one column or misses one multiplies in
+a dot product, which Apple's Accelerate sums by the memory alignment of its second operand: a stack
+that held it moved a bit for an odd slice of 5 or more columns, on macOS arm64 only, so such a
+pattern stays alone, and the cases cover every count of observed columns with several rows each.
+The sizes sit at the edges of the code: a stack of one pattern, the stack limit and the patterns on
+each side of it, and the patterns that stay alone (a pattern of several rows, a complete row, a row
+that observes nothing, a row that observes one column or misses one).
 """
 
 from __future__ import annotations
+
+import math
 
 import numpy as np
 import pytest
@@ -103,11 +109,46 @@ def check(X, mean, precision) -> None:
 @pytest.mark.parametrize("rows", [2, 3])
 def test_two_or_three_one_row_patterns_match_the_loop_term_by_term(observed, d, rows):
     # Each draw has two or three patterns of one row with the same number of observed columns, so
-    # they form one stack, and a total of two or three terms moves when a term moves.
+    # they form one stack when they observe and miss two or more columns, and a total of two or
+    # three terms moves when a term moves.
     for seed in range(40):
         rng = np.random.default_rng(1000 * observed + 10 * d + seed)
         mean, precision = model(d, rng)
         check(rows_observing(d, observed, rows, rng), mean, precision)
+
+
+@pytest.mark.parametrize("d", [4, 5, 6, 8, 12, 20])
+@pytest.mark.parametrize("rows", [2, 3, 4])
+def test_patterns_missing_one_column_match_the_loop(d, rows):
+    # Each row observes all columns but one, so its filled value is a dot product of d - 1 terms.
+    for seed in range(40):
+        rng = np.random.default_rng(100 * d + 10 * rows + seed)
+        mean, precision = model(d, rng)
+        check(rows_observing(d, d - 1, rows, rng), mean, precision)
+
+
+@pytest.mark.parametrize("d", [7, 12, 20])
+def test_every_count_of_observed_columns_matches_the_loop_over_odd_and_even_slices(d):
+    # Nine or fewer one-row patterns for each count of observed columns, so a stack has slices at
+    # odd and even offsets of memory, with an odd and an even number of columns in each part.
+    for observed in range(1, d):
+        for seed in range(6):
+            rng = np.random.default_rng(10_000 * d + 100 * observed + seed)
+            mean, precision = model(d, rng)
+            check(rows_observing(d, observed, min(9, math.comb(d, observed)), rng), mean, precision)
+
+
+def test_no_stack_holds_a_pattern_that_observes_one_column_or_misses_one():
+    d = 9
+    rng = np.random.default_rng(8)
+    mean, precision = model(d, rng)
+    X = np.vstack([rows_observing(d, observed, 4, rng) for observed in range(1, d)])
+    plan = Patterns(X)
+    assert plan.stacks
+    assert all(min(os_.shape[1], ms.shape[1]) >= 2 for _, _, os_, ms, _ in plan.stacks)
+    assert {o.size for _, _, o, *_ in plan.alone} >= {1, d - 1}  # one observed, one missing
+    assert {m.size for _, _, _, m, *_ in plan.alone} >= {1, d - 1}
+    check(X, mean, precision)
 
 
 @pytest.fixture

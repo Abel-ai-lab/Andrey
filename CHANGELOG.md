@@ -233,6 +233,12 @@ names its pull request.
 - The limit to one BLAS thread that a fit runs under reaches a library imported before the fit starts
   and after the first fit of the process, such as torch's OpenMP pool, which it missed because the
   pools were found once per process. ([#1259])
+- On macOS with Apple's Accelerate, `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`,
+  `notears`, `dagma`, and `calm` with `missing="em"` return the same bits as before the E-step
+  grouped the rows by pattern. A stack of one-row patterns gave another bit in the E-step's
+  log-likelihood for rows that observe one column, and in the expected mean and covariance for rows
+  that miss one, because Accelerate sums a dot product by the memory alignment of its operand; such
+  patterns are solved alone. ([#1341])
 
 ## [0.19.0] - 2026-11-24
 
@@ -3202,3 +3208,4 @@ First alpha release.
 [#1327]: https://github.com/Abel-ai-lab/Andrey/pull/1327
 [#1329]: https://github.com/Abel-ai-lab/Andrey/pull/1329
 [#1331]: https://github.com/Abel-ai-lab/Andrey/pull/1331
+[#1341]: https://github.com/Abel-ai-lab/Andrey/pull/1341
