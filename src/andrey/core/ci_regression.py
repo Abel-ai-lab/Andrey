@@ -106,24 +106,22 @@ def _fold_curve(
     """The held-out error after each round of boosted trees of ``depth`` fit on the other rows,
     with every round after the stop set to infinity, as :func:`_early_stopped` gives.
 
-    The model grows only through the stop round: a callback adds each new tree's prediction of the
-    held-out rows, as staged prediction does, records the error, and stops the fit.
+    The model grows only through the stop round: a callback reads each new round's prediction of
+    the held-out rows from the model's own ``staged_predict``, so the curve is the one the finished
+    model gives on any platform, records the error, and stops the fit.
     """
-    # The trees read their features as float32, which staged prediction converts them to.
-    held_features = np.ascontiguousarray(features[held], dtype=np.float32)
+    held_features = features[held]
     held_target = target[held]
     curve = np.full(_BOOST_ROUNDS, np.inf)
-    prediction = np.empty(0)
+    staged = None
     best = 0
 
     def stop_at_patience(i: int, model: GradientBoostingRegressor, _: dict) -> bool:
-        nonlocal prediction, best
-        if i == 0:
-            prediction = model.init_.predict(held_features).astype(np.float64)
-        # A round adds its tree's prediction times the rate, as staged prediction does.
-        tree = model.estimators_[i, 0]
-        prediction = prediction + _BOOST_RATE * tree.predict(held_features, check_input=False)
-        curve[i] = np.sqrt(np.mean((held_target - prediction) ** 2))
+        nonlocal staged, best
+        if staged is None:
+            staged = model.staged_predict(held_features)
+        # The generator's next round is round i, the one just grown.
+        curve[i] = np.sqrt(np.mean((held_target - next(staged)) ** 2))
         if curve[i] < curve[best]:
             best = i
         return i - best >= _BOOST_PATIENCE
