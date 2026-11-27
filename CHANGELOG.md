@@ -78,6 +78,13 @@ names its pull request.
 - For contributors, a test lists every module-level cache and checks each cache whose result can
   change while its key does not, and registry-driven tests check that a wrong type of a parameter of
   column labels, of `knowledge`, of `targets`, and of `bootstrap` and `markov_check` raises. ([#1259])
+- Methods that check their data for copied columns, those with a partial-correlation test or the
+  linear-Gaussian BIC among them, return the same results while the check holds less memory on data
+  with many columns. It reads the correlation matrix in blocks of rows instead of making three
+  temporary copies of it, and the BIC's check keeps the whole correlation matrix only when the data
+  have more rows than columns, for its eigenvalue test. On 4,000 variables and 300 rows, the BIC's
+  check peaks at about 17 MB instead of 488 MB, and an `hc` fit at about 537 MB instead of 637 MB.
+  ([#1275])
 - The grow step of `iamb` and `inter_iamb`, and so of `calm` and `rsmax2` with `restrict="iamb"`,
   reads the p-values of a scan as one array where the test answers a scan at once, so with
   `fisherz`, `student_t`, or `normal_scores` on complete data these searches run faster on hundreds
@@ -98,6 +105,10 @@ names its pull request.
   together, so `exact_search`, `hc`, `tabu`, `ges`, `xges`, `lges`, `boss`, `grasp`, `boss_fci`,
   `grasp_fci`, `gfci`, `mmhc`, `rsmax2`, and `gies` run faster with either score, with the same
   scores and graphs bit for bit. ([#1284])
+- `pc`, `fci`, `cdnod`, and `fci_jci` with `fisherz` or `student_t` on data with missing values
+  build the conditioning-size-0 pass from arrays, and so does the search for the separating sets of
+  the pairs that knowledge makes non-adjacent, so they run faster on many variables, with the same
+  output bit for bit and the same counts of the queries not tested. ([#1296])
 - `nogam` runs faster: each fold of its cross-validated kernel regressions is assembled from slices
   of the kernel, the kernels are built in place, and the repeated non-finite checks of the Cholesky
   steps are skipped, with the same output bit for bit. ([#1298])
@@ -3059,9 +3070,11 @@ First alpha release.
 [#1257]: https://github.com/Abel-ai-lab/Andrey/pull/1257
 [#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
+[#1275]: https://github.com/Abel-ai-lab/Andrey/pull/1275
 [#1284]: https://github.com/Abel-ai-lab/Andrey/pull/1284
 [#1287]: https://github.com/Abel-ai-lab/Andrey/pull/1287
 [#1289]: https://github.com/Abel-ai-lab/Andrey/pull/1289
 [#1290]: https://github.com/Abel-ai-lab/Andrey/pull/1290
 [#1293]: https://github.com/Abel-ai-lab/Andrey/pull/1293
+[#1296]: https://github.com/Abel-ai-lab/Andrey/pull/1296
 [#1298]: https://github.com/Abel-ai-lab/Andrey/pull/1298

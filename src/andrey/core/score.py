@@ -55,13 +55,14 @@ from __future__ import annotations
 
 import copy
 import math
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from functools import lru_cache
 from typing import Protocol, Self, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
 from scipy.linalg import get_lapack_funcs
+from scipy.sparse import csr_array
 from scipy.sparse.csgraph import connected_components
 from scipy.special import gammaln
 
@@ -215,21 +216,81 @@ def copy_groups(corr: np.ndarray, n: int) -> tuple[tuple[int, ...], ...]:
     Parameters
     ----------
     corr : ndarray, shape (d, d)
-        Correlation matrix of the data's columns.
+        Correlation matrix of the data's columns. It is read in blocks of whole rows of at most
+        ``COPY_BLOCK_ENTRIES`` entries, so beyond it the check holds about one such block and the
+        copies found in it.
     n : int
         Sample count.
     """
-    if n <= 2 or corr.shape[0] < 2:
+    d = corr.shape[0]
+    if n <= 2 or d < 2:
         return ()
-    alike = np.abs(corr)
-    np.fill_diagonal(alike, 0.0)
-    copies = 1.0 - alike**2 <= ZERO_RESIDUAL
+    first = np.arange(d)
+    for rows in _row_blocks(d):
+        first = _join_copies(first, _copy_mask(corr[rows], rows), rows.start)
+    return _groups_by_first(first)
+
+
+#: Correlation entries the copy check holds at once, 8 MB of float64.
+COPY_BLOCK_ENTRIES = 1 << 20
+
+
+def _row_blocks(d: int) -> Iterator[slice]:
+    """The rows ``0, ..., d - 1`` in order, in blocks of at most ``COPY_BLOCK_ENTRIES`` entries."""
+    step = max(1, COPY_BLOCK_ENTRIES // d)
+    return (slice(start, min(start + step, d)) for start in range(0, d, step))
+
+
+def _copy_mask(block: np.ndarray, rows: slice) -> np.ndarray:
+    """``True`` where ``block``, correlation rows ``rows``, marks a copy off the diagonal.
+
+    The entries are taken in floating point, in the precision of ``block`` when it is floating.
+    """
+    alike = np.abs(block, dtype=np.result_type(block, 1.0))
+    np.fill_diagonal(alike[:, rows.start :], 0.0)
+    np.square(alike, out=alike)
+    np.subtract(1.0, alike, out=alike)
+    return alike <= ZERO_RESIDUAL
+
+
+def _join_copies(first: np.ndarray, copies: np.ndarray, start: int) -> np.ndarray:
+    """Each column's smallest connected column, ``first``, updated with the copies ``copies``.
+
+    ``copies`` is the mask of :func:`_copy_mask` for the rows ``start, start + 1, ...``. The graph
+    holds one edge from each column to its ``first`` and the pairs the mask marks, so it stays
+    within a block's pairs plus one edge per column, however large a group of copies grows.
+    """
     if not copies.any():
+        return first
+    d = first.size
+    links = (np.ones(d), first.astype(np.int32), np.arange(d + 1, dtype=np.int32))
+    graph = _pairs_graph(copies, start) + csr_array(links, shape=(d, d))
+    _, label = connected_components(graph, directed=False)
+    _, smallest = np.unique(label, return_index=True)
+    return smallest[label]
+
+
+def _pairs_graph(copies: np.ndarray, start: int) -> csr_array:
+    """The ``(d, d)`` graph of the pairs ``copies`` marks in the rows ``start, start + 1, ...``.
+
+    It is built from the mask row by row, with 32-bit indices, without listing the pairs' positions
+    first.
+    """
+    rows, d = copies.shape
+    indptr = np.zeros(d + 1, dtype=np.int32)
+    indptr[start + 1 : start + rows + 1] = np.cumsum(copies.sum(axis=1))
+    indptr[start + rows + 1 :] = indptr[start + rows]
+    columns = np.broadcast_to(np.arange(d, dtype=np.int32), copies.shape)[copies]
+    return csr_array((np.ones(columns.size), columns, indptr), shape=(d, d))
+
+
+def _groups_by_first(first: np.ndarray) -> tuple[tuple[int, ...], ...]:
+    """The groups of :func:`copy_groups` from each column's smallest connected column ``first``."""
+    if (first == np.arange(first.size)).all():
         return ()
-    _, component = connected_components(copies, directed=False)
     members: dict[int, list[int]] = {}
-    for j, label in enumerate(component.tolist()):
-        members.setdefault(label, []).append(j)
+    for column, kept in enumerate(first.tolist()):
+        members.setdefault(kept, []).append(column)
     return tuple(tuple(group) for group in members.values() if len(group) > 1)
 
 
@@ -307,11 +368,18 @@ def check_columns(cov: np.ndarray, n: int, name: Callable[[int], str] | None = N
     if d < 2 or n <= 2:
         return
     sd = np.sqrt(variance)
-    corr = cov / np.outer(sd, sd)
-    groups = copy_groups(corr, n)
+    corr = np.empty((d, d), dtype=np.result_type(cov, sd)) if n > d else None
+    first = np.arange(d)
+    for rows in _row_blocks(d):
+        block = np.outer(sd[rows], sd)
+        np.divide(cov[rows], block, out=block)
+        if corr is not None:
+            corr[rows] = block
+        first = _join_copies(first, _copy_mask(block, rows), rows.start)
+    groups = _groups_by_first(first)
     if groups:
         raise copies_error(groups)
-    if n <= d:
+    if corr is None:
         return
     if np.linalg.eigvalsh(corr)[0] > ZERO_RESIDUAL:
         return
