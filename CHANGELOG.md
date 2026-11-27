@@ -216,6 +216,15 @@ names its pull request.
   each cross-validation fold grows only through the round where its early stop cuts it, and the
   repeated input checks of the many small fits are skipped, so the methods that take them as
   `indep_test` run faster, with the same output bit for bit. ([#1309])
+- `fisherz`, `student_t`, and `normal_scores` take the partial correlation of a conditioning set of
+  two from the second-order closed form, and of three or more from the Cholesky factor of the
+  correlation submatrix, in place of its inverse, so the constraint-based and time-series methods
+  that take them as `indep_test` run faster, among them `pc`, `fci`, `iamb`, `inter_iamb`, `mmpc`,
+  `pcmci`, `pcmciplus`, `lpcmci`, and `jpcmciplus`. A submatrix that is not clearly well
+  conditioned still takes the inverse and its eigenvalue test, so the same queries raise the
+  singular-correlation error. The partial correlations and p-values differ from the inverse's in
+  their last digits, with no decision of the identity corpus or the quality gate changed, and a
+  query has the same answer on every call path. ([#1346])
 
 ### Fixed
 
@@ -3209,3 +3218,4 @@ First alpha release.
 [#1329]: https://github.com/Abel-ai-lab/Andrey/pull/1329
 [#1331]: https://github.com/Abel-ai-lab/Andrey/pull/1331
 [#1341]: https://github.com/Abel-ai-lab/Andrey/pull/1341
+[#1346]: https://github.com/Abel-ai-lab/Andrey/pull/1346
