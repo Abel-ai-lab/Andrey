@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from andrey.core import GraphStructure, backend
+from andrey.core import GraphStructure, _bitset, backend
 from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.orient import cpdag_of_pdag, pdag2dag, to_structure
 from andrey.core.score import Score, make_score
@@ -45,8 +45,8 @@ def recompute_objective(adj: np.ndarray, score: Score, n: int) -> float:
     the categorical scores, and the mixed-data scores are score-equivalent), so ``pdag2dag``'s
     choice of representative is immaterial.
     """
-    dag = pdag2dag(adj)
-    return float(sum(score.score(v, ops.parents(dag, v).tolist()) for v in range(n)))
+    parents = _bitset.row_lists(pdag2dag(adj) == ops.ARROW)
+    return float(sum(score.score(v, parents[v]) for v in range(n)))
 
 
 #: How :func:`ges` applies ``max_parents``: ``"cap"`` on the most parents any DAG of the class gives

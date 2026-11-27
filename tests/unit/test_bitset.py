@@ -116,3 +116,37 @@ def test_nodes_inverts_bitmask(seed):
     for size in {0, 1, min(d, 24), min(d, 25), int(rng.integers(0, d + 1)), d}:
         chosen = sorted(rng.choice(d, size=size, replace=False).tolist())
         assert _bitset.nodes(_bitset.bitmask(chosen)) == chosen, (seed, d, size)
+
+
+def _row_list_masks() -> list[tuple[str, np.ndarray]]:
+    """Boolean masks that read as one row of columns each, of every shape ``row_lists`` meets."""
+    rng = np.random.default_rng(0)
+    sparse = rng.random((7, 7)) < 0.4
+    sparse[0] = False
+    sparse[-1] = False
+    wide = rng.random((70, 130)) < 0.3
+    square = rng.random((50, 50)) < 0.3
+    return [
+        ("0 x 0", np.zeros((0, 0), dtype=bool)),
+        ("0 x 5", np.zeros((0, 5), dtype=bool)),
+        ("3 x 0", np.zeros((3, 0), dtype=bool)),
+        ("1 x 1 empty", np.zeros((1, 1), dtype=bool)),
+        ("1 x 1 full", np.ones((1, 1), dtype=bool)),
+        ("empty rows", np.zeros((5, 5), dtype=bool)),
+        ("all True", np.ones((5, 5), dtype=bool)),
+        ("first and last rows empty", sparse),
+        ("transposed view", square.T),
+        ("strided view", square[::2, ::2]),
+        ("column-major", np.asfortranarray(square)),
+        ("more than 64 columns", wide),
+        ("more than 64 columns, all True", np.ones((3, 200), dtype=bool)),
+    ]
+
+
+@pytest.mark.parametrize(("name", "mask"), _row_list_masks(), ids=lambda value: str(value)[:40])
+def test_row_lists_equal_flatnonzero(name, mask):
+    """Each row's list is the ascending columns of its ``True`` entries, as Python ints."""
+    got = _bitset.row_lists(mask)
+    assert got == [np.flatnonzero(row).tolist() for row in mask], name
+    assert len(got) == mask.shape[0]
+    assert all(type(column) is int for row in got for column in row), name
