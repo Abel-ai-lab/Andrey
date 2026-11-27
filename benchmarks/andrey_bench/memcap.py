@@ -16,6 +16,7 @@ import platform
 import re
 import signal
 import threading
+import time
 from collections.abc import Callable
 from typing import Mapping
 
@@ -27,6 +28,10 @@ ROUTES: tuple[str, ...] = (POLL, SLURM, NONE)
 
 #: Sampling period for the polling route.
 DEFAULT_POLL_INTERVAL_S = 0.05
+
+#: The least time between two reads of the tree's Pss while its RSS sum is over the cap. A read
+#: stalls the fit (:func:`pss_kb`), so the gap is also at least 20 times the last read's duration.
+PSS_INTERVAL_S = 1.0
 
 _MB = 1024.0 * 1024.0
 
@@ -169,9 +174,9 @@ def tree_memory_mb(pid: int, *, pss: bool = True) -> tuple[float, float | None]:
     """Return the summed RSS and Pss (:func:`pss_kb`) in MB of a process and its descendants.
 
     RSS counts a page that processes share once per process; Pss counts it once in all. Pss is
-    ``None`` without ``pss`` or when the root's cannot be read, and a descendant that exits
-    mid-sample adds none. A descendant that runs in its parent's address space
-    (:func:`shares_parent_memory`) is left out of both.
+    ``None`` without ``pss`` or when a live process's cannot be read, so it never leaves out
+    memory the RSS sum holds; a process that exits mid-sample adds no Pss. A descendant that runs
+    in its parent's address space (:func:`shares_parent_memory`) is left out of both.
     """
     import psutil  # the benchmarks' own dependency; importing the harness does not need it
 
@@ -181,7 +186,7 @@ def tree_memory_mb(pid: int, *, pss: bool = True) -> tuple[float, float | None]:
     except (psutil.NoSuchProcess, psutil.AccessDenied):
         return 0.0, None
     rss = 0
-    total: int | None = None
+    total: int | None = 0 if pss else None
     for proc in procs:
         if proc is not root and shares_parent_memory(proc.pid):
             continue
@@ -189,11 +194,13 @@ def tree_memory_mb(pid: int, *, pss: bool = True) -> tuple[float, float | None]:
             rss += proc.memory_info().rss
         except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
             continue
-        kb = pss_kb(proc.pid) if pss else None
-        if proc is root:
-            total = kb
-        elif total is not None and kb is not None:
+        if total is None:
+            continue
+        kb = pss_kb(proc.pid)
+        if kb is not None:
             total += kb
+        elif proc.is_running():  # alive, yet its Pss cannot be read
+            total = None
     return rss / _MB, None if total is None else total * 1024 / _MB
 
 
@@ -219,8 +226,11 @@ class TreeMemoryPoller(threading.Thread):
     Each sample reads the tree's RSS sum. Only a sum over the cap reads the tree's Pss as well,
     which decides where Linux reports it: Pss is at most the RSS sum, so a tree under the cap by
     RSS is under it by Pss, and the slow Pss read (:func:`pss_kb`) stays out of a fit under the cap.
-    ``breached`` records a cap violation; ``peak_mb`` (RSS) may underestimate the true peak, and
-    ``peak_pss_mb`` is the largest Pss read, ``None`` while the RSS sum stays under the cap.
+    Over the cap, a read is repeated after :data:`PSS_INTERVAL_S`, or sooner once the last read
+    plus the RSS sum's growth since it passes the cap; in between, that sum stands for the Pss. Only
+    a fresh read, or the RSS sum where Pss cannot be read, breaches the cap. ``breached`` records a
+    cap violation; ``peak_mb`` (RSS) may underestimate the true peak, and ``peak_pss_mb`` is the
+    largest Pss read, ``None`` while the RSS sum stays under the cap.
     """
 
     def __init__(
@@ -235,20 +245,37 @@ class TreeMemoryPoller(threading.Thread):
         self.cap_mem_mb = float(cap_mem_mb)
         self.peak_mb = 0.0
         self.peak_pss_mb: float | None = None
+        # The last Pss read: when it started, the RSS sum then, the Pss, and how long it took.
+        self._last_pss: tuple[float, float, float, float] | None = None
         self.breached = False
         self._interval = interval
         # Not ``_stop`` — that name shadows ``threading.Thread._stop``, which ``join`` calls.
         self._stop_evt = threading.Event()
+
+    def _pss(self, rss: float) -> float | None:
+        """The tree's Pss over the cap: a fresh read when one is due, else the last read plus the
+        RSS sum's growth since it; ``None`` where Pss cannot be read."""
+        now = time.monotonic()
+        if self._last_pss is not None:
+            then, rss_then, pss_then, cost = self._last_pss
+            bound = pss_then + max(0.0, rss - rss_then)
+            if bound <= self.cap_mem_mb and now - then < max(PSS_INTERVAL_S, 20.0 * cost):
+                return bound
+        _, pss = tree_memory_mb(self.pid)
+        if pss is None:
+            self._last_pss = None
+            return None
+        self._last_pss = (now, rss, pss, time.monotonic() - now)
+        self.peak_pss_mb = max(self.peak_pss_mb or 0.0, pss)
+        return pss
 
     def sample(self) -> float:
         """Sample the tree's memory and enforce the cap; return the sample the cap reads."""
         total, _ = tree_memory_mb(self.pid, pss=False)
         self.peak_mb = max(self.peak_mb, total)
         if total > self.cap_mem_mb:
-            _, pss = tree_memory_mb(self.pid)
-            if pss is not None:
-                self.peak_pss_mb = max(self.peak_pss_mb or 0.0, pss)
-                total = pss
+            pss = self._pss(total)
+            total = total if pss is None else pss
         if not self.breached and total > self.cap_mem_mb:
             self.breached = True
             _kill_tree(self.pid)
@@ -272,6 +299,7 @@ __all__ = [
     "NONE",
     "ROUTES",
     "DEFAULT_POLL_INTERVAL_S",
+    "PSS_INTERVAL_S",
     "TreeMemoryPoller",
     "resolve_route",
     "srun_prefix",

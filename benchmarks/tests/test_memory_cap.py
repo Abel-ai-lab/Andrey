@@ -508,7 +508,9 @@ def test_the_tree_pss_is_at_most_its_rss_and_counts_shared_pages_once():
 
 
 def test_the_poller_reads_pss_only_over_the_cap_and_caps_on_it(monkeypatch):
-    """Pss is at most the RSS sum, so a tree under the cap by RSS never pays for the Pss read."""
+    """Pss is at most the RSS sum, so a tree under the cap by RSS never pays for the Pss read; over
+    it, the read repeats only when due, or when the RSS growth since the last read could pass the
+    cap, and only a fresh read breaches."""
     from andrey_bench import memcap
 
     state: dict[str, float | None] = {"rss": 400.0, "pss": 300.0}
@@ -523,9 +525,29 @@ def test_the_poller_reads_pss_only_over_the_cap_and_caps_on_it(monkeypatch):
     poller = memcap.TreeMemoryPoller(os.getpid(), 500.0)
     assert poller.sample() == 400.0 and reads == [False] and poller.peak_pss_mb is None
     state.update(rss=900.0, pss=450.0)  # over the cap by RSS, under it by Pss
-    assert poller.sample() == 450.0 and not poller.breached
+    assert poller.sample() == 450.0 and reads[-2:] == [False, True] and not poller.breached
     assert (poller.peak_mb, poller.peak_pss_mb) == (900.0, 450.0)
-    state.update(pss=None)  # no Pss here: the RSS sum decides
+    reads.clear()
+    state.update(rss=930.0)  # 450 + 30 is under the cap: no read is due yet
+    assert poller.sample() == 480.0 and reads == [False]
+    state.update(rss=990.0, pss=470.0)  # 450 + 90 could pass the cap: read now
+    assert poller.sample() == 470.0 and reads == [False, False, True] and not poller.breached
+    state.update(rss=1100.0, pss=None)  # 470 + 110 could pass the cap; no Pss: the RSS sum decides
     killed: list[int] = []
     monkeypatch.setattr(memcap, "_kill_tree", killed.append)
-    assert poller.sample() == 900.0 and poller.breached and killed == [os.getpid()]
+    assert poller.sample() == 1100.0 and poller.breached and killed == [os.getpid()]
+
+
+def test_a_live_process_without_a_readable_pss_leaves_the_tree_without_one(monkeypatch):
+    """A partial Pss would leave out memory the RSS sum holds, so the cap falls back to RSS."""
+    from andrey_bench import memcap
+
+    with _Forks() as forks:
+        if memcap.tree_memory_mb(forks.child.pid)[1] is None:
+            pytest.skip("Pss cannot be read here")
+        real = memcap.pss_kb
+        monkeypatch.setattr(
+            memcap, "pss_kb", lambda pid: None if pid == forks.grandchild else real(pid)
+        )
+        rss, pss = memcap.tree_memory_mb(forks.child.pid)
+    assert rss > 0.0 and pss is None
