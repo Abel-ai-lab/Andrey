@@ -155,6 +155,14 @@ names its pull request.
   ([#1303])
 - `camuv` keeps each residual its sink tests fit, so it fits each variable on each set of
   regressors once, with the same output bit for bit. ([#1306])
+- A process that imports Andrey starts a fit sooner, with the same output bit for bit: `scipy.stats`
+  and the basis cache of the functional causal models are imported where they are used, a table is
+  read as a DataFrame only once pandas is imported, so a fit on an array never imports it, and the
+  forkserver preloads the method registry that a worker's first fit reads, so a bootstrap on worker
+  processes starts its workers sooner. With a CPU build of torch, the automatic backend choice
+  rules CUDA out from the build's version file, so a `direct_lingam` fit and a fit with
+  `indep_test="kci"` or `indep_test="cmiknn"` that stay on NumPy no longer import torch. A torch
+  already imported is asked, and so is a `cuda` pin. ([#1314])
 
 ### Fixed
 
@@ -3129,3 +3137,4 @@ First alpha release.
 [#1302]: https://github.com/Abel-ai-lab/Andrey/pull/1302
 [#1303]: https://github.com/Abel-ai-lab/Andrey/pull/1303
 [#1306]: https://github.com/Abel-ai-lab/Andrey/pull/1306
+[#1314]: https://github.com/Abel-ai-lab/Andrey/pull/1314
