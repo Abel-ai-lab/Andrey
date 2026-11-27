@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import dataclasses
 import warnings
+from collections.abc import Iterable, Mapping
 
 import numpy as np
 import pandas as pd
@@ -17,6 +19,7 @@ from andrey.data import sample_context_series
 from andrey.temporal import jpcmciplus as engine
 from andrey.temporal import pcmciplus as pcmciplus_engine
 from andrey.temporal.jpcmciplus import ContextTest, Nodes, one_hot, pooled_design
+from andrey.temporal.pcmci import DesignTest
 
 
 def _datasets(n_datasets: int = 3, n_steps: int = 40, seed: int = 0) -> list[np.ndarray]:
@@ -398,3 +401,327 @@ def test_the_generator_refuses_what_it_cannot_draw():
         sample_context_series(n_system=2, n_time=2, n_space=1)
     with pytest.raises(ValueError, match="links"):
         sample_context_series(n_system=3, n_time=1, n_space=0, n_links=4)
+
+
+class _Copied(_Fixed):
+    """A test that records its queries and names the groups of design columns that repeat."""
+
+    def __init__(self, groups: tuple[tuple[int, ...], ...]) -> None:
+        super().__init__(0.01)
+        self.groups = groups
+
+    def copies(self) -> tuple[tuple[int, ...], ...]:
+        return self.groups
+
+
+def _copied_context_test(*groups: tuple[int, ...]) -> tuple[_Copied, ContextTest]:
+    """The test of ``_context_test``, over a design whose columns in each of ``groups`` repeat."""
+    answer = _Copied(groups)
+    design = DesignTest(answer, np.zeros((100, 15)))
+    return answer, ContextTest(design, Nodes(2, 1, 1, True), ((9,), (10, 11, 12), (13, 14)), 1, 100)
+
+
+@pytest.mark.parametrize(
+    ("groups", "x", "y", "conditions", "reaching", "answer"),
+    [
+        # A level of the tested dummy repeats a column the test conditions on: its pair is left
+        # out, and the other levels are tested.
+        pytest.param(
+            ((10, 1),), 4, 0, [1], [(11, 0, (1,)), (12, 0, (1,))], (0.5, 0.03), id="a level of x"
+        ),
+        pytest.param(
+            ((10, 1),), 0, 4, [1], [(0, 11, (1,)), (0, 12, (1,))], (0.5, 0.03), id="a level of y"
+        ),
+        # No tested column has a copy among the conditions.
+        pytest.param(
+            ((10, 1),), 4, 0, [], [(10, 0, ()), (11, 0, ()), (12, 0, ())], (0.5, 0.03), id="none"
+        ),
+        pytest.param(((10, 1),), 0, 2, [1], [(0, 2, (1,))], (0.5, 0.01), id="a copy not tested"),
+        # Every pair has a column with a copy among the conditions: nothing reaches the test, and
+        # the tests that did not run count as not rejecting.
+        pytest.param(((10, 1), (13, 2)), 4, 5, [1, 2], [], (0.0, 1.0), id="every pair"),
+        # A context that repeats a column the test conditions on is left out without an error.
+        pytest.param(((2, 5),), 2, 0, [6 + 2], [], (0.0, 1.0), id="a time context"),
+    ],
+)
+def test_a_pair_with_a_copy_among_the_conditions_is_not_tested(
+    groups, x, y, conditions, reaching, answer
+):
+    inner, test = _copied_context_test(*groups)
+    assert _ask(test, x, y, conditions) == answer
+    assert inner.queries == reaching
+
+
+def test_a_tested_system_variable_with_a_copy_among_the_conditions_raises():
+    inner, test = _copied_context_test((0, 3))
+    with pytest.raises(SingularCorrelationError, match="span") as caught:
+        _ask(test, 0, 1, [6])
+    assert "linear function of other columns" in caught.value.__notes__[0]
+    assert not inner.queries
+
+
+class _ReadsNodes(ContextTest):
+    """A :class:`ContextTest` that reads each node count from ``nodes`` and the node and design
+    columns of each conditioning column when it uses them, and forms ``set(given)`` and the union
+    of the copies of each pair of tested columns again for every pair."""
+
+    def _columns(self, column: int) -> tuple[int, ...]:
+        lag, node = divmod(column, self.nodes.count)
+        if node < self.nodes.n_series:
+            return (lag * self.nodes.n_series + node,)
+        return self.fixed[node - self.nodes.n_series]
+
+    def _given(self, row: Iterable[int]) -> tuple[tuple[int, ...], set[int]]:
+        given: set[int] = set()
+        present = set()
+        for column in row:
+            present.add(column % self.nodes.count)
+            columns = self._columns(column)
+            given.update(columns[:-1] if column % self.nodes.count in self.dummy_nodes else columns)
+        if self.nodes.space_dummy_node in present:
+            given -= self.space_columns
+        if self.nodes.time_dummy_node in present:
+            given -= self.time_columns
+        return tuple(sorted(given)), present
+
+    def _fixed_by(self, column: int, present: set[int]) -> bool:
+        node = column % self.nodes.count
+        if self.nodes.n_system <= node < self.nodes.n_series:
+            return self.nodes.time_dummy_node in present
+        if self.nodes.n_series <= node < self.nodes.space_dummy_node:
+            return self.nodes.space_dummy_node in present
+        return False
+
+    def statistic_pvalues(
+        self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        statistics = np.zeros(len(x))
+        smallest = np.ones(len(x))
+        tests = np.ones(len(x))
+        batches: dict[int, list[tuple[int, int, int, tuple[int, ...]]]] = {}
+        for query, (a, b, row) in enumerate(
+            zip(np.asarray(x).tolist(), np.asarray(y).tolist(), np.asarray(conditions).tolist())
+        ):
+            given, present = self._given(row)
+            if self._fixed_by(a, present) or self._fixed_by(b, present):
+                statistics[query], smallest[query] = 1.0, 0.0
+                continue
+            self._check_rows(given)
+            left, right = self._levels(a), self._levels(b)
+            tests[query] = len(left) * len(right)
+            for column in {left[0], right[0]} & self.system_columns:
+                if self.copies.get(column, set()) & set(given):
+                    error = SingularCorrelationError(
+                        "a tested column lies in the span of its conditioning columns; cannot run "
+                        "a partial-correlation test"
+                    )
+                    error.add_note(engine.SPAN_NOTE)
+                    raise error
+            for u in left:
+                for v in right:
+                    if not (self.copies.get(u, set()) | self.copies.get(v, set())) & set(given):
+                        batches.setdefault(len(given), []).append((query, u, v, given))
+        for size, batch in batches.items():
+            queries = [query for query, _, _, _ in batch]
+            answers = self._answer(
+                np.array([u for _, u, _, _ in batch], dtype=np.intp),
+                np.array([v for _, _, v, _ in batch], dtype=np.intp),
+                np.array([given for _, _, _, given in batch], dtype=np.intp).reshape(
+                    len(batch), size
+                ),
+            )
+            for query, statistic, p_value in zip(queries, *answers):
+                if p_value < smallest[query]:
+                    smallest[query], statistics[query] = p_value, statistic
+        return statistics, np.minimum(1.0, smallest * tests)
+
+
+def _bits(value) -> object:
+    """``value`` with each float as its hex and each array as its bytes, so equal values are equal
+    bit for bit."""
+    if isinstance(value, np.ndarray):
+        return (value.shape, value.dtype.str, value.tobytes())
+    if isinstance(value, float | np.floating):
+        return float(value).hex()
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        return (type(value).__name__, _bits(dataclasses.astuple(value)))
+    if isinstance(value, Mapping):
+        return [(_bits(k), _bits(v)) for k, v in value.items()]
+    if isinstance(value, list | tuple):
+        return [_bits(v) for v in value]
+    return value
+
+
+_ANSWER = ContextTest._answer
+
+
+def _run(test_class: type[ContextTest], fit) -> tuple[object, list[object], list[int]]:
+    """The result of ``fit()`` with ``test_class`` as the test, the queries that reached the
+    inner test with their answers, and the number of columns with copies of each test built."""
+    asked: list[object] = []
+    copied: list[int] = []
+    init = test_class.__init__
+
+    def recording_init(self, *args, **kwargs):
+        init(self, *args, **kwargs)
+        copied.append(len(self.copies))
+
+    def recording_answer(self, x, y, conditions):
+        answers = _ANSWER(self, x, y, conditions)
+        asked.append(_bits([x, y, conditions, *answers]))
+        return answers
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(engine, "ContextTest", test_class)
+        patch.setattr(test_class, "__init__", recording_init)
+        patch.setattr(ContextTest, "_answer", recording_answer)
+        try:
+            result = fit()
+        except Exception as error:
+            result = ("error", type(error).__name__, str(error), getattr(error, "__notes__", None))
+    return result, asked, copied
+
+
+def _fit(data, **options):
+    def fit() -> object:
+        out = andrey.jpcmciplus(data, **options)
+        structure = out.structure
+        return _bits([structure.lags, structure.lag_weights, structure.labels, out.metadata])
+
+    return fit
+
+
+def _contexts(series) -> dict[str, list[int]]:
+    return {
+        "time_contexts": list(series.time_contexts),
+        "space_contexts": list(series.space_contexts),
+    }
+
+
+def _fit_cases() -> list:
+    """Fits of the kinds the test is meant for: contexts that are declared or not, dummies that
+    are on or off, a design with columns that repeat, and a fit that raises."""
+    cases = []
+    for seed in (0, 1):
+        series = sample_context_series(
+            n_system=5, n_time=1, n_space=1, n_datasets=6, n_steps=60, tau_max=2, seed=seed
+        )
+        data, options = list(series.datasets), {"alpha": 0.05, "tau_max": 2, **_contexts(series)}
+        cases.append((f"default-{seed}", _fit(data, **options), None))
+        cases.append((f"no-time-dummy-{seed}", _fit(data, time_dummy=False, **options), None))
+        cases.append(
+            (f"conservative-{seed}", _fit(data, collider_rule="conservative", **options), None)
+        )
+        order = np.random.default_rng(100 + seed).permutation(data[0].shape[1])
+        where = {int(old): new for new, old in enumerate(order)}
+        permuted = {key: [where[i] for i in value] for key, value in _contexts(series).items()}
+        cases.append(
+            (
+                f"permuted-{seed}",
+                _fit([d[:, order] for d in data], alpha=0.05, tau_max=2, **permuted),
+                None,
+            )
+        )
+        hidden = sample_context_series(
+            n_system=5, n_time=2, n_space=2, n_datasets=5, n_steps=30, observed=0.5, seed=seed
+        )
+        cases.append(
+            (
+                f"hidden-contexts-{seed}",
+                _fit(list(hidden.datasets), alpha=0.05, tau_max=2, **_contexts(hidden)),
+                None,
+            )
+        )
+        rng = np.random.default_rng(seed)
+        two = []
+        for level in (0.0, 1.0):
+            first = level + rng.standard_normal(100)
+            two.append(np.column_stack([first, rng.standard_normal(100), np.full(100, level)]))
+        for dummy in (False, True):
+            fit = _fit(two, space_contexts=[2], time_dummy=dummy)
+            cases.append((f"two-datasets-{seed}-{dummy}", fit, "copies"))
+        pulse = np.zeros(40)
+        pulse[20] = 1.0
+        pulsed = [np.column_stack([d, pulse]) for d in _datasets(3, 40, seed)]
+        cases.append((f"pulse-declared-{seed}", _fit(pulsed, time_contexts=[2]), None))
+        cases.append((f"pulse-undeclared-{seed}", _fit(pulsed), "error"))
+    wide = sample_context_series(
+        n_system=12, n_time=1, n_space=1, n_datasets=8, n_steps=80, tau_max=2, seed=0
+    )
+    cases.append(
+        ("twelve", _fit(list(wide.datasets), alpha=0.05, tau_max=2, **_contexts(wide)), None)
+    )
+    return cases
+
+
+@pytest.mark.parametrize(
+    ("fit", "reaches"), [pytest.param(f, r, id=name) for name, f, r in _fit_cases()]
+)
+def test_the_stored_counts_and_column_maps_give_the_fit_that_reads_the_nodes_each_time(
+    fit, reaches
+):
+    kept, kept_asked, copied = _run(ContextTest, fit)
+    read, read_asked, _ = _run(_ReadsNodes, fit)
+    assert kept == read
+    assert kept_asked == read_asked
+    assert kept_asked or reaches == "error"
+    if reaches == "copies":
+        assert any(copied)  # the design has columns that repeat, so a pair can be left out
+    if reaches == "error":
+        assert kept[0] == "error"  # the fit stops on a tested column in the span of its conditions
+
+
+def _random_queries(
+    rng: np.random.Generator, n_columns: int, n_queries: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Lagged node columns to test and to condition on, some past the lags of the design."""
+    x, y = (rng.integers(0, n_columns, n_queries) for _ in range(2))
+    size = int(rng.integers(0, 5))
+    conditions = rng.integers(0, n_columns, (n_queries, size))
+    return x, y, conditions
+
+
+class _Hash:
+    """Answers each query with a statistic and a p-value that depend on all its columns."""
+
+    def __init__(self, groups: tuple[tuple[int, ...], ...]) -> None:
+        self.groups = groups
+
+    def copies(self) -> tuple[tuple[int, ...], ...]:
+        return self.groups
+
+    def statistic_pvalues(self, x, y, conditions):
+        key = 7 * np.asarray(x) + 13 * np.asarray(y) + np.asarray(conditions).sum(axis=1)
+        return key * 0.25, (key % 97 + 1) / 100
+
+
+@pytest.mark.parametrize("time_dummy", [True, False])
+@pytest.mark.parametrize("tau_max", [1, 2])
+def test_random_queries_get_the_answers_of_the_test_that_reads_the_nodes_each_time(
+    tau_max, time_dummy
+):
+    n_system, n_time, n_space = 3, 1, 1
+    nodes = Nodes(n_system, n_time, n_space, time_dummy)
+    n_lagged = (2 * tau_max + 1) * nodes.n_series
+    fixed = ((n_lagged,), (n_lagged + 1, n_lagged + 2, n_lagged + 3), (n_lagged + 4, n_lagged + 5))
+    fixed = fixed[: 2 + int(time_dummy)]
+    n_design = n_lagged + 1 + sum(len(block) for block in fixed[1:])
+    rng = np.random.default_rng(tau_max)
+    raised = answered = 0
+    for _ in range(120):
+        picks = rng.choice(n_design, (int(rng.integers(0, 3)), 2), replace=False)
+        groups = tuple(tuple(int(c) for c in pick) for pick in picks)
+        design = DesignTest(_Hash(groups), np.zeros((50, n_design)))
+        # Columns up to two lags past the design's: the stored column map holds only its own.
+        queries = _random_queries(rng, (2 * tau_max + 3) * nodes.count, 30)
+        outcomes = []
+        for test_class in (ContextTest, _ReadsNodes):
+            test = test_class(design, nodes, fixed, tau_max, 50)
+            try:
+                outcomes.append(_bits(list(test.statistic_pvalues(*queries))))
+            except SingularCorrelationError as error:
+                outcomes.append(("error", str(error), error.__notes__))
+        assert outcomes[0] == outcomes[1]
+        raised += outcomes[0][0] == "error"
+        answered += outcomes[0][0] != "error"
+    assert raised and answered  # the draws reach the tests that raise and the ones that answer

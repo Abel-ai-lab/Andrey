@@ -180,6 +180,10 @@ names its pull request.
   target with one search, so a run that several targets share is made once, and each result counts
   the rows of the runs its target reads, as a call for that target alone counts them. These lists
   run faster, with the same output bit for bit. ([#1317])
+- `jpcmciplus` runs faster as the number of system variables grows, with the same output bit for
+  bit: its test over the stacked design keeps the node counts and the design columns each lagged
+  node adds to a conditioning set, and forms each conditioning set once per query, instead of
+  reading them again for every column of every query. ([#1322])
 - `boss` runs faster, with the same output bit for bit: it scores each batch of added parents with
   fewer temporary arrays and keeps each vertex's penalty and rounding terms for the fit. `grasp`,
   `boss_fci`, `grasp_fci`, and `gfci` score their added parents the same way and return the same
@@ -3164,3 +3168,4 @@ First alpha release.
 [#1315]: https://github.com/Abel-ai-lab/Andrey/pull/1315
 [#1317]: https://github.com/Abel-ai-lab/Andrey/pull/1317
 [#1320]: https://github.com/Abel-ai-lab/Andrey/pull/1320
+[#1322]: https://github.com/Abel-ai-lab/Andrey/pull/1322
