@@ -269,7 +269,8 @@ def score_skew(X: np.ndarray, U: list[int]) -> np.ndarray:
     first multiplied by the sign of its skewness (Eq. 13, ``+1`` for a skewness of ``0``) so that
     ``rho`` is the correlation of the multiplied columns; the entry is then positive when ``i``
     precedes ``j`` (Theorem 2), whatever the sign of the skewness. A column of symmetric noise has
-    skewness near ``0``, and the measure then says little about it. Returns an array aligned with
+    skewness near ``0``, and the measure then says little about it; a skewness within the rounding
+    of the sums that compute it takes its sign from that rounding. Returns an array aligned with
     ``U``, higher = more exogenous, as :func:`score_candidates` does.
     """
     if len(U) < 2:
@@ -394,7 +395,9 @@ def find_causal_order(
     ``"pwling"`` scores with :func:`pruned_scores`, which gives the pick of
     :func:`score_candidates` from fewer entropies.
 
-    Each pick is residualized out of the rest. Only one column of each copy group
+    The columns are centered once first, so a column's offset moves nothing but the last bits of the
+    values the search reads, and the order is the one of the column without it. Each pick is
+    residualized out of the rest. Only one column of each copy group
     (:func:`copy_groups`) is scored; when it is picked, its copies follow it directly in the order.
     Ties and copy representatives are decided by :func:`~andrey.core.ties.tie_ranks` of the input
     columns, which are identical on every machine and keep their ranks when the columns are
@@ -410,6 +413,11 @@ def find_causal_order(
     order: list[int] = []
     residualized = np.array(X, dtype=np.float64)  # copy + float64: the write-back must not truncate
     ranks = tie_ranks(residualized)
+    # Both papers define the search on zero-mean columns. Centered once, every later mean,
+    # covariance, and residual is taken between values of the columns' spread, so an offset costs
+    # them none of its rounding. One pass is enough: each step's standardization subtracts the small
+    # mean the pass leaves.
+    residualized -= residualized.mean(axis=0)
     hint: dict[int, float] = {}
     while remaining:
         if precedence is None:
