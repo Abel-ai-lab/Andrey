@@ -1203,10 +1203,11 @@ def rcd(
     ``weighted_adjacency``. With no hidden common causes, use :func:`~andrey.direct_lingam`; with
     nonlinear effects, :func:`~andrey.camuv`, and with Gaussian noise, :func:`~andrey.fci`.
 
-    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: the causal order compares the
-    residuals of every variable over the same rows, so a row with a missing value has no place in
-    it. Drop the incomplete rows yourself, which suits values missing completely at random, or use
-    :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: its regressions on common
+    ancestors, and the tests of their residuals, read every row of every variable, so a row with a
+    missing value has no place in it. Drop the incomplete rows yourself, which suits values missing
+    completely at random, or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows
+    per test.
 
     **Limitations.** On linear data with uniform noise in which some nodes are hidden it made fewer
     errors than the empty graph on small sparse graphs, but on denser graphs only on small ones with

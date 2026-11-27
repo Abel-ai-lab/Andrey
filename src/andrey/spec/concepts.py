@@ -1308,7 +1308,9 @@ _CONCEPTS = (
                 "resit",
                 "camuv",
             ),
-            *_exempt("Its skew-normal fits read every row of every variable.", "skewd_mv"),
+            *_exempt(
+                "Its skew-normal fits read every row of a variable and its parents.", "skewd_mv"
+            ),
             *_exempt(
                 "Its estimate of the score's Jacobian reads every row of every variable.",
                 "score_matching",
@@ -1320,15 +1322,20 @@ _CONCEPTS = (
             ),
             *_exempt("Its fit of one column given the other reads every row of both.", "cpcm"),
             *_exempt(
-                "Its fit of each variable given its parents reads every row of every variable.",
+                "Its test of the residuals' joint independence compares every variable's residual "
+                "over the same rows.",
                 "cpcm_graph",
             ),
             *_exempt(
                 "Its causal order compares the residuals of every variable over the same rows.",
                 "direct_lingam",
                 "multi_group_direct_lingam",
-                "rcd",
                 "bottom_up_parce_lingam",
+            ),
+            *_exempt(
+                "Its regressions on common ancestors, and the tests of their residuals, read every "
+                "row of every variable.",
+                "rcd",
             ),
             *_exempt(
                 "Its independent components need complete rows to unmix every variable.",
@@ -1351,8 +1358,8 @@ _CONCEPTS = (
                 "icp",
             ),
             *_exempt(
-                "Each invariance test regresses or tests a variable on all of its conditioning "
-                "variables in each environment.",
+                "Each invariance test compares the observational rows with one setting's, and "
+                "regresses or tests a variable on its conditioning variables over all of them.",
                 "igsp",
                 "ut_igsp",
             ),
@@ -1362,7 +1369,8 @@ _CONCEPTS = (
                 "granger",
             ),
             *_exempt(
-                "A series cannot drop a step, and its loss fits every step on the steps before it.",
+                "A series cannot drop a step, and each row of its loss reads a step and the steps "
+                "before it.",
                 "dynotears",
             ),
             *_exempt(
