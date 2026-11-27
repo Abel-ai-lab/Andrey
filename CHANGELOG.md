@@ -216,6 +216,12 @@ names its pull request.
   each cross-validation fold grows only through the round where its early stop cuts it, and the
   repeated input checks of the many small fits are skipped, so the methods that take them as
   `indep_test` run faster, with the same output bit for bit. ([#1309])
+- The shrink step of `iamb` and `inter_iamb`, and so of `calm` and `rsmax2` with `restrict="iamb"`,
+  asks every member it has not visited in one call where the test answers many queries at once: with
+  `fisherz`, `student_t`, or `normal_scores` on complete data, it drops the first member found
+  independent and asks the members after it again given the smaller blanket, so these searches run
+  faster, with the same output bit for bit and the same queries. For contributors, `DEVELOPMENT.md`
+  says that tests a speed change computes ahead and discards do not count. ([#1347])
 
 ### Fixed
 
@@ -3209,3 +3215,4 @@ First alpha release.
 [#1329]: https://github.com/Abel-ai-lab/Andrey/pull/1329
 [#1331]: https://github.com/Abel-ai-lab/Andrey/pull/1331
 [#1341]: https://github.com/Abel-ai-lab/Andrey/pull/1341
+[#1347]: https://github.com/Abel-ai-lab/Andrey/pull/1347
