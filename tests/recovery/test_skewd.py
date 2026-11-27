@@ -10,10 +10,14 @@ from scipy.stats import binomtest, skewnorm
 from andrey import skewd, skewd_mv
 from andrey.fcm.skewd import OPTIMIZERS
 from andrey.metrics import decision_rate, direction_accuracy, shd
+from tests.release import release_cases
 
 PAIRS = 12
 PAIR_ROWS = 400
 FIT = {"tuning_iter": 2, "max_iter": 200}
+# The recovery with CMA-ES, the default optimizer, takes 12 minutes on one core, so it runs at the
+# release gates (the ``release`` mark); pull requests run it with L-BFGS-B.
+BY_OPTIMIZER = release_cases(OPTIMIZERS, {"cmaes"})
 
 
 def _noise(seed: int, n: int) -> np.ndarray:
@@ -30,7 +34,7 @@ def _pair(seed: int) -> np.ndarray:
     return np.column_stack([x, y])
 
 
-@pytest.mark.parametrize("optimizer", OPTIMIZERS)
+@pytest.mark.parametrize("optimizer", BY_OPTIMIZER)
 def test_skewd_names_the_direction_of_skew_normal_location_scale_pairs(optimizer):
     # Both criteria read the same two fits of a pair, and the likelihood criterion's edge points
     # from the larger of the reported log-likelihoods (tests/unit/test_skewd.py), so each pair is
@@ -63,7 +67,7 @@ def _tree(seed: int, n: int = 600) -> tuple[np.ndarray, np.ndarray]:
     return np.column_stack([x0, x1, x2, x3]), truth
 
 
-@pytest.mark.parametrize("optimizer", OPTIMIZERS)
+@pytest.mark.parametrize("optimizer", BY_OPTIMIZER)
 def test_skewd_mv_beats_the_empty_graph_on_a_skew_normal_tree(optimizer):
     data, truth = _tree(0)
     out = skewd_mv(data, seed=0, optimizer=optimizer, **FIT)

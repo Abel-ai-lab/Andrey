@@ -18,9 +18,15 @@ from andrey import skewd, skewd_mv
 from andrey.api.irregular import _pair_matrix
 from andrey.core.orient import ARROW, NULL, TAIL, dag2cpdag
 from andrey.fcm import skewd as native
+from tests.release import release_cases
 
 SHORT_PAIR = {"tuning_iter": 1, "max_iter": 5}
 SHORT_GRAPH = {**SHORT_PAIR, "indep_test": "fisherz"}
+# A fit with the default optimizer, CMA-ES, takes about ten seconds even at this budget, so a test
+# of a property that holds for every optimizer runs on L-BFGS-B in pull requests and on both at the
+# release gates (the ``release`` mark).
+FAST = {"optimizer": "lbfgs"}
+OPTIMIZERS = release_cases(native.OPTIMIZERS, {"cmaes"})
 
 
 def _marks(d: int, lines=(), arrows=()) -> np.ndarray:
@@ -203,12 +209,14 @@ def _chain(n: int = 150, seed: int = 0) -> np.ndarray:
 
 
 @pytest.mark.parametrize("criterion", ["independence", "likelihood"])
-def test_skewd_reads_no_units_and_repeats(criterion):
+@pytest.mark.parametrize("optimizer", OPTIMIZERS)
+def test_skewd_reads_no_units_and_repeats(criterion, optimizer):
     # The columns are standardized first, so a change of units (exact products) changes nothing.
     data = pd.DataFrame(_pair(), columns=["x", "y"])
-    first = skewd(data, criterion=criterion, **SHORT_PAIR)
-    assert skewd(data, criterion=criterion, **SHORT_PAIR).metadata == first.metadata
-    scaled = skewd(data * np.array([2.0**-30, 2.0**20]), criterion=criterion, **SHORT_PAIR)
+    kwargs = {"criterion": criterion, "optimizer": optimizer, **SHORT_PAIR}
+    first = skewd(data, **kwargs)
+    assert skewd(data, **kwargs).metadata == first.metadata
+    scaled = skewd(data * np.array([2.0**-30, 2.0**20]), **kwargs)
     assert scaled.structure.oriented_edges() == first.structure.oriented_edges()
     assert scaled.metadata == first.metadata
 
@@ -223,31 +231,35 @@ def test_skewd_reads_the_same_table_in_any_units_up_to_rounding():
         np.testing.assert_allclose(scaled, base, rtol=0, atol=1e-13)
 
 
-def test_the_likelihood_criterion_points_from_the_larger_likelihood_of_the_same_fits():
+@pytest.mark.parametrize("optimizer", OPTIMIZERS)
+def test_the_likelihood_criterion_points_from_the_larger_likelihood_of_the_same_fits(optimizer):
     data = _pair()
-    by_test = skewd(data, criterion="independence", **SHORT_PAIR)
-    by_likelihood = skewd(data, criterion="likelihood", **SHORT_PAIR)
+    short = {"optimizer": optimizer, **SHORT_PAIR}
+    by_test = skewd(data, criterion="independence", **short)
+    by_likelihood = skewd(data, criterion="likelihood", **short)
     fits = by_likelihood.metadata["log_likelihoods"]
     assert fits == by_test.metadata["log_likelihoods"]
     cause = 0 if fits["forward"] > fits["backward"] else 1
     assert by_likelihood.structure.oriented_edges() == [(cause, 1 - cause, "directed")]
-    reverse = skewd(data[:, ::-1], criterion="likelihood", **SHORT_PAIR)
+    reverse = skewd(data[:, ::-1], criterion="likelihood", **short)
     assert reverse.structure.oriented_edges() == [(1 - cause, cause, "directed")]
 
 
 def test_skewd_decides_by_the_likelihood_by_default():
     data = _pair()
-    default = skewd(data, **SHORT_PAIR)
-    assert default.metadata == skewd(data, criterion="likelihood", **SHORT_PAIR).metadata
+    default = skewd(data, **FAST, **SHORT_PAIR)
+    assert default.metadata == skewd(data, criterion="likelihood", **FAST, **SHORT_PAIR).metadata
     assert "p_values" not in default.metadata
     with pytest.raises(ValueError, match="criterion='independence'"):
-        skewd(data, alpha=0.05, **SHORT_PAIR)
+        skewd(data, alpha=0.05, **FAST, **SHORT_PAIR)
 
 
-def test_skewd_swapped_columns_swap_the_directions():
+@pytest.mark.parametrize("optimizer", OPTIMIZERS)
+def test_skewd_swapped_columns_swap_the_directions(optimizer):
     data = pd.DataFrame(_pair(), columns=["x", "y"])
-    first = skewd(data, criterion="likelihood", **SHORT_PAIR)
-    swapped = skewd(data[["y", "x"]], criterion="likelihood", **SHORT_PAIR)
+    short = {"criterion": "likelihood", "optimizer": optimizer, **SHORT_PAIR}
+    first = skewd(data, **short)
+    swapped = skewd(data[["y", "x"]], **short)
     assert swapped.structure.oriented_edges() == first.structure.oriented_edges()
     assert swapped.metadata["log_likelihoods"]["forward"] == pytest.approx(
         first.metadata["log_likelihoods"]["backward"]
@@ -257,18 +269,20 @@ def test_skewd_swapped_columns_swap_the_directions():
     )
 
 
-def test_skewd_mv_reads_no_units_ignores_column_order_and_repeats():
+@pytest.mark.parametrize("optimizer", OPTIMIZERS)
+def test_skewd_mv_reads_no_units_ignores_column_order_and_repeats(optimizer):
     data = pd.DataFrame(_chain(), columns=["x", "y", "z"])
-    first = skewd_mv(data, **SHORT_GRAPH)
+    short = {"optimizer": optimizer, **SHORT_GRAPH}
+    first = skewd_mv(data, **short)
     assert {frozenset(edge[:2]) for edge in first.structure.oriented_edges()} == {
         frozenset("xy"),
         frozenset("yz"),
     }
     assert first.metadata["candidates"] == 3  # the chain's class: one DAG per root
-    assert skewd_mv(data, **SHORT_GRAPH).metadata == first.metadata
-    scaled = skewd_mv(data * np.array([2.0**-30, 2.0**20, 2.0**-10]), **SHORT_GRAPH)
+    assert skewd_mv(data, **short).metadata == first.metadata
+    scaled = skewd_mv(data * np.array([2.0**-30, 2.0**20, 2.0**-10]), **short)
     assert scaled.structure.oriented_edges() == first.structure.oriented_edges()
-    reordered = skewd_mv(data[["z", "x", "y"]], **SHORT_GRAPH)
+    reordered = skewd_mv(data[["z", "x", "y"]], **short)
     assert sorted(reordered.structure.oriented_edges()) == sorted(first.structure.oriented_edges())
 
 
@@ -301,28 +315,30 @@ def test_skewd_needs_a_complete_row_for_each_cross_validation_fold():
         skewd(data, **SHORT_PAIR)
 
 
-def test_skewd_mv_reads_columns_whose_moments_overflow():
+@pytest.mark.parametrize("optimizer", OPTIMIZERS)
+def test_skewd_mv_reads_columns_whose_moments_overflow(optimizer):
     # Every value is near 1e308 in magnitude, so a plain mean or variance overflows.
     data = pd.DataFrame(_chain(), columns=["x", "y", "z"])
-    huge = skewd_mv((data + 4.0) * 1e307, **SHORT_GRAPH)
-    assert (
-        huge.structure.oriented_edges() == skewd_mv(data, **SHORT_GRAPH).structure.oriented_edges()
-    )
+    short = {"optimizer": optimizer, **SHORT_GRAPH}
+    huge = skewd_mv((data + 4.0) * 1e307, **short)
+    plain = skewd_mv(data, **short)
+    assert huge.structure.oriented_edges() == plain.structure.oriented_edges()
 
 
-def test_skewd_mv_breaks_ties_without_overflowing_on_two_huge_columns():
+@pytest.mark.parametrize("optimizer", OPTIMIZERS)
+def test_skewd_mv_breaks_ties_without_overflowing_on_two_huge_columns(optimizer):
     # The tie ranks standardize the raw columns they compare: values near 1e308 overflow the sums.
     data = pd.DataFrame(_chain(), columns=["x", "y", "z"])[["x", "y"]]
     with warnings.catch_warnings():
         warnings.simplefilter("error", RuntimeWarning)
-        huge = skewd_mv((data + 4.0) * 1e307, **SHORT_GRAPH)
-    assert (
-        huge.structure.oriented_edges() == skewd_mv(data, **SHORT_GRAPH).structure.oriented_edges()
-    )
+        huge = skewd_mv((data + 4.0) * 1e307, optimizer=optimizer, **SHORT_GRAPH)
+    plain = skewd_mv(data, optimizer=optimizer, **SHORT_GRAPH)
+    assert huge.structure.oriented_edges() == plain.structure.oriented_edges()
 
 
 @pytest.mark.parametrize("missing_cell", [False, True])
-def test_a_column_that_spans_the_float_range_is_read_without_overflow(missing_cell):
+@pytest.mark.parametrize("optimizer", OPTIMIZERS)
+def test_a_column_that_spans_the_float_range_is_read_without_overflow(missing_cell, optimizer):
     # Column 0 holds both signs up to 1.7e308, so its largest value less its smallest overflows.
     data = _pair()
     huge = data.copy()
@@ -331,9 +347,9 @@ def test_a_column_that_spans_the_float_range_is_read_without_overflow(missing_ce
         data[3, 1] = huge[3, 1] = np.nan
     with warnings.catch_warnings():
         warnings.simplefilter("error", RuntimeWarning)
-        pair = skewd(huge, criterion="independence", **SHORT_PAIR)
-        graph = skewd_mv(huge[~np.isnan(huge).any(axis=1)], **SHORT_GRAPH)
-    plain = skewd(data, criterion="independence", **SHORT_PAIR)
+        pair = skewd(huge, criterion="independence", optimizer=optimizer, **SHORT_PAIR)
+        graph = skewd_mv(huge[~np.isnan(huge).any(axis=1)], optimizer=optimizer, **SHORT_GRAPH)
+    plain = skewd(data, criterion="independence", optimizer=optimizer, **SHORT_PAIR)
     assert pair.structure.oriented_edges() == plain.structure.oriented_edges()
     assert len(graph.structure.oriented_edges()) == 1
 
@@ -746,7 +762,7 @@ def _under_sixteen_blas_threads(method: str, data, kwargs: dict, counts: tuple[i
     return outs
 
 
-@pytest.mark.parametrize("optimizer", native.OPTIMIZERS)
+@pytest.mark.parametrize("optimizer", OPTIMIZERS)
 @pytest.mark.parametrize("workers", [4, 8])
 def test_a_fit_on_workers_gives_the_serial_fit_bit_for_bit(workers, optimizer):
     # Every search draws from its own stream, spawned in a fixed order, so where the searches
@@ -770,7 +786,7 @@ def test_a_fit_on_workers_gives_the_serial_fit_bit_for_bit(workers, optimizer):
         assert np.array_equal(each.result().residual, serial.residual)
 
 
-@pytest.mark.parametrize("optimizer", native.OPTIMIZERS)
+@pytest.mark.parametrize("optimizer", OPTIMIZERS)
 def test_skewd_gives_the_same_bits_on_any_number_of_workers(optimizer):
     data = pd.DataFrame(_pair(), columns=["x", "y"])
     kwargs = {**SHORT_PAIR, "optimizer": optimizer}
@@ -796,7 +812,7 @@ def test_skewd_gives_the_same_bits_on_any_number_of_workers(optimizer):
     }
 
 
-@pytest.mark.parametrize("optimizer", native.OPTIMIZERS)
+@pytest.mark.parametrize("optimizer", OPTIMIZERS)
 def test_skewd_mv_gives_the_same_bits_on_any_number_of_workers(optimizer):
     data = pd.DataFrame(_chain(), columns=["x", "y", "z"])
     kwargs = {**SHORT_GRAPH, "optimizer": optimizer}
