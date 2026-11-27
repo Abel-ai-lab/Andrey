@@ -98,12 +98,15 @@ def table_counts(
     ``j``-th occurring configuration of the parents, in mixed-radix order with the first parent the
     most significant, where ``node`` takes category ``k``. A parent set whose table fits within a
     few cells per row is counted over every possible configuration, several sets in one bincount,
-    and its empty configurations dropped; a larger one is numbered by :func:`configurations`.
+    and its empty configurations dropped; a larger one is numbered by :func:`configurations`. A
+    set that starts with the previous counted set's first parents reuses their code, so sets in
+    lexicographic order do the least work; the tables do not depend on the order of the sets.
 
     Parameters
     ----------
     codes : ndarray of int64, shape (n_samples, n_features)
-        Category codes from :func:`encode`.
+        Category codes from :func:`encode`; each column is read on its own, so a column-major array
+        reads fastest.
     cardinalities : ndarray of int64, shape (n_features,)
         Categories per column, from :func:`encode`.
     node : int
@@ -143,13 +146,27 @@ def table_counts(
         part = dense[start:stop]
         flat = np.empty((len(part), n), dtype=np.int64)
         offset = 0
+        prefix: list[np.ndarray] = []  # the mixed-radix code of the previous set's first parents
+        last: Sequence[int] = ()
         for b, (i, q) in enumerate(part):
             row = flat[b]
-            row[:] = 0
-            for p in parent_sets[i]:
-                row *= int(cardinalities[p])
-                row += codes[:, p]
-            row *= r
+            parents = parent_sets[i]
+            shared = 0
+            for a, c in zip(last, parents, strict=False):
+                if a != c:
+                    break
+                shared += 1
+            del prefix[shared:]
+            for p in parents[shared:]:
+                if prefix:
+                    prefix.append(prefix[-1] * int(cardinalities[p]) + codes[:, p])
+                else:
+                    prefix.append(codes[:, p])
+            last = parents
+            if prefix:
+                np.multiply(prefix[-1], r, out=row)
+            else:
+                row[:] = 0
             row += target + offset
             offset += q * r
         counts = np.bincount(flat.ravel(), minlength=offset)
