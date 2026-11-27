@@ -8,11 +8,11 @@ calls, and the scalar loop otherwise, so a test that implements only
 :class:`~andrey.core.ci.CITest` still works. Every shipped vectorized path returns the scalar
 p-values exactly, so the skeleton is the same either way. Subsets are consumed in fixed-size
 chunks, so the scan holds one chunk in memory however many subsets it visits. :func:`scan_pairs`
-scans every pair of one conditioning size; for FisherZ, StudentT, RCoT, and the degenerate
+scans every pair of one conditioning size; for FisherZ, StudentT, KCI, RCoT, and the degenerate
 Gaussian test it stacks the chunks of consecutive pairs into one evaluation, up to
-``_STACK_BYTES`` of submatrices; RCoT evaluates a stack one conditioning set at a time, and the
-degenerate Gaussian test regresses on each conditioning set once. :func:`vote_triples` decides the
-unshielded triples of a final skeleton by the conservative or majority collider rule.
+``_STACK_BYTES`` of submatrices; KCI and RCoT evaluate a stack one conditioning set at a time, and
+the degenerate Gaussian test regresses on each conditioning set once. :func:`vote_triples` decides
+the unshielded triples of a final skeleton by the conservative or majority collider rule.
 """
 
 from __future__ import annotations
@@ -289,12 +289,12 @@ def _canonical_route(test: CITest) -> Callable[..., np.ndarray] | None:
 
 def _stacked_route(test: CITest) -> Callable[..., np.ndarray] | None:
     """The ``_canonical_pvalues`` that :func:`scan_pairs` stacks the chunks of many pairs into:
-    :func:`_canonical_route`'s, or an RCoT test's, exactly, which evaluates a stack one
+    :func:`_canonical_route`'s, or a KCI or an RCoT test's, exactly, which evaluates a stack one
     conditioning set at a time; else ``None``."""
     canonical = _canonical_route(test)
     if canonical is not None:
         return canonical
-    if is_rcot(test):
+    if is_rcot(test) or is_kci(test):
         return test._canonical_pvalues  # ty: ignore[unresolved-attribute]  # gated by the type
     return None
 
@@ -304,6 +304,12 @@ def is_rcot(test: CITest) -> bool:
     # An RCoT test has loaded its module; a fit with another test leaves it unloaded.
     kernel = sys.modules.get("andrey.core.ci_kernel")
     return kernel is not None and type(test) is kernel.RCoT
+
+
+def is_kci(test: CITest) -> bool:
+    """Whether ``test`` is a KCI test, exactly: a subclass may change what a query returns."""
+    kernel = sys.modules.get("andrey.core.ci_kernel")
+    return kernel is not None and type(test) is kernel.KCI
 
 
 def _query_arrays(
@@ -774,7 +780,7 @@ def scan_pairs(
     removals do not depend on column order; a subset both endpoints offer is tested once, from the
     first.
     This is the general ``|S| >= 2`` scan the vectorized prescreen does not cover; the serial loop
-    and the parallel workers share it, so they stay identical. A FisherZ, StudentT, RCoT, or
+    and the parallel workers share it, so they stay identical. A FisherZ, StudentT, KCI, RCoT, or
     degenerate Gaussian test evaluates the chunks of consecutive pairs in one stack
     (:func:`stacked_scan`); another test scans each pair with :func:`scan_conditioning_sets`. Both
     test the same subsets in the same order. With ``trace`` given, every test is recorded in the

@@ -15,6 +15,7 @@ import subprocess
 import sys
 import warnings
 from functools import partial
+from itertools import combinations
 
 import numpy as np
 import pytest
@@ -416,6 +417,116 @@ def test_kci_decomposes_each_conditioning_set_once(monkeypatch):
         pvalues = [test(*query) for query in queries]
         assert len(calls) == 2  # sets {2}, {2, 3}
         assert [KCI(data)(*query) for query in queries] == pvalues
+
+
+def _earlier_kci(test: KCI, x: int, y: int, cond: tuple[int, ...]) -> tuple[float, float]:
+    """The statistic and p-value of an exact conditional query as it was computed before ``A`` was
+    kept: ``R Kxs R`` built inside the query, from an ``R`` decomposed afresh."""
+    x_int, y_int, ranked = ci._canonical_ranked(x, y, cond, test._tie_rank)
+    data = test._data
+    xs = np.column_stack([data[:, x_int], 0.5 * data[:, ranked]])
+    kxs = ci_kernel._centered_gaussian_kernel(xs, test._width(len(ranked)))
+    resid = test._residual_maker(tuple(ranked))
+    moments = _kci_moments(resid @ kxs @ resid, test._residualized_kernel(y_int, tuple(ranked)))
+    return moments[0] / moments[1], _gamma_pvalue(*moments)
+
+
+def _joint_kernel_builds(monkeypatch) -> list[tuple[int, tuple[int, ...]]]:
+    """The ``(x, conditioning set)`` of each ``A`` that a KCI test builds from here on."""
+    built = []
+    joint = KCI._residualized_joint_kernel
+    monkeypatch.setattr(
+        KCI,
+        "_residualized_joint_kernel",
+        lambda self, x, cond: built.append((x, cond)) or joint(self, x, cond),
+    )
+    return built
+
+
+@pytest.mark.parametrize("cache_bytes", [None, 0], ids=["default caches", "one entry each"])
+def test_kci_builds_each_joint_kernel_once_and_the_cache_changes_no_bit(monkeypatch, cache_bytes):
+    """Queries with the same ``x`` and conditioning set share ``A = R Kxs R``. Each statistic and
+    p-value equals that of the expression that builds ``A`` inside the query, whatever the cache's
+    size."""
+    if cache_bytes is not None:
+        monkeypatch.setattr(ci_kernel, "_CACHE_BYTES", cache_bytes)
+    built = _joint_kernel_builds(monkeypatch)
+    data = _common_cause(seed=3, n=120, n_cond=3)
+    queries = [
+        (0, 1, (2,)),
+        (0, 3, (2,)),
+        (1, 3, (2,)),
+        (3, 0, (2,)),
+        (0, 1, (2, 3)),
+        (1, 0, (3, 2)),
+        (0, 1, (2, 3)),
+        (3, 1, (2,)),
+    ]
+    test = KCI(data)
+    with andrey.config(backend="numpy"):
+        got = [test._statistic_pvalue(*query) for query in queries]
+    assert got == [_earlier_kci(test, *query) for query in queries]
+    if cache_bytes is None:
+        ranked = [ci._canonical_ranked(*query, test._tie_rank) for query in queries]
+        assert len(built) == len({(x, tuple(cond)) for x, _, cond in ranked}) < len(queries)
+
+
+@pytest.mark.parametrize("size", [0, 1, 2, 3])
+def test_kci_grouped_pvalues_equal_its_queries_in_any_order(monkeypatch, size):
+    """``_canonical_pvalues`` returns each query's own p-value, bit for bit, whatever the order of
+    the queries, and with one entry in each cache it decomposes each conditioning set and builds
+    each ``A`` once."""
+    data = np.random.default_rng(5).standard_normal((120, 6))
+    data[:, 1] += np.sin(2 * data[:, 0])
+    data[:, 4] += data[:, 2] * data[:, 3]
+    queries = [
+        (x, y, cond)
+        for x, y in combinations(range(6), 2)
+        for cond in combinations(sorted(set(range(6)) - {x, y}), size)
+    ]
+    want = [KCI(data)(*query) for query in queries]
+    monkeypatch.setattr(ci_kernel, "_CACHE_BYTES", 0)  # one entry in each cache
+    decompositions = []
+    eigh = np.linalg.eigh
+    monkeypatch.setattr(np.linalg, "eigh", lambda a: decompositions.append(1) or eigh(a))
+    built = _joint_kernel_builds(monkeypatch)
+    rng = np.random.default_rng(size)
+    for order in (np.arange(len(queries)), rng.permutation(len(queries))):
+        test = KCI(data)
+        decompositions.clear()
+        built.clear()
+        xs, ys, conds = (np.array([queries[i][k] for i in order]) for k in range(3))
+        with andrey.config(backend="numpy"):
+            got = test._canonical_pvalues(xs, ys, conds.reshape(len(order), size))
+        assert got.tolist() == [want[i] for i in order]
+        if size:
+            ranked = [ci._canonical_ranked(*queries[i], test._tie_rank) for i in order]
+            assert len(decompositions) == len({tuple(cond) for _, _, cond in ranked})
+            assert len(built) == len({(x, tuple(cond)) for x, _, cond in ranked})
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_a_failing_kci_stack_raises_the_error_of_the_first_failing_query(monkeypatch, reverse):
+    """When two queries of a stack raise, the first in the stack's order raises, though the grouped
+    order reaches the other one first in one of the two orders."""
+    data = _common_cause(seed=3, n=120, n_cond=3)
+    queries = [(0, 1, (2,)), (0, 3, (2,)), (2, 3, (1,)), (1, 3, (0,)), (1, 2, (3,)), (0, 2, (3,))]
+    failing = {queries[1], queries[4]}
+    call = KCI.__call__
+
+    def raising(test, x, y, condition_set=()):
+        query = (x, y, tuple(condition_set))
+        if query in failing:
+            raise FloatingPointError(f"query {query}")
+        return call(test, x, y, condition_set)
+
+    monkeypatch.setattr(KCI, "__call__", raising)
+    queries = queries[::-1] if reverse else queries
+    xs, ys, conds = (np.array([q[k] for q in queries]) for k in range(3))
+    first = next(query for query in queries if query in failing)
+    with pytest.raises(FloatingPointError) as raised, andrey.config(backend="numpy"):
+        KCI(data)._canonical_pvalues(xs, ys, conds)
+    assert str(raised.value) == f"query {first}"
 
 
 def test_kci_builds_each_marginal_kernel_once_and_the_cache_changes_no_bit(monkeypatch):
