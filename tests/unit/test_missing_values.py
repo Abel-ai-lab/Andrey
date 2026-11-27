@@ -386,10 +386,10 @@ def test_a_scan_takes_its_conditioning_set_as_one_query_does():
 
 #: The gaps of :func:`_discrete_scan_data`, each sending the queries of a chi-square scan down one
 #: path of :class:`~andrey.core.ci_missing.ChiSquareDeletion`.
-DISCRETE_SCAN_KINDS = ["cells", "rare", "few", "apart", "pair", "flat"]
+DISCRETE_SCAN_KINDS = ["cells", "rare", "few", "apart", "pair", "flat", "levels"]
 
 
-def _discrete_scan_data(kind: str, seed: int, d: int = 10, n: int = 600) -> np.ndarray:
+def _discrete_scan_data(kind: str, seed: int, d: int = 10, n: int | None = None) -> np.ndarray:
     """Categorical data of ``d`` columns, each close to the one before it, with gaps of one kind.
 
     ``cells`` are missing completely at random. In ``rare``, columns 1 and 4 hold a level that three
@@ -397,8 +397,10 @@ def _discrete_scan_data(kind: str, seed: int, d: int = 10, n: int = 600) -> np.n
     are missing. ``few`` has few rows and many gaps, so queries are not tested. In ``apart``,
     columns 2 and 6 are never observed together; in ``pair``, only on two rows, the fewest a query
     is tested on. In ``flat``, column 5 holds one category, so a query over it has no degrees of
-    freedom.
+    freedom. In ``levels``, columns 3 and 6 hold a hundred levels on few rows with many gaps, so a
+    block has more of them than four for each of its rows.
     """
+    n = n or {"few": 40, "levels": 150}.get(kind, 600)
     rng = np.random.default_rng(seed)
     x = rng.integers(0, 3, (n, d)).astype(np.float64)
     for column in range(1, d):
@@ -410,13 +412,15 @@ def _discrete_scan_data(kind: str, seed: int, d: int = 10, n: int = 600) -> np.n
         x[:, 0] = x[:, 0] * 0.5 - 1.25
         rate = 0.2
     elif kind == "few":
-        x = x[:40]
         rate = 0.45
     elif kind in ("apart", "pair"):
         x[: n // 2, 2] = np.nan
         x[n // 2 :, 6] = np.nan
     elif kind == "flat":
         x[:, 5] = 1.0
+    elif kind == "levels":
+        x[:, [3, 6]] = rng.integers(0, 100, (n, 2))
+        rate = 0.35
     x[rng.random(x.shape) < rate] = np.nan
     if kind == "pair":  # two rows observe every column, and differ in columns 2 and 6
         x[[0, -1]] = rng.integers(0, 3, (2, d))
@@ -441,15 +445,21 @@ def test_a_chi_square_scan_on_missing_values_is_each_candidate_asked_alone_bit_f
     leave in it: the rows, the queries not tested, their pairs and sets, and the largest p-values,
     whichever way the query goes: a block that lost a category, too few rows, a pair never observed
     together, or no degrees of freedom."""
-    x = _discrete_scan_data(kind, seed=1, **({"n": 40} if kind == "few" else {}))
-    built = [0]
+    x = _discrete_scan_data(kind, seed=1)
+    built, sparse = [0], [0]
     real = ci_missing.ChiSquareDeletion._block_pvalue
+    renumber = ci_missing._compact
 
     def counting(self, *args):
         built[0] += 1
         return real(self, *args)
 
+    def renumbering(index, size, n):
+        sparse[0] += size > 4 * n  # more categories than four for each row: renumbered by sorting
+        return renumber(index, size, n)
+
     monkeypatch.setattr(ci_missing.ChiSquareDeletion, "_block_pvalue", counting)
+    monkeypatch.setattr(ci_missing, "_compact", renumbering)
     untested = lost = fewest = 0
     for target, xs, cond in _scans(x.shape[1], np.random.default_rng(1)):
         scanned = make_indep_test(name, x, degrees_of_freedom=degrees_of_freedom)
@@ -474,15 +484,17 @@ def test_a_chi_square_scan_on_missing_values_is_each_candidate_asked_alone_bit_f
     assert untested or kind in ("cells", "rare")
     assert lost or kind != "rare"
     assert fewest or kind != "pair"
+    assert sparse[0] or kind != "levels"
 
 
+@pytest.mark.parametrize("kind", ["rare", "levels"])
 def test_a_chi_square_scan_numbers_each_block_as_the_test_numbers_a_block_it_is_built_over(
-    monkeypatch,
+    kind, monkeypatch
 ):
     """The codes a scan gives a candidate's block, its categories, and the numbering of the
     conditioning set's configurations are those of the test built over the block's values, also
     where the block lost a category or a configuration the other candidates have."""
-    x = _discrete_scan_data("rare", seed=8)
+    x = _discrete_scan_data(kind, seed=8)
     seen = []
     real = ci.ChiSquare.from_codes.__func__  # ty: ignore[unresolved-attribute]
 
@@ -669,7 +681,7 @@ def test_a_chi_square_blanket_search_on_missing_values_is_the_search_asking_one_
     """``iamb`` and ``inter_iamb`` with ``chisq`` or ``gsq`` on data with gaps return the blanket,
     the separating sets, the rows counted, and every metadata value of the search that asks each
     candidate alone, or raise its error."""
-    x = _discrete_scan_data(kind, seed=3, d=9, **({"n": 40} if kind == "few" else {"n": 400}))
+    x = _discrete_scan_data(kind, seed=3, d=9, n=40 if kind == "few" else 400)
     options = {"indep_test": indep_test, **options}
     got = _blanket_search_digest(fit, x, options)
     assert blanket._dependence_scan(make_indep_test(indep_test, x)) is not None
