@@ -1125,18 +1125,11 @@ def delta_many_with_base(
             if gamma:
                 penalty += ebic_step(len(S_base_sorted) - 1, n_vars, gamma)
             for u in remove_us:
-                u_idx = idx_of[u]
-                M_uu = float(Mdiag[u_idx])
-                if M_uu <= 0.0 or not np.isfinite(M_uu):
-                    continue
-                R_u_new = 1.0 / M_uu
-                M_col = M_old[:, u_idx]
-                num = float(cs_v @ M_col) - float(cs_v[u_idx]) * M_uu
-                e_vu = float(cov[i, u]) + num / M_uu
-                R_v_new = R_v_old + e_vu * (e_vu / R_u_new)
-                if R_v_new <= floor or not np.isfinite(R_v_new):
-                    continue
-                remove_deltas[u] = float(n * (_log(R_v_new) - log_Rv_old) - penalty)
+                ratio = _remove_log_ratio(
+                    cov, n, i, u, idx_of[u], M_old, Mdiag, cs_v, R_v_old, log_Rv_old, floor
+                )
+                if ratio is not None:
+                    remove_deltas[u] = float(ratio - penalty)
         for idx, u in removes:
             d = remove_deltas.get(u)
             if d is None:
@@ -1144,6 +1137,89 @@ def delta_many_with_base(
             results[idx] = d
 
     return results
+
+
+def _remove_log_ratio(
+    cov: np.ndarray,
+    n: int,
+    i: int,
+    u: int,
+    u_idx: int,
+    M_old: np.ndarray,
+    Mdiag: np.ndarray,
+    cs_v: np.ndarray,
+    R_v_old: float,
+    log_Rv_old: float,
+    floor: float,
+) -> float | None:
+    """``n * (log R(i | S - u) - log R(i | S))`` by the rank-one remove, or ``None``.
+
+    ``M_old`` is ``inv(cov[S, S])``, ``Mdiag`` its diagonal, ``cs_v`` is ``cov[S, i]``, ``R_v_old``
+    is ``R(i | S)``, ``log_Rv_old`` its log, and ``u_idx`` is the position of ``u`` in the sorted
+    ``S``. ``None`` when the update is unusable and the move falls back to two full scores. The
+    value does not read the penalty.
+    """
+    M_uu = float(Mdiag[u_idx])
+    if M_uu <= 0.0 or not np.isfinite(M_uu):
+        return None
+    R_u_new = 1.0 / M_uu
+    M_col = M_old[:, u_idx]
+    num = float(cs_v @ M_col) - float(cs_v[u_idx]) * M_uu
+    e_vu = float(cov[i, u]) + num / M_uu
+    R_v_new = R_v_old + e_vu * (e_vu / R_u_new)
+    if R_v_new <= floor or not np.isfinite(R_v_new):
+        return None
+    return float(n * (_log(R_v_new) - log_Rv_old))
+
+
+def remove_ratio(
+    score_obj: BICScore,
+    i: int,
+    base_sorted: tuple[int, ...],
+    u: int,
+    inv_cov_cache: _InvCache,
+    *,
+    cond_threshold: float = _COND_THRESHOLD,
+) -> float | None:
+    """The penalty-free part of the delta of removing ``u`` from the sorted parents ``base_sorted``.
+
+    With ``ebic_gamma`` 0, the ratio minus ``score_obj.log_n * score_obj.penalty_discount``, as a
+    float, equals the one delta of :func:`delta_many_with_base` for the move ``("remove", u)`` bit
+    for bit, so the ratio serves every penalty over one covariance. It is ``None`` where that
+    function falls back to two full scores for the move, which depend on the penalty.
+    ``inv_cov_cache`` holds the inverses of ``cov[S, S]``, which depend on the covariance alone, so
+    one cache serves every score over it.
+    """
+    if u not in base_sorted:
+        return None
+    cov = score_obj.cov
+    cov_diag = score_obj._cov_diag
+    floor = ZERO_RESIDUAL * float(cov_diag[i])
+    S_list = list(base_sorted)
+    M_old, ill = _get_inv_with_cond(inv_cov_cache, base_sorted, cov, S_list, cond_threshold)
+    if base_sorted in inv_cov_cache:
+        inv_cov_cache.move_to_end(base_sorted)
+        _evict_inv(inv_cov_cache)
+    if ill:
+        return None
+    assert M_old is not None
+    cs_v = cov[S_list, i]
+    R_v_old = float(cov_diag[i] - cs_v @ (M_old @ cs_v))
+    if not (R_v_old > floor) or not np.isfinite(R_v_old):
+        return None
+    return _remove_log_ratio(
+        cov,
+        score_obj.n,
+        i,
+        u,
+        base_sorted.index(u),
+        M_old,
+        np.diag(M_old),
+        cs_v,
+        R_v_old,
+        float(_log(R_v_old)),
+        floor,
+    )
 
 
 def add_deltas(
@@ -1291,12 +1367,21 @@ class DeltaBICScore:
         The base score whose covariance and constants drive the delta arithmetic.
     cond_threshold : float
         Conditioning-gate threshold on ``||cov[S,S]||_inf * ||inv||_inf``.
+    inv_cov_cache : _InvCache, optional
+        The inv-cov cache to use, in place of a new one. ``inv(cov[S, S])`` reads the covariance
+        alone, so scores over one covariance can share a cache.
     """
 
-    def __init__(self, score: BICScore, *, cond_threshold: float = _COND_THRESHOLD) -> None:
+    def __init__(
+        self,
+        score: BICScore,
+        *,
+        cond_threshold: float = _COND_THRESHOLD,
+        inv_cov_cache: _InvCache | None = None,
+    ) -> None:
         self.score_obj = score
         self.cond_threshold = float(cond_threshold)
-        self.inv_cov_cache: _InvCache = _InvCache()
+        self.inv_cov_cache: _InvCache = _InvCache() if inv_cov_cache is None else inv_cov_cache
         self.residual_cache: OrderedDict = OrderedDict()
         # Route the batched surfaces' inv-cov cache to this companion's cache.
         _INV_CACHES[score] = self.inv_cov_cache

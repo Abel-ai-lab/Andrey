@@ -112,26 +112,21 @@ class DeltaEngine(Protocol):
 
 
 # Per-graph-state neighborhood precompute shared by every chunk of a pass.
-NeighborState = tuple[list[set[int]], list[np.ndarray], list[set[int]]]
+NeighborState = tuple[list[set[int]], list[list[int]], list[set[int]]]
 
 
 def neighborhood_state(adj: np.ndarray) -> NeighborState:
     """The per-node adjacency sets, directed parents, and undirected neighbors for a graph state.
 
     Computed once per graph state and shared read-only across chunks. Each chunk reads all node
-    arrays but iterates only its targets ``[y0, y1)``. Node ``v``'s entries equal ``ops.adjacent``,
-    ``ops.parents``, and ``ops.undirected_neighbors`` of ``v``.
+    sets and lists but iterates only its targets ``[y0, y1)``. Node ``v``'s entries hold the nodes
+    of ``ops.adjacent`` (a set), ``ops.parents`` (an ascending list), and
+    ``ops.undirected_neighbors`` (a set) of ``v``.
     """
-    adj_sets = [set(row.tolist()) for row in _rows(adj != ops.NULL)]
-    par_of = _rows(adj == ops.ARROW)
-    nbr = [set(row.tolist()) for row in _rows((adj == ops.TAIL) & (adj.T == ops.TAIL))]
+    adj_sets = [set(row) for row in _bitset.row_lists(adj != ops.NULL)]
+    par_of = _bitset.row_lists(adj == ops.ARROW)
+    nbr = [set(row) for row in _bitset.row_lists((adj == ops.TAIL) & (adj.T == ops.TAIL))]
     return adj_sets, par_of, nbr
-
-
-def _rows(mask: np.ndarray) -> list[np.ndarray]:
-    """The column indices of each row's ``True`` entries, ascending, one array per row."""
-    rows, cols = np.nonzero(mask)
-    return np.split(cols, np.searchsorted(rows, np.arange(1, mask.shape[0])))
 
 
 def _over_cap(cap: float | None, parents: int) -> bool:
