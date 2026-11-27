@@ -143,6 +143,11 @@ names its pull request.
   test, ask the test-wise deletion test for each grow scan at once and read its p-values as one
   array, so these searches run faster on tens of variables, with the same output bit for bit.
   ([#1299])
+- `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, and the PAG of `GraphStructure.to_pag` apply
+  FCI's orientation rules R4, R5, and R6 from column and row reads and lists of each node's `o-o`
+  neighbors, and `fci`, `fci_jci`, and `gfci` search possible-d-sep sets over sets of each node's
+  arrowheads and neighbors, so they run faster on many variables, with the same output bit for bit.
+  ([#1303])
 - `camuv` keeps each residual its sink tests fit, so it fits each variable on each set of
   regressors once, with the same output bit for bit. ([#1306])
 
@@ -3116,4 +3121,5 @@ First alpha release.
 [#1296]: https://github.com/Abel-ai-lab/Andrey/pull/1296
 [#1298]: https://github.com/Abel-ai-lab/Andrey/pull/1298
 [#1299]: https://github.com/Abel-ai-lab/Andrey/pull/1299
+[#1303]: https://github.com/Abel-ai-lab/Andrey/pull/1303
 [#1306]: https://github.com/Abel-ai-lab/Andrey/pull/1306
