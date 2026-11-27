@@ -78,12 +78,13 @@ names its pull request.
 - For contributors, a test lists every module-level cache and checks each cache whose result can
   change while its key does not, and registry-driven tests check that a wrong type of a parameter of
   column labels, of `knowledge`, of `targets`, and of `bootstrap` and `markov_check` raises. ([#1259])
-- `pc`, `fci`, `fci_jci`, `cdnod`, `gfci`, `boss_fci`, `grasp_fci`, `rsmax2`, `mmpc`, and `mmhc`
-  return the same results with less memory. The skeleton search holds the pairs the empty set
-  separates as one boolean matrix, and their p-values as the matrix of marginal p-values it
-  already computes, where it kept a separating set and a p-value for each pair; each MMPC run holds
-  the candidates the empty set separates from its target the same way. On a sparse graph of 2,000
-  variables and 300 rows, the peak memory `pc` adds falls from 1035.7 MiB to 342.8 MiB. ([#1277])
+- `pc`, `fci`, `mmpc`, and `mmhc` return the same results with less memory. The skeleton search,
+  which `fci_jci`, `cdnod`, `gfci`, `boss_fci`, `grasp_fci`, and `rsmax2` share, holds the pairs the
+  empty set separates as one boolean matrix, and their p-values as the matrix of marginal p-values
+  it already computes, where it kept a separating set and a p-value for each pair; each MMPC run
+  holds the candidates the empty set separates from its target the same way. On a sparse graph of
+  2,000 variables and 300 rows, the peak memory `pc` adds falls from 1035.7 MiB to 342.8 MiB.
+  ([#1277])
 
 ### Fixed
 
