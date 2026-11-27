@@ -24,6 +24,8 @@ if _STARTED_PATH:
 
 import numpy as np  # noqa: E402 - write the start marker first
 
+from andrey_bench.memcap import shares_parent_memory  # noqa: E402 - stdlib only
+
 #: Bytes per MiB used by the memory metrics.
 _MIB = 1024.0 * 1024.0
 
@@ -126,7 +128,13 @@ def _vmrss_kb(pid: int) -> int:
 
 
 class _TreeRSSSampler(threading.Thread):
-    """Sample peak RSS for the worker and its descendants during a fit."""
+    """Sample peak RSS for the worker and its descendants during a fit.
+
+    A page that processes share counts once per process. A descendant that runs in its parent's
+    address space (:func:`~andrey_bench.memcap.shares_parent_memory`) is left out. Pss, which would
+    count a shared page once, is not read: reading it stalls the fit being timed
+    (:func:`~andrey_bench.memcap.pss_kb`).
+    """
 
     def __init__(self, interval: float = 0.2) -> None:
         super().__init__(daemon=True)
@@ -138,12 +146,11 @@ class _TreeRSSSampler(threading.Thread):
 
     def _sample(self) -> None:
         self_pid = os.getpid()
-        children_kb = sum(_vmrss_kb(p) for p in _descendants(self_pid))
+        children = [p for p in _descendants(self_pid) if not shares_parent_memory(p)]
+        children_kb = sum(_vmrss_kb(p) for p in children)
         total_kb = _vmrss_kb(self_pid) + children_kb
-        if children_kb > self.max_children_kb:
-            self.max_children_kb = children_kb
-        if total_kb > self.max_total_kb:
-            self.max_total_kb = total_kb
+        self.max_children_kb = max(self.max_children_kb, children_kb)
+        self.max_total_kb = max(self.max_total_kb, total_kb)
 
     def run(self) -> None:
         while not self._stop_evt.is_set():
