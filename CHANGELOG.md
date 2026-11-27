@@ -176,11 +176,21 @@ names its pull request.
   The entries of these methods say what the environment index favors and gives up against pooling
   the rows, among them when one index holds many environments. `confounded_index` keeps `True`, and
   the entries of `gfci`, `boss_fci`, `grasp_fci`, and `fci_jci` say what each value favors and gives
-  up. The entries of `collider_rule` in `gfci`, `alpha` in `anm`, `pnl`, and `loci`, `restrict` and
-  `maximize` in `rsmax2`, `invariance_test` in `igsp` and `ut_igsp`, and `"bdeu"` and
+  up. The entries of `collider_rule` in `gfci` and `pcmciplus`, `alpha` in `anm`, `pnl`, and
+  `loci`, `restrict` and `maximize` in `rsmax2`, `invariance_test` in `igsp` and `ut_igsp`, and `"bdeu"` and
   `"discrete_bic"` in `ges` do the same, without numbers. For contributors, the quality gate fits
   `rsmax2` at its defaults, and the knowledge-paths lane runs it with MMPC and hill climbing, the
   search of its reference. ([#1288])
+- `indep_test="degen_gauss"` and `"cond_gauss"` are supported in `pc` and `fci`. On mixed data,
+  `"degen_gauss"` finds more of the true edges and orients more of them when the categorical
+  variables stand for latent Gaussian variables, and `"cond_gauss"` is more accurate on conditional
+  Gaussian data and where the categorical variables have only categorical parents, and more accurate
+  than reading the category codes as numbers on every kind of mixed data measured. `"cond_gauss"`
+  has one gap, named in the `pc` and `fci` entries: a reference implementation of its test could not
+  be run on data like its paper's. `required_paths` is supported in `tabu`, and `forbidden_paths` in
+  `iamb`, `inter_iamb`, and `mmpc`, so a fit with them no longer warns `ExperimentalWarning`; each
+  entry states the difference a check found, a tie rule in `tabu` and, in the blanket methods, a
+  graph with no consistent extension, where a claim acts only on an edge. ([#1288])
 
 ### Fixed
 

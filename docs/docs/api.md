@@ -231,14 +231,16 @@ order search's prior knowledge (Shimizu et al. 2011, Section 3.4).
 These parts are supported wherever [true claims measured no
 worse](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
 than the same fit without them and than a reference package given the same knowledge: in every
-method that honors them except six. `required_paths` is experimental in `tabu`, `mmhc`, and
-`rsmax2`, where a reference package given the required edges those paths imply made fewer errors,
-and `forbidden_paths` is experimental in `iamb`, `inter_iamb`, and `mmpc`, where the graph found at
-50 variables often has no consistent extension: a claim there acts only on an edge, the fits we
-measured dropped about 96% of the forbidden paths on such a graph, and with forbidden paths alone
-the CPDAG was 0.65 to 1.95 edges farther from the class the claims define. An
-experimental part warns with
-{py:class}`~andrey.ExperimentalWarning`, and its meaning may change without deprecation. A CPDAG
+method that honors them except two. `required_paths` is experimental in `mmhc` and `rsmax2`, where a
+reference package given the required edges those paths imply made fewer errors. An experimental part
+warns with {py:class}`~andrey.ExperimentalWarning`, and its meaning may change without deprecation.
+`tabu` supports `required_paths`, and `iamb`, `inter_iamb`, and `mmpc` support `forbidden_paths`,
+each with a difference. With the plain BIC (`ebic_gamma=0`), `tabu` can end on another graph than a
+reference package's where ties between equally scoring moves break another way, and over many
+datasets the two are as accurate. The blanket methods return a graph with no consistent extension
+more often than `pc` on larger graphs: a claim there acts only on an edge, so the class the claims
+define can move farther than the graph does, though the graph itself moves toward it. The [0.20.0
+release card](https://andrey.abel.ai/docs/benchmarks/0.20.0.html) has the comparisons. A CPDAG
 method reads the claims on the graph it found, so where that graph is wrong, a true claim can direct
 an edge the wrong way, and a required path cannot restore an edge the search left out. A path claim
 says less than an edge and so directs less: when you know the edge itself, state it as `required`.
@@ -850,7 +852,8 @@ A method becomes supported once it has:
 | `"student_t"` | Partial correlation with a Student-t p-value, exact for Gaussian data at any size | Supported |
 | `"normal_scores"` | Fisher's z-transform of the partial correlation of each column's normal scores: monotone effects, any marginals | Experimental |
 | `"chisq"`, `"gsq"` | Pearson's chi-square and G-square on category codes | Supported |
-| `"degen_gauss"`, `"cond_gauss"` | Degenerate and conditional Gaussian likelihood ratios on mixed data | Experimental |
+| `"degen_gauss"` | Degenerate Gaussian likelihood ratio on mixed data: each categorical column as indicators of latent Gaussian variables | Supported in `pc` and `fci`; experimental in the other methods |
+| `"cond_gauss"` | Conditional Gaussian likelihood ratio on mixed data: each joint category its own Gaussian | Supported in `pc` and `fci`, with one gap; experimental in the other methods |
 | `"kci"` | Kernel conditional-independence test, with a gamma approximation of its null | Supported |
 | `"rcot"` | Random-feature approximation of the kernel test; time linear in the rows | Supported |
 | `"cmiknn"` | Nearest-neighbor conditional mutual information, with a local permutation null | Supported |
@@ -858,6 +861,19 @@ A method becomes supported once it has:
 | `"gcm"` | Generalized covariance measure: the normalized covariance of the residuals of boosted-tree regressions | Experimental |
 | `"wgcm"` | Weighted generalized covariance measure: the GCM with weights on the conditioning set, for a covariance that changes sign | Experimental |
 | `"pcm"` | Projected covariance measure: whether one variable improves an additive-model prediction of the other | Experimental |
+
+On mixed data, `"degen_gauss"` favors data whose categorical variables stand for latent Gaussian
+variables, where it finds more of the true edges and orients more of them than `"cond_gauss"`; it
+gives up more false edges and false arrowheads, and accuracy on conditional Gaussian data and on
+data whose categorical variables have only categorical parents. `"cond_gauss"` favors data from the
+conditional Gaussian model and data whose categorical variables have only categorical parents, and
+on every kind of mixed data measured it is more accurate than reading the category codes as numbers
+with `"fisherz"`; it gives up some true edges and orientations to `"degen_gauss"` on data whose
+categorical variables stand for latent Gaussian variables. The one gap of `"cond_gauss"`: a
+reference implementation of its test could not be run on data like its paper's, where it stopped
+with an error on almost every dataset, so there it was compared with the empty graph and with
+`"fisherz"` on the category codes, not with the reference. The [0.20.0 release
+card](https://andrey.abel.ai/docs/benchmarks/0.20.0.html) has the comparisons.
 
 `normal_scores` ranks each column over every row its test reads, and its model is one distribution.
 Ranked over the rows of several environments, a column mixes their distributions, and its scores

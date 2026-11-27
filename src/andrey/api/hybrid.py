@@ -368,9 +368,9 @@ def rsmax2(
         read the data alone; ``knowledge`` below says why. On linear-Gaussian data, ``"iamb"``
         favors accuracy against ``"mmpc"`` and ``"pc"``: fewer missing and extra edges and more
         correctly oriented ones, most on denser graphs; it gives up time against ``"mmpc"`` on many
-        variables. ``"inter_iamb"`` is about as accurate as ``"iamb"`` and gives up the same time.
-        ``"mmpc"`` favors time against the two blanket restricts; it gives up accuracy to them.
-        ``"pc"`` gives up accuracy on denser graphs. See Notes.
+        variables. ``"inter_iamb"`` gives about the same graphs as ``"iamb"``, as accurate, and
+        gives up the same time. ``"mmpc"`` favors time against the two blanket restricts; it gives
+        up accuracy to them. ``"pc"`` gives up accuracy on denser graphs. See Notes.
     maximize : {"hc", "tabu"}, default="tabu"
         The maximize phase: :func:`~andrey.tabu` or :func:`~andrey.hc`. On linear-Gaussian data,
         ``"tabu"`` favors fewer errors, more correctly oriented edges, and a better-scoring graph

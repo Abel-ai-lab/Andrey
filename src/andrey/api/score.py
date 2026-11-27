@@ -2455,9 +2455,15 @@ def tabu(
     errors than the empty graph on sparse graphs of moderate size, where :func:`~andrey.ges` reached
     hundreds of variables, on denser graphs only on small ones, and on dense graphs at no size. With
     fewer rows than columns the BIC is unreliable, and the search never selects a parent set that
-    fits its child exactly. The
-    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
-    every setting.
+    fits its child exactly. Required paths bring the graph closer to the true graph than the same
+    search without them on small sparse linear-Gaussian graphs. At the standard BIC, how ties
+    between equally scoring moves break decides the graph: with
+    ``andrey.config.tie_break="position"`` the search follows the moves of a reference tabu search
+    given the same required edges on nearly every dataset, and with the default order-free ties a
+    given dataset can end on a different graph, though over many datasets the two are as accurate.
+    The `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__
+    has every setting, and the `0.20.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.20.0.html>`__ the comparison for required paths.
 
     References
     ----------

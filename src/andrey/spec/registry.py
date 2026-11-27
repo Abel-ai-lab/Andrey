@@ -3784,27 +3784,29 @@ for _name in EM_METHODS:
 #: The path and confounder parts a method honors as supported: the method ran in the lanes of
 #: benchmarks/knowledge_paths.py, and the part passed them, against the same fit without the claims
 #: and, where a reference package takes the same knowledge, against it. A part a method honors
-#: beyond the edge parts and does not list here is experimental: tabu, mmhc, and rsmax2 made more
-#: errors than their reference given the required edges, on repeated seeds, and iamb, inter_iamb,
-#: and mmpc with forbidden paths alone were farther from the class the claims leave at 50
-#: variables, over two seed groups pooled. In pc, cdnod, iamb, inter_iamb, and mmpc the parts were
-#: measured with the rule for a graph with no consistent extension, on which a claim acts on an
-#: edge and most claims are dropped.
+#: beyond the edge parts and does not list here is experimental: mmhc and rsmax2 made more errors
+#: than their reference given the required edges, on repeated seeds. tabu with required paths and
+#: iamb, inter_iamb, and mmpc with forbidden paths are supported with a gap their docstrings state:
+#: with the plain BIC, tabu ends on another graph than the reference's on a dataset whose ties
+#: break another way, and on a graph with no consistent extension the class the claims define moves
+#: further than the graph does. In pc, cdnod, iamb, inter_iamb, and mmpc the parts were measured
+#: with the rule for a graph with no consistent extension, on which a claim acts on an edge and
+#: most claims are dropped.
 _SUPPORTED_PARTS: dict[str, tuple[KnowledgePart, ...]] = {
     "pc": PATH_PARTS,
     "cdnod": PATH_PARTS,
     "ges": PATH_PARTS,
     "xges": PATH_PARTS,
     "hc": PATH_PARTS,
-    "tabu": ("forbidden_paths",),
+    "tabu": PATH_PARTS,
     "mmhc": ("forbidden_paths",),
     "rsmax2": ("forbidden_paths",),
     "boss": PATH_PARTS,
     "grasp": PATH_PARTS,
     "exact_search": PATH_PARTS,
-    "iamb": ("required_paths",),
-    "inter_iamb": ("required_paths",),
-    "mmpc": ("required_paths",),
+    "iamb": PATH_PARTS,
+    "inter_iamb": PATH_PARTS,
+    "mmpc": PATH_PARTS,
     "fci": _PAG_PARTS,
     "fci_jci": _PAG_PARTS,
     "gfci": _PAG_PARTS,
