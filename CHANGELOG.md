@@ -15,6 +15,14 @@ names its pull request.
 - Andrey needs scikit-learn 1.9 or later (it was 1.5), and the `torch` extra needs PyTorch 2.5 or
   later (it was 2.2). An environment that pins an older version of either must upgrade it before it
   installs this release. ([#1336])
+- Andrey needs NumPy 2.0 or later (it was 1.26), SciPy 1.14 (1.13), pandas 2.2.2 (2.2), statsmodels
+  0.14.2 (0.14), networkx 3.3 (3), typer 0.26 (0.12.4), threadpoolctl 3.5 (3), and, for the `viz`
+  extra, matplotlib 3.8.4 (3.7). Each is the oldest version on which the tests pass with every
+  direct dependency at its oldest allowed version. Below them, CMIknn gives other p-values (NumPy),
+  NoGAM raises on an empty system (SciPy), the tests' d-separation oracle is missing (networkx 3.3
+  adds `is_d_separator`), the command words its usage errors differently under the current click
+  (typer), and pandas, statsmodels, and matplotlib do not work with NumPy 2. An environment that
+  pins an older version of any of them must upgrade it before it installs this release. ([#1353])
 - `andrey.data.generate` and `andrey.data.Ensemble` are removed, as their warning said they would be
   in 0.16.0. A loop over `SCM.sample` draws the same datasets:
   `[scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]` replaces
@@ -232,6 +240,11 @@ names its pull request.
   independent and asks the members after it again given the smaller blanket, so these searches run
   faster, with the same output bit for bit and the same queries. For contributors, `DEVELOPMENT.md`
   says that tests a speed change computes ahead and discards do not count. ([#1347])
+- The partial-correlation tests, `fisherz`, `student_t`, and `normal_scores`, settle each submatrix
+  of a stack of queries as not singular from the largest and smallest entries of its inverse,
+  without the absolute value of the whole stack, so the collider test of `iamb`, `inter_iamb`, and
+  `mmpc` with `structure="cpdag"` runs faster, with the same output bit for bit and the same
+  queries. ([#1352])
 - `calm` runs faster, with the same output bit for bit: each Adam step of its optimizer is applied
   as the in-place tensor operations of `torch.optim.Adam`, so the first fit in a process no
   longer builds an optimizer, which imports `torch._dynamo` and its dependencies. ([#1343])
@@ -3237,4 +3250,6 @@ First alpha release.
 [#1341]: https://github.com/Abel-ai-lab/Andrey/pull/1341
 [#1343]: https://github.com/Abel-ai-lab/Andrey/pull/1343
 [#1347]: https://github.com/Abel-ai-lab/Andrey/pull/1347
+[#1352]: https://github.com/Abel-ai-lab/Andrey/pull/1352
+[#1353]: https://github.com/Abel-ai-lab/Andrey/pull/1353
 [#1358]: https://github.com/Abel-ai-lab/Andrey/pull/1358

@@ -2216,10 +2216,21 @@ def _invert_nonsingular(stack: np.ndarray) -> np.ndarray:
         return np.linalg.inv(stack)
     size = stack.shape[-1]
     limit = 1.0 / (BOUND_MARGIN * SINGULAR_RTOL * size * size)
-    unsettled = ~(np.abs(inv).max(axis=(1, 2)) < limit)  # NaN fails the comparison too
+    unsettled = _unsettled(inv, limit)
     if unsettled.any():
         _raise_if_singular(stack[unsettled])
     return inv
+
+
+def _unsettled(inv: np.ndarray, limit: float) -> np.ndarray:
+    """Which matrices of the ``(N, k, k)`` stack of inverses ``inv`` the bound of
+    :func:`_invert_nonsingular` leaves to the eigenvalue test: those with an entry of magnitude at
+    least ``limit``, a NaN, or an infinity.
+
+    The largest magnitude of a matrix is the larger of its largest entry and its negated smallest,
+    which are read in place; the absolute value of the stack would be a second array of its size.
+    """
+    return ~(np.maximum(inv.max(axis=(1, 2)), -inv.min(axis=(1, 2))) < limit)  # NaN fails too
 
 
 def _raise_if_singular(stack: np.ndarray) -> None:
