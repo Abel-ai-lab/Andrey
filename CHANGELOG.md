@@ -79,9 +79,9 @@ names its pull request.
   change while its key does not, and registry-driven tests check that a wrong type of a parameter of
   column labels, of `knowledge`, of `targets`, and of `bootstrap` and `markov_check` raises. ([#1259])
 - `boss`, `grasp`, `boss_fci`, and `grasp_fci` take less memory on large graphs: without
-  knowledge, each variable's grow-shrink tree lists the other variables when a node grows instead
-  of storing them, so the trees of a search take memory linear in the number of variables rather
-  than quadratic. Results are unchanged, bit for bit. ([#1274])
+  knowledge, each variable's grow-shrink tree no longer stores a list of every other variable,
+  which took memory quadratic in the number of variables; the trees of a search share one tuple of
+  the variables. Results are unchanged, bit for bit. ([#1274])
 
 ### Fixed
 
