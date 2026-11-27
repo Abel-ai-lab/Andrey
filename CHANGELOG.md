@@ -78,6 +78,10 @@ names its pull request.
 - For contributors, a test lists every module-level cache and checks each cache whose result can
   change while its key does not, and registry-driven tests check that a wrong type of a parameter of
   column labels, of `knowledge`, of `targets`, and of `bootstrap` and `markov_check` raises. ([#1259])
+- `boss`, `grasp`, `boss_fci`, and `grasp_fci` take less memory on large graphs: without
+  knowledge, each variable's grow-shrink tree lists the other variables when a node grows instead
+  of storing them, so the trees of a search take memory linear in the number of variables rather
+  than quadratic. Results are unchanged, bit for bit. ([#1274])
 
 ### Fixed
 
@@ -3036,3 +3040,4 @@ First alpha release.
 [#1257]: https://github.com/Abel-ai-lab/Andrey/pull/1257
 [#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
+[#1274]: https://github.com/Abel-ai-lab/Andrey/pull/1274
