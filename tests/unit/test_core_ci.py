@@ -820,6 +820,137 @@ def test_guard_decides_by_eigenvalues_whatever_the_inversion_returns(monkeypatch
         ci._invert_nonsingular(singular)
 
 
+def _absolute_value_bound(inv: np.ndarray, limit: float) -> np.ndarray:
+    """Which matrices of the stack the inverse bound leaves to the eigenvalue test, by the largest
+    magnitude of each inverse read as the absolute value of its entries."""
+    return ~(np.abs(inv).max(axis=(1, 2)) < limit)
+
+
+def _absolute_value_invert(stack: np.ndarray) -> np.ndarray:
+    """``_invert_nonsingular`` with the bound of :func:`_absolute_value_bound`."""
+    try:
+        inv = np.linalg.inv(stack)
+    except np.linalg.LinAlgError:
+        inv = None
+    if inv is None:
+        ci._raise_if_singular(stack)
+        return np.linalg.inv(stack)
+    size = stack.shape[-1]
+    limit = 1.0 / (ci.BOUND_MARGIN * ci.SINGULAR_RTOL * size * size)
+    unsettled = _absolute_value_bound(inv, limit)
+    if unsettled.any():
+        ci._raise_if_singular(stack[unsettled])
+    return inv
+
+
+def _crafted_inverses(size: int, limit: float) -> np.ndarray:
+    """A stack of ``(size, size)`` matrices of small entries and one entry that is NaN, infinite,
+    a zero of either sign, at the limit, one step either side of it, or huge, of either sign,
+    placed in each corner, and elsewhere. The other entries are all positive, all negative, or of
+    both signs."""
+    below, above = np.nextafter(limit, 0.0), np.nextafter(limit, np.inf)
+    values = [limit, below, above, 3.0 * limit, 1e300, 0.0, np.nan, np.inf]
+    values += [-value for value in values[:-2]] + [-np.inf, -0.0]
+    places = [(0, 0), (0, size - 1), (size - 1, 0), (size - 1, size - 1), (1, 2), (size // 2, 1)]
+    rng = np.random.default_rng(size)
+    stack = []
+    for value in values:
+        for i, j in places:
+            for others in (
+                np.full((size, size), 0.1 * limit),
+                np.full((size, size), -0.1 * limit),
+                rng.uniform(-0.5, 0.5, (size, size)) * limit,
+            ):
+                matrix = others.copy()
+                matrix[i, j] = value
+                stack.append(matrix)
+    return np.array(stack)
+
+
+@pytest.mark.parametrize("size", [3, 4, 5, 9, 14])
+def test_the_inverse_bound_leaves_the_rows_the_absolute_value_bound_leaves(size):
+    # The bound settles a matrix by the larger of the maximum and the negated minimum of its
+    # inverse. It must leave a matrix to the eigenvalue test under the same condition as the
+    # largest absolute value does: an entry at the limit or beyond it, of either sign, and a NaN
+    # or an infinity anywhere; a zero of either sign and an entry one step inside the limit settle
+    # it.
+    limit = 1.0 / (ci.BOUND_MARGIN * ci.SINGULAR_RTOL * size * size)
+    crafted = _crafted_inverses(size, limit)
+    rng = np.random.default_rng(size)
+    random = rng.standard_normal((400, size, size)) * 10.0 ** rng.integers(-3, 12, (400, 1, 1))
+    holes = rng.random(random.shape)
+    random[holes < 0.002] = np.nan
+    random[(holes > 0.002) & (holes < 0.004)] = np.inf
+    random[(holes > 0.004) & (holes < 0.006)] = -np.inf
+    random[(holes > 0.006) & (holes < 0.008)] = -0.0
+    for inv in (crafted, random, crafted[:1], random[:1]):
+        np.testing.assert_array_equal(ci._unsettled(inv, limit), _absolute_value_bound(inv, limit))
+    unsettled = ci._unsettled(crafted, limit)
+    assert unsettled.any() and not unsettled.all()
+
+
+def _healthy_and_singular_stacks() -> list[np.ndarray]:
+    """Stacks of correlation submatrices of sizes 2 to 14 of data whose column 7 combines columns 3
+    and 5 up to noise of relative size 1e-1 down to none, and whose column 11 copies column 2 when
+    there is none. Each stack holds random sets of columns and sets that hold the combining columns,
+    and is followed by its first matrix alone; an empty stack follows the data. Further stacks come
+    from data with fewer rows than columns.
+    """
+    rng = np.random.default_rng(11)
+    stacks = []
+    for noise in (None, 1e-1, 1e-4, 1e-5, 1e-6, 1e-9, 1e-12, 0.0):
+        X = rng.standard_normal((300, 16))
+        if noise is not None:
+            combined = X[:, 3] + 2.0 * X[:, 5]
+            X[:, 7] = combined + noise * np.std(combined) * rng.standard_normal(300)
+        if noise == 0.0:
+            X[:, 11] = 3.0 * X[:, 2] + 1.0
+        corr = np.corrcoef(X, rowvar=False)
+        for size in (2, 3, 4, 5, 8, 14):
+            index = [rng.permutation(16)[:size] for _ in range(40)]
+            if size >= 3:
+                others = [c for c in range(16) if c not in (3, 5, 7)]
+                index += [[3, 5, 7, *rng.permutation(others)[: size - 3]] for _ in range(4)]
+            index = np.array(index)
+            stacks.append(corr[index[:, :, None], index[:, None, :]])
+            stacks.append(stacks[-1][:1])
+        stacks.append(np.empty((0, 4, 4)))
+    fewer = np.corrcoef(rng.standard_normal((6, 10)), rowvar=False)
+    for size in (3, 5, 6, 7, 9):
+        index = np.array([rng.permutation(10)[:size] for _ in range(30)])
+        stacks.append(fewer[index[:, :, None], index[:, None, :]])
+    return stacks
+
+
+def _inverted_or_error(invert, stack):
+    """The inverse of ``stack`` by ``invert``, or the type and message of what it raises."""
+    try:
+        return invert(stack)
+    except (ValueError, np.linalg.LinAlgError) as error:
+        return type(error), str(error)
+
+
+def test_the_guard_returns_and_raises_as_the_absolute_value_bound_did(monkeypatch):
+    # Every stack gives the same bits, or the same error, and hands the same rows to the
+    # eigenvalue test, as the guard did when it read the largest absolute value of the inverse.
+    outcomes = set()
+    for stack in _healthy_and_singular_stacks():
+        handed = _eigenvalue_checks(monkeypatch)
+        got = _inverted_or_error(ci._invert_nonsingular, stack)
+        got_handed, handed[:] = list(handed), []
+        want = _inverted_or_error(_absolute_value_invert, stack)
+        assert len(handed) == len(got_handed)
+        for a, b in zip(handed, got_handed, strict=True):
+            np.testing.assert_array_equal(a, b)
+        if isinstance(got, tuple):
+            assert got == want
+        else:
+            assert got.tobytes() == want.tobytes()
+        outcomes.add((isinstance(got, tuple), bool(got_handed)))
+    # settled by the bound alone; handed to the eigenvalues and accepted; handed and rejected
+    assert outcomes == {(False, False), (False, True), (True, True)}
+
+
 # ---- independently verifiable known value ------------------------------------------------
 
 
