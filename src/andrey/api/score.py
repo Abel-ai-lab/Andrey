@@ -762,15 +762,14 @@ def fges(
 
     Notes
     -----
-    **When to use.** FGES suits data with no unmeasured common causes, as GES does, and takes
-    its scores, penalties, ``max_parents``, and background knowledge (see :func:`~andrey.ges` for
-    the scores and how to choose ``penalty_discount``). It is for runs where GES takes longer than
-    you can wait, for its first two passes scan fewer candidate edges than GES's first forward
-    phase, and for readers who want the algorithm of [2]_ by name. It returns the equivalence
-    class. When the variables are so many that time and memory decide, and a pair that is
-    independent in the data while its edge improves the score once other variables are in the graph
-    can be left out, use ``one_edge_faithfulness=True``, which skips the third pass. When
-    unmeasured common causes are plausible, use :func:`~andrey.fci`.
+    **When to use.** FGES makes the assumptions of GES: i.i.d. observational data, no unmeasured
+    common causes, and, with the BIC score on continuous data, linear relations with Gaussian noise.
+    It takes the scores, penalties, ``max_parents``, and background knowledge of :func:`~andrey.ges`
+    (see it for the scores and how to choose ``penalty_discount``) and returns the equivalence
+    class. Use it instead of GES on sparse graphs with many variables, where it takes less time.
+    When time and memory decide and the graph is large and sparse, use
+    ``one_edge_faithfulness=True``, which skips the pass over every pair. When unmeasured common
+    causes are plausible, use :func:`~andrey.fci`.
 
     **How it works.** FGES scores the one-edge graph of every pair against the empty graph under
     the plain BIC (the likelihood and the ``penalty_discount`` penalty, without the extended-BIC
@@ -797,13 +796,15 @@ def fges(
     rows yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
     :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** The third pass scans every pair, as GES does, so with the default the time and
-    memory of a fit grow with the number of variables much as GES's do, and it saves less of both
-    than ``one_edge_faithfulness=True``. With ``True``, a pair whose variables show no link on their
-    own is not added in the first phase, so an edge whose effect shows only once other variables
-    are in the graph can be missed, as it is in the authors' implementation; with the standard BIC
-    at a large ``penalty_discount``, as in [2]_, and on denser graphs, it was less accurate than
-    GES.
+    **Limitations.** By default FGES makes no more errors than :func:`~andrey.ges`, and often
+    fewer on denser graphs, in less time. Its time and memory still grow with the number of
+    variables much as GES's do, because the third pass scans every pair. With
+    ``one_edge_faithfulness=True`` it takes less time and holds less memory, and makes more errors
+    than GES: a pair whose variables show no link on their own is not added in the first phase, so
+    an edge whose effect shows only once other variables are in the graph can be missed, more so
+    with the standard BIC at a large ``penalty_discount``, as in [2]_, and on denser graphs. The
+    `0.20.0 release card <https://andrey.abel.ai/docs/benchmarks/0.20.0.html#fges>`__ has the
+    measurements.
 
     References
     ----------
