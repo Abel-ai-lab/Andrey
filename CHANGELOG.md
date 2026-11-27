@@ -246,6 +246,11 @@ names its pull request.
   log-likelihood for rows that observe one column, and in the expected mean and covariance for rows
   that miss one, because Accelerate sums a dot product by the memory alignment of its operand; such
   patterns are solved alone. ([#1341])
+- `direct_lingam` and `multi_group_direct_lingam` give the same causal order when a column is
+  shifted by a constant. The order search now centers each column once; before, its standardization
+  and residuals took the offset's rounding, which could reverse the order of `measure="skew"` on
+  columns whose skewness is zero or near it, such as exchangeable or balanced binary ones. A group's
+  offset no longer sets the tie ranks of `multi_group_direct_lingam`. ([#1351])
 
 ## [0.19.0] - 2026-11-24
 
@@ -3217,3 +3222,4 @@ First alpha release.
 [#1331]: https://github.com/Abel-ai-lab/Andrey/pull/1331
 [#1339]: https://github.com/Abel-ai-lab/Andrey/pull/1339
 [#1341]: https://github.com/Abel-ai-lab/Andrey/pull/1341
+[#1351]: https://github.com/Abel-ai-lab/Andrey/pull/1351
