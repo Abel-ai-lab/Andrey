@@ -21,6 +21,17 @@ installs the wheel, and one that changes the code, the documentation, or the not
 website and reruns every notebook, which must reproduce the outputs the website shows. NumPy in
 float64 is the reference: the PyTorch paths must match its results and repeat exactly.
 
+A pull request into a release or topic branch also has its changes to `tests/` and `qa/` read for
+weakened tests. The lint job compares the head with the base by syntax trees and flags a removed
+assertion or `pytest.raises` check, a larger tolerance or a looser bound, a `skip`, `skipif`,
+`xfail`, or `release` marker added to a test that existed, a deleted test or `parametrize` case, and
+a re-recorded baseline file. It prints each flagged change with its reason and fails until a
+maintainer, who has read the flags, sets the label `test-change-approved`; re-run the job after the
+label is set. An added test, a tighter tolerance, and a test that only moved or was renamed are not
+flagged. The check cannot see an assertion rewritten to a weaker one or a tolerance passed through
+a variable, so it does not replace review. To see the flags before you push, run
+`uv run python scripts/test_weakening.py --base origin/<release branch>`.
+
 Each release's pull request into `main` runs every test, the `release`-marked checks included, and
 a quality gate that fits every supported method ({{ n_supported }}) and the supported nonlinear
 tests to data with known graphs, and many of them to the Sachs data too, and the release merges only

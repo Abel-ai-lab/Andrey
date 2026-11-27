@@ -1,0 +1,782 @@
+"""Flag a pull request that weakens a test, so that a person approves the change.
+
+A change that must make a check pass can drop an assertion, loosen a tolerance, skip the test, or
+record the new output as the baseline, and each of these passes the check without making the code
+right. This script compares the base and the head of ``tests/`` and ``qa/`` by their syntax trees,
+function by function, and flags:
+
+- a removed ``assert`` statement, ``assert_*`` call, ``pytest.raises`` check, or ``pytest.approx``
+  assertion, and a ``pytest.raises`` that lost its ``match`` or widened to ``Exception``;
+- a looser tolerance or bound: a larger ``rtol``, ``atol``, ``abs``, ``rel``, ``tol``, or ``delta``,
+  a smaller ``decimal`` or ``places``, a looser bound in a comparison, an exact comparison turned
+  into ``pytest.approx``, in a call, a default, a module constant, or a tolerance table;
+- a new ``skip``, ``skipif``, or ``xfail`` marker or call, or a new ``release`` marker (a pull
+  request into a release branch skips those tests), on a test that existed in the base;
+- a deleted test function, or fewer ``parametrize`` cases;
+- a re-recorded baseline file: a changed or deleted file of ``baselines/`` or named for one, and a
+  JSON baseline whose recorded values changed.
+
+An added test, a tightened tolerance, and a test that only moved or was renamed are not flagged. It
+cannot see an assertion rewritten to a weaker one, a tolerance passed through a variable, or a
+check that moved into a helper, so a pass is necessary and not sufficient.
+
+The script prints each flagged change with its reason and exits 1 unless the pull request carries
+the label ``test-change-approved``, which a maintainer sets after reading the flags. Run it in a
+checkout with the history of ``--base``; a pull request's merge commit is ``HEAD`` and its first
+parent ``HEAD^1``. ``--pr`` reads the label from GitHub with ``gh`` (``GH_TOKEN`` and
+``GITHUB_REPOSITORY`` set). It exits 2 when it cannot decide.
+
+    python3 scripts/test_weakening.py --base HEAD^1 --pr 123
+"""
+
+from __future__ import annotations
+
+import argparse
+import ast
+import copy
+import json
+import operator
+import os
+import re
+import subprocess
+import sys
+from collections import Counter, defaultdict
+from collections.abc import Callable, Iterator, Sequence
+from typing import Any, NamedTuple
+
+LABEL = "test-change-approved"
+ROOTS = ("tests", "qa")
+
+LARGER_IS_LOOSER = frozenset(
+    {"rtol", "atol", "rel_tol", "abs_tol", "rel", "abs", "tol", "tolerance", "eps", "epsilon"}
+    | {"delta", "nulp", "maxulp"}
+)
+SMALLER_IS_LOOSER = frozenset({"decimal", "places", "significant", "precision"})
+TOLERANCES = LARGER_IS_LOOSER | SMALLER_IS_LOOSER
+# A constant or a parameter named for a tolerance: RTOL, GPU_ATOL, rtol, tol_loose.
+TOLERANCE_NAME = re.compile(
+    r"(?:^|_)(?:rtol|atol|tol|tols|tolerance|tolerances|eps|epsilon|delta|decimal|places)(?:$|_)",
+    re.IGNORECASE,
+)
+# Positional tolerance arguments, by callee, and the defaults of the tolerances a call leaves out,
+# read from the signatures of NumPy 2.4 and pytest 9.1.
+POSITIONAL = {
+    "approx": {1: "rel", 2: "abs"},
+    "assert_allclose": {2: "rtol", 3: "atol"},
+    "isclose": {2: "rtol", 3: "atol"},
+    "allclose": {2: "rtol", 3: "atol"},
+    "assert_almost_equal": {2: "decimal"},
+    "assert_array_almost_equal": {2: "decimal"},
+    "assert_approx_equal": {2: "significant"},
+    "assert_array_almost_equal_nulp": {2: "nulp"},
+    "assert_array_max_ulp": {2: "maxulp"},
+    "assertAlmostEqual": {2: "places"},
+}
+DEFAULTS = {
+    "assert_allclose": {"rtol": 1e-7, "atol": 0.0},
+    "isclose": {"rtol": 1e-5, "atol": 1e-8},
+    "allclose": {"rtol": 1e-5, "atol": 1e-8},
+    "assert_almost_equal": {"decimal": 7},
+    "assert_array_almost_equal": {"decimal": 6},
+    "assert_approx_equal": {"significant": 7},
+    "assert_array_almost_equal_nulp": {"nulp": 1},
+    "assert_array_max_ulp": {"maxulp": 1},
+}
+APPROX_DEFAULT_REL, APPROX_DEFAULT_ABS = 1e-6, 1e-12
+RAISES = frozenset({"raises", "warns", "deprecated_call"})
+MARKERS = frozenset({"skip", "skipif", "xfail", "release"})
+SKIP_CALLS = frozenset({"skip", "xfail", "importorskip"})
+BROAD = frozenset({"Exception", "BaseException"})
+ARITHMETIC = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.Pow: operator.pow,
+}
+MAX_LINES = 6
+
+Flag = Callable[..., None]
+
+
+class Finding(NamedTuple):
+    """One flagged change: where, why, and the code before and after."""
+
+    path: str
+    line: int
+    unit: str
+    reason: str
+    before: str = ""
+    after: str = ""
+
+
+class Change(NamedTuple):
+    """One changed file of the pull request, with its source before and after (None if absent)."""
+
+    path: str
+    old_path: str
+    old: str | None
+    new: str | None
+
+
+class Unit(NamedTuple):
+    """A function, or the module or class code outside every function, with its syntax nodes."""
+
+    path: str
+    qualname: str
+    node: ast.AST
+    nodes: list[ast.AST]
+    source: str
+    constants: dict[str, ast.AST]
+
+    @property
+    def is_function(self) -> bool:
+        """Whether the unit is a function (not a module or class body)."""
+        return isinstance(self.node, ast.FunctionDef | ast.AsyncFunctionDef)
+
+    @property
+    def is_test(self) -> bool:
+        """Whether the unit is a function named ``test...``."""
+        return self.is_function and self.qualname.rsplit(".", 1)[-1].startswith("test")
+
+
+class Check(NamedTuple):
+    """An assertion-like node: an assert, an ``assert_*`` call, or a ``pytest.raises``."""
+
+    kind: str
+    node: ast.AST
+    key: str
+
+
+class Knob(NamedTuple):
+    """A numeric tolerance or bound, the context that identifies it, and which way is looser."""
+
+    context: tuple
+    label: str
+    value: float
+    larger_is_looser: bool
+
+
+def _callee(node: ast.AST) -> str:
+    func = node.func if isinstance(node, ast.Call) else node
+    if isinstance(func, ast.Name):
+        return func.id
+    return func.attr if isinstance(func, ast.Attribute) else ""
+
+
+def _number(node: ast.AST | None) -> float | None:
+    """Return the value of a numeric literal or of arithmetic on literals, else None."""
+    if isinstance(node, ast.Constant):
+        number = isinstance(node.value, int | float) and not isinstance(node.value, bool)
+        return float(node.value) if number else None
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.UAdd | ast.USub):
+        value = _number(node.operand)
+        return value if value is None or isinstance(node.op, ast.UAdd) else -value
+    if isinstance(node, ast.BinOp) and type(node.op) in ARITHMETIC:
+        left, right = _number(node.left), _number(node.right)
+        if left is None or right is None:
+            return None
+        try:
+            value = ARITHMETIC[type(node.op)](left, right)
+        except (ArithmeticError, ValueError):
+            return None
+        return float(value) if isinstance(value, int | float) else None
+    return None
+
+
+class _Mask(ast.NodeTransformer):
+    """Rewrite a node without its numbers, tolerances, and ``approx`` wrappers."""
+
+    def visit_Constant(self, node: ast.Constant) -> ast.AST:
+        if _number(node) is not None:
+            return ast.Constant(value=0, kind=None)
+        return node
+
+    def visit_Call(self, node: ast.Call) -> ast.AST:
+        node = self.generic_visit(node)
+        name = _callee(node)
+        if name == "approx" and node.args:
+            return node.args[0]
+        node.keywords = [keyword for keyword in node.keywords if keyword.arg not in TOLERANCES]
+        if name in POSITIONAL:
+            node.args = node.args[: min(POSITIONAL[name])]
+        return node
+
+
+def _key(node: ast.AST) -> str:
+    """Return the node without its numbers and tolerances: one check before and after an edit."""
+    return ast.dump(_Mask().visit(copy.deepcopy(node)))
+
+
+def _position(node: ast.AST) -> tuple[int, int]:
+    return getattr(node, "lineno", 0), getattr(node, "col_offset", 0)
+
+
+def _text(unit: Unit, node: ast.AST) -> str:
+    return ast.get_source_segment(unit.source, node) or ""
+
+
+def _clip(text: str) -> str:
+    lines = text.splitlines()
+    return "\n".join(lines[:MAX_LINES] + (["..."] if len(lines) > MAX_LINES else []))
+
+
+def _scope_nodes(root: ast.AST, definitions: list[ast.AST]) -> Iterator[ast.AST]:
+    """Yield the nodes of a module or class outside its functions and nested classes."""
+    stack = list(ast.iter_child_nodes(root))
+    while stack:
+        node = stack.pop()
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+            definitions.append(node)
+            continue
+        yield node
+        stack.extend(ast.iter_child_nodes(node))
+
+
+def collect(path: str, source: str) -> dict[str, Unit]:
+    """Every unit of a source file, by qualified name; ``<module>`` holds the module's own code."""
+    tree = ast.parse(source)
+    constants = {}
+    for statement in tree.body:
+        if isinstance(statement, ast.Assign) and len(statement.targets) == 1:
+            target, value = statement.targets[0], statement.value
+        elif isinstance(statement, ast.AnnAssign) and statement.value is not None:
+            target, value = statement.target, statement.value
+        else:
+            continue
+        if isinstance(target, ast.Name):
+            constants[target.id] = value
+    units: dict[str, Unit] = {}
+
+    def add(root: ast.AST, qualname: str) -> None:
+        definitions: list[ast.AST] = []
+        if isinstance(root, ast.ClassDef | ast.Module):
+            nodes = list(_scope_nodes(root, definitions))
+        else:
+            nodes = list(ast.walk(root))
+        units[qualname] = Unit(path, qualname, root, nodes, source, constants)
+        for child in definitions:
+            name = getattr(child, "name", "")
+            add(child, name if qualname == "<module>" else f"{qualname}.{name}")
+
+    add(tree, "<module>")
+    return units
+
+
+def _checks(unit: Unit) -> list[Check]:
+    checks = []
+    for node in sorted(unit.nodes, key=_position):
+        name = _callee(node) if isinstance(node, ast.Call) else ""
+        if isinstance(node, ast.Assert) or name.startswith("assert"):
+            checks.append(Check("assert", node, _key(node)))
+        elif name in RAISES:
+            checks.append(Check("raises", node, "raises"))
+    return checks
+
+
+def _count_approx(node: ast.AST) -> int:
+    return sum(isinstance(n, ast.Call) and _callee(n) == "approx" for n in ast.walk(node))
+
+
+def _call_knobs(call: ast.Call) -> list[Knob]:
+    name = _callee(call)
+    given: dict[str, float] = {}
+    opaque: set[str] = set()
+    positional = POSITIONAL.get(name, {})
+    named = [(positional[i], arg) for i, arg in enumerate(call.args) if i in positional]
+    named += [(kw.arg, kw.value) for kw in call.keywords if kw.arg in TOLERANCES]
+    for tolerance, value in named:
+        number = _number(value)
+        if number is None:
+            opaque.add(tolerance)
+        else:
+            given[tolerance] = number
+    if name == "approx":
+        if opaque:
+            return []
+        absolute = given.get("abs")
+        relative = given.get("rel")
+        if relative is None:
+            relative = 0.0 if absolute is not None else APPROX_DEFAULT_REL
+        given = {"rel": relative, "abs": APPROX_DEFAULT_ABS if absolute is None else absolute}
+    else:
+        given = {**{k: v for k, v in DEFAULTS.get(name, {}).items() if k not in opaque}, **given}
+    return [
+        Knob(("call", name, tolerance), tolerance, value, tolerance in LARGER_IS_LOOSER)
+        for tolerance, value in given.items()
+    ]
+
+
+def _compare_knobs(node: ast.Compare) -> list[Knob]:
+    if len(node.ops) != 1 or not isinstance(node.ops[0], ast.Lt | ast.LtE | ast.Gt | ast.GtE):
+        return []
+    left, right = node.left, node.comparators[0]
+    upper = isinstance(node.ops[0], ast.Lt | ast.LtE)
+    if _number(right) is not None and _number(left) is None:
+        value, other, larger_is_looser = _number(right), left, upper
+    elif _number(left) is not None and _number(right) is None:
+        value, other, larger_is_looser = _number(left), right, not upper
+    else:
+        return []
+    assert value is not None
+    return [Knob(("bound", larger_is_looser, _key(other)), "bound", value, larger_is_looser)]
+
+
+def _check_knobs(node: ast.AST) -> list[Knob]:
+    knobs = []
+    for child in ast.walk(node):
+        if isinstance(child, ast.Call):
+            knobs += _call_knobs(child)
+        elif isinstance(child, ast.Compare):
+            knobs += _compare_knobs(child)
+    return knobs
+
+
+def _dict_knobs(node: ast.Dict, path: tuple[str, ...]) -> Iterator[Knob]:
+    for key, value in zip(node.keys, node.values, strict=True):
+        if not (isinstance(key, ast.Constant) and isinstance(key.value, str)):
+            continue
+        here = (*path, key.value)
+        if isinstance(value, ast.Dict):
+            yield from _dict_knobs(value, here)
+        elif key.value in TOLERANCES and (number := _number(value)) is not None:
+            yield Knob(("key", here), ".".join(here), number, key.value in LARGER_IS_LOOSER)
+
+
+def _own_knobs(unit: Unit) -> list[Knob]:
+    """Return the tolerances a unit holds outside its checks: defaults, constants, and tables."""
+    knobs = []
+    for node in sorted(unit.nodes, key=_position):
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+            a = node.args
+            positional = [*a.posonlyargs, *a.args]
+            pairs = list(zip(positional[len(positional) - len(a.defaults) :], a.defaults))
+            pairs += [(arg, d) for arg, d in zip(a.kwonlyargs, a.kw_defaults) if d is not None]
+            for arg, default in pairs:
+                number = _number(default)
+                if number is not None and TOLERANCE_NAME.search(arg.arg):
+                    larger = not re.search(r"decimal|places", arg.arg, re.IGNORECASE)
+                    knobs.append(Knob(("default", node.name, arg.arg), arg.arg, number, larger))
+        elif isinstance(node, ast.Assign | ast.AnnAssign) and not unit.is_function:
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            if len(targets) != 1 or not isinstance(targets[0], ast.Name) or node.value is None:
+                continue
+            name, number = targets[0].id, _number(node.value)
+            if number is not None and TOLERANCE_NAME.search(name):
+                larger = not re.search(r"decimal|places", name, re.IGNORECASE)
+                knobs.append(Knob(("name", name), name, number, larger))
+            elif isinstance(node.value, ast.Dict):
+                knobs += [
+                    Knob(
+                        ("table", name, *k.context[1]),
+                        f"{name}.{k.label}",
+                        k.value,
+                        k.larger_is_looser,
+                    )
+                    for k in _dict_knobs(node.value, ())
+                ]
+    return knobs
+
+
+def _looser(before: list[Knob], after: list[Knob]) -> list[str]:
+    """Return why a tolerance or bound of ``after`` is looser than its match in ``before``."""
+    by_context: dict[tuple, list[Knob]] = defaultdict(list)
+    for knob in before:
+        by_context[knob.context].append(knob)
+    seen: Counter[tuple] = Counter()
+    reasons = []
+    for knob in after:
+        index = seen[knob.context]
+        seen[knob.context] += 1
+        if index >= len(by_context[knob.context]):
+            continue
+        old = by_context[knob.context][index]
+        looser = knob.value > old.value if knob.larger_is_looser else knob.value < old.value
+        if looser:
+            reasons.append(f"{knob.label} loosened from {old.value:g} to {knob.value:g}")
+    return reasons
+
+
+def _first_name(call: ast.Call) -> str:
+    return _callee(call.args[0]) if call.args else ""
+
+
+def _raises_reasons(before: ast.Call, after: ast.Call) -> list[str]:
+    reasons = []
+    if any(k.arg == "match" for k in before.keywords) and not any(
+        k.arg == "match" for k in after.keywords
+    ):
+        reasons.append("pytest.raises lost its match")
+    if _first_name(after) in BROAD and _first_name(before) not in BROAD:
+        reasons.append(f"pytest.raises widened to {_first_name(after)}")
+    return reasons
+
+
+def _markers(unit: Unit) -> dict[str, list[ast.AST]]:
+    found: dict[str, list[ast.AST]] = defaultdict(list)
+    for node in sorted(unit.nodes, key=_position):
+        if (
+            isinstance(node, ast.Attribute)
+            and node.attr in MARKERS
+            and isinstance(node.value, ast.Attribute)
+            and node.value.attr == "mark"
+        ):
+            found[f"pytest.mark.{node.attr}"].append(node)
+        elif (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr in SKIP_CALLS
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "pytest"
+        ):
+            found[f"pytest.{node.func.attr}()"].append(node)
+    return found
+
+
+def _elements(
+    node: ast.AST | None, constants: dict[str, ast.AST], depth: int = 0
+) -> list[str] | None:
+    """Return the cases a parametrize argument lists, when the source states them, else None."""
+    if isinstance(node, ast.List | ast.Tuple | ast.Set):
+        if any(isinstance(element, ast.Starred) for element in node.elts):
+            return None
+        return [ast.dump(element) for element in node.elts]
+    if isinstance(node, ast.Dict):
+        return [ast.dump(key) for key in node.keys if key is not None]
+    if isinstance(node, ast.Name) and node.id in constants and depth < 2:
+        return _elements(constants[node.id], constants, depth + 1)
+    if isinstance(node, ast.Call) and _callee(node) in {"list", "tuple", "set"} and node.args:
+        return _elements(node.args[0], constants, depth + 1)
+    return None
+
+
+def _argnames(node: ast.AST) -> tuple[str, ...]:
+    """Return the argument names a parametrize call lists."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return tuple(sorted(name.strip() for name in node.value.split(",") if name.strip()))
+    if isinstance(node, ast.List | ast.Tuple):
+        names = [
+            e.value for e in node.elts if isinstance(e, ast.Constant) and isinstance(e.value, str)
+        ]
+        if len(names) == len(node.elts):
+            return tuple(sorted(names))
+    return (ast.dump(node),)
+
+
+def _parametrizations(unit: Unit) -> list[tuple[tuple[str, ...], list[str] | None, ast.Call]]:
+    """List the parametrizations of a unit: argument names, the cases when known, and the call."""
+    found = []
+    for node in sorted(unit.nodes, key=_position):
+        if not isinstance(node, ast.Call):
+            continue
+        name = _callee(node)
+        if name == "parametrize" and node.args:
+            values = node.args[1] if len(node.args) > 1 else None
+            values = values or next((k.value for k in node.keywords if k.arg == "argvalues"), None)
+            found.append((_argnames(node.args[0]), _elements(values, unit.constants), node))
+        elif name == "fixture":
+            params = next((k.value for k in node.keywords if k.arg == "params"), None)
+            if params is not None:
+                found.append((("params",), _elements(params, unit.constants), node))
+    return found
+
+
+def _pair(
+    old: list[Check], new: list[Check]
+) -> tuple[list[tuple[Check, Check]], list[Check], list[Check]]:
+    """Match the checks that are the same up to numbers and tolerances; return what is left."""
+    kept: dict[str, list[Check]] = defaultdict(list)
+    for check in new:
+        kept[check.key].append(check)
+    paired, lost = [], []
+    for check in old:
+        if kept[check.key]:
+            paired.append((check, kept[check.key].pop(0)))
+        else:
+            lost.append(check)
+    return paired, lost, [check for checks in kept.values() for check in checks]
+
+
+def _check_findings(old: Unit, new: Unit, flag: Flag) -> None:
+    """Flag the checks a unit lost and the tolerances and bounds of its checks that loosened."""
+    old_checks, new_checks = _checks(old), _checks(new)
+    paired, lost, gained = _pair(old_checks, new_checks)
+    removed = False
+    for kind, noun in (("assert", "assertion"), ("raises", "pytest.raises check")):
+        net = sum(c.kind == kind for c in old_checks) - sum(c.kind == kind for c in new_checks)
+        if net > 0:
+            removed |= kind == "assert"
+            texts = [_clip(_text(old, c.node)) for c in lost if c.kind == kind]
+            flag(None, f"{noun} removed" if net == 1 else f"{net} {noun}s removed", texts)
+    approx_lost = sum(_count_approx(c.node) for c in lost)
+    if not removed and approx_lost > sum(_count_approx(c.node) for c in gained):
+        texts = [_clip(_text(old, c.node)) for c in lost if _count_approx(c.node)]
+        flag(None, "pytest.approx assertion removed or rewritten", texts)
+    for before, after in paired:
+        reasons = _raises_reasons(before.node, after.node) if before.kind == "raises" else []
+        if _count_approx(after.node) > _count_approx(before.node):
+            reasons.append("exact comparison relaxed to pytest.approx")
+        reasons += _looser(_check_knobs(before.node), _check_knobs(after.node))
+        if reasons:
+            flag(
+                after.node,
+                "; ".join(reasons),
+                [_clip(_text(old, before.node))],
+                [_clip(_text(new, after.node))],
+            )
+    for reason in _looser(_own_knobs(old), _own_knobs(new)):
+        flag(None, reason)
+
+
+def _marker_findings(old: Unit, new: Unit, flag: Flag) -> None:
+    """Flag the skip, xfail, and release markers a unit gained."""
+    before = _markers(old)
+    for name, nodes in _markers(new).items():
+        extra = len(nodes) - len(before.get(name, []))
+        for node in nodes[len(nodes) - extra :] if extra > 0 else []:
+            flag(node, f"{name} added to a test that existed", [], [_clip(_text(new, node))])
+
+
+def _parametrize_findings(old: Unit, new: Unit, flag: Flag) -> None:
+    """Flag the cases a unit's parametrizations lost and an argument left without one."""
+    pool: dict[tuple[str, ...], list[tuple[list[str] | None, ast.Call]]] = defaultdict(list)
+    kept = set()
+    for names, elements, node in _parametrizations(new):
+        pool[names].append((elements, node))
+        kept.update(names)
+    for names, elements, node in _parametrizations(old):
+        if pool[names]:
+            after_elements, after_node = pool[names].pop(0)
+            if elements is not None and after_elements is not None:
+                fewer = len(elements) - len(after_elements)
+                if fewer > 0:
+                    flag(
+                        after_node,
+                        f"{fewer} parametrize case(s) removed",
+                        [_clip(_text(old, node))],
+                        [_clip(_text(new, after_node))],
+                    )
+        elif missing := [name for name in names if name not in kept]:
+            flag(
+                None, f"parametrization of {', '.join(missing)} removed", [_clip(_text(old, node))]
+            )
+
+
+def compare(old: Unit, new: Unit) -> list[Finding]:
+    """Return the weakenings in ``new`` against the same unit ``old``."""
+    findings: list[Finding] = []
+
+    def flag(
+        node: ast.AST | None, reason: str, before: Sequence[str] = (), after: Sequence[str] = ()
+    ) -> None:
+        line = (_position(node)[0] if node is not None else 0) or _position(new.node)[0]
+        findings.append(
+            Finding(new.path, line, new.qualname, reason, "\n".join(before), "\n".join(after))
+        )
+
+    _check_findings(old, new, flag)
+    _marker_findings(old, new, flag)
+    _parametrize_findings(old, new, flag)
+    return findings
+
+
+def _body_key(unit: Unit) -> str:
+    """Return a function's arguments and body, without its name, decorators, and docstring."""
+    node = unit.node
+    assert isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+    body = node.body
+    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant):
+        body = body[1:]
+    return ast.dump(node.args) + "".join(ast.dump(statement) for statement in body)
+
+
+def analyze(changes: Sequence[Change]) -> list[Finding]:
+    """Return the weakenings in the changed Python files of a pull request."""
+    findings: list[Finding] = []
+    deleted: list[Unit] = []
+    added: list[Unit] = []
+    for change in changes:
+        if change.old is None:
+            continue
+        try:
+            old_units = collect(change.old_path, change.old)
+        except (SyntaxError, ValueError):
+            continue
+        try:
+            new_units = collect(change.path, change.new or "")
+        except (SyntaxError, ValueError) as error:
+            line = getattr(error, "lineno", None) or 1
+            findings.append(Finding(change.path, line, "", f"does not parse: {error}"))
+            continue
+        for name, unit in old_units.items():
+            if name in new_units:
+                findings += compare(unit, new_units[name])
+            elif unit.is_test:
+                deleted.append(unit)
+        added += [u for n, u in new_units.items() if n not in old_units and u.is_test]
+    for unit in deleted:
+        key = _body_key(unit)
+        name = unit.qualname.rsplit(".", 1)[-1]
+        match = next((a for a in added if _body_key(a) == key), None)
+        if match is None:
+            same_name = [a for a in added if a.qualname.rsplit(".", 1)[-1] == name]
+            match = same_name[0] if len(same_name) == 1 else None
+        if match is None:
+            line = _position(unit.node)[0]
+            findings.append(
+                Finding(
+                    unit.path, line, unit.qualname, "test deleted", _clip(_text(unit, unit.node))
+                )
+            )
+        else:
+            added.remove(match)
+            findings += compare(unit, match)
+    return findings
+
+
+def _is_baseline(path: str) -> bool:
+    parts = path.split("/")
+    named = "baselines" in parts[:-1] or "baseline" in parts[-1].lower()
+    return named and parts[0] in ROOTS and not path.endswith((".py", ".md"))
+
+
+def _changed_values(old: Any, new: Any, path: str = "") -> list[str]:
+    """Return the paths in ``old`` whose value is gone or different in ``new``."""
+    if isinstance(old, dict) and isinstance(new, dict):
+        return [
+            leaf
+            for key, value in old.items()
+            for leaf in (
+                _changed_values(value, new[key], f"{path}.{key}" if path else str(key))
+                if key in new
+                else [f"{path}.{key}" if path else str(key)]
+            )
+        ]
+    if isinstance(old, list) and isinstance(new, list):
+        leaves = [
+            leaf
+            for index, (a, b) in enumerate(zip(old, new))
+            for leaf in _changed_values(a, b, f"{path}[{index}]")
+        ]
+        return leaves + [f"{path}[{index}]" for index in range(len(new), len(old))]
+    return [] if old == new else [path or "(value)"]
+
+
+def baseline_findings(path: str, old: str | None, new: str | None) -> list[Finding]:
+    """Flag a baseline that was deleted, or changed (a JSON one: its old values changed)."""
+    if old is None:
+        return []
+    if new is None:
+        return [Finding(path, 0, "", "baseline deleted")]
+    if old == new:
+        return []
+    if path.endswith(".json"):
+        try:
+            leaves = _changed_values(json.loads(old), json.loads(new))
+        except ValueError:
+            leaves = ["(file)"]
+        if not leaves:
+            return []
+        shown = ", ".join(leaves[:5]) + (f", and {len(leaves) - 5} more" if len(leaves) > 5 else "")
+        return [Finding(path, 0, "", f"baseline re-recorded (changed: {shown})")]
+    return [Finding(path, 0, "", "baseline re-recorded")]
+
+
+def _git(*args: str, root: str | None = None) -> bytes:
+    return subprocess.run(["git", *args], check=True, capture_output=True, cwd=root).stdout
+
+
+def _show(root: str, revision: str, path: str) -> str:
+    return _git("show", f"{revision}:{path}", root=root).decode("utf-8", "replace")
+
+
+def changed_files(base: str, head: str, root: str) -> list[tuple[str, str, str, str]]:
+    """List the changed files of ``tests/`` and ``qa/``: status, old path, new path, merge base."""
+    merge_base = _git("merge-base", base, head, root=root).decode().strip()
+    raw = _git("diff", "--name-status", "-z", "-M", merge_base, head, "--", *ROOTS, root=root)
+    tokens = raw.decode("utf-8", "replace").split("\0")
+    files, index = [], 0
+    while index < len(tokens) and tokens[index]:
+        status = tokens[index]
+        width = 2 if status[0] in "RC" else 1
+        paths = tokens[index + 1 : index + 1 + width]
+        files.append((status[0], paths[0], paths[-1], merge_base))
+        index += 1 + width
+    return files
+
+
+def load(base: str, head: str, root: str) -> tuple[list[Change], list[Finding]]:
+    """Read the changed Python and baseline files; return the Python changes and baseline flags."""
+    changes: list[Change] = []
+    findings: list[Finding] = []
+    for status, old_path, path, merge_base in changed_files(base, head, root):
+        old = None if status in "AC" else _show(root, merge_base, old_path)
+        new = None if status == "D" else _show(root, head, path)
+        if path.endswith(".py") and path.split("/")[0] in ROOTS:
+            changes.append(Change(path, old_path, old, new))
+        elif _is_baseline(path):
+            findings += baseline_findings(path, old, new)
+    return changes, findings
+
+
+def report(findings: Sequence[Finding]) -> str:
+    """Format the flags: where, why, and the code before and after."""
+    lines = []
+    for finding in findings:
+        where = f"{finding.path}:{finding.line}" if finding.line else finding.path
+        unit = f" {finding.unit}:" if finding.unit else ""
+        lines.append(f"{where}:{unit} {finding.reason}")
+        lines += [f"    - {line}" for line in finding.before.splitlines()]
+        lines += [f"    + {line}" for line in finding.after.splitlines()]
+    return "\n".join(lines)
+
+
+def labels(repository: str, pull_request: str) -> list[str]:
+    """Return the names of the labels a pull request carries now, read from GitHub."""
+    path = f"repos/{repository}/issues/{pull_request}/labels"
+    out = subprocess.run(
+        ["gh", "api", "--paginate", path, "--jq", ".[].name"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    return out.split()
+
+
+def main(argv: Sequence[str] = ()) -> int:
+    """Print the flagged changes; exit 0 when none or approved, 1 when not, 2 on an error."""
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--base", required=True, help="the revision the change starts from")
+    parser.add_argument("--head", default="HEAD", help="the revision to check (default HEAD)")
+    parser.add_argument("--pr", help="the pull request whose labels approve the change")
+    parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
+    parser.add_argument("--label", default=LABEL, help=f"the approving label (default {LABEL})")
+    args = parser.parse_args(argv)
+    try:
+        root = _git("rev-parse", "--show-toplevel").decode().strip()
+        changes, findings = load(args.base, args.head, root)
+        findings = [*analyze(changes), *findings]
+        if not findings:
+            print(f"No weakened test between {args.base} and {args.head}.")
+            return 0
+        print(f"{len(findings)} flagged change(s) in tests/ and qa/:\n\n{report(findings)}\n")
+        approved = bool(args.pr) and args.label in labels(args.repo, args.pr)
+    except (subprocess.CalledProcessError, OSError) as error:
+        detail = getattr(error, "stderr", None) or b""
+        print(f"::error::The weakened-test check could not run: {error} {detail.decode().strip()}")
+        return 2
+    if approved:
+        print(f"::notice::The label {args.label} approves these changes.")
+        return 0
+    for finding in findings:
+        location = f"file={finding.path},line={max(finding.line, 1)}"
+        print(f"::error {location},title=Weakened test::{finding.reason}")
+    print(
+        f"::error::The pull request weakens tests or re-records baselines. A maintainer who has "
+        f"read the flags above approves it with the label {args.label}; then re-run this job."
+    )
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
