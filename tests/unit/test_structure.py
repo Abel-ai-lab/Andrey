@@ -861,3 +861,298 @@ def test_topological_order_takes_the_lowest_key_among_the_ready_nodes():
     adj[1, 3] = True
     with pytest.raises(ValueError, match="the network has a directed cycle"):
         topological_order(adj, what="the network")
+
+
+# ---- NumPy CSR results against SciPy and edge-by-edge references --------------------------------
+
+_KINDS = ("dag", "cpdag", "pag", "mag", "digraph", "undirected")
+
+
+def _random_marks(rng, n, kind, density, loops=False, valid=True):
+    """A random ``(n, n)`` endpoint matrix with marks allowed for ``kind``, or any marks."""
+    pairs = {
+        "dag": [(TAIL, ARROW)],
+        "cpdag": [(TAIL, ARROW), (TAIL, TAIL)],
+        "undirected": [(TAIL, TAIL)],
+        "digraph": [(TAIL, ARROW), (ARROW, ARROW)],
+        "mag": [(TAIL, ARROW), (ARROW, ARROW), (TAIL, TAIL)],
+    }.get(kind)
+    M = np.zeros((n, n), dtype=np.int8)
+    for i in range(n):
+        for j in range(i + 1, n):
+            if rng.random() < density:
+                if valid and pairs is not None:
+                    a, b = pairs[int(rng.integers(len(pairs)))]
+                    a, b = (a, b) if rng.random() < 0.5 else (b, a)
+                else:
+                    a, b = rng.integers(1, 4, size=2)
+                M[i, j], M[j, i] = a, b
+    if loops:
+        M[np.diag_indices(n)] = np.where(rng.random(n) < 0.3, ARROW, NULL)
+    return M
+
+
+def _csr(M):
+    """Reference CSR of ``M`` built by SciPy, with sorted columns and no stored zeros."""
+    import scipy.sparse
+
+    sp = scipy.sparse.csr_array(M)
+    sp.sum_duplicates()
+    sp.sort_indices()
+    return sp.indptr.astype(np.int64), sp.indices.astype(np.int32), sp.data.astype(np.int8)
+
+
+def _damage(rng, store, how):
+    """A copy of the CSR ``store`` that is no longer canonical, or leaves ``_far_marks`` unsure."""
+    indptr, indices, marks = (a.copy() for a in store)
+    n, nnz = indptr.size - 1, indices.size
+    if not nnz:
+        return indptr, indices, marks
+    k = int(rng.integers(nnz))
+    row = int(np.searchsorted(indptr, k, side="right") - 1)
+    if how == "half":  # a stored cell whose partner is missing
+        indices, marks = np.delete(indices, k), np.delete(marks, k)
+        indptr[row + 1 :] -= 1
+    elif how == "null":  # an explicitly stored NULL
+        marks[k] = NULL
+    elif how == "duplicate":
+        indices, marks = np.insert(indices, k, indices[k]), np.insert(marks, k, marks[k])
+        indptr[row + 1 :] += 1
+    elif how == "unsorted":
+        lo, hi = indptr[row], indptr[row + 1]
+        if hi - lo > 1:
+            indices[lo:hi], marks[lo:hi] = indices[lo:hi][::-1].copy(), marks[lo:hi][::-1].copy()
+    elif how == "out_of_range":
+        indices[k] = n + int(rng.integers(3))
+    elif how == "negative":
+        indices[k] = -1
+    return indptr, indices, marks
+
+
+def _reference_try_compact(n, indptr, indices, marks, kind):
+    """Reference for ``_try_compact``: the partner marks come from SciPy's transpose."""
+    import scipy.sparse
+
+    if kind not in ("dag", "cpdag", "undirected"):
+        return None
+    if (marks == NULL).any() or (marks == CIRCLE).any():
+        return None
+    rows = np.repeat(np.arange(n, dtype=np.int64), np.diff(indptr))
+    cols = indices.astype(np.int64)
+    if bool(np.any((rows[1:] == rows[:-1]) & (np.diff(cols) <= 0))):
+        return None
+    sp = scipy.sparse.csr_array((marks, indices, indptr), shape=(n, n))
+    spT = sp.T.tocsr()
+    spT.sort_indices()
+    if not (np.array_equal(sp.indptr, spT.indptr) and np.array_equal(sp.indices, spT.indices)):
+        return None
+    partner = spT.data.astype(np.int8)
+    upper = (rows != cols) & (rows < cols)
+    mi, mj = marks[upper], partner[upper]
+    fwd, bwd = (mi == TAIL) & (mj == ARROW), (mi == ARROW) & (mj == TAIL)
+    und = (mi == TAIL) & (mj == TAIL)
+    ok = und if kind == "undirected" else fwd | bwd | (und if kind == "cpdag" else False)
+    if not bool(np.all(ok)):
+        return None
+    off = rows != cols
+    r_up, c_up = rows[upper], cols[upper]
+    er = np.concatenate([np.where(bwd, c_up, r_up), rows[~off]])
+    ec = np.concatenate([np.where(bwd, r_up, c_up), cols[~off]])
+    em = np.concatenate([np.where(und, TAIL, ARROW).astype(np.int8), marks[~off]])
+    order = np.lexsort((ec, er))
+    new_indptr = np.zeros(n + 1, dtype=np.int64)
+    np.add.at(new_indptr, er[order] + 1, 1)
+    np.cumsum(new_indptr, out=new_indptr)
+    return new_indptr, ec[order].astype(np.int32), em[order].astype(np.int8)
+
+
+def _reference_mark_pairs(g):
+    """Reference for ``_mark_pairs``: SciPy looks up every partner mark."""
+    import scipy.sparse
+
+    indptr, indices, marks = g._sym_csr()
+    rows = np.repeat(np.arange(g.n_nodes, dtype=np.intp), np.diff(indptr))
+    cols = indices.astype(np.intp)
+    keep = rows <= cols
+    rows, cols, near = rows[keep], cols[keep], marks[keep].astype(np.int64)
+    if not rows.size:
+        return rows, cols, near, near.copy()
+    sym = scipy.sparse.csr_array((marks, indices, indptr), shape=(g.n_nodes, g.n_nodes))
+    return rows, cols, near, np.asarray(sym[cols, rows], dtype=np.int64).ravel()
+
+
+def _reference_validate(g):
+    """Reference for ``validate``: the message of the first edge-by-edge failure, else ``None``."""
+    from andrey.core.structure import _lookup
+
+    indptr, indices, marks = g._sym_csr()
+    if g.kind != "pag" and (marks == CIRCLE).any():
+        return f"CIRCLE marks require kind='pag', not '{g.kind}'"
+    for i, j, mi, mj in g._iter_edges():
+        if i == j:
+            continue
+        if g.kind in ("dag", "cpdag") and mi == ARROW and mj == ARROW:
+            return (
+                f"double arrowhead {i}<->{j} requires kind='pag' or 'mag' (bidirected) or "
+                f"kind='digraph' (2-cycle)"
+            )
+        if g.kind in ("dag", "digraph") and mi == TAIL and mj == TAIL:
+            return f"undirected edge {i}--{j} requires kind='cpdag', 'pag', 'mag', or 'undirected'"
+        if g.kind == "undirected" and (mi, mj) != (TAIL, TAIL):
+            return f"edge {i}-{j} has an arrowhead, which kind='undirected' forbids"
+    rows = np.repeat(np.arange(g.n_nodes, dtype=np.intp), np.diff(indptr))
+    for i, j in zip(rows.tolist(), indices.tolist()):
+        if _lookup(indptr, indices, marks, j, i) == NULL:
+            return f"asymmetric half-edge: ({i}, {j}) stored but ({j}, {i}) missing"
+    return None
+
+
+def _validation_message(g):
+    try:
+        g.validate()
+    except ValueError as error:
+        return str(error)
+    return None
+
+
+def test_dense_to_csr_equals_scipys_canonical_csr():
+    from andrey.core.structure import _dense_to_csr
+
+    rng = np.random.default_rng(0)
+    for n in (0, 1, 2, 7, 40):
+        for kind in _KINDS:
+            for loops in (False, True):
+                M = _random_marks(rng, n, kind, 0.3, loops, valid=False)
+                got, want = _dense_to_csr(M), _csr(M)
+                for a, b in zip(got, want):
+                    assert a.dtype == b.dtype and np.array_equal(a, b)
+
+
+def test_far_marks_find_each_partner_mark_in_a_canonical_store():
+    from andrey.core.structure import _far_marks
+
+    rng = np.random.default_rng(1)
+    for n in (0, 1, 2, 9, 30):
+        M = _random_marks(rng, n, "pag", 0.3, loops=True, valid=False)
+        M[np.triu(rng.random((n, n)) < 0.2, 1)] = NULL  # an upper cell dropped leaves a half-edge
+        indptr, indices, marks = _csr(M)
+        rows, cols, far = _far_marks(n, indptr, indices, marks)
+        assert np.array_equal(rows, np.repeat(np.arange(n), np.diff(indptr)))
+        assert np.array_equal(cols, indices)
+        assert np.array_equal(far, M[cols, rows]) and far.dtype == np.int8
+
+
+@pytest.mark.parametrize("how", ["duplicate", "unsorted", "out_of_range", "negative"])
+def test_far_marks_decline_a_store_that_is_not_canonical(how):
+    from andrey.core.structure import _far_marks
+
+    rng = np.random.default_rng(2)
+    declined = 0
+    for _ in range(30):
+        M = _random_marks(rng, 8, "pag", 0.5, valid=False)
+        indptr, indices, marks = _damage(rng, _csr(M), how)
+        found = _far_marks(8, indptr, indices, marks)
+        declined += found is None
+        assert how == "unsorted" or found is None  # an unsorted row of one cell stays canonical
+    assert declined
+
+
+def test_far_marks_decline_an_indptr_that_does_not_fit_the_store():
+    from andrey.core.structure import _far_marks
+
+    indptr, indices, marks = _csr(_random_marks(np.random.default_rng(3), 5, "pag", 0.6))
+    assert _far_marks(5, indptr, indices, marks) is not None
+    assert _far_marks(6, indptr, indices, marks) is None  # one row too few
+    assert _far_marks(5, indptr + 1, indices, marks) is None  # does not start at 0
+    assert _far_marks(5, indptr, indices[:-1], marks[:-1]) is None  # ends past the entries
+    assert _far_marks(5, indptr, indices, marks[:-1]) is None  # marks and indices differ
+    assert _far_marks(5, indptr[::-1].copy(), indices, marks) is None  # counts below zero
+
+
+def test_validate_raises_the_first_error_of_the_edge_by_edge_reference():
+    rng = np.random.default_rng(4)
+    seen = set()
+    for seed in range(40):
+        for n in (2, 3, 6, 12):
+            for kind in _KINDS:
+                for valid in (True, False):
+                    M = _random_marks(rng, n, kind, 0.4, loops=kind == "digraph", valid=valid)
+                    store = _csr(M)
+                    if seed % 4 == 3:
+                        store = _damage(
+                            rng, store, ("half", "null", "duplicate", "unsorted")[seed % 3]
+                        )
+                    g = GraphStructure._from_csr(n, *store, kind=kind)
+                    message = _validation_message(g)
+                    assert message == _reference_validate(g)
+                    seen.add((kind, None if message is None else message.split()[0]))
+    # every kind meets a valid graph, and each message of the reference is raised for some kind
+    assert {m for _, m in seen} >= {None, "double", "undirected", "edge", "asymmetric", "CIRCLE"}
+    assert {kind for kind, m in seen if m is None} == set(_KINDS)
+
+
+def test_validate_of_a_half_edge_matches_the_edge_by_edge_reference():
+    # 0 -> 1 stored with (1, 0) absent: an undirected graph reads the missing mark as an arrowhead,
+    # every other kind names the half-edge
+    indptr, indices, marks = np.array([0, 1, 1]), np.array([1]), np.array([TAIL])
+    for kind in _KINDS:
+        message = _validation_message(
+            GraphStructure._from_csr(2, indptr, indices, marks, kind=kind)
+        )
+        assert message is not None
+        assert message == _reference_validate(
+            GraphStructure._from_csr(2, indptr, indices, marks, kind=kind)
+        )
+
+
+def test_compact_store_equals_the_scipy_construction():
+    from andrey.core.structure import _try_compact
+
+    rng = np.random.default_rng(5)
+    compacted = 0
+    for n in (0, 1, 2, 5, 12, 40):
+        for kind in _KINDS:
+            for valid in (True, False):
+                for how in (None, "half", "null", "duplicate", "unsorted"):
+                    M = _random_marks(rng, n, kind, 0.3, loops=kind == "digraph", valid=valid)
+                    store = _csr(M) if how is None else _damage(rng, _csr(M), how)
+                    got = _try_compact(n, *store, kind)
+                    want = _reference_try_compact(n, *store, kind)
+                    assert (got is None) == (want is None)
+                    if got is not None:
+                        compacted += 1
+                        for a, b in zip(got, want):
+                            assert a.dtype == b.dtype and np.array_equal(a, b)
+    assert compacted
+
+
+@pytest.mark.parametrize("edges", [0, 1, 5, 40, 511, 512, 513, 700])
+def test_mark_pairs_equal_the_scipy_lookup_on_both_sides_of_the_entry_cutoff(edges):
+    rng = np.random.default_rng(6)
+    nodes = 100
+    pairs = np.array(np.triu_indices(nodes, 1)).T
+    for kind in _KINDS:
+        for how in (None, "half", "null", "duplicate", "unsorted"):
+            M = np.zeros((nodes, nodes), dtype=np.int8)
+            for i, j in pairs[rng.choice(len(pairs), edges, replace=False)]:
+                M[i, j], M[j, i] = TAIL, (TAIL if kind == "undirected" else ARROW)
+            store = _csr(M) if how is None else _damage(rng, _csr(M), how)
+            g = GraphStructure._from_csr(nodes, *store, kind=kind)
+            for got, want in zip(g._mark_pairs(), _reference_mark_pairs(g)):
+                assert got.dtype == want.dtype and np.array_equal(got, want)
+
+
+def test_mark_pairs_use_the_array_lookup_up_to_the_entry_cutoff_only(monkeypatch):
+    from andrey.core import structure
+
+    calls = []
+    real = structure._far_marks
+    monkeypatch.setattr(structure, "_far_marks", lambda *a: calls.append(a[0]) or real(*a))
+    for edges in (structure._NUMPY_PARTNER_ENTRIES // 2, structure._NUMPY_PARTNER_ENTRIES // 2 + 1):
+        M = np.zeros((edges + 1, edges + 1), np.int8)
+        M[np.arange(edges), np.arange(1, edges + 1)] = TAIL  # a path: two stored entries per edge
+        M[np.arange(1, edges + 1), np.arange(edges)] = ARROW
+        g = GraphStructure.from_numpy(M, kind="dag")
+        calls.clear()
+        g._mark_pairs()
+        assert calls == ([edges + 1] if 2 * edges <= structure._NUMPY_PARTNER_ENTRIES else [])

@@ -134,14 +134,15 @@ def data_matrix(
         )
     if X.shape[0] < min_rows:
         raise ValueError(f"{name} needs at least {min_rows} rows (samples), got {X.shape[0]}")
-    finite = np.isfinite(X)
-    if not finite.all():
+    high, low = _column_extremes(X)  # NaN propagates and an infinity is an extreme
+    if not (np.isfinite(high).all() and np.isfinite(low).all()):
+        finite = np.isfinite(X)
         X = _missing_values(data, X, finite, name=name, method=method, missing=missing, fix=fix)
         if method in EM_METHODS:
             X = X[~np.isnan(X).all(axis=1)]
         flat = np.nanmax(X, axis=0) == np.nanmin(X, axis=0)
     else:
-        flat = X.max(axis=0) == X.min(axis=0)  # their difference can pass the largest float
+        flat = high == low  # their difference can pass the largest float
     constant = [_column_name(data, int(j)) for j in np.flatnonzero(flat)]
     if constant:
         if len(constant) == 1:
@@ -158,6 +159,25 @@ def data_matrix(
         if not reads_categories:
             warn_category_codes(X, data, method, name=name)
     return X
+
+
+def _column_extremes(X: np.ndarray, rows: int = 256) -> tuple[np.ndarray, np.ndarray]:
+    """Return each column's maximum and minimum, ``NaN`` for a column that holds one.
+
+    A C-ordered matrix with at least ``2 * rows`` rows is reduced as a ``(n // rows, rows * d)``
+    view, one pass over contiguous memory, then over the ``rows`` partial results per column.
+    """
+    n, d = X.shape
+    if not X.flags.c_contiguous or n < 2 * rows or d == 0:
+        return X.max(axis=0), X.min(axis=0)
+    head = n - n % rows
+    blocks = X[:head].reshape(head // rows, rows * d)
+    high = blocks.max(axis=0).reshape(rows, d).max(axis=0)
+    low = blocks.min(axis=0).reshape(rows, d).min(axis=0)
+    if head < n:
+        high = np.maximum(high, X[head:].max(axis=0))
+        low = np.minimum(low, X[head:].min(axis=0))
+    return high, low
 
 
 def _numbers(data: npt.ArrayLike) -> np.ndarray:
@@ -319,6 +339,7 @@ def check_same_data(method: str, score_func: str, indep_test: str) -> None:
 #: The most distinct whole numbers a column may hold for :func:`warn_category_codes` to name it as
 #: possible category codes.
 MAX_CATEGORIES = 10
+_SCREEN_ROWS = 1024  # rows that rule out a column of fractions before every row is read
 
 
 def declared_columns(data: npt.ArrayLike, categorical: object) -> np.ndarray | None:
@@ -925,14 +946,19 @@ def _category_counts(X: np.ndarray, max_categories: int) -> np.ndarray:
     """Count each column's values when they are at most ``max_categories`` whole numbers.
 
     The count reads all the observed values, ``NaN`` marking a missing one; any other column
-    counts ``0``.
+    counts ``0``. The first :data:`_SCREEN_ROWS` rows rule out most columns before the full check.
     """
     counts = np.zeros(X.shape[1], dtype=np.int64)
-    observed = ~np.isnan(X)
-    for j in np.flatnonzero(np.all((X == np.round(X)) | ~observed, axis=0)).tolist():
-        k = np.unique(X[observed[:, j], j]).size
+    head = X[:_SCREEN_ROWS]
+    whole = np.flatnonzero(np.all((head == np.round(head)) | np.isnan(head), axis=0))
+    if not whole.size:
+        return counts
+    rest = X if whole.size == X.shape[1] else X[:, whole]
+    observed = ~np.isnan(rest)
+    for i in np.flatnonzero(np.all((rest == np.round(rest)) | ~observed, axis=0)).tolist():
+        k = np.unique(rest[observed[:, i], i]).size
         if k <= max_categories:
-            counts[j] = k
+            counts[whole[i]] = k
     return counts
 
 
