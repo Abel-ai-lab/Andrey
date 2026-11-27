@@ -31,6 +31,7 @@ from andrey.spec.concepts import (
     CI_SEARCHES,
     CONCEPTS,
     CONTINUOUS_TESTED,
+    MARKOV_CHECK_PARAMS,
     PCMCI_FAMILY,
     Concept,
 )
@@ -714,6 +715,55 @@ def test_a_bad_value_raises_one_message_shape(method, param, value, error):
     parameter, what it accepts, and the value."""
     with pytest.raises(error, match=rf"^{method}: {param.name} must be .+, got "):
         facade(method)(*inputs(method, codes=False), **{param.name: value})
+
+
+#: Values of another type for the parameters that name columns or hold a knowledge or targets
+#: object. The spec passes them on unchanged, since only the data can check a label, so the fit
+#: must still raise.
+WRONG_TYPES = {
+    "str_list": [5, 1.5, {"a": 1}, [1.5]],
+    "str_or_list": [5.5, {"a": 1}, [1.5]],
+    "knowledge": [5, "x", [1, 2]],
+    "targets": [5.5, "x", {"a": 1}],
+}
+
+
+@pytest.mark.parametrize(
+    ("method", "param", "value"),
+    [
+        pytest.param(m, p.name, v, id=f"{m}-{p.name}-{k}")
+        for m, spec in REGISTRY.items()
+        for p in spec.params
+        if not p.choices
+        for k, v in enumerate(WRONG_TYPES.get(p.type, []))
+    ],
+)
+def test_a_parameter_of_labels_refuses_another_type(method, param, value):
+    if method == "calm":
+        pytest.importorskip("torch")
+    with pytest.raises((TypeError, ValueError)):
+        facade(method)(*inputs(method, codes=False), **{param: value})
+
+
+@pytest.mark.parametrize(
+    ("utility", "key", "value", "error"),
+    [
+        pytest.param(u, k, v, e, id=f"{u}-{k}-{v!r}")
+        for u, params in (("bootstrap", BOOTSTRAP_PARAMS), ("markov_check", MARKOV_CHECK_PARAMS))
+        for k, spec in params.items()
+        for v, e in bad_values(spec)
+    ],
+)
+def test_the_utilities_refuse_a_bad_value_with_one_message_shape(utility, key, value, error):
+    data = frame(0, codes=False, gaps=False).to_numpy()
+    graph = andrey.pc(data)
+    call = (
+        (lambda **kw: andrey.bootstrap(andrey.pc, data, **kw))
+        if utility == "bootstrap"
+        else (lambda **kw: andrey.markov_check(graph, data, **kw))
+    )
+    with pytest.raises(error, match=rf"^{utility}: {key} must be .+, got "):
+        call(**{key: value})
 
 
 SEEDED = [m for m, spec in REGISTRY.items() if spec.seeded]

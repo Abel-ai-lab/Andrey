@@ -209,7 +209,11 @@ class RunRecord:
     # is the comparable number and a run_id field. The route and peak are supporting evidence.
     # Under polling, the peak is a lower bound because samples can miss spikes.
     mem_route: str | None = None  # poll | slurm | none
-    tree_peak_mem_mb: float | None = None  # parent-observed process-tree peak
+    tree_peak_mem_mb: float | None = None  # parent-observed process-tree peak (RSS sum)
+    # The tree's largest Pss (Linux), which counts a page the processes share once where the RSS
+    # sum counts it once per process. It is read only while the RSS sum is over the cap, where the
+    # cap reads it, so it is `None` for a tree that stayed under the cap.
+    tree_peak_pss_mb: float | None = None
     oom_source: str | None = None  # poller | cgroup | external; source of OOM attribution
     # Why a non-ok record is non-ok.
     # Scheduler context as JSON: job, node, partition, CPUs. `job` tells two sittings apart inside

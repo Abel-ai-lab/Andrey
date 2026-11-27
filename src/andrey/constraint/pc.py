@@ -15,7 +15,10 @@ import numpy as np
 
 from andrey.constraint._parallel_skeleton import skeleton_pool
 from andrey.constraint._skeleton import (
+    MaskedMapping,
+    PValues,
     Removal,
+    SeparatingSets,
     adjacent_pairs,
     check_collider_rule,
     first_order_removals,
@@ -188,8 +191,8 @@ def pc(
 def correct_skeleton(
     X: np.ndarray,
     skeleton: np.ndarray,
-    sepsets: dict[tuple[int, int], tuple[int, ...]],
-    pvalues: dict[tuple[int, int], float],
+    sepsets: SeparatingSets,
+    pvalues: PValues,
     deletion: CITest,
     *,
     indep_test: str,
@@ -510,7 +513,7 @@ def adjacency_search(
     warn_expensive: bool = False,
     trace: list[dict] | None = None,
     undecided: set[tuple[int, int]] | None = None,
-) -> tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]], dict[tuple[int, int], float]]:
+) -> tuple[np.ndarray, SeparatingSets, PValues]:
     """The stable adjacency search of PC, CD-NOD, RSMAX2's PC restrict, FCI, FCI-JCI, and GFCI:
     the skeleton, and for every removed pair its separating set and p-value.
 
@@ -536,9 +539,13 @@ def adjacency_search(
     usual; a pair no tested conditioning set separates gets neither.
 
     When the test exposes the vectorized marginal and first-order paths, the size-0 and size-1
-    passes take them (all-pairs marginal threshold, then one first-order batch per surviving pair)
-    in place of the dense scalar scan -- same removals, same separating sets, same p-values. With
-    ``workers > 1`` and a FisherZ or StudentT test, an ``|S| >= 2`` pass of at least
+    passes take them (all-pairs marginal threshold, then the surviving pairs' first-order tests in
+    batches) in place of the dense scalar scan -- same removals, same separating sets, same
+    p-values. The pairs the size-0 pass then removes are held as one boolean matrix, and their
+    p-values as the marginal p-value matrix (:class:`~andrey.constraint._skeleton.MaskedMapping`),
+    where that takes fewer bytes than a dict entry per pair, as when most pairs are marginally
+    independent; the returns read as the dicts the search fills either way. With ``workers > 1``
+    and a FisherZ or StudentT test, an ``|S| >= 2`` pass of at least
     :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_QUERIES` tests, or the
     ``ANDREY_SKELETON_PARALLEL_MIN_WORK`` that overrides it, fans out across worker processes; the
     per-chunk removals are concatenated in pair order, so the result, a raised error included, is
@@ -571,8 +578,8 @@ def adjacency_search(
         np.ones((n_vars, n_vars), dtype=bool) if support is None else np.array(support, dtype=bool)
     )
     np.fill_diagonal(support, False)
-    sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
-    pvalues: dict[tuple[int, int], float] = {}
+    sepsets: SeparatingSets = {}
+    pvalues: PValues = {}
 
     can_prescreen = prescreen_capable(test)
     pool = skeleton_pool(test, workers) if trace is None else None
@@ -587,11 +594,14 @@ def adjacency_search(
             testable = support if keep is None else support & ~keep
             removals: list[Removal] | None
             if can_prescreen and size == 0:
-                upper = np.triu(testable, 1)
-                removals = [
-                    (x, y, (), p)
-                    for x, y, p in marginal_removals(test, upper, alpha, trace, record_pvalues)
-                ]
+                separated, pmat = marginal_removals(test, np.triu(testable, 1), alpha, trace)
+                support &= ~(separated | separated.T)
+                separated.flags.writeable = False
+                sepsets = MaskedMapping(separated).compact()
+                if record_pvalues:
+                    pvalues = MaskedMapping(separated, pmat).compact()
+                del separated, pmat  # the mappings keep what they hold
+                removals = []
             elif can_prescreen and size == 1:
                 removals = first_order_removals(
                     test, adjacent_pairs(testable), neighbors, alpha, trace, record_pvalues

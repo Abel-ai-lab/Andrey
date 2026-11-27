@@ -49,6 +49,7 @@ import numpy.typing as npt
 from . import backend
 from .ci import (
     BOUND_MARGIN,
+    FALLBACK_STACK_ENTRIES,
     ONE_MINUS_EPS,
     SINGULAR_RTOL,
     CGTest,
@@ -296,6 +297,8 @@ class RowCounts(Counter[int]):
 def not_tested(p: npt.ArrayLike) -> np.ndarray:
     """Mark the p-values that are :data:`NOT_TESTED`: the queries whose block held fewer rows than
     their test needs."""
+    if type(p) is float:
+        return cast("np.ndarray", np.bool_(p != p))
     return np.isnan(np.asarray(p, dtype=np.float64))
 
 
@@ -917,8 +920,9 @@ class GaussianDeletion(PartialCorrelationDeletion):
     degrees of freedom, and p-value are those of the block's test, so the p-value equals that
     test's up to rounding, as the sums run in another order. A query's answer does not depend on
     the queries evaluated with it, so every query path (a single call, :meth:`batched_call`,
-    :meth:`statistic_pvalues`, and the canonical query arrays the skeleton searches pass) gives it
-    the same bits.
+    :meth:`statistic_pvalues`, :meth:`statistic_pvalues_given`, which answers one conditioning set
+    against many candidates, and the canonical query arrays the skeleton searches pass) gives it the
+    same bits.
 
     With few missingness patterns, sums use tables stored once per pattern group
     (:mod:`~andrey.core.missing_groups`) instead of every row; the path is chosen once per test from
@@ -999,6 +1003,34 @@ class GaussianDeletion(PartialCorrelationDeletion):
         y = np.asarray(y, dtype=np.intp)
         conds = np.sort(np.asarray(conditions, dtype=np.intp).reshape(len(x), -1), axis=1)
         return self._answer(np.minimum(x, y), np.maximum(x, y), conds)
+
+    def statistic_pvalues_given(
+        self, x: int, ys: Sequence[int], condition_set: Iterable[int]
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Partial correlations and p-values of ``x`` and each of ``ys`` given one conditioning set.
+
+        Entry ``i`` equals ``statistic_pvalue(x, ys[i], condition_set)`` bit for bit, and the rows
+        each query counts are those of that call. A query the exact path raises on raises its error
+        after the queries before it are counted, as separate calls do. A repeated column of the set
+        counts once. ``ys`` excludes ``x`` and the set's members. The candidates go in chunks whose
+        correlation blocks hold at most ``FALLBACK_STACK_ENTRIES`` entries, so a large set does not
+        hold every candidate's block at once.
+        """
+        cond = sorted(set(map(int, condition_set)))
+        cols = np.asarray(ys, dtype=np.intp).reshape(-1)
+        if not len(cols):
+            return np.empty(0), np.empty(0)
+        in_set = int(x) in cond or np.isin(cols, cond).any()
+        assert not in_set, "x, y cannot be in condition_set."
+        xs = np.full(len(cols), int(x), dtype=np.intp)
+        sets = np.tile(np.asarray(cond, dtype=np.intp), (len(cols), 1))
+        lo, hi = np.minimum(xs, cols), np.maximum(xs, cols)
+        step = max(1, FALLBACK_STACK_ENTRIES // (len(cond) + 2) ** 2)
+        parts = [
+            self._answer(lo[i : i + step], hi[i : i + step], sets[i : i + step])
+            for i in range(0, len(cols), step)
+        ]
+        return np.concatenate([r for r, _ in parts]), np.concatenate([p for _, p in parts])
 
     def _canonical_pvalues(
         self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray

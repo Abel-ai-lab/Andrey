@@ -68,6 +68,100 @@ names its pull request.
   authors' code does. For contributors, `DEVELOPMENT.md` and `CONTRIBUTING.md` give the pytest flags
   CI runs, `-n logical --dist loadfile`, and the `calm` required-edge cell of the concepts test and
   one drawing test skip when torch or pygraphviz is missing. ([#1247])
+- The 0.3.0 post's method table lists GIES, exact search, and CALM as supported, as they have
+  been since 0.7.0, and an update note points to the 0.7.0 release card. ([#1254])
+- The `missing` concept gives each method that refuses the argument its own reason, from what its
+  fit reads, where twenty shared one; `icp`, `rcd`, `igsp`, `ut_igsp`, and `dynotears` say the same
+  in their docstrings. `anm`, `pnl`, `loci`, and `skewd` say that a gap in one column that depends on
+  the other selects the rows on the effect, so their direction is evidence under values missing
+  completely at random. `markov_check` says that `rows_per_test` counts the rows each test draws
+  before deletion, and gives the condition under which test-wise deletion is valid. ([#1256])
+- On the website, the AI statement that ends each blog post and release card has its own container:
+  a left rule in the accent color on a faint accent tint, with its label in small uppercase above
+  the text. The label underlines under the pointer and under keyboard focus. ([#1267])
+- For contributors, SkewD's tests of a property that holds for every optimizer run on L-BFGS-B in
+  pull requests, and their CMA-ES cases, with the CMA-ES recovery tests, carry the `release` mark, so
+  the unit tests of `tests/unit/test_skewd.py` take 120 s on one core instead of 625 s, and the macOS
+  unit job skips the `release` cases unless a manual run asks for them, and then has 90 minutes
+  instead of 40. ([#1257])
+- For contributors, a test lists every module-level cache and checks each cache whose result can
+  change while its key does not, and registry-driven tests check that a wrong type of a parameter of
+  column labels, of `knowledge`, of `targets`, and of `bootstrap` and `markov_check` raises. ([#1259])
+- `pc`, `fci`, `mmpc`, and `mmhc` return the same results with less memory where the empty set
+  separates many pairs, as on a sparse graph. The skeleton search, which `fci_jci`, `cdnod`, `gfci`,
+  `boss_fci`, `grasp_fci`, and `rsmax2` share, holds the pairs the empty set separates as one
+  boolean matrix, and their p-values as the matrix of marginal p-values it already computes, only
+  where that takes less memory than a separating set and a p-value for each pair; each MMPC run
+  holds the candidates the empty set separates from its target the same way. Where it separates
+  few pairs, the search keeps a separating set and a p-value for each, as before. On a sparse graph
+  of 2,000 variables and 300 rows, the peak memory `pc` adds falls to about a third. ([#1277])
+- `ges`, `gfci`, and `ages` return the same results with less memory, because GES's forward phase
+  keeps the screening delta and bound of each candidate it scored in two arrays of floats, 16 bytes
+  for each candidate, where it kept a set and two dictionaries. On a sparse graph of 1,000
+  variables, a serial `ges` adds about a quarter of the memory it added before, and with
+  `n_jobs=4` each worker holds less than half as much. ([#1278])
+- `boss`, `grasp`, `boss_fci`, and `grasp_fci` take less memory on large graphs: without
+  knowledge, each variable's grow-shrink tree no longer stores a list of every other variable,
+  which took memory quadratic in the number of variables; the trees of a search share one tuple of
+  the variables. Results are unchanged, bit for bit. ([#1274])
+- With more than one worker on Linux, the workers of GES, of the skeleton and possible-d-separation
+  searches (PC, FCI, FCI-JCI, GFCI, CD-NOD, and RSMAX2 with `restrict="pc"`), and of a list of
+  targets (IAMB, Inter-IAMB, and MMPC) read one shared copy of the covariance or correlation matrix
+  in `/dev/shm` instead of a copy each, and starting them no longer holds a copy per worker in the
+  caller. The copy has no name in `/dev/shm`, so its memory goes back when the last worker exits,
+  even when a fit is killed. Where `/dev/shm` cannot hold the matrix, each worker gets its own copy
+  as before. The results are the same bit for bit. For contributors, the benchmark harness's `poll`
+  route caps on the process tree's Pss, which counts a shared page once, once the tree's RSS sum
+  passes the cap, and records it as `tree_peak_pss_mb`; the tree's sums leave out a child started by
+  `vfork` that has not yet called exec. ([#1276])
+- Methods that check their data for copied columns, those with a partial-correlation test or the
+  linear-Gaussian BIC among them, return the same results while the check holds less memory on data
+  with many columns. It reads the correlation matrix in blocks of rows instead of making three
+  temporary copies of it, and the BIC's check keeps the whole correlation matrix only when the data
+  have more rows than columns, for its eigenvalue test. On 4,000 variables and 300 rows, the BIC's
+  check peaks at about 17 MB instead of 488 MB, and an `hc` fit at about 537 MB instead of 637 MB.
+  ([#1275])
+- The grow step of `iamb` and `inter_iamb`, and so of `calm` and `rsmax2` with `restrict="iamb"`,
+  reads the p-values of a scan as one array where the test answers a scan at once, so with
+  `fisherz`, `student_t`, or `normal_scores` on complete data these searches run faster on hundreds
+  of variables, with the same output bit for bit. ([#1289])
+- `pc`, `fci`, `cdnod`, `fci_jci`, `rsmax2`, and the other methods that run the PC family's skeleton
+  search with `fisherz`, `student_t`, or `normal_scores` on complete data build the queries of the
+  conditioning-size-1 pass from arrays, and the scans of conditioning sets of two or more variables
+  list the sets of a small neighborhood at once, so they run faster on many variables, with the
+  same output bit for bit. The size-1 pass holds a boolean matrix of the variables' adjacency.
+  ([#1287])
+- `resit`, `camuv`, `loci`, `anm`, `pnl`, `rcd`, `bottom_up_parce_lingam`, `gin`, `cpcm`,
+  `score_matching`, `das`, `nogam`, `skewd` with `criterion="independence"`, and the queries of
+  `indep_test="kci"` without a conditioning set build their Gaussian kernel matrices faster, with the
+  same output bit for bit. ([#1290])
+- For contributors, git and CI enforce LF line endings: `.gitattributes` stores text files with LF,
+  and `ruff format --check` fails a Python file that has CRLF. ([#1293])
+- `bdeu` and `discrete_bic` count each family's table faster, and `bdeu` scores a batch of tables
+  together, so `exact_search`, `hc`, `tabu`, `ges`, `xges`, `lges`, `boss`, `grasp`, `boss_fci`,
+  `grasp_fci`, `gfci`, `mmhc`, `rsmax2`, and `gies` run faster with either score, with the same
+  scores and graphs bit for bit. ([#1284])
+- `pc`, `fci`, `cdnod`, and `fci_jci` with `fisherz` or `student_t` on data with missing values
+  build the conditioning-size-0 pass from arrays, and so does the search for the separating sets of
+  the pairs that knowledge makes non-adjacent, so they run faster on many variables, with the same
+  output bit for bit and the same counts of the queries not tested. ([#1296])
+- `lges` runs faster, with the same output bit for bit: it keeps each target's SafeInsert verdicts
+  for the whole fit, builds the sets that extend the common neighbors of a source once for all the
+  sources that share them, reads one reachability search per clique, and scores each base once.
+  The turning scan of `gies` and `lges` builds the sort key of a turn only for a turn that improves
+  the score. ([#1302])
+- `nogam` runs faster: each fold of its cross-validated kernel regressions is assembled from slices
+  of the kernel, the kernels are built in place, and the repeated non-finite checks of the Cholesky
+  steps are skipped, with the same output bit for bit. ([#1298])
+- `iamb` and `inter_iamb` on data with missing values and `fisherz` or `student_t`, the default
+  test, ask the test-wise deletion test for each grow scan at once and read its p-values as one
+  array, so these searches run faster on tens of variables, with the same output bit for bit.
+  ([#1299])
+- `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, and the PAG of `GraphStructure.to_pag` apply
+  FCI's orientation rules R4, R5, and R6 from column and row reads and lists of each node's `o-o`
+  neighbors, and `fci`, `fci_jci`, and `gfci` search possible-d-sep sets over sets of each node's
+  arrowheads and neighbors, so they run faster on many variables, with the same output bit for bit.
+  ([#1303])
 
 ### Fixed
 
@@ -82,6 +176,9 @@ names its pull request.
   (`chisq`, `gsq`, `bdeu`, and `discrete_bic`) refused it as a code of "2**53 or more", and reading
   the columns as numbers (`categorical=[]`) kept it as a value and returned another graph.
   ([#1241])
+- The limit to one BLAS thread that a fit runs under reaches a library imported before the fit starts
+  and after the first fit of the process, such as torch's OpenMP pool, which it missed because the
+  pools were found once per process. ([#1259])
 
 ## [0.19.0] - 2026-11-24
 
@@ -3018,3 +3115,23 @@ First alpha release.
 [#1243]: https://github.com/Abel-ai-lab/Andrey/pull/1243
 [#1245]: https://github.com/Abel-ai-lab/Andrey/pull/1245
 [#1247]: https://github.com/Abel-ai-lab/Andrey/pull/1247
+[#1254]: https://github.com/Abel-ai-lab/Andrey/pull/1254
+[#1256]: https://github.com/Abel-ai-lab/Andrey/pull/1256
+[#1257]: https://github.com/Abel-ai-lab/Andrey/pull/1257
+[#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
+[#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
+[#1274]: https://github.com/Abel-ai-lab/Andrey/pull/1274
+[#1275]: https://github.com/Abel-ai-lab/Andrey/pull/1275
+[#1276]: https://github.com/Abel-ai-lab/Andrey/pull/1276
+[#1277]: https://github.com/Abel-ai-lab/Andrey/pull/1277
+[#1278]: https://github.com/Abel-ai-lab/Andrey/pull/1278
+[#1284]: https://github.com/Abel-ai-lab/Andrey/pull/1284
+[#1287]: https://github.com/Abel-ai-lab/Andrey/pull/1287
+[#1289]: https://github.com/Abel-ai-lab/Andrey/pull/1289
+[#1290]: https://github.com/Abel-ai-lab/Andrey/pull/1290
+[#1293]: https://github.com/Abel-ai-lab/Andrey/pull/1293
+[#1296]: https://github.com/Abel-ai-lab/Andrey/pull/1296
+[#1298]: https://github.com/Abel-ai-lab/Andrey/pull/1298
+[#1299]: https://github.com/Abel-ai-lab/Andrey/pull/1299
+[#1302]: https://github.com/Abel-ai-lab/Andrey/pull/1302
+[#1303]: https://github.com/Abel-ai-lab/Andrey/pull/1303

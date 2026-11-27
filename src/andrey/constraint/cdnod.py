@@ -49,6 +49,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from andrey.constraint._skeleton import (
+    PValues,
+    SeparatingSets,
     check_collider_rule,
     flagged_triples,
     unseparated_triples,
@@ -281,8 +283,8 @@ def cdnod(
 
 def _orient_with_context(
     skeleton: np.ndarray,
-    sepsets: dict[tuple[int, int], tuple[int, ...]],
-    pvalues: dict[tuple[int, int], float],
+    sepsets: SeparatingSets,
+    pvalues: PValues,
     *,
     context: int | None,
     order: str = "p_value",
