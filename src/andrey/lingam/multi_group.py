@@ -119,7 +119,6 @@ def _find_shared_causal_order(
         placed = [m, *copies[m]]
         remaining = [u for u in remaining if u not in placed]
         for X in residualized:
-            for i in remaining:
-                X[:, i] = pwling.compute_residual(X[:, i], X[:, m])
+            pwling.residualize(X, remaining, m)
         order += placed
     return order
