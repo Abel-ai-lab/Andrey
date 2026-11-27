@@ -296,6 +296,8 @@ class RowCounts(Counter[int]):
 def not_tested(p: npt.ArrayLike) -> np.ndarray:
     """Mark the p-values that are :data:`NOT_TESTED`: the queries whose block held fewer rows than
     their test needs."""
+    if type(p) is float:
+        return cast("np.ndarray", np.bool_(p != p))
     return np.isnan(np.asarray(p, dtype=np.float64))
 
 
