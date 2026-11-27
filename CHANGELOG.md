@@ -78,6 +78,10 @@ names its pull request.
 - For contributors, a test lists every module-level cache and checks each cache whose result can
   change while its key does not, and registry-driven tests check that a wrong type of a parameter of
   column labels, of `knowledge`, of `targets`, and of `bootstrap` and `markov_check` raises. ([#1259])
+- The grow step of `iamb` and `inter_iamb`, and so of `calm` and `rsmax2` with `restrict="iamb"`,
+  reads the p-values of a scan as one array when the test answers a scan at once (`fisherz`,
+  `student_t`, `normal_scores`, `chisq`, and `gsq` on complete data), so the searches run faster on
+  hundreds of variables, with the same output bit for bit. ([#1289])
 
 ### Fixed
 
@@ -3036,3 +3040,4 @@ First alpha release.
 [#1257]: https://github.com/Abel-ai-lab/Andrey/pull/1257
 [#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
+[#1289]: https://github.com/Abel-ai-lab/Andrey/pull/1289
