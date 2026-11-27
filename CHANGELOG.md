@@ -78,6 +78,12 @@ names its pull request.
 - For contributors, a test lists every module-level cache and checks each cache whose result can
   change while its key does not, and registry-driven tests check that a wrong type of a parameter of
   column labels, of `knowledge`, of `targets`, and of `bootstrap` and `markov_check` raises. ([#1259])
+- Methods that check their data for copied columns, those with a partial-correlation test or the
+  linear-Gaussian BIC among them, return the same results while the check holds less memory. It
+  reads the correlation matrix in blocks of rows instead of making three temporary copies of it,
+  and the BIC's check keeps the whole correlation matrix only when the data have more rows than
+  columns, for its eigenvalue test. On 4,000 variables and 300 rows, the BIC's check peaks at about
+  17 MB instead of 488 MB, and an `hc` fit at about 537 MB instead of 634 MB. ([#1275])
 
 ### Fixed
 
@@ -3036,3 +3042,4 @@ First alpha release.
 [#1257]: https://github.com/Abel-ai-lab/Andrey/pull/1257
 [#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
+[#1275]: https://github.com/Abel-ai-lab/Andrey/pull/1275
