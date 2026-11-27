@@ -61,6 +61,12 @@ names its pull request.
   one drawing test skip when torch or pygraphviz is missing. ([#1247])
 - The 0.3.0 post's method table lists GIES, exact search, and CALM as supported, as they have
   been since 0.7.0, and an update note points to the 0.7.0 release card. ([#1254])
+- The `missing` concept gives each method that refuses the argument its own reason, from what its
+  fit reads, where twenty shared one; `icp`, `rcd`, `igsp`, `ut_igsp`, and `dynotears` say the same
+  in their docstrings. `anm`, `pnl`, `loci`, and `skewd` say that a gap in one column that depends on
+  the other selects the rows on the effect, so their direction is evidence under values missing
+  completely at random. `markov_check` says that `rows_per_test` counts the rows each test draws
+  before deletion, and gives the condition under which test-wise deletion is valid. ([#1256])
 - For contributors, SkewD's tests of a property that holds for every optimizer run on L-BFGS-B in
   pull requests, and their CMA-ES cases, with the CMA-ES recovery tests, carry the `release` mark, so
   the unit tests of `tests/unit/test_skewd.py` take 120 s on one core instead of 625 s, and the macOS
@@ -3016,4 +3022,5 @@ First alpha release.
 [#1245]: https://github.com/Abel-ai-lab/Andrey/pull/1245
 [#1247]: https://github.com/Abel-ai-lab/Andrey/pull/1247
 [#1254]: https://github.com/Abel-ai-lab/Andrey/pull/1254
+[#1256]: https://github.com/Abel-ai-lab/Andrey/pull/1256
 [#1257]: https://github.com/Abel-ai-lab/Andrey/pull/1257
