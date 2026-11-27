@@ -218,11 +218,11 @@ names its pull request.
   `indep_test` run faster, with the same output bit for bit. ([#1309])
 - `dagma`, and `notears` with `robust=True`, take each Adam step from the gradient of the loss and
   of the penalty alone, without computing their values, and `dagma` forms `s * I` once per stage.
-  `notears`, `dynotears`, and the robust paths compute the matrix exponential of the acyclicity
-  constraint through SciPy's own kernels on SciPy 1.15 and later, after a check at import that they
-  return the bytes of `scipy.linalg.expm`, which computes it for any other SciPy, for a diagonal or
-  triangular matrix, and for any error. These fits run faster, with the same output bit for bit.
-  ([#1339])
+  `notears`, with and without `robust=True`, and `dynotears` compute the matrix exponential of the
+  acyclicity constraint through SciPy's own kernels on SciPy 1.15 and later, after a check at import
+  that they return the bytes of `scipy.linalg.expm`, which computes it for any other SciPy, for a
+  diagonal or triangular matrix, and for any error. These fits run faster, with the same output bit
+  for bit. ([#1339])
 
 ### Fixed
 
