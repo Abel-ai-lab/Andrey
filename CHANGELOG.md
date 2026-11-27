@@ -88,6 +88,10 @@ names its pull request.
   list the sets of a small neighborhood at once, so they run faster on many variables, with the
   same output bit for bit. The size-1 pass holds a boolean matrix of the variables' adjacency.
   ([#1287])
+- `resit`, `camuv`, `loci`, `anm`, `pnl`, `rcd`, `bottom_up_parce_lingam`, `gin`, `cpcm`,
+  `score_matching`, `das`, `nogam`, `skewd` with `criterion="independence"`, and the queries of
+  `indep_test="kci"` without a conditioning set build their Gaussian kernel matrices faster, with the
+  same output bit for bit. ([#1290])
 - For contributors, git and CI enforce LF line endings: `.gitattributes` stores text files with LF,
   and `ruff format --check` fails a Python file that has CRLF. ([#1293])
 
@@ -3050,4 +3054,5 @@ First alpha release.
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
 [#1287]: https://github.com/Abel-ai-lab/Andrey/pull/1287
 [#1289]: https://github.com/Abel-ai-lab/Andrey/pull/1289
+[#1290]: https://github.com/Abel-ai-lab/Andrey/pull/1290
 [#1293]: https://github.com/Abel-ai-lab/Andrey/pull/1293
