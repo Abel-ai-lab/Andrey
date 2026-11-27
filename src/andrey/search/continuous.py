@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
 import scipy.linalg
@@ -49,12 +49,92 @@ def least_squares(cov: np.ndarray, weights: np.ndarray) -> tuple[float, np.ndarr
     return 0.5 * float(np.trace(residual.T @ product)), -product
 
 
+class _ExpmKernels(NamedTuple):
+    """The compiled steps of ``scipy.linalg.expm`` that SciPy 1.15 and later define."""
+
+    bandwidth: Callable[[np.ndarray], tuple[int, int]]
+    pick_pade_structure: Callable[[np.ndarray], tuple[int, int]]
+    pade_uv_calc: Callable[[np.ndarray, int], int]
+
+
+def _kernel_expm(a: np.ndarray, kernels: _ExpmKernels) -> np.ndarray | None:
+    """``scipy.linalg.expm(a)`` from its kernels, or ``None`` when ``a`` takes another path there.
+
+    This is the generic branch of ``scipy.linalg.expm`` without its wrapper: the Pade order and the
+    scaling, the numerator and denominator, and the squarings, for a float64 array of at least
+    2 x 2 that is square and neither diagonal nor triangular. Any other input, and an error code
+    from a kernel, gives ``None``, so ``scipy.linalg.expm`` computes it or raises its error.
+    """
+    if a.ndim != 2 or a.dtype != np.float64 or a.shape[0] < 2 or a.shape[0] != a.shape[1]:
+        return None
+    lower, upper = kernels.bandwidth(a)
+    if lower == 0 or upper == 0:
+        return None
+    work = np.empty((5, *a.shape))
+    work[0] = a
+    order, squarings = kernels.pick_pade_structure(work)
+    if order < 0 or kernels.pade_uv_calc(work, order) != 0:
+        return None
+    result = work[0]
+    for _ in range(squarings):
+        result = result @ result
+    return result
+
+
+#: Matrices of the kernels' self-check: the first two scale and square the exponential (twice and
+#: once), and the third takes its Pade approximant without squaring.
+_SELF_CHECK = (
+    np.array([[1.0, 4.0, -2.0], [3.0, -5.0, 6.0], [-4.0, 2.0, 7.0]]),
+    np.array([[0.0, 3.0, 1.0], [2.0, 0.0, 4.0], [1.0, 5.0, 0.0]]),
+    np.array([[0.1, 0.2, 0.0], [-0.3, 0.4, 0.1], [0.2, 0.0, -0.2]]),
+)
+
+
+def _load_kernels() -> _ExpmKernels | None:
+    """The kernels of ``scipy.linalg.expm`` when SciPy is 1.15 or later and they reproduce it.
+
+    The kernels are private to SciPy, and their arguments changed in 1.15. They are used only when
+    :func:`_kernel_expm` gives ``scipy.linalg.expm``'s bytes on each matrix of ``_SELF_CHECK``, so
+    any other SciPy, and any failure of the import or of a kernel, leaves ``scipy.linalg.expm``.
+    """
+    try:
+        major, minor = (int(part) for part in scipy.__version__.split(".")[:2])
+        if (major, minor) < (1, 15):
+            return None
+        from scipy.linalg._matfuncs_expm import pade_UV_calc, pick_pade_structure
+
+        kernels = _ExpmKernels(
+            getattr(scipy.linalg.bandwidth, "__wrapped__", scipy.linalg.bandwidth),
+            pick_pade_structure,
+            pade_UV_calc,
+        )
+        for a in _SELF_CHECK:
+            result = _kernel_expm(a, kernels)
+            if result is None or result.tobytes() != scipy.linalg.expm(a).tobytes():
+                return None
+        return kernels
+    except Exception:
+        return None
+
+
+_KERNELS = _load_kernels()
+
+
+def _expm(a: np.ndarray) -> np.ndarray:
+    """``scipy.linalg.expm(a)``, through SciPy's kernels where :func:`_load_kernels` found them."""
+    if _KERNELS is not None:
+        result = _kernel_expm(a, _KERNELS)
+        if result is not None:
+            return result
+    return scipy.linalg.expm(a)
+
+
 def trace_exponential(weights: np.ndarray) -> tuple[float, np.ndarray]:
     """Value and gradient of ``h(W) = tr(exp(W * W)) - d`` (Zheng et al. 2018).
 
     ``h`` is zero exactly when ``W`` has no directed cycle, and positive otherwise.
     """
-    expm = scipy.linalg.expm(weights * weights)
+    expm = _expm(weights * weights)
     return float(np.trace(expm)) - weights.shape[0], expm.T * weights * 2.0
 
 
@@ -86,29 +166,87 @@ def gaussian_likelihood(cov: np.ndarray, weights: np.ndarray) -> tuple[float, np
     return 0.5 * float(np.log(variances).sum()), -product / variances
 
 
-def l1_penalty(lambda1: float) -> Penalty:
+def loss_gradient(loss: Loss, cov: np.ndarray) -> Callable[[np.ndarray], np.ndarray]:
+    """The gradient of ``loss`` over ``cov`` as a function of the weights, without its value.
+
+    :func:`least_squares` and :func:`gaussian_likelihood` run the operations of their own gradient,
+    with the identity and the variance floor formed once, so the result equals the second part of
+    their return bit for bit. Any other loss is called for its value and its gradient, and its
+    gradient is kept. The weights have the shape of ``cov``.
+    """
+    identity = np.eye(cov.shape[0])
+    if loss is least_squares:
+        return lambda weights: -(cov @ (identity - weights))
+    if loss is gaussian_likelihood:
+        floor = _VARIANCE_FLOOR * np.diagonal(cov)
+
+        def likelihood_gradient(weights: np.ndarray) -> np.ndarray:
+            residual = identity - weights
+            product = cov @ residual
+            variances = np.maximum(np.einsum("ij,ij->j", residual, product), floor)
+            return -product / variances
+
+        return likelihood_gradient
+    return lambda weights: loss(cov, weights)[1]
+
+
+@dataclass(frozen=True)
+class L1Penalty:
     """The penalty ``lambda1 * |W|`` on each entry (the subgradient is zero at zero)."""
 
-    def penalty(weights: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        return lambda1 * np.abs(weights), lambda1 * np.sign(weights)
+    lambda1: float
 
-    return penalty
+    def __call__(self, weights: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        return self.lambda1 * np.abs(weights), self.gradient(weights)
+
+    def gradient(self, weights: np.ndarray) -> np.ndarray:
+        """The gradient of each entry, without its value."""
+        return self.lambda1 * np.sign(weights)
 
 
-def quasi_mcp(lam: float, delta: float) -> Penalty:
+@dataclass(frozen=True)
+class QuasiMCP:
     """The quasi-MCP penalty of each entry (Deng et al. 2024).
 
     It is ``lam * (|t| - t**2 / (2 * delta))`` for ``|t| <= delta`` and the constant
     ``lam * delta / 2`` above, so a weight larger than ``delta`` costs the same however large it is.
     """
 
-    def penalty(weights: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        inside = np.abs(weights) <= delta
-        value = lam * np.where(inside, np.abs(weights) - weights**2 / (2.0 * delta), delta / 2.0)
-        grad = lam * np.where(inside, np.sign(weights) - weights / delta, 0.0)
-        return value, grad
+    lam: float
+    delta: float
 
-    return penalty
+    def __call__(self, weights: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        inside = np.abs(weights) <= self.delta
+        value = self.lam * np.where(
+            inside, np.abs(weights) - weights**2 / (2.0 * self.delta), self.delta / 2.0
+        )
+        return value, self.gradient(weights)
+
+    def gradient(self, weights: np.ndarray) -> np.ndarray:
+        """The gradient of each entry, without its value."""
+        inside = np.abs(weights) <= self.delta
+        return self.lam * np.where(inside, np.sign(weights) - weights / self.delta, 0.0)
+
+
+def l1_penalty(lambda1: float) -> L1Penalty:
+    """The penalty :class:`L1Penalty` of ``lambda1``."""
+    return L1Penalty(lambda1)
+
+
+def quasi_mcp(lam: float, delta: float) -> QuasiMCP:
+    """The penalty :class:`QuasiMCP` of ``lam`` and ``delta``."""
+    return QuasiMCP(lam, delta)
+
+
+def penalty_gradient(penalty: Penalty) -> Callable[[np.ndarray], np.ndarray]:
+    """The gradient of ``penalty`` as a function of the weights, without its value.
+
+    :class:`L1Penalty` and :class:`QuasiMCP` compute their gradient alone. Any other penalty is
+    called for its value and its gradient, and its gradient is kept.
+    """
+    if isinstance(penalty, L1Penalty | QuasiMCP):
+        return penalty.gradient
+    return lambda weights: penalty(weights)[1]
 
 
 # --------------------------------------------------------------------------------------------
@@ -290,13 +428,20 @@ def adam_augmented_lagrangian(
     free = ~fixed
     penalized = ~canonical.required
 
-    def objective(weights: np.ndarray, rho: float, alpha: float) -> tuple[float, np.ndarray]:
-        value, grad = loss(cov, weights)
-        h, grad_h = trace_exponential(weights)
-        pen_value, pen_grad = penalty(weights)
+    loss_grad = loss_gradient(loss, cov)
+    penalty_grad = penalty_gradient(penalty)
+
+    def objective(weights: np.ndarray, rho: float, alpha: float) -> float:
+        value, _ = loss(cov, weights)
+        h, _ = trace_exponential(weights)
+        pen_value, _ = penalty(weights)
         value += 0.5 * rho * h * h + alpha * h + float(pen_value[penalized].sum())
-        grad = grad + (rho * h + alpha) * grad_h + pen_grad * penalized
-        return value, grad * free
+        return value
+
+    def gradient(weights: np.ndarray, rho: float, alpha: float) -> np.ndarray:
+        h, grad_h = trace_exponential(weights)
+        grad = loss_grad(weights) + (rho * h + alpha) * grad_h + penalty_grad(weights) * penalized
+        return grad * free
 
     def solve(weights: np.ndarray, rho: float, alpha: float) -> np.ndarray:
         weights = np.where(free, weights, 0.0)
@@ -304,7 +449,7 @@ def adam_augmented_lagrangian(
         second = np.zeros_like(weights)
         previous = 1e16
         for step in range(num_steps):
-            value, grad = objective(weights, rho, alpha)
+            grad = gradient(weights, rho, alpha)
             first = 0.01 * grad + 0.99 * first
             second = 0.001 * grad * grad + 0.999 * second
             direction = (first / (1.0 - 0.99 ** (step + 1))) / (
@@ -312,7 +457,7 @@ def adam_augmented_lagrangian(
             )
             weights = (weights - lr * direction) * free
             if step % 1000 == 0 or step == num_steps - 1:
-                value, _ = objective(weights, rho, alpha)
+                value = objective(weights, rho, alpha)
                 if abs(previous - value) / max(abs(previous), abs(value), 1.0) < 1e-6:
                     break
                 previous = value
@@ -398,13 +543,17 @@ def central_path(
         pen_value, _ = penalty(weights)
         return mu * (value + float(pen_value[penalized].sum())) + log_det_acyclicity(weights, s)
 
+    loss_grad = loss_gradient(loss, cov)
+    penalty_grad = penalty_gradient(penalty)
+
     def stage(weights: np.ndarray, mu: float, s: float, rate: float, steps: int):
+        shifted = s * identity
         previous = 1e16
         first = np.zeros_like(weights)
         second = np.zeros_like(weights)
         direction = np.zeros_like(weights)
         for step in range(1, steps + 1):
-            inverse = np.linalg.inv(s * identity - weights * weights) + 1e-16
+            inverse = np.linalg.inv(shifted - weights * weights) + 1e-16
             while (inverse < 0).any():
                 if step == 1 or s <= 0.9:
                     return weights, False, False
@@ -413,10 +562,11 @@ def central_path(
                 if rate <= 1e-16:
                     return weights, True, False
                 weights = weights - rate * direction
-                inverse = np.linalg.inv(s * identity - weights * weights) + 1e-16
-            _, grad_loss = loss(cov, weights)
-            _, grad_pen = penalty(weights)
-            grad = mu * (grad_loss + grad_pen * penalized) + 2.0 * weights * inverse.T
+                inverse = np.linalg.inv(shifted - weights * weights) + 1e-16
+            grad = (
+                mu * (loss_grad(weights) + penalty_grad(weights) * penalized)
+                + 2.0 * weights * inverse.T
+            )
             first = 0.01 * grad + 0.99 * first
             second = 0.001 * grad * grad + 0.999 * second
             direction = (first / (1.0 - 0.99**step)) / (
