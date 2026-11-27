@@ -81,11 +81,11 @@ names its pull request.
 - `pc`, `fci`, `mmpc`, and `mmhc` return the same results with less memory where the empty set
   separates many pairs, as on a sparse graph. The skeleton search, which `fci_jci`, `cdnod`, `gfci`,
   `boss_fci`, `grasp_fci`, and `rsmax2` share, holds the pairs the empty set separates as one
-  boolean matrix, and their p-values as the matrix of marginal p-values it already computes, where
-  that takes less memory than a separating set and a p-value for each pair; each MMPC run holds the
-  candidates the empty set separates from its target the same way. Where it separates few pairs,
-  the search keeps a separating set and a p-value for each, as before. On a sparse graph of 2,000
-  variables and 300 rows, the peak memory `pc` adds falls to about a third. ([#1277])
+  boolean matrix, and their p-values as the matrix of marginal p-values it already computes, only
+  where that takes less memory than a separating set and a p-value for each pair; each MMPC run
+  holds the candidates the empty set separates from its target the same way. Where it separates
+  few pairs, the search keeps a separating set and a p-value for each, as before. On a sparse graph
+  of 2,000 variables and 300 rows, the peak memory `pc` adds falls to about a third. ([#1277])
 - `pc`, `fci`, `cdnod`, `fci_jci`, `rsmax2`, and the other methods that run the PC family's skeleton
   search with `fisherz`, `student_t`, or `normal_scores` on complete data build the queries of the
   conditioning-size-1 pass from arrays, and the scans of conditioning sets of two or more variables

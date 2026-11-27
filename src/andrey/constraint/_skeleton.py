@@ -568,8 +568,8 @@ class MaskedMapping(MutableMapping):
 
 _ABSENT = object()
 #: A floor on the bytes one dict entry takes, its key included, by the number of axes of the mask
-#: that marks it: an integer key, whose integer the search already holds, takes about 26 to 54
-#: bytes, and a pair key about 87 to 165 once the dict holds a few thousand entries (CPython 3.11
+#: that marks it: an integer key, whose integer the search already holds, takes at least about 26
+#: bytes, and a pair key at least about 87 once the dict holds a few thousand entries (CPython 3.11
 #: and 3.14).
 _ENTRY_BYTES = {1: 24, 2: 80}
 
