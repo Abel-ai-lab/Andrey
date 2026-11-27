@@ -1984,12 +1984,13 @@ def _sidecar_stages(
 ) -> tuple[dict[tuple, Stages], dict[tuple, Stages]] | None:
     """The stages of the fits of both manifests, read from the sidecars their headers name, next
     to each manifest; ``None`` unless both name one that exists."""
-    sidecars = [
-        path.with_name(m["header"].get("checkpoints") or "") for path, m in zip(paths, manifests)
-    ]
-    if not all(m["header"].get("checkpoints") and s.is_file() for m, s in zip(manifests, sidecars)):
+    names = [m["header"].get("checkpoints") for m in manifests]
+    if not all(names):
         return None
-    before, after = (read_stages(s, m["rows"]) for s, m in zip(sidecars, manifests))
+    sidecars = [path.with_name(name) for path, name in zip(paths, names, strict=True)]
+    if not all(s.is_file() for s in sidecars):
+        return None
+    before, after = (read_stages(s, m["rows"]) for s, m in zip(sidecars, manifests, strict=True))
     return before, after
 
 

@@ -1351,3 +1351,12 @@ def test_the_checkpoint_mode_needs_a_manifest_and_a_package_that_has_the_sink(
     monkeypatch.setitem(sys.modules, "andrey.core._checkpoint", None)
     with pytest.raises(SystemExit):
         identity.main(["PC", "--checkpoints", "-o", str(tmp_path / "m.json")])
+
+
+def test_a_plain_manifest_compares_from_the_command_line_with_no_checkpoint_report(
+    tmp_path, capsys
+) -> None:
+    manifest = tmp_path / "plain.json"
+    manifest.write_text(json.dumps(_manifest()))
+    assert identity.main(["--compare", str(manifest), str(manifest)]) == 0
+    assert "checkpoint" not in capsys.readouterr().out
