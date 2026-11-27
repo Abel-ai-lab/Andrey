@@ -9,6 +9,7 @@ one table, a per-configuration loop for a conditional test, the BDeu formula wri
 from __future__ import annotations
 
 import math
+import tracemalloc
 from itertools import combinations, permutations
 
 import numpy as np
@@ -17,6 +18,7 @@ from scipy.special import chdtrc
 from scipy.stats import chi2, chi2_contingency, hypergeom
 
 from andrey.core import categorical, ci
+from andrey.core import score as score_module
 from andrey.core.ci import ChiSquare
 from andrey.core.score import BDeuScore, CategoricalBICScore, make_score
 
@@ -600,11 +602,18 @@ def test_make_score_builds_the_categorical_bic_with_its_weight():
     assert built.score(1, [0]) == CategoricalBICScore(x, penalty_discount=2.0).score(1, [0])
 
 
-def _configuration_counts(x: np.ndarray, node: int, parents: tuple[int, ...]) -> np.ndarray:
-    codes, cards = categorical.encode(x)
+def _counts_by_configurations(
+    codes: np.ndarray, cards: np.ndarray, node: int, parents: tuple[int, ...]
+) -> np.ndarray:
+    """The node's table over the occurring configurations that :func:`configurations` numbers."""
     config, m = categorical.configurations(codes, cards, parents)
     r = int(cards[node])
     return np.bincount(config * r + codes[:, node], minlength=m * r).reshape(m, r)
+
+
+def _configuration_counts(x: np.ndarray, node: int, parents: tuple[int, ...]) -> np.ndarray:
+    codes, cards = categorical.encode(x)
+    return _counts_by_configurations(codes, cards, node, parents)
 
 
 def test_batched_table_counts_equal_one_numbering_per_set(monkeypatch):
@@ -624,12 +633,225 @@ def test_batched_table_counts_equal_one_numbering_per_set(monkeypatch):
                 np.testing.assert_array_equal(a, b)
 
 
-@pytest.mark.parametrize("cls", [BDeuScore, CategoricalBICScore])
-def test_a_score_is_the_same_alone_or_in_a_batch(cls):
-    x = _codes(n=300)
-    sets = [[], [1], [2, 1], [3, 1, 2]]
-    alone = [cls(x).score(0, s) for s in sets]
-    assert cls(x).score_many(0, sets) == alone
+def _set_orders(d: int, node: int, rng: np.random.Generator) -> dict[str, list[tuple[int, ...]]]:
+    """Orders of one node's parent sets, most of them with neighbors that share their first
+    parents, as a search that lists sets in lexicographic order does."""
+    ascending = _parent_sets(d, node, 4)
+    depth_first = sorted(ascending)
+    longest = depth_first[-1]
+    return {
+        "by size": ascending,
+        "depth first": depth_first,
+        "reversed": depth_first[::-1],
+        "digits shuffled": [tuple(rng.permutation(s).tolist()) for s in depth_first],
+        "random": [ascending[i] for i in rng.permutation(len(ascending))],
+        "repeats and drops": [longest, longest, depth_first[1], longest[:1], (), longest, (), ()],
+        "empty and one": [()] + [longest],
+    }
+
+
+@pytest.mark.parametrize("dense_min", [1 << 16, 0], ids=["dense", "mixed"])
+@pytest.mark.parametrize("batch", [1 << 22, 1000, 250, 7])
+def test_table_counts_reuse_the_code_of_shared_first_parents(monkeypatch, batch, dense_min):
+    """Each table equals the one :func:`configurations` numbers, in value, shape, and dtype, for
+    sets that repeat, follow a longer set, or start with a set's first parents, across layouts and
+    batch sizes, and with sets too large for the dense count among those that are not."""
+    monkeypatch.setattr(categorical, "BATCH_CELLS", batch)
+    monkeypatch.setattr(categorical, "DENSE_MIN", dense_min)
+    rng = np.random.default_rng(3)
+    x = np.column_stack([rng.integers(0, k, 100) for k in (2, 3, 50, 4, 5, 2, 3)])
+    codes, cards = categorical.encode(x.astype(np.float64))
+    for node in (0, 2, 5):
+        for order in _set_orders(x.shape[1], node, rng).values():
+            expected = [_counts_by_configurations(codes, cards, node, s) for s in order]
+            for layout in (np.ascontiguousarray, np.asfortranarray):
+                got = categorical.table_counts(layout(codes), cards, node, order)
+                assert len(got) == len(expected)
+                for table, reference in zip(got, expected, strict=True):
+                    assert table.dtype == reference.dtype
+                    np.testing.assert_array_equal(table, reference)
+
+
+def test_table_counts_hold_the_codes_of_few_prefixes_of_a_long_set(monkeypatch):
+    """A set of many parents that do not grow its table, here constant columns, is counted with the
+    codes of at most ``BATCH_CELLS`` entries held for shared prefixes, and its table is the one
+    :func:`configurations` numbers."""
+    n = 2000
+    monkeypatch.setattr(categorical, "BATCH_CELLS", 3 * n)
+    rng = np.random.default_rng(4)
+    x = np.column_stack([rng.integers(0, 3, n), rng.integers(0, 2, n), np.zeros((n, 300))])
+    codes, cards = categorical.encode(x)
+    sets = [tuple(range(1, 302)), tuple(range(1, 301)), (1, *range(2, 302, 2)), (1, 2)]
+    expected = [_counts_by_configurations(codes, cards, 0, s) for s in sets]
+    tracemalloc.start()
+    try:
+        got = categorical.table_counts(codes, cards, 0, sets)
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+    for table, reference in zip(got, expected, strict=True):
+        assert table.dtype == reference.dtype
+        np.testing.assert_array_equal(table, reference)
+    assert peak < 40 * n * 8  # a prefix per parent would hold 300 arrays of n integers
+
+
+def _mixed_tables(seed: int = 0, n: int = 400) -> np.ndarray:
+    """Columns of 1, 2, 5, 3, 12, and 2 categories, one with negative non-integer values, so the
+    tables of a node's parent sets have many shapes."""
+    rng = np.random.default_rng(seed)
+    x = np.column_stack([rng.integers(0, k, n) for k in (1, 2, 5, 3, 12, 2)]).astype(np.float64)
+    x[:, 2] = np.where(rng.random(n) < 0.5, x[:, 1], x[:, 2])
+    x[:, 3] = x[:, 3] * 1.7 - 2.5
+    return x
+
+
+def _parent_sets(d: int, node: int, size: int = 3) -> list[tuple[int, ...]]:
+    others = [v for v in range(d) if v != node]
+    return [c for k in range(size + 1) for c in combinations(others, k)]
+
+
+#: The scores whose batched and one-table paths must give the same bits, with the settings the
+#: BDeu prior and the multinomial penalty read.
+SCORES = [
+    pytest.param(lambda x: BDeuScore(x), id="bdeu"),
+    pytest.param(
+        lambda x: BDeuScore(x, equivalent_sample_size=0.5, structure_prior=0.3), id="bdeu-0.5"
+    ),
+    pytest.param(lambda x: BDeuScore(x, equivalent_sample_size=3.7), id="bdeu-3.7"),
+    pytest.param(
+        lambda x: BDeuScore(x, equivalent_sample_size=10.0, structure_prior=0.3), id="bdeu-10"
+    ),
+    pytest.param(lambda x: CategoricalBICScore(x), id="discrete_bic"),
+    pytest.param(lambda x: CategoricalBICScore(x, penalty_discount=2.5), id="discrete_bic-2.5"),
+]
+
+
+def _exact(values) -> list[str]:
+    """Each value's exact bits, as the hex of the float."""
+    return [float(v).hex() for v in values]
+
+
+@pytest.mark.parametrize("make", SCORES)
+def test_a_score_is_the_same_alone_or_in_a_batch(make):
+    """Every way to ask for a set's score gives the same bits: alone, in one batch, in batches of
+    several sizes with duplicates, sets in any order, and some already memoized."""
+    x = _mixed_tables()
+    for node in range(x.shape[1]):
+        sets = _parent_sets(x.shape[1], node)
+        alone = _exact(make(x).score(node, s) for s in sets)  # each set on a fresh score
+        assert _exact(make(x).score_many(node, sets)) == alone
+        rng = np.random.default_rng(node)
+        for size in (1, 2, 3, 7):
+            scorer = make(x)
+            for s in sets[::4]:
+                scorer.score(node, s)
+            got = {}
+            order = rng.permutation(len(sets))
+            for start in range(0, len(order), size):
+                batch = [sets[i] for i in order[start : start + size]]
+                batch = [tuple(reversed(s)) for s in (*batch, batch[0])]
+                for s, value in zip(batch, scorer.score_many(node, batch), strict=True):
+                    got[tuple(sorted(s))] = value
+            assert _exact(got[s] for s in sets) == alone
+        # One set not yet memoized: a batch of one table.
+        scorer = make(x)
+        scorer.score_many(node, sets[:-1])
+        assert _exact(scorer.score_many(node, sets)) == alone
+
+
+@pytest.mark.parametrize("cells", [1 << 22, 300, 1], ids=["one chunk", "chunks", "one table"])
+@pytest.mark.parametrize("dense_min", [1 << 16, 0], ids=["dense", "numbered"])
+@pytest.mark.parametrize("make", SCORES)
+def test_a_batch_scores_the_tables_of_the_configurations_numbering(
+    monkeypatch, make, dense_min, cells
+):
+    """A batch scores each set as :meth:`_local` scores the table :func:`configurations` numbers,
+    whether the tables are scored together, in chunks, or one by one."""
+    monkeypatch.setattr(categorical, "BATCH_CELLS", cells)
+    monkeypatch.setattr(categorical, "DENSE_MIN", dense_min)
+    monkeypatch.setattr(categorical, "DENSE_ROWS", 4 if dense_min else 0)
+    x = _mixed_tables()
+    codes, cards = categorical.encode(x)
+    scorer = make(x)
+    for node in range(x.shape[1]):
+        sets = _parent_sets(x.shape[1], node)
+        expected = [
+            scorer._local(node, s, _counts_by_configurations(codes, cards, node, s)) for s in sets
+        ]
+        assert _exact(make(x).score_many(node, sets)) == _exact(expected)
+
+
+def test_a_bdeu_batch_takes_the_log_gamma_of_at_most_batch_cells_at_a_time(monkeypatch):
+    """The ``gammaln`` calls of a batch hold the tables of a chunk, not of the whole batch, and a
+    table larger than the chunk is scored alone."""
+    sizes: list[int] = []
+    real = score_module.gammaln
+    monkeypatch.setattr(score_module, "gammaln", lambda v: (sizes.append(np.size(v)), real(v))[1])
+    monkeypatch.setattr(categorical, "BATCH_CELLS", 200)
+    x = _mixed_tables()
+    sets = _parent_sets(x.shape[1], 0)
+    scorer = BDeuScore(x)
+    codes, cards = categorical.encode(x)
+    largest = max(_counts_by_configurations(codes, cards, 0, s).size for s in sets)
+    got = scorer.score_many(0, sets)
+    assert len(sizes) > 4  # several chunks, each with its calls
+    assert max(sizes) <= max(200, largest)
+    monkeypatch.undo()
+    assert _exact(got) == _exact(BDeuScore(x).score_many(0, sets))
+
+
+def test_codes_in_either_layout_are_the_same_codes():
+    """``encode`` numbers the categories alike in either layout, and ``order="F"`` stores each
+    column contiguously."""
+    x = _mixed_tables()
+    by_rows, cards = categorical.encode(x)
+    by_columns, same_cards = categorical.encode(x, order="F")
+    np.testing.assert_array_equal(by_rows, by_columns)
+    np.testing.assert_array_equal(cards, same_cards)
+    assert by_columns.dtype == by_rows.dtype
+    assert by_columns.flags["F_CONTIGUOUS"]
+
+
+@pytest.mark.parametrize("make", SCORES)
+def test_a_count_score_holds_one_copy_of_the_codes_while_it_is_built(make):
+    """Building a score allocates its codes once, not as a row-major matrix and then a copy."""
+    n, d = 20000, 20
+    x = np.random.default_rng(0).integers(0, 4, (n, d)).astype(np.float64)
+    tracemalloc.start()
+    try:
+        make(x)
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+    assert peak < 1.6 * 8 * n * d  # a second copy of the codes would reach 2
+
+
+@pytest.mark.parametrize("make", SCORES)
+def test_on_rows_scores_the_rows_with_the_categories_of_all_rows(make):
+    """``on_rows`` by a mask or by indices scores the selected rows over the categories of all
+    rows, and selecting every row gives the score's own values."""
+    x = _mixed_tables()
+    codes, cards = categorical.encode(x)
+    rng = np.random.default_rng(1)
+    mask = rng.random(len(x)) < 0.7
+    mask[:2] = True
+    whole = make(x)
+    for rows in (mask, np.flatnonzero(mask)[::-1].copy(), np.ones(len(x), dtype=bool)):
+        selected = whole.on_rows(rows)
+        for node in range(x.shape[1]):
+            sets = _parent_sets(x.shape[1], node)
+            expected = [
+                whole._local(node, s, _counts_by_configurations(codes[rows], cards, node, s))
+                for s in sets
+            ]
+            assert _exact(selected.score_many(node, sets)) == _exact(expected)
+            assert _exact(selected.score(node, s) for s in sets) == _exact(expected)
+    with pytest.raises(IndexError):
+        whole.on_rows(mask[:-1])
+    everything = whole.on_rows(np.ones(len(x), dtype=bool))
+    for node in range(x.shape[1]):
+        sets = _parent_sets(x.shape[1], node)
+        assert _exact(everything.score_many(node, sets)) == _exact(whole.score_many(node, sets))
 
 
 def test_a_cell_mean_matches_the_hypergeometric_sum_on_both_sides_of_the_expansion():
