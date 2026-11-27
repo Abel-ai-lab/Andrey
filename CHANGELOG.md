@@ -59,6 +59,12 @@ names its pull request.
   authors' code does. For contributors, `DEVELOPMENT.md` and `CONTRIBUTING.md` give the pytest flags
   CI runs, `-n logical --dist loadfile`, and the `calm` required-edge cell of the concepts test and
   one drawing test skip when torch or pygraphviz is missing. ([#1247])
+- The `missing` concept gives each method that refuses the argument its own reason, from what its
+  fit reads, where twenty shared one. `anm`, `pnl`, `loci`, and `skewd` say that a gap in one column
+  that depends on the other selects the rows on the effect, so their direction is evidence under
+  values missing completely at random. `markov_check` says that `rows_per_test` counts the rows
+  each test draws before deletion and when a rejection or a pass says little about the graph.
+  ([#1256])
 
 ### Fixed
 
@@ -3009,3 +3015,4 @@ First alpha release.
 [#1243]: https://github.com/Abel-ai-lab/Andrey/pull/1243
 [#1245]: https://github.com/Abel-ai-lab/Andrey/pull/1245
 [#1247]: https://github.com/Abel-ai-lab/Andrey/pull/1247
+[#1256]: https://github.com/Abel-ai-lab/Andrey/pull/1256
