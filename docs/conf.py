@@ -627,7 +627,6 @@ METHOD_LISTS = {
     "missing": lambda s: s.data.missing,
     "em": lambda s: _takes(s, "missing", "em"),
     "em_supported": lambda s: s.name in EM_SUPPORTED,
-    "em_experimental": lambda s: _takes(s, "missing", "em") and s.name not in EM_SUPPORTED,
     # The rows of the concepts guide's table, by the assumptions and the graph returned.
     "class_cpdag": lambda s: (
         s.output.graph_kind in ("cpdag", "undirected")
