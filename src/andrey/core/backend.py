@@ -427,6 +427,8 @@ def select(
         # checks liveness first so the *decision* to stay on numpy never imports anything.
         if b in ("cuda", "mps") and not amortized and not _is_live(b):
             continue
+        if b == "cuda" and "torch" not in sys.modules and _torch_is_cpu_build():
+            continue  # a CPU build has no CUDA device, so the answer needs no torch import
         if not _is_available(b):
             continue
         return _record_dispatch(op, b)
@@ -704,6 +706,16 @@ def _torch_gpu_build() -> bool:
     except Exception:  # noqa: BLE001 - an unknown build is checked by importing torch
         return True
     return getattr(module, "cuda", True) is not None or getattr(module, "hip", True) is not None
+
+
+@lru_cache(maxsize=1)
+def _torch_is_cpu_build() -> bool:
+    """Whether torch is installed and was built for neither CUDA nor ROCm, read once per process.
+
+    Reads the answer from ``torch/version.py`` without importing torch, so the automatic choice
+    of a device can rule out CUDA on a CPU build before any import.
+    """
+    return _installed("torch") and not _torch_gpu_build()
 
 
 def describe() -> Backend:

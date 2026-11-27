@@ -168,6 +168,14 @@ names its pull request.
 - `pcmci` and `pcmciplus` on data with missing values stop the scan that picks each candidate's
   conditions once it has the ones the PC1 rounds keep, so they run faster on tens of variables,
   with the same output bit for bit. ([#1315])
+- A process that imports Andrey starts a fit sooner, with the same output bit for bit: `scipy.stats`
+  and the basis cache of the functional causal models are imported where they are used, a table is
+  read as a DataFrame only once pandas is imported, so a fit on an array never imports it, and the
+  forkserver preloads the method registry that a worker's first fit reads, so a bootstrap on worker
+  processes starts its workers sooner. With a CPU build of torch, the automatic backend choice
+  rules CUDA out from the build's version file, so a `direct_lingam` fit and a fit with
+  `indep_test="kci"` or `indep_test="cmiknn"` that stay on NumPy no longer import torch. A torch
+  already imported is asked, and so is a `cuda` pin. ([#1314])
 - `iamb`, `inter_iamb`, and `mmpc` with a list of `target` on data with missing values answer every
   target with one search, so a run that several targets share is made once, and each result counts
   the rows of the runs its target reads, as a call for that target alone counts them. These lists
@@ -3148,5 +3156,6 @@ First alpha release.
 [#1306]: https://github.com/Abel-ai-lab/Andrey/pull/1306
 [#1307]: https://github.com/Abel-ai-lab/Andrey/pull/1307
 [#1311]: https://github.com/Abel-ai-lab/Andrey/pull/1311
+[#1314]: https://github.com/Abel-ai-lab/Andrey/pull/1314
 [#1315]: https://github.com/Abel-ai-lab/Andrey/pull/1315
 [#1317]: https://github.com/Abel-ai-lab/Andrey/pull/1317
