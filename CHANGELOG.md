@@ -143,6 +143,12 @@ names its pull request.
   test, ask the test-wise deletion test for each grow scan at once and read its p-values as one
   array, so these searches run faster on tens of variables, with the same output bit for bit.
   ([#1299])
+- `iamb` and `inter_iamb` on data with missing values and `chisq` or `gsq` code each column once and
+  answer each grow scan against one conditioning set together, reading its p-values as one array,
+  so these searches run faster on tens of variables, with the same output bit for bit.
+  `ChiSquare.from_codes` builds the test over encoded data, and `make_indep_test` with `chisq` or
+  `gsq` on data with missing values raises for an unknown `degrees_of_freedom` when it builds the
+  test, not at its first query. ([#1307])
 
 ### Fixed
 
@@ -3114,3 +3120,4 @@ First alpha release.
 [#1296]: https://github.com/Abel-ai-lab/Andrey/pull/1296
 [#1298]: https://github.com/Abel-ai-lab/Andrey/pull/1298
 [#1299]: https://github.com/Abel-ai-lab/Andrey/pull/1299
+[#1307]: https://github.com/Abel-ai-lab/Andrey/pull/1307
