@@ -1302,9 +1302,13 @@ _CONCEPTS = (
                 "lges",
             ),
             *_exempt(
+                "Its regressions on the other variables, and the tests of their smooth terms, "
+                "read every row of every variable.",
+                "cam",
+            ),
+            *_exempt(
                 "Its regressions, and the tests of their residuals, read every row of every "
                 "variable.",
-                "cam",
                 "resit",
                 "camuv",
             ),
@@ -1353,8 +1357,8 @@ _CONCEPTS = (
             ),
             *_exempt("Its tests compare clusters of variables over the same rows.", "gin"),
             *_exempt(
-                "Each invariance test regresses the target on a set of the other variables in "
-                "each environment.",
+                "Each invariance test compares the regression of the target on a set of the other "
+                "variables across the environments.",
                 "icp",
             ),
             *_exempt(
