@@ -35,7 +35,7 @@ classifiers = [
 dependencies = [
   "numpy>=1.26",
   "scipy>=1.13",
-  "scikit-learn>=1.5",
+  "scikit-learn>=1.9",
   "threadpoolctl>=3",        # single-thread BLAS keeps parallel GES bit-identical
   "statsmodels>=0.14",       # VARMALiNGAM
   "pandas>=2.2",             # andrey.data.load_sachs returns a DataFrame
@@ -46,7 +46,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-torch = ["torch>=2.2"]     # GPU primitives and CALM; the build (CPU/CUDA/ROCm) is picked at install
+torch = ["torch>=2.5"]     # GPU primitives and CALM; the build (CPU/CUDA/ROCm) is picked at install
 viz   = ["matplotlib>=3.7", "pygraphviz>=2"]  # andrey.viz.mpl; Graphviz layouts
 all   = ["andrey-core[torch,viz]"]
 
