@@ -239,3 +239,29 @@ def test_pnl_matches_the_cpu(device):
 
     assert np.array_equal(decisions(got), decisions(cpu))
     assert np.array_equal(decisions(threaded), decisions(cpu))
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_skewd_on_cuda_repeats_and_decides_as_the_cpu(device):
+    """SkewD's CMA-ES searches run in lockstep on cuda: a fit repeats bit for bit with one worker
+    or four, and a clear pair gets the CPU's direction. The device rounds differently from NumPy,
+    so the searches' paths, and the log-likelihoods, differ in their last digits or more."""
+    if device != "cuda":
+        pytest.skip("SkewD has no mps backend")
+    from scipy.stats import skewnorm
+
+    rng = np.random.default_rng(0)
+    x = rng.standard_normal(300)
+    y = np.tanh(2 * x) + x + (0.4 + 0.2 * np.tanh(x)) * skewnorm.rvs(5, size=300, random_state=rng)
+    data = np.column_stack([x, y])
+    kwargs = {"criterion": "likelihood", "tuning_iter": 2, "max_iter": 50, "seed": 0}
+    with andrey.config(backend="numpy"):
+        cpu = andrey.skewd(data, **kwargs)
+    backend._dispatch_counts.clear()
+    with andrey.config(backend=device):
+        got = andrey.skewd(data, **kwargs)
+        with andrey.config(n_jobs=4):
+            threaded = andrey.skewd(data, **kwargs)
+    assert backend.dispatch_stats() == {("skewd", "cuda"): 2}
+    assert threaded.metadata == got.metadata
+    assert got.structure.oriented_edges() == cpu.structure.oriented_edges()

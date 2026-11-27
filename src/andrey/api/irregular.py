@@ -951,7 +951,8 @@ def skewd(
     the direction as often as the code published with the paper, with either criterion, and the
     likelihood criterion, the default, named every pair right; :func:`~andrey.loci` was as accurate
     on every set but the most skewed location-scale one, in a fraction of the time. A pair is slow
-    to fit; ``andrey.config(n_jobs)`` runs its searches on threads, which cuts the wall time.
+    to fit; ``andrey.config(n_jobs)`` runs its searches on threads, and
+    ``andrey.config(backend="cuda")`` on a GPU, which cuts the wall time.
 
     In each direction, the effect given the cause is skew-normal with location ``f``, scale ``g``,
     and one shape ``lambda`` for every row; ``f`` is a cubic B-spline of 12 knots (14 columns) and
@@ -985,9 +986,19 @@ def skewd(
 
     ``n_jobs`` above 1 (``andrey.config`` or ``ANDREY_N_JOBS``) runs the two directions, and the
     searches of each, on that many threads. Each search draws from its own random stream,
-    split from ``seed`` in a fixed order, so the result is the same bit for bit with any number of
-    workers. The fits and the tests run on one BLAS thread with any number of workers, so the
-    result does not depend on the machine's BLAS thread count either.
+    split from ``seed`` in a fixed order, so on NumPy and on a GPU the result is the same bit for
+    bit with any number of workers. The fits and the tests run on one BLAS thread with any number
+    of workers, so the result does not depend on the machine's BLAS thread count either.
+
+    ``backend="cuda"`` (``andrey.config`` or ``ANDREY_BACKEND``) runs the CMA-ES searches of each
+    step together on a GPU with PyTorch, in float64, and ``backend="cpu"`` runs them the same way
+    with PyTorch on the CPU; ``"auto"``, the default, and ``optimizer="lbfgs"`` keep NumPy. Each
+    search keeps its own distribution, random stream, and stop rule, and one batched likelihood
+    scores the candidates of every search in each generation. The GPU favors time, with one
+    worker, as more threads only compete for the device. It gives up bit identity with NumPy: the
+    device rounds differently, so the log-likelihoods differ from NumPy's in their last digits, or
+    more where the rounding moves a chosen penalty; the directions were NumPy's in every case
+    measured.
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits use test-wise
     deletion, keeping rows where both columns are observed; ``metadata["rows_tested"]`` gives their
@@ -1096,10 +1107,10 @@ def _skewd_directions(x: np.ndarray, y: np.ndarray, budget, seed: int):
     from concurrent.futures import ThreadPoolExecutor
 
     from andrey.core import backend
-    from andrey.fcm.skewd import fit, search_pool
+    from andrey.fcm.skewd import fit, search_device, search_pool
 
     workers = backend.worker_count()
-    with search_pool(workers) as run:
+    with search_pool(workers, search_device(budget.optimizer)) as run:
         if workers <= 1:
             return fit(x, y[:, 0], budget, seed, run), fit(y, x[:, 0], budget, seed, run)
         with ThreadPoolExecutor(max_workers=2) as both:

@@ -638,7 +638,11 @@ it to apply) makes it refuse a class that needs more, before it fits any. Both f
 skewed location-scale data and give up time: at the defaults a pair took a median of 15 to 22 CPU
 minutes per set and a graph of 6 or 10 variables 18 to 49, by the size, the CPU, and the seeds,
 where LOCI and CAM take a median under a second. `andrey.config(n_jobs)` runs their searches on that
-many threads with the same result bit for bit, which cuts the wall time. `optimizer="lbfgs"` runs
+many threads with the same result bit for bit, which cuts the wall time.
+`andrey.config(backend="cuda")` runs their CMA-ES searches together on a GPU, in float64: it favors
+time, with one worker, as more workers only compete for the GPU, and gives up bit identity with
+NumPy, as the log-likelihoods differ in their last digits or more, while the decisions were the
+same in every case we measured. `optimizer="lbfgs"` runs
 each search with L-BFGS-B and the analytic gradient instead of the paper's CMA-ES: on the paper's
 simulations it decided worse in no setting by a paired bootstrap, at a median of 5.8 to 14.9 times
 less time per pair and 2.4 times less per graph, and its penalized likelihood was lower in 306 of

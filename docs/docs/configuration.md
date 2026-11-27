@@ -37,9 +37,16 @@ setting wins:
 - `ANDREY_DEVICE`: another name for `ANDREY_BACKEND`; if you set both, `ANDREY_BACKEND` takes
   precedence, but both values must be valid.
 
-A GPU speeds up covariance, correlation, entropy, the KCI and CMIknn tests, and the independence
-tests of `pnl`. GES, hill climbing, and the other searches run on the CPU. An operation without the
-requested backend uses `auto`, without a warning.
+A GPU speeds up covariance, correlation, entropy, the KCI and CMIknn tests, the independence tests
+of `pnl`, and, when you set `cuda`, the CMA-ES searches of `skewd` and `skewd_mv`. GES, hill
+climbing, and the other searches run on the CPU. An operation without the requested backend uses
+`auto`, without a warning.
+
+SkewD's searches on `cuda` favor time, with one worker, as more workers only compete for the GPU.
+They give up bit identity with NumPy: the GPU rounds differently, so the log-likelihoods differ from
+NumPy's in their last digits, or more where the rounding moves a chosen penalty; the decisions were
+the same in every case we measured. `cpu` runs the same searches with PyTorch on the CPU, and
+`optimizer="lbfgs"` keeps them on NumPy.
 
 ## Parallel search
 
@@ -61,9 +68,9 @@ requested backend uses `auto`, without a warning.
   float64 matrices; when the threads you ask for would hold more than 4 GiB, fewer run, with a
   `PerformanceWarning`. `skewd` runs its two directions and their searches on the threads,
   and `skewd_mv` its conditional models and their searches; every search draws from its own random
-  stream, so the results are the same bit for bit with any number of workers. Unlike `pnl`, both run
-  on one BLAS thread with any number of workers, so their results do not depend on the BLAS thread
-  count either; the limit applies to the whole process while a fit runs.
+  stream, so on NumPy and on a GPU the results are the same bit for bit with any number of workers.
+  Unlike `pnl`, both run on one BLAS thread with any number of workers, so their results do not
+  depend on the BLAS thread count either; the limit applies to the whole process while a fit runs.
 - `ANDREY_GES_PARALLEL_MIN_WORK`: a GES pass uses the workers only when it expects to evaluate more
   candidates than this. The default is `10000`; `0` always uses them.
 - `ANDREY_SKELETON_PARALLEL_MIN_WORK`: a conditioning-size pass of the skeleton search of PC, FCI,
@@ -163,7 +170,8 @@ columns, is summed over every row; this bounds the rounding, which no speed sett
   by default. A threshold you set wins.
 
 Under `auto`, an operation that runs once per fit uses the GPU only when PyTorch and the device are
-already running in the process, so a CPU fit never pays to start a GPU.
+already running in the process, so a CPU fit never pays to start a GPU. The searches of `skewd` and
+`skewd_mv` have no threshold: `auto` keeps them on NumPy, and only `cuda` or `cpu` moves them.
 `andrey.core.backend.dispatch_stats()` counts which backend each operation ran on.
 
 ## Reproducibility

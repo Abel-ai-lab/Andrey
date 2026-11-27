@@ -121,9 +121,9 @@ work that cannot change the result, and uses GPU code where that helps.
 
 No. The default install uses NumPy on the CPU. The `torch` extra adds a PyTorch backend, which
 CALM needs. A CUDA GPU speeds up covariance and correlation, the entropy terms of DirectLiNGAM and
-the methods built on it, the KCI and CMIknn tests, and the tests of PNL;
-[Configuration](configuration.md#gpu-dispatch) says when each moves. Apple GPUs are not supported
-in the alpha.
+the methods built on it, the KCI and CMIknn tests, the tests of PNL, and, when you ask for it, the
+searches of SkewD; [Configuration](configuration.md#gpu-dispatch) says when each moves. Apple GPUs
+are not supported in the alpha.
 
 ### What do the optional extras add?
 

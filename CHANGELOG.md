@@ -17,6 +17,15 @@ names its pull request.
   `[scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]` replaces
   `generate(Ensemble(scms=scms, seeds=range(10), n=500))`. ([#1221])
 
+### Added
+
+- `skewd` and `skewd_mv` run their CMA-ES searches on a GPU with `andrey.config(backend="cuda")`,
+  or with PyTorch on the CPU with `backend="cpu"`; the paper's CMA-ES is unchanged, and `"auto"`
+  and `optimizer="lbfgs"` keep NumPy. A `cuda` or `cpu` pin set for other operations now moves
+  these searches too. The GPU favors time, with one worker, as more workers only compete for it; it
+  gives up bit identity with NumPy, as the log-likelihoods differ in their last digits or more, and
+  the decisions were NumPy's in every case measured. ([#1251])
+
 ### Changed
 
 - Each method's Limitations paragraph says in a few sentences where it does better or worse and
@@ -3009,3 +3018,4 @@ First alpha release.
 [#1243]: https://github.com/Abel-ai-lab/Andrey/pull/1243
 [#1245]: https://github.com/Abel-ai-lab/Andrey/pull/1245
 [#1247]: https://github.com/Abel-ai-lab/Andrey/pull/1247
+[#1251]: https://github.com/Abel-ai-lab/Andrey/pull/1251

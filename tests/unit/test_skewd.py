@@ -23,6 +23,15 @@ SHORT_PAIR = {"tuning_iter": 1, "max_iter": 5}
 SHORT_GRAPH = {**SHORT_PAIR, "indep_test": "fisherz"}
 
 
+@pytest.fixture(autouse=True)
+def default_backend(monkeypatch):
+    """Fit on the default backend whatever ``ANDREY_BACKEND`` or ``ANDREY_DEVICE`` pins: a pinned
+    ``cpu`` or ``cuda`` moves the searches to PyTorch, which the tests of that path ask for in
+    ``andrey.config``."""
+    monkeypatch.delenv("ANDREY_BACKEND", raising=False)
+    monkeypatch.delenv("ANDREY_DEVICE", raising=False)
+
+
 def _marks(d: int, lines=(), arrows=()) -> np.ndarray:
     marks = np.full((d, d), NULL, dtype=np.int8)
     for i, j in lines:
@@ -812,3 +821,94 @@ def test_skewd_mv_gives_the_same_bits_on_any_number_of_workers(optimizer):
     with andrey.config(n_jobs=4):
         reordered = skewd_mv(data[["z", "x", "y"]], **kwargs)
     assert sorted(reordered.structure.oriented_edges()) == sorted(first.structure.oriented_edges())
+
+
+def _fold_searches(parents: int, candidates: int) -> list:
+    rng = np.random.default_rng(6)
+    x = rng.standard_normal((150, parents))
+    y = np.tanh(x).sum(axis=1) + skewnorm.rvs(4, size=150, random_state=rng)
+    x, y = (x - x.mean(axis=0)) / x.std(axis=0), (y - y.mean()) / y.std()
+    design = native._design(x, 6)
+    rows = [np.sort(rng.choice(150, size=size, replace=False)) for size in (120, 120, 125)]
+    return [
+        search
+        for log_penalties in rng.uniform(-4, 4, size=(candidates, 2 * parents))
+        for train in rows
+        for search in native._searches(design, train, y, log_penalties, [], rng, "cmaes")
+    ]
+
+
+def test_only_a_pinned_torch_backend_moves_the_searches_off_numpy():
+    pytest.importorskip("torch")
+    assert native.search_device("cmaes") == "numpy"  # auto keeps the NumPy path
+    with andrey.config(backend="cpu"):
+        assert native.search_device("cmaes") == "cpu"
+        assert native.search_device("lbfgs") == "numpy"
+
+
+@pytest.mark.parametrize("parents", [1, 2])
+def test_the_batched_objective_is_the_penalized_likelihood(parents):
+    torch = pytest.importorskip("torch")
+    search = _fold_searches(parents, 1)[0]
+    rng = np.random.default_rng(2)
+    theta = search.start + 3 * rng.standard_normal((60, search.start.size))
+    theta[:5, :-1] = 1e200 * (-1.0) ** np.arange(theta.shape[1] - 1)  # overflows: infinite
+    theta = np.clip(theta, search.lower, search.upper)
+    location, scale = search.design.location[search.rows], search.design.scale[search.rows]
+    effect = search.effect[search.rows]
+    k = theta.shape[1] - 1 - scale.shape[1]
+    frame = search.frame
+    raw = theta if frame is None else np.hstack([theta[:, :k] @ frame.T, theta[:, k:]])
+    expected = native._penalized_nll(raw, location, scale, effect, search.k_alpha, search.m_kappa)
+
+    def put(a):
+        return torch.as_tensor(np.ascontiguousarray(a), dtype=torch.float64)[None]
+
+    got = native._batched_penalized_nll(
+        put(theta),
+        put(location),
+        put(scale),
+        put(effect),
+        put(search.k_alpha),
+        put(search.m_kappa),
+        None if frame is None else put(frame)[0],
+    )[0].numpy()
+    assert np.array_equal(np.isinf(got), np.isinf(expected)) and np.isinf(expected[:5]).all()
+    np.testing.assert_allclose(got, expected, rtol=1e-12)
+
+
+@pytest.mark.parametrize("parents", [1, 2])
+def test_lockstep_searches_follow_the_serial_searches_up_to_rounding(monkeypatch, parents):
+    # Folds of two sizes form two groups; each search keeps its own stream and stop rule, so over
+    # a short horizon the device's rounding leaves the searches where the serial ones end.
+    pytest.importorskip("torch")
+    monkeypatch.setattr(native, "GENERATIONS", 40)
+    searches = _fold_searches(parents, 2)
+
+    def fresh():
+        import dataclasses
+
+        streams = np.random.default_rng(9).spawn(len(searches))
+        return [dataclasses.replace(s, stream=r) for s, r in zip(searches, streams, strict=True)]
+
+    serial = native._serial(fresh())
+    lockstep = native._lockstep(fresh(), "cpu")
+    for (theta, value), (theta_dev, value_dev) in zip(serial, lockstep, strict=True):
+        assert value_dev == pytest.approx(value, rel=1e-9)
+        np.testing.assert_allclose(theta_dev, theta, rtol=1e-6, atol=1e-8)
+
+
+def test_a_fit_on_the_torch_path_repeats_and_reads_the_torch_device():
+    pytest.importorskip("torch")
+    from andrey.core import backend
+
+    data = pd.DataFrame(_pair(), columns=["x", "y"])
+    with andrey.config(backend="cpu"):
+        before = backend.dispatch_stats().get(("skewd", "cpu"), 0)
+        first = skewd(data, **SHORT_PAIR)
+        again = skewd(data, **SHORT_PAIR)
+        with andrey.config(n_jobs=4):
+            threaded = skewd(data, **SHORT_PAIR)
+        assert backend.dispatch_stats().get(("skewd", "cpu"), 0) == before + 3
+    assert again.metadata == first.metadata
+    assert threaded.metadata == first.metadata
