@@ -61,6 +61,9 @@ names its pull request.
   one drawing test skip when torch or pygraphviz is missing. ([#1247])
 - The 0.3.0 post's method table lists GIES, exact search, and CALM as supported, as they have
   been since 0.7.0, and an update note points to the 0.7.0 release card. ([#1254])
+- On the website, the AI statement that ends each blog post and release card has its own container:
+  a left rule in the accent color on a faint accent tint, with its label in small uppercase above
+  the text. The label underlines under the pointer and under keyboard focus. ([#1267])
 
 ### Fixed
 
@@ -3012,3 +3015,4 @@ First alpha release.
 [#1245]: https://github.com/Abel-ai-lab/Andrey/pull/1245
 [#1247]: https://github.com/Abel-ai-lab/Andrey/pull/1247
 [#1254]: https://github.com/Abel-ai-lab/Andrey/pull/1254
+[#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
