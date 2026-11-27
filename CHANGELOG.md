@@ -135,6 +135,8 @@ names its pull request.
   test, ask the test-wise deletion test for each grow scan at once and read its p-values as one
   array, so these searches run faster on tens of variables, with the same output bit for bit.
   ([#1299])
+- `camuv` keeps each residual its sink tests fit, so it repeats no regression and runs a little
+  faster, with the same output bit for bit. ([#1306])
 
 ### Fixed
 
@@ -3105,3 +3107,4 @@ First alpha release.
 [#1296]: https://github.com/Abel-ai-lab/Andrey/pull/1296
 [#1298]: https://github.com/Abel-ai-lab/Andrey/pull/1298
 [#1299]: https://github.com/Abel-ai-lab/Andrey/pull/1299
+[#1306]: https://github.com/Abel-ai-lab/Andrey/pull/1306
