@@ -69,9 +69,15 @@ reaches it. The accent and amber color no code.
 
 A box on the website takes the docs index's cards' style: a `surface` fill, a 1px `line` border,
 the radius tokens (`--andrey-radius-sm`, `-md`, `-lg`), and no shadow; under the pointer its border
-turns `accent`. The cards, the Back to top button, the AI statement, notes, the color-mode menu and
-the header's tooltips, badges, and the search page's field follow it, and a notebook's code cell is
-a plain code block. A keyboard focus ring is a 2px `accent` outline just outside the element.
+turns `accent`. The cards, the Back to top button, notes, the color-mode menu and the header's
+tooltips, badges, and the search page's field follow it, and a notebook's code cell is a plain code
+block. A keyboard focus ring is a 2px `accent` outline just outside the element.
+
+The AI statement that ends a blog post and a release card has its own container: a 3px `accent`
+rule on its left, over a faint `accent` tint (6% of `accent` mixed into `surface`), with the 1px
+`line` border and the `--andrey-radius-md` radius on its other sides. Its text is `muted`, and its
+"AI statement." label, a link to the AI policy, sits above the text in small uppercase and
+underlines under the pointer and under keyboard focus.
 
 ### Art
 
