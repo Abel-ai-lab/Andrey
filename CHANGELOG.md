@@ -59,6 +59,10 @@ names its pull request.
   authors' code does. For contributors, `DEVELOPMENT.md` and `CONTRIBUTING.md` give the pytest flags
   CI runs, `-n logical --dist loadfile`, and the `calm` required-edge cell of the concepts test and
   one drawing test skip when torch or pygraphviz is missing. ([#1247])
+- For contributors, SkewD's tests of a property that holds for every optimizer run on L-BFGS-B in
+  pull requests, and their CMA-ES cases, with the CMA-ES recovery tests, carry the `release` mark, so
+  the unit tests of `tests/unit/test_skewd.py` take 140 s on one core instead of 625 s, and the macOS
+  unit job skips the `release` cases on a pull request into a release or topic branch. ([#1257])
 
 ### Fixed
 
@@ -3009,3 +3013,4 @@ First alpha release.
 [#1243]: https://github.com/Abel-ai-lab/Andrey/pull/1243
 [#1245]: https://github.com/Abel-ai-lab/Andrey/pull/1245
 [#1247]: https://github.com/Abel-ai-lab/Andrey/pull/1247
+[#1257]: https://github.com/Abel-ai-lab/Andrey/pull/1257
