@@ -216,6 +216,13 @@ names its pull request.
   each cross-validation fold grows only through the round where its early stop cuts it, and the
   repeated input checks of the many small fits are skipped, so the methods that take them as
   `indep_test` run faster, with the same output bit for bit. ([#1309])
+- `indep_test="kci"` runs faster: a query keeps the kernel of its first variable with the
+  conditioning set for the queries that share it, as it kept the second variable's, and the
+  skeleton searches of `pc`, `fci`, and the methods built on them evaluate a stack of queries one
+  conditioning set at a time, so each matrix is built once for the stack. A p-value is the same bit
+  for bit on one BLAS thread, which the skeleton scans use on fewer than 2,000 rows; `gfci`,
+  `boss_fci`, and `grasp_fci` also query the test outside that pin to derive separating sets, and
+  there a p-value can differ in its last digits. ([#1337])
 
 ### Fixed
 
@@ -3202,3 +3209,4 @@ First alpha release.
 [#1327]: https://github.com/Abel-ai-lab/Andrey/pull/1327
 [#1329]: https://github.com/Abel-ai-lab/Andrey/pull/1329
 [#1331]: https://github.com/Abel-ai-lab/Andrey/pull/1331
+[#1337]: https://github.com/Abel-ai-lab/Andrey/pull/1337
